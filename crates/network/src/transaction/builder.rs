@@ -300,14 +300,6 @@ pub trait TransactionBuilder: Default + Sized + Send + Sync + 'static {
     {
         f(self)
     }
-
-    /// True if the builder contains all necessary information to be submitted
-    /// to the `eth_sendTransaction` endpoint.
-    fn can_submit(&self) -> bool;
-
-    /// True if the builder contains all necessary information to be built into
-    /// a valid transaction.
-    fn can_build(&self) -> bool;
 }
 
 /// Network-specific transaction builder.
@@ -316,6 +308,14 @@ pub trait TransactionBuilder: Default + Sized + Send + Sync + 'static {
 /// and [`build`](Self::build) methods.
 #[doc(alias = "NetworkTxBuilder")]
 pub trait NetworkTransactionBuilder<N: Network>: TransactionBuilder {
+    /// True if the builder contains all necessary information to be submitted
+    /// to the `eth_sendTransaction` endpoint.
+    fn can_submit(&self) -> bool;
+
+    /// True if the builder contains all necessary information to be built into
+    /// a valid transaction.
+    fn can_build(&self) -> bool;
+
     /// Check if all necessary keys are present to build the specified type,
     /// returning a list of missing keys.
     fn complete_type(&self, ty: N::TxType) -> Result<(), Vec<&'static str>>;

@@ -109,7 +109,9 @@ impl TransactionBuilder for WithOtherFields<TransactionRequest> {
     fn set_access_list(&mut self, access_list: AccessList) {
         self.deref_mut().set_access_list(access_list)
     }
+}
 
+impl NetworkTransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn can_submit(&self) -> bool {
         self.deref().can_submit()
     }
@@ -117,9 +119,7 @@ impl TransactionBuilder for WithOtherFields<TransactionRequest> {
     fn can_build(&self) -> bool {
         self.deref().can_build()
     }
-}
 
-impl NetworkTransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
         self.deref().complete_type(ty.try_into().map_err(|_| vec!["unsupported_transaction_type"])?)
     }
