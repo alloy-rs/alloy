@@ -435,6 +435,13 @@ impl From<AnyRpcTransaction> for Recovered<AnyTxEnvelope> {
     }
 }
 
+impl From<AnyRpcTransaction> for WithOtherFields<TransactionRequest> {
+    fn from(tx: AnyRpcTransaction) -> Self {
+        let req: TransactionRequest = tx.0.inner.into_recovered().into();
+        Self::new(req)
+    }
+}
+
 impl TryFrom<AnyRpcTransaction> for TxEnvelope {
     type Error = ValueError<AnyTxEnvelope>;
 
