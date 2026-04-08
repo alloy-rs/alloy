@@ -1,4 +1,21 @@
 //! JWT (JSON Web Token) utilities for the Engine API.
+//!
+//! # Feature flags
+//!
+//! This module is gated behind the `jwt` feature, which is **not enabled by default**.
+//! Enabling `jwt` alone is not sufficient to build this crate: the underlying
+//! [`jsonwebtoken`] crate requires a cryptographic backend, and this crate does not
+//! select one for you. You must opt in to a backend explicitly via one of:
+//!
+//! - `jwt-aws-lc-rs` — enables `jwt` together with `jsonwebtoken/aws_lc_rs` (recommended
+//!   for most platforms; uses [aws-lc-rs](https://github.com/aws/aws-lc-rs)).
+//! - Enabling `jsonwebtoken/rust_crypto` (or the individual `hmac` + `sha2` features) from your own
+//!   `Cargo.toml` if you prefer the pure-Rust backend.
+//!
+//! Building with just `jwt` and no backend will fail to link the HS256 implementation
+//! used by [`JwtSecret::validate`] and [`JwtSecret::encode`]. This is intentional so
+//! downstream crates can choose the backend that fits their target and licensing
+//! constraints rather than inheriting one transitively.
 
 use alloc::string::String;
 use alloy_primitives::hex;
@@ -227,6 +244,15 @@ impl JwtSecret {
     /// - The JWT `exp` (expiration time) claim is validated by default if defined.
     ///
     /// See also: [JWT Claims - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#jwt-claims)
+    ///
+    /// # Crypto backend
+    ///
+    /// HS256 verification is performed by [`jsonwebtoken`], which requires a cryptographic
+    /// backend to be selected at build time. This crate does not pick one for you; enable
+    /// either the `jwt-aws-lc-rs` feature on this crate, or one of `jsonwebtoken`'s own
+    /// backend features (`aws_lc_rs`, `rust_crypto`, or `hmac` + `sha2`) from your
+    /// `Cargo.toml`. Without a backend selected the crate will fail to build. See the
+    /// [module-level docs](self) for details.
     #[cfg(feature = "serde")]
     pub fn validate(&self, jwt: &str) -> Result<(), JwtError> {
         // Create a new validation object with the required signature algorithm
