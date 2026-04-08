@@ -1,5 +1,5 @@
 use crate::{
-    block::HeaderInfo,
+    block::{HeaderInfo, HeaderRoots},
     constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH},
     Block, BlockBody,
 };
@@ -167,7 +167,7 @@ impl Default for Header {
 
 impl Sealable for Header {
     fn hash_slow(&self) -> B256 {
-        self.hash_slow()
+        Self::hash_slow(self)
     }
 }
 
@@ -184,6 +184,17 @@ impl Header {
         let mut out = Vec::<u8>::new();
         self.encode(&mut out);
         keccak256(&out)
+    }
+
+    /// Decodes the RLP-encoded header and computes the hash from the raw RLP bytes.
+    ///
+    /// This is more efficient than decoding and then re-encoding to compute the hash,
+    /// as it reuses the original RLP bytes for hashing.
+    pub fn decode_sealed(buf: &mut &[u8]) -> alloy_rlp::Result<Sealed<Self>> {
+        let start = *buf;
+        let header = Self::decode(buf)?;
+        let hash = keccak256(&start[..start.len() - buf.len()]);
+        Ok(header.seal_unchecked(hash))
     }
 
     /// Check if the ommers hash equals to empty hash list.
@@ -227,7 +238,7 @@ impl Header {
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
-    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    /// Returns `None` if `excess_blob_gas`, `blob_gas_used`, or `base_fee_per_gas` is not set.
     pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
         Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas?,
@@ -466,50 +477,15 @@ impl Decodable for Header {
     }
 }
 
-/// Generates a header which is valid __with respect to past and future forks__. This means, for
-/// example, that if the withdrawals root is present, the base fee per gas is also present.
-///
-/// If blob gas used were present, then the excess blob gas and parent beacon block root are also
-/// present. In this example, the withdrawals root would also be present.
-///
-/// This __does not, and should not guarantee__ that the header is valid with respect to __anything
-/// else__.
-#[cfg(any(test, feature = "arbitrary"))]
-pub(crate) const fn generate_valid_header(
-    mut header: Header,
-    eip_4844_active: bool,
-    blob_gas_used: u64,
-    excess_blob_gas: u64,
-    parent_beacon_block_root: B256,
-) -> Header {
-    // Clear all related fields if EIP-1559 is inactive
-    if header.base_fee_per_gas.is_none() {
-        header.withdrawals_root = None;
-    }
-
-    // Set fields based on EIP-4844 being active
-    if eip_4844_active {
-        header.blob_gas_used = Some(blob_gas_used);
-        header.excess_blob_gas = Some(excess_blob_gas);
-        header.parent_beacon_block_root = Some(parent_beacon_block_root);
-    } else {
-        header.blob_gas_used = None;
-        header.excess_blob_gas = None;
-        header.parent_beacon_block_root = None;
-    }
-
-    // Placeholder for future EIP adjustments
-    header.requests_hash = None;
-
-    header
-}
-
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for Header {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // Generate an arbitrary header, passing it to the generate_valid_header function to make
-        // sure it is valid _with respect to hardforks only_.
-        let base = Self {
+        let is_prague = u.arbitrary::<bool>()?;
+        let is_cancun = is_prague || u.arbitrary::<bool>()?;
+        let is_shanghai = is_cancun || u.arbitrary::<bool>()?;
+        let is_london = is_shanghai || u.arbitrary::<bool>()?;
+
+        Ok(Self {
             parent_hash: u.arbitrary()?,
             ommers_hash: u.arbitrary()?,
             beneficiary: u.arbitrary()?,
@@ -525,21 +501,13 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             extra_data: u.arbitrary()?,
             mix_hash: u.arbitrary()?,
             nonce: u.arbitrary()?,
-            base_fee_per_gas: u.arbitrary()?,
-            blob_gas_used: u.arbitrary()?,
-            excess_blob_gas: u.arbitrary()?,
-            parent_beacon_block_root: u.arbitrary()?,
-            requests_hash: u.arbitrary()?,
-            withdrawals_root: u.arbitrary()?,
-        };
-
-        Ok(generate_valid_header(
-            base,
-            u.arbitrary()?,
-            u.arbitrary()?,
-            u.arbitrary()?,
-            u.arbitrary()?,
-        ))
+            base_fee_per_gas: if is_london { Some(u.arbitrary()?) } else { None },
+            withdrawals_root: if is_shanghai { Some(u.arbitrary()?) } else { None },
+            blob_gas_used: if is_cancun { Some(u.arbitrary()?) } else { None },
+            excess_blob_gas: if is_cancun { Some(u.arbitrary()?) } else { None },
+            parent_beacon_block_root: if is_cancun { Some(u.arbitrary()?) } else { None },
+            requests_hash: if is_prague { Some(u.arbitrary()?) } else { None },
+        })
     }
 }
 
@@ -558,6 +526,18 @@ pub trait BlockHeader {
             blob_gas_used: self.blob_gas_used(),
             difficulty: self.difficulty(),
             mix_hash: self.mix_hash(),
+        }
+    }
+
+    /// Returns all roots contained in the header.
+    fn header_roots(&self) -> HeaderRoots {
+        HeaderRoots {
+            state_root: self.state_root(),
+            transactions_root: self.transactions_root(),
+            receipts_root: self.receipts_root(),
+            withdrawals_root: self.withdrawals_root(),
+            parent_beacon_block_root: self.parent_beacon_block_root(),
+            logs_bloom: self.logs_bloom(),
         }
     }
 

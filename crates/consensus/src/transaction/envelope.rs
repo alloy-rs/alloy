@@ -9,7 +9,6 @@ use crate::{
 };
 use alloy_eips::{eip2718::Encodable2718, eip7594::Encodable7594};
 use alloy_primitives::{Bytes, Signature, B256};
-use core::fmt::Debug;
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
@@ -1060,7 +1059,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{Recovered, SignableTransaction, SignerRecoverable},
+        transaction::{Recovered, SignableTransaction},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
@@ -1378,7 +1377,7 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
-        let tx = TxEip4844Variant::<BlobTransactionSidecarVariant>::TxEip4844(tx);
+        let tx: TxEip4844Variant = tx.into();
         let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
@@ -1532,7 +1531,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde_roundtrip_eip4844() {
-        let tx = TxEip4844Variant::<BlobTransactionSidecarVariant>::TxEip4844(TxEip4844 {
+        let tx: TxEip4844Variant = TxEip4844 {
             chain_id: 1,
             nonce: 100,
             max_fee_per_gas: 50_000_000_000,
@@ -1547,7 +1546,8 @@ mod tests {
             }]),
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
-        });
+        }
+        .into();
         test_serde_roundtrip(tx);
 
         let tx = TxEip4844Variant::<BlobTransactionSidecarVariant>::TxEip4844WithSidecar(

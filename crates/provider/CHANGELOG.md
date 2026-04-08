@@ -5,6 +5,249 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3](https://github.com/alloy-rs/alloy/releases/tag/v1.8.3) - 2026-03-27
+
+### Miscellaneous Tasks
+
+- Release 1.8.2
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+
+## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
+
+### Bug Fixes
+
+- [provider] Detect EIP-7594 blob sidecars in BlobGasFiller ([#3815](https://github.com/alloy-rs/alloy/issues/3815))
+- [provider] Use pending nonce in CachedNonceManager init ([#3802](https://github.com/alloy-rs/alloy/issues/3802))
+
+### Features
+
+- [provider] Add `watch_headers` to `Provider` trait ([#3800](https://github.com/alloy-rs/alloy/issues/3800))
+
+### Miscellaneous Tasks
+
+- Release 1.8.0
+
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Bug Fixes
+
+- Correct Debug trait name for PendingBlock ([#3738](https://github.com/alloy-rs/alloy/issues/3738))
+
+### Features
+
+- Add `reth_get_block_execution_outcome` to `RethProviderExt` ([#3751](https://github.com/alloy-rs/alloy/issues/3751))
+- [ws] Auto-extract basic auth from URL in WsConnect ([#3728](https://github.com/alloy-rs/alloy/issues/3728))
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
+
+### Refactor
+
+- [provider] Reuse helper functions in block_and_aggregate / try_block_and_aggregate ([#3752](https://github.com/alloy-rs/alloy/issues/3752))
+
+## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-18
+
+### Miscellaneous Tasks
+
+- Release 1.7.3
+- Release 1.7.2
+
+## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
+
+### Miscellaneous Tasks
+
+- Release 1.7.1
+
+## [1.7.0](https://github.com/alloy-rs/alloy/releases/tag/v1.7.0) - 2026-02-17
+
+### Bug Fixes
+
+- Actually retry failed block fetches instead of skipping them ([#3698](https://github.com/alloy-rs/alloy/issues/3698))
+
+### Dependencies
+
+- Remove jsonrpsee dependencies ([#3690](https://github.com/alloy-rs/alloy/issues/3690))
+
+### Features
+
+- [provider] Add get_storage_values for batch storage slot retrieval ([#3692](https://github.com/alloy-rs/alloy/issues/3692))
+- [provider] Add engine_getBlobsV1/V2 to EngineApi trait ([#3670](https://github.com/alloy-rs/alloy/issues/3670))
+
+### Miscellaneous Tasks
+
+- Release 1.7.0
+
+## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
+
+### Miscellaneous Tasks
+
+- Release 1.6.3
+
+## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
+
+### Features
+
+- [provider] Add `with_default_block` to ProviderBuilder ([#3055](https://github.com/alloy-rs/alloy/issues/3055))
+- [provider] Add engine_getPayloadBodiesByHashV2 and engine_getPay… ([#3647](https://github.com/alloy-rs/alloy/issues/3647))
+
+### Miscellaneous Tasks
+
+- Release 1.6.2
+
+### Performance
+
+- [provider] Use get_header instead of get_block in get_block_number_by_id ([#3640](https://github.com/alloy-rs/alloy/issues/3640))
+
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
+
+## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
+
+### Bug Fixes
+
+- Reduce test flakiness for node-bindings and network tests ([#3632](https://github.com/alloy-rs/alloy/issues/3632))
+- Clarify boolean return docs ([#3586](https://github.com/alloy-rs/alloy/issues/3586))
+
+### Features
+
+- [provider] Add EIP-7928 block access list helper methods ([#3637](https://github.com/alloy-rs/alloy/issues/3637))
+- [provider] Add get_header methods ([#3617](https://github.com/alloy-rs/alloy/issues/3617))
+
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
+### Performance
+
+- Avoid cloning Filter in cache `get_logs` ([#3597](https://github.com/alloy-rs/alloy/issues/3597))
+
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Miscellaneous Tasks
+
+- Release 1.5.2
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Features
+
+- [provider] Add new_payload_v4_requests accepting RequestsOrHash ([#3556](https://github.com/alloy-rs/alloy/issues/3556))
+- [engine] Add ExecutionPayloadV4 and ExecutionPayloadEnvelopeV6 types ([#3552](https://github.com/alloy-rs/alloy/issues/3552))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+
+## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
+
+### Features
+
+- Add engine_getPayloadV5 ([#3515](https://github.com/alloy-rs/alloy/issues/3515))
+
+### Miscellaneous Tasks
+
+- Release 1.4.2
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Features
+
+- [provider] Add CacheLayer builder methods ([#3490](https://github.com/alloy-rs/alloy/issues/3490))
+- [provider] Add accessors to FillProvider and NonceFiller ([#3501](https://github.com/alloy-rs/alloy/issues/3501))
+- [engine] Add TestingApi with testing_buildBlockV1 support ([#3511](https://github.com/alloy-rs/alloy/issues/3511))
+- Added  reth provider trait ext ([#3480](https://github.com/alloy-rs/alloy/issues/3480))
+- [provider] Add mapping and mutable accessors to JoinFill ([#3488](https://github.com/alloy-rs/alloy/issues/3488))
+- [alloy-provider] Add methods for creating custom gas estimator for `BlobGasFiller` ([#3489](https://github.com/alloy-rs/alloy/issues/3489))
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+
+### Refactor
+
+- [provider] Use BoxedFut alias in From impl for ProviderCall ([#3492](https://github.com/alloy-rs/alloy/issues/3492))
+
+## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
+
+### Features
+
+- [provider] Add filler getters to FillProvider ([#3485](https://github.com/alloy-rs/alloy/issues/3485))
+- Added custom estimator to blobgasfilter ([#3447](https://github.com/alloy-rs/alloy/issues/3447))
+- [provider] Add balance caching to CacheProvider ([#3453](https://github.com/alloy-rs/alloy/issues/3453))
+- [provider] Add transaction count caching to CacheProvider ([#3448](https://github.com/alloy-rs/alloy/issues/3448))
+
+### Miscellaneous Tasks
+
+- Release 1.4.0
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Bug Fixes
+
+- Update `SidecarBuilder::build` to allow 7594 ([#3428](https://github.com/alloy-rs/alloy/issues/3428))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+### Performance
+
+- [provider] Skip batch calls when client disconnects ([#3440](https://github.com/alloy-rs/alloy/issues/3440))
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Bug Fixes
+
+- Incorrect debug log message in heartbeat transaction watcher ([#3362](https://github.com/alloy-rs/alloy/issues/3362))
+- Don't blow up header maps when using auth ([#3360](https://github.com/alloy-rs/alloy/issues/3360))
+- Resolve clippy and doctest warnings ([#3333](https://github.com/alloy-rs/alloy/issues/3333))
+
+### Dependencies
+
+- [deps] Run cargo shear ([#3405](https://github.com/alloy-rs/alloy/issues/3405))
+
+### Documentation
+
+- [provider] Fix debug trace call option type ([#3318](https://github.com/alloy-rs/alloy/issues/3318))
+- Fix SendableTx::try_into_request documentation ([#3311](https://github.com/alloy-rs/alloy/issues/3311))
+
+### Features
+
+- Allow fusaka sidecars in the tx request ([#3321](https://github.com/alloy-rs/alloy/issues/3321))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+- Aggregate PRs ([#3404](https://github.com/alloy-rs/alloy/issues/3404))
+- Remove redundant clone in provider test ([#3342](https://github.com/alloy-rs/alloy/issues/3342))
+- Rm all deprecations ([#3341](https://github.com/alloy-rs/alloy/issues/3341))
+
+### Other
+
+- Add a layer to alloy-transport-http that allows propagating trace information ([#3367](https://github.com/alloy-rs/alloy/issues/3367))
+
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
 ### Documentation
@@ -18,6 +261,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make BuiltInConnectionString::connect configurable ([#3296](https://github.com/alloy-rs/alloy/issues/3296))
 - [provider] Add `verify_flashbots_signature` function ([#3273](https://github.com/alloy-rs/alloy/issues/3273))
 - [provider] Add `fill_transaction` method to Provider trait ([#3221](https://github.com/alloy-rs/alloy/issues/3221))
+
+### Miscellaneous Tasks
+
+- Release 1.1.3
 
 ### Other
 
@@ -919,12 +1166,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
-### Miscellaneous Tasks
-
-- Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
 ### Bug Fixes
 
 - Wrong func sig ([#1742](https://github.com/alloy-rs/alloy/issues/1742))
@@ -935,6 +1176,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 - Use encoded2718 ([#1702](https://github.com/alloy-rs/alloy/issues/1702))
 

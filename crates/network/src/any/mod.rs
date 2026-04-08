@@ -4,7 +4,7 @@ mod either;
 pub mod error;
 
 use alloy_consensus::{
-    Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
+    Sealed, Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
 };
 use alloy_eips::{eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
@@ -45,10 +45,9 @@ use std::ops::{Deref, DerefMut};
 ///   transaction types. It will successfully decode an Ethereum [`TxEnvelope`], but will decode
 ///   only the type for any unknown transaction type. It will also leave the buffer unconsumed,
 ///   which will cause further deserialization to produce erroneous results.
-/// - The implementation of [`Encodable2718`] for [`AnyTypedTransaction`] will not work for
-///   non-Ethereum transaction types. It will encode the type for any unknown transaction type, but
-///   will not encode any other fields. This is symmetric with the decoding behavior, but still
-///   erroneous.
+/// - The implementation of [`Encodable2718`] for [`AnyTxEnvelope`] will panic for non-Ethereum
+///   transaction types. Unknown transaction types cannot be re-encoded through [`AnyNetwork`]; use
+///   a custom transaction type and network implementation instead.
 /// - The [`TransactionRequest`] will build ONLY Ethereum types. It will error when attempting to
 ///   build any unknown type.
 /// - The [`Network::TransactionResponse`] may deserialize unknown metadata fields into the inner
@@ -120,6 +119,23 @@ impl AnyRpcBlock {
             .try_convert_transactions()
             .map_err(AnyConversionError::new)
             .map(Block::into_consensus_block)
+    }
+
+    /// Attempts to convert the inner RPC [`Block`] into a sealed consensus block.
+    ///
+    /// Uses the block hash from the RPC header to seal the block.
+    ///
+    /// Returns an [`AnyConversionError`] if any of the conversions fail.
+    pub fn try_into_sealed<T, H>(
+        self,
+    ) -> Result<Sealed<alloy_consensus::Block<T, H>>, AnyConversionError>
+    where
+        T: TryFrom<AnyRpcTransaction, Error: Error + Send + Sync + 'static>,
+        H: TryFrom<AnyHeader, Error: Error + Send + Sync + 'static>,
+    {
+        let block_hash = self.header.hash;
+        let block = self.try_into_consensus()?;
+        Ok(Sealed::new_unchecked(block, block_hash))
     }
 
     /// Tries to convert inner transactions into a vector of [`AnyRpcTransaction`].

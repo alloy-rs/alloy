@@ -16,17 +16,25 @@ use once_cell as _;
 
 pub use alloy_trie::TrieAccount;
 
+/// Represents an TrieAccount in the account trie
+#[deprecated(since = "0.7.3", note = "use TrieAccount instead")]
+pub type Account = TrieAccount;
+
 mod block;
-pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header, HeaderInfo};
+pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header, HeaderInfo, HeaderRoots};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
-    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, Receipt, ReceiptEnvelope,
-    ReceiptWithBloom, Receipts, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
+    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, EthereumReceipt, Receipt,
+    ReceiptEnvelope, ReceiptWithBloom, Receipts, RlpDecodableReceipt, RlpEncodableReceipt,
+    TxReceipt, TxTy,
 };
+
+pub mod size;
+pub use size::InMemorySize;
 
 pub mod conditional;
 pub mod proofs;
@@ -45,6 +53,7 @@ pub use alloy_eips::{
         builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
         utils, Blob, BlobTransactionSidecar, Bytes48,
     },
+    eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant},
     Typed2718,
 };
 

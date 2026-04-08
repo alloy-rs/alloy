@@ -1047,7 +1047,7 @@ impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844 {
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]
-pub struct TxEip4844WithSidecar<T = BlobTransactionSidecar> {
+pub struct TxEip4844WithSidecar<T = BlobTransactionSidecarVariant> {
     /// The actual transaction.
     #[cfg_attr(feature = "serde", serde(flatten))]
     #[doc(alias = "transaction")]

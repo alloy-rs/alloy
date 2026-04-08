@@ -5,6 +5,7 @@
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 /* --------------------------------------- Core re-exports -------------------------------------- */
 
@@ -98,7 +99,12 @@ pub use alloy_network as network;
 pub use alloy_genesis as genesis;
 
 /// Ethereum execution-layer client bindings.
+///
+/// Enable the `node-bindings` feature to access this re-export.
+/// For `ProviderBuilder::connect_anvil*` in `alloy::providers`, enable
+/// `provider-anvil-node` or combine `providers` with `node-bindings`.
 #[cfg(feature = "node-bindings")]
+#[cfg_attr(docsrs, doc(cfg(feature = "node-bindings")))]
 #[doc(inline)]
 pub use alloy_node_bindings as node_bindings;
 

@@ -19,9 +19,12 @@ main() {
     fi
 
     install_geth &
+    local geth_pid=$!
     install_reth &
+    local reth_pid=$!
 
-    wait
+    wait $geth_pid || { echo "install_geth failed"; exit 1; }
+    wait $reth_pid || { echo "install_reth failed"; exit 1; }
 }
 
 # Installs geth from https://geth.ethereum.org/downloads

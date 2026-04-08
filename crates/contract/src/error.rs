@@ -21,8 +21,9 @@ pub enum Error {
     /// Called `deploy` with a transaction that is not a deployment transaction.
     #[error("transaction is not a deployment transaction")]
     NotADeploymentTransaction,
-    /// `contractAddress` was not found in the deployment transaction’s receipt.
-    #[error("missing `contractAddress` from deployment transaction receipt")]
+    /// Contract was not deployed: either the deployment transaction reverted or `contractAddress`
+    /// was not found in the receipt.
+    #[error("contract not deployed: deployment transaction failed")]
     ContractNotDeployed,
     /// The contract returned no data.
     #[error("contract call to `{0}` returned no data (\"0x\"); the called address might not be a contract")]
@@ -200,15 +201,15 @@ pub trait TransportErrorExt {
 
 impl TransportErrorExt for TransportError {
     fn try_parse_transport_error<I: SolInterface>(self) -> TryParseTransportErrorResult<I> {
-        let revert_data = self.as_error_resp().and_then(|e| e.as_revert_data().map(|d| d.to_vec()));
+        let revert_data = self.as_error_resp().and_then(|e| e.as_revert_data());
         if let Some(decoded) =
-            revert_data.as_ref().and_then(|data| I::abi_decode(data.as_slice()).ok())
+            revert_data.as_ref().and_then(|data| I::abi_decode(data.as_ref()).ok())
         {
             return TryParseTransportErrorResult::Decoded(decoded);
         }
 
         if let Some(decoded) = revert_data {
-            return TryParseTransportErrorResult::UnknownSelector(decoded.into());
+            return TryParseTransportErrorResult::UnknownSelector(decoded);
         }
         TryParseTransportErrorResult::Original(self)
     }

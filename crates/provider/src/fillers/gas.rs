@@ -1,9 +1,13 @@
-use std::future::IntoFuture;
+use std::{
+    fmt::{self, Formatter},
+    future::IntoFuture,
+    sync::Arc,
+};
 
 use crate::{
     fillers::{FillerControlFlow, TxFiller},
     provider::SendableTx,
-    utils::Eip1559Estimation,
+    utils::{Eip1559Estimation, Eip1559Estimator},
     Provider,
 };
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
@@ -66,8 +70,12 @@ pub enum GasFillable {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone, Copy, Debug, Default)]
-pub struct GasFiller;
+#[non_exhaustive]
+#[derive(Clone, Debug, Default)]
+pub struct GasFiller {
+    /// The eip1559 gas estimator to use.
+    pub estimator: Eip1559Estimator,
+}
 
 impl GasFiller {
     async fn prepare_legacy<P, N>(
@@ -114,7 +122,7 @@ impl GasFiller {
             async move { Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas }) }
                 .left_future()
         } else {
-            provider.estimate_eip1559_fees().right_future()
+            provider.estimate_eip1559_fees_with(self.estimator.clone()).right_future()
         };
 
         let (gas_limit, estimate) = futures::try_join!(gas_limit_fut, eip1559_fees_fut)?;
@@ -187,9 +195,92 @@ impl<N: Network> TxFiller<N> for GasFiller {
     }
 }
 
-/// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct BlobGasFiller;
+/// An estimator function for blob gas fees.
+pub type BlobGasEstimatorFunction = fn(u128, &[f64]) -> u128;
+
+/// A trait responsible for estimating blob gas values
+pub trait BlobGasEstimatorFn: Send + Sync + Unpin {
+    /// Estimates the blob gas fee given the base fee per blob gas
+    /// and the blob gas usage ratio.
+    fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128;
+}
+
+/// Blob Gas estimator variants
+#[derive(Default, Clone)]
+pub enum BlobGasEstimator {
+    /// Uses the builtin estimator
+    #[default]
+    Default,
+    /// Uses a custom estimator
+    Custom(Arc<dyn BlobGasEstimatorFn>),
+}
+
+impl BlobGasEstimator {
+    /// Creates a new estimator from a closure
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin + 'static,
+    {
+        Self::new_estimator(f)
+    }
+
+    /// Creates a new estimate fn
+    pub fn new_estimator<F: BlobGasEstimatorFn + 'static>(f: F) -> Self {
+        Self::Custom(Arc::new(f))
+    }
+
+    /// Create a custom estimator
+    pub fn custom<F>(f: F) -> Self
+    where
+        F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin + 'static,
+    {
+        Self::Custom(Arc::new(f))
+    }
+
+    /// Create a scaled estimator
+    pub fn scaled(scale: u128) -> Self {
+        Self::custom(move |base_fee, _| base_fee.saturating_mul(scale))
+    }
+
+    /// Estimates the blob gas fee given the base fee per blob gas
+    /// and the blob gas usage ratio.
+    pub fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128 {
+        match self {
+            Self::Default => base_fee_per_blob_gas,
+            Self::Custom(val) => val.estimate(base_fee_per_blob_gas, blob_gas_used_ratio),
+        }
+    }
+}
+
+impl<F> BlobGasEstimatorFn for F
+where
+    F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin,
+{
+    fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128 {
+        (self)(base_fee_per_blob_gas, blob_gas_used_ratio)
+    }
+}
+
+impl fmt::Debug for BlobGasEstimator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlobGasEstimator")
+            .field(
+                "estimator",
+                &match self {
+                    Self::Default => "default",
+                    Self::Custom(_) => "custom",
+                },
+            )
+            .finish()
+    }
+}
+
+/// Filler for the `max_fee_per_blob_gas` field in blob transactions.
+#[derive(Clone, Debug, Default)]
+pub struct BlobGasFiller {
+    /// The blob gas estimator to use.
+    pub estimator: BlobGasEstimator,
+}
 
 impl<N: Network> TxFiller<N> for BlobGasFiller
 where
@@ -198,9 +289,9 @@ where
     type Fillable = u128;
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
-        // Nothing to fill if non-eip4844 tx or `max_fee_per_blob_gas` is already set to a valid
-        // value.
-        if tx.blob_sidecar().is_none()
+        // Nothing to fill if no blob sidecar is present or `max_fee_per_blob_gas` is already set
+        // to a valid value.
+        if !tx.has_blob_sidecar()
             || tx.max_fee_per_blob_gas().is_some_and(|gas| gas >= BLOB_TX_MIN_BLOB_GASPRICE)
         {
             return FillerControlFlow::Finished;
@@ -225,13 +316,15 @@ where
             }
         }
 
-        provider
-            .get_fee_history(2, BlockNumberOrTag::Latest, &[])
-            .await?
-            .base_fee_per_blob_gas
-            .last()
-            .ok_or(RpcError::NullResp)
-            .copied()
+        // Fetch the latest fee_history
+        let fee_history = provider.get_fee_history(2, BlockNumberOrTag::Latest, &[]).await?;
+
+        let base_fee_per_blob_gas =
+            fee_history.base_fee_per_blob_gas.last().ok_or(RpcError::NullResp).copied()?;
+
+        let blob_gas_used_ratio = fee_history.blob_gas_used_ratio;
+
+        Ok(self.estimator.estimate(base_fee_per_blob_gas, &blob_gas_used_ratio))
     }
 
     async fn fill(
@@ -253,6 +346,7 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_consensus::{SidecarBuilder, SimpleCoder, Transaction};
     use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
+    use alloy_network::Ethereum;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
@@ -300,7 +394,7 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
-        let sidecar = sidecar.build().unwrap();
+        let sidecar = sidecar.build_4844().unwrap();
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
@@ -327,7 +421,7 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
-        let sidecar = sidecar.build().unwrap();
+        let sidecar = sidecar.build_4844().unwrap();
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
@@ -347,6 +441,18 @@ mod tests {
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
             DATA_GAS_PER_BLOB
+        );
+    }
+
+    #[test]
+    fn eip7594_sidecar_marks_blob_gas_filler_ready() {
+        let sidecar =
+            SidecarBuilder::<SimpleCoder>::from_slice(b"Hello World").build_7594().unwrap();
+        let tx = TransactionRequest { sidecar: Some(sidecar.into()), ..Default::default() };
+
+        assert_eq!(
+            <BlobGasFiller as TxFiller<Ethereum>>::status(&BlobGasFiller::default(), &tx),
+            FillerControlFlow::Ready
         );
     }
 }

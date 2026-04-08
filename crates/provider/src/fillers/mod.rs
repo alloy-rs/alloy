@@ -37,7 +37,10 @@ mod nonce;
 pub use nonce::{CachedNonceManager, NonceFiller, NonceManager, SimpleNonceManager};
 
 mod gas;
-pub use gas::{BlobGasFiller, GasFillable, GasFiller};
+pub use gas::{
+    BlobGasEstimator, BlobGasEstimatorFn, BlobGasEstimatorFunction, BlobGasFiller, GasFillable,
+    GasFiller,
+};
 
 mod join_fill;
 pub use join_fill::JoinFill;
@@ -58,7 +61,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
-    FilterChanges, Log,
+    FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
 };
 use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
@@ -314,6 +317,26 @@ where
         Self { inner, filler, _pd: PhantomData }
     }
 
+    /// Returns a reference to the filler.
+    pub const fn filler(&self) -> &F {
+        &self.filler
+    }
+
+    /// Returns a mutable reference to the filler.
+    pub const fn filler_mut(&mut self) -> &mut F {
+        &mut self.filler
+    }
+
+    /// Returns a reference to the inner provider.
+    pub const fn inner(&self) -> &P {
+        &self.inner
+    }
+
+    /// Returns a mutable reference to the inner provider.
+    pub const fn inner_mut(&mut self) -> &mut P {
+        &mut self.inner
+    }
+
     /// Joins a filler to this provider
     pub fn join_with<Other: TxFiller<N>>(
         self,
@@ -353,6 +376,7 @@ where
     /// # use alloy_rpc_types_eth::TransactionRequest;
     /// # use alloy_network::TransactionBuilder;
     ///
+    /// # #[cfg(feature = "anvil-node")]
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     // Create transaction request
     ///     let tx_request = TransactionRequest::default()
@@ -377,6 +401,8 @@ where
     ///
     ///     Ok(())
     /// }
+    /// # #[cfg(not(feature = "anvil-node"))]
+    /// # fn example() {}
     /// ```
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
         self.fill_inner(SendableTx::Builder(tx)).await
@@ -514,6 +540,24 @@ where
         self.inner.get_block_receipts(block)
     }
 
+    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header(block).await
+    }
+
+    async fn get_header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header_by_hash(hash).await
+    }
+
+    async fn get_header_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header_by_number(number).await
+    }
+
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         self.inner.get_code_at(address)
     }
@@ -573,6 +617,13 @@ where
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.inner.get_storage_at(address, key)
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.inner.get_storage_values(requests)
     }
 
     fn get_transaction_by_hash(
