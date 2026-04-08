@@ -1,7 +1,7 @@
 //! Transaction types.
 
 use crate::Signed;
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Selector, TxHash, TxKind, B256, U256};
 use auto_impl::auto_impl;
@@ -574,6 +574,12 @@ impl<T: TxHashRef> TxHashRef for Recovered<T> {
 impl<T: TxHashRef> TxHashRef for alloy_eips::eip2718::WithEncoded<T> {
     fn tx_hash(&self) -> &TxHash {
         self.value().tx_hash()
+    }
+}
+
+impl<T: TxHashRef + Clone> TxHashRef for Cow<'_, T> {
+    fn tx_hash(&self) -> &TxHash {
+        (**self).tx_hash()
     }
 }
 

@@ -171,7 +171,7 @@ impl serde::Serialize for BlockNumberOrTag {
         S: serde::Serializer,
     {
         match *self {
-            Self::Number(x) => serializer.serialize_str(&format!("0x{x:x}")),
+            Self::Number(x) => alloy_serde::quantity::serialize(&x, serializer),
             Self::Latest => serializer.serialize_str("latest"),
             Self::Finalized => serializer.serialize_str("finalized"),
             Self::Safe => serializer.serialize_str("safe"),
@@ -982,6 +982,22 @@ mod tests {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
         assert_eq!(serialized, "\"0x1\"");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn block_number_or_tag_serialization() {
+        let number = BlockNumberOrTag::Number(0);
+        assert_eq!(serde_json::to_string(&number).unwrap(), "\"0x0\"");
+
+        let number = BlockNumberOrTag::Number(16);
+        assert_eq!(serde_json::to_string(&number).unwrap(), "\"0x10\"");
+
+        let latest = BlockNumberOrTag::Latest;
+        assert_eq!(serde_json::to_string(&latest).unwrap(), "\"latest\"");
+
+        let pending = BlockNumberOrTag::Pending;
+        assert_eq!(serde_json::to_string(&pending).unwrap(), "\"pending\"");
     }
 
     #[test]

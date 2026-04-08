@@ -10,6 +10,7 @@ body:
 
         Thanks for taking the time to report this bug!
   - type: dropdown
+    id: component
     attributes:
       label: Component
       description: What component is the bug in?
@@ -43,6 +44,7 @@ body:
         - Linux
         - Other (please specify)
   - type: textarea
+    id: description
     attributes:
       label: Describe the bug
       description: Please include code snippets as well if relevant.

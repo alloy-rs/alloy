@@ -41,11 +41,20 @@ pub struct SyncStatusMetadata {
     /// Whether the node is currently syncing.
     pub syncing: bool,
     /// The starting block.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub starting_block: u64,
     /// The current block.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub current_block: u64,
     /// The highest block.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub highest_block: Option<u64>,
 }
 
@@ -320,5 +329,40 @@ mod tests {
         let serialized = serde_json::to_string(&param).unwrap();
         let expected = serde_json::to_string(&filter).unwrap();
         assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn sync_status_metadata_serde() {
+        let metadata = SyncStatusMetadata {
+            syncing: true,
+            starting_block: 900,
+            current_block: 902,
+            highest_block: Some(1108),
+        };
+
+        let serialized = serde_json::to_string(&metadata).unwrap();
+        // Block numbers should be hex-encoded per EIP-1474
+        assert_eq!(
+            serialized,
+            r#"{"syncing":true,"startingBlock":"0x384","currentBlock":"0x386","highestBlock":"0x454"}"#
+        );
+
+        // Roundtrip
+        let deserialized: SyncStatusMetadata = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(metadata, deserialized);
+
+        // Test without highest_block
+        let metadata_no_highest = SyncStatusMetadata {
+            syncing: false,
+            starting_block: 0,
+            current_block: 100,
+            highest_block: None,
+        };
+        let serialized = serde_json::to_string(&metadata_no_highest).unwrap();
+        assert_eq!(serialized, r#"{"syncing":false,"startingBlock":"0x0","currentBlock":"0x64"}"#);
+
+        let deserialized: SyncStatusMetadata = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(metadata_no_highest, deserialized);
     }
 }
