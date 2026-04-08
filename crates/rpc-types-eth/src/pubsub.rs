@@ -157,7 +157,7 @@ pub struct TransactionReceiptsParams {
     /// Optional list of transaction hashes to filter by.
     ///
     /// If not provided or empty, all transaction receipts will be returned.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub transaction_hashes: Option<Vec<B256>>,
 }
 
@@ -453,6 +453,14 @@ mod tests {
         let serialized = serde_json::to_string(&param).unwrap();
         let expected = r#"{"transactionHashes":["0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"]}"#;
         assert_eq!(serialized, expected);
+
+        // None must be serialized as `null` (not omitted) so that round-tripping
+        // through `Params::from_json_value` keeps the `TransactionReceipts` variant.
+        let param = Params::TransactionReceipts(TransactionReceiptsParams::default());
+        let serialized = serde_json::to_string(&param).unwrap();
+        assert_eq!(serialized, r#"{"transactionHashes":null}"#);
+        let roundtrip: Params = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(roundtrip, param);
     }
 
     #[test]
