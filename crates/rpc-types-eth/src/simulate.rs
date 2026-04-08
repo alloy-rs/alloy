@@ -74,7 +74,7 @@ impl<TxReq> SimBlock<TxReq> {
 }
 
 /// Represents the result of simulating a block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulatedBlock<B = Block> {
@@ -200,7 +200,7 @@ pub struct SimulateError {
 impl SimulateError {
     /// Creates a new invalid params error.
     pub fn invalid_params() -> Self {
-        Self { code: -32602, message: "invalid params".to_string() }
+        Self { code: -32602, message: "invalid params".to_string(), data: None }
     }
 }
 
