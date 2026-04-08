@@ -29,6 +29,12 @@ pub enum BlobTransactionSidecarVariant {
     Eip7594(BlobTransactionSidecarEip7594),
 }
 
+impl Default for BlobTransactionSidecarVariant {
+    fn default() -> Self {
+        Self::Eip4844(BlobTransactionSidecar::default())
+    }
+}
+
 impl BlobTransactionSidecarVariant {
     /// Returns true if this is a [`BlobTransactionSidecarVariant::Eip4844`].
     pub const fn is_eip4844(&self) -> bool {
@@ -550,6 +556,81 @@ impl BlobTransactionSidecarEip7594 {
             + self.cell_proofs.capacity() * BYTES_PER_PROOF
     }
 
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the hex encoded blob str.
+    ///
+    /// See also [`Blob::from_hex`](c_kzg::Blob::from_hex)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_hex<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<str>,
+    {
+        let mut converted = Vec::new();
+        for blob in blobs {
+            converted.push(crate::eip4844::utils::hex_to_blob(blob)?);
+        }
+        Self::try_from_blobs(converted)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given blob
+    /// bytes.
+    ///
+    /// See also [`Blob::from_bytes`](c_kzg::Blob::from_bytes)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_bytes<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<[u8]>,
+    {
+        let mut converted = Vec::new();
+        for blob in blobs {
+            converted.push(crate::eip4844::utils::bytes_to_blob(blob)?);
+        }
+        Self::try_from_blobs(converted)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given
+    /// blobs and KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        let mut commitments = Vec::with_capacity(blobs.len());
+        let mut proofs = Vec::with_capacity(blobs.len());
+        for blob in &blobs {
+            // SAFETY: same size
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
+
+            // SAFETY: same size
+            unsafe {
+                commitments
+                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                for kzg_proof in kzg_proofs.iter() {
+                    proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
+                        kzg_proof.to_bytes(),
+                    ));
+                }
+            }
+        }
+
+        Ok(Self::new(blobs, commitments, proofs))
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given
+    /// blobs.
+    ///
+    /// This uses the global/default KZG settings, see also
+    /// [`EnvKzgSettings::Default`](crate::eip4844::env_settings::EnvKzgSettings).
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs(blobs: Vec<Blob>) -> Result<Self, c_kzg::Error> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        Self::try_from_blobs_with_settings(blobs, EnvKzgSettings::Default.get())
+    }
+
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
     /// proofs.
     ///
@@ -621,7 +702,8 @@ impl BlobTransactionSidecarEip7594 {
             let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
             for blob in &self.blobs {
                 let blob = core::mem::transmute::<&Blob, &c_kzg::Blob>(blob);
-                cells.extend(proof_settings.compute_cells(blob)?.into_iter());
+                let blob_cells = proof_settings.compute_cells(blob)?;
+                cells.extend_from_slice(blob_cells.as_ref());
             }
 
             proof_settings.verify_cell_kzg_proof_batch(
@@ -909,6 +991,11 @@ pub mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "kzg")]
+    use crate::eip4844::{
+        builder::{SidecarBuilder, SimpleCoder},
+        env_settings::EnvKzgSettings,
+    };
 
     #[test]
     fn sidecar_variant_rlp_roundtrip() {
@@ -998,5 +1085,15 @@ mod tests {
         encoded.clear();
         sidecar_variant_7594.encode_7594(&mut encoded);
         assert_eq!(sidecar_variant_7594, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn validate_7594_sidecar() {
+        let sidecar =
+            SidecarBuilder::<SimpleCoder>::from_slice(b"Blobs are fun!").build_7594().unwrap();
+        let versioned_hashes = sidecar.versioned_hashes().collect::<Vec<_>>();
+
+        sidecar.validate(&versioned_hashes, EnvKzgSettings::Default.get()).unwrap();
     }
 }

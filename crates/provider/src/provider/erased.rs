@@ -19,7 +19,8 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
+    StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -184,6 +185,24 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_block_receipts(block)
     }
 
+    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
+        self.0.get_header(block).await
+    }
+
+    async fn get_header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.0.get_header_by_hash(hash).await
+    }
+
+    async fn get_header_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.0.get_header_by_number(number).await
+    }
+
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         self.0.get_code_at(address)
     }
@@ -243,6 +262,13 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.0.get_storage_at(address, key)
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.0.get_storage_values(requests)
     }
 
     fn get_transaction_by_hash(

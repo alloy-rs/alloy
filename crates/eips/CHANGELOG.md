@@ -5,11 +5,198 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3](https://github.com/alloy-rs/alloy/releases/tag/v1.8.3) - 2026-03-27
+
+### Miscellaneous Tasks
+
+- Release 1.8.2
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+
+## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
+
+### Bug Fixes
+
+- [eips] Eip 7594 replace unoptimized iter ([#3804](https://github.com/alloy-rs/alloy/issues/3804))
+
+### Miscellaneous Tasks
+
+- Release 1.8.0
+- [eips] Add doc to let check happy ([#3797](https://github.com/alloy-rs/alloy/issues/3797))
+
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Bug Fixes
+
+- [eips] Use post-EIP-2028 non-zero byte calldata cost (16) ([#3755](https://github.com/alloy-rs/alloy/issues/3755))
+
+### Features
+
+- [eips] Allow custom system contracts in EIP-7910 ([#3765](https://github.com/alloy-rs/alloy/issues/3765))
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
+
+## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-18
+
+### Miscellaneous Tasks
+
+- Release 1.7.3
+- Release 1.7.2
+
+## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
+
+### Miscellaneous Tasks
+
+- Release 1.7.1
+
+## [1.7.0](https://github.com/alloy-rs/alloy/releases/tag/v1.7.0) - 2026-02-17
+
+### Features
+
+- Add trait impls for Cow to support Recovered<Cow<'_, T>> ([#3689](https://github.com/alloy-rs/alloy/issues/3689))
+
+### Miscellaneous Tasks
+
+- Release 1.7.0
+
+## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
+
+### Miscellaneous Tasks
+
+- Release 1.6.3
+
+## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
+
+### Documentation
+
+- [eips] Clarify blob_base_cost default values for different hardforks ([#3664](https://github.com/alloy-rs/alloy/issues/3664))
+- [eips] Fix incorrect default precompute value in KZG settings doc ([#3657](https://github.com/alloy-rs/alloy/issues/3657))
+
+### Miscellaneous Tasks
+
+- Release 1.6.2
+
+### Performance
+
+- Optimize hex serialization for Index and BlockNumberOrTag ([#3626](https://github.com/alloy-rs/alloy/issues/3626))
+
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
+
+## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Miscellaneous Tasks
+
+- Release 1.5.2
+- Revert "chore: add amsterdam support" ([#3573](https://github.com/alloy-rs/alloy/issues/3573))
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Features
+
+- [eips] Add eip7928 module re-exporting alloy-eip7928 types ([#3558](https://github.com/alloy-rs/alloy/issues/3558))
+- [provider] Add new_payload_v4_requests accepting RequestsOrHash ([#3556](https://github.com/alloy-rs/alloy/issues/3556))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+- Add amsterdam support ([#3152](https://github.com/alloy-rs/alloy/issues/3152))
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+
+## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Bug Fixes
+
+- [eips] Use for loop in blob conversion to avoid stack overflow ([#3499](https://github.com/alloy-rs/alloy/issues/3499))
+
+### Features
+
+- [rpc-types-engine] Add ExecutionPayloadEnvelope V4/V5 conversions ([#3510](https://github.com/alloy-rs/alloy/issues/3510))
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+
+## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
+
+### Miscellaneous Tasks
+
+- Release 1.4.0
+
+### Other
+
+- [eips] Make Blob import conditional ([#3472](https://github.com/alloy-rs/alloy/issues/3472))
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Bug Fixes
+
+- Update `SidecarBuilder::build` to allow 7594 ([#3428](https://github.com/alloy-rs/alloy/issues/3428))
+
+### Features
+
+- Add try_from_blobs for BlobTransactionSidecarEip7594 ([#3425](https://github.com/alloy-rs/alloy/issues/3425))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Bug Fixes
+
+- Simplify size functions ([#3403](https://github.com/alloy-rs/alloy/issues/3403))
+
+### Features
+
+- Add bincode compat support for BlobTransactionSidecarVariant ([#3325](https://github.com/alloy-rs/alloy/issues/3325))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+- Rm all deprecations ([#3341](https://github.com/alloy-rs/alloy/issues/3341))
+
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
 ### Bug Fixes
 
 - [eip1898] RpcBlockHash serde to use rename_all = \"camelCase\" ([#3255](https://github.com/alloy-rs/alloy/issues/3255))
+
+### Miscellaneous Tasks
+
+- Release 1.1.3
 
 ## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
 
@@ -766,12 +953,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
-### Miscellaneous Tasks
-
-- Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
 ### Bug Fixes
 
 - Adjust EIP-7742 to latest spec ([#1713](https://github.com/alloy-rs/alloy/issues/1713))
@@ -793,6 +974,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 
 ## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28

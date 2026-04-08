@@ -5,6 +5,144 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3](https://github.com/alloy-rs/alloy/releases/tag/v1.8.3) - 2026-03-27
+
+### Miscellaneous Tasks
+
+- Release 1.8.2
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+
+## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.0
+
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Features
+
+- [network] Signature flow generic over `Network` ([#3724](https://github.com/alloy-rs/alloy/issues/3724))
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
+
+## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-18
+
+### Miscellaneous Tasks
+
+- Release 1.7.3
+- Release 1.7.2
+
+## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
+
+### Miscellaneous Tasks
+
+- Release 1.7.1
+
+## [1.7.0](https://github.com/alloy-rs/alloy/releases/tag/v1.7.0) - 2026-02-17
+
+### Miscellaneous Tasks
+
+- Release 1.7.0
+
+## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
+
+### Miscellaneous Tasks
+
+- Release 1.6.3
+
+## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
+
+### Miscellaneous Tasks
+
+- Release 1.6.2
+
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
+
+## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Miscellaneous Tasks
+
+- Release 1.5.2
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Features
+
+- Add versioned_hashes helper to BlobsBundle and try_into_sealed to AnyRpcBlock ([#3527](https://github.com/alloy-rs/alloy/issues/3527))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+
+## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+
+## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
+
+### Miscellaneous Tasks
+
+- Release 1.4.0
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Features
+
+- [`contract`] Add sidecar_7594 to CallBuilder ([#3424](https://github.com/alloy-rs/alloy/issues/3424))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Documentation
+
+- [network] Fix outdated Network trait example in README ([#3346](https://github.com/alloy-rs/alloy/issues/3346))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+- Remove cyclic dev dep ([#3411](https://github.com/alloy-rs/alloy/issues/3411))
+
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
 ### Bug Fixes
@@ -14,6 +152,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - Add documentation for build_unsigned and build methods ([#3187](https://github.com/alloy-rs/alloy/issues/3187))
+
+### Miscellaneous Tasks
+
+- Release 1.1.3
 
 ## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
 
@@ -592,11 +734,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
-### Miscellaneous Tasks
-
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 
 ## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28

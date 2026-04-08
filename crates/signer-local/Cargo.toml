@@ -82,6 +82,10 @@ keystore-geth-compat = ["keystore", "eth-keystore?/geth-compat"]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39", "zeroize"]
 mnemonic-all-languages = ["mnemonic", "coins-bip39?/all-langs"]
 yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
-secp256k1 = ["dep:secp256k1"]
+secp256k1 = [
+	"dep:secp256k1",
+	"alloy-consensus/secp256k1",
+	"yubihsm?/secp256k1"
+]
 
 eip712 = ["alloy-signer/eip712"]

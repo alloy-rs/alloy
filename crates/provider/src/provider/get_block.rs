@@ -4,7 +4,7 @@ use crate::{utils, ProviderCall};
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcRecv;
 use alloy_network::BlockResponse;
-use alloy_network_primitives::BlockTransactionsKind;
+use alloy_network_primitives::{BlockTransactionsKind, HeaderResponse};
 use alloy_primitives::{Address, BlockHash, B256, B64};
 use alloy_rpc_client::{ClientRef, RpcCall};
 #[cfg(feature = "pubsub")]
@@ -257,7 +257,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
-            Self::PendingBlock(call) => f.debug_tuple("PendingBlockCall").field(call).finish(),
+            Self::PendingBlock(call) => f.debug_tuple("PendingBlock").field(call).finish(),
             Self::ProviderCall(_) => f.debug_struct("ProviderCall").finish(),
         }
     }
@@ -341,6 +341,60 @@ where
                     Ok(blocks) => {
                         // Ignore `None` responses.
                         Either::Left(blocks.into_iter().filter_map(|block| block.map(Ok)))
+                    }
+                    Err(err) => Either::Right(std::iter::once(Err(err))),
+                })
+            });
+        Box::pin(stream)
+    }
+}
+
+/// A builder type for polling new block headers using the [`FilterPollerBuilder`].
+///
+/// The polling stream must be consumed by calling [`WatchHeaders::into_stream`].
+#[derive(Debug)]
+#[must_use = "this builder does nothing unless you call `.into_stream`"]
+pub struct WatchHeaders<HeaderResp> {
+    poller: FilterPollerBuilder<B256>,
+    _pd: std::marker::PhantomData<HeaderResp>,
+}
+
+impl<HeaderResp> WatchHeaders<HeaderResp>
+where
+    HeaderResp: HeaderResponse + RpcRecv,
+{
+    /// Create a new [`WatchHeaders`] instance.
+    pub(crate) const fn new(poller: FilterPollerBuilder<B256>) -> Self {
+        Self { poller, _pd: PhantomData }
+    }
+
+    /// Sets the channel size for the poller task.
+    pub const fn set_channel_size(&mut self, channel_size: usize) {
+        self.poller.set_channel_size(channel_size);
+    }
+
+    /// Sets a limit on the number of successful polls.
+    pub fn set_limit(&mut self, limit: Option<usize>) {
+        self.poller.set_limit(limit);
+    }
+
+    /// Sets the duration between polls.
+    pub const fn set_poll_interval(&mut self, poll_interval: Duration) {
+        self.poller.set_poll_interval(poll_interval);
+    }
+
+    /// Consumes the stream of block hashes from the inner [`FilterPollerBuilder`] and maps it to a
+    /// stream of [`HeaderResponse`].
+    pub fn into_stream(self) -> impl Stream<Item = TransportResult<HeaderResp>> + Unpin {
+        let client = self.poller.client();
+        let stream = self
+            .poller
+            .into_stream()
+            .then(move |hashes| utils::hashes_to_headers(hashes, client.clone()))
+            .flat_map(|res| {
+                futures::stream::iter(match res {
+                    Ok(headers) => {
+                        Either::Left(headers.into_iter().filter_map(|header| header.map(Ok)))
                     }
                     Err(err) => Either::Right(std::iter::once(Err(err))),
                 })
@@ -452,8 +506,9 @@ mod tests {
 
         let res = provider.get_block_by_number(BlockNumberOrTag::Pending).full().await;
         if let Err(err) = &res {
-            if err.to_string().contains("no response") {
-                // response can be flaky
+            let err_str = err.to_string();
+            if err_str.contains("no response") || err.is_transport_error() {
+                // response can be flaky due to network issues
                 eprintln!("skipping flaky response: {err:?}");
                 return;
             }

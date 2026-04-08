@@ -351,7 +351,15 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     }
 
     async fn send_batch(&mut self) {
-        let pending = std::mem::take(&mut self.pending);
+        let mut pending = std::mem::take(&mut self.pending);
+
+        // Remove requests where the client has disconnected.
+        pending.retain(|msg| !msg.tx.is_closed());
+
+        // If all clients disconnected, return early.
+        if pending.is_empty() {
+            return;
+        }
 
         // If there's only a single call, avoid batching and perform the request directly.
         if pending.len() == 1 {
@@ -364,7 +372,18 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         let result = self.send_batch_inner(&pending).await;
         match result {
             Ok(results) => {
-                debug_assert_eq!(results.len(), pending.len());
+                if results.len() != pending.len() {
+                    let err = format!(
+                        "multicall batch response count mismatch: expected {}, got {}",
+                        pending.len(),
+                        results.len()
+                    );
+                    for msg in pending {
+                        let _ = msg.tx.send(Err(TransportErrorKind::custom_str(&err)));
+                    }
+                    return;
+                }
+
                 for (result, msg) in results.into_iter().zip(pending) {
                     let _ = msg.tx.send(Ok(result));
                 }
@@ -558,6 +577,24 @@ mod tests {
         assert_eq!(chain_id_ok.unwrap(), 2);
         assert!(block_number_err.unwrap_err().to_string().contains("reverted"));
         assert!(chain_id_err.unwrap_err().to_string().contains("reverted"));
+        assert!(asserter.read_q().is_empty(), "only 1 request should've been made");
+    }
+
+    #[tokio::test]
+    async fn batch_response_len_mismatch_errors_all_callers() {
+        let asserter = Asserter::new();
+        let provider =
+            ProviderBuilder::new().with_call_batching().connect_mocked_client(asserter.clone());
+
+        push_m3_success(&asserter, &[(true, 1.abi_encode())]);
+
+        let (block_number, chain_id) =
+            tokio::join!(provider.get_block_number(), provider.get_chain_id());
+
+        let block_number_err = block_number.unwrap_err().to_string();
+        let chain_id_err = chain_id.unwrap_err().to_string();
+        assert!(block_number_err.contains("response count mismatch"), "{block_number_err}");
+        assert!(chain_id_err.contains("response count mismatch"), "{chain_id_err}");
         assert!(asserter.read_q().is_empty(), "only 1 request should've been made");
     }
 

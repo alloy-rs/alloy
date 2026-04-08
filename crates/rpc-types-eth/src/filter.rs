@@ -191,11 +191,10 @@ impl<T: Clone + Eq + Hash> FilterSet<T> {
     /// - If the filter has only 1 value, it returns the single value
     /// - Otherwise it returns an array of values
     pub fn to_value_or_array(&self) -> Option<ValueOrArray<T>> {
-        let mut values = self.set.iter().cloned().collect::<Vec<T>>();
-        match values.len() {
+        match self.set.len() {
             0 => None,
-            1 => Some(ValueOrArray::Value(values.pop().expect("values length is one"))),
-            _ => Some(ValueOrArray::Array(values)),
+            1 => self.set.iter().next().cloned().map(ValueOrArray::Value),
+            _ => Some(ValueOrArray::Array(self.set.iter().cloned().collect())),
         }
     }
 }
@@ -690,10 +689,8 @@ impl Filter {
 
         if let Some(to) = self.block_option.get_to_block() {
             match to {
-                BlockNumberOrTag::Number(num) => {
-                    if *num < block_number {
-                        res = false;
-                    }
+                BlockNumberOrTag::Number(num) if *num < block_number => {
+                    res = false;
                 }
                 BlockNumberOrTag::Earliest => {
                     res = false;
@@ -712,10 +709,15 @@ impl Filter {
         }
     }
 
-    /// Returns `true` if the filter matches the given block. Checks both the
-    /// block number and hash.
+    /// Returns `true` if the filter matches the given block.
+    ///
+    /// For [`FilterBlockOption::AtBlockHash`] filters, only the block hash is checked.
+    /// For [`FilterBlockOption::Range`] filters, only the block number range is checked.
     pub fn matches_block(&self, block: &BlockNumHash) -> bool {
-        self.matches_block_range(block.number) || self.matches_block_hash(block.hash)
+        match self.block_option {
+            FilterBlockOption::AtBlockHash(_) => self.matches_block_hash(block.hash),
+            FilterBlockOption::Range { .. } => self.matches_block_range(block.number),
+        }
     }
 
     /// Returns `true` if either of the following is true:
@@ -954,7 +956,7 @@ impl serde::Serialize for Filter {
             s.serialize_field("address", &address)?;
         }
 
-        let mut filtered_topics = Vec::new();
+        let mut filtered_topics = Vec::with_capacity(self.topics.len());
         let mut filtered_topics_len = 0;
         for (i, topic) in self.topics.iter().enumerate() {
             if !topic.is_empty() {
@@ -1352,26 +1354,6 @@ impl From<String> for FilterId {
     }
 }
 
-#[cfg(feature = "jsonrpsee-types")]
-impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
-    fn from(value: FilterId) -> Self {
-        match value {
-            FilterId::Num(n) => jsonrpsee_types::SubscriptionId::Num(n),
-            FilterId::Str(s) => jsonrpsee_types::SubscriptionId::Str(s.into()),
-        }
-    }
-}
-
-#[cfg(feature = "jsonrpsee-types")]
-impl From<jsonrpsee_types::SubscriptionId<'_>> for FilterId {
-    fn from(value: jsonrpsee_types::SubscriptionId<'_>) -> Self {
-        match value {
-            jsonrpsee_types::SubscriptionId::Num(n) => n.into(),
-            jsonrpsee_types::SubscriptionId::Str(s) => s.into_owned().into(),
-        }
-    }
-}
-
 /// Specifies the kind of information you wish to receive from the `eth_newPendingTransactionFilter`
 /// RPC endpoint.
 ///
@@ -1631,6 +1613,28 @@ mod tests {
         serde_json::to_value(t).expect("Failed to serialize value")
     }
 
+    #[test]
+    fn test_filterset_to_value_or_array_semantics() {
+        let empty = FilterSet::<u8>::default();
+        assert_eq!(empty.to_value_or_array(), None);
+
+        let mut single = FilterSet::<u8>::default();
+        assert!(single.insert(7));
+        assert_eq!(single.to_value_or_array(), Some(ValueOrArray::Value(7)));
+
+        let mut multi = FilterSet::<u8>::default();
+        assert!(multi.insert(1));
+        assert!(multi.insert(2));
+        match multi.to_value_or_array() {
+            Some(ValueOrArray::Array(values)) => {
+                assert_eq!(values.len(), 2);
+                assert!(values.contains(&1));
+                assert!(values.contains(&2));
+            }
+            other => panic!("expected Some(ValueOrArray::Array(_)), got {other:?}"),
+        }
+    }
+
     // <https://hoodi.etherscan.io/block/400001>
     #[test]
     #[cfg(feature = "serde")]
@@ -1745,12 +1749,12 @@ mod tests {
         }
 
         let item = Item { value: ValueOrArray::Value(U256::from(1u64)) };
-        let json = serde_json::to_value(item.clone()).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
 
         let item = Item { value: ValueOrArray::Array(vec![U256::from(1u64), U256::ZERO]) };
-        let json = serde_json::to_value(item.clone()).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
     }
@@ -2456,5 +2460,32 @@ mod tests {
         // Test empty filter (default Range with None values)
         let filter = Filter::new();
         assert_eq!(filter.extract_block_range(), (None, None));
+    }
+
+    #[test]
+    fn test_matches_block_at_block_hash() {
+        let target_hash = B256::with_last_byte(0xab);
+        let filter = Filter::new().at_block_hash(target_hash);
+
+        // Matching hash should return true regardless of block number
+        assert!(filter.matches_block(&BlockNumHash { number: 0, hash: target_hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 999, hash: target_hash }));
+
+        // Non-matching hash must return false
+        let wrong_hash = B256::with_last_byte(0xcd);
+        assert!(!filter.matches_block(&BlockNumHash { number: 0, hash: wrong_hash }));
+        assert!(!filter.matches_block(&BlockNumHash { number: 999, hash: wrong_hash }));
+    }
+
+    #[test]
+    fn test_matches_block_range_filter() {
+        let filter = Filter::new().from_block(10).to_block(20);
+
+        let hash = B256::ZERO;
+        assert!(!filter.matches_block(&BlockNumHash { number: 9, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 10, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 15, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 20, hash }));
+        assert!(!filter.matches_block(&BlockNumHash { number: 21, hash }));
     }
 }

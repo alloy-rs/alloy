@@ -166,10 +166,7 @@ where
     }
 
     fn is_create(&self) -> bool {
-        match self {
-            Self::BuiltIn(tx) => tx.is_create(),
-            Self::Other(_tx) => false,
-        }
+        delegate!(self => tx.is_create())
     }
 
     fn value(&self) -> U256 {

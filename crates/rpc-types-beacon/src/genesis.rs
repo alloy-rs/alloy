@@ -4,7 +4,7 @@ use alloy_primitives::{FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-/// Response from the `eth/v1/beacon/genesis` endpoint.
+/// Response from the [`/eth/v1/beacon/genesis`](https://ethereum.github.io/beacon-APIs/#/Beacon/getGenesis) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GenesisResponse {
     /// Container for the genesis data.

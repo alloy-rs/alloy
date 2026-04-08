@@ -19,7 +19,7 @@ mod error;
 pub use error::{Error, Result, TransportErrorExt, TryParseTransportErrorResult};
 
 mod event;
-pub use event::{Event, EventPoller};
+pub use event::{ChunkedEvent, Event, EventPoller};
 
 #[cfg(feature = "pubsub")]
 pub use event::subscription::EventSubscription;

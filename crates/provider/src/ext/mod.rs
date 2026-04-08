@@ -15,6 +15,11 @@ mod engine;
 #[cfg(feature = "engine-api")]
 pub use engine::EngineApi;
 
+#[cfg(feature = "engine-api")]
+mod testing;
+#[cfg(feature = "engine-api")]
+pub use testing::TestingApi;
+
 #[cfg(feature = "debug-api")]
 mod debug;
 #[cfg(feature = "debug-api")]
@@ -63,6 +68,9 @@ pub use mev::{
     sign_flashbots_payload, verify_flashbots_signature, FlashbotsSignatureError, MevApi,
     MevBuilder, FLASHBOTS_SIGNATURE_HEADER,
 };
+
+/// Reth related apis.
+pub mod reth;
 
 #[cfg(test)]
 pub(crate) mod test {
