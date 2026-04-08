@@ -689,10 +689,8 @@ impl Filter {
 
         if let Some(to) = self.block_option.get_to_block() {
             match to {
-                BlockNumberOrTag::Number(num) => {
-                    if *num < block_number {
-                        res = false;
-                    }
+                BlockNumberOrTag::Number(num) if *num < block_number => {
+                    res = false;
                 }
                 BlockNumberOrTag::Earliest => {
                     res = false;

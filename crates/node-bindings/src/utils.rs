@@ -38,6 +38,7 @@ impl GracefulShutdown {
         }
 
         child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
+        let _ = child.wait();
     }
 }
 
@@ -101,10 +102,6 @@ pub fn run_with_tempdir_sync(prefix: &str, f: impl FnOnce(PathBuf)) {
     let temp_dir = TempDir::with_prefix(prefix).unwrap();
     let temp_dir_path = temp_dir.path().to_path_buf();
     f(temp_dir_path);
-    #[cfg(not(windows))]
-    {
-        let _ = temp_dir.close();
-    }
 }
 
 /// Runs the given async closure with a temporary directory.
@@ -116,10 +113,6 @@ where
     let temp_dir = TempDir::with_prefix(prefix).unwrap();
     let temp_dir_path = temp_dir.path().to_path_buf();
     f(temp_dir_path).await;
-    #[cfg(not(windows))]
-    {
-        let _ = temp_dir.close();
-    }
 }
 
 #[cfg(test)]
@@ -196,5 +189,19 @@ mod tests {
             assert!(path.is_dir(), "Temporary directory should be a directory");
         })
         .await;
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn graceful_shutdown_reaps_after_force_kill() {
+        let mut child = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("trap '' TERM; while :; do :; done")
+            .spawn()
+            .unwrap();
+
+        GracefulShutdown::shutdown(&mut child, 0, "sh");
+
+        assert!(child.try_wait().unwrap().is_some());
     }
 }
