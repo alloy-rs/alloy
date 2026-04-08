@@ -227,7 +227,7 @@ impl Params {
         }
 
         let is_transaction_receipts =
-            v.as_object().map_or(false, |obj| obj.contains_key("transactionHashes"));
+            v.as_object().is_some_and(|obj| obj.contains_key("transactionHashes"));
         if is_transaction_receipts {
             return serde_json::from_value::<TransactionReceiptsParams>(v).map(Into::into);
         }
