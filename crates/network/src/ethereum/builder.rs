@@ -403,6 +403,7 @@ mod tests {
             effective_gas_price: Some(1000),
             block_hash: None,
             block_number: None,
+            block_timestamp: None,
             transaction_index: None,
         };
 
