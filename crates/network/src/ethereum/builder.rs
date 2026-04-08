@@ -403,8 +403,8 @@ mod tests {
             effective_gas_price: Some(1000),
             block_hash: None,
             block_number: None,
-            transaction_index: None,
             block_timestamp: None,
+            transaction_index: None,
         };
 
         // Convert the transaction response into a transaction request via

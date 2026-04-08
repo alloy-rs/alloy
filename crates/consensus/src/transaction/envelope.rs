@@ -1567,7 +1567,7 @@ mod tests {
                     blob_versioned_hashes: vec![B256::random()],
                     max_fee_per_blob_gas: 0,
                 },
-                sidecar: BlobTransactionSidecarVariant::Eip4844(Default::default()),
+                sidecar: Default::default(),
             },
         );
         test_serde_roundtrip(tx);
