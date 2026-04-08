@@ -18,6 +18,7 @@ use alloy_eips::{
     eip7594::{BlobTransactionSidecarEip7594, CELLS_PER_EXT_BLOB},
     eip7685::Requests,
     eip7840::BlobParams,
+    eip7928::EMPTY_BLOCK_ACCESS_LIST_HASH,
     BlockNumHash,
 };
 use alloy_primitives::{keccak256, Address, Bloom, Bytes, Sealable, B256, B64, U256};
@@ -1505,7 +1506,9 @@ impl ExecutionPayloadV4 {
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`].
     ///
     /// This uses the header's `block_access_list_hash` bytes as the `block_access_list` fallback
-    /// when the full RLP-encoded block access list is not available on the block value.
+    /// when the full RLP-encoded block access list is not available on the block value. If the
+    /// block header does not carry a BAL hash, this falls back to the canonical empty BAL hash
+    /// bytes.
     /// Use [`Self::from_block_unchecked_with_bal`] when the full block access list bytes are
     /// available and should be preserved.
     ///
@@ -1523,7 +1526,9 @@ impl ExecutionPayloadV4 {
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`] using the given block hash.
     ///
     /// This uses the header's `block_access_list_hash` bytes as the `block_access_list` fallback
-    /// because the full RLP-encoded block access list is not available on the block value.
+    /// because the full RLP-encoded block access list is not available on the block value. If the
+    /// block header does not carry a BAL hash, this falls back to the canonical empty BAL hash
+    /// bytes.
     /// Use [`Self::from_block_unchecked_with_bal`] when the full block access list bytes are
     /// available and should be preserved.
     ///
@@ -1538,7 +1543,10 @@ impl ExecutionPayloadV4 {
             block_access_list: block
                 .header
                 .block_access_list_hash()
-                .map_or_else(Bytes::default, |hash| Bytes::copy_from_slice(hash.as_slice())),
+                .map_or_else(
+                    || Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice()),
+                    |hash| Bytes::copy_from_slice(hash.as_slice()),
+                ),
             slot_number: block.header.slot_number().unwrap_or_default(),
         }
     }
@@ -2153,8 +2161,9 @@ impl ExecutionPayload {
     ///
     /// For Amsterdam/V4 payloads this uses the header's `block_access_list_hash` bytes as the
     /// `block_access_list` fallback, because the full RLP-encoded block access list is not part of
-    /// the block value. Use [`Self::from_block_unchecked_with_bal`] when the full block access
-    /// list bytes are available and should be preserved.
+    /// the block value. If the block header does not carry a BAL hash, this falls back to the
+    /// canonical empty BAL hash bytes. Use [`Self::from_block_unchecked_with_bal`] when the full
+    /// block access list bytes are available and should be preserved.
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     /// See also [`ExecutionPayloadSidecar::from_block`].
@@ -3266,7 +3275,8 @@ impl ExecutionData {
     /// [`RequestsOrHash`](alloy_eips::eip7685::RequestsOrHash).
     /// Likewise, Amsterdam/V4 payload conversion falls back to the header's
     /// `block_access_list_hash` bytes when the full RLP-encoded block access list is not
-    /// available on the block value.
+    /// available on the block value, or to the canonical empty BAL hash bytes if the header does
+    /// not carry a BAL hash.
     ///
     /// See also [`ExecutionPayload::from_block_unchecked`].
     pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
@@ -4484,6 +4494,21 @@ mod tests {
         let payload = payload.as_v4().expect("expected V4 payload");
         assert_eq!(payload.block_access_list, Bytes::copy_from_slice(bal_hash.as_slice()));
         assert_eq!(payload.slot_number, 7);
+    }
+
+    #[test]
+    fn payload_v4_from_block_without_bal_hash_uses_empty_bal_hash_bytes() {
+        let mut header = Header::default();
+        header.slot_number = Some(3);
+
+        let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
+        let payload = ExecutionPayloadV4::from_block_unchecked(B256::with_last_byte(2), &block);
+
+        assert_eq!(
+            payload.block_access_list,
+            Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice())
+        );
+        assert_eq!(payload.slot_number, 3);
     }
 
     #[test]
