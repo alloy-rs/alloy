@@ -1,7 +1,7 @@
 //! Ethereum types for pub-sub
 
 use crate::{Filter, Header, Log, Transaction, TransactionReceipt};
-use alloc::{boxed::Box, format, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::B256;
 use alloy_serde::WithOtherFields;
 
@@ -123,15 +123,13 @@ pub enum SubscriptionKind {
     TransactionReceipts,
 }
 
-/// The maximum number of transaction hash criteria allowed in a single subscription.
-pub const MAX_TX_HASHES: usize = 200;
-
 /// Parameters for transaction receipts subscription.
 ///
 /// # Example
 ///
+/// Subscribe to specific transaction receipts:
+///
 /// ```json
-/// // Subscribe to specific transaction receipts
 /// {
 ///   "transactionHashes": [
 ///     "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"
@@ -139,24 +137,26 @@ pub const MAX_TX_HASHES: usize = 200;
 /// }
 /// ```
 ///
+/// Subscribe to all transaction receipts (no filter):
+///
 /// ```json
-/// // Subscribe to all transaction receipts (no filter)
 /// {
 ///   "transactionHashes": null
 /// }
+/// ```
+///
 /// ```json
-/// // Subscribe to all transaction receipts (no filter)
 /// {
 ///   "transactionHashes": []
 /// }
 /// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
 pub struct TransactionReceiptsParams {
     /// Optional list of transaction hashes to filter by.
+    ///
     /// If not provided or empty, all transaction receipts will be returned.
-    /// Limited to MAX_TX_HASHES items.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub transaction_hashes: Option<Vec<B256>>,
 }
@@ -251,69 +251,6 @@ impl From<bool> for Params {
 impl From<TransactionReceiptsParams> for Params {
     fn from(params: TransactionReceiptsParams) -> Self {
         Self::TransactionReceipts(params)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for TransactionReceiptsParams {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use core::fmt;
-        use serde::de::{Error, MapAccess, Visitor};
-
-        struct TransactionReceiptsParamsVisitor;
-
-        impl<'de> Visitor<'de> for TransactionReceiptsParamsVisitor {
-            type Value = TransactionReceiptsParams;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a transaction receipts parameters object")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                let mut transaction_hashes: Option<Option<Vec<B256>>> = None;
-
-                while let Some(key) = map.next_key::<alloc::string::String>()? {
-                    match key.as_str() {
-                        "transactionHashes" => {
-                            if transaction_hashes.is_some() {
-                                return Err(A::Error::duplicate_field("transactionHashes"));
-                            }
-                            let hashes: Option<Vec<B256>> = map.next_value()?;
-
-                            if let Some(ref hash_vec) = hashes {
-                                if hash_vec.len() > MAX_TX_HASHES {
-                                    return Err(A::Error::custom(format!(
-                                        "exceed max number of transaction hashes allowed per transactionReceipts subscription: {} items (max: {})",
-                                        hash_vec.len(),
-                                        MAX_TX_HASHES
-                                    )));
-                                }
-                            }
-
-                            transaction_hashes = Some(hashes);
-                        }
-                        key => {
-                            return Err(serde::de::Error::unknown_field(
-                                key,
-                                &["transactionHashes"],
-                            ))
-                        }
-                    }
-                }
-
-                Ok(TransactionReceiptsParams {
-                    transaction_hashes: transaction_hashes.unwrap_or_default(),
-                })
-            }
-        }
-
-        deserializer.deserialize_map(TransactionReceiptsParamsVisitor)
     }
 }
 
@@ -516,27 +453,6 @@ mod tests {
         let serialized = serde_json::to_string(&param).unwrap();
         let expected = r#"{"transactionHashes":["0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"]}"#;
         assert_eq!(serialized, expected);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn params_transaction_hashes_limit() {
-        // Test rejection of arrays exceeding the limit
-        let large_array: Vec<_> = (0..=MAX_TX_HASHES).map(|i| format!("0x{:064x}", i)).collect();
-        let json_payload = serde_json::json!({ "transactionHashes": large_array });
-        let result: Result<TransactionReceiptsParams, _> = serde_json::from_value(json_payload);
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("exceed max number of transaction hashes"));
-
-        // Test acceptance of arrays at the limit
-        let valid_array: Vec<_> = (0..MAX_TX_HASHES).map(|i| format!("0x{:064x}", i)).collect();
-        let json_payload = serde_json::json!({ "transactionHashes": valid_array });
-        let result: Result<TransactionReceiptsParams, _> = serde_json::from_value(json_payload);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().transaction_hashes.unwrap().len(), MAX_TX_HASHES);
     }
 
     #[test]
