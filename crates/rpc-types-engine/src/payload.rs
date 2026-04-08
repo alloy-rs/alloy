@@ -1504,6 +1504,11 @@ impl ssz::Encode for ExecutionPayloadV4 {
 impl ExecutionPayloadV4 {
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`].
     ///
+    /// This uses the header's `block_access_list_hash` bytes as the `block_access_list` fallback
+    /// when the full RLP-encoded block access list is not available on the block value.
+    /// Use [`Self::from_block_unchecked_with_bal`] when the full block access list bytes are
+    /// available and should be preserved.
+    ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     ///
     /// Note: This re-calculates the block hash.
@@ -1517,6 +1522,11 @@ impl ExecutionPayloadV4 {
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`] using the given block hash.
     ///
+    /// This uses the header's `block_access_list_hash` bytes as the `block_access_list` fallback
+    /// because the full RLP-encoded block access list is not available on the block value.
+    /// Use [`Self::from_block_unchecked_with_bal`] when the full block access list bytes are
+    /// available and should be preserved.
+    ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
     where
@@ -1525,13 +1535,19 @@ impl ExecutionPayloadV4 {
     {
         Self {
             payload_inner: ExecutionPayloadV3::from_block_unchecked(block_hash, block),
-            block_access_list: Default::default(),
+            block_access_list: block
+                .header
+                .block_access_list_hash()
+                .map_or_else(Bytes::default, |hash| Bytes::copy_from_slice(hash.as_slice())),
             slot_number: block.header.slot_number().unwrap_or_default(),
         }
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`] using the given block hash
     /// and block access list.
+    ///
+    /// Unlike [`Self::from_block_unchecked`], this preserves the full RLP-encoded block access
+    /// list instead of falling back to the header hash bytes.
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     pub fn from_block_unchecked_with_bal<T, H>(
@@ -2113,7 +2129,9 @@ impl ExecutionPayload {
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
-    /// [`ExecutionPayloadSidecar`] extracted from the block.(for BAL)
+    /// [`ExecutionPayloadSidecar`] extracted from the block along with block access list.
+    ///
+    /// This preserves the full RLP-encoded block access list for Amsterdam/V4 payloads.
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     /// See also [`ExecutionPayloadSidecar::from_block`].
@@ -2132,6 +2150,11 @@ impl ExecutionPayload {
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
     /// [`ExecutionPayloadSidecar`] extracted from the block.
+    ///
+    /// For Amsterdam/V4 payloads this uses the header's `block_access_list_hash` bytes as the
+    /// `block_access_list` fallback, because the full RLP-encoded block access list is not part of
+    /// the block value. Use [`Self::from_block_unchecked_with_bal`] when the full block access
+    /// list bytes are available and should be preserved.
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     /// See also [`ExecutionPayloadSidecar::from_block`].
@@ -2164,6 +2187,8 @@ impl ExecutionPayload {
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
     /// [`ExecutionPayloadSidecar`] extracted from the block along with block access list.
+    ///
+    /// This preserves the full RLP-encoded block access list for Amsterdam/V4 payloads.
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     /// See also [`ExecutionPayloadSidecar::from_block`].
@@ -3239,6 +3264,9 @@ impl ExecutionData {
     /// For the [`ExecutionPayloadSidecar`] this is expected to use just the requests hash, because
     /// the [`Requests`] are not part of the block/header. See also
     /// [`RequestsOrHash`](alloy_eips::eip7685::RequestsOrHash).
+    /// Likewise, Amsterdam/V4 payload conversion falls back to the header's
+    /// `block_access_list_hash` bytes when the full RLP-encoded block access list is not
+    /// available on the block value.
     ///
     /// See also [`ExecutionPayload::from_block_unchecked`].
     pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
@@ -4441,6 +4469,21 @@ mod tests {
         let serialized = serde_json::to_string(&payload).unwrap();
         let deserialized: ExecutionPayloadV4 = serde_json::from_str(&serialized).unwrap();
         assert_eq!(payload, deserialized);
+    }
+
+    #[test]
+    fn payload_v4_from_block_falls_back_to_bal_hash_bytes() {
+        let bal_hash = b256!("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+        let mut header = Header::default();
+        header.block_access_list_hash = Some(bal_hash);
+        header.slot_number = Some(7);
+
+        let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
+        let (payload, _) = ExecutionPayload::from_block_unchecked(B256::with_last_byte(1), &block);
+
+        let payload = payload.as_v4().expect("expected V4 payload");
+        assert_eq!(payload.block_access_list, Bytes::copy_from_slice(bal_hash.as_slice()));
+        assert_eq!(payload.slot_number, 7);
     }
 
     #[test]
