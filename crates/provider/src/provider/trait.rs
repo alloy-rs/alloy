@@ -302,7 +302,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             }
         };
 
-        Ok(estimator.estimate(base_fee_per_gas, &fee_history.reward.unwrap_or_default()))
+        let ctx = utils::FeeEstimationContext {
+            base_fee_per_gas,
+            rewards: fee_history.reward.as_deref().unwrap_or_default(),
+            gas_used_ratio: &fee_history.gas_used_ratio,
+        };
+        Ok(estimator.estimate(&ctx))
     }
 
     /// Estimates the [EIP-1559] `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -2573,7 +2578,7 @@ mod tests {
             .connect_anvil();
 
         let _ = provider
-            .estimate_eip1559_fees_with(Eip1559Estimator::new(|_fee, _rewards| Eip1559Estimation {
+            .estimate_eip1559_fees_with(Eip1559Estimator::new(|_ctx| Eip1559Estimation {
                 max_fee_per_gas: 0,
                 max_priority_fee_per_gas: 0,
             }))
