@@ -8,7 +8,6 @@ use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip1898::BlockWithParent,
     eip7840::BlobParams,
-    eip7928::EMPTY_BLOCK_ACCESS_LIST_HASH,
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
 };
@@ -384,9 +383,6 @@ impl Header {
         self.requests_hash.is_some()
     }
 
-    /// True if the Amsterdam hardfork is active.
-    ///
-    /// This function checks that the block access list hash is present.
     pub const fn amsterdam_active(&self) -> bool {
         self.block_access_list_hash.is_some()
     }
@@ -664,14 +660,8 @@ pub trait BlockHeader {
     /// Retrieves the requests hash of the block, if available
     fn requests_hash(&self) -> Option<B256>;
 
-    /// Retrieves the block access list hash of the block, if available
-    ///
-    /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
     fn block_access_list_hash(&self) -> Option<B256>;
 
-    /// Retrieves the slot number of the block, if available
-    ///
-    /// [EIP-7843]: https://eips.ethereum.org/EIPS/eip-7843
     fn slot_number(&self) -> Option<u64>;
 
     /// Retrieves the block's extra data field
@@ -740,17 +730,12 @@ pub trait BlockHeader {
         BlockNumHash { number: self.number().saturating_sub(1), hash: self.parent_hash() }
     }
 
-    /// Checks if the header is considered empty - has no transactions, no ommers or withdrawals or
-    /// bal
+    /// Checks if the header is considered empty - has no transactions, no ommers or withdrawals
     fn is_empty(&self) -> bool {
         let txs_and_ommers_empty = self.transactions_root() == EMPTY_ROOT_HASH
             && self.ommers_hash() == EMPTY_OMMER_ROOT_HASH;
-
-        let bal_empty =
-            self.block_access_list_hash().is_none_or(|hash| hash == EMPTY_BLOCK_ACCESS_LIST_HASH);
-
-        self.withdrawals_root().map_or(txs_and_ommers_empty && bal_empty, |withdrawals_root| {
-            txs_and_ommers_empty && bal_empty && withdrawals_root == EMPTY_ROOT_HASH
+        self.withdrawals_root().map_or(txs_and_ommers_empty, |withdrawals_root| {
+            txs_and_ommers_empty && withdrawals_root == EMPTY_ROOT_HASH
         })
     }
 
