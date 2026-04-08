@@ -454,20 +454,19 @@ mod tests {
 
     /// Helper to build a call frame tree for testing.
     fn make_frame(label: &str, children: Vec<CallFrame>) -> CallFrame {
-        CallFrame {
-            typ: label.to_string(),
-            calls: children,
-            ..Default::default()
-        }
+        CallFrame { typ: label.to_string(), calls: children, ..Default::default() }
     }
 
     #[test]
     fn test_callframe_iter_all() {
         // Build tree:  A -> [B -> [D, E], C]
-        let root = make_frame("A", vec![
-            make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
-            make_frame("C", vec![]),
-        ]);
+        let root = make_frame(
+            "A",
+            vec![
+                make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
+                make_frame("C", vec![]),
+            ],
+        );
 
         let labels: Vec<&str> = root.iter().map(|f| f.typ.as_str()).collect();
         assert_eq!(labels, vec!["A", "B", "D", "E", "C"]);
@@ -476,10 +475,13 @@ mod tests {
     #[test]
     fn test_callframe_iter_skip_children() {
         // Build tree:  A -> [B -> [D, E], C]
-        let root = make_frame("A", vec![
-            make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
-            make_frame("C", vec![]),
-        ]);
+        let root = make_frame(
+            "A",
+            vec![
+                make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
+                make_frame("C", vec![]),
+            ],
+        );
 
         let mut labels = Vec::new();
         let mut iter = root.iter();
@@ -501,10 +503,7 @@ mod tests {
 
     #[test]
     fn test_callframe_iter_skip_root_children() {
-        let root = make_frame("A", vec![
-            make_frame("B", vec![]),
-            make_frame("C", vec![]),
-        ]);
+        let root = make_frame("A", vec![make_frame("B", vec![]), make_frame("C", vec![])]);
 
         let mut iter = root.iter();
         let first = iter.next().unwrap();
