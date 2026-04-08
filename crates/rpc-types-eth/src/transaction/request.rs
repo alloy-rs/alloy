@@ -1561,7 +1561,7 @@ pub(super) mod serde_bincode_compat {
         use crate::TransactionRequest;
         use arbitrary::Arbitrary;
         use bincode::config;
-        use rand::Rng;
+        use rand::{rngs::StdRng, Rng, SeedableRng};
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
 
@@ -1577,7 +1577,7 @@ pub(super) mod serde_bincode_compat {
             }
 
             let mut bytes = vec![0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
+            StdRng::seed_from_u64(0x3600_4844_7594_7702).fill(bytes.as_mut_slice());
             let data = Data {
                 transaction: TransactionRequest::arbitrary(&mut arbitrary::Unstructured::new(
                     &bytes,
