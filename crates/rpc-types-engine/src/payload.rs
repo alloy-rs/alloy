@@ -1540,13 +1540,10 @@ impl ExecutionPayloadV4 {
     {
         Self {
             payload_inner: ExecutionPayloadV3::from_block_unchecked(block_hash, block),
-            block_access_list: block
-                .header
-                .block_access_list_hash()
-                .map_or_else(
-                    || Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice()),
-                    |hash| Bytes::copy_from_slice(hash.as_slice()),
-                ),
+            block_access_list: block.header.block_access_list_hash().map_or_else(
+                || Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice()),
+                |hash| Bytes::copy_from_slice(hash.as_slice()),
+            ),
             slot_number: block.header.slot_number().unwrap_or_default(),
         }
     }
@@ -4484,9 +4481,11 @@ mod tests {
     #[test]
     fn payload_v4_from_block_falls_back_to_bal_hash_bytes() {
         let bal_hash = b256!("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
-        let mut header = Header::default();
-        header.block_access_list_hash = Some(bal_hash);
-        header.slot_number = Some(7);
+        let header = Header {
+            block_access_list_hash: Some(bal_hash),
+            slot_number: Some(7),
+            ..Default::default()
+        };
 
         let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
         let (payload, _) = ExecutionPayload::from_block_unchecked(B256::with_last_byte(1), &block);
@@ -4498,8 +4497,7 @@ mod tests {
 
     #[test]
     fn payload_v4_from_block_without_bal_hash_uses_empty_bal_hash_bytes() {
-        let mut header = Header::default();
-        header.slot_number = Some(3);
+        let header = Header { slot_number: Some(3), ..Default::default() };
 
         let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
         let payload = ExecutionPayloadV4::from_block_unchecked(B256::with_last_byte(2), &block);
