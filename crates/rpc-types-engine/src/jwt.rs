@@ -251,8 +251,7 @@ impl JwtSecret {
     /// backend to be selected at build time. This crate does not pick one for you; enable
     /// either the `jwt-aws-lc-rs` feature on this crate, or one of `jsonwebtoken`'s own
     /// backend features (`aws_lc_rs`, `rust_crypto`, or `hmac` + `sha2`) from your
-    /// `Cargo.toml`. Without a backend selected the crate will fail to build. See the
-    /// [module-level docs](self) for details.
+    /// `Cargo.toml`. Without a backend selected the crate will fail to build.
     #[cfg(feature = "serde")]
     pub fn validate(&self, jwt: &str) -> Result<(), JwtError> {
         // Create a new validation object with the required signature algorithm
