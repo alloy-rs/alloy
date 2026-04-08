@@ -48,7 +48,6 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 rand = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
 
-
 [features]
 default = ["jwt", "std", "serde"]
 std = [
