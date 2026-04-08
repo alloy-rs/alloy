@@ -128,6 +128,7 @@ where
 
 #[cfg(all(not(debug_assertions), feature = "serde"))]
 #[inline(always)]
+/// Helper function to deserialize boxed blobs from a serde deserializer.
 pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<alloc::vec::Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
