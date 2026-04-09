@@ -1,12 +1,12 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilder7702,
-    TransactionBuilderError,
+    BuildResult, Ethereum, Network, NetworkTransactionBuilder, NetworkWallet, TransactionBuilder,
+    TransactionBuilder7702, TransactionBuilderError,
 };
 use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList, TransactionInputKind};
 
-impl TransactionBuilder<Ethereum> for TransactionRequest {
+impl TransactionBuilder for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
@@ -114,17 +114,9 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn set_access_list(&mut self, access_list: AccessList) {
         self.access_list = Some(access_list);
     }
+}
 
-    fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
-        match ty {
-            TxType::Legacy => self.complete_legacy(),
-            TxType::Eip2930 => self.complete_2930(),
-            TxType::Eip1559 => self.complete_1559(),
-            TxType::Eip4844 => self.complete_4844(),
-            TxType::Eip7702 => self.complete_7702(),
-        }
-    }
-
+impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     fn can_submit(&self) -> bool {
         // value and data may be None. If they are, they will be set to default.
         // gas fields and nonce may be None, if they are, they will be populated
@@ -148,6 +140,16 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 
         let eip7702 = eip1559 && self.authorization_list().is_some();
         common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)
+    }
+
+    fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
+        match ty {
+            TxType::Legacy => self.complete_legacy(),
+            TxType::Eip2930 => self.complete_2930(),
+            TxType::Eip1559 => self.complete_1559(),
+            TxType::Eip4844 => self.complete_4844(),
+            TxType::Eip7702 => self.complete_7702(),
+        }
     }
 
     #[doc(alias = "output_transaction_type")]
@@ -185,7 +187,8 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 #[cfg(test)]
 mod tests {
     use crate::{
-        TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError,
+        NetworkTransactionBuilder, TransactionBuilder, TransactionBuilder4844,
+        TransactionBuilder7702, TransactionBuilderError,
     };
     use alloy_consensus::{
         transaction::Recovered, BlobTransactionSidecar, SignableTransaction, TxEip1559, TxEnvelope,

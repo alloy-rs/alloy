@@ -374,7 +374,7 @@ where
     /// # use alloy_primitives::{address, U256};
     /// # use alloy_provider::ProviderBuilder;
     /// # use alloy_rpc_types_eth::TransactionRequest;
-    /// # use alloy_network::TransactionBuilder;
+    /// # use alloy_network::{NetworkTransactionBuilder, TransactionBuilder};
     ///
     /// # #[cfg(feature = "anvil-node")]
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
