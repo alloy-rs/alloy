@@ -2668,6 +2668,126 @@ impl ExecutionPayload {
                 })
         })
     }
+
+    /// Sets the parent hash for the payload.
+    #[doc(hidden)]
+    pub const fn set_parent_hash(&mut self, parent_hash: B256) {
+        self.as_v1_mut().parent_hash = parent_hash;
+    }
+
+    /// Sets the fee recipient for the payload.
+    #[doc(hidden)]
+    pub const fn set_fee_recipient(&mut self, fee_recipient: Address) {
+        self.as_v1_mut().fee_recipient = fee_recipient;
+    }
+
+    /// Sets the state root for the payload.
+    #[doc(hidden)]
+    pub const fn set_state_root(&mut self, state_root: B256) {
+        self.as_v1_mut().state_root = state_root;
+    }
+
+    /// Sets the receipts root for the payload.
+    #[doc(hidden)]
+    pub const fn set_receipts_root(&mut self, receipts_root: B256) {
+        self.as_v1_mut().receipts_root = receipts_root;
+    }
+
+    /// Sets the logs bloom for the payload.
+    #[doc(hidden)]
+    pub const fn set_logs_bloom(&mut self, logs_bloom: Bloom) {
+        self.as_v1_mut().logs_bloom = logs_bloom;
+    }
+
+    /// Sets the prev randao for the payload.
+    #[doc(hidden)]
+    pub const fn set_prev_randao(&mut self, prev_randao: B256) {
+        self.as_v1_mut().prev_randao = prev_randao;
+    }
+
+    /// Sets the block number for the payload.
+    #[doc(hidden)]
+    pub const fn set_block_number(&mut self, block_number: u64) {
+        self.as_v1_mut().block_number = block_number;
+    }
+
+    /// Sets the gas limit for the payload.
+    #[doc(hidden)]
+    pub const fn set_gas_limit(&mut self, gas_limit: u64) {
+        self.as_v1_mut().gas_limit = gas_limit;
+    }
+
+    /// Sets the gas used for the payload.
+    #[doc(hidden)]
+    pub const fn set_gas_used(&mut self, gas_used: u64) {
+        self.as_v1_mut().gas_used = gas_used;
+    }
+
+    /// Sets the timestamp for the payload.
+    #[doc(hidden)]
+    pub const fn set_timestamp(&mut self, timestamp: u64) {
+        self.as_v1_mut().timestamp = timestamp;
+    }
+
+    /// Sets the extra data for the payload.
+    #[doc(hidden)]
+    pub fn set_extra_data(&mut self, extra_data: Bytes) {
+        self.as_v1_mut().extra_data = extra_data;
+    }
+
+    /// Sets the base fee per gas for the payload.
+    #[doc(hidden)]
+    pub const fn set_base_fee_per_gas(&mut self, base_fee_per_gas: U256) {
+        self.as_v1_mut().base_fee_per_gas = base_fee_per_gas;
+    }
+
+    /// Sets the block hash for the payload.
+    #[doc(hidden)]
+    pub const fn set_block_hash(&mut self, block_hash: B256) {
+        self.as_v1_mut().block_hash = block_hash;
+    }
+
+    /// Sets the withdrawals for the payload.
+    ///
+    /// Returns `true` if the payload is V2 or higher and the withdrawals were set.
+    #[doc(hidden)]
+    pub fn set_withdrawals(&mut self, withdrawals: Vec<Withdrawal>) -> bool {
+        match self.as_v2_mut() {
+            Some(payload) => {
+                payload.withdrawals = withdrawals;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Sets the blob gas used for the payload.
+    ///
+    /// Returns `true` if the payload is V3 or higher and the value was set.
+    #[doc(hidden)]
+    pub const fn set_blob_gas_used(&mut self, blob_gas_used: u64) -> bool {
+        match self.as_v3_mut() {
+            Some(payload) => {
+                payload.blob_gas_used = blob_gas_used;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Sets the excess blob gas for the payload.
+    ///
+    /// Returns `true` if the payload is V3 or higher and the value was set.
+    #[doc(hidden)]
+    pub const fn set_excess_blob_gas(&mut self, excess_blob_gas: u64) -> bool {
+        match self.as_v3_mut() {
+            Some(payload) => {
+                payload.excess_blob_gas = excess_blob_gas;
+                true
+            }
+            None => false,
+        }
+    }
 }
 
 impl From<ExecutionPayloadV1> for ExecutionPayload {
