@@ -75,7 +75,7 @@ impl<TxReq> SimBlock<TxReq> {
 }
 
 /// Represents the result of simulating a block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulatedBlock<B = Block> {
@@ -100,6 +100,16 @@ pub struct SimCallResult {
     /// The amount of gas used by the transaction.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
+    /// Maximum gas consumed during execution, before refunds.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub max_used_gas: Option<u64>,
     /// The final status of the transaction, typically indicating success or failure.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub status: bool,
@@ -195,6 +205,9 @@ pub struct SimulateError {
     pub code: i32,
     /// Message error
     pub message: String,
+    /// Data for the error, e.g. revert reason.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub data: Option<Bytes>,
 }
 
 impl SimulateError {
@@ -207,17 +220,44 @@ impl SimulateError {
 
     /// Creates a new invalid params error.
     pub fn invalid_params() -> Self {
-        Self { code: Self::INVALID_PARAMS_ERROR_CODE, message: "invalid params".to_string() }
+        Self {
+            code: Self::INVALID_PARAMS_ERROR_CODE,
+            message: "invalid params".to_string(),
+            data: None,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{Address, TxKind};
+    use alloy_primitives::{bytes, Address, TxKind};
     #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_deserialize_simulate_error_no_data() {
+        let error_json = json!({
+            "code": -32000,
+            "message": "Execution reverted"
+        });
+        let err: SimulateError = serde_json::from_value(error_json).unwrap();
+        assert_eq!(err.data, None);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_deserialize_simulate_error_with_data() {
+        let error_json = json!({
+            "code": -32000,
+            "message": "Execution reverted",
+            "data": "0xcabedea8"
+        });
+        let err: SimulateError = serde_json::from_value(error_json).unwrap();
+        assert_eq!(err.data, Some(bytes!("cabedea8")));
+    }
 
     #[test]
     #[cfg(feature = "serde")]
