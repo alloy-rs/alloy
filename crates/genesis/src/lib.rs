@@ -312,7 +312,6 @@ impl From<GenesisAccount> for TrieAccount {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
-#[expect(clippy::manual_non_exhaustive)]
 pub struct ChainConfig {
     /// The network's chain ID.
     pub chain_id: u64,
@@ -456,7 +455,9 @@ pub struct ChainConfig {
     pub blob_schedule: BTreeMap<String, BlobParams>,
 
     /// Non-exhaustive field to allow adding new fields to the struct without breaking changes.
-    _non_exhaustive: (),
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub _non_exhaustive: (),
 }
 
 /// Bincode-compatible [`ChainConfig`] serde implementation.
