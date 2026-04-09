@@ -456,7 +456,9 @@ pub struct ChainConfig {
     pub blob_schedule: BTreeMap<String, BlobParams>,
 
     /// Non-exhaustive field to allow adding new fields to the struct without breaking changes.
-    _non_exhaustive: (),
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub _non_exhaustive: (),
 }
 
 /// Bincode-compatible [`ChainConfig`] serde implementation.
