@@ -8,7 +8,7 @@ use alloy_eips::{
     Decodable2718, Typed2718,
 };
 use alloy_primitives::{Bloom, Log};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpEncodable, RlpDecodable};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable};
 use core::fmt;
 
 /// Receipt containing result of transaction execution.
