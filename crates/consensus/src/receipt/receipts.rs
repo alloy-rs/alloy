@@ -12,7 +12,7 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::fmt;
 
 /// Receipt containing result of transaction execution.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, alloy_rlp::RlpEncodable, alloy_rlp::RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -572,6 +572,40 @@ mod test {
                 "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
             ))
         );
+    }
+
+    #[test]
+    fn slim_receipt_rlp_roundtrip_post_byzantium() {
+        let receipt = Receipt {
+            status: Eip658Value::Eip658(true),
+            cumulative_gas_used: 21000,
+            logs: vec![Log::default()],
+        };
+
+        let mut encoded = vec![];
+        receipt.encode(&mut encoded);
+
+        let decoded = Receipt::<Log>::decode(&mut encoded.as_slice()).unwrap();
+        assert_eq!(receipt, decoded);
+    }
+
+    #[test]
+    fn slim_receipt_rlp_roundtrip_pre_byzantium() {
+        use alloy_primitives::b256;
+
+        let receipt = Receipt {
+            status: Eip658Value::PostState(b256!(
+                "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
+            )),
+            cumulative_gas_used: 50000,
+            logs: vec![],
+        };
+
+        let mut encoded = vec![];
+        receipt.encode(&mut encoded);
+
+        let decoded = Receipt::<Log>::decode(&mut encoded.as_slice()).unwrap();
+        assert_eq!(receipt, decoded);
     }
 
     #[test]
