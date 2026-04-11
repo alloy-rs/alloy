@@ -8,11 +8,11 @@ use alloy_eips::{
     Decodable2718, Typed2718,
 };
 use alloy_primitives::{Bloom, Log};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpEncodable, RlpDecodable};
 use core::fmt;
 
 /// Receipt containing result of transaction execution.
-#[derive(Clone, Debug, Default, PartialEq, Eq, alloy_rlp::RlpEncodable, alloy_rlp::RlpDecodable)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
