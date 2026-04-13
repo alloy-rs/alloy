@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.0.0
 - Allow unused ignored advisories ([#3883](https://github.com/alloy-rs/alloy/issues/3883))
 - Make _non_exhaustive pub ([#3873](https://github.com/alloy-rs/alloy/issues/3873))
 - Added feature rlp to eip7928 ([#3865](https://github.com/alloy-rs/alloy/issues/3865))
