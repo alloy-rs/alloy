@@ -41,7 +41,7 @@ impl MaybeCancunPayloadFields {
         Self { fields: None }
     }
 
-    /// Returns a new `MaybeCancunPayloadFields` with the given cancun fields.
+    /// Consumes `self` and returns the contained [`CancunPayloadFields`], if present.
     pub fn into_inner(self) -> Option<CancunPayloadFields> {
         self.fields
     }

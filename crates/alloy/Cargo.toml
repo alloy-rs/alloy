@@ -143,7 +143,6 @@ wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 # ---------------------------------------- Main re-exports --------------------------------------- #
 
 # general
-consensus = ["dep:alloy-consensus"]
 contract = [
     "dep:alloy-contract",
     "providers",
@@ -152,11 +151,15 @@ contract = [
     "json",
     "sol-types",
 ]
-eips = ["dep:alloy-eips"]
+eips = ["dep:alloy-eips", "rlp"]
 ens = ["dep:alloy-ens"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
+
+# consensus
+consensus = ["dep:alloy-consensus", "rlp"]
+consensus-secp256k1 = ["consensus", "alloy-consensus?/secp256k1"]
 
 # providers
 providers = [
@@ -248,7 +251,6 @@ rpc-types-engine = [
     "alloy-provider?/engine-api",
 ]
 rpc-types-eth = ["rpc-types", "alloy-rpc-types?/eth"]
-rpc-types-json = ["rpc-types", "alloy-rpc-types?/jsonrpsee-types"]
 rpc-types-mev = ["rpc-types", "alloy-rpc-types?/mev"]
 rpc-types-trace = [
     "rpc-types",
@@ -282,7 +284,10 @@ signer-mnemonic-all-languages = [
     "alloy-signer-local?/mnemonic-all-languages",
 ]
 signer-yubihsm = ["signer-local", "alloy-signer-local?/yubihsm"]
-
+secp256k1 = [
+	"alloy-consensus?/secp256k1",
+	"alloy-signer-local?/secp256k1"
+]
 # transports
 transports = ["dep:alloy-transport"]
 transport-http = ["transports", "dep:alloy-transport-http"]
@@ -337,11 +342,12 @@ eip712 = [
     "alloy-signer-aws?/eip712",
     "alloy-signer-gcp?/eip712",
     "alloy-signer-ledger?/eip712",
+    "alloy-signer-local?/eip712",
     "alloy-signer-turnkey?/eip712",
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
 ]
-more-tuple-impls = ["alloy-core/more-tuple-impls"]
+more-tuple-impls = ["alloy-core/more-tuple-impls", "alloy-provider/more-tuple-impls"]
 
 arbitrary = [
     "alloy-core/arbitrary",

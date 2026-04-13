@@ -61,6 +61,17 @@ impl RequestMeta {
     pub const fn extensions_mut(&mut self) -> &mut Extensions {
         &mut self.extensions
     }
+
+    /// Returns a reference to the request headers, if any.
+    pub fn headers(&self) -> Option<&http::HeaderMap> {
+        self.extensions.get::<http::HeaderMap>()
+    }
+
+    /// Returns a mutable reference to the request headers, inserting an empty
+    /// header map if one does not already exist.
+    pub fn headers_mut(&mut self) -> &mut http::HeaderMap {
+        self.extensions.get_or_insert_default::<http::HeaderMap>()
+    }
 }
 
 impl PartialEq for RequestMeta {
@@ -354,6 +365,17 @@ impl SerializedRequest {
         &mut self.meta
     }
 
+    /// Returns a reference to the request headers, if any.
+    pub fn headers(&self) -> Option<&http::HeaderMap> {
+        self.meta.headers()
+    }
+
+    /// Returns a mutable reference to the request headers, inserting an empty
+    /// header map if one does not already exist.
+    pub fn headers_mut(&mut self) -> &mut http::HeaderMap {
+        self.meta.headers_mut()
+    }
+
     /// Returns the request ID.
     pub const fn id(&self) -> &Id {
         &self.meta.id
@@ -362,6 +384,14 @@ impl SerializedRequest {
     /// Returns the request method.
     pub fn method(&self) -> &str {
         &self.meta.method
+    }
+
+    /// Returns the request method.
+    pub fn method_clone(&self) -> Cow<'static, str> {
+        match &self.meta.method {
+            Cow::Borrowed(b) => Cow::Borrowed(b),
+            Cow::Owned(o) => Cow::Owned(o.clone()),
+        }
     }
 
     /// Mark the request as a non-standard subscription (i.e. not

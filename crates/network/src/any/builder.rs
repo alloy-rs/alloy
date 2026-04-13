@@ -1,13 +1,13 @@
 use crate::{
-    any::AnyNetwork, BuildResult, Network, NetworkWallet, TransactionBuilder,
-    TransactionBuilderError,
+    any::AnyNetwork, BuildResult, Network, NetworkTransactionBuilder, NetworkWallet,
+    TransactionBuilder, TransactionBuilderError,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionInputKind, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use std::ops::{Deref, DerefMut};
 
-impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
+impl TransactionBuilder for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<ChainId> {
         self.deref().chain_id()
     }
@@ -109,17 +109,19 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn set_access_list(&mut self, access_list: AccessList) {
         self.deref_mut().set_access_list(access_list)
     }
+}
 
-    fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
-        self.deref().complete_type(ty.try_into().map_err(|_| vec!["unsupported_transaction_type"])?)
-    }
-
+impl NetworkTransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn can_submit(&self) -> bool {
         self.deref().can_submit()
     }
 
     fn can_build(&self) -> bool {
         self.deref().can_build()
+    }
+
+    fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
+        self.deref().complete_type(ty.try_into().map_err(|_| vec!["unsupported_transaction_type"])?)
     }
 
     #[doc(alias = "output_transaction_type")]
@@ -136,6 +138,21 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().prep_for_submission()
     }
 
+    /// Build an unsigned typed transaction.
+    ///
+    /// This method validates that all required fields are present and builds an
+    /// unsigned transaction. Returns an error if any required fields are missing.
+    ///
+    /// # Limitations
+    ///
+    /// The [`TransactionRequest`] can only build Ethereum transaction types
+    /// (Legacy, EIP-2930, EIP-1559, EIP-4844, EIP-7702). Attempting to build
+    /// unknown transaction types will result in an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TransactionBuilderError::InvalidTransactionRequest`] if required
+    /// fields are missing for the transaction type.
     fn build_unsigned(self) -> BuildResult<<AnyNetwork as Network>::UnsignedTx, AnyNetwork> {
         if let Err((tx_type, missing)) = self.missing_keys() {
             return Err(TransactionBuilderError::InvalidTransactionRequest(
@@ -146,6 +163,21 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         }
         Ok(self.inner.build_typed_tx().expect("checked by missing_keys").into())
     }
+
+    /// Build and sign a transaction using the provided wallet.
+    ///
+    /// This method signs the transaction request with the given wallet and returns
+    /// a signed transaction envelope ready for submission to the network.
+    ///
+    /// # Limitations
+    ///
+    /// The [`TransactionRequest`] can only build Ethereum transaction types.
+    /// Unknown transaction types cannot be signed through this builder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails or if the wallet cannot produce the
+    /// required signature type for the transaction.
     async fn build<W: NetworkWallet<AnyNetwork>>(
         self,
         wallet: &W,

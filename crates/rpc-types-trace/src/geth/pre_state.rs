@@ -48,6 +48,34 @@ impl PreStateFrame {
             _ => None,
         }
     }
+
+    /// Consumes the type and returns the prestate of the frame.
+    pub fn into_pre_state(self) -> BTreeMap<Address, AccountState> {
+        match self {
+            Self::Default(frame) => frame.0,
+            Self::Diff(frame) => frame.pre,
+        }
+    }
+
+    /// Returns the prestate of the frame.
+    pub const fn pre_state(&self) -> &BTreeMap<Address, AccountState> {
+        match self {
+            Self::Default(frame) => &frame.0,
+            Self::Diff(frame) => &frame.pre,
+        }
+    }
+}
+
+impl From<PreStateMode> for PreStateFrame {
+    fn from(mode: PreStateMode) -> Self {
+        Self::Default(mode)
+    }
+}
+
+impl From<DiffMode> for PreStateFrame {
+    fn from(mode: DiffMode) -> Self {
+        Self::Diff(mode)
+    }
 }
 
 /// Includes all the account states necessary to execute a given transaction.

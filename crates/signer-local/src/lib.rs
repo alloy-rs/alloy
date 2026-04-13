@@ -24,6 +24,9 @@ pub use mnemonic::{MnemonicBuilder, MnemonicBuilderError, MnemonicSignerIter};
 
 mod private_key;
 
+#[cfg(feature = "secp256k1")]
+mod secp256k1;
+
 #[cfg(feature = "yubihsm")]
 mod yubi;
 
@@ -33,21 +36,18 @@ pub use yubihsm;
 #[cfg(feature = "mnemonic")]
 pub use coins_bip39;
 
+#[cfg(feature = "secp256k1")]
+pub use self::secp256k1::Secp256k1Credential;
+
 /// A signer instantiated with a locally stored private key.
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
-#[doc(hidden)]
-#[deprecated(note = "use `PrivateKeySigner` instead")]
-pub type LocalWallet = PrivateKeySigner;
-
+/// A signer instantiated with a locally stored private key, using the `secp256k1` crate.
+#[cfg(feature = "secp256k1")]
+pub type Secp256k1Signer = LocalSigner<Secp256k1Credential>;
 /// A signer instantiated with a YubiHSM.
 #[cfg(feature = "yubihsm")]
 pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
-
-#[cfg(feature = "yubihsm")]
-#[doc(hidden)]
-#[deprecated(note = "use `YubiSigner` instead")]
-pub type YubiWallet = YubiSigner;
 
 /// An Ethereum private-public key pair which can be used for signing messages.
 ///

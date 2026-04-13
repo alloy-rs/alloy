@@ -348,8 +348,13 @@ impl LedgerSigner {
 
             debug!(chunk = hex::encode(chunk), "Dispatching packet to device");
             let res = transport.exchange(&command).await;
-            debug!(?res, "Received response from device");
-            let ans = res?;
+            let ans = match res {
+                Ok(ans) => ans,
+                Err(err) => {
+                    error!(%err, "Failed to receive response from device");
+                    return Err(err.into());
+                }
+            };
             let data = ans.data().ok_or(LedgerError::UnexpectedNullResponse)?;
             debug!(response = hex::encode(data), "Received response from device");
             answer = Some(ans);

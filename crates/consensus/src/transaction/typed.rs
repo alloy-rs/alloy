@@ -1,15 +1,17 @@
 pub use crate::transaction::envelope::EthereumTypedTransaction;
 use crate::{
     error::ValueError,
+    private::alloy_eips::eip2718::Eip2718Error,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        RlpEcdsaEncodableTx,
+        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
     EthereumTxEnvelope, SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
     TxType,
 };
-use alloy_eips::Typed2718;
-use alloy_primitives::{bytes::BufMut, ChainId, Signature, TxHash};
+use alloy_eips::{eip2718::Eip2718Result, Typed2718};
+use alloy_primitives::{ChainId, Signature, TxHash};
+use alloy_rlp::{Buf, BufMut, Decodable};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
 pub type TypedTransaction = EthereumTypedTransaction<TxEip4844Variant>;
@@ -123,6 +125,32 @@ impl<Eip4844> EthereumTypedTransaction<Eip4844> {
     }
 }
 
+impl<Eip4844: RlpEcdsaDecodableTx> EthereumTypedTransaction<Eip4844> {
+    /// Decode an unsigned typed transaction from RLP bytes.
+    pub fn decode_unsigned(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        if buf.is_empty() {
+            return Err(alloy_rlp::Error::InputTooShort.into());
+        }
+
+        let first_byte = buf[0];
+
+        // Eip2718: legacy transactions start with >= 0xc0
+        if first_byte >= 0xc0 {
+            return Ok(Self::Legacy(TxLegacy::decode(buf)?));
+        }
+
+        let tx_type = buf.get_u8();
+        match tx_type {
+            0x00 => Ok(Self::Legacy(TxLegacy::decode(buf)?)),
+            0x01 => Ok(Self::Eip2930(TxEip2930::decode(buf)?)),
+            0x02 => Ok(Self::Eip1559(TxEip1559::decode(buf)?)),
+            0x03 => Ok(Self::Eip4844(Eip4844::rlp_decode(buf)?)),
+            0x04 => Ok(Self::Eip7702(TxEip7702::decode(buf)?)),
+            _ => Err(Eip2718Error::UnexpectedType(tx_type)),
+        }
+    }
+}
+
 impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
     /// Return the [`TxType`] of the inner txn.
     #[doc(alias = "transaction_type")]
@@ -192,7 +220,7 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
         }
     }
 
-    /// Consumes the type and returns the EIP-4844 if this transaction is of that type.
+    /// Consumes the type and returns the EIP-7702 if this transaction is of that type.
     pub fn try_into_eip7702(self) -> Result<TxEip7702, ValueError<Self>> {
         match self {
             Self::Eip7702(tx) => Ok(tx),
@@ -473,5 +501,107 @@ pub(crate) mod serde_bincode_compat {
                 bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{Address, Bytes, U256};
+
+    #[test]
+    fn test_decode_unsigned_all_types() {
+        let transactions = [
+            TypedTransaction::Legacy(TxLegacy {
+                chain_id: Some(1),
+                nonce: 0,
+                gas_price: 1,
+                gas_limit: 2,
+                to: Address::ZERO.into(),
+                value: U256::ZERO,
+                input: Bytes::default(),
+            }),
+            TypedTransaction::Eip2930(TxEip2930 {
+                chain_id: 1,
+                nonce: 0,
+                gas_price: 1,
+                gas_limit: 2,
+                to: Address::ZERO.into(),
+                value: U256::ZERO,
+                input: Bytes::default(),
+                access_list: AccessList::default(),
+            }),
+            TypedTransaction::Eip1559(TxEip1559 {
+                chain_id: 1,
+                nonce: 0,
+                gas_limit: 1,
+                max_fee_per_gas: 2,
+                max_priority_fee_per_gas: 3,
+                to: Address::ZERO.into(),
+                value: U256::ZERO,
+                input: Bytes::default(),
+                access_list: AccessList::default(),
+            }),
+            TypedTransaction::Eip7702(TxEip7702 {
+                chain_id: 1,
+                nonce: 0,
+                gas_limit: 1,
+                max_fee_per_gas: 2,
+                max_priority_fee_per_gas: 3,
+                to: Address::ZERO,
+                value: U256::ZERO,
+                input: Bytes::default(),
+                access_list: AccessList::default(),
+                authorization_list: vec![],
+            }),
+        ];
+
+        for tx in transactions {
+            let mut encoded = Vec::new();
+            tx.encode_for_signing(&mut encoded);
+            let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap();
+            assert_eq!(decoded, tx);
+        }
+    }
+
+    #[test]
+    fn test_decode_unsigned_invalid_type() {
+        let invalid = vec![0x99, 0xc0];
+        let result = TypedTransaction::decode_unsigned(&mut invalid.as_slice());
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(matches!(err, alloy_eips::eip2718::Eip2718Error::UnexpectedType(0x99)));
+        }
+    }
+
+    #[test]
+    fn test_decode_unsigned_encode_stability() {
+        // Verify that decode(encode(tx)) == tx and encode(decode(encode(tx))) == encode(tx)
+        let tx = TypedTransaction::Eip1559(TxEip1559 {
+            chain_id: 1,
+            nonce: 100,
+            gas_limit: 50000,
+            max_fee_per_gas: 30_000_000_000,
+            max_priority_fee_per_gas: 2_000_000_000,
+            to: Address::random().into(),
+            value: U256::from(1_000_000),
+            input: Bytes::from(vec![1, 2, 3]),
+            access_list: AccessList::default(),
+        });
+
+        // Encode
+        let mut encoded = Vec::new();
+        tx.encode_for_signing(&mut encoded);
+
+        // Decode
+        let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap();
+        assert_eq!(decoded, tx);
+
+        // Re-encode
+        let mut re_encoded = Vec::new();
+        decoded.encode_for_signing(&mut re_encoded);
+
+        assert_eq!(encoded, re_encoded);
     }
 }

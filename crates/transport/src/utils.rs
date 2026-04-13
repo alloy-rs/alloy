@@ -31,8 +31,9 @@ pub fn guess_local_url(s: impl AsRef<str>) -> bool {
 pub trait Spawnable {
     /// Spawn the future as a task.
     ///
-    /// In WASM this will be a `wasm-bindgen-futures::spawn_local` call, while
-    /// in native it will be a `tokio::spawn` call.
+    /// In wasm32-unknown-unknown this will be a `wasm-bindgen-futures::spawn_local` call,
+    /// in wasm32-wasip1 it will be a `tokio::task::spawn_local` call,
+    /// and native will be a `tokio::spawn` call.
     fn spawn_task(self);
 }
 
@@ -46,7 +47,7 @@ where
     }
 }
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 impl<T> Spawnable for T
 where
     T: Future<Output = ()> + 'static,
@@ -57,5 +58,15 @@ where
 
         #[cfg(feature = "wasm-bindgen")]
         wasm_bindgen_futures::spawn_local(self);
+    }
+}
+
+#[cfg(all(target_family = "wasm", target_os = "wasi"))]
+impl<T> Spawnable for T
+where
+    T: Future<Output = ()> + 'static,
+{
+    fn spawn_task(self) {
+        tokio::task::spawn_local(self);
     }
 }

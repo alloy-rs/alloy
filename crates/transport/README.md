@@ -1,6 +1,38 @@
 # alloy-transport
 
-<!-- TODO: More links and real doctests -->
+### Example
+
+Send a JSON-RPC request through a mock transport using the `tower::Service` interface.
+
+```rust
+use alloy_transport::mock::{Asserter, MockTransport};
+use alloy_json_rpc as j;
+use tower::Service;
+
+// Prepare a mock response and a serialized request
+let asserter = Asserter::new();
+asserter.push_success(&12345u64);
+
+let req: j::SerializedRequest = j::Request::new("test_method", 1u64.into(), ())
+    .try_into()
+    .unwrap();
+let packet = j::RequestPacket::from(req);
+
+// Drive the service and assert the response
+let mut transport = MockTransport::new(asserter.clone());
+let resp = tokio::runtime::Runtime::new()
+    .unwrap()
+    .block_on(async move { transport.call(packet).await })
+    .unwrap();
+
+if let j::ResponsePacket::Single(r) = resp {
+    let n: u64 = match r.payload {
+        j::ResponsePayload::Success(val) => serde_json::from_str(val.get()).unwrap(),
+        j::ResponsePayload::Failure(err) => panic!("unexpected error: {err}"),
+    };
+    assert_eq!(n, 12345);
+}
+```
 
 Low-level Ethereum JSON-RPC transport abstraction.
 
@@ -16,6 +48,7 @@ with JSON-RPC servers that provide the standard Ethereum RPC endpoints, or the
 specific Ethereum endpoints.
 
 [alloy-provider]: https://docs.rs/alloy_provider/
+[alloy-rpc-client]: https://docs.rs/alloy_rpc_client/
 [tower `Service`]: https://docs.rs/tower/latest/tower/trait.Service.html
 
 ### Transports

@@ -205,17 +205,20 @@ impl<T: TransactionResponse> BlockTransactions<T> {
         self.into_hashes()
     }
 
-    /// Returns an iterator over the transaction hashes.
-    #[deprecated = "use `hashes` instead"]
-    #[inline]
-    pub fn iter(&self) -> BlockTransactionHashes<'_, T> {
-        self.hashes()
-    }
-
     /// Returns an iterator over references to the transaction hashes.
     #[inline]
     pub fn hashes(&self) -> BlockTransactionHashes<'_, T> {
         BlockTransactionHashes::new(self)
+    }
+
+    /// Consumes the type and returns the hashes as a vector.
+    ///
+    /// Note: if this is an uncle this will return an empty vector.
+    pub fn into_hashes_vec(self) -> Vec<B256> {
+        match self {
+            Self::Hashes(hashes) => hashes,
+            this => this.hashes().collect(),
+        }
     }
 }
 

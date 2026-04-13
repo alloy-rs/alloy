@@ -1,6 +1,8 @@
 mod with_auth;
 
-pub use self::with_auth::{sign_flashbots_payload, MevBuilder};
+pub use self::with_auth::{
+    sign_flashbots_payload, verify_flashbots_signature, FlashbotsSignatureError, MevBuilder,
+};
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, TxHash};

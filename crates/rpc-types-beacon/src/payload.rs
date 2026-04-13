@@ -13,6 +13,7 @@ use alloy_eips::eip4895::Withdrawal;
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
 use alloy_rpc_types_engine::{
     ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
+    ExecutionPayloadV4,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, DeserializeAs, DisplayFromStr, SerializeAs};
@@ -156,6 +157,8 @@ struct BeaconPayloadAttributes {
     withdrawals: Option<Vec<Withdrawal>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     parent_beacon_block_root: Option<B256>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot_number: Option<u64>,
 }
 
 /// A helper module for serializing and deserializing the payload attributes for the beacon API.
@@ -182,6 +185,7 @@ pub mod beacon_api_payload_attributes {
             suggested_fee_recipient: payload_attributes.suggested_fee_recipient,
             withdrawals: payload_attributes.withdrawals.clone(),
             parent_beacon_block_root: payload_attributes.parent_beacon_block_root,
+            slot_number: payload_attributes.slot_number,
         };
         beacon_api_payload_attributes.serialize(serializer)
     }
@@ -198,6 +202,7 @@ pub mod beacon_api_payload_attributes {
             suggested_fee_recipient: beacon_api_payload_attributes.suggested_fee_recipient,
             withdrawals: beacon_api_payload_attributes.withdrawals,
             parent_beacon_block_root: beacon_api_payload_attributes.parent_beacon_block_root,
+            slot_number: beacon_api_payload_attributes.slot_number,
         })
     }
 }
@@ -383,7 +388,7 @@ pub mod beacon_payload_v2 {
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 struct BeaconExecutionPayloadV3<'a> {
-    /// Inner V1 payload
+    /// Inner V2 payload
     #[serde(flatten)]
     payload_inner: BeaconExecutionPayloadV2<'a>,
     #[serde_as(as = "DisplayFromStr")]
@@ -435,6 +440,69 @@ pub mod beacon_payload_v3 {
     }
 }
 
+/// Beacon API representation of [`ExecutionPayloadV4`].
+///
+/// See also <https://github.com/alloy-rs/alloy/pull/3330>
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+struct BeaconExecutionPayloadV4<'a> {
+    /// Inner V3 payload
+    #[serde(flatten)]
+    payload_inner: BeaconExecutionPayloadV3<'a>,
+    /// RLP-encoded block access list as defined in EIP-7928.
+    block_access_list: Cow<'a, Bytes>,
+    /// The slot number corresponding to this block, calculated in the consensus layer.
+    #[serde_as(as = "DisplayFromStr")]
+    slot_number: u64,
+}
+
+impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
+    fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
+        let BeaconExecutionPayloadV4 { payload_inner, block_access_list, slot_number } = payload;
+        Self {
+            payload_inner: payload_inner.into(),
+            block_access_list: block_access_list.into_owned(),
+            slot_number,
+        }
+    }
+}
+
+impl<'a> From<&'a ExecutionPayloadV4> for BeaconExecutionPayloadV4<'a> {
+    fn from(value: &'a ExecutionPayloadV4) -> Self {
+        let ExecutionPayloadV4 { payload_inner, block_access_list, slot_number } = value;
+        BeaconExecutionPayloadV4 {
+            payload_inner: payload_inner.into(),
+            block_access_list: Cow::Borrowed(block_access_list),
+            slot_number: *slot_number,
+        }
+    }
+}
+
+/// A helper serde module to convert from/to the Beacon API which uses quoted decimals rather than
+/// big-endian hex.
+pub mod beacon_payload_v4 {
+    use super::*;
+
+    /// Serialize the payload attributes for the beacon API.
+    pub fn serialize<S>(
+        payload_attributes: &ExecutionPayloadV4,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        BeaconExecutionPayloadV4::from(payload_attributes).serialize(serializer)
+    }
+
+    /// Deserialize the payload attributes for the beacon API.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ExecutionPayloadV4, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        BeaconExecutionPayloadV4::deserialize(deserializer).map(Into::into)
+    }
+}
+
 /// Represents all possible payload versions.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
@@ -445,6 +513,8 @@ enum BeaconExecutionPayload<'a> {
     V2(BeaconExecutionPayloadV2<'a>),
     /// V3 payload
     V3(BeaconExecutionPayloadV3<'a>),
+    /// V4 payload (Amsterdam)
+    V4(BeaconExecutionPayloadV4<'a>),
 }
 
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
@@ -453,14 +523,17 @@ impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
     where
         D: Deserializer<'de>,
     {
+        #[serde_as]
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum BeaconExecutionPayloadDesc<'a> {
+            V4(BeaconExecutionPayloadV4<'a>),
             V3(BeaconExecutionPayloadV3<'a>),
             V2(BeaconExecutionPayloadV2<'a>),
             V1(BeaconExecutionPayloadV1<'a>),
         }
         match BeaconExecutionPayloadDesc::deserialize(deserializer)? {
+            BeaconExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
             BeaconExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
             BeaconExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
             BeaconExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
@@ -474,6 +547,7 @@ impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
             BeaconExecutionPayload::V1(payload) => Self::V1(ExecutionPayloadV1::from(payload)),
             BeaconExecutionPayload::V2(payload) => Self::V2(ExecutionPayloadV2::from(payload)),
             BeaconExecutionPayload::V3(payload) => Self::V3(ExecutionPayloadV3::from(payload)),
+            BeaconExecutionPayload::V4(payload) => Self::V4(ExecutionPayloadV4::from(payload)),
         }
     }
 }
@@ -489,6 +563,9 @@ impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
             }
             ExecutionPayload::V3(payload) => {
                 BeaconExecutionPayload::V3(BeaconExecutionPayloadV3::from(payload))
+            }
+            ExecutionPayload::V4(payload) => {
+                BeaconExecutionPayload::V4(BeaconExecutionPayloadV4::from(payload))
             }
         }
     }
@@ -761,6 +838,32 @@ mod tests {
             }
             ExecutionPayload::V2(_) => panic!("Expected V1 payload, got V2"),
             ExecutionPayload::V3(_) => panic!("Expected V1 payload, got V3"),
+            ExecutionPayload::V4(_) => panic!("Expected V1 payload, got V4"),
         }
+    }
+
+    #[test]
+    fn serde_beacon_payload_attributes_without_slot_number() {
+        use alloy_rpc_types_engine::PayloadAttributes;
+
+        let json = r#"{
+            "timestamp": "1234",
+            "prev_randao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "suggested_fee_recipient": "0x0000000000000000000000000000000000000000"
+        }"#;
+
+        let attrs: BeaconPayloadAttributes = serde_json::from_str(json).unwrap();
+        assert_eq!(attrs.timestamp, 1234);
+        assert!(attrs.slot_number.is_none());
+
+        let engine_attrs = PayloadAttributes {
+            timestamp: attrs.timestamp,
+            prev_randao: attrs.prev_randao,
+            suggested_fee_recipient: attrs.suggested_fee_recipient,
+            withdrawals: attrs.withdrawals,
+            parent_beacon_block_root: attrs.parent_beacon_block_root,
+            slot_number: attrs.slot_number,
+        };
+        assert!(engine_attrs.slot_number.is_none());
     }
 }

@@ -79,7 +79,7 @@ impl NonceManager for CachedNonceManager {
         let new_nonce = if *nonce == NONE {
             // Initialize the nonce if we haven't seen this account before.
             trace!(%address, "fetching nonce");
-            provider.get_transaction_count(address).await?
+            provider.get_transaction_count(address).pending().await?
         } else {
             trace!(%address, current_nonce = *nonce, "incrementing nonce");
             *nonce + 1
@@ -147,6 +147,16 @@ impl<M: NonceManager> NonceFiller<M> {
     /// [`Provider::send_transaction`], reducing the number of RPC calls.
     pub fn cached() -> NonceFiller<CachedNonceManager> {
         NonceFiller { nonce_manager: CachedNonceManager::default() }
+    }
+
+    /// Get a reference to the nonce manager.
+    pub const fn nonce_manager(&self) -> &M {
+        &self.nonce_manager
+    }
+
+    /// Get a mutable reference to the nonce manager.
+    pub const fn nonce_manager_mut(&mut self) -> &mut M {
+        &mut self.nonce_manager
     }
 }
 

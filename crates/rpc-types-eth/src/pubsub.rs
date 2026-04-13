@@ -1,7 +1,7 @@
 //! Ethereum types for pub-sub
 
-use crate::{Filter, Header, Log, Transaction};
-use alloc::{boxed::Box, format};
+use crate::{Filter, Header, Log, Transaction, TransactionReceipt};
+use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::B256;
 use alloy_serde::WithOtherFields;
 
@@ -9,7 +9,7 @@ use alloy_serde::WithOtherFields;
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
-pub enum SubscriptionResult<T = Transaction> {
+pub enum SubscriptionResult<T = Transaction, R = TransactionReceipt> {
     /// New block header.
     Header(Box<WithOtherFields<Header>>),
     /// Log
@@ -20,6 +20,8 @@ pub enum SubscriptionResult<T = Transaction> {
     FullTransaction(Box<T>),
     /// SyncStatus
     SyncState(PubSubSyncStatus),
+    /// Transaction Receipts
+    TransactionReceipts(Vec<R>),
 }
 
 /// Response type for a SyncStatus subscription.
@@ -41,18 +43,28 @@ pub struct SyncStatusMetadata {
     /// Whether the node is currently syncing.
     pub syncing: bool,
     /// The starting block.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub starting_block: u64,
     /// The current block.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub current_block: u64,
     /// The highest block.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub highest_block: Option<u64>,
 }
 
 #[cfg(feature = "serde")]
-impl<T> serde::Serialize for SubscriptionResult<T>
+impl<T, R> serde::Serialize for SubscriptionResult<T, R>
 where
     T: serde::Serialize,
+    R: serde::Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -64,6 +76,7 @@ where
             Self::TransactionHash(ref hash) => hash.serialize(serializer),
             Self::FullTransaction(ref tx) => tx.serialize(serializer),
             Self::SyncState(ref sync) => sync.serialize(serializer),
+            Self::TransactionReceipts(ref receipts) => receipts.serialize(serializer),
         }
     }
 }
@@ -101,6 +114,78 @@ pub enum SubscriptionKind {
     /// indicating that the synchronization has started (true), finished (false) or an object with
     /// various progress indicators.
     Syncing,
+    /// New transaction receipts subscription.
+    ///
+    /// Returns transaction receipts that are included in new imported blocks and match the given
+    /// filter criteria. In case of a chain reorganization the subscription will emit transaction
+    /// receipts for the new chain if they match the filter criteria. Therefore, the subscription
+    /// can emit same transaction receipts multiple times.
+    TransactionReceipts,
+}
+
+/// Parameters for transaction receipts subscription.
+///
+/// # Example
+///
+/// Subscribe to specific transaction receipts:
+///
+/// ```json
+/// {
+///   "transactionHashes": [
+///     "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"
+///   ]
+/// }
+/// ```
+///
+/// Subscribe to all transaction receipts (no filter):
+///
+/// ```json
+/// {
+///   "transactionHashes": null
+/// }
+/// ```
+///
+/// ```json
+/// {
+///   "transactionHashes": []
+/// }
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct TransactionReceiptsParams {
+    /// Optional list of transaction hashes to filter by.
+    ///
+    /// If not provided or empty, all transaction receipts will be returned.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub transaction_hashes: Option<Vec<B256>>,
+}
+
+impl core::fmt::Display for SubscriptionKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NewHeads => write!(f, "newHeads"),
+            Self::Logs => write!(f, "logs"),
+            Self::NewPendingTransactions => write!(f, "newPendingTransactions"),
+            Self::Syncing => write!(f, "syncing"),
+            Self::TransactionReceipts => write!(f, "transactionReceipts"),
+        }
+    }
+}
+
+impl core::str::FromStr for SubscriptionKind {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "newHeads" => Ok(Self::NewHeads),
+            "logs" => Ok(Self::Logs),
+            "newPendingTransactions" => Ok(Self::NewPendingTransactions),
+            "syncing" => Ok(Self::Syncing),
+            "transactionReceipts" => Ok(Self::TransactionReceipts),
+            _ => Err("invalid subscription kind"),
+        }
+    }
 }
 
 /// Any additional parameters for a subscription.
@@ -113,6 +198,8 @@ pub enum Params {
     Logs(Box<Filter>),
     /// Boolean parameter for new pending transactions.
     Bool(bool),
+    /// Transaction receipts parameters.
+    TransactionReceipts(TransactionReceiptsParams),
 }
 
 impl Params {
@@ -126,6 +213,26 @@ impl Params {
     #[inline]
     pub const fn is_logs(&self) -> bool {
         matches!(self, Self::Logs(_))
+    }
+
+    /// Creates a new [`Params`] from a [`serde_json::Value`].
+    #[cfg(feature = "serde")]
+    pub fn from_json_value(v: serde_json::Value) -> Result<Self, serde_json::Error> {
+        if v.is_null() {
+            return Ok(Self::None);
+        }
+
+        if let Some(val) = v.as_bool() {
+            return Ok(val.into());
+        }
+
+        let is_transaction_receipts =
+            v.as_object().is_some_and(|obj| obj.contains_key("transactionHashes"));
+        if is_transaction_receipts {
+            return serde_json::from_value::<TransactionReceiptsParams>(v).map(Into::into);
+        }
+
+        serde_json::from_value::<Filter>(v).map(Into::into)
     }
 }
 
@@ -141,6 +248,12 @@ impl From<bool> for Params {
     }
 }
 
+impl From<TransactionReceiptsParams> for Params {
+    fn from(params: TransactionReceiptsParams) -> Self {
+        Self::TransactionReceipts(params)
+    }
+}
+
 #[cfg(feature = "serde")]
 impl serde::Serialize for Params {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -151,6 +264,7 @@ impl serde::Serialize for Params {
             Self::None => (&[] as &[serde_json::Value]).serialize(serializer),
             Self::Logs(logs) => logs.serialize(serializer),
             Self::Bool(full) => full.serialize(serializer),
+            Self::TransactionReceipts(params) => params.serialize(serializer),
         }
     }
 }
@@ -161,27 +275,15 @@ impl<'a> serde::Deserialize<'a> for Params {
     where
         D: serde::Deserializer<'a>,
     {
-        use serde::de::Error;
-
         let v = serde_json::Value::deserialize(deserializer)?;
-
-        if v.is_null() {
-            return Ok(Self::None);
-        }
-
-        if let Some(val) = v.as_bool() {
-            return Ok(val.into());
-        }
-
-        serde_json::from_value::<Filter>(v)
-            .map(Into::into)
-            .map_err(|e| D::Error::custom(format!("Invalid Pub-Sub parameters: {e}")))
+        Self::from_json_value(v).map_err(serde::de::Error::custom)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::hex;
     use similar_asserts::assert_eq;
 
     #[test]
@@ -199,6 +301,41 @@ mod tests {
         let filter = Filter::default();
         let s: Params = serde_json::from_str(&serde_json::to_string(&filter).unwrap()).unwrap();
         assert_eq!(s, Params::Logs(Box::new(filter)));
+
+        // Test deserialization of transaction receipts parameters
+        let json = r#"{"transactionHashes":["0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"]}"#;
+        let param: Params = serde_json::from_str(json).unwrap();
+        match param {
+            Params::TransactionReceipts(params) => {
+                assert_eq!(
+                    params.transaction_hashes,
+                    Some(vec![B256::from(hex!(
+                        "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"
+                    ))])
+                );
+            }
+            _ => panic!("Expected TransactionReceipts variant"),
+        }
+
+        // Test deserialization of transaction receipts parameters, with null transactionHashes
+        let json = r#"{"transactionHashes":null}"#;
+        let param: Params = serde_json::from_str(json).unwrap();
+        match param {
+            Params::TransactionReceipts(params) => {
+                assert_eq!(params.transaction_hashes, None);
+            }
+            _ => panic!("Expected TransactionReceipts variant"),
+        }
+
+        // Test deserialization of transaction receipts parameters, with empty transactionHashes
+        let json = r#"{"transactionHashes":[]}"#;
+        let param: Params = serde_json::from_str(json).unwrap();
+        match param {
+            Params::TransactionReceipts(params) => {
+                assert_eq!(params.transaction_hashes, Some(vec![]));
+            }
+            _ => panic!("Expected TransactionReceipts variant"),
+        }
     }
 
     #[test]
@@ -244,6 +381,37 @@ mod tests {
     }
 
     #[test]
+    fn params_from_transaction_receipts() {
+        let params = TransactionReceiptsParams { transaction_hashes: Some(vec![B256::random()]) };
+        let param: Params = params.clone().into();
+        assert_eq!(param, Params::TransactionReceipts(params));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn subscription_kind_str_roundtrip() {
+        use core::str::FromStr;
+
+        for kind in [
+            SubscriptionKind::NewHeads,
+            SubscriptionKind::Logs,
+            SubscriptionKind::NewPendingTransactions,
+            SubscriptionKind::Syncing,
+            SubscriptionKind::TransactionReceipts,
+        ] {
+            let s = kind.to_string();
+            let parsed: SubscriptionKind = s.parse().unwrap();
+            assert_eq!(kind, parsed);
+
+            // Verify FromStr matches serde
+            let serde_str = serde_json::to_string(&kind).unwrap();
+            let serde_str = serde_str.trim_matches('"');
+            assert_eq!(s, serde_str);
+            assert_eq!(SubscriptionKind::from_str(serde_str).unwrap(), kind);
+        }
+    }
+
+    #[test]
     #[cfg(feature = "serde")]
     fn params_serialize_none() {
         let param = Params::None;
@@ -271,5 +439,62 @@ mod tests {
         let serialized = serde_json::to_string(&param).unwrap();
         let expected = serde_json::to_string(&filter).unwrap();
         assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn params_serialize_transaction_receipts() {
+        let params = TransactionReceiptsParams {
+            transaction_hashes: Some(vec![B256::from(hex!(
+                "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"
+            ))]),
+        };
+        let param = Params::TransactionReceipts(params);
+        let serialized = serde_json::to_string(&param).unwrap();
+        let expected = r#"{"transactionHashes":["0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"]}"#;
+        assert_eq!(serialized, expected);
+
+        // None must be serialized as `null` (not omitted) so that round-tripping
+        // through `Params::from_json_value` keeps the `TransactionReceipts` variant.
+        let param = Params::TransactionReceipts(TransactionReceiptsParams::default());
+        let serialized = serde_json::to_string(&param).unwrap();
+        assert_eq!(serialized, r#"{"transactionHashes":null}"#);
+        let roundtrip: Params = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(roundtrip, param);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn sync_status_metadata_serde() {
+        let metadata = SyncStatusMetadata {
+            syncing: true,
+            starting_block: 900,
+            current_block: 902,
+            highest_block: Some(1108),
+        };
+
+        let serialized = serde_json::to_string(&metadata).unwrap();
+        // Block numbers should be hex-encoded per EIP-1474
+        assert_eq!(
+            serialized,
+            r#"{"syncing":true,"startingBlock":"0x384","currentBlock":"0x386","highestBlock":"0x454"}"#
+        );
+
+        // Roundtrip
+        let deserialized: SyncStatusMetadata = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(metadata, deserialized);
+
+        // Test without highest_block
+        let metadata_no_highest = SyncStatusMetadata {
+            syncing: false,
+            starting_block: 0,
+            current_block: 100,
+            highest_block: None,
+        };
+        let serialized = serde_json::to_string(&metadata_no_highest).unwrap();
+        assert_eq!(serialized, r#"{"syncing":false,"startingBlock":"0x0","currentBlock":"0x64"}"#);
+
+        let deserialized: SyncStatusMetadata = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(metadata_no_highest, deserialized);
     }
 }

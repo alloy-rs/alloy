@@ -444,4 +444,21 @@ mod test {
         let payload: ErrorPayload = serde_json::from_str(json).unwrap();
         assert!(payload.is_retry_err());
     }
+
+    #[test]
+    fn extract_transaction_hash_box_raw_value() {
+        use crate::RpcError;
+        use alloy_primitives::B256;
+        use serde_json::value::RawValue;
+
+        let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        let json = format!(r#"{{"code":5,"message":"insufficient funds","data":"{}"}}"#, tx_hash);
+
+        let error_payload: ErrorPayload = serde_json::from_str(&json).unwrap();
+        let rpc_error: RpcError<(), Box<RawValue>> = RpcError::ErrorResp(error_payload);
+
+        let extracted_hash = rpc_error.tx_hash_data();
+        assert!(extracted_hash.is_some());
+        assert_eq!(extracted_hash.unwrap(), tx_hash.parse::<B256>().unwrap());
+    }
 }

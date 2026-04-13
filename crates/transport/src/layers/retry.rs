@@ -15,14 +15,14 @@ use std::{
 use tower::{Layer, Service};
 use tracing::trace;
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
-/// The default average cost of a request in compute units (CU).
-const DEFAULT_AVG_COST: u64 = 17u64;
+/// The default average cost of a request in Compute Units (CU).
+const DEFAULT_AVG_COST: u64 = 20u64;
 
 /// A Transport Layer that is responsible for retrying requests based on the
 /// error type. See [`TransportError`].
@@ -30,15 +30,15 @@ const DEFAULT_AVG_COST: u64 = 17u64;
 /// TransportError: crate::error::TransportError
 #[derive(Debug, Clone)]
 pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
-    /// The maximum number of retries for rate limit errors
+    /// The maximum number of retries for rate limit errors.
     max_rate_limit_retries: u32,
-    /// The initial backoff in milliseconds
+    /// The initial backoff in milliseconds.
     initial_backoff: u64,
-    /// The number of compute units per second for this provider
+    /// The number of Compute Units per second for this provider.
     compute_units_per_second: u64,
-    /// The average cost of a request. Defaults to [DEFAULT_AVG_COST]
+    /// The average cost of a request. Defaults to [DEFAULT_AVG_COST].
     avg_cost: u64,
-    /// The [RetryPolicy] to use. Defaults to [RateLimitRetryPolicy]
+    /// The [RetryPolicy] to use. Defaults to [RateLimitRetryPolicy].
     policy: P,
 }
 
@@ -58,17 +58,21 @@ impl RetryBackoffLayer {
         }
     }
 
-    /// Set the average cost of a request. Defaults to `17` CU
-    /// The cost of requests are usually weighted and can vary from 10 CU to several 100 CU,
-    /// cheaper requests are more common some example alchemy
-    /// weights:
-    /// - `eth_getStorageAt`: 17
-    /// - `eth_getBlockByNumber`: 16
-    /// - `eth_newFilter`: 20
+    /// Sets the average Compute Unit (CU) cost per request. Defaults to `20` CU.
     ///
-    /// (coming from forking mode) assuming here that storage request will be the
-    /// driver for Rate limits we choose `17` as the average cost
-    /// of any request
+    /// Based on Alchemy’s published Compute Unit (CU) table, most frequently used
+    /// JSON-RPC methods fall within the `10–20` CU range, with only a small number
+    /// of higher-cost outliers (such as log queries or transaction submissions).
+    /// Consequently, an average cost of `20` CU per request serves as a practical
+    /// and representative estimate for typical EVM workloads
+    ///
+    /// Alchemy also uses this `20` CU figure when expressing throughput in
+    /// requests per second. For example, the free tier maps `500 CU/s` to
+    /// approximately `25 req/s` under this average, which aligns with the `20` CU.
+    ///
+    /// References:
+    /// - <https://www.alchemy.com/docs/reference/compute-unit-costs#evm-standard-json-rpc-methods>
+    /// - <https://www.alchemy.com/pricing#table-products>
     pub const fn with_avg_unit_cost(mut self, avg_cost: u64) -> Self {
         self.avg_cost = avg_cost;
         self

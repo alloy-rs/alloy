@@ -69,6 +69,9 @@ pub struct Genesis {
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
+    /// The parent hash
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_hash: Option<B256>,
 }
 
 impl Genesis {
@@ -183,6 +186,12 @@ impl Genesis {
     /// Set the blob gas used.
     pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
         self.blob_gas_used = blob_gas_used;
+        self
+    }
+
+    /// Set the parent hash.
+    pub const fn with_parent_hash(mut self, parent_hash: Option<B256>) -> Self {
+        self.parent_hash = parent_hash;
         self
     }
 
@@ -386,6 +395,10 @@ pub struct ChainConfig {
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub osaka_time: Option<u64>,
 
+    /// Osaka switch time (None = no fork, 0 = already on amsterdam).
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
+    pub amsterdam_time: Option<u64>,
+
     /// BPO1 switch time (None = no fork, 0 = already on BPO1).
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo1_time: Option<u64>,
@@ -440,6 +453,11 @@ pub struct ChainConfig {
     /// See [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub blob_schedule: BTreeMap<String, BlobParams>,
+
+    /// Non-exhaustive field to allow adding new fields to the struct without breaking changes.
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub _non_exhaustive: (),
 }
 
 /// Bincode-compatible [`ChainConfig`] serde implementation.
@@ -514,6 +532,8 @@ pub mod serde_bincode_compat {
         #[serde(default)]
         osaka_time: Option<u64>,
         #[serde(default)]
+        amsterdam_time: Option<u64>,
+        #[serde(default)]
         bpo1_time: Option<u64>,
         #[serde(default)]
         bpo2_time: Option<u64>,
@@ -566,6 +586,7 @@ pub mod serde_bincode_compat {
                 cancun_time: value.cancun_time,
                 prague_time: value.prague_time,
                 osaka_time: value.osaka_time,
+                amsterdam_time: value.amsterdam_time,
                 bpo1_time: value.bpo1_time,
                 bpo2_time: value.bpo2_time,
                 bpo3_time: value.bpo3_time,
@@ -580,9 +601,9 @@ pub mod serde_bincode_compat {
                 blob_schedule: Cow::Borrowed(&value.blob_schedule),
                 extra_fields: {
                     let mut extra_fields = BTreeMap::new();
-                    for (k, v) in value.extra_fields.clone().into_iter() {
+                    for (k, v) in &value.extra_fields {
                         // Convert all serde_json::Value types to string for bincode compatibility
-                        extra_fields.insert(k, v.to_string());
+                        extra_fields.insert(k.clone(), v.to_string());
                     }
                     extra_fields
                 },
@@ -613,6 +634,7 @@ pub mod serde_bincode_compat {
                 shanghai_time: value.shanghai_time,
                 cancun_time: value.cancun_time,
                 prague_time: value.prague_time,
+                amsterdam_time: value.amsterdam_time,
                 osaka_time: value.osaka_time,
                 bpo1_time: value.bpo1_time,
                 bpo2_time: value.bpo2_time,
@@ -637,6 +659,7 @@ pub mod serde_bincode_compat {
                 },
                 deposit_contract_address: value.deposit_contract_address,
                 blob_schedule: value.blob_schedule.into_owned(),
+                _non_exhaustive: (),
             }
         }
     }
@@ -725,6 +748,7 @@ pub mod serde_bincode_compat {
                 cancun_time: None,
                 prague_time: None,
                 osaka_time: None,
+                amsterdam_time: None,
                 bpo1_time: None,
                 bpo2_time: None,
                 bpo3_time: None,
@@ -738,6 +762,7 @@ pub mod serde_bincode_compat {
                 extra_fields: Default::default(),
                 deposit_contract_address: None,
                 blob_schedule,
+                _non_exhaustive: (),
             };
 
             let data = Data { config };
@@ -781,6 +806,7 @@ pub mod serde_bincode_compat {
                 cancun_time: None,
                 prague_time: None,
                 osaka_time: None,
+                amsterdam_time: None,
                 bpo1_time: None,
                 bpo2_time: None,
                 bpo3_time: None,
@@ -794,6 +820,7 @@ pub mod serde_bincode_compat {
                 extra_fields: Default::default(),
                 deposit_contract_address: None,
                 blob_schedule: Default::default(),
+                _non_exhaustive: (),
             };
 
             // Add some extra fields with different serde_json::Value types
@@ -879,8 +906,9 @@ impl ChainConfig {
     /// Returns the [`BlobScheduleBlobParams`] from the configured blob schedule values.
     pub fn blob_schedule_blob_params(&self) -> BlobScheduleBlobParams {
         let mut cancun = None;
-        let mut prague = None;
         let mut osaka = None;
+        let mut prague = None;
+        let mut amsterdam = None;
         let mut scheduled = Vec::new();
 
         for (key, params) in &self.blob_schedule {
@@ -928,9 +956,18 @@ impl ChainConfig {
                         scheduled.push((timestamp, params));
                     }
                 }
+                "Amsterdam" => {
+                    if let Some(timestamp) = self.amsterdam_time {
+                        amsterdam = Some((timestamp, params));
+                    }
+                }
                 _ => (),
             }
         }
+
+        // we must insert amsterdam last because otherwise the ordering is incorrect if all have 0
+        // timestamp
+        scheduled.extend(amsterdam);
 
         scheduled.sort_by_key(|(timestamp, _)| *timestamp);
 
@@ -1057,6 +1094,7 @@ impl Default for ChainConfig {
             cancun_time: None,
             prague_time: None,
             osaka_time: None,
+            amsterdam_time: None,
             bpo1_time: None,
             bpo2_time: None,
             bpo3_time: None,
@@ -1070,6 +1108,7 @@ impl Default for ChainConfig {
             extra_fields: Default::default(),
             deposit_contract_address: None,
             blob_schedule: Default::default(),
+            _non_exhaustive: (),
         }
     }
 }
@@ -1934,6 +1973,7 @@ mod tests {
                 excess_blob_gas: None,
                 blob_gas_used: None,
                 number: None,
+                parent_hash: Some(B256::ZERO),
                 alloc: BTreeMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
@@ -2073,6 +2113,76 @@ mod tests {
         let s = serde_json::to_string_pretty(&gen1).unwrap();
         let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
         assert_eq!(gen1, gen2);
+    }
+
+    #[test]
+    fn test_parent_hash_serialization() {
+        // Test that parent_hash can be serialized and deserialized correctly
+        let parent_hash =
+            B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234")
+                .unwrap();
+
+        let genesis_with_parent_hash = Genesis::default().with_parent_hash(Some(parent_hash));
+        let json = serde_json::to_string(&genesis_with_parent_hash).unwrap();
+        let deserialized: Genesis = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.parent_hash, Some(parent_hash));
+
+        // Test that parent_hash is omitted when None (skip_serializing_if behavior)
+        let genesis_without_parent_hash = Genesis::default().with_parent_hash(None);
+        let json = serde_json::to_string(&genesis_without_parent_hash).unwrap();
+        assert!(!json.contains("parentHash"), "parentHash should be omitted when None");
+
+        // Test deserialization without parent_hash field (should default to None)
+        let genesis_json = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json).unwrap();
+        assert_eq!(genesis.parent_hash, None);
+
+        // Test deserialization with parent_hash field
+        let genesis_json_with_parent_hash = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000",
+            "parentHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json_with_parent_hash).unwrap();
+        assert_eq!(genesis.parent_hash, Some(parent_hash));
+
+        // Test that zero hash is preserved as Some(B256::ZERO) when explicitly set
+        let genesis_json_with_zero_hash = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json_with_zero_hash).unwrap();
+        assert_eq!(
+            genesis.parent_hash,
+            Some(B256::ZERO),
+            "Zero hash should be preserved when explicitly set"
+        );
     }
 
     #[test]

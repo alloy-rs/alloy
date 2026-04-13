@@ -154,7 +154,7 @@ impl EventHistoryParams {
 }
 
 /// 4-byte-function selector
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FunctionSelector(pub [u8; 4]);
 
 // === impl FunctionSelector ===
@@ -170,7 +170,7 @@ impl Serialize for FunctionSelector {
     where
         S: Serializer,
     {
-        serializer.serialize_str(self.to_string().as_str())
+        serializer.collect_str(self)
     }
 }
 
@@ -213,7 +213,7 @@ impl std::fmt::Display for FunctionSelector {
 
 impl LowerHex for FunctionSelector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{}", self.hex_encode())
+        std::fmt::Display::fmt(self, f)
     }
 }
 

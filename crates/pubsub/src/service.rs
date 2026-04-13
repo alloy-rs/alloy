@@ -13,10 +13,10 @@ use alloy_transport::{
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
 /// The service contains the backend handle, a subscription manager, and the
@@ -83,8 +83,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
         for (_, in_flight) in self.in_flights.iter() {
             let msg = in_flight.request.serialized().to_owned();
-            // Same as `dispatch_request`, but inlined to avoid double-borrowing `self`.
-            self.handle.to_socket.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
+            self.dispatch_request(msg)?;
         }
 
         // Re-subscribe to all active subscriptions
@@ -100,7 +99,7 @@ impl<T: PubSubConnect> PubSubService<T> {
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
-            self.handle.to_socket.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
+            self.dispatch_request(msg)?;
         }
 
         Ok(())
@@ -123,14 +122,10 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service a GetSub instruction.
     ///
-    /// If the subscription exists, the waiter is sent a broadcast receiver. If
-    /// the subscription does not exist, the waiter is sent nothing, and the
-    /// `tx` is dropped. This notifies the waiter that the subscription does
-    /// not exist.
-    fn service_get_sub(&self, local_id: B256, tx: oneshot::Sender<RawSubscription>) {
-        if let Some(rx) = self.subs.get_subscription(local_id) {
-            let _ = tx.send(rx);
-        }
+    /// If the subscription exists, the waiter is sent `Some` broadcast receiver. If
+    /// the subscription does not exist, the waiter is sent `None`.
+    fn service_get_sub(&self, local_id: B256, tx: oneshot::Sender<Option<RawSubscription>>) {
+        let _ = tx.send(self.subs.get_subscription(local_id));
     }
 
     /// Service an unsubscribe instruction.
@@ -249,8 +244,17 @@ impl<T: PubSubConnect> PubSubService<T> {
 
                     req_opt = self.reqs.recv() => {
                         if let Some(req) = req_opt {
-                            if let Err(e) = self.service_ix(req) {
-                                break Err(e)
+                            if let Err(err) = self.service_ix(req) {
+                                if err
+                                    .as_transport_err()
+                                    .is_some_and(TransportErrorKind::is_backend_gone)
+                                {
+                                    if let Err(e) = self.reconnect_with_retries().await {
+                                        break Err(e)
+                                    }
+                                } else {
+                                    break Err(err)
+                                }
                             }
                         } else {
                             info!("Pubsub service request channel closed. Shutting down.");
@@ -265,5 +269,79 @@ impl<T: PubSubConnect> PubSubService<T> {
             }
         };
         fut.spawn_task();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ConnectionInterface;
+    use alloy_json_rpc::Request;
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
+    use tokio::time::timeout;
+
+    #[derive(Clone, Debug, Default)]
+    struct MockConnect(Arc<Mutex<Option<ConnectionHandle>>>);
+
+    impl PubSubConnect for MockConnect {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            Err(TransportErrorKind::custom_str("connect is not used in this test"))
+        }
+
+        async fn try_reconnect(&self) -> TransportResult<ConnectionHandle> {
+            self.0
+                .lock()
+                .expect("poisoned mutex")
+                .take()
+                .ok_or_else(|| TransportErrorKind::custom_str("missing mock connection handle"))
+        }
+    }
+
+    #[tokio::test]
+    async fn reconnects_after_request_dispatch_hits_backend_gone() {
+        let (dead_handle, dead_interface) = ConnectionHandle::new();
+        let ConnectionInterface { from_frontend, to_frontend, error, shutdown } = dead_interface;
+        drop(from_frontend);
+        let _keep_dead_backend_alive = (to_frontend, error, shutdown);
+
+        let (reconnected_handle, mut reconnected_interface) = ConnectionHandle::new();
+        let connector = MockConnect(Arc::new(Mutex::new(Some(reconnected_handle))));
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle: dead_handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+
+        let first = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let (in_flight, rx) = InFlight::new(first, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
+
+        timeout(Duration::from_secs(1), rx)
+            .await
+            .expect("failed request should resolve promptly")
+            .expect_err("raced request should be dropped when the backend is gone");
+
+        let second = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
+        let expected = second.serialized().get().to_owned();
+        let (in_flight, _rx) = InFlight::new(second, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
+
+        let dispatched =
+            timeout(Duration::from_secs(1), reconnected_interface.recv_from_frontend())
+                .await
+                .expect("request should be dispatched after reconnect")
+                .expect("new backend should receive the request");
+        assert_eq!(dispatched.get(), expected);
     }
 }

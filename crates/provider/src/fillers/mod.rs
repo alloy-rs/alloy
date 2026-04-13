@@ -1,8 +1,20 @@
-//! Transaction Fillers
+//! Transaction fillers.
 //!
 //! Fillers decorate a [`Provider`], filling transaction details before they
-//! are sent to the network. Fillers are used to set the nonce, gas price, gas
-//! limit, and other transaction details, and are called before any other layer.
+//! are sent to the network, like nonces, gas limits, and gas prices.
+//!
+//! Fillers are called before any other layer in the provider.
+//!
+//! # Implementing a filler
+//!
+//! Fillers implement the [`TxFiller`] trait. Before a filler is called, [`TxFiller::status`] is
+//! called to determine whether the filler has any work to do. If this function returns
+//! [`FillerControlFlow::Ready`], the filler will be called.
+//!
+//! # Composing fillers
+//!
+//! To layer fillers, a utility filler is provided called [`JoinFill`], which is a composition of
+//! two fillers, left and right. The left filler is called before the right filler.
 //!
 //! [`Provider`]: crate::Provider
 
@@ -25,7 +37,10 @@ mod nonce;
 pub use nonce::{CachedNonceManager, NonceFiller, NonceManager, SimpleNonceManager};
 
 mod gas;
-pub use gas::{BlobGasFiller, GasFillable, GasFiller};
+pub use gas::{
+    BlobGasEstimator, BlobGasEstimatorFn, BlobGasEstimatorFunction, BlobGasFiller, GasFillable,
+    GasFiller,
+};
 
 mod join_fill;
 pub use join_fill::JoinFill;
@@ -46,7 +61,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
-    FilterChanges, Log,
+    FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
 };
 use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
@@ -302,6 +317,26 @@ where
         Self { inner, filler, _pd: PhantomData }
     }
 
+    /// Returns a reference to the filler.
+    pub const fn filler(&self) -> &F {
+        &self.filler
+    }
+
+    /// Returns a mutable reference to the filler.
+    pub const fn filler_mut(&mut self) -> &mut F {
+        &mut self.filler
+    }
+
+    /// Returns a reference to the inner provider.
+    pub const fn inner(&self) -> &P {
+        &self.inner
+    }
+
+    /// Returns a mutable reference to the inner provider.
+    pub const fn inner_mut(&mut self) -> &mut P {
+        &mut self.inner
+    }
+
     /// Joins a filler to this provider
     pub fn join_with<Other: TxFiller<N>>(
         self,
@@ -331,6 +366,44 @@ where
     }
 
     /// Fills the transaction request, using the configured fillers
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use alloy_consensus::{TypedTransaction, SignableTransaction};
+    /// # use alloy_primitives::{address, U256};
+    /// # use alloy_provider::ProviderBuilder;
+    /// # use alloy_rpc_types_eth::TransactionRequest;
+    /// # use alloy_network::{NetworkTransactionBuilder, TransactionBuilder};
+    ///
+    /// # #[cfg(feature = "anvil-node")]
+    /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // Create transaction request
+    ///     let tx_request = TransactionRequest::default()
+    ///         .with_from(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))
+    ///         .with_value(U256::from(1000));
+    ///
+    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+    ///
+    ///     // Fill transaction with provider data
+    ///     let filled_tx = provider.fill(tx_request).await?;
+    ///
+    ///     // Build unsigned transaction
+    ///     let typed_tx =
+    ///         filled_tx.as_builder().expect("filled tx is a builder").clone().build_unsigned()?;
+    ///
+    ///     // Encode, e.g. for offline signing
+    ///     let mut encoded = Vec::new();
+    ///     typed_tx.encode_for_signing(&mut encoded);
+    ///
+    ///     // Decode unsigned transaction
+    ///     let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice())?;
+    ///
+    ///     Ok(())
+    /// }
+    /// # #[cfg(not(feature = "anvil-node"))]
+    /// # fn example() {}
+    /// ```
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
         self.fill_inner(SendableTx::Builder(tx)).await
     }
@@ -426,7 +499,7 @@ where
         self.inner.get_account_info(address)
     }
 
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
         self.inner.get_account(address)
     }
 
@@ -465,6 +538,24 @@ where
         block: BlockId,
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         self.inner.get_block_receipts(block)
+    }
+
+    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header(block).await
+    }
+
+    async fn get_header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header_by_hash(hash).await
+    }
+
+    async fn get_header_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header_by_number(number).await
     }
 
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
@@ -526,6 +617,13 @@ where
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.inner.get_storage_at(address, key)
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.inner.get_storage_values(requests)
     }
 
     fn get_transaction_by_hash(
@@ -649,6 +747,23 @@ where
 
         // Errors in tx building happen further down the stack.
         self.inner.send_transaction_internal(tx).await
+    }
+
+    async fn send_transaction_sync_internal(
+        &self,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        tx = self.fill_inner(tx).await?;
+
+        if let Some(builder) = tx.as_builder() {
+            if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
+                let message = format!("missing properties: {missing:?}");
+                return Err(RpcError::local_usage_str(&message));
+            }
+        }
+
+        // Errors in tx building happen further down the stack.
+        self.inner.send_transaction_sync_internal(tx).await
     }
 
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {

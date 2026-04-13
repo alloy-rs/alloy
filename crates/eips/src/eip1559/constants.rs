@@ -1,10 +1,6 @@
 use alloy_primitives::U256;
 
 /// The default Ethereum block gas limit: 30M
-#[deprecated(note = "use ETHEREUM_BLOCK_GAS_LIMIT_30M instead")]
-pub const ETHEREUM_BLOCK_GAS_LIMIT: u64 = 30_000_000;
-
-/// The default Ethereum block gas limit: 30M
 pub const ETHEREUM_BLOCK_GAS_LIMIT_30M: u64 = 30_000_000;
 
 /// The default Ethereum block gas limit: 36M

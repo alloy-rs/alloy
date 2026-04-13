@@ -69,6 +69,13 @@ impl ForkchoiceState {
             Some(self.finalized_block_hash)
         }
     }
+
+    /// Returns true if any of the hashes in this [`ForkchoiceState`] match the given hash
+    pub fn contains(&self, hash: B256) -> bool {
+        self.head_block_hash == hash
+            || self.safe_block_hash == hash
+            || self.finalized_block_hash == hash
+    }
 }
 
 /// A standalone forkchoice update errors for RPC.
@@ -92,28 +99,6 @@ pub enum ForkchoiceUpdateError {
 }
 
 impl core::error::Error for ForkchoiceUpdateError {}
-
-#[cfg(feature = "jsonrpsee-types")]
-impl From<ForkchoiceUpdateError> for jsonrpsee_types::error::ErrorObject<'static> {
-    fn from(value: ForkchoiceUpdateError) -> Self {
-        match value {
-            ForkchoiceUpdateError::UpdatedInvalidPayloadAttributes => {
-                jsonrpsee_types::error::ErrorObject::owned(
-                    INVALID_PAYLOAD_ATTRIBUTES_ERROR,
-                    INVALID_PAYLOAD_ATTRIBUTES_ERROR_MSG,
-                    None::<()>,
-                )
-            }
-            ForkchoiceUpdateError::InvalidState | ForkchoiceUpdateError::UnknownFinalBlock => {
-                jsonrpsee_types::error::ErrorObject::owned(
-                    INVALID_FORK_CHOICE_STATE_ERROR,
-                    INVALID_FORK_CHOICE_STATE_ERROR_MSG,
-                    None::<()>,
-                )
-            }
-        }
-    }
-}
 
 /// Represents a successfully _processed_ forkchoice state update.
 ///
