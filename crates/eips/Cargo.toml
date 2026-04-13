@@ -63,6 +63,7 @@ borsh = { workspace = true, optional = true, features = ["derive"] }
 
 # misc
 auto_impl.workspace = true
+tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
@@ -90,7 +91,8 @@ std = [
 	"sha2?/std",
 	"either/std",
 	"serde_with?/std",
-	"borsh?/std"
+	"borsh?/std",
+	"dep:tracing",
 ]
 serde = [
 	"dep:alloy-serde",
