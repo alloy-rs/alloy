@@ -1,6 +1,7 @@
 [advisories]
 version = 2
 yanked = "warn"
+unused-ignored-advisory = "allow"
 ignore = [
     # https://rustsec.org/advisories/RUSTSEC-2024-0437, trezor-client dependency, no fix available yet
     "RUSTSEC-2024-0437",
