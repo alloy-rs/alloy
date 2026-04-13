@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0](https://github.com/alloy-rs/alloy/releases/tag/v2.0.0) - 2026-04-13
+
+### Features
+
+- [rpc-types-eth] Add `max_used_gas` to `SimCallResult` ([#3707](https://github.com/alloy-rs/alloy/issues/3707))
+- Add amsterdam fields ([#3871](https://github.com/alloy-rs/alloy/issues/3871))
+- [consensus] Change default tx env type
+- [network] Generic TransactionResponse to TransactionRequest conversion
+- [rpc-types-eth] Add optional timestamp field to Transaction
+- [rpc-types-eth] Parse data field on eth_simulateV1 errors
+
+### Miscellaneous Tasks
+
+- Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
+- Release 1.8.2
+
+### Other
+
+- "revert: remove transactionReceipts subscription kind" ([#3410](https://github.com/alloy-rs/alloy/issues/3410))
+
+### Refactor
+
+- [network] Unify EIP-4844 tx builder trait
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Bug Fixes
+
+- [provider] Detect EIP-7594 blob sidecars in BlobGasFiller ([#3815](https://github.com/alloy-rs/alloy/issues/3815))
+
+### Features
+
+- [rpc-types-eth] Add parent beacon root to BlockOverrides ([#3798](https://github.com/alloy-rs/alloy/issues/3798))
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+- Release 1.8.0
+- [rpc] Clippy happy with outer match ([#3793](https://github.com/alloy-rs/alloy/issues/3793))
+
 ## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
 
 ### Bug Fixes
@@ -22,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.7.4
 - Release 1.7.3
 - Release 1.7.2
 

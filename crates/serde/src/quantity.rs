@@ -26,7 +26,8 @@ where
     T: ConvertRuint,
     D: Deserializer<'de>,
 {
-    T::Ruint::deserialize(deserializer).map(T::from_ruint)
+    T::Ruint::deserialize(deserializer)
+        .and_then(|ruint| T::try_from_ruint(ruint).map_err(serde::de::Error::custom))
 }
 
 /// Serde functions for encoding optional primitive numbers using the Ethereum "quantity" format.
@@ -54,7 +55,10 @@ pub mod opt {
         T: ConvertRuint,
         D: Deserializer<'de>,
     {
-        Ok(Option::<T::Ruint>::deserialize(deserializer)?.map(T::from_ruint))
+        Option::<T::Ruint>::deserialize(deserializer)?
+            .map(T::try_from_ruint)
+            .transpose()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -66,7 +70,7 @@ pub mod vec {
     use alloc::vec::Vec;
     use core::{fmt, marker::PhantomData};
     use serde::{
-        de::{SeqAccess, Visitor},
+        de::{Error as _, SeqAccess, Visitor},
         ser::SerializeSeq,
         Deserializer, Serializer,
     };
@@ -111,7 +115,7 @@ pub mod vec {
                 let mut values = Vec::<T>::with_capacity(seq.size_hint().unwrap_or(0));
 
                 while let Some(value) = seq.next_element::<T::Ruint>()? {
-                    values.push(T::from_ruint(value));
+                    values.push(T::try_from_ruint(value).map_err(A::Error::custom)?);
                 }
                 Ok(values)
             }
@@ -173,7 +177,9 @@ pub mod hashmap {
     use alloy_primitives::map::HashMap;
     use core::{fmt, hash::BuildHasher, marker::PhantomData};
     use serde::{
-        de::MapAccess, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer,
+        de::{Error as _, MapAccess},
+        ser::SerializeMap,
+        Deserialize, Deserializer, Serialize, Serializer,
     };
 
     /// Serializes a `HashMap` of primitive numbers as a "quantity" hex string.
@@ -223,7 +229,7 @@ pub mod hashmap {
                     HashMap::with_capacity_and_hasher(map.size_hint().unwrap_or(0), H::default());
 
                 while let Some((key, value)) = map.next_entry::<K::Ruint, V>()? {
-                    values.insert(K::from_ruint(key), value);
+                    values.insert(K::try_from_ruint(key).map_err(A::Error::custom)?, value);
                 }
                 Ok(values)
             }
@@ -241,7 +247,9 @@ pub mod btreemap {
     use alloc::collections::BTreeMap;
     use core::{fmt, marker::PhantomData};
     use serde::{
-        de::MapAccess, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer,
+        de::{Error as _, MapAccess},
+        ser::SerializeMap,
+        Deserialize, Deserializer, Serialize, Serializer,
     };
 
     /// Serializes a `BTreeMap` of primitive numbers as a "quantity" hex string.
@@ -288,7 +296,7 @@ pub mod btreemap {
                 let mut values = BTreeMap::new();
 
                 while let Some((key, value)) = map.next_entry::<K::Ruint, V>()? {
-                    values.insert(K::from_ruint(key), value);
+                    values.insert(K::try_from_ruint(key).map_err(M::Error::custom)?, value);
                 }
                 Ok(values)
             }
@@ -302,25 +310,15 @@ pub mod btreemap {
 /// Private implementation details of the [`quantity`](self) module.
 #[expect(unnameable_types)]
 mod private {
+    use core::num::{NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8};
+
     #[doc(hidden)]
     pub trait ConvertRuint: Copy + Sized {
-        // We have to use `Try*` traits because `From` is not implemented by ruint types.
-        // They shouldn't ever error.
-        type Ruint: Copy
-            + serde::Serialize
-            + serde::de::DeserializeOwned
-            + TryFrom<Self>
-            + TryInto<Self>;
+        type Ruint: Copy + serde::Serialize + serde::de::DeserializeOwned;
 
-        #[inline]
-        fn into_ruint(self) -> Self::Ruint {
-            self.try_into().ok().unwrap()
-        }
+        fn into_ruint(self) -> Self::Ruint;
 
-        #[inline]
-        fn from_ruint(ruint: Self::Ruint) -> Self {
-            ruint.try_into().ok().unwrap()
-        }
+        fn try_from_ruint(ruint: Self::Ruint) -> Result<Self, &'static str>;
     }
 
     macro_rules! impl_from_ruint {
@@ -328,6 +326,36 @@ mod private {
             $(
                 impl ConvertRuint for $primitive {
                     type Ruint = $ruint;
+
+                    #[inline]
+                    fn into_ruint(self) -> Self::Ruint {
+                        self.try_into().ok().unwrap()
+                    }
+
+                    #[inline]
+                    fn try_from_ruint(ruint: Self::Ruint) -> Result<Self, &'static str> {
+                        ruint.try_into().map_err(|_| "value does not fit target type")
+                    }
+                }
+            )*
+        };
+    }
+
+    macro_rules! impl_nonzero_from_ruint {
+        ($($primitive:ty = $ruint:ty => $inner:ty),* $(,)?) => {
+            $(
+                impl ConvertRuint for $primitive {
+                    type Ruint = $ruint;
+
+                    #[inline]
+                    fn into_ruint(self) -> Self::Ruint {
+                        self.get().try_into().ok().unwrap()
+                    }
+
+                    #[inline]
+                    fn try_from_ruint(ruint: Self::Ruint) -> Result<Self, &'static str> {
+                        Self::new(ruint.to::<$inner>()).ok_or("expected non-zero quantity")
+                    }
                 }
             )*
         };
@@ -341,12 +369,72 @@ mod private {
         u64  = alloy_primitives::U64,
         u128 = alloy_primitives::U128,
     }
+
+    impl_nonzero_from_ruint! {
+        NonZeroU8 = alloy_primitives::U8 => u8,
+        NonZeroU16 = alloy_primitives::U16 => u16,
+        NonZeroU32 = alloy_primitives::U32 => u32,
+        NonZeroU64 = alloy_primitives::U64 => u64,
+        NonZeroU128 = alloy_primitives::U128 => u128,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use alloc::{string::ToString, vec, vec::Vec};
+    use core::num::{NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8};
     use serde::{Deserialize, Serialize};
+
+    macro_rules! nonzero_quantity_roundtrip_test {
+        ($name:ident, $ty:ty, $value:expr, $json:literal) => {
+            #[test]
+            fn $name() {
+                #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+                struct Value {
+                    #[serde(with = "super")]
+                    inner: $ty,
+                }
+
+                let val = Value { inner: <$ty>::new($value).unwrap() };
+                let s = serde_json::to_string(&val).unwrap();
+                assert_eq!(s, $json);
+
+                let deserialized: Value = serde_json::from_str(&s).unwrap();
+                assert_eq!(val, deserialized);
+            }
+        };
+    }
+
+    nonzero_quantity_roundtrip_test!(
+        test_nonzero_u8_via_ruint,
+        NonZeroU8,
+        7u8,
+        "{\"inner\":\"0x7\"}"
+    );
+    nonzero_quantity_roundtrip_test!(
+        test_nonzero_u16_via_ruint,
+        NonZeroU16,
+        1000u16,
+        "{\"inner\":\"0x3e8\"}"
+    );
+    nonzero_quantity_roundtrip_test!(
+        test_nonzero_u32_via_ruint,
+        NonZeroU32,
+        1000u32,
+        "{\"inner\":\"0x3e8\"}"
+    );
+    nonzero_quantity_roundtrip_test!(
+        test_nonzero_u64_via_ruint,
+        NonZeroU64,
+        1000u64,
+        "{\"inner\":\"0x3e8\"}"
+    );
+    nonzero_quantity_roundtrip_test!(
+        test_nonzero_u128_via_ruint,
+        NonZeroU128,
+        1000u128,
+        "{\"inner\":\"0x3e8\"}"
+    );
 
     #[test]
     fn test_hex_u64() {
@@ -411,6 +499,57 @@ mod tests {
 
         let deserialized: Value = serde_json::from_str(&s).unwrap();
         assert_eq!(val, deserialized);
+    }
+
+    #[test]
+    fn test_nonzero_u64_opt_via_ruint() {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Value {
+            #[serde(with = "super::opt")]
+            inner: Option<NonZeroU64>,
+        }
+
+        let val = Value { inner: Some(NonZeroU64::new(1000).unwrap()) };
+        let s = serde_json::to_string(&val).unwrap();
+        assert_eq!(s, "{\"inner\":\"0x3e8\"}");
+
+        let deserialized: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(val, deserialized);
+
+        let s = "{\"inner\":\"1000\"}".to_string();
+        let deserialized: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(val, deserialized);
+
+        let val = Value { inner: None };
+        let s = serde_json::to_string(&val).unwrap();
+        assert_eq!(s, "{\"inner\":null}");
+
+        let deserialized: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(val, deserialized);
+    }
+
+    #[test]
+    fn test_nonzero_u64_zero_is_rejected() {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Value {
+            #[serde(with = "super")]
+            inner: NonZeroU64,
+        }
+
+        let err = serde_json::from_str::<Value>("{\"inner\":\"0x0\"}").unwrap_err();
+        assert_eq!(err.to_string(), "expected non-zero quantity at line 1 column 15");
+    }
+
+    #[test]
+    fn test_nonzero_u64_opt_zero_is_rejected() {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Value {
+            #[serde(with = "super::opt")]
+            inner: Option<NonZeroU64>,
+        }
+
+        let err = serde_json::from_str::<Value>("{\"inner\":\"0x0\"}").unwrap_err();
+        assert_eq!(err.to_string(), "expected non-zero quantity at line 1 column 15");
     }
 
     #[test]

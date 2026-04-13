@@ -5,10 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0](https://github.com/alloy-rs/alloy/releases/tag/v2.0.0) - 2026-04-13
+
+### Features
+
+- [rpc-types-debug] Add header helpers to ExecutionWitness ([#3862](https://github.com/alloy-rs/alloy/issues/3862))
+
+### Miscellaneous Tasks
+
+- Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
+- Release 1.8.2
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Bug Fixes
+
+- [rpc-types-debug] Enable serde_with alloc for no_std ([#3811](https://github.com/alloy-rs/alloy/issues/3811))
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+- Release 1.8.0
+
 ## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
 
 ### Miscellaneous Tasks
 
+- Release 1.7.4
 - Release 1.7.3
 - Release 1.7.2
 

@@ -96,6 +96,19 @@ pub struct AnyHeader {
     /// EIP-7685 requests hash.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
+    /// EIP-7928 block access list hash.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub block_access_list_hash: Option<B256>,
+    /// EIP-7843 slot number.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub slot_number: Option<u64>,
 }
 
 impl AnyHeader {
@@ -144,6 +157,8 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            block_access_list_hash,
+            slot_number,
         } = self;
 
         Ok(Header {
@@ -168,6 +183,8 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            block_access_list_hash,
+            slot_number,
         })
     }
 
@@ -197,6 +214,8 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            block_access_list_hash,
+            slot_number,
         } = self;
 
         Header {
@@ -221,6 +240,8 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            block_access_list_hash,
+            slot_number,
         }
     }
 }
@@ -306,6 +327,14 @@ impl BlockHeader for AnyHeader {
         self.requests_hash
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.block_access_list_hash
+    }
+
+    fn slot_number(&self) -> Option<u64> {
+        self.slot_number
+    }
+
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }
@@ -335,6 +364,8 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            block_access_list_hash,
+            slot_number,
         } = value;
 
         Self {
@@ -359,6 +390,8 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            block_access_list_hash,
+            slot_number,
         }
     }
 }

@@ -78,6 +78,10 @@ pub struct NodeInfo {
     pub environment: NodeEnvironment,
     /// Info about the node's fork configuration
     pub fork_config: NodeForkConfig,
+    /// The network type this node is running (e.g., "tempo" for Tempo mode).
+    /// `None` for standard Ethereum.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
 }
 
 /// The current block environment of the node.
@@ -115,8 +119,12 @@ pub struct NodeForkConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Metadata {
-    /// client version
+    /// Client version
     pub client_version: String,
+    /// Client SemVer compatible version
+    pub client_semver: Option<String>,
+    /// Client commit SHA hash
+    pub client_commit_sha: Option<String>,
     /// Chain id of the node.
     pub chain_id: ChainId,
     /// Unique instance id

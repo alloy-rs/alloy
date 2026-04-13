@@ -4,7 +4,7 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchHeaders};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -153,15 +153,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         match block_id {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
-            _ => {
-                // Try get_header first (more efficient), fallback to get_block if not supported.
-                // Not all nodes support eth_getHeaderByHash/eth_getHeaderByNumber.
-                if let Ok(header) = self.get_header(block_id).await {
-                    return Ok(header.map(|h| h.number()));
-                }
-                let block = self.get_block(block_id).await?;
-                Ok(block.map(|b| b.header().number()))
-            }
+            _ => Ok(self.get_header(block_id).await?.map(|h| h.number())),
         }
     }
 
@@ -553,7 +545,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         hash: BlockHash,
     ) -> TransportResult<Option<N::HeaderResponse>> {
-        self.client().request("eth_getHeaderByHash", (hash,)).await
+        match self.client().request("eth_getHeaderByHash", (hash,)).await {
+            Ok(header) => Ok(header),
+            // eth_getHeaderByHash is non-standard; fall back to eth_getBlockByHash
+            Err(err) if err.as_error_resp().is_some_and(|e| e.code == -32601) => {
+                Ok(self.get_block_by_hash(hash).await?.map(|b| b.header().clone()))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Gets a block header by its [`BlockNumberOrTag`].
@@ -580,7 +579,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         number: BlockNumberOrTag,
     ) -> TransportResult<Option<N::HeaderResponse>> {
-        self.client().request("eth_getHeaderByNumber", (number,)).await
+        match self.client().request("eth_getHeaderByNumber", (number,)).await {
+            Ok(header) => Ok(header),
+            // eth_getHeaderByNumber is non-standard; fall back to eth_getBlockByNumber
+            Err(err) if err.as_error_resp().is_some_and(|e| e.code == -32601) => {
+                Ok(self.get_block_by_number(number).await?.map(|b| b.header().clone()))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Gets the bytecode located at the corresponding [`Address`].
@@ -643,6 +649,39 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
 
         Ok(WatchBlocks::new(poller))
+    }
+
+    /// Watch for new blocks by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes) and fetching the header for each
+    /// returned block hash.
+    ///
+    /// Returns the [`WatchHeaders`] type which consumes the stream of block hashes from
+    /// [`PollerBuilder`] and returns a stream of [`alloy_network_primitives::HeaderResponse`]s.
+    ///
+    /// Note that the backing RPC methods (`eth_getHeaderByHash` / `eth_getHeaderByNumber`) are
+    /// not supported by all clients.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 headers:
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let poller = provider.watch_headers().await?;
+    /// let mut stream = poller.into_stream().take(5);
+    /// while let Some(header) = stream.next().await {
+    ///   println!("new header: {header:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn watch_headers(&self) -> TransportResult<WatchHeaders<N::HeaderResponse>> {
+        let id = self.new_block_filter().await?;
+        let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
+
+        Ok(WatchHeaders::new(poller))
     }
 
     /// Watch for new pending transaction by polling the provider with
@@ -1123,7 +1162,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
         match tx {
             SendableTx::Builder(mut tx) => {
-                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                alloy_network::NetworkTransactionBuilder::prep_for_submission(&mut tx);
                 let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
                 Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
             }
@@ -1200,7 +1239,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
         match tx {
             SendableTx::Builder(mut tx) => {
-                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                alloy_network::NetworkTransactionBuilder::prep_for_submission(&mut tx);
                 let receipt = self.client().request("eth_sendTransactionSync", (tx,)).await?;
                 Ok(receipt)
             }
@@ -1599,7 +1638,9 @@ mod tests {
     use super::*;
     use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_consensus::{Transaction, TxEnvelope};
-    use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
+    use alloy_network::{
+        AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
+    };
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rlp::Decodable;
