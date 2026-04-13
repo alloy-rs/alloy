@@ -95,8 +95,24 @@ pub fn calc_next_block_base_fee(
     base_fee: u64,
     base_fee_params: BaseFeeParams,
 ) -> u64 {
+    let elasticity = base_fee_params.elasticity_multiplier;
+    let max_change_denominator = base_fee_params.max_change_denominator;
+
+    // Without these checks, `gas_limit / elasticity` or the EIP-1559 update term can divide by
+    // zero (e.g. elasticity or denominator set to zero from misconfiguration / malformed
+    // Holocene header data, or `gas_limit < elasticity` on chains that do not enforce a minimum
+    // gas limit). Nethermind returns the parent base fee unchanged in these cases; see
+    // `DefaultBaseFeeCalculator` in Nethermind.Core.
+    if elasticity == 0 || max_change_denominator == 0 {
+        return base_fee;
+    }
+
     // Calculate the target gas by dividing the gas limit by the elasticity multiplier.
-    let gas_target = gas_limit / base_fee_params.elasticity_multiplier as u64;
+    let gas_target = (gas_limit as u128 / elasticity) as u64;
+
+    if gas_target == 0 {
+        return base_fee;
+    }
 
     match gas_used.cmp(&gas_target) {
         // If the gas used in the current block is equal to the gas target, the base fee remains the
@@ -304,5 +320,30 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_zero_elasticity() {
+        let p = BaseFeeParams::new(8, 0);
+        assert_eq!(
+            calc_next_block_base_fee(1, 30_000_000, 1_000_000_000, p),
+            1_000_000_000
+        );
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_zero_denominator() {
+        let p = BaseFeeParams::new(0, 2);
+        assert_eq!(
+            calc_next_block_base_fee(15_000_000, 30_000_000, 1_000_000_000, p),
+            1_000_000_000
+        );
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_gas_limit_below_elasticity() {
+        let p = BaseFeeParams::ethereum();
+        // gas_target = 1 / 2 = 0; gas_used > 0 used to hit a divide-by-zero in the increase path.
+        assert_eq!(calc_next_block_base_fee(1, 1, 1_000_000_000, p), 1_000_000_000);
     }
 }
