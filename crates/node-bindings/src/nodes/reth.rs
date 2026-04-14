@@ -554,6 +554,16 @@ impl Reth {
         if self.keep_stdout {
             // re-attach the stdout handle if requested
             child.stdout = Some(reader.into_inner());
+        } else {
+            // We need to consume the stdout otherwise reth can become non-responsive
+            // when its pipe buffer fills up.
+            // See: <https://github.com/alloy-rs/alloy/issues/2091#issuecomment-2676134147>
+            std::thread::spawn(move || {
+                let mut buf = String::new();
+                loop {
+                    let _ = reader.read_line(&mut buf);
+                }
+            });
         }
 
         Ok(RethInstance {
