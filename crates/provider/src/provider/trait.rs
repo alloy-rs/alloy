@@ -469,7 +469,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
     /// Returns the RLP-encoded block access list, or `None` if the block is not found.
-    async fn get_block_access_list(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+    async fn get_block_access_list(
+        &self,
+        block: BlockId,
+    ) -> TransportResult<Option<serde_json::Value>> {
         match block {
             BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
             BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
@@ -482,7 +485,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn get_block_access_list_by_hash(
         &self,
         hash: BlockHash,
-    ) -> TransportResult<Option<Bytes>> {
+    ) -> TransportResult<Option<serde_json::Value>> {
         self.client().request("eth_getBlockAccessListByBlockHash", (hash,)).await
     }
 
@@ -492,8 +495,18 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn get_block_access_list_by_number(
         &self,
         number: BlockNumberOrTag,
-    ) -> TransportResult<Option<Bytes>> {
+    ) -> TransportResult<Option<serde_json::Value>> {
         self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
+    ///
+    /// Returns the  block access list raw, or `None` if the block is not found.
+    async fn get_block_access_list_raw(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListRaw", (number,)).await
     }
 
     /// Gets a block header by its [`BlockId`].
