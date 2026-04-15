@@ -554,6 +554,15 @@ impl Reth {
         if self.keep_stdout {
             // re-attach the stdout handle if requested
             child.stdout = Some(reader.into_inner());
+        } else {
+            // Drain stdout to prevent the pipe buffer from filling up and blocking the node.
+            std::thread::spawn(move || {
+                let mut buf = String::new();
+                loop {
+                    buf.clear();
+                    let _ = reader.read_line(&mut buf);
+                }
+            });
         }
 
         Ok(RethInstance {

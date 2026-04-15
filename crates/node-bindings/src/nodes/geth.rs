@@ -678,12 +678,11 @@ impl Geth {
             // re-attach the stderr handle if requested
             child.stderr = Some(reader.into_inner());
         } else {
-            // We need to consume the stderr otherwise geth is non-responsive and RPC server results
-            // in connection refused.
-            // See: <https://github.com/alloy-rs/alloy/issues/2091#issuecomment-2676134147>
+            // Drain stderr to prevent the pipe buffer from filling up and blocking the node.
             std::thread::spawn(move || {
                 let mut buf = String::new();
                 loop {
+                    buf.clear();
                     let _ = reader.read_line(&mut buf);
                 }
             });
