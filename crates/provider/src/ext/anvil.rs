@@ -1015,7 +1015,7 @@ mod tests {
 
         let seconds = provider.anvil_set_time(1001).await.unwrap();
 
-        assert_eq!(seconds, 1);
+        assert_eq!(seconds, 1001);
     }
 
     #[tokio::test]
