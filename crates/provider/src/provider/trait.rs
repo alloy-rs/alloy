@@ -15,7 +15,7 @@ use crate::{
     SendableTx,
 };
 use alloy_consensus::BlockHeader;
-use alloy_eips::eip2718::Encodable2718;
+use alloy_eips::{eip2718::Encodable2718, eip7928::BlockAccessList};
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
 use alloy_network_primitives::{BlockResponse, ReceiptResponse};
@@ -468,11 +468,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the json block access list, or `None` if the block is not found.
+    /// Returns the block access list, or `None` if the block is not found.
     async fn get_block_access_list(
         &self,
         block: BlockId,
-    ) -> TransportResult<Option<serde_json::Value>> {
+    ) -> TransportResult<Option<BlockAccessList>> {
         match block {
             BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
             BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
@@ -481,21 +481,21 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockHash`].
     ///
-    /// Returns the json block access list, or `None` if the block is not found.
+    /// Returns the block access list, or `None` if the block is not found.
     async fn get_block_access_list_by_hash(
         &self,
         hash: BlockHash,
-    ) -> TransportResult<Option<serde_json::Value>> {
+    ) -> TransportResult<Option<BlockAccessList>> {
         self.client().request("eth_getBlockAccessListByBlockHash", (hash,)).await
     }
 
     /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
     ///
-    /// Returns the json block access list, or `None` if the block is not found.
+    /// Returns the block access list, or `None` if the block is not found.
     async fn get_block_access_list_by_number(
         &self,
         number: BlockNumberOrTag,
-    ) -> TransportResult<Option<serde_json::Value>> {
+    ) -> TransportResult<Option<BlockAccessList>> {
         self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
     }
 
