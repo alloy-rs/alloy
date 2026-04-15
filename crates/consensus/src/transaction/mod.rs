@@ -83,7 +83,7 @@ use alloy_eips::Typed2718;
 /// We call these transactions "dynamic fee transactions".
 /// We call non dynamic fee transactions(EIP-155, EIP-2930) "legacy fee transactions".
 #[doc(alias = "Tx")]
-#[auto_impl::auto_impl(&, Arc)]
+#[auto_impl::auto_impl(&, &mut, Arc)]
 pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
@@ -255,7 +255,7 @@ pub trait SignableTransaction<Signature>: Transaction {
     /// Set `chain_id` if it is not already set. Checks that the provided `chain_id` matches the
     /// existing `chain_id` if it is already set, returning `false` if they do not match.
     fn set_chain_id_checked(&mut self, chain_id: ChainId) -> bool {
-        match self.chain_id() {
+        match Transaction::chain_id(self) {
             Some(tx_chain_id) => {
                 if tx_chain_id != chain_id {
                     return false;

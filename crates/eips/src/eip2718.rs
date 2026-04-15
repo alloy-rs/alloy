@@ -354,7 +354,7 @@ pub trait Eip2718Envelope: Decodable2718 + Encodable2718 {}
 impl<T> Eip2718Envelope for T where T: Decodable2718 + Encodable2718 {}
 
 /// A trait that helps to determine the type of the transaction.
-#[auto_impl::auto_impl(&)]
+#[auto_impl::auto_impl(&, &mut)]
 pub trait Typed2718 {
     /// Returns the EIP-2718 type flag.
     fn ty(&self) -> u8;
