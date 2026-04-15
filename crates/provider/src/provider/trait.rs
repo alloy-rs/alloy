@@ -468,7 +468,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    /// Returns the json block access list, or `None` if the block is not found.
     async fn get_block_access_list(
         &self,
         block: BlockId,
@@ -481,7 +481,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockHash`].
     ///
-    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    /// Returns the json block access list, or `None` if the block is not found.
     async fn get_block_access_list_by_hash(
         &self,
         hash: BlockHash,
@@ -491,7 +491,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
     ///
-    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    /// Returns the json block access list, or `None` if the block is not found.
     async fn get_block_access_list_by_number(
         &self,
         number: BlockNumberOrTag,
