@@ -298,6 +298,13 @@ where
     fn logs(&self) -> &[Self::Log] {
         self.receipt.logs()
     }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.receipt.into_logs()
+    }
 }
 
 impl<R> From<R> for ReceiptWithBloom<R>
@@ -522,7 +529,9 @@ pub(crate) mod serde_bincode_compat {
 mod test {
     use super::*;
     use crate::ReceiptEnvelope;
+    use alloc::sync::Arc;
     use alloy_rlp::{Decodable, Encodable};
+    use core::sync::atomic::{AtomicUsize, Ordering};
 
     const fn assert_tx_receipt<T: TxReceipt>() {}
 
@@ -530,6 +539,49 @@ mod test {
     const fn assert_receipt() {
         assert_tx_receipt::<Receipt>();
         assert_tx_receipt::<ReceiptWithBloom<Receipt>>();
+    }
+
+    #[derive(Debug)]
+    struct CountingLog {
+        clones: Arc<AtomicUsize>,
+        inner: Log,
+    }
+
+    impl Clone for CountingLog {
+        fn clone(&self) -> Self {
+            self.clones.fetch_add(1, Ordering::Relaxed);
+            Self { clones: self.clones.clone(), inner: self.inner.clone() }
+        }
+    }
+
+    impl AsRef<Log> for CountingLog {
+        fn as_ref(&self) -> &Log {
+            &self.inner
+        }
+    }
+
+    impl PartialEq for CountingLog {
+        fn eq(&self, other: &Self) -> bool {
+            self.inner == other.inner
+        }
+    }
+
+    impl Eq for CountingLog {}
+
+    #[test]
+    fn receipt_with_bloom_into_logs_moves_inner_logs() {
+        let clones = Arc::new(AtomicUsize::new(0));
+        let receipt = Receipt {
+            status: true.into(),
+            cumulative_gas_used: 0,
+            logs: vec![CountingLog { clones: clones.clone(), inner: Log::default() }],
+        };
+        let receipt = ReceiptWithBloom { receipt, logs_bloom: Bloom::default() };
+
+        let logs = receipt.into_logs();
+
+        assert_eq!(logs.len(), 1);
+        assert_eq!(clones.load(Ordering::Relaxed), 0);
     }
 
     #[cfg(feature = "serde")]
