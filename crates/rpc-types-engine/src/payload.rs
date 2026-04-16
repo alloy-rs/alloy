@@ -2154,6 +2154,34 @@ impl ExecutionPayload {
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block along with optional block access list.
+    ///
+    /// This preserves the full RLP-encoded block access list for Amsterdam/V4 payloads.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow_with_optional_bal<T, H>(
+        block: &Block<T, H>,
+        block_access_list: Option<Bytes>,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader + Sealable,
+    {
+        if block_access_list.is_none() {
+            Self::from_block_unchecked(block.hash_slow(), block)
+        } else {
+            Self::from_block_unchecked_with_bal(
+                block.hash_slow(),
+                block,
+                block_access_list.unwrap(),
+            )
+        }
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
     /// [`ExecutionPayloadSidecar`] extracted from the block.
     ///
     /// For Amsterdam/V4 payloads this uses the header's `block_access_list_hash` bytes as the
