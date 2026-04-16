@@ -59,6 +59,28 @@ impl From<B64> for PayloadId {
     }
 }
 
+/// Extra fields for payload construction.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
+pub struct PayloadExtras {
+    /// The block access list bytes.
+    pub bal: Option<Bytes>,
+}
+
+impl From<Option<Bytes>> for PayloadExtras {
+    fn from(bal: Option<Bytes>) -> Self {
+        Self { bal }
+    }
+}
+
+impl From<Bytes> for PayloadExtras {
+    fn from(bal: Bytes) -> Self {
+        Self { bal: Some(bal) }
+    }
+}
+
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
@@ -2150,7 +2172,32 @@ impl ExecutionPayload {
         T: Encodable2718 + Transaction,
         H: BlockHeader + Sealable,
     {
-        Self::from_block_unchecked_with_bal(block.hash_slow(), block, block_access_list)
+        Self::from_block_slow_with_extras(block, block_access_list)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block along with payload extras.
+    ///
+    /// This preserves the full RLP-encoded block access list for Amsterdam/V4 payloads.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow_with_extras<T, H>(
+        block: &Block<T, H>,
+        extras: impl Into<PayloadExtras>,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader + Sealable,
+    {
+        let extras = extras.into();
+        if let Some(block_access_list) = extras.bal {
+            Self::from_block_unchecked_with_bal(block.hash_slow(), block, block_access_list)
+        } else {
+            Self::from_block_unchecked(block.hash_slow(), block)
+        }
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
@@ -2228,6 +2275,30 @@ impl ExecutionPayload {
         };
 
         (execution_payload, sidecar)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block along with optional extras.
+    ///
+    /// This preserves the full RLP-encoded block access list for Amsterdam/V4 payloads if provided.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    pub fn from_block_unchecked_with_extras<T, H>(
+        block_hash: B256,
+        block: &Block<T, H>,
+        extras: impl Into<PayloadExtras>,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader,
+    {
+        let extras = extras.into();
+        if let Some(block_access_list) = extras.bal {
+            Self::from_block_unchecked_with_bal(block_hash, block, block_access_list)
+        } else {
+            Self::from_block_unchecked(block_hash, block)
+        }
     }
 
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
