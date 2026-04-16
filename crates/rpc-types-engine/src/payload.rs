@@ -2193,10 +2193,10 @@ impl ExecutionPayload {
         H: BlockHeader + Sealable,
     {
         let extras = extras.into();
-        if extras.bal.is_none() {
-            Self::from_block_unchecked(block.hash_slow(), block)
+        if let Some(block_access_list) = extras.bal {
+            Self::from_block_unchecked_with_bal(block.hash_slow(), block, block_access_list)
         } else {
-            Self::from_block_unchecked_with_bal(block.hash_slow(), block, extras.bal.unwrap())
+            Self::from_block_unchecked(block.hash_slow(), block)
         }
     }
 
