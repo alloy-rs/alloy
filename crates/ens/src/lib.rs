@@ -406,7 +406,7 @@ mod tests {
     #[tokio::test]
     async fn test_reverse_registrar_fetching_mainnet() {
         let provider = ProviderBuilder::new()
-            .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let res = provider.get_reverse_registrar().await;
         assert_eq!(*res.unwrap().address(), address!("0xa58E81fe9b61B5c3fE2AFD33CF304c454AbFc7Cb"));
@@ -415,7 +415,7 @@ mod tests {
     #[tokio::test]
     async fn test_pub_resolver_fetching_mainnet() {
         let provider = ProviderBuilder::new()
-            .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let name = "vitalik.eth";
         let node = namehash(name);
@@ -426,7 +426,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_name_via_universal_resolver() {
         let provider = ProviderBuilder::new()
-            .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let addr = provider.resolve_name("ur.integration-tests.eth").await.unwrap();
         assert_eq!(addr, address!("0x2222222222222222222222222222222222222222"));
@@ -435,7 +435,7 @@ mod tests {
     #[tokio::test]
     async fn test_lookup_address_via_universal_resolver() {
         let provider = ProviderBuilder::new()
-            .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let name = provider
             .lookup_address(&address!("0xeE9eeaAB0Bb7D9B969D701f6f8212609EDeA252E"))
@@ -447,7 +447,7 @@ mod tests {
     #[tokio::test]
     async fn test_lookup_txt_via_universal_resolver() {
         let provider = ProviderBuilder::new()
-            .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let avatar = provider.lookup_txt("integration-tests.eth", "avatar").await.unwrap();
         assert_eq!(
@@ -459,7 +459,7 @@ mod tests {
     #[tokio::test]
     async fn test_pub_resolver_text() {
         let provider = ProviderBuilder::new()
-            .connect_http("http://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+            .connect_http("http://ethereum.reth.rs/rpc".parse().unwrap());
 
         let name = "vitalik.eth";
         let node = namehash(name);
@@ -471,7 +471,7 @@ mod tests {
     #[tokio::test]
     async fn test_pub_resolver_fetching_txt() {
         let provider = ProviderBuilder::new()
-            .connect_http("http://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+            .connect_http("http://ethereum.reth.rs/rpc".parse().unwrap());
 
         let name = "vitalik.eth";
         let res = provider.lookup_txt(name, "avatar").await.unwrap();
