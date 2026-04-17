@@ -75,6 +75,14 @@ impl<T: Encodable7594> From<Signed<TxEip4844WithSidecar<T>>> for Signed<TxEip484
     }
 }
 
+impl From<TxEip4844WithSidecar<BlobTransactionSidecar>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(tx: TxEip4844WithSidecar<BlobTransactionSidecar>) -> Self {
+        Self::TxEip4844WithSidecar(tx.map_sidecar(Into::into))
+    }
+}
+
 impl From<TxEip4844Variant<BlobTransactionSidecar>>
     for TxEip4844Variant<BlobTransactionSidecarVariant>
 {
@@ -106,16 +114,6 @@ impl<T> From<TxEip4844> for TxEip4844Variant<T> {
 impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant<BlobTransactionSidecar> {
     fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecar)) -> Self {
         TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar).into()
-    }
-}
-
-impl From<TxEip4844WithSidecar<BlobTransactionSidecar>>
-    for TxEip4844Variant<BlobTransactionSidecarVariant>
-{
-    fn from(tx: TxEip4844WithSidecar<BlobTransactionSidecar>) -> Self {
-        let (tx, sidecar) = tx.into_parts();
-        let sidecar_variant = BlobTransactionSidecarVariant::Eip4844(sidecar);
-        TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar_variant).into()
     }
 }
 

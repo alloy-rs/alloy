@@ -15,7 +15,7 @@ use crate::{
     SendableTx,
 };
 use alloy_consensus::BlockHeader;
-use alloy_eips::eip2718::Encodable2718;
+use alloy_eips::{eip2718::Encodable2718, eip7928::BlockAccessList};
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
 use alloy_network_primitives::{BlockResponse, ReceiptResponse};
@@ -468,8 +468,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
-    async fn get_block_access_list(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+    /// Returns the block access list, or `None` if the block is not found.
+    async fn get_block_access_list(
+        &self,
+        block: BlockId,
+    ) -> TransportResult<Option<BlockAccessList>> {
         match block {
             BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
             BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
@@ -478,22 +481,32 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockHash`].
     ///
-    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    /// Returns the block access list, or `None` if the block is not found.
     async fn get_block_access_list_by_hash(
         &self,
         hash: BlockHash,
-    ) -> TransportResult<Option<Bytes>> {
+    ) -> TransportResult<Option<BlockAccessList>> {
         self.client().request("eth_getBlockAccessListByBlockHash", (hash,)).await
     }
 
     /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
     ///
-    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    /// Returns the block access list, or `None` if the block is not found.
     async fn get_block_access_list_by_number(
         &self,
         number: BlockNumberOrTag,
-    ) -> TransportResult<Option<Bytes>> {
+    ) -> TransportResult<Option<BlockAccessList>> {
         self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
+    ///
+    /// Returns the  block access list raw, or `None` if the block is not found.
+    async fn get_block_access_list_raw(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListRaw", (number,)).await
     }
 
     /// Gets a block header by its [`BlockId`].
@@ -1162,7 +1175,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
         match tx {
             SendableTx::Builder(mut tx) => {
-                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                alloy_network::NetworkTransactionBuilder::prep_for_submission(&mut tx);
                 let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
                 Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
             }
@@ -1239,7 +1252,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
         match tx {
             SendableTx::Builder(mut tx) => {
-                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                alloy_network::NetworkTransactionBuilder::prep_for_submission(&mut tx);
                 let receipt = self.client().request("eth_sendTransactionSync", (tx,)).await?;
                 Ok(receipt)
             }
@@ -1638,7 +1651,9 @@ mod tests {
     use super::*;
     use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_consensus::{Transaction, TxEnvelope};
-    use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
+    use alloy_network::{
+        AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
+    };
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rlp::Decodable;
@@ -2506,7 +2521,7 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "hyper-tls")]
     async fn hyper_https() {
-        let url = "https://reth-ethereum.ithaca.xyz/rpc";
+        let url = "https://ethereum.reth.rs/rpc";
 
         // With the `hyper` feature enabled .connect builds the provider based on
         // `HyperTransport`.
@@ -2636,8 +2651,7 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "hyper")]
     async fn test_connect_hyper_tls() {
-        let p =
-            ProviderBuilder::new().connect("https://reth-ethereum.ithaca.xyz/rpc").await.unwrap();
+        let p = ProviderBuilder::new().connect("https://ethereum.reth.rs/rpc").await.unwrap();
 
         let _num = p.get_block_number().await.unwrap();
 

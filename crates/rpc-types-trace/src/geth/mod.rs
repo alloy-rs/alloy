@@ -361,7 +361,7 @@ pub enum GethDebugBuiltInTracerType {
 /// Available tracers
 ///
 /// See <https://geth.ethereum.org/docs/developers/evm-tracing/built-in-tracers> and <https://geth.ethereum.org/docs/developers/evm-tracing/custom-tracer>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GethDebugTracerType {
     /// built-in tracer
@@ -814,7 +814,7 @@ impl From<GethDebugTracingOptions> for GethDebugTracingCallOptions {
     }
 }
 
-/// Serializes a storage map as a list of key-value pairs _without_ 0x-prefix
+/// Serializes a storage map as a list of key-value pairs with 0x-prefix
 fn serialize_string_storage_map_opt<S: Serializer>(
     storage: &Option<BTreeMap<B256, B256>>,
     s: S,
@@ -826,8 +826,7 @@ fn serialize_string_storage_map_opt<S: Serializer>(
             for (key, val) in storage {
                 let key = format!("{key:?}");
                 let val = format!("{val:?}");
-                // skip the 0x prefix
-                m.serialize_entry(&key.as_str()[2..], &val.as_str()[2..])?;
+                m.serialize_entry(key.as_str(), val.as_str())?;
             }
             m.end()
         }
@@ -905,7 +904,7 @@ mod tests {
 
     #[test]
     fn test_serialize_storage_map() {
-        let s = r#"{"pc":3349,"op":"SLOAD","gas":23959,"gasCost":2100,"depth":1,"stack":[],"memory":[],"storage":{"6693dabf5ec7ab1a0d1c5bc58451f85d5e44d504c9ffeb75799bfdb61aa2997a":"0000000000000000000000000000000000000000000000000000000000000000"}}"#;
+        let s = r#"{"pc":3349,"op":"SLOAD","gas":23959,"gasCost":2100,"depth":1,"stack":[],"memory":[],"storage":{"0x6693dabf5ec7ab1a0d1c5bc58451f85d5e44d504c9ffeb75799bfdb61aa2997a":"0x0000000000000000000000000000000000000000000000000000000000000000"}}"#;
         let log: StructLog = serde_json::from_str(s).unwrap();
         let val = serde_json::to_value(&log).unwrap();
         let input = serde_json::from_str::<serde_json::Value>(s).unwrap();

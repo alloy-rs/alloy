@@ -6,6 +6,7 @@ use crate::{
     },
     layers::{BlockIdLayer, CallBatchLayer, ChainLayer},
     provider::SendableTx,
+    utils::Eip1559Estimator,
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
@@ -183,6 +184,28 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
 }
 
 impl<L, F, N> ProviderBuilder<L, F, N> {
+    /// Apply a function to this builder.
+    ///
+    /// This is useful for extracting reusable builder-style helper functions without manually
+    /// reconstructing the [`ProviderBuilder`].
+    pub fn apply<T>(self, f: impl FnOnce(Self) -> T) -> T {
+        f(self)
+    }
+
+    /// Map the layer stack to a new type.
+    ///
+    /// This is useful for customizing or replacing the accumulated layers in a reusable helper.
+    pub fn map_layer<L2>(self, f: impl FnOnce(L) -> L2) -> ProviderBuilder<L2, F, N> {
+        ProviderBuilder { layer: f(self.layer), filler: self.filler, network: PhantomData }
+    }
+
+    /// Map the filler stack to a new type.
+    ///
+    /// This is useful for customizing or replacing the accumulated fillers in a reusable helper.
+    pub fn map_filler<F2>(self, f: impl FnOnce(F) -> F2) -> ProviderBuilder<L, F2, N> {
+        ProviderBuilder { layer: self.layer, filler: f(self.filler), network: PhantomData }
+    }
+
     /// Add a layer to the stack being built. This is similar to
     /// [`tower::ServiceBuilder::layer`].
     ///
@@ -195,22 +218,14 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// [`tower::ServiceBuilder::layer`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html#method.layer
     /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
     pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>, F, N> {
-        ProviderBuilder {
-            layer: Stack::new(layer, self.layer),
-            filler: self.filler,
-            network: PhantomData,
-        }
+        self.map_layer(|current| Stack::new(layer, current))
     }
 
     /// Add a transaction filler to the stack being built. Transaction fillers
     /// are used to fill in missing fields on transactions before they are sent,
     /// and are all joined to form the outermost layer of the stack.
     pub fn filler<F2>(self, filler: F2) -> ProviderBuilder<L, JoinFill<F, F2>, N> {
-        ProviderBuilder {
-            layer: self.layer,
-            filler: JoinFill::new(self.filler, filler),
-            network: PhantomData,
-        }
+        self.map_filler(|current| JoinFill::new(current, filler))
     }
 
     /// Change the network.
@@ -218,11 +233,20 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// By default, the network is `Ethereum`. This method must be called to configure a different
     /// network.
     ///
+    /// This replaces the filler stack with the target network's recommended fillers. Any custom
+    /// fillers should be added **after** calling `.network()`.
+    ///
     /// ```ignore
     /// builder.network::<Arbitrum>()
     /// ```
-    pub fn network<Net: Network>(self) -> ProviderBuilder<L, F, Net> {
-        ProviderBuilder { layer: self.layer, filler: self.filler, network: PhantomData }
+    pub fn network<Net: RecommendedFillers>(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<Identity, Net::RecommendedFillers>, Net> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: JoinFill::new(Identity, Net::recommended_fillers()),
+            network: PhantomData,
+        }
     }
 
     /// Add a chain layer to the stack being built. The layer will set
@@ -256,7 +280,17 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     ///
     /// See [`GasFiller`] for more information.
     pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
-        self.filler(GasFiller)
+        self.filler(GasFiller::default())
+    }
+
+    /// Add EIP-1559 gas estimation to the stack being built, using the provided estimator.
+    ///
+    /// See [`GasFiller`] and [`Eip1559Estimator`] for more information.
+    pub fn with_eip1559_estimator(
+        self,
+        estimator: Eip1559Estimator,
+    ) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
+        self.filler(GasFiller { estimator })
     }
 
     /// Add nonce management to the stack being built.
@@ -795,6 +829,50 @@ mod tests {
     #[tokio::test]
     async fn compile_with_network() {
         let p = ProviderBuilder::new_with_network::<AnyNetwork>().connect_anvil();
+        let num = p.get_block_number().await.unwrap();
+        assert_eq!(num, 0);
+    }
+
+    // Ensures `.network()` replaces fillers rather than keeping the old ones.
+    #[test]
+    fn network_replaces_fillers() {
+        // Add an extra filler before swapping, it should be dropped.
+        let builder = ProviderBuilder::new().filler(GasFiller::default()).network::<AnyNetwork>();
+
+        let _: ProviderBuilder<
+            Identity,
+            JoinFill<Identity, <AnyNetwork as RecommendedFillers>::RecommendedFillers>,
+            AnyNetwork,
+        > = builder;
+    }
+
+    #[test]
+    fn apply_transforms_builder() {
+        let builder = ProviderBuilder::new()
+            .apply(|builder| builder.disable_recommended_fillers().with_gas_estimation());
+
+        let _: ProviderBuilder<Identity, JoinFill<Identity, GasFiller>, Ethereum> = builder;
+    }
+
+    #[test]
+    fn map_filler_replaces_fillers() {
+        let builder = ProviderBuilder::new().map_filler(|_| GasFiller::default());
+
+        let _: ProviderBuilder<Identity, GasFiller, Ethereum> = builder;
+    }
+
+    #[test]
+    fn map_layer_replaces_layers() {
+        let builder = ProviderBuilder::<Identity, Identity>::default()
+            .map_layer(|_| ChainLayer::new(NamedChain::Mainnet));
+
+        let _: ProviderBuilder<ChainLayer, Identity, Ethereum> = builder;
+    }
+
+    #[tokio::test]
+    async fn network_swap_works_at_runtime() {
+        // Verify that `ProviderBuilder::new().network::<AnyNetwork>()` produces a working provider.
+        let p = ProviderBuilder::new().network::<AnyNetwork>().connect_anvil();
         let num = p.get_block_number().await.unwrap();
         assert_eq!(num, 0);
     }

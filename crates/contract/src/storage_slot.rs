@@ -197,7 +197,7 @@ mod tests {
     use alloy_provider::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::sol;
-    const FORK_URL: &str = "https://reth-ethereum.ithaca.xyz/rpc";
+    const FORK_URL: &str = "https://ethereum.reth.rs/rpc";
     use alloy_sol_types::SolCall;
 
     async fn test_erc20_token_set_balance(token: Address) {

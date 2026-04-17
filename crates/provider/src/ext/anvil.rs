@@ -517,15 +517,14 @@ mod tests {
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::{sol, SolCall};
 
-    // use alloy_node_bindings::Anvil; (to be used in `test_anvil_reset`)
-    const FORK_URL: &str = "https://reth-ethereum.ithaca.xyz/rpc";
+    const FORK_URL: &str = "https://ethereum.reth.rs/rpc";
 
     #[tokio::test]
     async fn test_anvil_impersonate_account_stop_impersonating_account() {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 
@@ -566,7 +565,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 
@@ -595,7 +594,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 
@@ -733,29 +732,22 @@ mod tests {
         provider.anvil_drop_all_transactions().await.unwrap();
     }
 
-    // TODO: Fix this test, `chain_id` is not being set correctly.
-    // #[tokio::test]
-    // async fn test_anvil_reset() {
-    //     let fork1 = Anvil::default().chain_id(777).spawn();
-    //     let fork2 = Anvil::default().chain_id(888).spawn();
+    #[tokio::test]
+    async fn test_anvil_reset() {
+        let provider = ProviderBuilder::new().connect_anvil();
 
-    //     let provider = ProviderBuilder::new()
-    //         .connect_anvil_with_config(|config| config.fork(fork1.endpoint_url().to_string()));
+        let alice = Address::random();
+        let balance = U256::from(1e18 as u64);
+        provider.anvil_set_balance(alice, balance).await.unwrap();
 
-    //     let chain_id = provider.get_chain_id().await.unwrap();
-    //     assert_eq!(chain_id, 777);
+        let current_balance = provider.get_balance(alice).await.unwrap();
+        assert_eq!(current_balance, balance);
 
-    //     provider
-    //         .anvil_reset(Some(Forking {
-    //             json_rpc_url: Some(fork2.endpoint_url().to_string()),
-    //             block_number: Some(0),
-    //         }))
-    //         .await
-    //         .unwrap();
+        provider.anvil_reset(None).await.unwrap();
 
-    //     let chain_id = provider.get_chain_id().await.unwrap();
-    //     assert_eq!(chain_id, 888);
-    // }
+        let reset_balance = provider.get_balance(alice).await.unwrap();
+        assert_eq!(reset_balance, U256::ZERO);
+    }
 
     #[tokio::test]
     async fn test_anvil_set_chain_id() {
@@ -1015,7 +1007,7 @@ mod tests {
 
         let seconds = provider.anvil_set_time(1001).await.unwrap();
 
-        assert_eq!(seconds, 1);
+        assert_eq!(seconds, 1001);
     }
 
     #[tokio::test]
@@ -1091,21 +1083,20 @@ mod tests {
         assert_eq!(num, start_num + 10);
     }
 
-    // TODO: Fix this test, only a single block is being mined regardless of the `blocks` parameter.
-    // #[tokio::test]
-    // async fn test_evm_mine_with_configuration() {
-    //     let provider = ProviderBuilder::new().connect_anvil();
+    #[tokio::test]
+    async fn test_evm_mine_with_configuration() {
+        let provider = ProviderBuilder::new().connect_anvil();
 
-    //     let start_num = provider.get_block_number().await.unwrap();
+        let start_num = provider.get_block_number().await.unwrap();
 
-    //     provider
-    //         .evm_mine(Some(MineOptions::Options { timestamp: Some(100), blocks: Some(10) }))
-    //         .await
-    //         .unwrap();
+        provider
+            .evm_mine(Some(MineOptions::Options { timestamp: None, blocks: Some(10) }))
+            .await
+            .unwrap();
 
-    //     let num = provider.get_block_number().await.unwrap();
-    //     assert_eq!(num, start_num + 10);
-    // }
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(num, start_num + 10);
+    }
 
     #[tokio::test]
     async fn test_anvil_mine_detailed_single_block() {
@@ -1123,28 +1114,24 @@ mod tests {
         assert_eq!(num, start_num + 10);
     }
 
-    // TODO: Fix this test, only a single block is being mined regardless of the `blocks` parameter.
-    // #[tokio::test]
-    // async fn test_anvil_mine_detailed_with_configuration() {
-    //     let provider = ProviderBuilder::new().connect_anvil();
+    #[tokio::test]
+    async fn test_anvil_mine_detailed_with_configuration() {
+        let provider = ProviderBuilder::new().connect_anvil();
 
-    //     let start_num = provider.get_block_number().await.unwrap();
+        let start_num = provider.get_block_number().await.unwrap();
 
-    //     let blocks = provider
-    //         .anvil_mine_detailed(Some(MineOptions::Options {
-    //             timestamp: Some(100),
-    //             blocks: Some(10),
-    //         }))
-    //         .await
-    //         .unwrap();
+        let blocks = provider
+            .anvil_mine_detailed(Some(MineOptions::Options { timestamp: None, blocks: Some(10) }))
+            .await
+            .unwrap();
 
-    //     let num = provider.get_block_number().await.unwrap();
-    //     assert_eq!(num, start_num + 10);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(num, start_num + 10);
 
-    //     for (idx, block) in blocks.iter().enumerate() {
-    //         assert_eq!(block.header.number, Some(start_num + idx as u64 + 1));
-    //     }
-    // }
+        for (idx, block) in blocks.iter().enumerate() {
+            assert_eq!(block.header.number, start_num + idx as u64 + 1);
+        }
+    }
 
     #[tokio::test]
     async fn test_anvil_set_rpc_url() {
@@ -1240,7 +1227,7 @@ mod tests {
                     let tx = TransactionRequest::default()
                         .with_from(alice)
                         .with_to(bob)
-                        .with_blob_sidecar(sidecar.clone());
+                        .with_blob_sidecar_4844(sidecar.clone());
 
                     let pending_tx = provider.send_transaction(tx).await.unwrap();
                     let _receipt = pending_tx.get_receipt().await.unwrap();
@@ -1280,7 +1267,7 @@ mod tests {
                     let tx = TransactionRequest::default()
                         .with_from(alice)
                         .with_to(bob)
-                        .with_blob_sidecar(sidecar.clone());
+                        .with_blob_sidecar_4844(sidecar.clone());
 
                     let pending_tx = provider.send_transaction(tx).await.unwrap();
                     let receipt = pending_tx.get_receipt().await.unwrap();

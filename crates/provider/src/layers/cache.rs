@@ -235,7 +235,7 @@ where
         let params_hash = req.params_hash().ok();
 
         if let Some(hash) = params_hash {
-            if let Some(cached) = self.cache.get_deserialized(&hash)? {
+            if let Ok(Some(cached)) = self.cache.get_deserialized(&hash) {
                 return Ok(cached);
             }
         }

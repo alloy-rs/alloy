@@ -119,8 +119,12 @@ pub struct NodeForkConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Metadata {
-    /// client version
+    /// Client version
     pub client_version: String,
+    /// Client SemVer compatible version
+    pub client_semver: Option<String>,
+    /// Client commit SHA hash
+    pub client_commit_sha: Option<String>,
     /// Chain id of the node.
     pub chain_id: ChainId,
     /// Unique instance id
