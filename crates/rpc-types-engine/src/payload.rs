@@ -2584,6 +2584,13 @@ impl ExecutionPayload {
         self.as_v4().map(|payload| &payload.block_access_list)
     }
 
+    /// Returns the block access list hash for the payload (EIP-7928).
+    ///
+    /// Returns `None` for pre-Amsterdam payloads (V1, V2, V3).
+    pub fn bal_hash(&self) -> Option<B256> {
+        self.as_v4().map(|payload| keccak256(&payload.block_access_list))
+    }
+
     /// Returns the slot number for the payload (EIP-7843).
     ///
     /// Returns `None` for pre-Amsterdam payloads (V1, V2, V3).
@@ -4698,6 +4705,41 @@ mod tests {
             Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice())
         );
         assert_eq!(payload.slot_number, 3);
+    }
+
+    #[test]
+    fn execution_payload_gets_bal_hash_and_slot_number_from_v4() {
+        let block_access_list = Bytes::from(vec![0xaa, 0xbb, 0xcc]);
+        let payload = ExecutionPayload::from(ExecutionPayloadV4 {
+            payload_inner: ExecutionPayloadV3 {
+                payload_inner: ExecutionPayloadV2 {
+                    payload_inner: ExecutionPayloadV1 {
+                        parent_hash: B256::default(),
+                        fee_recipient: Address::default(),
+                        state_root: B256::default(),
+                        receipts_root: B256::default(),
+                        logs_bloom: Bloom::default(),
+                        prev_randao: B256::default(),
+                        block_number: 1,
+                        gas_limit: 30_000_000,
+                        gas_used: 21_000,
+                        timestamp: 1_234,
+                        extra_data: Bytes::default(),
+                        base_fee_per_gas: U256::ZERO,
+                        block_hash: B256::default(),
+                        transactions: vec![],
+                    },
+                    withdrawals: vec![],
+                },
+                blob_gas_used: 0,
+                excess_blob_gas: 0,
+            },
+            block_access_list: block_access_list.clone(),
+            slot_number: 7,
+        });
+
+        assert_eq!(payload.slot_number(), Some(7));
+        assert_eq!(payload.bal_hash(), Some(keccak256(&block_access_list)));
     }
 
     #[test]
