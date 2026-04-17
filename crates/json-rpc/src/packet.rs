@@ -212,7 +212,7 @@ where
             where
                 A: SeqAccess<'de>,
             {
-                let mut responses = Vec::new();
+                let mut responses = Vec::with_capacity(seq.size_hint().unwrap_or(0));
 
                 while let Some(response) = seq.next_element()? {
                     responses.push(response);
