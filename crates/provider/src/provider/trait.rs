@@ -2651,8 +2651,7 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "hyper")]
     async fn test_connect_hyper_tls() {
-        let p =
-            ProviderBuilder::new().connect("https://ethereum.reth.rs/rpc").await.unwrap();
+        let p = ProviderBuilder::new().connect("https://ethereum.reth.rs/rpc").await.unwrap();
 
         let _num = p.get_block_number().await.unwrap();
 
