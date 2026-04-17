@@ -518,7 +518,7 @@ mod tests {
     use alloy_sol_types::{sol, SolCall};
 
     // use alloy_node_bindings::Anvil; (to be used in `test_anvil_reset`)
-    const FORK_URL: &str = "https://reth-ethereum.ithaca.xyz/rpc";
+    const FORK_URL: &str = "https://ethereum.reth.rs/rpc";
 
     #[tokio::test]
     async fn test_anvil_impersonate_account_stop_impersonating_account() {

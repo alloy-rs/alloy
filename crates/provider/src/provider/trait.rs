@@ -2521,7 +2521,7 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "hyper-tls")]
     async fn hyper_https() {
-        let url = "https://reth-ethereum.ithaca.xyz/rpc";
+        let url = "https://ethereum.reth.rs/rpc";
 
         // With the `hyper` feature enabled .connect builds the provider based on
         // `HyperTransport`.
@@ -2651,8 +2651,7 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "hyper")]
     async fn test_connect_hyper_tls() {
-        let p =
-            ProviderBuilder::new().connect("https://reth-ethereum.ithaca.xyz/rpc").await.unwrap();
+        let p = ProviderBuilder::new().connect("https://ethereum.reth.rs/rpc").await.unwrap();
 
         let _num = p.get_block_number().await.unwrap();
 
