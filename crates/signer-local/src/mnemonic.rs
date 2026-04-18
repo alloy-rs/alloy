@@ -214,6 +214,63 @@ impl<W: Wordlist> MnemonicBuilder<W> {
             mnemonic.derive_key(&self.derivation_path, self.password.as_deref())?;
         xpriv_to_signer(&derived_priv_key)
     }
+
+    /// Derives the parent extended private key for iteration.
+    ///
+    /// The parent key is derived once from the mnemonic phrase by stripping the last component
+    /// of the derivation path. For example, the default path `m/44'/60'/0'/0/0` produces a
+    /// parent key at `m/44'/60'/0'/0`.
+    fn derive_parent_key(&self) -> Result<XPriv, LocalSignerError> {
+        let mnemonic = match &self.phrase {
+            Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
+            None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
+        };
+
+        let master = mnemonic.master_key(self.password.as_deref())?;
+
+        let path_components: Vec<u32> = self.derivation_path.iter().copied().collect();
+        if path_components.len() > 1 {
+            let parent_path: DerivationPath =
+                path_components[..path_components.len() - 1].iter().copied().collect();
+            Ok(master.derive_path(&parent_path)?)
+        } else {
+            Ok(master)
+        }
+    }
+
+    /// Creates an iterator that generates signers by incrementing the derivation index.
+    ///
+    /// The parent key is derived once from the mnemonic phrase, and each subsequent signer
+    /// only requires a single BIP-32 child derivation, making this significantly faster than
+    /// calling [`build`](Self::build) in a loop with different indices.
+    ///
+    /// Returns an error if the phrase is not set or the mnemonic is invalid.
+    pub fn try_into_iter(&self) -> Result<MnemonicSignerIter, LocalSignerError> {
+        Ok(MnemonicSignerIter { parent_key: self.derive_parent_key()?, current_index: 0 })
+    }
+
+    /// Derives signers for the given index range in parallel using rayon.
+    ///
+    /// The parent key is derived once, then each child index is derived in parallel via
+    /// `rayon::iter::ParallelIterator`. Returns a `Vec` of results in index order.
+    #[cfg(feature = "rayon")]
+    pub fn par_build_range(
+        &self,
+        range: std::ops::Range<u32>,
+    ) -> Result<Vec<Result<PrivateKeySigner, LocalSignerError>>, LocalSignerError> {
+        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
+        let parent_key = self.derive_parent_key()?;
+        Ok(range
+            .into_par_iter()
+            .map(|index| {
+                parent_key
+                    .derive_child(index)
+                    .map_err(Into::into)
+                    .and_then(|child| xpriv_to_signer(&child))
+            })
+            .collect())
+    }
 }
 
 fn xpriv_to_signer(xpriv: &XPriv) -> Result<PrivateKeySigner, LocalSignerError> {
@@ -250,48 +307,12 @@ impl Iterator for MnemonicSignerIter {
     }
 }
 
-impl<W: Wordlist + Clone> IntoIterator for MnemonicBuilder<W> {
+impl<W: Wordlist> IntoIterator for MnemonicBuilder<W> {
     type Item = Result<PrivateKeySigner, LocalSignerError>;
     type IntoIter = MnemonicSignerIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.try_into_iter().expect("mnemonic phrase must be set for iteration")
-    }
-}
-
-impl<W: Wordlist> MnemonicBuilder<W> {
-    /// Creates an iterator that generates signers by incrementing the derivation index.
-    ///
-    /// The parent key is derived once from the mnemonic phrase, and each subsequent signer
-    /// only requires a single BIP-32 child derivation, making this significantly faster than
-    /// calling [`build`](Self::build) in a loop with different indices.
-    ///
-    /// The derivation path set on the builder is used as the parent path. The iterator appends
-    /// the child index to this path. For example, if the builder's derivation path is
-    /// `m/44'/60'/0'/0/0` (the default), the parent key will be derived at `m/44'/60'/0'/0`
-    /// and each iteration derives child `0`, `1`, `2`, etc.
-    ///
-    /// Returns an error if the phrase is not set or the mnemonic is invalid.
-    pub fn try_into_iter(&self) -> Result<MnemonicSignerIter, LocalSignerError> {
-        let mnemonic = match &self.phrase {
-            Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
-            None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
-        };
-
-        let master = mnemonic.master_key(self.password.as_deref())?;
-
-        // Derive the parent key by stripping the last component of the derivation path.
-        // e.g. m/44'/60'/0'/0/0 -> parent is m/44'/60'/0'/0
-        let path_components: Vec<u32> = self.derivation_path.iter().copied().collect();
-        let parent_key = if path_components.len() > 1 {
-            let parent_path: DerivationPath =
-                path_components[..path_components.len() - 1].iter().copied().collect();
-            master.derive_path(&parent_path)?
-        } else {
-            master
-        };
-
-        Ok(MnemonicSignerIter { parent_key, current_index: 0 })
     }
 }
 
@@ -384,6 +405,37 @@ mod tests {
         assert_eq!(signer1.address, signer2.address);
 
         dir.close().unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "rayon")]
+    fn mnemonic_par_build_range() {
+        let phrase =
+            "work man father plunge mystery proud hollow address reunion sauce theory bonus";
+
+        let builder = MnemonicBuilder::<English>::default().phrase(phrase);
+
+        // Derive 10 signers in parallel
+        let par_signers: Vec<_> = builder
+            .par_build_range(0..10)
+            .unwrap()
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        // Derive the same 10 sequentially and compare
+        let seq_signers: Vec<_> = MnemonicBuilder::<English>::default()
+            .phrase(phrase)
+            .try_into_iter()
+            .unwrap()
+            .take(10)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(par_signers.len(), 10);
+        for (par, seq) in par_signers.iter().zip(seq_signers.iter()) {
+            assert_eq!(par.address, seq.address);
+        }
     }
 
     #[test]
