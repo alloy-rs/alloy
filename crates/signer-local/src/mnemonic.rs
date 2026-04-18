@@ -158,7 +158,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     }
 
     /// Returns a reference to the derivation path of the child key to be derived.
-    pub fn get_derivation_path(&self) -> &DerivationPath {
+    pub const fn get_derivation_path(&self) -> &DerivationPath {
         &self.derivation_path
     }
 
