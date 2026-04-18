@@ -499,14 +499,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
     }
 
-    /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
+    /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
     /// Returns the  block access list raw, or `None` if the block is not found.
-    async fn get_block_access_list_raw(
-        &self,
-        number: BlockNumberOrTag,
-    ) -> TransportResult<Option<Bytes>> {
-        self.client().request("eth_getBlockAccessListRaw", (number,)).await
+    async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListRaw", (block,)).await
     }
 
     /// Gets a block header by its [`BlockId`].
