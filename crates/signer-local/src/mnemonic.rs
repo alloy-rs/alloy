@@ -5,7 +5,7 @@
 
 use crate::{LocalSigner, LocalSignerError, PrivateKeySigner};
 use alloy_signer::utils::secret_key_to_address;
-use coins_bip32::path::DerivationPath;
+use coins_bip32::{path::DerivationPath, prelude::Parent, xkeys::XPriv};
 use coins_bip39::{English, Mnemonic, Wordlist};
 use k256::ecdsa::SigningKey;
 use rand::Rng;
@@ -212,28 +212,38 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     ) -> Result<PrivateKeySigner, LocalSignerError> {
         let derived_priv_key =
             mnemonic.derive_key(&self.derivation_path, self.password.as_deref())?;
-        let key: &coins_bip32::prelude::SigningKey = derived_priv_key.as_ref();
-        let credential = SigningKey::from_bytes(&key.to_bytes())?;
-        let address = secret_key_to_address(&credential);
-        Ok(LocalSigner::<SigningKey> { credential, address, chain_id: None })
+        xpriv_to_signer(&derived_priv_key)
     }
 }
 
+fn xpriv_to_signer(xpriv: &XPriv) -> Result<PrivateKeySigner, LocalSignerError> {
+    let key: &coins_bip32::prelude::SigningKey = xpriv.as_ref();
+    let credential = SigningKey::from_bytes(&key.to_bytes())?;
+    let address = secret_key_to_address(&credential);
+    Ok(LocalSigner::<SigningKey> { credential, address, chain_id: None })
+}
+
 /// Iterator that generates signers from a mnemonic phrase by incrementing the derivation index.
+///
+/// The parent key (e.g. `m/44'/60'/0'/0`) is derived once at construction, and each call to
+/// [`Iterator::next`] only performs a single BIP-32 child derivation instead of re-running
+/// PBKDF2 + full path derivation from scratch.
 #[derive(Debug)]
-pub struct MnemonicSignerIter<W: Wordlist + Clone = English> {
-    builder: MnemonicBuilder<W>,
+pub struct MnemonicSignerIter {
+    parent_key: XPriv,
     current_index: u32,
 }
 
-impl<W: Wordlist + Clone> Iterator for MnemonicSignerIter<W> {
+impl Iterator for MnemonicSignerIter {
     type Item = Result<PrivateKeySigner, LocalSignerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // Use the builder to generate signer at current index
-        let result = self.builder.clone().index(self.current_index).and_then(|b| b.build());
+        let result = self
+            .parent_key
+            .derive_child(self.current_index)
+            .map_err(Into::into)
+            .and_then(|child| xpriv_to_signer(&child));
 
-        // Increment index for next iteration
         self.current_index += 1;
 
         Some(result)
@@ -242,10 +252,46 @@ impl<W: Wordlist + Clone> Iterator for MnemonicSignerIter<W> {
 
 impl<W: Wordlist + Clone> IntoIterator for MnemonicBuilder<W> {
     type Item = Result<PrivateKeySigner, LocalSignerError>;
-    type IntoIter = MnemonicSignerIter<W>;
+    type IntoIter = MnemonicSignerIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        MnemonicSignerIter { builder: self, current_index: 0 }
+        self.try_into_iter().expect("mnemonic phrase must be set for iteration")
+    }
+}
+
+impl<W: Wordlist> MnemonicBuilder<W> {
+    /// Creates an iterator that generates signers by incrementing the derivation index.
+    ///
+    /// The parent key is derived once from the mnemonic phrase, and each subsequent signer
+    /// only requires a single BIP-32 child derivation, making this significantly faster than
+    /// calling [`build`](Self::build) in a loop with different indices.
+    ///
+    /// The derivation path set on the builder is used as the parent path. The iterator appends
+    /// the child index to this path. For example, if the builder's derivation path is
+    /// `m/44'/60'/0'/0/0` (the default), the parent key will be derived at `m/44'/60'/0'/0`
+    /// and each iteration derives child `0`, `1`, `2`, etc.
+    ///
+    /// Returns an error if the phrase is not set or the mnemonic is invalid.
+    pub fn try_into_iter(&self) -> Result<MnemonicSignerIter, LocalSignerError> {
+        let mnemonic = match &self.phrase {
+            Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
+            None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
+        };
+
+        let master = mnemonic.master_key(self.password.as_deref())?;
+
+        // Derive the parent key by stripping the last component of the derivation path.
+        // e.g. m/44'/60'/0'/0/0 -> parent is m/44'/60'/0'/0
+        let path_components: Vec<u32> = self.derivation_path.iter().copied().collect();
+        let parent_key = if path_components.len() > 1 {
+            let parent_path: DerivationPath =
+                path_components[..path_components.len() - 1].iter().copied().collect();
+            master.derive_path(&parent_path)?
+        } else {
+            master
+        };
+
+        Ok(MnemonicSignerIter { parent_key, current_index: 0 })
     }
 }
 
