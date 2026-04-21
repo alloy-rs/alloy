@@ -59,6 +59,28 @@ impl From<B64> for PayloadId {
     }
 }
 
+/// Extra fields for payload construction.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
+pub struct PayloadExtras {
+    /// The block access list bytes.
+    pub bal: Option<Bytes>,
+}
+
+impl From<Option<Bytes>> for PayloadExtras {
+    fn from(bal: Option<Bytes>) -> Self {
+        Self { bal }
+    }
+}
+
+impl From<Bytes> for PayloadExtras {
+    fn from(bal: Bytes) -> Self {
+        Self { bal: Some(bal) }
+    }
+}
+
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
@@ -2150,7 +2172,32 @@ impl ExecutionPayload {
         T: Encodable2718 + Transaction,
         H: BlockHeader + Sealable,
     {
-        Self::from_block_unchecked_with_bal(block.hash_slow(), block, block_access_list)
+        Self::from_block_slow_with_extras(block, block_access_list)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block along with payload extras.
+    ///
+    /// This preserves the full RLP-encoded block access list for Amsterdam/V4 payloads.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow_with_extras<T, H>(
+        block: &Block<T, H>,
+        extras: impl Into<PayloadExtras>,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader + Sealable,
+    {
+        let extras = extras.into();
+        if let Some(block_access_list) = extras.bal {
+            Self::from_block_unchecked_with_bal(block.hash_slow(), block, block_access_list)
+        } else {
+            Self::from_block_unchecked(block.hash_slow(), block)
+        }
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
@@ -2228,6 +2275,30 @@ impl ExecutionPayload {
         };
 
         (execution_payload, sidecar)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block along with optional extras.
+    ///
+    /// This preserves the full RLP-encoded block access list for Amsterdam/V4 payloads if provided.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    pub fn from_block_unchecked_with_extras<T, H>(
+        block_hash: B256,
+        block: &Block<T, H>,
+        extras: impl Into<PayloadExtras>,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader,
+    {
+        let extras = extras.into();
+        if let Some(block_access_list) = extras.bal {
+            Self::from_block_unchecked_with_bal(block_hash, block, block_access_list)
+        } else {
+            Self::from_block_unchecked(block_hash, block)
+        }
     }
 
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
@@ -2511,6 +2582,13 @@ impl ExecutionPayload {
     /// Returns `None` for pre-Amsterdam payloads (V1, V2, V3).
     pub fn block_access_list(&self) -> Option<&Bytes> {
         self.as_v4().map(|payload| &payload.block_access_list)
+    }
+
+    /// Returns the block access list hash for the payload (EIP-7928).
+    ///
+    /// Returns `None` for pre-Amsterdam payloads (V1, V2, V3).
+    pub fn bal_hash(&self) -> Option<B256> {
+        self.as_v4().map(|payload| keccak256(&payload.block_access_list))
     }
 
     /// Returns the slot number for the payload (EIP-7843).
@@ -4627,6 +4705,41 @@ mod tests {
             Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice())
         );
         assert_eq!(payload.slot_number, 3);
+    }
+
+    #[test]
+    fn execution_payload_gets_bal_hash_and_slot_number_from_v4() {
+        let block_access_list = Bytes::from(vec![0xaa, 0xbb, 0xcc]);
+        let payload = ExecutionPayload::from(ExecutionPayloadV4 {
+            payload_inner: ExecutionPayloadV3 {
+                payload_inner: ExecutionPayloadV2 {
+                    payload_inner: ExecutionPayloadV1 {
+                        parent_hash: B256::default(),
+                        fee_recipient: Address::default(),
+                        state_root: B256::default(),
+                        receipts_root: B256::default(),
+                        logs_bloom: Bloom::default(),
+                        prev_randao: B256::default(),
+                        block_number: 1,
+                        gas_limit: 30_000_000,
+                        gas_used: 21_000,
+                        timestamp: 1_234,
+                        extra_data: Bytes::default(),
+                        base_fee_per_gas: U256::ZERO,
+                        block_hash: B256::default(),
+                        transactions: vec![],
+                    },
+                    withdrawals: vec![],
+                },
+                blob_gas_used: 0,
+                excess_blob_gas: 0,
+            },
+            block_access_list: block_access_list.clone(),
+            slot_number: 7,
+        });
+
+        assert_eq!(payload.slot_number(), Some(7));
+        assert_eq!(payload.bal_hash(), Some(keccak256(&block_access_list)));
     }
 
     #[test]

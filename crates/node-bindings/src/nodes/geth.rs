@@ -684,7 +684,11 @@ impl Geth {
             std::thread::spawn(move || {
                 let mut buf = String::new();
                 loop {
-                    let _ = reader.read_line(&mut buf);
+                    buf.clear();
+                    match reader.read_line(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {}
+                    }
                 }
             });
         }

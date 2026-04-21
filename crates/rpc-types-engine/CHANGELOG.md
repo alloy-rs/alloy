@@ -5,10 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.8.3](https://github.com/alloy-rs/alloy/releases/tag/v1.8.3) - 2026-03-27
+## [2.0.0](https://github.com/alloy-rs/alloy/releases/tag/v2.0.0) - 2026-04-13
+
+### Dependencies
+
+- [dep] Bump jsonwebtoken v10.3.0 fix cve ([#3754](https://github.com/alloy-rs/alloy/issues/3754))
+
+### Features
+
+- [rpc-types-engine] Add hidden setters to ExecutionPayload ([#3875](https://github.com/alloy-rs/alloy/issues/3875))
+- Add amsterdam fields ([#3871](https://github.com/alloy-rs/alloy/issues/3871))
 
 ### Miscellaneous Tasks
 
+- Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
 - Release 1.8.2
 
 ## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
@@ -16,11 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.8.1
-
-## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
-
-### Miscellaneous Tasks
-
 - Release 1.8.0
 
 ## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
@@ -32,11 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.7.4
-
-## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-18
-
-### Miscellaneous Tasks
-
 - Release 1.7.3
 - Release 1.7.2
 
@@ -46,12 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
 
-### Miscellaneous Tasks
-
-- Release 1.7.1
-
-## [1.7.0](https://github.com/alloy-rs/alloy/releases/tag/v1.7.0) - 2026-02-17
-
 ### Dependencies
 
 - Remove jsonrpsee dependencies ([#3690](https://github.com/alloy-rs/alloy/issues/3690))
@@ -59,25 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - [provider] Add engine_getBlobsV1/V2 to EngineApi trait ([#3670](https://github.com/alloy-rs/alloy/issues/3670))
-
-### Miscellaneous Tasks
-
-- Release 1.7.0
-
-## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
-
-### Miscellaneous Tasks
-
-- Release 1.6.3
-
-## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
-
-### Features
-
 - [rpc-types-engine] Add `into_block_raw_with_transactions_root` to execution payloads ([#3452](https://github.com/alloy-rs/alloy/issues/3452))
 
 ### Miscellaneous Tasks
 
+- Release 1.7.1
+- Release 1.7.0
+- Release 1.6.3
 - Release 1.6.2
 
 ## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
@@ -137,18 +119,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
 
-### Miscellaneous Tasks
-
-- Release 1.4.3
-
-## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
-
 ### Features
 
 - Add engine_getPayloadV5 ([#3515](https://github.com/alloy-rs/alloy/issues/3515))
 
 ### Miscellaneous Tasks
 
+- Release 1.4.3
 - Release 1.4.2
 
 ## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
@@ -161,11 +138,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.4.1
-
-## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
-
-### Miscellaneous Tasks
-
 - Release 1.4.0
 - Update alloy-trie ([#3454](https://github.com/alloy-rs/alloy/issues/3454))
 
@@ -228,11 +200,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.0.42
-
-## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
-
-### Miscellaneous Tasks
-
 - Release 1.0.41
 
 ## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
@@ -336,11 +303,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
-
-## [1.0.26](https://github.com/alloy-rs/alloy/releases/tag/v1.0.26) - 2025-08-26
-
-### Miscellaneous Tasks
-
 - Release 1.0.26
 
 ## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
@@ -453,11 +415,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.0.12
-
-## [1.0.11](https://github.com/alloy-rs/alloy/releases/tag/v1.0.11) - 2025-06-17
-
-### Miscellaneous Tasks
-
 - Release 1.0.11
 
 ## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
@@ -949,6 +906,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
 
+### Bug Fixes
+
+- Add missing conversion ([#1287](https://github.com/alloy-rs/alloy/issues/1287))
+
 ### Features
 
 - Add block num hash helper ([#1304](https://github.com/alloy-rs/alloy/issues/1304))
@@ -957,15 +918,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.3.6
-
-## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
-
-### Bug Fixes
-
-- Add missing conversion ([#1287](https://github.com/alloy-rs/alloy/issues/1287))
-
-### Miscellaneous Tasks
-
 - Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
@@ -1041,28 +993,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.1.4
-
-## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
-
-### Miscellaneous Tasks
-
 - Release 0.1.3
 - Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
 
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
-
-### Documentation
-
-- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
-- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
-
-### Miscellaneous Tasks
-
-- Release 0.1.2
-- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
-- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
-
-## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
 
 ### Bug Fixes
 
@@ -1072,6 +1006,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [deps] Bump all ([#864](https://github.com/alloy-rs/alloy/issues/864))
 - Bump jsonrpsee 0.22 ([#467](https://github.com/alloy-rs/alloy/issues/467))
+
+### Documentation
+
+- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
 
 ### Features
 
@@ -1091,6 +1030,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.2
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
 - [clippy] Apply lint suggestions ([#903](https://github.com/alloy-rs/alloy/issues/903))
 - [docs] Add doc aliases ([#843](https://github.com/alloy-rs/alloy/issues/843))
 - Add engine_getClientVersionV1 ([#823](https://github.com/alloy-rs/alloy/issues/823))
