@@ -95,15 +95,6 @@ pub fn calc_next_block_base_fee(
     base_fee: u64,
     base_fee_params: BaseFeeParams,
 ) -> u64 {
-    #[cfg(feature = "std")]
-    tracing::trace!(
-        gas_used,
-        gas_limit,
-        base_fee,
-        max_change_denominator = base_fee_params.max_change_denominator,
-        elasticity_multiplier = base_fee_params.elasticity_multiplier,
-        "calc_next_block_base_fee",
-    );
     let elasticity = base_fee_params.elasticity_multiplier;
     let max_change_denominator = base_fee_params.max_change_denominator;
 
@@ -127,25 +118,11 @@ pub fn calc_next_block_base_fee(
         // If the gas used in the current block is equal to the gas target, the base fee remains the
         // same (no increase).
         core::cmp::Ordering::Equal => {
-            #[cfg(feature = "std")]
-            tracing::trace!(
-                branch = "equal",
-                gas_used,
-                gas_target,
-                "calc_next_block_base_fee branch",
-            );
             base_fee
         }
         // If the gas used in the current block is greater than the gas target, calculate a new
         // increased base fee.
         core::cmp::Ordering::Greater => {
-            #[cfg(feature = "std")]
-            tracing::trace!(
-                branch = "greater",
-                gas_used,
-                gas_target,
-                "calc_next_block_base_fee branch",
-            );
             // Calculate the increase in base fee based on the formula defined by EIP-1559.
             base_fee
                 + (core::cmp::max(
@@ -158,13 +135,6 @@ pub fn calc_next_block_base_fee(
         // If the gas used in the current block is less than the gas target, calculate a new
         // decreased base fee.
         core::cmp::Ordering::Less => {
-            #[cfg(feature = "std")]
-            tracing::trace!(
-                branch = "less",
-                gas_used,
-                gas_target,
-                "calc_next_block_base_fee branch",
-            );
             // Calculate the decrease in base fee based on the formula defined by EIP-1559.
             base_fee.saturating_sub(
                 (base_fee as u128 * (gas_target - gas_used) as u128
