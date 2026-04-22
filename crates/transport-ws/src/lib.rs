@@ -44,6 +44,16 @@ pub struct WsBackend<T> {
 }
 
 impl<T> WsBackend<T> {
+    /// Create a new [`WsBackend`] from an already-established socket, a [`ConnectionInterface`],
+    /// and a keepalive interval.
+    pub fn from_socket(
+        socket: T,
+        interface: ConnectionInterface,
+        keepalive_interval: Duration,
+    ) -> Self {
+        Self { socket, interface, keepalive_interval }
+    }
+
     /// Handle inbound text from the websocket.
     #[expect(clippy::result_unit_err)]
     pub fn handle_text(&mut self, text: &str) -> Result<(), ()> {
