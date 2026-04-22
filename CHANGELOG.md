@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1](https://github.com/alloy-rs/alloy/releases/tag/v2.0.1) - 2026-04-22
+
+### Bug Fixes
+
+- [provider] Skip batching eth_call with block overrides ([#3910](https://github.com/alloy-rs/alloy/issues/3910))
+- [node-bindings] Align Reth::default with Reth::new ([#3900](https://github.com/alloy-rs/alloy/issues/3900))
+- Clear stderr buffer and break on EOF in geth reader thread ([#3888](https://github.com/alloy-rs/alloy/issues/3888))
+- [rpc-types-trace] Add 0x prefix to storage keys and values in `StructLog` ([#3891](https://github.com/alloy-rs/alloy/issues/3891))
+- [provider] Update `test_anvil_set_time` for corrected `evm_setTime` ([#3889](https://github.com/alloy-rs/alloy/issues/3889))
+
+### Dependencies
+
+- [deps] Bump github/codeql-action from 7fc6561ed893d15cec696e062df840b21db27eb0 to 95e58e9a2cdfd71adc6e0353d5c52f41a045d225 ([#3896](https://github.com/alloy-rs/alloy/issues/3896))
+- [deps] Bump taiki-e/install-action from 2.74.0 to 2.75.3 ([#3897](https://github.com/alloy-rs/alloy/issues/3897))
+
+### Features
+
+- [transport-ws] Add `WsBackend::from_socket` constructor ([#3911](https://github.com/alloy-rs/alloy/issues/3911))
+- [signer] Add MnemonicKey for efficient HD key derivation ([#3908](https://github.com/alloy-rs/alloy/issues/3908))
+- [rpc-types-engine] Add ExecutionPayload bal_hash getter ([#3904](https://github.com/alloy-rs/alloy/issues/3904))
+- [provider] Add ProviderBuilder apply helpers ([#3901](https://github.com/alloy-rs/alloy/issues/3901))
+
+### Miscellaneous Tasks
+
+- Changed get_block_access_list_raw to accept BlockId ([#3907](https://github.com/alloy-rs/alloy/issues/3907))
+- Update reth rpc endpoints ([#3902](https://github.com/alloy-rs/alloy/issues/3902))
+- [BAL] Added from_block_slow_optional_bal ([#3898](https://github.com/alloy-rs/alloy/issues/3898))
+- Added raw bal rpc ([#3892](https://github.com/alloy-rs/alloy/issues/3892))
+
+### Other
+
+- Pin actions to SHA and add dependabot cooldown ([#3895](https://github.com/alloy-rs/alloy/issues/3895))
+
+### Performance
+
+- [consensus] Avoid clones in ReceiptWithBloom::into_logs ([#3894](https://github.com/alloy-rs/alloy/issues/3894))
+
+### Testing
+
+- [provider] Re-enable anvil tests ([#3903](https://github.com/alloy-rs/alloy/issues/3903))
+
 ## [2.0.0](https://github.com/alloy-rs/alloy/releases/tag/v2.0.0) - 2026-04-13
 
 ### Bug Fixes
@@ -56,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.0.0
 - Release 2.0.0
 - Allow unused ignored advisories ([#3883](https://github.com/alloy-rs/alloy/issues/3883))
 - Make _non_exhaustive pub ([#3873](https://github.com/alloy-rs/alloy/issues/3873))

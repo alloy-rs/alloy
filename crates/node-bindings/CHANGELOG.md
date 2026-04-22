@@ -5,10 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0](https://github.com/alloy-rs/alloy/releases/tag/v2.0.0) - 2026-04-13
+## [2.0.1](https://github.com/alloy-rs/alloy/releases/tag/v2.0.1) - 2026-04-22
+
+### Bug Fixes
+
+- [node-bindings] Align Reth::default with Reth::new ([#3900](https://github.com/alloy-rs/alloy/issues/3900))
+- Clear stderr buffer and break on EOF in geth reader thread ([#3888](https://github.com/alloy-rs/alloy/issues/3888))
 
 ### Miscellaneous Tasks
 
+- Release 2.0.0
 - Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
 - Release 1.8.2
 
