@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 2.0.1
+- Release 2.0.1
 - Changed get_block_access_list_raw to accept BlockId ([#3907](https://github.com/alloy-rs/alloy/issues/3907))
 - Update reth rpc endpoints ([#3902](https://github.com/alloy-rs/alloy/issues/3902))
 - [BAL] Added from_block_slow_optional_bal ([#3898](https://github.com/alloy-rs/alloy/issues/3898))
