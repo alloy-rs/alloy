@@ -78,7 +78,7 @@ impl PubSubConnect for WsConnect {
             WsMeta::connect(&self.url, None).await.map_err(TransportErrorKind::custom)?.1.fuse();
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-        let backend = WsBackend::from_socket(socket, interface, self.keepalive_interval);
+        let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
 
         backend.spawn();
 

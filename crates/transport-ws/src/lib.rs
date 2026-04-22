@@ -46,7 +46,7 @@ pub struct WsBackend<T> {
 impl<T> WsBackend<T> {
     /// Create a new [`WsBackend`] from an already-established socket, a [`ConnectionInterface`],
     /// and a keepalive interval.
-    pub fn from_socket(
+    pub const fn from_socket(
         socket: T,
         interface: ConnectionInterface,
         keepalive_interval: Duration,
