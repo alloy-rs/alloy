@@ -165,7 +165,8 @@ fn install_default_crypto_provider() {
     let provider = rustls::crypto::aws_lc_rs::default_provider();
     #[cfg(all(feature = "ring", not(feature = "aws-lc-rs")))]
     let provider = rustls::crypto::ring::default_provider();
-    // install_default returns Err if a concurrent caller raced us past the get_default check; either provider is valid.
+    // install_default returns Err if a concurrent caller raced us past the get_default check;
+    // either provider is valid.
     let _ = rustls::crypto::CryptoProvider::install_default(provider);
 }
 
