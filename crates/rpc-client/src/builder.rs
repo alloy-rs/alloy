@@ -105,7 +105,7 @@ impl<L> ClientBuilder<L> {
 
     /// Connect a WS transport, producing an [`RpcClient`] with the provided
     /// connection.
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     pub async fn ws(self, ws_connect: alloy_transport_ws::WsConnect) -> TransportResult<RpcClient>
     where
         L: Layer<alloy_pubsub::PubSubFrontend>,

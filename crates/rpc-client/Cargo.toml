@@ -54,7 +54,7 @@ wasmtimer.workspace = true
 alloy-primitives.workspace = true
 alloy-node-bindings.workspace = true
 alloy-transport-ipc = { workspace = true, features = ["mock"] }
-alloy-transport-ws.workspace = true
+alloy-transport-ws = { workspace = true, features = ["aws-lc-rs"] }
 
 ci_info.workspace = true
 tempfile = "3"
@@ -66,5 +66,8 @@ default = ["reqwest"]
 reqwest = ["dep:url", "dep:reqwest", "alloy-transport-http/reqwest"]
 hyper = ["dep:url", "alloy-transport-http/hyper"]
 pubsub = ["dep:alloy-pubsub"]
-ws = ["pubsub", "dep:alloy-transport-ws", "dep:url"]
+ws-base = ["pubsub", "dep:url", "dep:alloy-transport-ws"]
+ws = ["ws-base", "alloy-transport-ws/aws-lc-rs"]
+ws-ring = ["ws-base", "alloy-transport-ws/ring"]
+ws-native-tls = ["ws-base", "alloy-transport-ws/native-tls"]
 ipc = ["pubsub", "dep:alloy-transport-ipc"]

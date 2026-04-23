@@ -252,7 +252,7 @@ mod tests {
         yield_block(false).await;
     }
     #[tokio::test]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     async fn yield_block_ws() {
         yield_block(true).await;
     }
@@ -280,7 +280,7 @@ mod tests {
         yield_many_blocks(false).await;
     }
     #[tokio::test]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     async fn yield_many_blocks_ws() {
         yield_many_blocks(true).await;
     }
