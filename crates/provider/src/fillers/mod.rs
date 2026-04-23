@@ -356,10 +356,10 @@ where
             if count >= 20 {
                 const ERROR: &str = "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing this message.";
                 error!(
-                    ?tx, ?self.filler,
+                    ?tx, ?self.filler, loop_iterations = count,
                     ERROR
                 );
-                panic!("{}, {:?}, {:?}", ERROR, &tx, &self.filler);
+                return Err(TransportError::local_usage_str(ERROR));
             }
         }
         Ok(tx)
