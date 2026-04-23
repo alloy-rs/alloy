@@ -112,7 +112,7 @@ reqwest = [
 ]
 hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
 hyper-tls = ["hyper", "alloy-transport-http/hyper-tls"]
-ws-base = ["pubsub", "dep:alloy-transport-ws"]
+ws-base = ["pubsub", "dep:alloy-transport-ws", "alloy-rpc-client/ws-base"]
 ws = ["ws-base", "alloy-rpc-client/ws", "alloy-transport-ws/aws-lc-rs"]
 ws-ring = ["ws-base", "alloy-rpc-client/ws-ring", "alloy-transport-ws/ring"]
 ws-native-tls = ["ws-base", "alloy-rpc-client/ws-native-tls", "alloy-transport-ws/native-tls"]

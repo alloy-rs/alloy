@@ -135,7 +135,7 @@ impl PubSubConnect for WsConnect {
     }
 
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
-        #[cfg(feature = "rustls-tls")]
+        #[cfg(any(feature = "aws-lc-rs", feature = "ring"))]
         install_default_crypto_provider();
 
         let request = self.clone().into_client_request();
@@ -156,7 +156,7 @@ impl PubSubConnect for WsConnect {
 /// Install a default rustls crypto provider if none is set.
 ///
 /// Required since rustls 0.23+ no longer auto-installs one.
-#[cfg(feature = "rustls-tls")]
+#[cfg(any(feature = "aws-lc-rs", feature = "ring"))]
 fn install_default_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_some() {
         return;
