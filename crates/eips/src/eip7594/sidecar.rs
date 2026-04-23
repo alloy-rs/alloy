@@ -556,6 +556,14 @@ impl BlobTransactionSidecarEip7594 {
             + self.cell_proofs.capacity() * BYTES_PER_PROOF
     }
 
+    /// Shrinks the sidecar vectors to fit their current contents.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.blobs.shrink_to_fit();
+        self.commitments.shrink_to_fit();
+        self.cell_proofs.shrink_to_fit();
+    }
+
     /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the hex encoded blob str.
     ///
     /// See also [`Blob::from_hex`](c_kzg::Blob::from_hex)
