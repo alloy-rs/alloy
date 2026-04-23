@@ -172,6 +172,8 @@ providers = [
 ]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
+provider-ws-ring = ["providers", "alloy-provider?/ws-ring", "transport-ws-ring"]
+provider-ws-native-tls = ["providers", "alloy-provider?/ws-native-tls", "transport-ws-native-tls"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
 provider-admin-api = [
     "providers",
@@ -226,6 +228,8 @@ rpc = []
 json-rpc = ["rpc", "dep:alloy-json-rpc"]
 rpc-client = ["rpc", "transports", "transport-http", "dep:alloy-rpc-client"]
 rpc-client-ws = ["rpc-client", "transport-ws", "alloy-rpc-client?/ws"]
+rpc-client-ws-ring = ["rpc-client", "transport-ws-ring", "alloy-rpc-client?/ws-ring"]
+rpc-client-ws-native-tls = ["rpc-client", "transport-ws-native-tls", "alloy-rpc-client?/ws-native-tls"]
 rpc-client-ipc = ["rpc-client", "transport-ipc", "alloy-rpc-client?/ipc"]
 rpc-types = ["rpc", "serde", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
 rpc-types-admin = [
@@ -293,7 +297,10 @@ transports = ["dep:alloy-transport"]
 transport-http = ["transports", "dep:alloy-transport-http"]
 transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
 transport-ipc-mock = ["alloy-transport-ipc?/mock"]
-transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]
+transport-ws-base = ["transports", "pubsub"]
+transport-ws = ["transport-ws-base", "alloy-transport-ws/aws-lc-rs"]
+transport-ws-ring = ["transport-ws-base", "alloy-transport-ws/ring"]
+transport-ws-native-tls = ["transport-ws-base", "alloy-transport-ws/native-tls"]
 transport-throttle = ["transports", "alloy-transport?/throttle"]
 
 # trie

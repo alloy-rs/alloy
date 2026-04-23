@@ -528,7 +528,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with a websocket connection.
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     pub async fn connect_ws(
         self,
         connect: alloy_transport_ws::WsConnect,

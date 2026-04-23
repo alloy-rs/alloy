@@ -135,11 +135,8 @@ impl PubSubConnect for WsConnect {
     }
 
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
-        // Install the default rustls crypto provider if not already set.
-        // Required since rustls 0.23+ no longer auto-installs a provider.
-        let _ = rustls::crypto::CryptoProvider::install_default(
-            rustls::crypto::aws_lc_rs::default_provider(),
-        );
+        #[cfg(feature = "rustls-tls")]
+        install_default_crypto_provider();
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
@@ -154,6 +151,22 @@ impl PubSubConnect for WsConnect {
 
         Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
     }
+}
+
+/// Install a default rustls crypto provider if none is set.
+///
+/// Required since rustls 0.23+ no longer auto-installs one.
+#[cfg(feature = "rustls-tls")]
+fn install_default_crypto_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_some() {
+        return;
+    }
+    #[cfg(feature = "aws-lc-rs")]
+    let provider = rustls::crypto::aws_lc_rs::default_provider();
+    #[cfg(all(feature = "ring", not(feature = "aws-lc-rs")))]
+    let provider = rustls::crypto::ring::default_provider();
+    // install_default returns Err if a concurrent caller raced us past the get_default check; either provider is valid.
+    let _ = rustls::crypto::CryptoProvider::install_default(provider);
 }
 
 impl WsBackend<TungsteniteStream> {

@@ -1846,7 +1846,7 @@ mod tests {
         assert_eq!(0, num);
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn subscribe_blocks_http() {
         let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.block_time(1));
@@ -1861,7 +1861,7 @@ mod tests {
     }
 
     // Ensures we can connect to a websocket using `wss`.
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn websocket_tls_setup() {
         for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
@@ -1869,7 +1869,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
@@ -1892,7 +1892,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn subscribe_full_blocks() {
         use futures::StreamExt;
@@ -1919,7 +1919,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     async fn subscribe_blocks_ws_remote() {
         use futures::stream::StreamExt;
 
