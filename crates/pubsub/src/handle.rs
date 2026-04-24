@@ -30,7 +30,9 @@ pub struct ConnectionHandle {
     /// Max number of retries before failing and exiting the connection.
     /// Default is 10.
     pub(crate) max_retries: u32,
-    /// The interval between retries.
+    /// The base interval between retries.
+    ///
+    /// Reconnect retries use capped exponential backoff from this base interval.
     /// Default is 3 seconds.
     pub(crate) retry_interval: Duration,
 }
@@ -67,7 +69,9 @@ impl ConnectionHandle {
         self
     }
 
-    /// Set the interval between retries.
+    /// Set the base interval between retries.
+    ///
+    /// Reconnect retries use capped exponential backoff from this base interval.
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = retry_interval;
         self

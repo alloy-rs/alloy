@@ -11,6 +11,7 @@ use alloy_transport::{
     TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
+use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
@@ -18,6 +19,8 @@ use wasmtimer::tokio::sleep;
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
+
+const MAX_RECONNECT_RETRY_INTERVAL: Duration = Duration::from_secs(30);
 
 /// The service contains the backend handle, a subscription manager, and the
 /// configuration details required to reconnect.
@@ -204,12 +207,12 @@ impl<T: PubSubConnect> PubSubService<T> {
                         error!("Reconnect failed after {max_retries} attempts, shutting down: {e}");
                         break Err(e);
                     }
+                    let retry_interval = reconnect_retry_interval(interval, retry_count);
                     warn!(
                         "Reconnection attempt {retry_count}/{max_retries} failed: {e}. \
-                         Retrying in {:?}s...",
-                        interval.as_secs_f64(),
+                         Retrying in {retry_interval:?}...",
                     );
-                    sleep(interval).await;
+                    sleep(retry_interval).await;
                 }
             }
         }
@@ -272,6 +275,19 @@ impl<T: PubSubConnect> PubSubService<T> {
     }
 }
 
+/// Returns the capped exponential backoff interval for a reconnect retry.
+///
+/// The configured retry interval is used as the base delay. Retry counts are 1-based, so the first
+/// failed attempt waits for the base interval, the second waits for twice the base interval, and so
+/// on. The delay is capped at [`MAX_RECONNECT_RETRY_INTERVAL`], unless the configured base interval
+/// is already higher, in which case the configured base interval is preserved.
+fn reconnect_retry_interval(base_interval: Duration, retry_count: u32) -> Duration {
+    let backoff_multiplier = 1u32.checked_shl(retry_count.saturating_sub(1)).unwrap_or(u32::MAX);
+    let max_interval = base_interval.max(MAX_RECONNECT_RETRY_INTERVAL);
+
+    base_interval.saturating_mul(backoff_multiplier).min(max_interval)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,6 +318,32 @@ mod tests {
                 .take()
                 .ok_or_else(|| TransportErrorKind::custom_str("missing mock connection handle"))
         }
+    }
+
+    #[test]
+    fn reconnect_retry_interval_uses_capped_exponential_backoff() {
+        let base = Duration::from_secs(1);
+
+        assert_eq!(reconnect_retry_interval(base, 1), Duration::from_secs(1));
+        assert_eq!(reconnect_retry_interval(base, 2), Duration::from_secs(2));
+        assert_eq!(reconnect_retry_interval(base, 3), Duration::from_secs(4));
+        assert_eq!(reconnect_retry_interval(base, 6), Duration::from_secs(30));
+    }
+
+    #[test]
+    fn reconnect_retry_interval_uses_configured_base_interval() {
+        let base = Duration::from_millis(1);
+
+        assert_eq!(reconnect_retry_interval(base, 1), Duration::from_millis(1));
+        assert_eq!(reconnect_retry_interval(base, 2), Duration::from_millis(2));
+    }
+
+    #[test]
+    fn reconnect_retry_interval_does_not_shorten_base_above_cap() {
+        let base = Duration::from_secs(60);
+
+        assert_eq!(reconnect_retry_interval(base, 1), Duration::from_secs(60));
+        assert_eq!(reconnect_retry_interval(base, 2), Duration::from_secs(60));
     }
 
     #[tokio::test]

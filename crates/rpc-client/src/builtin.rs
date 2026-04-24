@@ -275,7 +275,9 @@ pub struct ConnectionConfig {
     pub auth: Option<alloy_transport::Authorization>,
     /// Maximum number of connection retries.
     pub max_retries: Option<u32>,
-    /// Interval between connection retries.
+    /// Base interval between connection retries.
+    ///
+    /// WebSocket reconnect retries use capped exponential backoff from this base interval.
     pub retry_interval: Option<Duration>,
     /// WebSocket-specific configuration.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
@@ -306,7 +308,9 @@ impl ConnectionConfig {
         self
     }
 
-    /// Set the retry interval.
+    /// Set the base retry interval.
+    ///
+    /// WebSocket reconnect retries use capped exponential backoff from this base interval.
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = Some(retry_interval);
         self
