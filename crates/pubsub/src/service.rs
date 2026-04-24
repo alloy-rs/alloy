@@ -37,6 +37,15 @@ pub(crate) struct PubSubService<T> {
 
     /// The request manager.
     pub(crate) in_flights: RequestManager,
+
+    /// Consecutive backend deaths where the backend never produced any valid
+    /// pubsub traffic. A successful WS handshake alone does not count as
+    /// progress; only a received `PubSubItem` does.
+    consecutive_unhealthy_backend_deaths: u32,
+
+    /// Whether the current backend has delivered at least one valid
+    /// `PubSubItem` before dying.
+    backend_had_progress: bool,
 }
 
 impl<T: PubSubConnect> PubSubService<T> {
@@ -51,6 +60,8 @@ impl<T: PubSubConnect> PubSubService<T> {
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: Default::default(),
+            consecutive_unhealthy_backend_deaths: 0,
+            backend_had_progress: false,
         };
         this.spawn();
         Ok(PubSubFrontend::new(tx))
@@ -156,6 +167,7 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Handle an item from the backend.
     fn handle_item(&mut self, item: PubSubItem) -> TransportResult<()> {
+        self.backend_had_progress = true;
         match item {
             PubSubItem::Response(resp) => match self.in_flights.handle_response(resp) {
                 Some((server_id, in_flight)) => self.handle_sub_response(in_flight, server_id),
@@ -215,6 +227,36 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
     }
 
+    /// Record a backend death and check whether the consecutive-death budget
+    /// is exhausted. A backend that delivered at least one valid `PubSubItem`
+    /// before dying resets the streak; one that never produced traffic
+    /// increments it.
+    fn record_backend_death_and_check_budget(&mut self) -> TransportResult<()> {
+        if self.backend_had_progress {
+            self.consecutive_unhealthy_backend_deaths = 0;
+        } else {
+            self.consecutive_unhealthy_backend_deaths += 1;
+        }
+        self.backend_had_progress = false;
+
+        let max = self.handle.max_retries;
+        if self.consecutive_unhealthy_backend_deaths > max {
+            error!(
+                deaths = self.consecutive_unhealthy_backend_deaths,
+                max_retries = max,
+                "Backend died {deaths} consecutive times without producing valid traffic, \
+                 shutting down",
+                deaths = self.consecutive_unhealthy_backend_deaths,
+            );
+            return Err(TransportErrorKind::custom_str(
+                "pubsub service exhausted retry budget: backend repeatedly died \
+                 without producing valid traffic",
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Spawn the service.
     pub(crate) fn spawn(mut self) {
         let fut = async move {
@@ -230,13 +272,21 @@ impl<T: PubSubConnect> PubSubService<T> {
                             if let Err(e) = self.handle_item(item) {
                                 break Err(e)
                             }
-                        } else if let Err(e) = self.reconnect_with_retries().await {
-                            break Err(e)
+                        } else {
+                            if let Err(e) = self.record_backend_death_and_check_budget() {
+                                break Err(e)
+                            }
+                            if let Err(e) = self.reconnect_with_retries().await {
+                                break Err(e)
+                            }
                         }
                     }
 
                     _ = &mut self.handle.error => {
                         error!("Pubsub service backend error.");
+                        if let Err(e) = self.record_backend_death_and_check_budget() {
+                            break Err(e)
+                        }
                         if let Err(e) = self.reconnect_with_retries().await {
                             break Err(e)
                         }
@@ -249,6 +299,9 @@ impl<T: PubSubConnect> PubSubService<T> {
                                     .as_transport_err()
                                     .is_some_and(TransportErrorKind::is_backend_gone)
                                 {
+                                    if let Err(e) = self.record_backend_death_and_check_budget() {
+                                        break Err(e)
+                                    }
                                     if let Err(e) = self.reconnect_with_retries().await {
                                         break Err(e)
                                     }
@@ -258,7 +311,7 @@ impl<T: PubSubConnect> PubSubService<T> {
                             }
                         } else {
                             info!("Pubsub service request channel closed. Shutting down.");
-                           break Ok(())
+                            break Ok(())
                         }
                     }
                 }
@@ -278,6 +331,7 @@ mod tests {
     use crate::ConnectionInterface;
     use alloy_json_rpc::Request;
     use std::{
+        collections::VecDeque,
         sync::{Arc, Mutex},
         time::Duration,
     };
@@ -304,6 +358,39 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Debug)]
+    struct MultiMockConnect(Arc<Mutex<VecDeque<ConnectionHandle>>>);
+
+    impl PubSubConnect for MultiMockConnect {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            Err(TransportErrorKind::custom_str("connect is not used in this test"))
+        }
+
+        async fn try_reconnect(&self) -> TransportResult<ConnectionHandle> {
+            self.0
+                .lock()
+                .expect("poisoned mutex")
+                .pop_front()
+                .ok_or_else(|| TransportErrorKind::custom_str("no more mock handles"))
+        }
+    }
+
+    fn make_dead_handle() -> (ConnectionHandle, ConnectionInterface) {
+        let (handle, interface) = ConnectionHandle::new();
+        (handle, interface)
+    }
+
+    fn make_immediately_dying_handle() -> ConnectionHandle {
+        let (handle, interface) = ConnectionHandle::new();
+        drop(interface.to_frontend);
+        let _ = interface.error;
+        handle
+    }
+
     #[tokio::test]
     async fn reconnects_after_request_dispatch_hits_backend_gone() {
         let (dead_handle, dead_interface) = ConnectionHandle::new();
@@ -320,6 +407,8 @@ mod tests {
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: RequestManager::default(),
+            consecutive_unhealthy_backend_deaths: 0,
+            backend_had_progress: false,
         };
         service.spawn();
 
@@ -342,6 +431,122 @@ mod tests {
                 .await
                 .expect("request should be dispatched after reconnect")
                 .expect("new backend should receive the request");
+        assert_eq!(dispatched.get(), expected);
+    }
+
+    #[tokio::test]
+    async fn consecutive_unhealthy_deaths_exhaust_budget() {
+        let max_retries: u32 = 3;
+
+        let mut handles = VecDeque::new();
+        for _ in 0..max_retries {
+            handles.push_back(
+                make_immediately_dying_handle()
+                    .with_max_retries(max_retries)
+                    .with_retry_interval(Duration::from_millis(10)),
+            );
+        }
+        let connector = MultiMockConnect(Arc::new(Mutex::new(handles)));
+
+        let initial = make_immediately_dying_handle();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle: initial
+                .with_max_retries(max_retries)
+                .with_retry_interval(Duration::from_millis(10)),
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+            consecutive_unhealthy_backend_deaths: 0,
+            backend_had_progress: false,
+        };
+        service.spawn();
+
+        let req = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let (in_flight, rx) = InFlight::new(req, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
+
+        let result = timeout(Duration::from_secs(5), rx).await;
+        assert!(
+            result.is_ok(),
+            "request should resolve (not hang) once death budget is exhausted"
+        );
+    }
+
+    #[tokio::test]
+    async fn healthy_backend_resets_death_counter() {
+        let max_retries: u32 = 2;
+
+        let (healthy_handle, healthy_interface) = make_dead_handle();
+        let ConnectionInterface {
+            from_frontend: _from_frontend,
+            to_frontend: healthy_tx,
+            error: _error,
+            shutdown: _shutdown,
+        } = healthy_interface;
+
+        let dying_after_healthy = make_immediately_dying_handle();
+
+        let (final_handle, mut final_interface) = make_dead_handle();
+
+        let mut handles = VecDeque::new();
+        handles.push_back(
+            healthy_handle
+                .with_max_retries(max_retries)
+                .with_retry_interval(Duration::from_millis(10)),
+        );
+        handles.push_back(
+            dying_after_healthy
+                .with_max_retries(max_retries)
+                .with_retry_interval(Duration::from_millis(10)),
+        );
+        handles.push_back(final_handle.with_max_retries(max_retries));
+        let connector = MultiMockConnect(Arc::new(Mutex::new(handles)));
+
+        let initial = make_immediately_dying_handle();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle: initial
+                .with_max_retries(max_retries)
+                .with_retry_interval(Duration::from_millis(10)),
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+            consecutive_unhealthy_backend_deaths: 0,
+            backend_had_progress: false,
+        };
+        service.spawn();
+
+        // Wait for the service to cycle through the first (immediately dying)
+        // backend and land on the healthy one.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Send a valid JSON-RPC response through the healthy backend, then
+        // close it.
+        let raw = RawValue::from_string("\"0x1\"".to_string()).unwrap();
+        let resp = Response { id: Id::Number(0), payload: ResponsePayload::Success(raw) };
+        let _ = healthy_tx.send(PubSubItem::Response(resp));
+        drop(healthy_tx);
+
+        // The service saw progress, so the death counter should have reset.
+        // It will now cycle through `dying_after_healthy` (1 unhealthy death)
+        // and land on `final_handle`, which is alive.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Prove the service is still alive by sending a request through
+        // the final backend.
+        let req = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
+        let expected = req.serialized().get().to_owned();
+        let (in_flight, _rx) = InFlight::new(req, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
+
+        let dispatched =
+            timeout(Duration::from_secs(2), final_interface.recv_from_frontend())
+                .await
+                .expect("service should still be alive after counter reset")
+                .expect("final backend should receive the request");
         assert_eq!(dispatched.get(), expected);
     }
 }
