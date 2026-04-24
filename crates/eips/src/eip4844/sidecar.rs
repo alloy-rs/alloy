@@ -239,6 +239,14 @@ impl BlobTransactionSidecar {
         Self { blobs, commitments, proofs }
     }
 
+    /// Shrinks the sidecar vectors to fit their current contents.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.blobs.shrink_to_fit();
+        self.commitments.shrink_to_fit();
+        self.proofs.shrink_to_fit();
+    }
+
     /// Creates a new instance from the given KZG types.
     #[cfg(feature = "kzg")]
     pub fn from_kzg(
