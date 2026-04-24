@@ -26,7 +26,9 @@ pub struct WsConnect {
     /// Max number of retries before failing and exiting the connection.
     /// Default is 10.
     max_retries: u32,
-    /// The interval between retries.
+    /// The base interval between retries.
+    ///
+    /// Reconnect retries use capped exponential backoff from this base interval.
     /// Default is 3 seconds.
     retry_interval: Duration,
     /// The interval between keepalive pings.
@@ -95,7 +97,9 @@ impl WsConnect {
         self
     }
 
-    /// Sets the interval between retries.
+    /// Sets the base interval between retries.
+    ///
+    /// Reconnect retries use capped exponential backoff from this base interval.
     /// Default is 3 seconds.
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = retry_interval;
