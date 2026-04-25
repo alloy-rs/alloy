@@ -8,7 +8,7 @@ use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
     ffi::OsString,
-    fs::create_dir,
+    fs::create_dir_all,
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
@@ -466,7 +466,7 @@ impl Reth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 
