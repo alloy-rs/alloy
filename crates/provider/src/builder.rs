@@ -517,6 +517,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     ///
     /// [`PubSubConnect`]: alloy_pubsub::PubSubConnect
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     pub async fn connect_pubsub_with<C>(self, connect: C) -> Result<F::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<N>, N>,
@@ -529,6 +530,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Build this provider with a websocket connection.
     #[cfg(feature = "ws-base")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ws-base")))]
     pub async fn connect_ws(
         self,
         connect: alloy_transport_ws::WsConnect,
@@ -544,6 +546,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Build this provider with an IPC connection.
     #[cfg(feature = "ipc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ipc")))]
     pub async fn connect_ipc<T>(
         self,
         connect: alloy_transport_ipc::IpcConnect<T>,

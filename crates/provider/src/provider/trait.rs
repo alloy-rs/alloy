@@ -1309,6 +1309,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
         let rpc_call = self.client().request("eth_subscribe", (SubscriptionKind::NewHeads,));
         GetSubscription::new(self.weak_client(), rpc_call)
@@ -1338,6 +1339,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     fn subscribe_full_blocks(&self) -> SubFullBlocks<N> {
         SubFullBlocks::new(self.subscribe_blocks(), self.weak_client())
     }
@@ -1368,6 +1370,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
         let rpc_call =
             self.client().request("eth_subscribe", (SubscriptionKind::NewPendingTransactions,));
@@ -1405,6 +1408,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     fn subscribe_full_pending_transactions(
         &self,
     ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
@@ -1446,6 +1450,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
         let rpc_call = self.client().request(
             "eth_subscribe",
@@ -1456,6 +1461,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Subscribe to an RPC event.
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     fn subscribe<P, R>(&self, params: P) -> GetSubscription<P, R>
     where
@@ -1488,6 +1494,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     fn subscribe_to<R>(&self, method: &'static str) -> GetSubscription<NoParams, R>
     where
@@ -1501,6 +1508,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Cancels a subscription given the subscription ID.
     #[cfg(feature = "pubsub")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pubsub")))]
     async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.root().unsubscribe(id)
     }
