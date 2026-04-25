@@ -316,61 +316,6 @@ pub struct ExecutionPayloadEnvelopeV4 {
     pub execution_requests: Requests,
 }
 
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for ExecutionPayloadEnvelopeV4 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Helper {
-            execution_payload: ExecutionPayloadV3,
-            block_value: U256,
-            blobs_bundle: BlobsBundleV1,
-            should_override_builder: bool,
-            execution_requests: Requests,
-        }
-
-        let helper = Helper::deserialize(deserializer)?;
-        Ok(Self {
-            envelope_inner: ExecutionPayloadEnvelopeV3 {
-                execution_payload: helper.execution_payload,
-                block_value: helper.block_value,
-                blobs_bundle: helper.blobs_bundle,
-                should_override_builder: helper.should_override_builder,
-            },
-            execution_requests: helper.execution_requests,
-        })
-    }
-}
-
-/// This structure maps for the return value of `engine_getPayload` of the beacon chain spec, for
-/// V5.
-///
-/// See also:
-/// <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#engine_getpayloadv5>
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-pub struct ExecutionPayloadEnvelopeV5 {
-    /// Execution payload V3
-    pub execution_payload: ExecutionPayloadV3,
-    /// The expected value to be received by the feeRecipient in wei
-    pub block_value: U256,
-    /// The blobs, commitments, and EIP-7594 style cell proofs associated with the executed
-    /// payload. See also: <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#BlobsBundleV2>.
-    pub blobs_bundle: BlobsBundleV2,
-    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
-    /// should be used instead of an externally provided one.
-    pub should_override_builder: bool,
-    /// A list of opaque [EIP-7685][eip7685] requests.
-    ///
-    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
-    pub execution_requests: Requests,
-}
-
 impl ExecutionPayloadEnvelopeV4 {
     /// Converts this V4 envelope into an [`ExecutionPayload`] and [`ExecutionPayloadSidecar`].
     ///
@@ -431,6 +376,61 @@ impl ExecutionPayloadEnvelopeV4 {
             execution_requests: self.execution_requests,
         })
     }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for ExecutionPayloadEnvelopeV4 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Helper {
+            execution_payload: ExecutionPayloadV3,
+            block_value: U256,
+            blobs_bundle: BlobsBundleV1,
+            should_override_builder: bool,
+            execution_requests: Requests,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        Ok(Self {
+            envelope_inner: ExecutionPayloadEnvelopeV3 {
+                execution_payload: helper.execution_payload,
+                block_value: helper.block_value,
+                blobs_bundle: helper.blobs_bundle,
+                should_override_builder: helper.should_override_builder,
+            },
+            execution_requests: helper.execution_requests,
+        })
+    }
+}
+
+/// This structure maps for the return value of `engine_getPayload` of the beacon chain spec, for
+/// V5.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#engine_getpayloadv5>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadEnvelopeV5 {
+    /// Execution payload V3
+    pub execution_payload: ExecutionPayloadV3,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 style cell proofs associated with the executed
+    /// payload. See also: <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#BlobsBundleV2>.
+    pub blobs_bundle: BlobsBundleV2,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
 }
 
 #[cfg(feature = "kzg")]
