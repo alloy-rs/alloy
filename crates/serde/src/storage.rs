@@ -88,7 +88,7 @@ impl fmt::Display for JsonStorageKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Hash(hash) => hash.fmt(f),
-            Self::Number(num) => alloc::format!("{num:#x}").fmt(f),
+            Self::Number(num) => write!(f, "{num:#x}"),
         }
     }
 }
