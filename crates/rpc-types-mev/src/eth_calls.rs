@@ -27,13 +27,25 @@ pub struct EthCallBundle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coinbase: Option<Address>,
     /// the timestamp to use for this bundle simulation, in seconds since the unix epoch
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timestamp: Option<u64>,
     /// the timeout to apply to execution of this bundle, in milliseconds
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timeout: Option<u64>,
     /// gas limit of the block to use for this simulation
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub gas_limit: Option<u64>,
     /// difficulty of the block to use for this simulation
     #[serde(default, skip_serializing_if = "Option::is_none")]
