@@ -446,6 +446,7 @@ pub struct CallOutput {
     #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// The output data of the call.
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub output: Bytes,
 }
 
@@ -1028,5 +1029,12 @@ mod tests {
         let trace =
             serde_json::from_str::<TraceResultsWithTransactionHash>(reference_data).unwrap();
         assert_eq!(trace.full_trace.output, Bytes::default());
+    }
+
+    #[test]
+    fn test_call_output_missing_output_field() {
+        let json = r#"{ "gasUsed": "0x0" }"#;
+        let parsed: CallOutput = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.output, Bytes::default());
     }
 }
