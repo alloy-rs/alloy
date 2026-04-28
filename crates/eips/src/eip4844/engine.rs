@@ -117,7 +117,7 @@ impl ssz::Decode for BlobAndProofV2 {
 
 /// Blob cells type returned in responses to `engine_getBlobsV4`:
 /// <https://github.com/ethereum/execution-apis/pull/774>
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobCellsAndProofsV1 {
     /// The requested blob cells.
