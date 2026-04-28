@@ -8,11 +8,17 @@ pub const INVALID_FORK_CHOICE_STATE_ERROR: i32 = -38002;
 /// invalid payload attributes error code.
 pub const INVALID_PAYLOAD_ATTRIBUTES_ERROR: i32 = -38003;
 
+/// too deep reorg error code.
+pub const TOO_DEEP_REORG_ERROR: i32 = -38006;
+
 /// invalid forkchoice state error message.
 pub const INVALID_FORK_CHOICE_STATE_ERROR_MSG: &str = "Invalid forkchoice state";
 
 /// invalid payload attributes error message.
 pub const INVALID_PAYLOAD_ATTRIBUTES_ERROR_MSG: &str = "Invalid payload attributes";
+
+/// too deep reorg error message.
+pub const TOO_DEEP_REORG_ERROR_MSG: &str = "Too deep reorg";
 
 /// Represents possible variants of a processed forkchoice update.
 pub type ForkChoiceUpdateResult = Result<ForkchoiceUpdated, ForkchoiceUpdateError>;
@@ -96,6 +102,9 @@ pub enum ForkchoiceUpdateError {
     /// Thrown when a forkchoice final block does not exist in the database.
     #[display("final block not available in database")]
     UnknownFinalBlock,
+    /// Thrown when the requested reorg depth exceeds the client's configured limit.
+    #[display("too deep reorg")]
+    TooDeepReorg,
 }
 
 impl core::error::Error for ForkchoiceUpdateError {}
