@@ -3,7 +3,7 @@ use crate::{
         Blob, BlobAndProofV2, BlobTransactionSidecar, Bytes48, BYTES_PER_BLOB,
         BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
     },
-    eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
+    eip7594::{Cell, CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::B256;
@@ -639,6 +639,38 @@ impl BlobTransactionSidecarEip7594 {
         Self::try_from_blobs_with_settings(blobs, EnvKzgSettings::Default.get())
     }
 
+    /// Computes the EIP-7594 cells for all blobs using the default KZG settings.
+    ///
+    /// The returned cells are flattened by blob and each blob contributes
+    /// [`CELLS_PER_EXT_BLOB`] cells. For blob index `i` and cell index `j`, the cell is at
+    /// `i * CELLS_PER_EXT_BLOB + j`, matching the [`Self::cell_proofs`] layout.
+    #[cfg(feature = "kzg")]
+    pub fn compute_cells(&self) -> Result<Vec<Cell>, c_kzg::Error> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        self.compute_cells_with_settings(EnvKzgSettings::Default.get())
+    }
+
+    /// Computes the EIP-7594 cells for all blobs using the given KZG settings.
+    ///
+    /// The returned cells are flattened by blob and each blob contributes
+    /// [`CELLS_PER_EXT_BLOB`] cells. For blob index `i` and cell index `j`, the cell is at
+    /// `i * CELLS_PER_EXT_BLOB + j`, matching the [`Self::cell_proofs`] layout.
+    #[cfg(feature = "kzg")]
+    pub fn compute_cells_with_settings(
+        &self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Vec<Cell>, c_kzg::Error> {
+        let mut cells = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
+        for blob in &self.blobs {
+            // SAFETY: Blob and c_kzg::Blob have the same memory layout.
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let blob_cells = settings.compute_cells(blob)?;
+            cells.extend(blob_cells.iter().map(|cell| Cell::new(cell.to_bytes())));
+        }
+        Ok(cells)
+    }
+
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
     /// proofs.
     ///
@@ -1103,5 +1135,32 @@ mod tests {
         let versioned_hashes = sidecar.versioned_hashes().collect::<Vec<_>>();
 
         sidecar.validate(&versioned_hashes, EnvKzgSettings::Default.get()).unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn compute_cells_for_7594_sidecar() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
+            settings,
+        )
+        .unwrap();
+
+        let cells = sidecar.compute_cells_with_settings(settings).unwrap();
+        assert_eq!(cells.len(), sidecar.blobs.len() * CELLS_PER_EXT_BLOB);
+        assert_eq!(sidecar.compute_cells().unwrap(), cells);
+
+        for (blob_index, blob) in sidecar.blobs.iter().enumerate() {
+            // SAFETY: Blob and c_kzg::Blob have the same memory layout.
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let expected_cells = settings.compute_cells(blob).unwrap();
+            let start = blob_index * CELLS_PER_EXT_BLOB;
+            let end = start + CELLS_PER_EXT_BLOB;
+
+            for (cell, expected_cell) in cells[start..end].iter().zip(expected_cells.iter()) {
+                assert_eq!(*cell, Cell::new(expected_cell.to_bytes()));
+            }
+        }
     }
 }
