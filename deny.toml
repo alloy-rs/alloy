@@ -16,6 +16,9 @@ ignore = [
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Permit git/path deps in workspace members marked `publish = false`
+# (e.g. alloy-transport-mpp while the upstream `mpp` crate is git-pinned).
+allow-wildcard-paths = true
 highlight = "all"
 
 [licenses]
@@ -66,3 +69,4 @@ license-files = [{ path = "LICENSE", hash = 0x001c7e6c }]
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+allow-git = ["https://github.com/tempoxyz/mpp-rs"]
