@@ -703,4 +703,79 @@ mod tests {
         // The connector remains usable.
         assert!(connect.is_local());
     }
+
+    #[test]
+    fn new_extracts_basic_auth_from_url_userinfo() {
+        let connect = MppWsConnect::new("ws://alice:secret@example.com/rpc", DummyProvider);
+        let req = connect.into_client_request().unwrap();
+        let v = req.headers().get(AUTHORIZATION).expect("auth header set");
+        // The exact base64 of "alice:secret" is fixed.
+        assert_eq!(v.to_str().unwrap(), "Basic YWxpY2U6c2VjcmV0");
+    }
+
+    #[test]
+    fn new_without_userinfo_has_no_auth_header() {
+        let connect = MppWsConnect::new("ws://example.com/rpc", DummyProvider);
+        let req = connect.into_client_request().unwrap();
+        assert!(req.headers().get(AUTHORIZATION).is_none());
+    }
+
+    #[test]
+    fn with_auth_overrides_url_extracted_auth() {
+        // URL has userinfo, but explicit `with_auth` should win.
+        let connect = MppWsConnect::new("ws://alice:secret@example.com/rpc", DummyProvider)
+            .with_auth(Authorization::bearer("override"));
+        let req = connect.into_client_request().unwrap();
+        let v = req.headers().get(AUTHORIZATION).unwrap();
+        assert_eq!(v.to_str().unwrap(), "Bearer override");
+    }
+
+    #[test]
+    fn url_accessor_returns_configured_url() {
+        let connect = MppWsConnect::new("ws://example.com/rpc", DummyProvider);
+        assert_eq!(connect.url(), "ws://example.com/rpc");
+    }
+
+    #[test]
+    fn is_local_handles_more_url_shapes() {
+        // Path-only does not change the locality of the host.
+        assert!(MppWsConnect::new("ws://localhost/rpc", DummyProvider).is_local());
+        assert!(MppWsConnect::new("ws://127.0.0.1:8545/v1/ws", DummyProvider).is_local());
+        // Public hosts and TLS schemes are not local.
+        assert!(!MppWsConnect::new("ws://eth.example.com", DummyProvider).is_local());
+        assert!(!MppWsConnect::new("wss://eth.example.com:8545/rpc", DummyProvider).is_local());
+        // 0.0.0.0 is *not* treated as local by the upstream heuristic, despite
+        // being a bind-any address; pin this behavior to catch surprises.
+        assert!(!MppWsConnect::new("ws://0.0.0.0:8545", DummyProvider).is_local());
+    }
+
+    #[test]
+    fn mpp_handle_multiple_subscribers_are_independent() {
+        let connect = MppWsConnect::new("ws://localhost", DummyProvider);
+        let h1 = connect.mpp_handle();
+        let h2 = connect.mpp_handle();
+        // Both watchers see the initial empty state.
+        assert!(h1.receipt.borrow().is_none());
+        assert!(h2.receipt.borrow().is_none());
+        // Two independent receivers exist; sender count is 1 (the connector's tx).
+        assert_eq!(connect.events_tx.receiver_count(), 2);
+    }
+
+    #[test]
+    fn builder_setters_apply() {
+        // Ensure the const builder methods chain cleanly. Field correctness
+        // is covered indirectly by the integration tests; here we just assert
+        // the type compiles and is usable across all setters.
+        let cfg = WebSocketConfig::default();
+        let connect = MppWsConnect::new("ws://localhost:8545", DummyProvider)
+            .with_config(cfg)
+            .with_max_retries(7)
+            .with_retry_interval(Duration::from_millis(250))
+            .with_keepalive_interval(Duration::from_millis(500))
+            .with_auth(Authorization::raw("custom-token"));
+        // Round-trips through IntoClientRequest with the explicit auth header.
+        let req = connect.into_client_request().unwrap();
+        let v = req.headers().get(AUTHORIZATION).unwrap();
+        assert_eq!(v.to_str().unwrap(), "custom-token");
+    }
 }

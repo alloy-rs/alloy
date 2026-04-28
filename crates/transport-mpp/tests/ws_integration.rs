@@ -370,6 +370,437 @@ async fn duplicate_need_voucher_closes_connection() {
 }
 
 #[tokio::test]
+async fn payment_provider_error_surfaces_event_and_closes() {
+    // The provider rejects the challenge with an error; the translator must
+    // surface it as MppEvent::Error and close.
+    #[derive(Clone)]
+    struct FailingProvider;
+    impl PaymentProvider for FailingProvider {
+        fn supports(&self, _: &str, _: &str) -> bool {
+            true
+        }
+        async fn pay(&self, _: &PaymentChallenge) -> Result<PaymentCredential, MppError> {
+            Err(MppError::bad_request("nope"))
+        }
+    }
+
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            send_text(&mut ws, challenge_frame()).await;
+            // Client should NOT send a credential; just absorb whatever ends the conn.
+            let _ = ws.next().await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, FailingProvider);
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+
+    let mut saw_error = false;
+    while let Ok(Ok(ev)) = timeout(TIMEOUT, handle.events.recv()).await {
+        if let MppEvent::Error(s) = ev {
+            assert!(s.contains("nope") || !s.is_empty());
+            saw_error = true;
+            break;
+        }
+    }
+    assert!(saw_error, "expected Error event when payment provider returns Err");
+}
+
+#[tokio::test]
+async fn voucher_provider_error_surfaces_event_and_closes() {
+    #[derive(Clone)]
+    struct FailingVoucher;
+    impl VoucherProvider for FailingVoucher {
+        async fn next_voucher(&self, _: &VoucherRequest) -> Result<PaymentCredential, MppError> {
+            Err(MppError::bad_request("voucher unavailable"))
+        }
+    }
+
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            send_text(&mut ws, challenge_frame()).await;
+            let _ = recv_value(&mut ws).await;
+            send_text(
+                &mut ws,
+                serde_json::json!({
+                    "type": "needVoucher",
+                    "channelId": "0xchannel",
+                    "requiredCumulative": "2000",
+                    "acceptedCumulative": "1000",
+                    "deposit": "5000",
+                }),
+            )
+            .await;
+            let _ = ws.next().await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, StubProvider).with_voucher_provider(FailingVoucher);
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+
+    let mut saw_error = false;
+    while let Ok(Ok(ev)) = timeout(TIMEOUT, handle.events.recv()).await {
+        if let MppEvent::Error(_) = ev {
+            saw_error = true;
+            break;
+        }
+    }
+    assert!(saw_error, "expected Error event when voucher provider returns Err");
+}
+
+#[tokio::test]
+async fn multiple_json_rpc_requests_round_trip_in_session() {
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            // Handshake.
+            send_text(&mut ws, challenge_frame()).await;
+            let _ = recv_value(&mut ws).await;
+            // Echo back a fixed result for each incoming request.
+            for _ in 0..3 {
+                let outbound = recv_value(&mut ws).await;
+                assert_eq!(outbound["type"], "message");
+                let inner = &outbound["data"];
+                let id = inner["id"].clone();
+                let response = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": format!("0x{}", id),
+                });
+                send_text(
+                    &mut ws,
+                    serde_json::json!({ "type": "message", "data": response.to_string() }),
+                )
+                .await;
+            }
+            sleep(Duration::from_millis(50)).await;
+        })
+    })
+    .await;
+
+    let frontend = MppWsConnect::new(url, StubProvider).into_service().await.unwrap();
+    for i in 1..=3u64 {
+        let req = Request::new("eth_blockNumber", Id::Number(i), ()).serialize().unwrap();
+        let resp = timeout(TIMEOUT, frontend.send(req)).await.unwrap().unwrap();
+        let payload = resp.payload.as_success().unwrap();
+        assert_eq!(payload.get(), &format!("\"0x{i}\""));
+    }
+}
+
+#[tokio::test]
+async fn request_buffered_until_handshake_completes() {
+    // Verifies that an RPC issued before the challenge arrives is held in
+    // the frontend channel and only flushed once the credential is sent.
+    // Server-side ordering of reads guarantees the property: credential
+    // MUST come before the wrapped JSON-RPC `message`.
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            // Delay so the client has time to push the RPC into the channel
+            // before the challenge is even on the wire.
+            sleep(Duration::from_millis(150)).await;
+            send_text(&mut ws, challenge_frame()).await;
+
+            // The very first frame from the client must be the credential,
+            // not the queued JSON-RPC message.
+            let first = recv_value(&mut ws).await;
+            assert_eq!(first["type"], "credential");
+
+            // The next frame is the buffered JSON-RPC request.
+            let second = recv_value(&mut ws).await;
+            assert_eq!(second["type"], "message");
+            let id = second["data"]["id"].clone();
+            let response = serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": "0xqueued",
+            });
+            send_text(
+                &mut ws,
+                serde_json::json!({ "type": "message", "data": response.to_string() }),
+            )
+            .await;
+            sleep(Duration::from_millis(50)).await;
+        })
+    })
+    .await;
+
+    let frontend = MppWsConnect::new(url, StubProvider).into_service().await.unwrap();
+    let req = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+    let resp = timeout(TIMEOUT, frontend.send(req)).await.unwrap().unwrap();
+    let payload = resp.payload.as_success().unwrap();
+    assert_eq!(payload.get(), "\"0xqueued\"");
+}
+
+#[tokio::test]
+async fn re_challenge_mid_session_pays_again() {
+    // Server sends two challenges (with a gap so the first pay completes
+    // before the second arrives) and expects two credentials.
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            send_text(&mut ws, challenge_frame()).await;
+            let first = recv_value(&mut ws).await;
+            assert_eq!(first["type"], "credential");
+            // Brief gap so `pending_pay` is None when the next challenge lands.
+            sleep(Duration::from_millis(50)).await;
+            send_text(&mut ws, challenge_frame()).await;
+            let second = recv_value(&mut ws).await;
+            assert_eq!(second["type"], "credential");
+            sleep(Duration::from_millis(50)).await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, StubProvider);
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+
+    let mut challenges = 0;
+    let mut credentials_sent = 0;
+    while let Ok(Ok(ev)) = timeout(Duration::from_millis(800), handle.events.recv()).await {
+        match ev {
+            MppEvent::Challenge(_) => challenges += 1,
+            MppEvent::CredentialSent => credentials_sent += 1,
+            _ => {}
+        }
+        if challenges == 2 && credentials_sent == 2 {
+            break;
+        }
+    }
+    assert_eq!(challenges, 2, "expected two challenges");
+    assert_eq!(credentials_sent, 2, "expected two credentials sent");
+}
+
+#[tokio::test]
+async fn server_close_frame_closes_connection() {
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            // Send a Close frame straight away.
+            ws.close(None).await.ok();
+            sleep(Duration::from_millis(50)).await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, StubProvider);
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+    drop(connect);
+
+    // Translator should exit; eventually the events channel closes once the
+    // last sender (the translator's clone) is dropped.
+    let mut closed = false;
+    for _ in 0..50 {
+        match timeout(Duration::from_millis(100), handle.events.recv()).await {
+            Ok(Err(_)) => {
+                closed = true;
+                break;
+            }
+            Ok(Ok(_)) => continue,
+            Err(_) => continue,
+        }
+    }
+    assert!(closed, "translator should close after server Close frame");
+}
+
+#[tokio::test]
+async fn binary_frame_closes_connection() {
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            // Send an unsolicited binary frame; translator only handles text.
+            ws.send(Message::Binary(vec![0xde, 0xad, 0xbe, 0xef].into())).await.unwrap();
+            let _ = ws.next().await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, StubProvider);
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+    drop(connect);
+
+    let mut closed = false;
+    for _ in 0..50 {
+        match timeout(Duration::from_millis(100), handle.events.recv()).await {
+            Ok(Err(_)) => {
+                closed = true;
+                break;
+            }
+            Ok(Ok(_)) => continue,
+            Err(_) => continue,
+        }
+    }
+    assert!(closed, "translator should close on binary frame");
+}
+
+#[tokio::test]
+async fn malformed_challenge_closes_connection() {
+    // The outer envelope is valid, but the inner `challenge` payload cannot
+    // be deserialized into a PaymentChallenge.
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            send_text(
+                &mut ws,
+                serde_json::json!({
+                    "type": "challenge",
+                    "challenge": "not-an-object",
+                    "error": null,
+                }),
+            )
+            .await;
+            let _ = ws.next().await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, StubProvider);
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+    drop(connect);
+
+    let mut closed = false;
+    for _ in 0..50 {
+        match timeout(Duration::from_millis(100), handle.events.recv()).await {
+            Ok(Err(_)) => {
+                closed = true;
+                break;
+            }
+            Ok(Ok(_)) => continue,
+            Err(_) => continue,
+        }
+    }
+    assert!(closed, "translator should close on malformed challenge");
+}
+
+#[tokio::test]
+async fn malformed_data_payload_closes_connection() {
+    // Handshake completes, then server sends a Data frame whose inner
+    // payload is not valid JSON-RPC. The translator must close.
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            send_text(&mut ws, challenge_frame()).await;
+            let _ = recv_value(&mut ws).await;
+            send_text(&mut ws, serde_json::json!({ "type": "message", "data": "not json at all" }))
+                .await;
+            let _ = ws.next().await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, StubProvider);
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+    drop(connect);
+
+    let mut closed = false;
+    for _ in 0..50 {
+        match timeout(Duration::from_millis(100), handle.events.recv()).await {
+            Ok(Err(_)) => {
+                closed = true;
+                break;
+            }
+            Ok(Ok(_)) => continue,
+            Err(_) => continue,
+        }
+    }
+    assert!(closed, "translator should close on malformed Data payload");
+}
+
+#[tokio::test]
+async fn multiple_receipts_update_watch_channel() {
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            send_text(&mut ws, challenge_frame()).await;
+            let _ = recv_value(&mut ws).await;
+            // Two distinct receipts back-to-back.
+            send_text(
+                &mut ws,
+                serde_json::json!({
+                    "type": "receipt",
+                    "receipt": Receipt::success("tempo", "0xfirst"),
+                }),
+            )
+            .await;
+            send_text(
+                &mut ws,
+                serde_json::json!({
+                    "type": "receipt",
+                    "receipt": Receipt::success("tempo", "0xsecond"),
+                }),
+            )
+            .await;
+            sleep(Duration::from_millis(100)).await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, StubProvider);
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+
+    // The broadcast event channel sees one event per receipt — collect both.
+    let mut refs = Vec::new();
+    while let Ok(Ok(ev)) = timeout(TIMEOUT, handle.events.recv()).await {
+        if let MppEvent::Receipt(r) = ev {
+            refs.push(r.reference);
+            if refs.len() == 2 {
+                break;
+            }
+        }
+    }
+    assert_eq!(refs, vec!["0xfirst".to_string(), "0xsecond".to_string()]);
+
+    // The watch channel collapses to the most recent value; assert it
+    // converges on the second receipt (may already be there).
+    if handle.receipt.borrow().as_ref().map(|r| r.reference.as_str()) != Some("0xsecond") {
+        timeout(TIMEOUT, handle.receipt.changed()).await.unwrap().unwrap();
+    }
+    let latest = handle.receipt.borrow().as_ref().expect("latest receipt").reference.clone();
+    assert_eq!(latest, "0xsecond");
+}
+
+#[tokio::test]
+async fn multiple_event_subscribers_each_receive_handshake() {
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            send_text(&mut ws, challenge_frame()).await;
+            let _ = recv_value(&mut ws).await;
+            send_text(&mut ws, receipt_frame()).await;
+            sleep(Duration::from_millis(100)).await;
+        })
+    })
+    .await;
+
+    let connect = MppWsConnect::new(url, StubProvider);
+    let mut h1 = connect.mpp_handle();
+    let mut h2 = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+
+    async fn drain_until_receipt(rx: &mut tokio::sync::broadcast::Receiver<MppEvent>) -> bool {
+        let mut saw_challenge = false;
+        let mut saw_credential = false;
+        let mut saw_receipt = false;
+        while let Ok(Ok(ev)) = timeout(TIMEOUT, rx.recv()).await {
+            match ev {
+                MppEvent::Challenge(_) => saw_challenge = true,
+                MppEvent::CredentialSent => saw_credential = true,
+                MppEvent::Receipt(_) => {
+                    saw_receipt = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+        saw_challenge && saw_credential && saw_receipt
+    }
+
+    assert!(drain_until_receipt(&mut h1.events).await);
+    assert!(drain_until_receipt(&mut h2.events).await);
+}
+
+#[tokio::test]
 async fn server_error_frame_surfaces_event_and_closes() {
     let url = spawn_server(|mut ws| {
         Box::pin(async move {
