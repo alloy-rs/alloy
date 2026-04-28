@@ -35,11 +35,14 @@ alloy-transport-ws.workspace = true
 
 futures.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["sync", "rt", "time", "macros"] }
-tokio-tungstenite = { workspace = true }
 tracing.workspace = true
 url.workspace = true
+
+# non-WASM only
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 http.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "time", "macros"] }
+tokio-tungstenite = { workspace = true }
 rustls = { version = "0.23", default-features = false, optional = true }
 
 mpp = { git = "https://github.com/tempoxyz/mpp-rs", rev = "1bdea74189ccc9502a170e788789891b001abc63", default-features = false, features = ["ws"] }

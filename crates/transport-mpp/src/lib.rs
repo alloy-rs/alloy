@@ -15,6 +15,7 @@ mod ws;
 pub use ws::{MppEvent, MppHandle, MppWsConnect, NoVoucher, VoucherProvider, VoucherRequest};
 
 // Re-exports for ergonomics.
+#[cfg(not(target_family = "wasm"))]
 pub use mpp::{
     client::{
         ws::{WsClientMessage, WsServerMessage},
