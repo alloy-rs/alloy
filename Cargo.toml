@@ -70,6 +70,7 @@ alloy-transport = { version = "2.0.1", path = "crates/transport", default-featur
 alloy-transport-http = { version = "2.0.1", path = "crates/transport-http", default-features = false }
 alloy-transport-ipc = { version = "2.0.1", path = "crates/transport-ipc", default-features = false }
 alloy-transport-ws = { version = "2.0.1", path = "crates/transport-ws", default-features = false }
+alloy-transport-mpp = { version = "2.0.1", path = "crates/transport-mpp", default-features = false }
 alloy-eip5792 = { version = "2.0.1", path = "crates/eip5792", default-features = false }
 alloy-tx-macros = { version = "2.0.1", path = "crates/tx-macros", default-features = false }
 
