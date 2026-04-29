@@ -196,7 +196,7 @@ fn redact_url_userinfo(raw: &str) -> String {
             u.to_string()
         }
         Ok(_) => raw.to_string(),
-        Err(_) => "<unparseable>".to_string(),
+        Err(_) => "<unparsable>".to_string(),
     }
 }
 
