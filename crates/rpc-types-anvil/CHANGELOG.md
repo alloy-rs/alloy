@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.0.3
 - Release 2.0.2
 - Release 2.0.1
 - Release 2.0.0

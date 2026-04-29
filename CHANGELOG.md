@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Bug Fixes
+
+- [rpc-types-engine] Remove non_exhaustive from testing build request ([#3940](https://github.com/alloy-rs/alloy/issues/3940))
+
 ## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
 
 ### Features
 
 - [rpc-types-engine] Derive Default for testing build request ([#3939](https://github.com/alloy-rs/alloy/issues/3939))
+
+### Miscellaneous Tasks
+
+- Release 2.0.3
 
 ## [2.0.2](https://github.com/alloy-rs/alloy/releases/tag/v2.0.2) - 2026-04-29
 
