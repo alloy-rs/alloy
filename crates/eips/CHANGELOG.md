@@ -5,19 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1](https://github.com/alloy-rs/alloy/releases/tag/v2.0.1) - 2026-04-22
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
 
 ### Features
 
+- [eips] Add EIP-7594 cell matching helpers ([#3934](https://github.com/alloy-rs/alloy/issues/3934))
+- [eips] Add EIP-7594 sidecar cell helper ([#3933](https://github.com/alloy-rs/alloy/issues/3933))
+- [eips] Add blob cells response type ([#3932](https://github.com/alloy-rs/alloy/issues/3932))
+- [eips] Add SSZ support for blob proof types ([#3923](https://github.com/alloy-rs/alloy/issues/3923))
+- [eips] Add sidecar shrink_to_fit helpers ([#3918](https://github.com/alloy-rs/alloy/issues/3918))
 - Add amsterdam fields ([#3871](https://github.com/alloy-rs/alloy/issues/3871))
 - [consensus] Change default tx env type
 
 ### Miscellaneous Tasks
 
+- Release 2.0.3
+- Release 2.0.2
+- Release 2.0.1
 - Release 2.0.0
 - Added feature rlp to eip7928 ([#3865](https://github.com/alloy-rs/alloy/issues/3865))
 - Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
 - Release 1.8.2
+
+### Performance
+
+- [eips] Compute EIP-7594 cells only for matches ([#3937](https://github.com/alloy-rs/alloy/issues/3937))
 
 ## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
 
