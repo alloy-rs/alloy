@@ -245,8 +245,28 @@ where
 
                 match res {
                     Ok(res) => {
-                        if let Some(e) = res.as_error() {
-                            err = TransportError::ErrorResp(e.clone())
+                        // Pick the trigger error that drives the retry decision below.
+                        //  - Single: the response *is* the envelope, so collapse any error.
+                        //  - Batch: a batch is one HTTP request, so the only knob this layer has is
+                        //    "retry the whole batch or not" — retrying just one sub-call would mean
+                        //    splitting the batch, which lives a layer up. Trigger a retry iff at
+                        //    least one sub-call error is one the policy would actually retry on
+                        //    (otherwise a revert mixed in would loop until max-retries). If nothing
+                        //    is worth retrying, pass the batch through so each sub-call's result
+                        //    reaches its own Waiter.
+                        let trigger = match &res {
+                            ResponsePacket::Single(s) => s.payload.as_error().cloned(),
+                            ResponsePacket::Batch(items) => items
+                                .iter()
+                                .filter_map(|r| r.payload.as_error())
+                                .find(|e| {
+                                    this.policy
+                                        .should_retry(&TransportError::ErrorResp((*e).clone()))
+                                })
+                                .cloned(),
+                        };
+                        if let Some(e) = trigger {
+                            err = TransportError::ErrorResp(e);
                         } else {
                             this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                             return Ok(res);
@@ -328,6 +348,12 @@ fn compute_unit_offset_in_secs(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_json_rpc::{ErrorPayload, Id, Request, Response, ResponsePayload};
+    use serde_json::value::RawValue;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering as AtomicOrdering},
+        Arc, Mutex,
+    };
 
     #[test]
     fn test_compute_units_per_second() {
@@ -335,5 +361,284 @@ mod tests {
         assert_eq!(offset, 0);
         let offset = compute_unit_offset_in_secs(17, 10, 2, 2);
         assert_eq!(offset, 2);
+    }
+
+    /// Tower mock that returns a queued [`ResponsePacket`] on each call and
+    /// counts invocations. Lets the tests assert *exactly how many times*
+    /// the retry layer hit the inner service.
+    #[derive(Clone)]
+    struct MockService {
+        responses: Arc<Mutex<Vec<Result<ResponsePacket, TransportError>>>>,
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl MockService {
+        fn new(responses: Vec<Result<ResponsePacket, TransportError>>) -> Self {
+            Self {
+                responses: Arc::new(Mutex::new(responses)),
+                calls: Arc::new(AtomicUsize::new(0)),
+            }
+        }
+    }
+
+    impl Service<RequestPacket> for MockService {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _request: RequestPacket) -> Self::Future {
+            self.calls.fetch_add(1, AtomicOrdering::SeqCst);
+            // Pop the next canned response. Panicking on an unexpected extra
+            // call is the point: any retry the layer performs trips the test.
+            let next = self.responses.lock().unwrap().remove(0);
+            Box::pin(async move { next })
+        }
+    }
+
+    fn ok_response(id: u64, json_value: &str) -> Response {
+        Response {
+            id: Id::Number(id),
+            payload: ResponsePayload::Success(
+                RawValue::from_string(json_value.to_owned()).unwrap(),
+            ),
+        }
+    }
+
+    fn err_response(id: u64, code: i64, message: &'static str) -> Response {
+        Response {
+            id: Id::Number(id),
+            payload: ResponsePayload::Failure(ErrorPayload {
+                code,
+                message: message.into(),
+                data: None,
+            }),
+        }
+    }
+
+    fn dummy_request() -> RequestPacket {
+        RequestPacket::Single(Request::new("eth_call", Id::Number(1), ()).serialize().unwrap())
+    }
+
+    /// What we want the layer to deliver to the caller for a given mocked exchange.
+    #[derive(Debug)]
+    enum Expected {
+        BatchPassThrough { successes: usize, errors: usize },
+        SingleSuccess,
+        ErrorResp(i64),
+        MaxRetriesExceeded,
+    }
+
+    struct Case {
+        name: &'static str,
+        /// Responses the mock returns in FIFO order, one per `call`. The case
+        /// asserts the layer consumed exactly `expected_calls` of them.
+        responses: Vec<Result<ResponsePacket, TransportError>>,
+        expected_calls: usize,
+        expected: Expected,
+    }
+
+    impl Case {
+        async fn run(self) -> Result<(), String> {
+            let Self { responses, expected_calls, expected, .. } = self;
+            let mock = MockService::new(responses);
+            let calls = mock.calls.clone();
+            // 2 retries, 1ms backoff, huge CU/s so the queue offset is 0.
+            let mut svc = RetryBackoffLayer::new(2, 1, 1_000_000).layer(mock);
+            let res = svc.call(dummy_request()).await;
+
+            let actual_calls = calls.load(AtomicOrdering::SeqCst);
+            if actual_calls != expected_calls {
+                return Err(format!("calls: want {expected_calls}, got {actual_calls}"));
+            }
+            match (&expected, &res) {
+                (Expected::BatchPassThrough { successes, errors }, Ok(packet)) => {
+                    let batch = packet.as_batch().ok_or("want Batch, got Single")?;
+                    let ok = batch.iter().filter(|r| r.is_success()).count();
+                    let er = batch.iter().filter(|r| r.is_error()).count();
+                    (ok == *successes && er == *errors).then_some(()).ok_or_else(|| {
+                        format!("want {successes}ok/{errors}err, got {ok}ok/{er}err")
+                    })
+                }
+                (Expected::SingleSuccess, Ok(packet)) => packet
+                    .as_single()
+                    .filter(|s| s.is_success())
+                    .map(|_| ())
+                    .ok_or_else(|| "want Single success".into()),
+                (Expected::ErrorResp(want), Err(TransportError::ErrorResp(e))) => (e.code == *want)
+                    .then_some(())
+                    .ok_or_else(|| format!("want ErrorResp({want}), got ({})", e.code)),
+                (Expected::MaxRetriesExceeded, Err(e)) => e
+                    .to_string()
+                    .contains("Max retries exceeded")
+                    .then_some(())
+                    .ok_or_else(|| format!("want 'Max retries exceeded', got: {e}")),
+                (want, got) => Err(format!("shape: want {want:?}, got {got:?}")),
+            }
+        }
+    }
+
+    fn batch(responses: Vec<Response>) -> ResponsePacket {
+        ResponsePacket::Batch(responses)
+    }
+    fn single(response: Response) -> ResponsePacket {
+        ResponsePacket::Single(response)
+    }
+
+    /// Table test pinning down how `RetryBackoffLayer` handles every
+    /// response shape we care about: single vs batch, crossed with
+    /// all-ok / some-err / all-err and revert vs rate-limit error
+    /// classes. Each row is a contract; the panic on failure lists
+    /// every broken row so a regression names everything it touched.
+    #[tokio::test]
+    async fn retry_layer_response_handling() {
+        let cases = vec![
+            // ---- Single response: behavior is unchanged from upstream. ----
+            Case {
+                name: "single_success",
+                responses: vec![Ok(single(ok_response(1, "\"0xdeadbeef\"")))],
+                expected_calls: 1,
+                expected: Expected::SingleSuccess,
+            },
+            Case {
+                name: "single_revert_non_retryable",
+                responses: vec![Ok(single(err_response(1, 3, "execution reverted")))],
+                expected_calls: 1,
+                expected: Expected::ErrorResp(3),
+            },
+            Case {
+                name: "single_rate_limit_exhausts_retries",
+                responses: vec![
+                    Ok(single(err_response(1, 429, "rate limited"))),
+                    Ok(single(err_response(1, 429, "rate limited"))),
+                    Ok(single(err_response(1, 429, "rate limited"))),
+                ],
+                expected_calls: 3,
+                expected: Expected::MaxRetriesExceeded,
+            },
+            // ---- Batch response: the new behavior under Option A. ----
+            Case {
+                name: "batch_all_success",
+                responses: vec![Ok(batch(vec![
+                    ok_response(1, "\"0x1\""),
+                    ok_response(2, "\"0x2\""),
+                ]))],
+                expected_calls: 1,
+                expected: Expected::BatchPassThrough { successes: 2, errors: 0 },
+            },
+            Case {
+                name: "batch_one_revert_rest_success",
+                responses: vec![Ok(batch(vec![
+                    ok_response(1, "\"0x1\""),
+                    err_response(2, 3, "execution reverted"),
+                    ok_response(3, "\"0x3\""),
+                ]))],
+                expected_calls: 1,
+                expected: Expected::BatchPassThrough { successes: 2, errors: 1 },
+            },
+            Case {
+                name: "batch_some_revert_rest_success",
+                responses: vec![Ok(batch(vec![
+                    err_response(1, 3, "execution reverted"),
+                    ok_response(2, "\"0x2\""),
+                    err_response(3, 3, "execution reverted"),
+                ]))],
+                expected_calls: 1,
+                expected: Expected::BatchPassThrough { successes: 1, errors: 2 },
+            },
+            Case {
+                name: "batch_all_revert",
+                responses: vec![Ok(batch(vec![
+                    err_response(1, 3, "execution reverted"),
+                    err_response(2, 3, "execution reverted"),
+                ]))],
+                expected_calls: 1,
+                expected: Expected::BatchPassThrough { successes: 0, errors: 2 },
+            },
+            // ---- Hybrid behavior: any sub-call error the policy would
+            // ---- retry on (rate-limit codes) triggers a retry of the
+            // ---- whole batch — the only retry granularity available
+            // ---- at this layer (a batch is one HTTP request).
+            Case {
+                name: "batch_all_rate_limit_retries_whole_batch",
+                responses: vec![
+                    Ok(batch(vec![
+                        err_response(1, 429, "rate limited"),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                    Ok(batch(vec![
+                        err_response(1, 429, "rate limited"),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                    Ok(batch(vec![
+                        err_response(1, 429, "rate limited"),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                ],
+                expected_calls: 3,
+                expected: Expected::MaxRetriesExceeded,
+            },
+            Case {
+                name: "batch_mixed_rate_limit_and_success_retries_whole_batch",
+                responses: vec![
+                    Ok(batch(vec![
+                        ok_response(1, "\"0x1\""),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                    Ok(batch(vec![
+                        ok_response(1, "\"0x1\""),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                    Ok(batch(vec![
+                        ok_response(1, "\"0x1\""),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                ],
+                expected_calls: 3,
+                expected: Expected::MaxRetriesExceeded,
+            },
+            // Sibling: a non-retryable sub-call error (revert) mixed
+            // with a retryable one (rate-limit). The rate-limit makes
+            // the whole batch worth retrying; the revert hitches a ride
+            // and gets re-executed, but that's the necessary cost of
+            // batch-level retry granularity at this layer.
+            Case {
+                name: "batch_revert_plus_rate_limit_retries_whole_batch",
+                responses: vec![
+                    Ok(batch(vec![
+                        err_response(1, 3, "execution reverted"),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                    Ok(batch(vec![
+                        err_response(1, 3, "execution reverted"),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                    Ok(batch(vec![
+                        err_response(1, 3, "execution reverted"),
+                        err_response(2, 429, "rate limited"),
+                    ])),
+                ],
+                expected_calls: 3,
+                expected: Expected::MaxRetriesExceeded,
+            },
+        ];
+
+        let mut failures = Vec::new();
+        for case in cases {
+            let name = case.name;
+            if let Err(why) = case.run().await {
+                failures.push(format!("{name}: {why}"));
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{}/{} cases failed:\n  - {}",
+            failures.len(),
+            10,
+            failures.join("\n  - ")
+        );
     }
 }
