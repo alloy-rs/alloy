@@ -12,7 +12,13 @@ use mpp::{
     client::PaymentProvider, protocol::core::Base64UrlJson, MppError, PaymentChallenge,
     PaymentCredential, PaymentPayload, Receipt,
 };
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::Notify,
@@ -820,4 +826,121 @@ async fn server_error_frame_surfaces_event_and_closes() {
         MppEvent::Error(s) => assert_eq!(s, "bad request"),
         other => panic!("unexpected event: {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn unsupported_challenge_skips_pay_and_closes_fatal() {
+    #[derive(Clone, Default)]
+    struct UnsupportedProvider(Arc<AtomicUsize>);
+    impl PaymentProvider for UnsupportedProvider {
+        fn supports(&self, _: &str, _: &str) -> bool {
+            false
+        }
+        async fn pay(&self, _: &PaymentChallenge) -> Result<PaymentCredential, MppError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(MppError::bad_request("should not be called"))
+        }
+    }
+
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            send_text(&mut ws, challenge_frame()).await;
+            // Server must not receive a credential frame.
+            let next = timeout(Duration::from_millis(200), ws.next()).await;
+            assert!(next.is_err() || matches!(next, Ok(None) | Ok(Some(Err(_)))));
+        })
+    })
+    .await;
+
+    let pay_calls = Arc::new(AtomicUsize::new(0));
+    let connect = MppWsConnect::new(url, UnsupportedProvider(pay_calls.clone()));
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+
+    let mut saw_unsupported = false;
+    while let Ok(Ok(ev)) = timeout(TIMEOUT, handle.events.recv()).await {
+        if let MppEvent::Error(s) = ev {
+            assert!(s.contains("does not support"), "unexpected error: {s}");
+            saw_unsupported = true;
+            break;
+        }
+    }
+    assert!(saw_unsupported, "expected unsupported-method error event");
+    assert_eq!(pay_calls.load(Ordering::SeqCst), 0, "pay() must not be invoked");
+}
+
+#[tokio::test]
+async fn handshake_timeout_surfaces_error_when_server_silent() {
+    let url = spawn_server(|mut ws| {
+        Box::pin(async move {
+            // Hold the connection open without sending any frame.
+            let _ = timeout(Duration::from_secs(2), ws.next()).await;
+        })
+    })
+    .await;
+
+    let connect =
+        MppWsConnect::new(url, StubProvider).with_handshake_timeout(Duration::from_millis(200));
+    let mut handle = connect.mpp_handle();
+    let _conn = connect.connect().await.unwrap();
+
+    let mut saw_timeout = false;
+    while let Ok(Ok(ev)) = timeout(TIMEOUT, handle.events.recv()).await {
+        if let MppEvent::Error(s) = ev {
+            assert!(s.contains("timed out"), "unexpected error message: {s}");
+            saw_timeout = true;
+            break;
+        }
+    }
+    assert!(saw_timeout, "expected handshake timeout error event");
+}
+
+#[tokio::test]
+async fn fatal_provider_error_does_not_re_invoke_pay() {
+    // The server issues a challenge on every accept; any reconnect would
+    // surface as another accept and another `pay()` call.
+    #[derive(Clone, Default)]
+    struct CountingFailingProvider(Arc<AtomicUsize>);
+    impl PaymentProvider for CountingFailingProvider {
+        fn supports(&self, _: &str, _: &str) -> bool {
+            true
+        }
+        async fn pay(&self, _: &PaymentChallenge) -> Result<PaymentCredential, MppError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(MppError::bad_request("insufficient funds"))
+        }
+    }
+
+    let accepts = Arc::new(AtomicUsize::new(0));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let accepts_srv = accepts.clone();
+    tokio::spawn(async move {
+        loop {
+            let (stream, _) = match listener.accept().await {
+                Ok(p) => p,
+                Err(_) => return,
+            };
+            accepts_srv.fetch_add(1, Ordering::SeqCst);
+            tokio::spawn(async move {
+                if let Ok(mut ws) = tokio_tungstenite::accept_async(stream).await {
+                    send_text(&mut ws, challenge_frame()).await;
+                    let _ = timeout(Duration::from_millis(200), ws.next()).await;
+                }
+            });
+        }
+    });
+    let url = format!("ws://127.0.0.1:{port}");
+
+    let pay_calls = Arc::new(AtomicUsize::new(0));
+    let connect = MppWsConnect::new(url, CountingFailingProvider(pay_calls.clone()))
+        .with_max_retries(5)
+        .with_retry_interval(Duration::from_millis(10));
+    let _frontend = connect.into_service().await.unwrap();
+
+    // Long enough that several reconnects would happen if classification were wrong.
+    sleep(Duration::from_millis(800)).await;
+
+    assert_eq!(accepts.load(Ordering::SeqCst), 1, "fatal error must not trigger reconnects");
+    assert_eq!(pay_calls.load(Ordering::SeqCst), 1, "pay() must not be re-invoked");
 }

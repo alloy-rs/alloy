@@ -22,7 +22,15 @@ use mpp::{
     format_authorization, MppError, PaymentChallenge, PaymentCredential, Receipt,
 };
 use serde_json::value::RawValue;
-use std::{future::Future, time::Duration};
+use std::{
+    fmt,
+    future::Future,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::{
     net::TcpStream,
     sync::{
@@ -41,6 +49,7 @@ use url::Url;
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 const DEFAULT_KEEPALIVE_SECS: u64 = 10;
+const DEFAULT_HANDSHAKE_TIMEOUT_SECS: u64 = 30;
 const DEFAULT_EVENTS_CAPACITY: usize = 64;
 
 /// Server-issued request for a fresh session voucher.
@@ -122,6 +131,17 @@ pub struct MppHandle {
     pub events: BroadcastReceiver<MppEvent>,
 }
 
+/// Reason a translator session ended; controls whether the pubsub layer
+/// reconnects.
+#[derive(Clone, Copy, Debug)]
+enum TerminationReason {
+    /// Socket-level failure. Reconnect using the configured retry policy.
+    Transient,
+    /// Deterministic MPP failure (provider error, server `error` frame,
+    /// malformed/unexpected frame). Do not reconnect.
+    Fatal,
+}
+
 /// Connection details for an MPP-over-WebSocket transport.
 ///
 /// `MppWsConnect` is a drop-in [`PubSubConnect`] that speaks the
@@ -132,7 +152,10 @@ pub struct MppHandle {
 ///
 /// On reconnect, [`PaymentProvider::pay`] is called again with the server's
 /// new challenge — providers should handle repeated calls cheaply.
-#[derive(Clone, Debug)]
+///
+/// Only socket-level failures are retried; deterministic MPP failures are
+/// terminal and short-circuit further reconnect attempts.
+#[derive(Clone)]
 pub struct MppWsConnect<P, V = NoVoucher> {
     url: String,
     auth: Option<Authorization>,
@@ -140,10 +163,41 @@ pub struct MppWsConnect<P, V = NoVoucher> {
     max_retries: u32,
     retry_interval: Duration,
     keepalive_interval: Duration,
+    handshake_timeout: Duration,
     payment_provider: P,
     voucher_provider: V,
     receipt_tx: watch::Sender<Option<Receipt>>,
     events_tx: broadcast::Sender<MppEvent>,
+    /// Latched on fatal MPP failure; short-circuits future `connect()` calls.
+    fatal: Arc<AtomicBool>,
+}
+
+// Manual Debug impl: redact secrets in `url` and `auth`; omit providers
+// and internal channels.
+impl<P, V> fmt::Debug for MppWsConnect<P, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MppWsConnect")
+            .field("url", &redact_url_userinfo(&self.url))
+            .field("auth", &self.auth.as_ref().map(|_| "<redacted>"))
+            .field("max_retries", &self.max_retries)
+            .field("retry_interval", &self.retry_interval)
+            .field("keepalive_interval", &self.keepalive_interval)
+            .field("handshake_timeout", &self.handshake_timeout)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Strip `user:pass@` from a URL string for safe logging.
+fn redact_url_userinfo(raw: &str) -> String {
+    match Url::parse(raw) {
+        Ok(mut u) if !u.username().is_empty() || u.password().is_some() => {
+            let _ = u.set_username("");
+            let _ = u.set_password(None);
+            u.to_string()
+        }
+        Ok(_) => raw.to_string(),
+        Err(_) => "<unparseable>".to_string(),
+    }
 }
 
 impl<P> MppWsConnect<P, NoVoucher> {
@@ -164,10 +218,12 @@ impl<P> MppWsConnect<P, NoVoucher> {
             max_retries: 10,
             retry_interval: Duration::from_secs(3),
             keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE_SECS),
+            handshake_timeout: Duration::from_secs(DEFAULT_HANDSHAKE_TIMEOUT_SECS),
             payment_provider,
             voucher_provider: NoVoucher,
             receipt_tx,
             events_tx,
+            fatal: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -203,6 +259,17 @@ impl<P, V> MppWsConnect<P, V> {
         self
     }
 
+    /// Sets the per-phase handshake timeout.
+    ///
+    /// Bounds the time spent waiting for the server's `challenge` /
+    /// `needVoucher` and for the local `pay()` / `next_voucher()` to complete.
+    /// On expiry the connection is closed with a fatal error and not
+    /// reconnected.
+    pub const fn with_handshake_timeout(mut self, handshake_timeout: Duration) -> Self {
+        self.handshake_timeout = handshake_timeout;
+        self
+    }
+
     /// Plug in a [`VoucherProvider`] for streaming/session intents.
     pub fn with_voucher_provider<V2: VoucherProvider>(
         self,
@@ -215,10 +282,12 @@ impl<P, V> MppWsConnect<P, V> {
             max_retries: self.max_retries,
             retry_interval: self.retry_interval,
             keepalive_interval: self.keepalive_interval,
+            handshake_timeout: self.handshake_timeout,
             payment_provider: self.payment_provider,
             voucher_provider,
             receipt_tx: self.receipt_tx,
             events_tx: self.events_tx,
+            fatal: self.fatal,
         }
     }
 
@@ -258,6 +327,13 @@ where
     }
 
     async fn connect(&self) -> TransportResult<ConnectionHandle> {
+        // Refuse to reconnect after a fatal MPP failure.
+        if self.fatal.load(Ordering::Acquire) {
+            return Err(TransportErrorKind::custom_str(
+                "MPP connection terminated by a fatal error; not reconnecting",
+            ));
+        }
+
         #[cfg(any(feature = "aws-lc-rs", feature = "ring"))]
         install_default_crypto_provider();
 
@@ -274,8 +350,10 @@ where
             self.payment_provider.clone(),
             self.voucher_provider.clone(),
             self.keepalive_interval,
+            self.handshake_timeout,
             self.receipt_tx.clone(),
             self.events_tx.clone(),
+            self.fatal.clone(),
         )
         .spawn_task();
 
@@ -284,25 +362,33 @@ where
 }
 
 /// Bridge between alloy's JSON-RPC channels and MPP frames.
+#[allow(clippy::too_many_arguments)]
 async fn run_translator<P, V>(
     mut socket: WsStream,
     mut interface: ConnectionInterface,
     payment_provider: P,
     voucher_provider: V,
     keepalive_interval: Duration,
+    handshake_timeout: Duration,
     receipt_tx: watch::Sender<Option<Receipt>>,
     events_tx: broadcast::Sender<MppEvent>,
+    fatal: Arc<AtomicBool>,
 ) where
     P: PaymentProvider + 'static,
     V: VoucherProvider,
 {
-    let mut errored = false;
+    let mut termination: Option<TerminationReason> = None;
     let mut expecting_pong = false;
     // `false` until the first credential has been sent; gates outbound JSON-RPC
     // so application traffic never races the initial challenge.
     let mut handshake_complete = false;
     let keepalive = sleep(keepalive_interval);
     tokio::pin!(keepalive);
+
+    // Bounds time spent waiting for a challenge or a pay()/next_voucher()
+    // task to complete.
+    let handshake_deadline = sleep(handshake_timeout);
+    tokio::pin!(handshake_deadline);
 
     // Off-loop tasks: spawning `pay`/`next_voucher` keeps the keepalive arm
     // responsive while signing/broadcasting takes place.
@@ -325,7 +411,7 @@ async fn run_translator<P, V>(
                         keepalive.as_mut().reset(Instant::now() + keepalive_interval);
                         if let Err(err) = send_jsonrpc(&mut socket, rpc).await {
                             error!(%err, "WS connection error");
-                            errored = true;
+                            termination = Some(TerminationReason::Transient);
                             break;
                         }
                     }
@@ -339,20 +425,25 @@ async fn run_translator<P, V>(
                 match res {
                     Ok(Ok(cred)) => {
                         if let Err(()) = send_credential(&mut socket, &cred, &events_tx, false).await {
-                            errored = true;
+                            termination = Some(TerminationReason::Transient);
                             break;
                         }
                         handshake_complete = true;
                     }
                     Ok(Err(err)) => {
                         error!(?err, "MPP payment provider failed");
-                        let _ = events_tx.send(MppEvent::Error(err.to_string()));
-                        errored = true;
+                        let _ = events_tx.send(MppEvent::Error(format!(
+                            "{err}; not reconnecting"
+                        )));
+                        termination = Some(TerminationReason::Fatal);
                         break;
                     }
                     Err(join_err) => {
                         error!(%join_err, "MPP payment task panicked");
-                        errored = true;
+                        let _ = events_tx.send(MppEvent::Error(format!(
+                            "payment task panicked: {join_err}; not reconnecting"
+                        )));
+                        termination = Some(TerminationReason::Fatal);
                         break;
                     }
                 }
@@ -364,20 +455,25 @@ async fn run_translator<P, V>(
                 match res {
                     Ok(Ok(cred)) => {
                         if let Err(()) = send_credential(&mut socket, &cred, &events_tx, true).await {
-                            errored = true;
+                            termination = Some(TerminationReason::Transient);
                             break;
                         }
                         handshake_complete = true;
                     }
                     Ok(Err(err)) => {
                         error!(?err, "MPP voucher provider failed");
-                        let _ = events_tx.send(MppEvent::Error(err.to_string()));
-                        errored = true;
+                        let _ = events_tx.send(MppEvent::Error(format!(
+                            "{err}; not reconnecting"
+                        )));
+                        termination = Some(TerminationReason::Fatal);
                         break;
                     }
                     Err(join_err) => {
                         error!(%join_err, "MPP voucher task panicked");
-                        errored = true;
+                        let _ = events_tx.send(MppEvent::Error(format!(
+                            "voucher task panicked: {join_err}; not reconnecting"
+                        )));
+                        termination = Some(TerminationReason::Fatal);
                         break;
                     }
                 }
@@ -387,26 +483,38 @@ async fn run_translator<P, V>(
             _ = &mut keepalive => {
                 if expecting_pong {
                     error!("WS server missed a pong");
-                    errored = true;
+                    termination = Some(TerminationReason::Transient);
                     break;
                 }
                 keepalive.as_mut().reset(Instant::now() + keepalive_interval);
                 if let Err(err) = socket.send(Message::Ping(Default::default())).await {
                     error!(%err, "WS connection error");
-                    errored = true;
+                    termination = Some(TerminationReason::Transient);
                     break;
                 }
                 expecting_pong = true;
             }
 
-            // 5. Inbound from socket → MPP frame.
+            // 5. Handshake / payment timeout. Only armed while not `frontend_open`.
+            _ = &mut handshake_deadline, if !frontend_open => {
+                error!("MPP handshake timed out");
+                let _ = events_tx.send(MppEvent::Error(
+                    "MPP handshake timed out; not reconnecting".to_string(),
+                ));
+                termination = Some(TerminationReason::Fatal);
+                break;
+            }
+
+            // 6. Inbound from socket → MPP frame.
             resp = socket.next() => {
+                let pay_was_pending = pending_pay.is_some();
+                let voucher_was_pending = pending_voucher.is_some();
                 match resp {
                     Some(Ok(item)) => {
                         if item.is_pong() {
                             expecting_pong = false;
                         }
-                        let r = handle_message(
+                        match handle_message(
                             item,
                             &interface,
                             &payment_provider,
@@ -415,20 +523,33 @@ async fn run_translator<P, V>(
                             &events_tx,
                             &mut pending_pay,
                             &mut pending_voucher,
-                        ).await;
-                        if r.is_err() {
-                            errored = true;
-                            break;
+                        ).await {
+                            Ok(()) => {
+                                // Reset the handshake deadline when a new
+                                // pay()/next_voucher() task is spawned.
+                                let entered_pay = !pay_was_pending && pending_pay.is_some();
+                                let entered_voucher =
+                                    !voucher_was_pending && pending_voucher.is_some();
+                                if entered_pay || entered_voucher {
+                                    handshake_deadline
+                                        .as_mut()
+                                        .reset(Instant::now() + handshake_timeout);
+                                }
+                            }
+                            Err(reason) => {
+                                termination = Some(reason);
+                                break;
+                            }
                         }
                     }
                     Some(Err(err)) => {
                         error!(%err, "WS connection error");
-                        errored = true;
+                        termination = Some(TerminationReason::Transient);
                         break;
                     }
                     None => {
                         error!("WS server has gone away");
-                        errored = true;
+                        termination = Some(TerminationReason::Transient);
                         break;
                     }
                 }
@@ -444,8 +565,14 @@ async fn run_translator<P, V>(
         h.abort();
     }
 
-    if errored {
-        interface.close_with_error();
+    match termination {
+        Some(TerminationReason::Transient) => interface.close_with_error(),
+        Some(TerminationReason::Fatal) => {
+            // Latch so subsequent `connect()` calls short-circuit.
+            fatal.store(true, Ordering::Release);
+            interface.close_with_error();
+        }
+        None => {}
     }
 }
 
@@ -497,7 +624,7 @@ async fn handle_message<P: PaymentProvider + 'static, V: VoucherProvider>(
     events_tx: &broadcast::Sender<MppEvent>,
     pending_pay: &mut Option<JoinHandle<Result<PaymentCredential, MppError>>>,
     pending_voucher: &mut Option<JoinHandle<Result<PaymentCredential, MppError>>>,
-) -> Result<(), ()> {
+) -> Result<(), TerminationReason> {
     match msg {
         Message::Text(text) => {
             handle_text(
@@ -514,11 +641,11 @@ async fn handle_message<P: PaymentProvider + 'static, V: VoucherProvider>(
         }
         Message::Close(frame) => {
             error!(?frame, "Received WS close frame");
-            Err(())
+            Err(TerminationReason::Transient)
         }
         Message::Binary(_) => {
             error!("Received binary WS frame; expected text");
-            Err(())
+            Err(TerminationReason::Fatal)
         }
         Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => Ok(()),
     }
@@ -534,12 +661,14 @@ async fn handle_text<P: PaymentProvider + 'static, V: VoucherProvider>(
     events_tx: &broadcast::Sender<MppEvent>,
     pending_pay: &mut Option<JoinHandle<Result<PaymentCredential, MppError>>>,
     pending_voucher: &mut Option<JoinHandle<Result<PaymentCredential, MppError>>>,
-) -> Result<(), ()> {
+) -> Result<(), TerminationReason> {
     let server_msg: WsServerMessage = match serde_json::from_str(text) {
         Ok(m) => m,
         Err(err) => {
             error!(%err, %text, "failed to deserialize MPP frame");
-            return Err(());
+            let _ = events_tx
+                .send(MppEvent::Error(format!("malformed MPP frame: {err}; not reconnecting")));
+            return Err(TerminationReason::Fatal);
         }
     };
 
@@ -547,7 +676,12 @@ async fn handle_text<P: PaymentProvider + 'static, V: VoucherProvider>(
         WsServerMessage::Challenge { challenge, error } => {
             if pending_pay.is_some() {
                 error!("server issued a second challenge while a payment was in flight; closing");
-                return Err(());
+                let _ = events_tx.send(MppEvent::Error(
+                    "server issued a second challenge while a payment was in flight; not \
+                     reconnecting"
+                        .to_string(),
+                ));
+                return Err(TerminationReason::Fatal);
             }
             if let Some(err) = error {
                 warn!(%err, "MPP challenge carried error message");
@@ -556,11 +690,24 @@ async fn handle_text<P: PaymentProvider + 'static, V: VoucherProvider>(
                 Ok(c) => c,
                 Err(err) => {
                     error!(%err, "failed to deserialize PaymentChallenge");
-                    return Err(());
+                    let _ = events_tx.send(MppEvent::Error(format!(
+                        "malformed PaymentChallenge: {err}; not reconnecting"
+                    )));
+                    return Err(TerminationReason::Fatal);
                 }
             };
             debug!(method = %parsed.method, intent = %parsed.intent, "MPP challenge received");
             let _ = events_tx.send(MppEvent::Challenge(parsed.clone()));
+
+            // Skip `pay()` if the provider doesn't support (method, intent).
+            if !payment_provider.supports(parsed.method.as_str(), parsed.intent.as_str()) {
+                error!(method = %parsed.method, intent = %parsed.intent, "unsupported MPP challenge");
+                let _ = events_tx.send(MppEvent::Error(format!(
+                    "PaymentProvider does not support method={}, intent={}; not reconnecting",
+                    parsed.method, parsed.intent,
+                )));
+                return Err(TerminationReason::Fatal);
+            }
 
             // Spawn `pay()` so the main loop stays responsive (keepalive,
             // socket reads) while the provider signs/broadcasts.
@@ -574,11 +721,15 @@ async fn handle_text<P: PaymentProvider + 'static, V: VoucherProvider>(
                 Ok(i) => i,
                 Err(err) => {
                     error!(%err, %data, "failed to deserialize JSON-RPC payload from MPP data frame");
-                    return Err(());
+                    let _ = events_tx.send(MppEvent::Error(format!(
+                        "malformed MPP Data payload: {err}; not reconnecting"
+                    )));
+                    return Err(TerminationReason::Fatal);
                 }
             };
             interface.send_to_frontend(item).map_err(|err| {
                 error!(item=?err.0, "failed to forward to frontend");
+                TerminationReason::Fatal
             })
         }
         WsServerMessage::NeedVoucher {
@@ -589,7 +740,12 @@ async fn handle_text<P: PaymentProvider + 'static, V: VoucherProvider>(
         } => {
             if pending_voucher.is_some() {
                 error!("server issued a second NeedVoucher while a voucher was in flight; closing");
-                return Err(());
+                let _ = events_tx.send(MppEvent::Error(
+                    "server issued a second NeedVoucher while a voucher was in flight; not \
+                     reconnecting"
+                        .to_string(),
+                ));
+                return Err(TerminationReason::Fatal);
             }
             let req =
                 VoucherRequest { channel_id, required_cumulative, accepted_cumulative, deposit };
@@ -605,7 +761,10 @@ async fn handle_text<P: PaymentProvider + 'static, V: VoucherProvider>(
                 Ok(r) => r,
                 Err(err) => {
                     error!(%err, "failed to deserialize Receipt");
-                    return Err(());
+                    let _ = events_tx.send(MppEvent::Error(format!(
+                        "malformed Receipt: {err}; not reconnecting"
+                    )));
+                    return Err(TerminationReason::Fatal);
                 }
             };
             debug!(?parsed, "MPP receipt received");
@@ -616,7 +775,7 @@ async fn handle_text<P: PaymentProvider + 'static, V: VoucherProvider>(
         WsServerMessage::Error { error } => {
             error!(%error, "MPP error frame");
             let _ = events_tx.send(MppEvent::Error(error));
-            Err(())
+            Err(TerminationReason::Fatal)
         }
     }
 }
@@ -759,6 +918,18 @@ mod tests {
         assert!(h2.receipt.borrow().is_none());
         // Two independent receivers exist; sender count is 1 (the connector's tx).
         assert_eq!(connect.events_tx.receiver_count(), 2);
+    }
+
+    #[test]
+    fn debug_redacts_url_userinfo_and_auth() {
+        let connect = MppWsConnect::new("wss://alice:supersecret@example.com/rpc", DummyProvider)
+            .with_auth(Authorization::bearer("token-xyz"));
+        let s = format!("{connect:?}");
+        assert!(!s.contains("supersecret"), "password leaked: {s}");
+        assert!(!s.contains("alice"), "username leaked: {s}");
+        assert!(!s.contains("token-xyz"), "bearer token leaked: {s}");
+        assert!(s.contains("<redacted>"), "auth not marked redacted: {s}");
+        assert!(s.contains("example.com"), "host should remain: {s}");
     }
 
     #[test]
