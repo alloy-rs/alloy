@@ -1,6 +1,9 @@
 //! Misc types related to the 4844
 
-use crate::eip4844::{Blob, Bytes48};
+use crate::{
+    eip4844::{Blob, Bytes48},
+    eip7594::{Cell, CELLS_PER_EXT_BLOB},
+};
 use alloc::{boxed::Box, vec::Vec};
 
 /// Blob type returned in responses to `engine_getBlobsV1`: <https://github.com/ethereum/execution-apis/pull/559>
@@ -112,10 +115,85 @@ impl ssz::Decode for BlobAndProofV2 {
     }
 }
 
+/// Blob cells type returned in responses to `engine_getBlobsV4`:
+/// <https://github.com/ethereum/execution-apis/pull/774>
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BlobCellsAndProofsV1 {
+    /// The requested blob cells.
+    pub blob_cells: Vec<Option<Cell>>,
+    /// The KZG proofs for the requested blob cells.
+    pub proofs: Vec<Option<Bytes48>>,
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for BlobCellsAndProofsV1 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        <Vec<Option<Cell>> as ssz::Encode>::ssz_fixed_len()
+            + <Vec<Option<Bytes48>> as ssz::Encode>::ssz_fixed_len()
+            + ssz::Encode::ssz_bytes_len(&self.blob_cells)
+            + ssz::Encode::ssz_bytes_len(&self.proofs)
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let offset = <Vec<Option<Cell>> as ssz::Encode>::ssz_fixed_len()
+            + <Vec<Option<Bytes48>> as ssz::Encode>::ssz_fixed_len();
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+        encoder.append(&self.blob_cells);
+        encoder.append(&self.proofs);
+        encoder.finalize();
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for BlobCellsAndProofsV1 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+        builder.register_type::<Vec<Option<Cell>>>()?;
+        builder.register_type::<Vec<Option<Bytes48>>>()?;
+
+        let mut decoder = builder.build()?;
+        let blob_cells: Vec<Option<Cell>> = decoder.decode_next()?;
+        let proofs: Vec<Option<Bytes48>> = decoder.decode_next()?;
+
+        if blob_cells.len() > CELLS_PER_EXT_BLOB {
+            return Err(ssz::DecodeError::BytesInvalid(format!(
+                "Invalid BlobCellsAndProofsV1: expected at most {} blob cells, got {}",
+                CELLS_PER_EXT_BLOB,
+                blob_cells.len()
+            )));
+        }
+
+        if blob_cells.len() != proofs.len() {
+            return Err(ssz::DecodeError::BytesInvalid(format!(
+                "Invalid BlobCellsAndProofsV1: blob_cells length {} does not match proofs length {}",
+                blob_cells.len(),
+                proofs.len()
+            )));
+        }
+
+        if blob_cells.iter().zip(&proofs).any(|(cell, proof)| cell.is_some() != proof.is_some()) {
+            return Err(ssz::DecodeError::BytesInvalid(
+                "Invalid BlobCellsAndProofsV1: blob_cells and proofs must have matching null positions".into(),
+            ));
+        }
+
+        Ok(Self { blob_cells, proofs })
+    }
+}
+
 #[cfg(all(test, feature = "ssz"))]
 mod tests {
     use super::*;
-    use crate::{eip4844::BYTES_PER_BLOB, eip7594::CELLS_PER_EXT_BLOB};
+    use crate::eip4844::BYTES_PER_BLOB;
 
     #[test]
     fn ssz_blob_and_proof_v1_roundtrip() {
@@ -171,5 +249,85 @@ mod tests {
         assert!(
             matches!(err, ssz::DecodeError::BytesInvalid(message) if message.contains("BlobAndProofV2"))
         );
+    }
+
+    #[test]
+    fn ssz_blob_cells_and_proofs_v1_roundtrip() {
+        let blob_cells = vec![
+            Some(Cell::repeat_byte(0x01)),
+            None,
+            Some(Cell::repeat_byte(0x03)),
+            Some(Cell::repeat_byte(0x04)),
+        ];
+        let proofs = vec![
+            Some(Bytes48::repeat_byte(0x11)),
+            None,
+            Some(Bytes48::repeat_byte(0x33)),
+            Some(Bytes48::repeat_byte(0x44)),
+        ];
+        let blob_cells_and_proofs = BlobCellsAndProofsV1 { blob_cells, proofs };
+
+        let encoded = ssz::Encode::as_ssz_bytes(&blob_cells_and_proofs);
+        let decoded = <BlobCellsAndProofsV1 as ssz::Decode>::from_ssz_bytes(&encoded).unwrap();
+        assert_eq!(decoded, blob_cells_and_proofs);
+    }
+
+    #[test]
+    fn ssz_blob_cells_and_proofs_v1_rejects_too_many_cells() {
+        let blob_cells_and_proofs = BlobCellsAndProofsV1 {
+            blob_cells: vec![Some(Cell::ZERO); CELLS_PER_EXT_BLOB + 1],
+            proofs: vec![Some(Bytes48::ZERO); CELLS_PER_EXT_BLOB + 1],
+        };
+        let encoded = ssz::Encode::as_ssz_bytes(&blob_cells_and_proofs);
+
+        let err = <BlobCellsAndProofsV1 as ssz::Decode>::from_ssz_bytes(&encoded).unwrap_err();
+        assert!(
+            matches!(err, ssz::DecodeError::BytesInvalid(message) if message.contains("expected at most"))
+        );
+    }
+
+    #[test]
+    fn ssz_blob_cells_and_proofs_v1_rejects_mismatched_lengths() {
+        let blob_cells_and_proofs = BlobCellsAndProofsV1 {
+            blob_cells: vec![Some(Cell::ZERO)],
+            proofs: vec![Some(Bytes48::ZERO), Some(Bytes48::ZERO)],
+        };
+        let encoded = ssz::Encode::as_ssz_bytes(&blob_cells_and_proofs);
+
+        let err = <BlobCellsAndProofsV1 as ssz::Decode>::from_ssz_bytes(&encoded).unwrap_err();
+        assert!(
+            matches!(err, ssz::DecodeError::BytesInvalid(message) if message.contains("does not match"))
+        );
+    }
+
+    #[test]
+    fn ssz_blob_cells_and_proofs_v1_rejects_mismatched_null_positions() {
+        let blob_cells_and_proofs = BlobCellsAndProofsV1 {
+            blob_cells: vec![Some(Cell::ZERO), None],
+            proofs: vec![None, Some(Bytes48::ZERO)],
+        };
+        let encoded = ssz::Encode::as_ssz_bytes(&blob_cells_and_proofs);
+
+        let err = <BlobCellsAndProofsV1 as ssz::Decode>::from_ssz_bytes(&encoded).unwrap_err();
+        assert!(
+            matches!(err, ssz::DecodeError::BytesInvalid(message) if message.contains("matching null positions"))
+        );
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+
+    #[test]
+    fn blob_cells_and_proofs_v1_uses_spec_field_name() {
+        let blob_cells_and_proofs = BlobCellsAndProofsV1 {
+            blob_cells: vec![Some(Cell::ZERO), None],
+            proofs: vec![Some(Bytes48::ZERO), None],
+        };
+
+        let json = serde_json::to_string(&blob_cells_and_proofs).unwrap();
+        assert!(json.contains("\"blob_cells\""));
+        assert!(!json.contains("\"blobCells\""));
     }
 }
