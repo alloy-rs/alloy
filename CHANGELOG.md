@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.0.2
 - [rpc-types-engine] Mark TestingBuildBlockRequestV1 non_exhaustive ([#3913](https://github.com/alloy-rs/alloy/issues/3913))
 
 ### Performance
