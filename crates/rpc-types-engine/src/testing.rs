@@ -10,7 +10,7 @@ use alloy_primitives::{Bytes, B256};
 pub const TESTING_BUILD_BLOCK_V1: &str = "testing_buildBlockV1";
 
 /// Request payload for `testing_buildBlockV1`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[non_exhaustive]
