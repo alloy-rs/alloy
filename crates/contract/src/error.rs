@@ -1,5 +1,5 @@
 use alloy_dyn_abi::Error as AbiError;
-use alloy_primitives::{Bytes, Selector};
+use alloy_primitives::{Bytes, Selector, B256};
 use alloy_provider::PendingTransactionError;
 use alloy_sol_types::{SolError, SolInterface};
 use alloy_transport::{RpcError, TransportError, TransportErrorKind};
@@ -18,6 +18,18 @@ pub enum Error {
     /// Unknown function selector referenced.
     #[error("unknown function: function with selector {0} does not exist")]
     UnknownSelector(Selector),
+    /// Unknown event referenced.
+    #[error("unknown event: event {0} does not exist")]
+    UnknownEvent(String),
+    /// Unknown event topic (selector) referenced.
+    #[error("unknown event: event with selector {0} does not exist")]
+    UnknownEventSelector(B256),
+    /// Unknown error referenced.
+    #[error("unknown error: error {0} does not exist")]
+    UnknownAbiError(String),
+    /// Unknown error selector referenced.
+    #[error("unknown error: error with selector {0} does not exist")]
+    UnknownAbiErrorSelector(Selector),
     /// Called `deploy` with a transaction that is not a deployment transaction.
     #[error("transaction is not a deployment transaction")]
     NotADeploymentTransaction,
