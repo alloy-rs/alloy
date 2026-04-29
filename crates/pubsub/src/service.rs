@@ -82,10 +82,10 @@ impl<T: PubSubConnect> PubSubService<T> {
 
         old_handle.shutdown();
 
-        // Re-issue pending requests.
-        debug!(count = self.in_flights.len(), "Reissuing pending requests");
-        for (_, in_flight) in self.in_flights.iter() {
-            let msg = in_flight.request.serialized().to_owned();
+        // Re-issue pending requests, dropping any that exceeded their reissue limit.
+        let msgs = self.in_flights.reissue_or_drain();
+        debug!(count = msgs.len(), "Reissuing pending requests");
+        for msg in msgs {
             self.dispatch_request(msg)?;
         }
 
@@ -385,5 +385,57 @@ mod tests {
                 .expect("request should be dispatched after reconnect")
                 .expect("new backend should receive the request");
         assert_eq!(dispatched.get(), expected);
+    }
+
+    /// Mock connector: reconnect always succeeds but the backend immediately closes.
+    #[derive(Clone, Debug, Default)]
+    struct AlwaysReconnectThenDie;
+
+    impl PubSubConnect for AlwaysReconnectThenDie {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            Err(TransportErrorKind::custom_str("connect is not used in this test"))
+        }
+
+        async fn try_reconnect(&self) -> TransportResult<ConnectionHandle> {
+            let (handle, _interface) = ConnectionHandle::new();
+            Ok(handle)
+        }
+    }
+
+    #[tokio::test]
+    async fn poisoned_request_is_drained_after_repeated_reconnects() {
+        let req = Request::new("eth_getLogs", Id::Number(1), ()).serialize().unwrap();
+        let (in_flight, rx) = InFlight::new(req, 16);
+
+        let mut in_flights = RequestManager::default();
+        in_flights.insert(in_flight);
+
+        let (dead_handle, dead_interface) = ConnectionHandle::new();
+        let dead_handle = dead_handle.with_retry_interval(Duration::from_millis(1));
+        drop(dead_interface);
+
+        let connector = AlwaysReconnectThenDie;
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle: dead_handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights,
+        };
+        service.spawn();
+
+        let _tx = tx; // keep channel open
+
+        let result = timeout(Duration::from_secs(2), rx)
+            .await
+            .expect("request should resolve within timeout")
+            .expect("oneshot should receive a value, not be dropped");
+
+        assert!(result.is_err(), "drained request should receive a backend_gone error");
     }
 }
