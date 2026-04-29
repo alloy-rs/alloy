@@ -13,7 +13,6 @@ pub const TESTING_BUILD_BLOCK_V1: &str = "testing_buildBlockV1";
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-#[non_exhaustive]
 pub struct TestingBuildBlockRequestV1 {
     /// Parent block hash of the block to build.
     pub parent_block_hash: B256,
