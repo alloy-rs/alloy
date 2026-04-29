@@ -58,15 +58,15 @@ impl Visitor<'_> for TxpoolInspectSummaryVisitor {
         let (addr, rest) = value
             .split_once(": ")
             .ok_or_else(|| de::Error::custom("invalid format for TxpoolInspectSummary: to"))?;
-        let (value_str, rest) = rest
-            .split_once(" wei + ")
-            .ok_or_else(|| de::Error::custom("invalid format for TxpoolInspectSummary: gasLimit"))?;
+        let (value_str, rest) = rest.split_once(" wei + ").ok_or_else(|| {
+            de::Error::custom("invalid format for TxpoolInspectSummary: gasLimit")
+        })?;
         let (gas_str, rest) = rest
             .split_once(" gas × ")
             .ok_or_else(|| de::Error::custom("invalid format for TxpoolInspectSummary: gas"))?;
-        let (gas_price_str, _) = rest
-            .split_once(" wei")
-            .ok_or_else(|| de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"))?;
+        let (gas_price_str, _) = rest.split_once(" wei").ok_or_else(|| {
+            de::Error::custom("invalid format for TxpoolInspectSummary: gas_price")
+        })?;
         let to = match addr {
             "" | "0x" | "contract creation" => None,
             addr => {
