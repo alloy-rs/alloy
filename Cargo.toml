@@ -64,6 +64,7 @@ alloy-signer-aws = { version = "2.0.1", path = "crates/signer-aws", default-feat
 alloy-signer-gcp = { version = "2.0.1", path = "crates/signer-gcp", default-features = false }
 alloy-signer-ledger = { version = "2.0.1", path = "crates/signer-ledger", default-features = false }
 alloy-signer-local = { version = "2.0.1", path = "crates/signer-local", default-features = false }
+alloy-signer-tempo = { version = "2.0.1", path = "crates/signer-tempo", default-features = false }
 alloy-signer-trezor = { version = "2.0.1", path = "crates/signer-trezor", default-features = false }
 alloy-signer-turnkey = { version = "2.0.1", path = "crates/signer-turnkey", default-features = false }
 alloy-transport = { version = "2.0.1", path = "crates/transport", default-features = false }
