@@ -34,6 +34,7 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
@@ -45,10 +46,14 @@ default = ["std"]
 std = [
 	"alloy-eips/std",
 	"alloy-consensus/std",
-	"alloy-serde?/std",
 	"alloy-primitives/std",
 	"alloy-rlp/std",
-	"serde?/std"
+	# The AnyTx* types require std (OnceLock) and always need serde/alloy-serde
+	"dep:serde",
+	"serde/std",
+	"dep:alloy-serde",
+	"alloy-serde/std",
+	"dep:serde_json",
 ]
 arbitrary = [
 	"std",
