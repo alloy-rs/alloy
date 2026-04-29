@@ -873,6 +873,16 @@ impl BlobTransactionSidecarEip7594 {
         let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
         let cells = settings.compute_cells(blob)?;
 
+        Ok(Some(Self::blob_cells_and_proofs_from_computed_cells(cell_mask, cells.as_ref(), proofs)))
+    }
+
+    /// Returns the requested cells and proofs from precomputed cells.
+    #[cfg(feature = "kzg")]
+    fn blob_cells_and_proofs_from_computed_cells(
+        cell_mask: BlobCellMask,
+        cells: &[c_kzg::Cell],
+        proofs: &[Bytes48],
+    ) -> BlobCellsAndProofsV1 {
         let mut blob_cells = Vec::with_capacity(cell_mask.count());
         let mut selected_proofs = Vec::with_capacity(cell_mask.count());
         for cell_index in cell_mask.selected_indices() {
@@ -880,36 +890,7 @@ impl BlobTransactionSidecarEip7594 {
             selected_proofs.push(Some(proofs[cell_index]));
         }
 
-        Ok(Some(BlobCellsAndProofsV1 { blob_cells, proofs: selected_proofs }))
-    }
-
-    /// Returns the requested cells and proofs from precomputed flattened cells.
-    fn blob_cells_and_proofs_from_cells(
-        &self,
-        blob_index: usize,
-        cell_mask: BlobCellMask,
-        cells: Option<&[Cell]>,
-    ) -> Option<BlobCellsAndProofsV1> {
-        self.blobs.get(blob_index)?;
-
-        let proof_start = blob_index * CELLS_PER_EXT_BLOB;
-        let proofs = self.cell_proofs.get(proof_start..proof_start + CELLS_PER_EXT_BLOB)?;
-
-        if cell_mask.count() == 0 {
-            return Some(BlobCellsAndProofsV1::default());
-        }
-
-        let cell_start = blob_index * CELLS_PER_EXT_BLOB;
-        let cells = cells?.get(cell_start..cell_start + CELLS_PER_EXT_BLOB)?;
-
-        let mut blob_cells = Vec::with_capacity(cell_mask.count());
-        let mut selected_proofs = Vec::with_capacity(cell_mask.count());
-        for cell_index in cell_mask.selected_indices() {
-            blob_cells.push(Some(cells[cell_index]));
-            selected_proofs.push(Some(proofs[cell_index]));
-        }
-
-        Some(BlobCellsAndProofsV1 { blob_cells, proofs: selected_proofs })
+        BlobCellsAndProofsV1 { blob_cells, proofs: selected_proofs }
     }
 
     /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV2`]) pairs
@@ -970,40 +951,48 @@ impl BlobTransactionSidecarEip7594 {
         cell_mask: BlobCellMask,
         settings: &c_kzg::KzgSettings,
     ) -> Result<impl Iterator<Item = (usize, BlobCellsAndProofsV1)> + 'a, c_kzg::Error> {
-        let cells = if cell_mask.count() == 0 {
-            None
-        } else {
-            Some(self.compute_cells_with_settings(settings)?)
-        };
-        let mut blob_index = 0;
-        let mut target_index = 0;
+        let mut matches = Vec::new();
+        let mut cells_and_proofs_by_blob = Vec::<(usize, BlobCellsAndProofsV1)>::new();
 
-        Ok(core::iter::from_fn(move || {
-            while blob_index < self.commitments.len() {
-                let blob_versioned_hash =
-                    crate::eip4844::kzg_to_versioned_hash(self.commitments[blob_index].as_slice());
-
-                while target_index < versioned_hashes.len() {
-                    let matched_index = target_index;
-                    target_index += 1;
-
-                    if blob_versioned_hash == versioned_hashes[matched_index] {
-                        if let Some(cells_and_proofs) = self.blob_cells_and_proofs_from_cells(
-                            blob_index,
-                            cell_mask,
-                            cells.as_deref(),
-                        ) {
-                            return Some((matched_index, cells_and_proofs));
-                        }
-                    }
+        for (blob_index, commitment) in self.commitments.iter().enumerate() {
+            let blob_versioned_hash = crate::eip4844::kzg_to_versioned_hash(commitment.as_slice());
+            for (matched_index, target_hash) in versioned_hashes.iter().enumerate() {
+                if blob_versioned_hash != *target_hash {
+                    continue;
                 }
 
-                blob_index += 1;
-                target_index = 0;
-            }
+                let Some(blob) = self.blobs.get(blob_index) else { continue };
+                let proof_start = blob_index * CELLS_PER_EXT_BLOB;
+                let Some(proofs) =
+                    self.cell_proofs.get(proof_start..proof_start + CELLS_PER_EXT_BLOB)
+                else {
+                    continue;
+                };
 
-            None
-        }))
+                let cells_and_proofs = if cell_mask.count() == 0 {
+                    BlobCellsAndProofsV1::default()
+                } else if let Some((_, cells_and_proofs)) =
+                    cells_and_proofs_by_blob.iter().find(|(index, _)| *index == blob_index)
+                {
+                    cells_and_proofs.clone()
+                } else {
+                    // SAFETY: Blob and c_kzg::Blob have the same memory layout.
+                    let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+                    let cells = settings.compute_cells(blob)?;
+                    let cells_and_proofs = Self::blob_cells_and_proofs_from_computed_cells(
+                        cell_mask,
+                        cells.as_ref(),
+                        proofs,
+                    );
+                    cells_and_proofs_by_blob.push((blob_index, cells_and_proofs.clone()));
+                    cells_and_proofs
+                };
+
+                matches.push((matched_index, cells_and_proofs));
+            }
+        }
+
+        Ok(matches.into_iter())
     }
 
     /// Outputs the RLP length of [BlobTransactionSidecarEip7594] fields without a RLP header.
@@ -1423,5 +1412,35 @@ mod tests {
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(default_matches, vec![(0, cells_and_proofs)]);
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn match_versioned_hashes_cells_only_computes_matched_blobs() {
+        let settings = EnvKzgSettings::Default.get();
+        let mut sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01)],
+            settings,
+        )
+        .unwrap();
+        let versioned_hash = sidecar.versioned_hashes().next().unwrap();
+        let cell_mask = BlobCellMask::from_bits(1);
+
+        let invalid_blob = Blob::repeat_byte(0xff);
+        // SAFETY: Blob and c_kzg::Blob have the same memory layout.
+        let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(&invalid_blob) };
+        assert!(settings.compute_cells(blob).is_err());
+
+        sidecar.blobs.push(invalid_blob);
+        sidecar.commitments.push(Bytes48::ZERO);
+        sidecar.cell_proofs.extend(core::iter::repeat_n(Bytes48::ZERO, CELLS_PER_EXT_BLOB));
+
+        let cells_and_proofs =
+            sidecar.blob_cells_and_proofs_with_settings(0, cell_mask, settings).unwrap().unwrap();
+        let matches = sidecar
+            .match_versioned_hashes_cells_with_settings(&[versioned_hash], cell_mask, settings)
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert_eq!(matches, vec![(0, cells_and_proofs)]);
     }
 }
