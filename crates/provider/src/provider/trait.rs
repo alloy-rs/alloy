@@ -179,7 +179,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// #    my_overrides: StateOverride
     /// # ) -> Result<(), Box<dyn std::error::Error>> {
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
-    /// // Execute a call on the latest block, with no state overrides
+    /// // Execute a call on the pending block, with no state overrides
     /// let output = provider.call(tx).await?;
     /// # Ok(())
     /// # }
@@ -241,11 +241,15 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Create an [EIP-2930] access list.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
+    ///
+    /// This function returns [`RpcWithBlock`] which can be used to execute the
+    /// request or set a [`BlockId`]. If no block ID is provided, the access
+    /// list will be generated on the pending block with the current state.
     fn create_access_list<'a>(
         &self,
         request: &'a N::TransactionRequest,
     ) -> RpcWithBlock<&'a N::TransactionRequest, AccessListResult> {
-        self.client().request("eth_createAccessList", request).into()
+        RpcWithBlock::new_rpc(self.client().request("eth_createAccessList", request)).pending()
     }
 
     /// Create an [`EthCall`] future to estimate the gas required for a
@@ -1690,6 +1694,23 @@ mod tests {
         let provider = builder::<Ethereum>().with_recommended_fillers().connect_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
+    }
+
+    #[test]
+    fn create_access_list_defaults_to_pending_block() {
+        let provider =
+            ProviderBuilder::new().connect_mocked_client(alloy_transport::mock::Asserter::new());
+        let tx = TransactionRequest::default();
+
+        let default_call = std::future::IntoFuture::into_future(provider.create_access_list(&tx));
+        let default_rpc = default_call.as_rpc_call().unwrap();
+        assert_eq!(default_rpc.method(), "eth_createAccessList");
+        assert_eq!(default_rpc.request().params.block_id, BlockId::pending());
+
+        let latest_call =
+            std::future::IntoFuture::into_future(provider.create_access_list(&tx).latest());
+        let latest_rpc = latest_call.as_rpc_call().unwrap();
+        assert_eq!(latest_rpc.request().params.block_id, BlockId::latest());
     }
 
     #[cfg(feature = "hyper")]
