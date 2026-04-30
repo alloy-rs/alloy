@@ -1,0 +1,16 @@
+# One good + one malformed entry. Strict deserialization should fail and
+# the salvage pass should pick up only the good one.
+
+[[keys]]
+wallet_type = "local"
+wallet_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+chain_id = 4217
+key_type = "secp256k1"
+key_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+key = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+
+[[keys]]
+# Missing required `wallet_address`.
+wallet_type = "local"
+chain_id = 4217
+key_type = "secp256k1"
