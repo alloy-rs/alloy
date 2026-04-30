@@ -126,12 +126,25 @@ impl BuiltInConnectionString {
         let _ = &config; // Suppress unused warning for non-WS transports
         match self {
             // reqwest is enabled, hyper is not
-            #[cfg(all(not(feature = "hyper"), feature = "reqwest"))]
+            #[cfg(all(
+                not(feature = "hyper"),
+                feature = "reqwest",
+                not(all(target_os = "wasi", target_env = "p1"))
+            ))]
             Self::Http(url) => {
                 Ok(alloy_transport::Transport::boxed(
                     alloy_transport_http::Http::<reqwest::Client>::new(url.clone()),
                 ))
             }
+
+            #[cfg(all(
+                not(feature = "hyper"),
+                feature = "reqwest",
+                all(target_os = "wasi", target_env = "p1")
+            ))]
+            Self::Http(_) => Err(TransportErrorKind::custom_str(
+                "reqwest HTTP transport is not supported on wasm32-wasip1",
+            )),
 
             // hyper is enabled, reqwest is not
             #[cfg(feature = "hyper")]

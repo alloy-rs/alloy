@@ -60,7 +60,6 @@ futures-utils-wasm.workspace = true
 futures.workspace = true
 lru.workspace = true
 pin-project.workspace = true
-reqwest = { workspace = true, optional = true }
 serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -69,6 +68,9 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 either.workspace = true
 http = { workspace = true, optional = true }
+
+[target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
+reqwest = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true

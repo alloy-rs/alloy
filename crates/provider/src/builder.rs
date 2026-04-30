@@ -559,7 +559,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with an Reqwest HTTP transport.
-    #[cfg(any(test, feature = "reqwest"))]
+    #[cfg(any(test, all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))))]
     pub fn connect_http(self, url: reqwest::Url) -> F::Provider
     where
         L: ProviderLayer<crate::RootProvider<N>, N>,
@@ -571,7 +571,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with a pre-built Reqwest client.
-    #[cfg(any(test, feature = "reqwest"))]
+    #[cfg(any(test, all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))))]
     pub fn connect_reqwest<C>(self, client: C, url: reqwest::Url) -> F::Provider
     where
         L: ProviderLayer<crate::RootProvider<N>, N>,
@@ -584,7 +584,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with a provided Reqwest client builder.
-    #[cfg(any(test, feature = "reqwest"))]
+    #[cfg(any(test, all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))))]
     pub fn with_reqwest<B>(self, url: reqwest::Url, builder: B) -> F::Provider
     where
         L: ProviderLayer<crate::RootProvider<N>, N>,
