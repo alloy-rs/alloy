@@ -459,7 +459,7 @@ mod tests {
     #[tokio::test]
     async fn test_pub_resolver_text() {
         let provider =
-            ProviderBuilder::new().connect_http("http://ethereum.reth.rs/rpc".parse().unwrap());
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let name = "vitalik.eth";
         let node = namehash(name);
@@ -471,7 +471,7 @@ mod tests {
     #[tokio::test]
     async fn test_pub_resolver_fetching_txt() {
         let provider =
-            ProviderBuilder::new().connect_http("http://ethereum.reth.rs/rpc".parse().unwrap());
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let name = "vitalik.eth";
         let res = provider.lookup_txt(name, "avatar").await.unwrap();

@@ -42,7 +42,7 @@ pub fn builder<N: Network>() -> ProviderBuilder<Identity, Identity, N> {
 
 impl<N: Network> RootProvider<N> {
     /// Creates a new HTTP root provider from the given URL.
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http(url: url::Url) -> Self {
         Self::new(RpcClient::new_http(url))
     }
