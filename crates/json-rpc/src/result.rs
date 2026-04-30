@@ -26,11 +26,19 @@ pub fn transform_response<T, E, ErrResp>(response: Response<T, ErrResp>) -> RpcR
 where
     ErrResp: RpcRecv,
 {
-    match response {
-        Response { payload: ResponsePayload::Failure(err_resp), .. } => {
-            Err(RpcError::err_resp(err_resp))
-        }
-        Response { payload: ResponsePayload::Success(result), .. } => Ok(result),
+    transform_response_payload(response.payload)
+}
+
+/// Transform a response payload into an [`RpcResult`].
+pub fn transform_response_payload<T, E, ErrResp>(
+    payload: ResponsePayload<T, ErrResp>,
+) -> RpcResult<T, E, ErrResp>
+where
+    ErrResp: RpcRecv,
+{
+    match payload {
+        ResponsePayload::Failure(err_resp) => Err(RpcError::err_resp(err_resp)),
+        ResponsePayload::Success(result) => Ok(result),
     }
 }
 
