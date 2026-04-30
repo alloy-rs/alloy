@@ -23,6 +23,7 @@ use mpp::{
 };
 use serde_json::value::RawValue;
 use std::{
+    collections::VecDeque,
     fmt,
     future::Future,
     sync::{
@@ -329,7 +330,7 @@ where
     async fn connect(&self) -> TransportResult<ConnectionHandle> {
         // Refuse to reconnect after a fatal MPP failure.
         if self.fatal.load(Ordering::Acquire) {
-            return Err(TransportErrorKind::custom_str(
+            return Err(TransportErrorKind::non_retryable_str(
                 "MPP connection terminated by a fatal error; not reconnecting",
             ));
         }
@@ -394,38 +395,48 @@ async fn run_translator<P, V>(
     // responsive while signing/broadcasting takes place.
     let mut pending_pay: Option<JoinHandle<Result<PaymentCredential, MppError>>> = None;
     let mut pending_voucher: Option<JoinHandle<Result<PaymentCredential, MppError>>> = None;
+    // Outbound RPCs queued while not safe to send (handshake/payment).
+    // Polling `recv_from_frontend` unconditionally lets shutdown be observed
+    // mid-payment.
+    let mut pending_outbound: VecDeque<Box<RawValue>> = VecDeque::new();
 
     loop {
         let payment_in_flight = pending_pay.is_some() || pending_voucher.is_some();
         let frontend_open = handshake_complete && !payment_in_flight;
+        let can_flush = frontend_open && !pending_outbound.is_empty();
 
         tokio::select! {
             biased;
 
-            // 1. Outbound JSON-RPC from the alloy frontend → MPP `message` frame.
-            //    Held while a credential exchange is in flight, so RPC never
-            //    races a challenge.
-            inst = interface.recv_from_frontend(), if frontend_open => {
+            // 1. Flush one buffered RPC when handshake is done and no
+            //    credential exchange is in flight. The ready future keeps
+            //    other arms reachable between sends.
+            _ = std::future::ready(()), if can_flush => {
+                let rpc = pending_outbound.pop_front().expect("guarded by can_flush");
+                keepalive.as_mut().reset(Instant::now() + keepalive_interval);
+                if let Err(err) = send_jsonrpc(&mut socket, rpc).await {
+                    error!(%err, "WS connection error");
+                    termination = Some(TerminationReason::Transient);
+                    break;
+                }
+            }
+
+            // 2. Inbound RPC from frontend → buffer. Always polled so a
+            //    `None` (shutdown / handle dropped) is seen promptly.
+            inst = interface.recv_from_frontend() => {
                 match inst {
-                    Some(rpc) => {
-                        keepalive.as_mut().reset(Instant::now() + keepalive_interval);
-                        if let Err(err) = send_jsonrpc(&mut socket, rpc).await {
-                            error!(%err, "WS connection error");
-                            termination = Some(TerminationReason::Transient);
-                            break;
-                        }
-                    }
+                    Some(rpc) => pending_outbound.push_back(rpc),
                     None => break,
                 }
             }
 
-            // 2. Pay task completion.
+            // 3. Pay task completion.
             res = poll_join(&mut pending_pay), if pending_pay.is_some() => {
                 pending_pay = None;
                 match res {
                     Ok(Ok(cred)) => {
-                        if let Err(()) = send_credential(&mut socket, &cred, &events_tx, false).await {
-                            termination = Some(TerminationReason::Transient);
+                        if let Err(reason) = send_credential(&mut socket, &cred, &events_tx, false).await {
+                            termination = Some(reason);
                             break;
                         }
                         handshake_complete = true;
@@ -449,13 +460,13 @@ async fn run_translator<P, V>(
                 }
             }
 
-            // 3. Voucher task completion.
+            // 4. Voucher task completion.
             res = poll_join(&mut pending_voucher), if pending_voucher.is_some() => {
                 pending_voucher = None;
                 match res {
                     Ok(Ok(cred)) => {
-                        if let Err(()) = send_credential(&mut socket, &cred, &events_tx, true).await {
-                            termination = Some(TerminationReason::Transient);
+                        if let Err(reason) = send_credential(&mut socket, &cred, &events_tx, true).await {
+                            termination = Some(reason);
                             break;
                         }
                         handshake_complete = true;
@@ -479,7 +490,7 @@ async fn run_translator<P, V>(
                 }
             }
 
-            // 4. Keepalive ping.
+            // 5. Keepalive ping.
             _ = &mut keepalive => {
                 if expecting_pong {
                     error!("WS server missed a pong");
@@ -495,7 +506,7 @@ async fn run_translator<P, V>(
                 expecting_pong = true;
             }
 
-            // 5. Handshake / payment timeout. Only armed while not `frontend_open`.
+            // 6. Handshake / payment timeout. Only armed while not `frontend_open`.
             _ = &mut handshake_deadline, if !frontend_open => {
                 error!("MPP handshake timed out");
                 let _ = events_tx.send(MppEvent::Error(
@@ -505,7 +516,7 @@ async fn run_translator<P, V>(
                 break;
             }
 
-            // 6. Inbound from socket → MPP frame.
+            // 7. Inbound from socket → MPP frame.
             resp = socket.next() => {
                 let pay_was_pending = pending_pay.is_some();
                 let voucher_was_pending = pending_voucher.is_some();
@@ -596,18 +607,23 @@ async fn send_credential(
     cred: &PaymentCredential,
     events_tx: &broadcast::Sender<MppEvent>,
     is_voucher: bool,
-) -> Result<(), ()> {
+) -> Result<(), TerminationReason> {
+    // Malformed credentials from the provider are deterministic; don't retry.
     let auth = match format_authorization(cred) {
         Ok(s) => s,
         Err(err) => {
             error!(?err, "failed to format MPP credential");
-            return Err(());
+            let _ = events_tx.send(MppEvent::Error(format!(
+                "failed to format MPP credential: {err}; not reconnecting"
+            )));
+            return Err(TerminationReason::Fatal);
         }
     };
+    // Socket errors are transient: a fresh socket yields a fresh challenge.
     let frame = WsClientMessage::Credential { credential: auth };
     if let Err(err) = socket.send(Message::Text(frame.to_text().into())).await {
         error!(%err, "failed to send MPP credential");
-        return Err(());
+        return Err(TerminationReason::Transient);
     }
     let _ =
         events_tx.send(if is_voucher { MppEvent::VoucherSent } else { MppEvent::CredentialSent });

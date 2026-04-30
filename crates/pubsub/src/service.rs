@@ -4,7 +4,7 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
-use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
+use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -202,6 +202,10 @@ impl<T: PubSubConnect> PubSubService<T> {
             match self.reconnect().await {
                 Ok(()) => break Ok(()),
                 Err(e) => {
+                    if matches!(&e, RpcError::Transport(k) if k.is_non_retryable()) {
+                        error!("Reconnect aborted (non-retryable), shutting down: {e}");
+                        break Err(e);
+                    }
                     retry_count += 1;
                     if retry_count >= max_retries {
                         error!("Reconnect failed after {max_retries} attempts, shutting down: {e}");
@@ -320,6 +324,25 @@ mod tests {
         }
     }
 
+    /// Returns a non-retryable error and counts `try_reconnect` calls.
+    #[derive(Clone, Debug, Default)]
+    struct NonRetryableConnect(Arc<std::sync::atomic::AtomicUsize>);
+
+    impl PubSubConnect for NonRetryableConnect {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            Err(TransportErrorKind::non_retryable_str("non-retryable test failure"))
+        }
+
+        async fn try_reconnect(&self) -> TransportResult<ConnectionHandle> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Err(TransportErrorKind::non_retryable_str("non-retryable test failure"))
+        }
+    }
+
     #[test]
     fn reconnect_retry_interval_uses_capped_exponential_backoff() {
         let base = Duration::from_secs(1);
@@ -385,5 +408,37 @@ mod tests {
                 .expect("request should be dispatched after reconnect")
                 .expect("new backend should receive the request");
         assert_eq!(dispatched.get(), expected);
+    }
+
+    #[tokio::test]
+    async fn non_retryable_reconnect_error_short_circuits_retry_loop() {
+        let (dead_handle, dead_interface) = ConnectionHandle::new();
+        let ConnectionInterface { from_frontend, to_frontend, error, shutdown } = dead_interface;
+        drop(from_frontend);
+        let _keep_dead_backend_alive = (to_frontend, error, shutdown);
+
+        let connector = NonRetryableConnect::default();
+        let counter = connector.0.clone();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle: dead_handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+
+        let req = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let (in_flight, rx) = InFlight::new(req, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
+
+        timeout(Duration::from_secs(1), rx)
+            .await
+            .expect("non-retryable reconnect should resolve promptly")
+            .expect_err("request should fail when backend is gone and reconnect aborts");
+
+        // Exactly one attempt, not `max_retries`.
+        assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }

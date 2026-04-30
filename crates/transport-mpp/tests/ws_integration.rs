@@ -944,3 +944,61 @@ async fn fatal_provider_error_does_not_re_invoke_pay() {
     assert_eq!(accepts.load(Ordering::SeqCst), 1, "fatal error must not trigger reconnects");
     assert_eq!(pay_calls.load(Ordering::SeqCst), 1, "pay() must not be re-invoked");
 }
+
+#[tokio::test]
+async fn shutdown_during_in_flight_payment_breaks_promptly() {
+    // Dropping the handle while pay() is parked must close the socket
+    // without waiting for the keepalive interval or handshake timeout.
+    #[derive(Clone)]
+    struct BlockingProvider(Arc<Notify>);
+    impl PaymentProvider for BlockingProvider {
+        fn supports(&self, _: &str, _: &str) -> bool {
+            true
+        }
+        async fn pay(&self, ch: &PaymentChallenge) -> Result<PaymentCredential, MppError> {
+            self.0.notified().await;
+            Ok(PaymentCredential::new(ch.to_echo(), PaymentPayload::hash("0xnever")))
+        }
+    }
+
+    // Server signals once the client closes the WS.
+    let (client_gone_tx, client_gone_rx) = tokio::sync::oneshot::channel::<()>();
+    let url = spawn_server(move |mut ws| {
+        Box::pin(async move {
+            send_text(&mut ws, challenge_frame()).await;
+            while let Some(msg) = ws.next().await {
+                match msg {
+                    Ok(Message::Close(_)) | Err(_) => break,
+                    _ => {}
+                }
+            }
+            let _ = client_gone_tx.send(());
+        })
+    })
+    .await;
+
+    let release = Arc::new(Notify::new());
+    let connect = MppWsConnect::new(url, BlockingProvider(release.clone()));
+    let mut handle = connect.mpp_handle();
+    let conn = connect.connect().await.unwrap();
+
+    // Wait until pay() has been spawned (and is now parked).
+    let ev = timeout(TIMEOUT, handle.events.recv()).await.unwrap().unwrap();
+    assert!(matches!(ev, MppEvent::Challenge(_)));
+
+    let start = std::time::Instant::now();
+    drop(conn);
+
+    timeout(Duration::from_secs(2), client_gone_rx)
+        .await
+        .expect("translator should drop the WS stream promptly after handle is dropped")
+        .expect("server task should still be alive");
+    let elapsed = start.elapsed();
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "shutdown observed in {elapsed:?}; should be ≪ keepalive interval"
+    );
+
+    // Unpark pay() so the spawned task can finish on abort.
+    release.notify_waiters();
+}

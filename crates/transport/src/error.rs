@@ -39,6 +39,10 @@ pub enum TransportErrorKind {
     /// Custom error.
     #[error("{0}")]
     Custom(#[source] Box<dyn StdError + Send + Sync + 'static>),
+
+    /// Deterministic failure that retry loops should not retry.
+    #[error("{0}")]
+    NonRetryable(#[source] Box<dyn StdError + Send + Sync + 'static>),
 }
 
 impl TransportErrorKind {
@@ -56,6 +60,21 @@ impl TransportErrorKind {
     /// Instantiate a new `TransportError` from a custom error.
     pub fn custom(err: impl StdError + Send + Sync + 'static) -> TransportError {
         RpcError::Transport(Self::Custom(Box::new(err)))
+    }
+
+    /// Instantiate a new non-retryable `TransportError` from a string.
+    pub fn non_retryable_str(err: &str) -> TransportError {
+        RpcError::Transport(Self::NonRetryable(err.into()))
+    }
+
+    /// Instantiate a new non-retryable `TransportError` from a custom error.
+    pub fn non_retryable(err: impl StdError + Send + Sync + 'static) -> TransportError {
+        RpcError::Transport(Self::NonRetryable(Box::new(err)))
+    }
+
+    /// Returns true if this is [`TransportErrorKind::NonRetryable`].
+    pub const fn is_non_retryable(&self) -> bool {
+        matches!(self, Self::NonRetryable(_))
     }
 
     /// Instantiate a new `TransportError` from a missing ID.
