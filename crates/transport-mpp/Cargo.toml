@@ -1,0 +1,55 @@
+[package]
+name = "alloy-transport-mpp"
+description = "Machine Payments Protocol (MPP) transport layer over WebSocket"
+# Cannot be published while the `mpp` dependency is git-pinned
+# (crates.io rejects packages with git/path runtime deps). Flip back to
+# the workspace default once mpp-rs publishes a release with the `ws`
+# feature.
+publish = false
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+alloy-json-rpc.workspace = true
+alloy-pubsub.workspace = true
+alloy-transport.workspace = true
+alloy-transport-ws.workspace = true
+
+futures.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+# non-WASM only
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+http.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "time", "macros"] }
+tokio-tungstenite = { workspace = true }
+rustls = { version = "0.23", default-features = false, optional = true }
+
+mpp = { git = "https://github.com/tempoxyz/mpp-rs", rev = "1bdea74189ccc9502a170e788789891b001abc63", default-features = false, features = ["ws"] }
+
+[features]
+default = ["aws-lc-rs"]
+aws-lc-rs = ["alloy-transport-ws/aws-lc-rs", "dep:rustls", "rustls?/aws-lc-rs"]
+ring = ["alloy-transport-ws/ring", "dep:rustls", "rustls?/ring"]
+native-tls = ["alloy-transport-ws/native-tls"]
+rustls-tls = ["alloy-transport-ws/rustls-tls"]

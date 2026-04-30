@@ -76,10 +76,14 @@ mod tests {
         ]))
         .into();
 
-        assert_eq!(
-            serde_json::to_string(&opts).unwrap(),
+        // Compare as parsed JSON so the test isn't sensitive to the
+        // non-deterministic key order of `HashMap` iteration.
+        let serialized: serde_json::Value = serde_json::to_value(&opts).unwrap();
+        let expected: serde_json::Value = serde_json::from_str(
             r#"{"tracer":"muxTracer","tracerConfig":{"4byteTracer":null,"callTracer":{"onlyTopCall":true,"withLog":true},"prestateTracer":{"diffMode":true},"{ js_tracer_code }":null}}"#,
-        );
+        )
+        .unwrap();
+        assert_eq!(serialized, expected);
     }
 
     #[test]
