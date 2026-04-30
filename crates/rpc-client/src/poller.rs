@@ -105,7 +105,12 @@ where
     }
 
     /// Sets the channel size for the poller task.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `channel_size` is zero.
     pub const fn set_channel_size(&mut self, channel_size: usize) {
+        assert!(channel_size != 0, "channel size must be non-zero");
         self.channel_size = channel_size;
     }
 
@@ -512,4 +517,16 @@ where
 fn _assert_unpin() {
     fn _assert<T: Unpin>() {}
     _assert::<PollChannel<()>>();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "channel size must be non-zero")]
+    fn set_channel_size_rejects_zero() {
+        let mut builder = PollerBuilder::<(), ()>::new(WeakClient::new(), "eth_blockNumber", ());
+        builder.set_channel_size(0);
+    }
 }

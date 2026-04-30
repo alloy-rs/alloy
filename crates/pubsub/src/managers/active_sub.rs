@@ -65,6 +65,7 @@ impl fmt::Debug for ActiveSubscription {
 impl ActiveSubscription {
     /// Create a new active subscription.
     pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
+        assert_ne!(channel_size, 0, "channel size must be non-zero");
         let local_id = request.params_hash();
         let (tx, rx) = broadcast::channel(channel_size);
         Self { request, local_id, tx, rx: Mutex::new(Some(rx)) }
