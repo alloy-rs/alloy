@@ -64,7 +64,7 @@ impl RpcClient {
     }
 
     /// Create a new [`RpcClient`] with an HTTP transport.
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http(url: reqwest::Url) -> Self {
         let http = alloy_transport_http::Http::new(url);
         let is_local = http.guess_local();
@@ -72,7 +72,7 @@ impl RpcClient {
     }
 
     /// Create a new [`RpcClient`] with an HTTP transport using a pre-built [`reqwest::Client`].
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http_with_client(client: reqwest::Client, url: reqwest::Url) -> Self {
         let http = alloy_transport_http::Http::with_client(client, url);
         let is_local = http.guess_local();
