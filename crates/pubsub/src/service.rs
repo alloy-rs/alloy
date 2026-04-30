@@ -115,10 +115,12 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service a request.
     fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
-        let brv = in_flight.request();
+        let brv = in_flight.request.serialized().to_owned();
 
-        self.dispatch_request(brv.serialized().to_owned())?;
+        // Track the request before dispatching. If the backend is already gone,
+        // reconnect logic can still replay this in-flight request.
         self.in_flights.insert(in_flight);
+        self.dispatch_request(brv)?;
 
         Ok(())
     }
@@ -154,6 +156,17 @@ impl<T: PubSubConnect> PubSubService<T> {
                 Ok(())
             }
             PubSubInstruction::Unsubscribe(alias) => self.service_unsubscribe(alias),
+        }
+    }
+
+    /// Service an instruction, reconnecting on backend-gone errors.
+    async fn service_ix_or_reconnect(&mut self, ix: PubSubInstruction) -> TransportResult<()> {
+        match self.service_ix(ix) {
+            Ok(()) => Ok(()),
+            Err(err) if err.as_transport_err().is_some_and(TransportErrorKind::is_backend_gone) => {
+                self.reconnect_with_retries().await
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -247,17 +260,8 @@ impl<T: PubSubConnect> PubSubService<T> {
 
                     req_opt = self.reqs.recv() => {
                         if let Some(req) = req_opt {
-                            if let Err(err) = self.service_ix(req) {
-                                if err
-                                    .as_transport_err()
-                                    .is_some_and(TransportErrorKind::is_backend_gone)
-                                {
-                                    if let Err(e) = self.reconnect_with_retries().await {
-                                        break Err(e)
-                                    }
-                                } else {
-                                    break Err(err)
-                                }
+                            if let Err(e) = self.service_ix_or_reconnect(req).await {
+                                break Err(e)
                             }
                         } else {
                             info!("Pubsub service request channel closed. Shutting down.");
@@ -292,31 +296,71 @@ fn reconnect_retry_interval(base_interval: Duration, retry_count: u32) -> Durati
 mod tests {
     use super::*;
     use crate::ConnectionInterface;
-    use alloy_json_rpc::Request;
+    use alloy_json_rpc::{Id, Request};
+    use alloy_transport::impl_future;
     use std::{
+        collections::VecDeque,
         sync::{Arc, Mutex},
         time::Duration,
     };
     use tokio::time::timeout;
 
     #[derive(Clone, Debug, Default)]
-    struct MockConnect(Arc<Mutex<Option<ConnectionHandle>>>);
+    struct MockReconnectConnect(Arc<Mutex<Option<ConnectionHandle>>>);
 
-    impl PubSubConnect for MockConnect {
+    impl PubSubConnect for MockReconnectConnect {
         fn is_local(&self) -> bool {
             true
         }
 
-        async fn connect(&self) -> TransportResult<ConnectionHandle> {
-            Err(TransportErrorKind::custom_str("connect is not used in this test"))
+        fn connect(&self) -> impl_future!(<Output = TransportResult<ConnectionHandle>>) {
+            async { Err(TransportErrorKind::custom_str("connect is not used in this test")) }
         }
 
-        async fn try_reconnect(&self) -> TransportResult<ConnectionHandle> {
-            self.0
+        fn try_reconnect(&self) -> impl_future!(<Output = TransportResult<ConnectionHandle>>) {
+            let this = self.clone();
+            async move {
+                this.0
+                    .lock()
+                    .expect("poisoned mutex")
+                    .take()
+                    .ok_or_else(|| TransportErrorKind::custom_str("missing mock connection handle"))
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct TestConnector {
+        handles: Arc<Mutex<VecDeque<ConnectionHandle>>>,
+    }
+
+    impl TestConnector {
+        fn new(handles: Vec<ConnectionHandle>) -> Self {
+            Self { handles: Arc::new(Mutex::new(handles.into())) }
+        }
+
+        fn take_handle(&self) -> TransportResult<ConnectionHandle> {
+            self.handles
                 .lock()
-                .expect("poisoned mutex")
-                .take()
-                .ok_or_else(|| TransportErrorKind::custom_str("missing mock connection handle"))
+                .expect("test connector mutex poisoned")
+                .pop_front()
+                .ok_or_else(|| TransportErrorKind::custom_str("no test handles left"))
+        }
+    }
+
+    impl PubSubConnect for TestConnector {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        fn connect(&self) -> impl_future!(<Output = TransportResult<ConnectionHandle>>) {
+            let this = self.clone();
+            async move { this.take_handle() }
+        }
+
+        fn try_reconnect(&self) -> impl_future!(<Output = TransportResult<ConnectionHandle>>) {
+            let this = self.clone();
+            async move { this.take_handle() }
         }
     }
 
@@ -354,7 +398,7 @@ mod tests {
         let _keep_dead_backend_alive = (to_frontend, error, shutdown);
 
         let (reconnected_handle, mut reconnected_interface) = ConnectionHandle::new();
-        let connector = MockConnect(Arc::new(Mutex::new(Some(reconnected_handle))));
+        let connector = MockReconnectConnect(Arc::new(Mutex::new(Some(reconnected_handle))));
         let (tx, reqs) = mpsc::unbounded_channel();
         let service = PubSubService {
             handle: dead_handle,
@@ -366,13 +410,15 @@ mod tests {
         service.spawn();
 
         let first = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
-        let (in_flight, rx) = InFlight::new(first, 16);
+        let expected_first = first.serialized().get().to_owned();
+        let (in_flight, _rx) = InFlight::new(first, 16);
         tx.send(PubSubInstruction::Request(in_flight)).unwrap();
 
-        timeout(Duration::from_secs(1), rx)
+        let replayed = timeout(Duration::from_secs(1), reconnected_interface.recv_from_frontend())
             .await
-            .expect("failed request should resolve promptly")
-            .expect_err("raced request should be dropped when the backend is gone");
+            .expect("in-flight request should be replayed after reconnect")
+            .expect("reconnected backend should receive replayed request");
+        assert_eq!(replayed.get(), expected_first);
 
         let second = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
         let expected = second.serialized().get().to_owned();
@@ -385,5 +431,42 @@ mod tests {
                 .expect("request should be dispatched after reconnect")
                 .expect("new backend should receive the request");
         assert_eq!(dispatched.get(), expected);
+    }
+
+    #[tokio::test]
+    async fn request_dispatch_failure_reconnects_and_reissues_inflight_request() {
+        let (dead_handle, dead_interface) = ConnectionHandle::new();
+        drop(dead_interface);
+
+        let (next_handle, mut next_interface) = ConnectionHandle::new();
+        let connector = TestConnector::new(vec![next_handle]);
+
+        let (_req_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle: dead_handle.with_max_retries(1).with_retry_interval(Duration::from_millis(1)),
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+
+        let request =
+            Request::new("eth_blockNumber", Id::Number(1), ()).serialize().expect("serialize");
+        let (in_flight, _rx) = InFlight::new(request, 1);
+
+        service
+            .service_ix_or_reconnect(PubSubInstruction::Request(in_flight))
+            .await
+            .expect("service request should reconnect");
+
+        assert_eq!(service.in_flights.len(), 1);
+
+        let replayed = timeout(Duration::from_secs(1), next_interface.from_frontend.recv())
+            .await
+            .expect("timed out waiting for replayed request")
+            .expect("reconnected backend channel closed");
+        let replayed: serde_json::Value =
+            serde_json::from_str(replayed.get()).expect("valid replayed request json");
+        assert_eq!(replayed["method"], "eth_blockNumber");
     }
 }
