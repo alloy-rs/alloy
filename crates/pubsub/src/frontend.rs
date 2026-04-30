@@ -66,6 +66,10 @@ impl PubSubFrontend {
         let method_name = req.method_clone();
 
         async move {
+            if channel_size == 0 {
+                return Err(TransportErrorKind::custom_str("channel size must be non-zero"));
+            }
+
             debug!("sending request to backend");
             let (in_flight, rx) = InFlight::new(req, channel_size);
             tx.send(PubSubInstruction::Request(in_flight))
@@ -105,8 +109,12 @@ impl PubSubFrontend {
     /// subscription channels. Defaults to 16. See
     /// [`tokio::sync::broadcast`] for a description of relevant
     /// behavior.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `channel_size` is zero.
     pub fn set_channel_size(&self, channel_size: usize) {
-        debug_assert_ne!(channel_size, 0, "channel size must be non-zero");
+        assert_ne!(channel_size, 0, "channel size must be non-zero");
         self.channel_size.store(channel_size, Ordering::Relaxed);
     }
 }
@@ -126,5 +134,17 @@ impl tower::Service<RequestPacket> for PubSubFrontend {
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         self.send_packet(req)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "channel size must be non-zero")]
+    fn set_channel_size_rejects_zero() {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        PubSubFrontend::new(tx).set_channel_size(0);
     }
 }
