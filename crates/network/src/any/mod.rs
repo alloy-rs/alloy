@@ -368,7 +368,7 @@ impl AnyRpcTransaction {
     where
         U: From<AnyTxEnvelope>,
     {
-        self.into_inner().map(U::from)
+        self.map(U::from)
     }
 
     /// Converts the transaction to the given alternative that is `TryFrom<T>`
@@ -380,7 +380,7 @@ impl AnyRpcTransaction {
     where
         U: TryFrom<AnyTxEnvelope>,
     {
-        self.into_inner().try_map(U::try_from)
+        self.try_map(U::try_from)
     }
 }
 
