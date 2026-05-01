@@ -6,12 +6,12 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[cfg(feature = "reqwest")]
+#[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
 pub use reqwest;
-#[cfg(feature = "reqwest")]
+#[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
 mod reqwest_transport;
 
-#[cfg(feature = "reqwest")]
+#[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
 #[doc(inline)]
 pub use reqwest_transport::*;
 
