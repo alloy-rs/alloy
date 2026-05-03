@@ -2,6 +2,7 @@ use crate::{managers::ActiveSubscription, RawSubscription};
 use alloy_json_rpc::{EthNotification, SerializedRequest, SubId};
 use alloy_primitives::B256;
 use bimap::BiBTreeMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Default)]
 pub(crate) struct SubscriptionManager {
@@ -9,6 +10,8 @@ pub(crate) struct SubscriptionManager {
     local_to_sub: BiBTreeMap<B256, ActiveSubscription>,
     /// Tracks the CURRENT server id for a subscription.
     local_to_server: BiBTreeMap<B256, SubId>,
+    /// Tracks all server id aliases that may identify a subscription in notifications.
+    server_to_local: BTreeMap<SubId, B256>,
 }
 
 impl SubscriptionManager {
@@ -33,7 +36,7 @@ impl SubscriptionManager {
         let sub = active.subscribe();
 
         let local_id = active.local_id;
-        self.local_to_server.insert(local_id, server_id);
+        self.insert_server_id(local_id, server_id);
         self.local_to_sub.insert(local_id, active);
 
         sub
@@ -60,7 +63,11 @@ impl SubscriptionManager {
 
     /// De-alias an alias, getting the original ID.
     pub(crate) fn local_id_for(&self, server_id: &SubId) -> Option<B256> {
-        self.local_to_server.get_by_right(server_id).copied()
+        self.server_to_local.get(server_id).copied().or_else(|| {
+            server_id
+                .as_number()
+                .and_then(|number| self.server_to_local.get(&SubId::Number(number)).copied())
+        })
     }
 
     /// De-alias an alias, getting the original ID.
@@ -71,17 +78,19 @@ impl SubscriptionManager {
     /// Drop all server_ids.
     pub(crate) fn drop_server_ids(&mut self) {
         self.local_to_server.clear();
+        self.server_to_local.clear();
     }
 
     /// Change the server_id of a subscription.
     fn change_server_id(&mut self, local_id: B256, server_id: SubId) {
-        self.local_to_server.insert(local_id, server_id);
+        self.remove_server_id(&local_id);
+        self.insert_server_id(local_id, server_id);
     }
 
     /// Remove a subscription by its local_id.
     pub(crate) fn remove_sub(&mut self, local_id: B256) {
         let _ = self.local_to_sub.remove_by_left(&local_id);
-        let _ = self.local_to_server.remove_by_left(&local_id);
+        self.remove_server_id(&local_id);
     }
 
     /// Notify the subscription channel of a new value, if the sub is known,
@@ -98,5 +107,64 @@ impl SubscriptionManager {
     /// Get a receiver for a subscription.
     pub(crate) fn get_subscription(&self, local_id: B256) -> Option<RawSubscription> {
         self.local_to_sub.get_by_left(&local_id).map(ActiveSubscription::subscribe)
+    }
+
+    /// Insert the current server ID and any numeric-compatible aliases.
+    fn insert_server_id(&mut self, local_id: B256, server_id: SubId) {
+        self.insert_server_aliases(local_id, &server_id);
+        self.local_to_server.insert(local_id, server_id);
+    }
+
+    /// Remove the current server ID and any numeric-compatible aliases.
+    fn remove_server_id(&mut self, local_id: &B256) {
+        if let Some((local_id, server_id)) = self.local_to_server.remove_by_left(local_id) {
+            self.remove_server_aliases(local_id, &server_id);
+        }
+    }
+
+    fn insert_server_aliases(&mut self, local_id: B256, server_id: &SubId) {
+        self.server_to_local.insert(server_id.clone(), local_id);
+        if let Some(number) = server_id.as_number() {
+            self.server_to_local.insert(SubId::Number(number), local_id);
+        }
+    }
+
+    fn remove_server_aliases(&mut self, local_id: B256, server_id: &SubId) {
+        self.remove_server_alias(local_id, server_id);
+        if let Some(number) = server_id.as_number() {
+            self.remove_server_alias(local_id, &SubId::Number(number));
+        }
+    }
+
+    fn remove_server_alias(&mut self, local_id: B256, server_id: &SubId) {
+        if self.server_to_local.get(server_id) == Some(&local_id) {
+            self.server_to_local.remove(server_id);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_json_rpc::{Id, Request};
+    use alloy_transport::utils::to_json_raw_value;
+
+    #[test]
+    fn notifies_subscription_when_server_id_forms_differ() {
+        let mut manager = SubscriptionManager::default();
+        let request =
+            Request::new("eth_subscribe", Id::Number(1), ("newHeads",)).serialize().unwrap();
+        let server_id = "0x7413bf1aeb8f1c0087c36b4243f7a41a";
+
+        let mut sub = manager.upsert(request, SubId::String(server_id.to_string()), 16);
+        let notification = EthNotification {
+            subscription: serde_json::from_str(&format!(r#""{server_id}""#)).unwrap(),
+            result: to_json_raw_value(&42).unwrap(),
+        };
+        assert!(matches!(notification.subscription, SubId::Number(_)));
+
+        manager.notify(notification);
+
+        assert_eq!(sub.try_recv().unwrap().get(), "42");
     }
 }

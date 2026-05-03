@@ -15,6 +15,16 @@ pub enum SubId {
     String(String),
 }
 
+impl SubId {
+    /// Returns this subscription ID as a number, if it is numerically encoded.
+    pub fn as_number(&self) -> Option<U256> {
+        match self {
+            Self::Number(number) => Some(*number),
+            Self::String(string) => string.parse().ok(),
+        }
+    }
+}
+
 impl From<U256> for SubId {
     fn from(value: U256) -> Self {
         Self::Number(value)
@@ -186,6 +196,12 @@ mod tests {
         let string = "subscription_id".to_string();
         let subid: SubId = string.clone().into();
         assert_eq!(subid, SubId::String(string));
+    }
+
+    #[test]
+    fn subid_string_as_number() {
+        let subid = SubId::String("0x7413bf1aeb8f1c0087c36b4243f7a41a".to_string());
+        assert_eq!(subid.as_number(), Some("0x7413bf1aeb8f1c0087c36b4243f7a41a".parse().unwrap()));
     }
 
     #[test]

@@ -63,16 +63,16 @@ For a normal request, the user sends a request to the **frontend**, and
 later receives a response via a tokio oneshot channel. This is straightforward
 and easy to reason about. Subscriptions, however, are side-effects of other
 requests, and are long-lived. They are managed by the **service** and
-identified by a `U256` id. The **service** uses this id to manage the
-subscription lifecycle, and to dispatch notifications to the correct
-subscribers.
+identified by a local `B256` id. The **service** uses this id to manage the
+subscription lifecycle, and maps it to the server's `SubId` to dispatch
+notifications to the correct subscribers.
 
 ### Server & Local IDs
 
 When a user issues a subscription request, the **frontend** sends a
 subscription request to the **service**. The **service** dispatches it to the
 RPC server via the **backend**. The **service** then intercepts the RPC server
-response containing the serve id, and assigns a `local_id` to the subscription.
+response containing the server id, and assigns a `local_id` to the subscription.
 This `local_id` is used to identify the subscription in the **service** and in
 tasks consuming the subscription, while the `server_id` is used to identify the
 subscription to the RPC server, and to associate notifications with specific
@@ -94,8 +94,8 @@ on unknown methods, the `Request`, `SerializedRequest` and `RpcCall` expose
 subscription.
 
 When marking a request as a subscription, the **service** will intercept the
-RPC response, which MUST be a `U256` value. Subscription requests that return
-anything other than a `U256` value will not function.
+RPC response, which MUST be a valid `SubId`. Subscription requests that return
+anything other than a numeric or string subscription ID will not function.
 
 ### Subscription Lifecycle
 
@@ -119,7 +119,7 @@ Subscription Request Lifecycle:
 1. The **service** stores the oneshot channel in its `RequestManager`.
 1. The **service** sends the request to the **backend**.
 1. The **backend** sends the request to the RPC server.
-1. The RPC server responds with a `U256` value (the `server_id`).
+1. The RPC server responds with a `SubId` value (the `server_id`).
 1. The **backend** sends the response to the **service**.
 1. The **service** assigns a `local_id` to the subscription, creates a
    subscription broadcast channel, and stores the relevant information in its
