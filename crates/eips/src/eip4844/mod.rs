@@ -376,6 +376,30 @@ impl AsCkzg for Bytes48 {
     }
 }
 
+/// Returns blobs as c-kzg blobs.
+#[cfg(feature = "kzg")]
+#[deprecated(note = "use `Blob::slice_as_ckzg` via the `AsCkzg` trait instead")]
+#[inline]
+pub fn blobs_as_ckzg(blobs: &[Blob]) -> &[c_kzg::Blob] {
+    Blob::slice_as_ckzg(blobs)
+}
+
+/// Returns commitment/proof bytes as c-kzg bytes.
+#[cfg(feature = "kzg")]
+#[deprecated(note = "use `Bytes48::slice_as_ckzg` via the `AsCkzg` trait instead")]
+#[inline]
+pub fn bytes48_as_ckzg(bytes: &[Bytes48]) -> &[c_kzg::Bytes48] {
+    Bytes48::slice_as_ckzg(bytes)
+}
+
+/// Converts c-kzg bytes into the Alloy 48-byte wrapper.
+#[cfg(feature = "kzg")]
+#[deprecated(note = "use `Bytes48::from_ckzg` via the `AsCkzg` trait instead")]
+#[inline]
+pub fn bytes48_from_ckzg(bytes: c_kzg::Bytes48) -> Bytes48 {
+    Bytes48::from_ckzg(bytes)
+}
+
 /// Calculates the versioned hash for a KzgCommitment of 48 bytes.
 ///
 /// Specified in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension)
