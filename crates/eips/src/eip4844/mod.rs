@@ -233,6 +233,82 @@ impl alloy_rlp::Decodable for HeapBlob {
 /// A commitment/proof serialized as 0x-prefixed hex string
 pub type Bytes48 = FixedBytes<48>;
 
+/// Conversion helpers for c-kzg blobs.
+#[cfg(feature = "kzg")]
+pub trait BlobCkzgExt {
+    /// Returns this blob as a c-kzg blob.
+    fn as_ckzg(&self) -> &c_kzg::Blob;
+
+    /// Returns this blob as a mutable c-kzg blob.
+    fn as_ckzg_mut(&mut self) -> &mut c_kzg::Blob;
+}
+
+#[cfg(feature = "kzg")]
+impl BlobCkzgExt for Blob {
+    #[inline]
+    fn as_ckzg(&self) -> &c_kzg::Blob {
+        // SAFETY: `Blob` is `FixedBytes<BYTES_PER_BLOB>`, which is `repr(transparent)` over
+        // `[u8; BYTES_PER_BLOB]`. `c_kzg::Blob` is `repr(C)` with a single
+        // `[u8; BYTES_PER_BLOB]` field.
+        unsafe { core::mem::transmute(self) }
+    }
+
+    #[inline]
+    fn as_ckzg_mut(&mut self) -> &mut c_kzg::Blob {
+        // SAFETY: See `BlobCkzgExt::as_ckzg`.
+        unsafe { core::mem::transmute(self) }
+    }
+}
+
+/// Conversion helpers for c-kzg commitment/proof bytes.
+#[cfg(feature = "kzg")]
+pub trait Bytes48CkzgExt {
+    /// Returns these bytes as c-kzg bytes.
+    fn as_ckzg(&self) -> &c_kzg::Bytes48;
+
+    /// Returns these bytes as mutable c-kzg bytes.
+    fn as_ckzg_mut(&mut self) -> &mut c_kzg::Bytes48;
+}
+
+#[cfg(feature = "kzg")]
+impl Bytes48CkzgExt for Bytes48 {
+    #[inline]
+    fn as_ckzg(&self) -> &c_kzg::Bytes48 {
+        // SAFETY: `Bytes48` is `FixedBytes<48>`, which is `repr(transparent)` over `[u8; 48]`.
+        // `c_kzg::Bytes48` is `repr(C)` with a single `[u8; 48]` field.
+        unsafe { core::mem::transmute(self) }
+    }
+
+    #[inline]
+    fn as_ckzg_mut(&mut self) -> &mut c_kzg::Bytes48 {
+        // SAFETY: See `Bytes48CkzgExt::as_ckzg`.
+        unsafe { core::mem::transmute(self) }
+    }
+}
+
+/// Returns blobs as c-kzg blobs.
+#[cfg(feature = "kzg")]
+#[inline]
+pub fn blobs_as_ckzg(blobs: &[Blob]) -> &[c_kzg::Blob] {
+    // SAFETY: See `BlobCkzgExt::as_ckzg`.
+    unsafe { core::mem::transmute(blobs) }
+}
+
+/// Returns commitment/proof bytes as c-kzg bytes.
+#[cfg(feature = "kzg")]
+#[inline]
+pub fn bytes48_as_ckzg(bytes: &[Bytes48]) -> &[c_kzg::Bytes48] {
+    // SAFETY: See `Bytes48CkzgExt::as_ckzg`.
+    unsafe { core::mem::transmute(bytes) }
+}
+
+/// Converts c-kzg bytes into the Alloy 48-byte wrapper.
+#[cfg(feature = "kzg")]
+#[inline]
+pub fn bytes48_from_ckzg(bytes: c_kzg::Bytes48) -> Bytes48 {
+    Bytes48::new(bytes.into_inner())
+}
+
 /// Calculates the versioned hash for a KzgCommitment of 48 bytes.
 ///
 /// Specified in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension)

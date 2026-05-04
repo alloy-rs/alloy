@@ -13,6 +13,8 @@ use alloy_rlp::{Decodable, Encodable, Header};
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
+#[cfg(feature = "kzg")]
+use crate::eip4844::{blobs_as_ckzg, bytes48_as_ckzg, bytes48_from_ckzg, BlobCkzgExt};
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
@@ -94,19 +96,11 @@ impl BlobTransactionSidecar {
         let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
 
         for blob in self.blobs.iter() {
-            // SAFETY: Blob and c_kzg::Blob have the same memory layout
-            let blob_kzg = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-
             // Compute cells and their KZG proofs for this blob
-            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob_kzg)?;
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
 
-            // SAFETY: same size
-            unsafe {
-                for kzg_proof in kzg_proofs.iter() {
-                    cell_proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
-                        kzg_proof.to_bytes(),
-                    ));
-                }
+            for kzg_proof in kzg_proofs.iter() {
+                cell_proofs.push(bytes48_from_ckzg(kzg_proof.to_bytes()));
             }
         }
 
@@ -254,19 +248,10 @@ impl BlobTransactionSidecar {
         commitments: Vec<c_kzg::Bytes48>,
         proofs: Vec<c_kzg::Bytes48>,
     ) -> Self {
-        // transmutes the vec of items, see also [core::mem::transmute](https://doc.rust-lang.org/std/mem/fn.transmute.html)
-        unsafe fn transmute_vec<U, T>(input: Vec<T>) -> Vec<U> {
-            let mut v = core::mem::ManuallyDrop::new(input);
-            Vec::from_raw_parts(v.as_mut_ptr() as *mut U, v.len(), v.capacity())
-        }
-
-        // SAFETY: all types have the same size and alignment
-        unsafe {
-            let blobs = transmute_vec::<Blob, c_kzg::Blob>(blobs);
-            let commitments = transmute_vec::<Bytes48, c_kzg::Bytes48>(commitments);
-            let proofs = transmute_vec::<Bytes48, c_kzg::Bytes48>(proofs);
-            Self { blobs, commitments, proofs }
-        }
+        let blobs = blobs.into_iter().map(|blob| Blob::new(blob.into_inner())).collect();
+        let commitments = commitments.into_iter().map(bytes48_from_ckzg).collect();
+        let proofs = proofs.into_iter().map(bytes48_from_ckzg).collect();
+        Self { blobs, commitments, proofs }
     }
 
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
@@ -312,18 +297,13 @@ impl BlobTransactionSidecar {
             }
         }
 
-        // SAFETY: ALL types have the same size
-        let res = unsafe {
-            proof_settings.verify_blob_kzg_proof_batch(
-                // blobs
-                core::mem::transmute::<&[Blob], &[c_kzg::Blob]>(self.blobs.as_slice()),
-                // commitments
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.commitments.as_slice()),
-                // proofs
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.proofs.as_slice()),
+        let res = proof_settings
+            .verify_blob_kzg_proof_batch(
+                blobs_as_ckzg(self.blobs.as_slice()),
+                bytes48_as_ckzg(self.commitments.as_slice()),
+                bytes48_as_ckzg(self.proofs.as_slice()),
             )
-        }
-        .map_err(BlobTransactionValidationError::KZGError)?;
+            .map_err(BlobTransactionValidationError::KZGError)?;
 
         res.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
@@ -402,17 +382,12 @@ impl BlobTransactionSidecar {
         let mut commitments = Vec::with_capacity(blobs.len());
         let mut proofs = Vec::with_capacity(blobs.len());
         for blob in &blobs {
-            // SAFETY: same size
-            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let blob = blob.as_ckzg();
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let proof = settings.compute_blob_kzg_proof(blob, &commitment.to_bytes())?;
 
-            // SAFETY: same size
-            unsafe {
-                commitments
-                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
-                proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(proof.to_bytes()));
-            }
+            commitments.push(bytes48_from_ckzg(commitment.to_bytes()));
+            proofs.push(bytes48_from_ckzg(proof.to_bytes()));
         }
 
         Ok(Self::new(blobs, commitments, proofs))
