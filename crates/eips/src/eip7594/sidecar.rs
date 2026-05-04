@@ -793,11 +793,17 @@ impl BlobTransactionSidecarEip7594 {
             commitments.extend(core::iter::repeat_n(*commitment, CELLS_PER_EXT_BLOB));
         }
 
-        let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
-        for blob in &self.blobs {
-            let blob_cells = proof_settings.compute_cells(blob.as_ckzg())?;
-            cells.extend_from_slice(blob_cells.as_ref());
-        }
+        let cells = if let [blob] = self.blobs.as_slice() {
+            let cells: Box<[c_kzg::Cell]> = proof_settings.compute_cells(blob.as_ckzg())?;
+            cells.into()
+        } else {
+            let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
+            for blob in &self.blobs {
+                let blob_cells = proof_settings.compute_cells(blob.as_ckzg())?;
+                cells.extend_from_slice(blob_cells.as_ref());
+            }
+            cells
+        };
 
         let res = proof_settings.verify_cell_kzg_proof_batch(
             Bytes48::slice_as_ckzg(&commitments),
