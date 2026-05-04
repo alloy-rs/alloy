@@ -455,13 +455,16 @@ where
             impersonate_future.await?;
         }
 
-        let tx_hash = self.anvil_send_impersonated_transaction(request).await?;
-        let pending = PendingTransactionBuilder::new(self.root().clone(), tx_hash);
+        let tx_hash = self.anvil_send_impersonated_transaction(request).await;
 
         if config.stop_impersonate {
-            self.anvil_stop_impersonating_account(from).await?;
+            let stop_result = self.anvil_stop_impersonating_account(from).await;
+            if tx_hash.is_ok() {
+                stop_result?;
+            }
         }
 
+        let pending = PendingTransactionBuilder::new(self.root().clone(), tx_hash?);
         Ok(pending)
     }
 }
@@ -522,6 +525,7 @@ mod tests {
     use alloy_primitives::{address, B256};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::{sol, SolCall};
+    use alloy_transport::mock::Asserter;
 
     const FORK_URL: &str = "https://ethereum.reth.rs/rpc";
 
@@ -593,6 +597,25 @@ mod tests {
 
         let recipient_balance = provider.get_balance(to).await.unwrap();
         assert_eq!(recipient_balance, val);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_impersonated_send_stops_on_send_error() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&());
+        asserter.push_failure_msg("send failed");
+        asserter.push_success(&());
+
+        let tx = TransactionRequest::default().with_from(Address::random());
+        let err = provider
+            .anvil_send_impersonated_transaction_with_config(tx, ImpersonateConfig::default())
+            .await
+            .unwrap_err();
+
+        assert!(err.to_string().contains("send failed"));
+        assert!(asserter.read_q().is_empty(), "stop impersonation response should be consumed");
     }
 
     #[tokio::test]
