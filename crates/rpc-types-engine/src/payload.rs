@@ -10,7 +10,7 @@ use alloy_consensus::{
     HeaderInfo, Transaction, EMPTY_OMMER_ROOT_HASH,
 };
 #[cfg(feature = "kzg")]
-use alloy_eips::eip4844::AsCkzg;
+use alloy_eips::eip4844::{AsAlloy, AsCkzg};
 use alloy_eips::{
     calc_next_block_base_fee,
     eip1559::BaseFeeParams,
@@ -1818,15 +1818,25 @@ impl BlobsBundleV1 {
     ) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
         use alloy_eips::eip7594::CELLS_PER_EXT_BLOB;
 
+        if let [blob] = self.blobs.as_slice() {
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+            let cell_proofs =
+                alloy_eips::eip4844::c_kzg::KzgProof::boxed_slice_as_alloy(kzg_proofs).into();
+            return Ok(BlobsBundleV2 {
+                commitments: self.commitments,
+                proofs: cell_proofs,
+                blobs: self.blobs,
+            });
+        }
+
         let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
 
         for blob in self.blobs.iter() {
             // Compute cells and their KZG proofs for this blob
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
-
-            for kzg_proof in kzg_proofs.iter() {
-                cell_proofs.push(Bytes48::from_ckzg(kzg_proof.to_bytes()));
-            }
+            cell_proofs.extend_from_slice(alloy_eips::eip4844::c_kzg::KzgProof::slice_as_alloy(
+                kzg_proofs.as_ref(),
+            ));
         }
 
         Ok(BlobsBundleV2 { commitments: self.commitments, proofs: cell_proofs, blobs: self.blobs })

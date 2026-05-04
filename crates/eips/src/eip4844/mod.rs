@@ -261,102 +261,160 @@ pub trait AsCkzg: Sized {
     fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self>;
 }
 
+/// Conversion helpers for c-kzg byte wrappers back to Alloy byte wrappers.
 #[cfg(feature = "kzg")]
-impl AsCkzg for Blob {
-    type Ckzg = c_kzg::Blob;
+pub trait AsAlloy: Sized {
+    /// The equivalent Alloy byte wrapper type.
+    type Alloy;
 
-    #[inline]
-    fn as_ckzg(&self) -> &Self::Ckzg {
-        // SAFETY: `Blob` is `FixedBytes<BYTES_PER_BLOB>`, which is `repr(transparent)` over
-        // `[u8; BYTES_PER_BLOB]`. `c_kzg::Blob` is `repr(C)` with a single
-        // `[u8; BYTES_PER_BLOB]` field.
-        unsafe { core::mem::transmute(self) }
-    }
+    /// Returns this value as its Alloy equivalent.
+    fn as_alloy(&self) -> &Self::Alloy;
 
-    #[inline]
-    fn as_ckzg_mut(&mut self) -> &mut Self::Ckzg {
-        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { core::mem::transmute(self) }
-    }
+    /// Returns this value as its mutable Alloy equivalent.
+    fn as_alloy_mut(&mut self) -> &mut Self::Alloy;
 
-    #[inline]
-    fn from_ckzg(value: Self::Ckzg) -> Self {
-        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { core::mem::transmute(value) }
-    }
+    /// Converts this value into its Alloy equivalent.
+    fn into_alloy(self) -> Self::Alloy;
 
-    #[inline]
-    fn slice_as_ckzg(slice: &[Self]) -> &[Self::Ckzg] {
-        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { core::mem::transmute(slice) }
-    }
+    /// Returns this slice as its Alloy equivalent.
+    fn slice_as_alloy(slice: &[Self]) -> &[Self::Alloy];
 
-    #[inline]
-    fn slice_as_ckzg_mut(slice: &mut [Self]) -> &mut [Self::Ckzg] {
-        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { core::mem::transmute(slice) }
-    }
+    /// Returns this slice as its mutable Alloy equivalent.
+    fn slice_as_alloy_mut(slice: &mut [Self]) -> &mut [Self::Alloy];
 
-    #[inline]
-    fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg> {
-        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { core::mem::transmute(vec) }
-    }
+    /// Converts this vector into its Alloy equivalent.
+    fn vec_as_alloy(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Alloy>;
 
-    #[inline]
-    fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self> {
-        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { core::mem::transmute(vec) }
-    }
+    /// Converts this boxed slice into its Alloy equivalent.
+    fn boxed_slice_as_alloy(boxed: alloc::boxed::Box<[Self]>) -> alloc::boxed::Box<[Self::Alloy]>;
+
+    /// Converts an Alloy vector into this type's equivalent vector.
+    fn vec_from_alloy(vec: alloc::vec::Vec<Self::Alloy>) -> alloc::vec::Vec<Self>;
 }
 
 #[cfg(feature = "kzg")]
-impl AsCkzg for Bytes48 {
-    type Ckzg = c_kzg::Bytes48;
+macro_rules! impl_ckzg_conversions {
+    ($alloy:ty, $ckzg:ty) => {
+        impl AsCkzg for $alloy {
+            type Ckzg = $ckzg;
 
-    #[inline]
-    fn as_ckzg(&self) -> &Self::Ckzg {
-        // SAFETY: `Bytes48` is `FixedBytes<48>`, which is `repr(transparent)` over `[u8; 48]`.
-        // `c_kzg::Bytes48` is `repr(C)` with a single `[u8; 48]` field.
-        unsafe { core::mem::transmute(self) }
-    }
+            #[inline]
+            fn as_ckzg(&self) -> &Self::Ckzg {
+                // SAFETY: This macro is only invoked for transparent byte wrappers with the same
+                // layout and alignment as their c-kzg equivalents.
+                unsafe { core::mem::transmute(self) }
+            }
 
-    #[inline]
-    fn as_ckzg_mut(&mut self) -> &mut Self::Ckzg {
-        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { core::mem::transmute(self) }
-    }
+            #[inline]
+            fn as_ckzg_mut(&mut self) -> &mut Self::Ckzg {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(self) }
+            }
 
-    #[inline]
-    fn from_ckzg(value: Self::Ckzg) -> Self {
-        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { core::mem::transmute(value) }
-    }
+            #[inline]
+            fn from_ckzg(value: Self::Ckzg) -> Self {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(value) }
+            }
 
-    #[inline]
-    fn slice_as_ckzg(slice: &[Self]) -> &[Self::Ckzg] {
-        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { core::mem::transmute(slice) }
-    }
+            #[inline]
+            fn slice_as_ckzg(slice: &[Self]) -> &[Self::Ckzg] {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(slice) }
+            }
 
-    #[inline]
-    fn slice_as_ckzg_mut(slice: &mut [Self]) -> &mut [Self::Ckzg] {
-        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { core::mem::transmute(slice) }
-    }
+            #[inline]
+            fn slice_as_ckzg_mut(slice: &mut [Self]) -> &mut [Self::Ckzg] {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(slice) }
+            }
 
-    #[inline]
-    fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg> {
-        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { core::mem::transmute(vec) }
-    }
+            #[inline]
+            fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg> {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(vec) }
+            }
 
-    #[inline]
-    fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self> {
-        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { core::mem::transmute(vec) }
-    }
+            #[inline]
+            fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self> {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(vec) }
+            }
+        }
+
+        impl_ckzg_conversions!(reverse $alloy, $ckzg);
+    };
+    (reverse $alloy:ty, $ckzg:ty) => {
+        impl AsAlloy for $ckzg {
+            type Alloy = $alloy;
+
+            #[inline]
+            fn as_alloy(&self) -> &Self::Alloy {
+                // SAFETY: This macro is only invoked for c-kzg byte wrappers with the same layout
+                // and alignment as their Alloy equivalents.
+                unsafe { core::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn as_alloy_mut(&mut self) -> &mut Self::Alloy {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn into_alloy(self) -> Self::Alloy {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn slice_as_alloy(slice: &[Self]) -> &[Self::Alloy] {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(slice) }
+            }
+
+            #[inline]
+            fn slice_as_alloy_mut(slice: &mut [Self]) -> &mut [Self::Alloy] {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(slice) }
+            }
+
+            #[inline]
+            fn vec_as_alloy(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Alloy> {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(vec) }
+            }
+
+            #[inline]
+            fn boxed_slice_as_alloy(
+                boxed: alloc::boxed::Box<[Self]>,
+            ) -> alloc::boxed::Box<[Self::Alloy]> {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe {
+                    core::mem::transmute::<
+                        alloc::boxed::Box<[Self]>,
+                        alloc::boxed::Box<[Self::Alloy]>,
+                    >(boxed)
+                }
+            }
+
+            #[inline]
+            fn vec_from_alloy(vec: alloc::vec::Vec<Self::Alloy>) -> alloc::vec::Vec<Self> {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(vec) }
+            }
+        }
+    };
 }
+
+#[cfg(feature = "kzg")]
+impl_ckzg_conversions!(Blob, c_kzg::Blob);
+#[cfg(feature = "kzg")]
+impl_ckzg_conversions!(Bytes48, c_kzg::Bytes48);
+#[cfg(feature = "kzg")]
+impl_ckzg_conversions!(reverse Bytes48, c_kzg::KzgProof);
+#[cfg(feature = "kzg")]
+impl_ckzg_conversions!(reverse crate::eip7594::Cell, c_kzg::Cell);
 
 /// Returns blobs as c-kzg blobs.
 #[cfg(feature = "kzg")]

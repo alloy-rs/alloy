@@ -12,7 +12,7 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use super::{Decodable7594, Encodable7594};
 use crate::eip4844::VersionedHashIter;
 #[cfg(feature = "kzg")]
-use crate::eip4844::{AsCkzg, BlobTransactionValidationError};
+use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
@@ -657,17 +657,24 @@ impl BlobTransactionSidecarEip7594 {
         blobs: Vec<Blob>,
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
+        if let [blob] = blobs.as_slice() {
+            let blob = blob.as_ckzg();
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
+            let commitments = vec![Bytes48::from_ckzg(commitment.to_bytes())];
+            let proofs = c_kzg::KzgProof::boxed_slice_as_alloy(kzg_proofs).into();
+            return Ok(Self::new(blobs, commitments, proofs));
+        }
+
         let mut commitments = Vec::with_capacity(blobs.len());
-        let mut proofs = Vec::with_capacity(blobs.len());
+        let mut proofs = Vec::with_capacity(blobs.len() * CELLS_PER_EXT_BLOB);
         for blob in &blobs {
             let blob = blob.as_ckzg();
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
 
             commitments.push(Bytes48::from_ckzg(commitment.to_bytes()));
-            for kzg_proof in kzg_proofs.iter() {
-                proofs.push(Bytes48::from_ckzg(kzg_proof.to_bytes()));
-            }
+            proofs.extend_from_slice(c_kzg::KzgProof::slice_as_alloy(kzg_proofs.as_ref()));
         }
 
         Ok(Self::new(blobs, commitments, proofs))
@@ -707,10 +714,15 @@ impl BlobTransactionSidecarEip7594 {
         &self,
         settings: &c_kzg::KzgSettings,
     ) -> Result<Vec<Cell>, c_kzg::Error> {
+        if let [blob] = self.blobs.as_slice() {
+            let blob_cells = settings.compute_cells(blob.as_ckzg())?;
+            return Ok(c_kzg::Cell::boxed_slice_as_alloy(blob_cells).into());
+        }
+
         let mut cells = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
         for blob in &self.blobs {
             let blob_cells = settings.compute_cells(blob.as_ckzg())?;
-            cells.extend(blob_cells.iter().map(|cell| Cell::new(cell.to_bytes())));
+            cells.extend_from_slice(c_kzg::Cell::slice_as_alloy(blob_cells.as_ref()));
         }
         Ok(cells)
     }

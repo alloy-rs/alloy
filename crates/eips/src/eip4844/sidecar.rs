@@ -11,10 +11,10 @@ use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
-#[cfg(feature = "kzg")]
-use crate::eip4844::AsCkzg;
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
+#[cfg(feature = "kzg")]
+use crate::eip4844::{AsAlloy, AsCkzg};
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
@@ -93,15 +93,22 @@ impl BlobTransactionSidecar {
     ) -> Result<crate::eip7594::BlobTransactionSidecarEip7594, c_kzg::Error> {
         use crate::eip7594::CELLS_PER_EXT_BLOB;
 
+        if let [blob] = self.blobs.as_slice() {
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+            let cell_proofs = c_kzg::KzgProof::boxed_slice_as_alloy(kzg_proofs).into();
+            return Ok(crate::eip7594::BlobTransactionSidecarEip7594::new(
+                self.blobs,
+                self.commitments,
+                cell_proofs,
+            ));
+        }
+
         let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
 
         for blob in self.blobs.iter() {
             // Compute cells and their KZG proofs for this blob
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
-
-            for kzg_proof in kzg_proofs.iter() {
-                cell_proofs.push(Bytes48::from_ckzg(kzg_proof.to_bytes()));
-            }
+            cell_proofs.extend_from_slice(c_kzg::KzgProof::slice_as_alloy(kzg_proofs.as_ref()));
         }
 
         Ok(crate::eip7594::BlobTransactionSidecarEip7594::new(
