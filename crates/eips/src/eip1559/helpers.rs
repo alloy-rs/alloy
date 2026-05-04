@@ -117,9 +117,7 @@ pub fn calc_next_block_base_fee(
     match gas_used.cmp(&gas_target) {
         // If the gas used in the current block is equal to the gas target, the base fee remains the
         // same (no increase).
-        core::cmp::Ordering::Equal => {
-            base_fee
-        }
+        core::cmp::Ordering::Equal => base_fee,
         // If the gas used in the current block is greater than the gas target, calculate a new
         // increased base fee.
         core::cmp::Ordering::Greater => {
@@ -327,10 +325,7 @@ mod tests {
     #[test]
     fn next_base_fee_no_panic_zero_elasticity() {
         let p = BaseFeeParams::new(8, 0);
-        assert_eq!(
-            calc_next_block_base_fee(1, 30_000_000, 1_000_000_000, p),
-            1_000_000_000
-        );
+        assert_eq!(calc_next_block_base_fee(1, 30_000_000, 1_000_000_000, p), 1_000_000_000);
     }
 
     #[test]
