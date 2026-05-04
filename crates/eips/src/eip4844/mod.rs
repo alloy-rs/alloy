@@ -262,24 +262,6 @@ pub trait AsCkzg: Sized {
 }
 
 #[cfg(feature = "kzg")]
-unsafe fn transmute_ckzg_value<T, U>(value: T) -> U {
-    let value = core::mem::ManuallyDrop::new(value);
-    unsafe { core::ptr::read((&*value as *const T).cast::<U>()) }
-}
-
-#[cfg(feature = "kzg")]
-unsafe fn transmute_ckzg_vec<T, U>(input: alloc::vec::Vec<T>) -> alloc::vec::Vec<U> {
-    let mut input = core::mem::ManuallyDrop::new(input);
-    unsafe {
-        alloc::vec::Vec::from_raw_parts(
-            input.as_mut_ptr().cast::<U>(),
-            input.len(),
-            input.capacity(),
-        )
-    }
-}
-
-#[cfg(feature = "kzg")]
 impl AsCkzg for Blob {
     type Ckzg = c_kzg::Blob;
 
@@ -300,7 +282,7 @@ impl AsCkzg for Blob {
     #[inline]
     fn from_ckzg(value: Self::Ckzg) -> Self {
         // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { transmute_ckzg_value(value) }
+        unsafe { core::mem::transmute(value) }
     }
 
     #[inline]
@@ -318,13 +300,13 @@ impl AsCkzg for Blob {
     #[inline]
     fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg> {
         // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { transmute_ckzg_vec(vec) }
+        unsafe { core::mem::transmute(vec) }
     }
 
     #[inline]
     fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self> {
         // SAFETY: See `AsCkzg for Blob::as_ckzg`.
-        unsafe { transmute_ckzg_vec(vec) }
+        unsafe { core::mem::transmute(vec) }
     }
 }
 
@@ -348,7 +330,7 @@ impl AsCkzg for Bytes48 {
     #[inline]
     fn from_ckzg(value: Self::Ckzg) -> Self {
         // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { transmute_ckzg_value(value) }
+        unsafe { core::mem::transmute(value) }
     }
 
     #[inline]
@@ -366,13 +348,13 @@ impl AsCkzg for Bytes48 {
     #[inline]
     fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg> {
         // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { transmute_ckzg_vec(vec) }
+        unsafe { core::mem::transmute(vec) }
     }
 
     #[inline]
     fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self> {
         // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
-        unsafe { transmute_ckzg_vec(vec) }
+        unsafe { core::mem::transmute(vec) }
     }
 }
 
