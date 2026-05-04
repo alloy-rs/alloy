@@ -11,10 +11,10 @@ use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
+#[cfg(feature = "kzg")]
+use crate::eip4844::AsCkzg;
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
-#[cfg(feature = "kzg")]
-use crate::eip4844::{blobs_as_ckzg, bytes48_as_ckzg, bytes48_from_ckzg, BlobCkzgExt};
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
@@ -100,7 +100,7 @@ impl BlobTransactionSidecar {
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
 
             for kzg_proof in kzg_proofs.iter() {
-                cell_proofs.push(bytes48_from_ckzg(kzg_proof.to_bytes()));
+                cell_proofs.push(Bytes48::from_ckzg(kzg_proof.to_bytes()));
             }
         }
 
@@ -248,9 +248,9 @@ impl BlobTransactionSidecar {
         commitments: Vec<c_kzg::Bytes48>,
         proofs: Vec<c_kzg::Bytes48>,
     ) -> Self {
-        let blobs = blobs.into_iter().map(|blob| Blob::new(blob.into_inner())).collect();
-        let commitments = commitments.into_iter().map(bytes48_from_ckzg).collect();
-        let proofs = proofs.into_iter().map(bytes48_from_ckzg).collect();
+        let blobs = Blob::vec_from_ckzg(blobs);
+        let commitments = Bytes48::vec_from_ckzg(commitments);
+        let proofs = Bytes48::vec_from_ckzg(proofs);
         Self { blobs, commitments, proofs }
     }
 
@@ -299,9 +299,9 @@ impl BlobTransactionSidecar {
 
         let res = proof_settings
             .verify_blob_kzg_proof_batch(
-                blobs_as_ckzg(self.blobs.as_slice()),
-                bytes48_as_ckzg(self.commitments.as_slice()),
-                bytes48_as_ckzg(self.proofs.as_slice()),
+                Blob::slice_as_ckzg(self.blobs.as_slice()),
+                Bytes48::slice_as_ckzg(self.commitments.as_slice()),
+                Bytes48::slice_as_ckzg(self.proofs.as_slice()),
             )
             .map_err(BlobTransactionValidationError::KZGError)?;
 
@@ -386,8 +386,8 @@ impl BlobTransactionSidecar {
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let proof = settings.compute_blob_kzg_proof(blob, &commitment.to_bytes())?;
 
-            commitments.push(bytes48_from_ckzg(commitment.to_bytes()));
-            proofs.push(bytes48_from_ckzg(proof.to_bytes()));
+            commitments.push(Bytes48::from_ckzg(commitment.to_bytes()));
+            proofs.push(Bytes48::from_ckzg(proof.to_bytes()));
         }
 
         Ok(Self::new(blobs, commitments, proofs))

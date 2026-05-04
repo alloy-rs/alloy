@@ -233,20 +233,58 @@ impl alloy_rlp::Decodable for HeapBlob {
 /// A commitment/proof serialized as 0x-prefixed hex string
 pub type Bytes48 = FixedBytes<48>;
 
-/// Conversion helpers for c-kzg blobs.
+/// Conversion helpers for c-kzg byte wrappers.
 #[cfg(feature = "kzg")]
-pub trait BlobCkzgExt {
-    /// Returns this blob as a c-kzg blob.
-    fn as_ckzg(&self) -> &c_kzg::Blob;
+pub trait AsCkzg: Sized {
+    /// The equivalent c-kzg byte wrapper type.
+    type Ckzg;
 
-    /// Returns this blob as a mutable c-kzg blob.
-    fn as_ckzg_mut(&mut self) -> &mut c_kzg::Blob;
+    /// Returns this value as its c-kzg equivalent.
+    fn as_ckzg(&self) -> &Self::Ckzg;
+
+    /// Returns this value as its mutable c-kzg equivalent.
+    fn as_ckzg_mut(&mut self) -> &mut Self::Ckzg;
+
+    /// Converts a c-kzg value into this type.
+    fn from_ckzg(value: Self::Ckzg) -> Self;
+
+    /// Returns this slice as its c-kzg equivalent.
+    fn slice_as_ckzg(slice: &[Self]) -> &[Self::Ckzg];
+
+    /// Returns this slice as its mutable c-kzg equivalent.
+    fn slice_as_ckzg_mut(slice: &mut [Self]) -> &mut [Self::Ckzg];
+
+    /// Converts this vector into its c-kzg equivalent.
+    fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg>;
+
+    /// Converts a c-kzg vector into this type's equivalent vector.
+    fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self>;
 }
 
 #[cfg(feature = "kzg")]
-impl BlobCkzgExt for Blob {
+unsafe fn transmute_ckzg_value<T, U>(value: T) -> U {
+    let value = core::mem::ManuallyDrop::new(value);
+    unsafe { core::ptr::read((&*value as *const T).cast::<U>()) }
+}
+
+#[cfg(feature = "kzg")]
+unsafe fn transmute_ckzg_vec<T, U>(input: alloc::vec::Vec<T>) -> alloc::vec::Vec<U> {
+    let mut input = core::mem::ManuallyDrop::new(input);
+    unsafe {
+        alloc::vec::Vec::from_raw_parts(
+            input.as_mut_ptr().cast::<U>(),
+            input.len(),
+            input.capacity(),
+        )
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl AsCkzg for Blob {
+    type Ckzg = c_kzg::Blob;
+
     #[inline]
-    fn as_ckzg(&self) -> &c_kzg::Blob {
+    fn as_ckzg(&self) -> &Self::Ckzg {
         // SAFETY: `Blob` is `FixedBytes<BYTES_PER_BLOB>`, which is `repr(transparent)` over
         // `[u8; BYTES_PER_BLOB]`. `c_kzg::Blob` is `repr(C)` with a single
         // `[u8; BYTES_PER_BLOB]` field.
@@ -254,59 +292,88 @@ impl BlobCkzgExt for Blob {
     }
 
     #[inline]
-    fn as_ckzg_mut(&mut self) -> &mut c_kzg::Blob {
-        // SAFETY: See `BlobCkzgExt::as_ckzg`.
+    fn as_ckzg_mut(&mut self) -> &mut Self::Ckzg {
+        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
         unsafe { core::mem::transmute(self) }
+    }
+
+    #[inline]
+    fn from_ckzg(value: Self::Ckzg) -> Self {
+        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
+        unsafe { transmute_ckzg_value(value) }
+    }
+
+    #[inline]
+    fn slice_as_ckzg(slice: &[Self]) -> &[Self::Ckzg] {
+        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
+        unsafe { core::mem::transmute(slice) }
+    }
+
+    #[inline]
+    fn slice_as_ckzg_mut(slice: &mut [Self]) -> &mut [Self::Ckzg] {
+        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
+        unsafe { core::mem::transmute(slice) }
+    }
+
+    #[inline]
+    fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg> {
+        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
+        unsafe { transmute_ckzg_vec(vec) }
+    }
+
+    #[inline]
+    fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self> {
+        // SAFETY: See `AsCkzg for Blob::as_ckzg`.
+        unsafe { transmute_ckzg_vec(vec) }
     }
 }
 
-/// Conversion helpers for c-kzg commitment/proof bytes.
 #[cfg(feature = "kzg")]
-pub trait Bytes48CkzgExt {
-    /// Returns these bytes as c-kzg bytes.
-    fn as_ckzg(&self) -> &c_kzg::Bytes48;
+impl AsCkzg for Bytes48 {
+    type Ckzg = c_kzg::Bytes48;
 
-    /// Returns these bytes as mutable c-kzg bytes.
-    fn as_ckzg_mut(&mut self) -> &mut c_kzg::Bytes48;
-}
-
-#[cfg(feature = "kzg")]
-impl Bytes48CkzgExt for Bytes48 {
     #[inline]
-    fn as_ckzg(&self) -> &c_kzg::Bytes48 {
+    fn as_ckzg(&self) -> &Self::Ckzg {
         // SAFETY: `Bytes48` is `FixedBytes<48>`, which is `repr(transparent)` over `[u8; 48]`.
         // `c_kzg::Bytes48` is `repr(C)` with a single `[u8; 48]` field.
         unsafe { core::mem::transmute(self) }
     }
 
     #[inline]
-    fn as_ckzg_mut(&mut self) -> &mut c_kzg::Bytes48 {
-        // SAFETY: See `Bytes48CkzgExt::as_ckzg`.
+    fn as_ckzg_mut(&mut self) -> &mut Self::Ckzg {
+        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
         unsafe { core::mem::transmute(self) }
     }
-}
 
-/// Returns blobs as c-kzg blobs.
-#[cfg(feature = "kzg")]
-#[inline]
-pub fn blobs_as_ckzg(blobs: &[Blob]) -> &[c_kzg::Blob] {
-    // SAFETY: See `BlobCkzgExt::as_ckzg`.
-    unsafe { core::mem::transmute(blobs) }
-}
+    #[inline]
+    fn from_ckzg(value: Self::Ckzg) -> Self {
+        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
+        unsafe { transmute_ckzg_value(value) }
+    }
 
-/// Returns commitment/proof bytes as c-kzg bytes.
-#[cfg(feature = "kzg")]
-#[inline]
-pub fn bytes48_as_ckzg(bytes: &[Bytes48]) -> &[c_kzg::Bytes48] {
-    // SAFETY: See `Bytes48CkzgExt::as_ckzg`.
-    unsafe { core::mem::transmute(bytes) }
-}
+    #[inline]
+    fn slice_as_ckzg(slice: &[Self]) -> &[Self::Ckzg] {
+        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
+        unsafe { core::mem::transmute(slice) }
+    }
 
-/// Converts c-kzg bytes into the Alloy 48-byte wrapper.
-#[cfg(feature = "kzg")]
-#[inline]
-pub fn bytes48_from_ckzg(bytes: c_kzg::Bytes48) -> Bytes48 {
-    Bytes48::new(bytes.into_inner())
+    #[inline]
+    fn slice_as_ckzg_mut(slice: &mut [Self]) -> &mut [Self::Ckzg] {
+        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
+        unsafe { core::mem::transmute(slice) }
+    }
+
+    #[inline]
+    fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg> {
+        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
+        unsafe { transmute_ckzg_vec(vec) }
+    }
+
+    #[inline]
+    fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self> {
+        // SAFETY: See `AsCkzg for Bytes48::as_ckzg`.
+        unsafe { transmute_ckzg_vec(vec) }
+    }
 }
 
 /// Calculates the versioned hash for a KzgCommitment of 48 bytes.

@@ -10,7 +10,7 @@ use alloy_consensus::{
     HeaderInfo, Transaction, EMPTY_OMMER_ROOT_HASH,
 };
 #[cfg(feature = "kzg")]
-use alloy_eips::eip4844::{bytes48_from_ckzg, BlobCkzgExt, Bytes48CkzgExt};
+use alloy_eips::eip4844::AsCkzg;
 use alloy_eips::{
     calc_next_block_base_fee,
     eip1559::BaseFeeParams,
@@ -1825,7 +1825,7 @@ impl BlobsBundleV1 {
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
 
             for kzg_proof in kzg_proofs.iter() {
-                cell_proofs.push(bytes48_from_ckzg(kzg_proof.to_bytes()));
+                cell_proofs.push(Bytes48::from_ckzg(kzg_proof.to_bytes()));
             }
         }
 
@@ -2065,7 +2065,7 @@ impl BlobsBundleV2 {
             // Compute the blob proof
             let proof = settings.compute_blob_kzg_proof(blob.as_ckzg(), commitment.as_ckzg())?;
 
-            proofs.push(bytes48_from_ckzg(proof.to_bytes()));
+            proofs.push(Bytes48::from_ckzg(proof.to_bytes()));
         }
 
         Ok(BlobsBundleV1 { commitments: self.commitments, proofs, blobs: self.blobs })

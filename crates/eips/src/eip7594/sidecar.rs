@@ -12,9 +12,7 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use super::{Decodable7594, Encodable7594};
 use crate::eip4844::VersionedHashIter;
 #[cfg(feature = "kzg")]
-use crate::eip4844::{
-    bytes48_as_ckzg, bytes48_from_ckzg, BlobCkzgExt, BlobTransactionValidationError,
-};
+use crate::eip4844::{AsCkzg, BlobTransactionValidationError};
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
@@ -666,9 +664,9 @@ impl BlobTransactionSidecarEip7594 {
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
 
-            commitments.push(bytes48_from_ckzg(commitment.to_bytes()));
+            commitments.push(Bytes48::from_ckzg(commitment.to_bytes()));
             for kzg_proof in kzg_proofs.iter() {
-                proofs.push(bytes48_from_ckzg(kzg_proof.to_bytes()));
+                proofs.push(Bytes48::from_ckzg(kzg_proof.to_bytes()));
             }
         }
 
@@ -790,10 +788,10 @@ impl BlobTransactionSidecarEip7594 {
         }
 
         let res = proof_settings.verify_cell_kzg_proof_batch(
-            bytes48_as_ckzg(&commitments),
+            Bytes48::slice_as_ckzg(&commitments),
             &cell_indices,
             &cells,
-            bytes48_as_ckzg(self.cell_proofs.as_slice()),
+            Bytes48::slice_as_ckzg(self.cell_proofs.as_slice()),
         )?;
 
         res.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
