@@ -459,6 +459,243 @@ mod tests {
         assert_eq!(decoded, tx.into_signed(sig));
     }
 
+    /// Demonstrates that a TxEip7702 with many zero-valued SignedAuthorization items
+    /// can have an in-memory size ~4x its RLP-encoded size.
+    ///
+    /// Each SignedAuthorization is ~160 bytes in memory (due to U256 fields stored as
+    /// 4×u64 limbs) but only ~27 bytes in RLP when all U256 fields are zero (each
+    /// zero U256 encodes as a single 0x80 byte). The only non-compressible field is
+    /// `address` (always 21 bytes on wire).
+    #[test]
+    fn test_rlp_vs_in_memory_size_amplification() {
+        use alloy_eips::eip7702::Authorization;
+        use alloy_rlp::Encodable;
+
+        // Build a SignedAuthorization with all zeros (except address, which is fixed-size)
+        let zero_auth = SignedAuthorization::new_unchecked(
+            Authorization { chain_id: U256::ZERO, address: Address::ZERO, nonce: 0 },
+            0,          // y_parity
+            U256::ZERO, // r
+            U256::ZERO, // s
+        );
+
+        // Measure a single item
+        let single_rlp_len = zero_auth.length();
+        let single_mem_size = core::mem::size_of::<SignedAuthorization>();
+        eprintln!(
+            "Single SignedAuthorization: RLP = {} bytes, mem = {} bytes, ratio = {:.1}x",
+            single_rlp_len,
+            single_mem_size,
+            single_mem_size as f64 / single_rlp_len as f64,
+        );
+
+        // Target ~10 MiB RLP. We need to account for the RLP list header overhead
+        // for the authorization_list vec + the outer TxEip7702 envelope.
+        let target_rlp_bytes = 10 * 1024 * 1024; // 10 MiB
+        let num_auths = target_rlp_bytes / single_rlp_len;
+
+        let tx = TxEip7702 {
+            chain_id: 0,
+            nonce: 0,
+            max_fee_per_gas: 0,
+            max_priority_fee_per_gas: 0,
+            gas_limit: 0,
+            to: Address::ZERO,
+            value: U256::ZERO,
+            input: Default::default(),
+            access_list: Default::default(),
+            authorization_list: vec![zero_auth; num_auths],
+        };
+
+        let rlp_len = tx.length();
+        let mem_size = tx.size();
+        let ratio = mem_size as f64 / rlp_len as f64;
+
+        eprintln!("num authorization items: {num_auths}");
+        eprintln!("RLP encoded size:  {} bytes ({:.2} MiB)", rlp_len, rlp_len as f64 / (1024.0 * 1024.0));
+        eprintln!("InMemorySize:      {} bytes ({:.2} MiB)", mem_size, mem_size as f64 / (1024.0 * 1024.0));
+        eprintln!("Amplification:     {ratio:.2}x");
+
+        // Assert we got close to 10 MiB RLP
+        assert!(rlp_len >= 9 * 1024 * 1024, "RLP size should be ~10 MiB, got {rlp_len}");
+        assert!(rlp_len <= 11 * 1024 * 1024, "RLP size should be ~10 MiB, got {rlp_len}");
+
+        // Assert the memory amplification is >= 4x
+        assert!(ratio >= 4.0, "Expected >=4x amplification, got {ratio:.2}x");
+    }
+
+    /// Explores the worst-case memory amplification for a *list* of signed
+    /// transactions across all `EthereumTxEnvelope` variants, using both
+    /// zero signatures (theoretical max) and valid/realistic signatures.
+    ///
+    /// A valid ECDSA signature has r,s as full 32-byte scalars (~33 bytes each
+    /// in RLP with length prefix), whereas zero r,s encode as 1 byte each.
+    /// This test quantifies the difference.
+    #[test]
+    fn test_list_of_signed_txs_amplification() {
+        use crate::{InMemorySize, Signed, TxEip1559, TxEip2930, TxLegacy};
+        use alloy_eips::eip7702::Authorization;
+        use alloy_primitives::{Signature, TxKind};
+
+        // A realistic signature from an existing test vector (32-byte r and s)
+        let real_sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        );
+        // Realistic auth-list signature (32-byte r and s)
+        let real_auth_sig_r =
+            U256::from_be_bytes(b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565").0);
+        let real_auth_sig_s =
+            U256::from_be_bytes(b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1").0);
+
+        let target_rlp = 10 * 1024 * 1024usize;
+
+        fn measure<T: super::RlpEcdsaEncodableTx + InMemorySize>(
+            name: &str,
+            signed: &Signed<T>,
+            target_rlp: usize,
+        ) -> (String, f64) {
+            let one_rlp = signed.eip2718_encoded_length();
+            let one_mem = signed.size();
+            let num_txs = core::cmp::max(1, target_rlp / one_rlp);
+            let total_rlp = num_txs * one_rlp;
+            let total_mem = num_txs * one_mem;
+            let ratio = total_mem as f64 / total_rlp as f64;
+            eprintln!(
+                "{name:30}: per-tx RLP={one_rlp:4}, mem={one_mem:4} | \
+                 {num_txs:>7} txs => RLP {:.2} MiB, mem {:.2} MiB, ratio {ratio:.2}x",
+                total_rlp as f64 / (1024.0 * 1024.0),
+                total_mem as f64 / (1024.0 * 1024.0),
+            );
+            (name.to_string(), ratio)
+        }
+
+        let mut results = Vec::new();
+
+        // Legacy
+        {
+            let tx = TxLegacy {
+                chain_id: None,
+                nonce: 0,
+                gas_price: 0,
+                gas_limit: 0,
+                to: TxKind::Call(Address::ZERO),
+                value: U256::ZERO,
+                input: Default::default(),
+            };
+            let signed = Signed::new_unhashed(tx, real_sig);
+            results.push(measure("Legacy (real sig)", &signed, target_rlp));
+        }
+
+        // EIP-2930
+        {
+            let tx = TxEip2930 {
+                chain_id: 0,
+                nonce: 0,
+                gas_price: 0,
+                gas_limit: 0,
+                to: TxKind::Call(Address::ZERO),
+                value: U256::ZERO,
+                access_list: Default::default(),
+                input: Default::default(),
+            };
+            let signed = Signed::new_unhashed(tx, real_sig);
+            results.push(measure("EIP-2930 (real sig)", &signed, target_rlp));
+        }
+
+        // EIP-1559
+        {
+            let tx = TxEip1559 {
+                chain_id: 0,
+                nonce: 0,
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+                gas_limit: 0,
+                to: TxKind::Call(Address::ZERO),
+                value: U256::ZERO,
+                access_list: Default::default(),
+                input: Default::default(),
+            };
+            let signed = Signed::new_unhashed(tx, real_sig);
+            results.push(measure("EIP-1559 (real sig)", &signed, target_rlp));
+        }
+
+        // EIP-7702 (0 auth)
+        {
+            let tx = TxEip7702 {
+                chain_id: 0,
+                nonce: 0,
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+                gas_limit: 0,
+                to: Address::ZERO,
+                value: U256::ZERO,
+                access_list: Default::default(),
+                authorization_list: vec![],
+                input: Default::default(),
+            };
+            let signed = Signed::new_unhashed(tx, real_sig);
+            results.push(measure("EIP-7702 0auth (real sig)", &signed, target_rlp));
+        }
+
+        // EIP-7702 with 1 real-sig auth item
+        {
+            let auth = SignedAuthorization::new_unchecked(
+                Authorization { chain_id: U256::ZERO, address: Address::ZERO, nonce: 0 },
+                0,
+                real_auth_sig_r,
+                real_auth_sig_s,
+            );
+            let tx = TxEip7702 {
+                chain_id: 0,
+                nonce: 0,
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+                gas_limit: 0,
+                to: Address::ZERO,
+                value: U256::ZERO,
+                access_list: Default::default(),
+                authorization_list: vec![auth],
+                input: Default::default(),
+            };
+            let signed = Signed::new_unhashed(tx, real_sig);
+            results.push(measure("EIP-7702 1auth (real sig)", &signed, target_rlp));
+        }
+
+        // EIP-7702 many zero-field auth items with real sigs
+        {
+            let auth = SignedAuthorization::new_unchecked(
+                Authorization { chain_id: U256::ZERO, address: Address::ZERO, nonce: 0 },
+                0,
+                real_auth_sig_r,
+                real_auth_sig_s,
+            );
+            let auth_rlp_len = alloy_rlp::Encodable::length(&auth);
+            let tx = TxEip7702 {
+                chain_id: 0,
+                nonce: 0,
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+                gas_limit: 0,
+                to: Address::ZERO,
+                value: U256::ZERO,
+                access_list: Default::default(),
+                authorization_list: vec![auth; target_rlp / auth_rlp_len],
+                input: Default::default(),
+            };
+            let signed = Signed::new_unhashed(tx, real_sig);
+            results.push(measure("EIP-7702 big (real sigs)", &signed, target_rlp));
+        }
+
+        eprintln!();
+        let (best_name, best_ratio) = results
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .unwrap();
+        eprintln!("Worst case (valid sig): {best_name} at {best_ratio:.2}x");
+    }
+
     #[test]
     fn test_decode_call() {
         let tx = TxEip7702 {
