@@ -10,9 +10,9 @@ use alloy_primitives::{B128, B256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
 use super::{Decodable7594, Encodable7594};
-#[cfg(feature = "kzg")]
-use crate::eip4844::BlobTransactionValidationError;
 use crate::eip4844::VersionedHashIter;
+#[cfg(feature = "kzg")]
+use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
@@ -657,24 +657,24 @@ impl BlobTransactionSidecarEip7594 {
         blobs: Vec<Blob>,
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
+        if let [blob] = blobs.as_slice() {
+            let blob = blob.as_ckzg();
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
+            let commitments = vec![Bytes48::from_ckzg(commitment.to_bytes())];
+            let proofs = c_kzg::KzgProof::boxed_slice_as_alloy(kzg_proofs).into();
+            return Ok(Self::new(blobs, commitments, proofs));
+        }
+
         let mut commitments = Vec::with_capacity(blobs.len());
-        let mut proofs = Vec::with_capacity(blobs.len());
+        let mut proofs = Vec::with_capacity(blobs.len() * CELLS_PER_EXT_BLOB);
         for blob in &blobs {
-            // SAFETY: same size
-            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let blob = blob.as_ckzg();
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
 
-            // SAFETY: same size
-            unsafe {
-                commitments
-                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
-                for kzg_proof in kzg_proofs.iter() {
-                    proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
-                        kzg_proof.to_bytes(),
-                    ));
-                }
-            }
+            commitments.push(Bytes48::from_ckzg(commitment.to_bytes()));
+            proofs.extend_from_slice(c_kzg::KzgProof::slice_as_alloy(kzg_proofs.as_ref()));
         }
 
         Ok(Self::new(blobs, commitments, proofs))
@@ -714,12 +714,15 @@ impl BlobTransactionSidecarEip7594 {
         &self,
         settings: &c_kzg::KzgSettings,
     ) -> Result<Vec<Cell>, c_kzg::Error> {
+        if let [blob] = self.blobs.as_slice() {
+            let blob_cells = settings.compute_cells(blob.as_ckzg())?;
+            return Ok(c_kzg::Cell::boxed_slice_as_alloy(blob_cells).into());
+        }
+
         let mut cells = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
         for blob in &self.blobs {
-            // SAFETY: Blob and c_kzg::Blob have the same memory layout.
-            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-            let blob_cells = settings.compute_cells(blob)?;
-            cells.extend(blob_cells.iter().map(|cell| Cell::new(cell.to_bytes())));
+            let blob_cells = settings.compute_cells(blob.as_ckzg())?;
+            cells.extend_from_slice(c_kzg::Cell::slice_as_alloy(blob_cells.as_ref()));
         }
         Ok(cells)
     }
@@ -790,26 +793,24 @@ impl BlobTransactionSidecarEip7594 {
             commitments.extend(core::iter::repeat_n(*commitment, CELLS_PER_EXT_BLOB));
         }
 
-        // SAFETY: ALL types have the same size
-        let res = unsafe {
+        let cells = if let [blob] = self.blobs.as_slice() {
+            let cells: Box<[c_kzg::Cell]> = proof_settings.compute_cells(blob.as_ckzg())?;
+            cells.into()
+        } else {
             let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
             for blob in &self.blobs {
-                let blob = core::mem::transmute::<&Blob, &c_kzg::Blob>(blob);
-                let blob_cells = proof_settings.compute_cells(blob)?;
+                let blob_cells = proof_settings.compute_cells(blob.as_ckzg())?;
                 cells.extend_from_slice(blob_cells.as_ref());
             }
-
-            proof_settings.verify_cell_kzg_proof_batch(
-                // commitments
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(&commitments),
-                // cell indices
-                &cell_indices,
-                // cells
-                &cells,
-                // proofs
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.cell_proofs.as_slice()),
-            )?
+            cells
         };
+
+        let res = proof_settings.verify_cell_kzg_proof_batch(
+            Bytes48::slice_as_ckzg(&commitments),
+            &cell_indices,
+            &cells,
+            Bytes48::slice_as_ckzg(self.cell_proofs.as_slice()),
+        )?;
 
         res.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
@@ -869,9 +870,7 @@ impl BlobTransactionSidecarEip7594 {
             return Ok(Some(BlobCellsAndProofsV1::default()));
         }
 
-        // SAFETY: Blob and c_kzg::Blob have the same memory layout.
-        let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-        let cells = settings.compute_cells(blob)?;
+        let cells = settings.compute_cells(blob.as_ckzg())?;
 
         Ok(Some(Self::blob_cells_and_proofs_from_computed_cells(cell_mask, cells.as_ref(), proofs)))
     }
@@ -976,9 +975,7 @@ impl BlobTransactionSidecarEip7594 {
                 {
                     cells_and_proofs.clone()
                 } else {
-                    // SAFETY: Blob and c_kzg::Blob have the same memory layout.
-                    let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-                    let cells = settings.compute_cells(blob)?;
+                    let cells = settings.compute_cells(blob.as_ckzg())?;
                     let cells_and_proofs = Self::blob_cells_and_proofs_from_computed_cells(
                         cell_mask,
                         cells.as_ref(),
@@ -1341,9 +1338,7 @@ mod tests {
         assert_eq!(sidecar.compute_cells().unwrap(), cells);
 
         for (blob_index, blob) in sidecar.blobs.iter().enumerate() {
-            // SAFETY: Blob and c_kzg::Blob have the same memory layout.
-            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-            let expected_cells = settings.compute_cells(blob).unwrap();
+            let expected_cells = settings.compute_cells(blob.as_ckzg()).unwrap();
             let start = blob_index * CELLS_PER_EXT_BLOB;
             let end = start + CELLS_PER_EXT_BLOB;
 
@@ -1387,9 +1382,7 @@ mod tests {
             vec![Some(sidecar.cell_proofs[0]), Some(sidecar.cell_proofs[7])]
         );
 
-        // SAFETY: Blob and c_kzg::Blob have the same memory layout.
-        let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(&sidecar.blobs[0]) };
-        let expected_cells = settings.compute_cells(blob).unwrap();
+        let expected_cells = settings.compute_cells(sidecar.blobs[0].as_ckzg()).unwrap();
         assert_eq!(
             cells_and_proofs.blob_cells,
             vec![
@@ -1427,9 +1420,7 @@ mod tests {
         let cell_mask = BlobCellMask::from_bits(1);
 
         let invalid_blob = Blob::repeat_byte(0xff);
-        // SAFETY: Blob and c_kzg::Blob have the same memory layout.
-        let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(&invalid_blob) };
-        assert!(settings.compute_cells(blob).is_err());
+        assert!(settings.compute_cells(invalid_blob.as_ckzg()).is_err());
 
         sidecar.blobs.push(invalid_blob);
         sidecar.commitments.push(Bytes48::ZERO);

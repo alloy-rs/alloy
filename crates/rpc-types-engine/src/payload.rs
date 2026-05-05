@@ -9,6 +9,8 @@ use alloy_consensus::{
     constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, BlockHeader, Bytes48, Header,
     HeaderInfo, Transaction, EMPTY_OMMER_ROOT_HASH,
 };
+#[cfg(feature = "kzg")]
+use alloy_eips::eip4844::{AsAlloy, AsCkzg};
 use alloy_eips::{
     calc_next_block_base_fee,
     eip1559::BaseFeeParams,
@@ -21,7 +23,7 @@ use alloy_eips::{
     eip7928::EMPTY_BLOCK_ACCESS_LIST_HASH,
     BlockNumHash,
 };
-use alloy_primitives::{keccak256, Address, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_primitives::{keccak256, Address, Bloom, Bytes, Sealable, Sealed, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -1816,25 +1818,25 @@ impl BlobsBundleV1 {
     ) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
         use alloy_eips::eip7594::CELLS_PER_EXT_BLOB;
 
+        if let [blob] = self.blobs.as_slice() {
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+            let cell_proofs =
+                alloy_eips::eip4844::c_kzg::KzgProof::boxed_slice_as_alloy(kzg_proofs).into();
+            return Ok(BlobsBundleV2 {
+                commitments: self.commitments,
+                proofs: cell_proofs,
+                blobs: self.blobs,
+            });
+        }
+
         let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
 
         for blob in self.blobs.iter() {
-            // SAFETY: Blob and alloy_eips::eip4844::c_kzg::Blob have the same memory layout
-            let blob_kzg =
-                unsafe { core::mem::transmute::<&Blob, &alloy_eips::eip4844::c_kzg::Blob>(blob) };
-
             // Compute cells and their KZG proofs for this blob
-            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob_kzg)?;
-
-            // SAFETY: same size
-            unsafe {
-                for kzg_proof in kzg_proofs.iter() {
-                    cell_proofs.push(core::mem::transmute::<
-                        alloy_eips::eip4844::c_kzg::Bytes48,
-                        Bytes48,
-                    >(kzg_proof.to_bytes()));
-                }
-            }
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+            cell_proofs.extend_from_slice(alloy_eips::eip4844::c_kzg::KzgProof::slice_as_alloy(
+                kzg_proofs.as_ref(),
+            ));
         }
 
         Ok(BlobsBundleV2 { commitments: self.commitments, proofs: cell_proofs, blobs: self.blobs })
@@ -2070,22 +2072,10 @@ impl BlobsBundleV2 {
         let mut proofs = Vec::with_capacity(self.blobs.len());
 
         for (blob, commitment) in self.blobs.iter().zip(self.commitments.iter()) {
-            // SAFETY: Blob and alloy_eips::eip4844::c_kzg::Blob have the same memory layout
-            let blob_kzg =
-                unsafe { core::mem::transmute::<&Blob, &alloy_eips::eip4844::c_kzg::Blob>(blob) };
-            let commitment_kzg = unsafe {
-                core::mem::transmute::<&Bytes48, &alloy_eips::eip4844::c_kzg::Bytes48>(commitment)
-            };
-
             // Compute the blob proof
-            let proof = settings.compute_blob_kzg_proof(blob_kzg, commitment_kzg)?;
+            let proof = settings.compute_blob_kzg_proof(blob.as_ckzg(), commitment.as_ckzg())?;
 
-            // SAFETY: same size
-            unsafe {
-                proofs.push(core::mem::transmute::<alloy_eips::eip4844::c_kzg::Bytes48, Bytes48>(
-                    proof.to_bytes(),
-                ));
-            }
+            proofs.push(Bytes48::from_ckzg(proof.to_bytes()));
         }
 
         Ok(BlobsBundleV1 { commitments: self.commitments, proofs, blobs: self.blobs })
@@ -3565,6 +3555,54 @@ impl ExecutionData {
     }
 }
 
+impl<T, H> From<Sealed<Block<T, H>>> for ExecutionData
+where
+    T: Encodable2718 + Transaction,
+    H: BlockHeader,
+{
+    fn from(sealed: Sealed<Block<T, H>>) -> Self {
+        let (block, block_hash) = sealed.into_parts();
+        Self::from_block_unchecked(block_hash, &block)
+    }
+}
+
+impl<T, H> From<Sealed<&Block<T, H>>> for ExecutionData
+where
+    T: Encodable2718 + Transaction,
+    H: BlockHeader,
+{
+    fn from(sealed: Sealed<&Block<T, H>>) -> Self {
+        let (block, block_hash) = sealed.into_parts();
+        Self::from_block_unchecked(block_hash, block)
+    }
+}
+
+impl<T, H> From<(Sealed<Block<T, H>>, PayloadExtras)> for ExecutionData
+where
+    T: Encodable2718 + Transaction,
+    H: BlockHeader,
+{
+    fn from((sealed, extras): (Sealed<Block<T, H>>, PayloadExtras)) -> Self {
+        let (block, block_hash) = sealed.into_parts();
+        let (payload, sidecar) =
+            ExecutionPayload::from_block_unchecked_with_extras(block_hash, &block, extras);
+        Self::new(payload, sidecar)
+    }
+}
+
+impl<T, H> From<(Sealed<&Block<T, H>>, PayloadExtras)> for ExecutionData
+where
+    T: Encodable2718 + Transaction,
+    H: BlockHeader,
+{
+    fn from((sealed, extras): (Sealed<&Block<T, H>>, PayloadExtras)) -> Self {
+        let (block, block_hash) = sealed.into_parts();
+        let (payload, sidecar) =
+            ExecutionPayload::from_block_unchecked_with_extras(block_hash, block, extras);
+        Self::new(payload, sidecar)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4705,6 +4743,68 @@ mod tests {
             Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice())
         );
         assert_eq!(payload.slot_number, 3);
+    }
+
+    #[test]
+    fn execution_data_from_sealed_block_uses_sealed_hash() {
+        let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
+        let block_hash = B256::with_last_byte(3);
+
+        let execution_data = ExecutionData::from(Sealed::new_unchecked(block, block_hash));
+
+        assert_eq!(execution_data.block_hash(), block_hash);
+    }
+
+    #[test]
+    fn execution_data_from_sealed_block_ref_uses_sealed_hash() {
+        let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
+        let block_hash = B256::with_last_byte(4);
+
+        let execution_data = ExecutionData::from(Sealed::new_unchecked(&block, block_hash));
+
+        assert_eq!(execution_data.block_hash(), block_hash);
+    }
+
+    #[test]
+    fn execution_data_from_sealed_block_with_extras_preserves_bal() {
+        let block_access_list = Bytes::from(vec![0xaa, 0xbb, 0xcc]);
+        let header = Header {
+            block_access_list_hash: Some(keccak256(&block_access_list)),
+            slot_number: Some(7),
+            ..Default::default()
+        };
+
+        let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
+        let block_hash = B256::with_last_byte(5);
+        let execution_data = ExecutionData::from((
+            Sealed::new_unchecked(block, block_hash),
+            PayloadExtras::from(block_access_list.clone()),
+        ));
+
+        assert_eq!(execution_data.block_hash(), block_hash);
+        assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
+        assert_eq!(execution_data.payload.slot_number(), Some(7));
+    }
+
+    #[test]
+    fn execution_data_from_sealed_block_ref_with_extras_preserves_bal() {
+        let block_access_list = Bytes::from(vec![0xaa, 0xbb, 0xcc]);
+        let header = Header {
+            block_access_list_hash: Some(keccak256(&block_access_list)),
+            slot_number: Some(7),
+            ..Default::default()
+        };
+
+        let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
+        let block_hash = B256::with_last_byte(6);
+        let execution_data = ExecutionData::from((
+            Sealed::new_unchecked(&block, block_hash),
+            PayloadExtras::from(block_access_list.clone()),
+        ));
+
+        assert_eq!(execution_data.block_hash(), block_hash);
+        assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
+        assert_eq!(execution_data.payload.slot_number(), Some(7));
     }
 
     #[test]
