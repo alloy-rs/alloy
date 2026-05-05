@@ -23,7 +23,7 @@ use alloy_eips::{
     eip7928::EMPTY_BLOCK_ACCESS_LIST_HASH,
     BlockNumHash,
 };
-use alloy_primitives::{keccak256, Address, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_primitives::{keccak256, Address, Bloom, Bytes, Sealable, Sealed, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -3555,6 +3555,54 @@ impl ExecutionData {
     }
 }
 
+impl<T, H> From<Sealed<Block<T, H>>> for ExecutionData
+where
+    T: Encodable2718 + Transaction,
+    H: BlockHeader,
+{
+    fn from(sealed: Sealed<Block<T, H>>) -> Self {
+        let (block, block_hash) = sealed.into_parts();
+        Self::from_block_unchecked(block_hash, &block)
+    }
+}
+
+impl<T, H> From<Sealed<&Block<T, H>>> for ExecutionData
+where
+    T: Encodable2718 + Transaction,
+    H: BlockHeader,
+{
+    fn from(sealed: Sealed<&Block<T, H>>) -> Self {
+        let (block, block_hash) = sealed.into_parts();
+        Self::from_block_unchecked(block_hash, block)
+    }
+}
+
+impl<T, H> From<(Sealed<Block<T, H>>, PayloadExtras)> for ExecutionData
+where
+    T: Encodable2718 + Transaction,
+    H: BlockHeader,
+{
+    fn from((sealed, extras): (Sealed<Block<T, H>>, PayloadExtras)) -> Self {
+        let (block, block_hash) = sealed.into_parts();
+        let (payload, sidecar) =
+            ExecutionPayload::from_block_unchecked_with_extras(block_hash, &block, extras);
+        Self::new(payload, sidecar)
+    }
+}
+
+impl<T, H> From<(Sealed<&Block<T, H>>, PayloadExtras)> for ExecutionData
+where
+    T: Encodable2718 + Transaction,
+    H: BlockHeader,
+{
+    fn from((sealed, extras): (Sealed<&Block<T, H>>, PayloadExtras)) -> Self {
+        let (block, block_hash) = sealed.into_parts();
+        let (payload, sidecar) =
+            ExecutionPayload::from_block_unchecked_with_extras(block_hash, block, extras);
+        Self::new(payload, sidecar)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4695,6 +4743,68 @@ mod tests {
             Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice())
         );
         assert_eq!(payload.slot_number, 3);
+    }
+
+    #[test]
+    fn execution_data_from_sealed_block_uses_sealed_hash() {
+        let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
+        let block_hash = B256::with_last_byte(3);
+
+        let execution_data = ExecutionData::from(Sealed::new_unchecked(block, block_hash));
+
+        assert_eq!(execution_data.block_hash(), block_hash);
+    }
+
+    #[test]
+    fn execution_data_from_sealed_block_ref_uses_sealed_hash() {
+        let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
+        let block_hash = B256::with_last_byte(4);
+
+        let execution_data = ExecutionData::from(Sealed::new_unchecked(&block, block_hash));
+
+        assert_eq!(execution_data.block_hash(), block_hash);
+    }
+
+    #[test]
+    fn execution_data_from_sealed_block_with_extras_preserves_bal() {
+        let block_access_list = Bytes::from(vec![0xaa, 0xbb, 0xcc]);
+        let header = Header {
+            block_access_list_hash: Some(keccak256(&block_access_list)),
+            slot_number: Some(7),
+            ..Default::default()
+        };
+
+        let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
+        let block_hash = B256::with_last_byte(5);
+        let execution_data = ExecutionData::from((
+            Sealed::new_unchecked(block, block_hash),
+            PayloadExtras::from(block_access_list.clone()),
+        ));
+
+        assert_eq!(execution_data.block_hash(), block_hash);
+        assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
+        assert_eq!(execution_data.payload.slot_number(), Some(7));
+    }
+
+    #[test]
+    fn execution_data_from_sealed_block_ref_with_extras_preserves_bal() {
+        let block_access_list = Bytes::from(vec![0xaa, 0xbb, 0xcc]);
+        let header = Header {
+            block_access_list_hash: Some(keccak256(&block_access_list)),
+            slot_number: Some(7),
+            ..Default::default()
+        };
+
+        let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
+        let block_hash = B256::with_last_byte(6);
+        let execution_data = ExecutionData::from((
+            Sealed::new_unchecked(&block, block_hash),
+            PayloadExtras::from(block_access_list.clone()),
+        ));
+
+        assert_eq!(execution_data.block_hash(), block_hash);
+        assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
+        assert_eq!(execution_data.payload.slot_number(), Some(7));
     }
 
     #[test]
