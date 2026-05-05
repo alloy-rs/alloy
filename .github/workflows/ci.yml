@@ -121,6 +121,7 @@ jobs:
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-local \
+            --exclude alloy-signer-tempo \
             --exclude alloy-signer-trezor \
             --exclude alloy-signer-turnkey \
             --exclude alloy-transport-ipc
