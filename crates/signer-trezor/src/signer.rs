@@ -170,7 +170,7 @@ impl TrezorSigner {
     ) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
         let path = Self::convert_path(&self.derivation);
-        let request = build_sign_request(tx);
+        let request = build_sign_request(tx)?;
 
         let signature = match request {
             TrezorSignRequest::Legacy(req) => client.ethereum_sign_tx(
@@ -268,7 +268,9 @@ pub(crate) enum TrezorSignRequest {
 /// [`alloy_consensus::TxEip1559`] are still routed to the EIP-1559 Trezor API. Routing them to
 /// the legacy API instead causes Trezor to sign the EIP-155 legacy preimage and the resulting
 /// signature recovers to a different address than the one displayed on the device.
-pub(crate) fn build_sign_request(tx: &dyn SignableTransaction<Signature>) -> TrezorSignRequest {
+pub(crate) fn build_sign_request(
+    tx: &dyn SignableTransaction<Signature>,
+) -> Result<TrezorSignRequest, TrezorError> {
     let nonce = u64_to_trezor(tx.nonce());
     let gas_limit = u64_to_trezor(tx.gas_limit());
     let to = match tx.kind() {
@@ -293,7 +295,7 @@ pub(crate) fn build_sign_request(tx: &dyn SignableTransaction<Signature>) -> Tre
                     .collect()
             })
             .unwrap_or_default();
-        TrezorSignRequest::Eip1559(Eip1559Request {
+        Ok(TrezorSignRequest::Eip1559(Eip1559Request {
             nonce,
             gas_limit,
             to,
@@ -303,10 +305,10 @@ pub(crate) fn build_sign_request(tx: &dyn SignableTransaction<Signature>) -> Tre
             max_gas_fee,
             max_priority_fee,
             access_list,
-        })
-    } else {
+        }))
+    } else if tx.is_legacy() {
         let gas_price = u128_to_trezor(tx.max_fee_per_gas());
-        TrezorSignRequest::Legacy(LegacyRequest {
+        Ok(TrezorSignRequest::Legacy(LegacyRequest {
             nonce,
             gas_price,
             gas_limit,
@@ -314,7 +316,9 @@ pub(crate) fn build_sign_request(tx: &dyn SignableTransaction<Signature>) -> Tre
             value,
             data,
             chain_id,
-        })
+        }))
+    } else {
+        Err(TrezorError::UnsupportedTransactionType(tx.ty()))
     }
 }
 
@@ -348,7 +352,7 @@ fn signature_from_trezor(x: trezor_client::client::Signature) -> Result<Signatur
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_consensus::{Transaction, TxEip1559, TxLegacy, Typed2718};
+    use alloy_consensus::{Transaction, TxEip1559, TxEip2930, TxLegacy, Typed2718};
     use alloy_network::{EthereumWallet, NetworkTransactionBuilder, TransactionBuilder};
     use alloy_primitives::{address, b256, Bytes};
     use alloy_rpc_types_eth::{AccessList, AccessListItem, TransactionRequest};
@@ -512,6 +516,19 @@ mod tests {
         }
     }
 
+    fn sample_eip2930_tx() -> TxEip2930 {
+        TxEip2930 {
+            chain_id: 42431,
+            nonce: 1,
+            gas_price: 40_000_000_001,
+            gas_limit: 356_613,
+            to: TxKind::Call(Address::ZERO),
+            value: U256::ZERO,
+            access_list: Default::default(),
+            input: Bytes::new(),
+        }
+    }
+
     /// A transparent wrapper around any [`SignableTransaction`]. It is a *different* concrete
     /// type from the wrapped value, so the previous `(tx as &dyn Any).downcast_ref::<TxEip1559>()`
     /// dispatch in the Trezor signer fails for it. Used to reproduce the Foundry bug where a
@@ -599,7 +616,7 @@ mod tests {
     #[test]
     fn build_sign_request_dispatches_concrete_eip1559_to_eip1559_api() {
         let tx = sample_eip1559_tx();
-        let request = build_sign_request(&tx as &dyn SignableTransaction<Signature>);
+        let request = build_sign_request(&tx as &dyn SignableTransaction<Signature>).unwrap();
         assert!(
             matches!(request, TrezorSignRequest::Eip1559(_)),
             "concrete TxEip1559 must dispatch to the EIP-1559 path, got {request:?}",
@@ -627,7 +644,8 @@ mod tests {
         assert!(wrapped.is_eip1559());
         assert_eq!(wrapped.ty(), 0x02);
 
-        let wrapped_request = build_sign_request(&wrapped as &dyn SignableTransaction<Signature>);
+        let wrapped_request =
+            build_sign_request(&wrapped as &dyn SignableTransaction<Signature>).unwrap();
         assert!(
             matches!(wrapped_request, TrezorSignRequest::Eip1559(_)),
             "wrapper around TxEip1559 must dispatch to the EIP-1559 path, got {wrapped_request:?}",
@@ -635,7 +653,8 @@ mod tests {
 
         // The wrapper request must also produce the same parameters as the concrete one,
         // so that signing the wrapper is byte-for-byte equivalent to signing the inner tx.
-        let concrete_request = build_sign_request(&inner as &dyn SignableTransaction<Signature>);
+        let concrete_request =
+            build_sign_request(&inner as &dyn SignableTransaction<Signature>).unwrap();
         assert_eq!(wrapped_request, concrete_request);
     }
 
@@ -643,7 +662,7 @@ mod tests {
     #[test]
     fn build_sign_request_dispatches_legacy_to_legacy_api() {
         let tx = sample_legacy_tx();
-        let request = build_sign_request(&tx as &dyn SignableTransaction<Signature>);
+        let request = build_sign_request(&tx as &dyn SignableTransaction<Signature>).unwrap();
         assert!(
             matches!(request, TrezorSignRequest::Legacy(_)),
             "TxLegacy must dispatch to the legacy path, got {request:?}",
@@ -654,10 +673,20 @@ mod tests {
     #[test]
     fn build_sign_request_dispatches_wrapped_legacy_to_legacy_api() {
         let wrapped = SignableWrapper(sample_legacy_tx());
-        let request = build_sign_request(&wrapped as &dyn SignableTransaction<Signature>);
+        let request = build_sign_request(&wrapped as &dyn SignableTransaction<Signature>).unwrap();
         assert!(
             matches!(request, TrezorSignRequest::Legacy(_)),
             "wrapper around TxLegacy must dispatch to the legacy path, got {request:?}",
+        );
+    }
+
+    #[test]
+    fn build_sign_request_rejects_unsupported_typed_transactions() {
+        let tx = sample_eip2930_tx();
+        let err = build_sign_request(&tx as &dyn SignableTransaction<Signature>).unwrap_err();
+        assert!(
+            matches!(err, TrezorError::UnsupportedTransactionType(0x01)),
+            "EIP-2930 must be rejected instead of routed to the legacy path, got {err:?}",
         );
     }
 }
