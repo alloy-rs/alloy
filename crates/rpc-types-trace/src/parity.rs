@@ -4,7 +4,7 @@
 
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256, U64};
 use alloy_rpc_types_eth::BlockNumHash;
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
+use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -464,16 +464,44 @@ pub struct CreateOutput {
 }
 
 /// Represents the output of a trace.
-///
-/// Variant order is significant: `Create` is tried first because `CallOutput`
-/// only requires `gasUsed`, so a create result would otherwise match `Call`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum TraceOutput {
     /// Output of a CREATE transaction.
     Create(CreateOutput),
     /// Output of a regular call transaction.
     Call(CallOutput),
+}
+
+impl<'de> Deserialize<'de> for TraceOutput {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct OutputFields {
+            address: Option<Address>,
+            code: Option<Bytes>,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_used: u64,
+            output: Option<Bytes>,
+        }
+
+        let OutputFields { address, code, gas_used, output } =
+            OutputFields::deserialize(deserializer)?;
+
+        match (address, code) {
+            (Some(address), Some(code)) => {
+                Ok(Self::Create(CreateOutput { address, code, gas_used }))
+            }
+            (None, None) => {
+                Ok(Self::Call(CallOutput { gas_used, output: output.unwrap_or_default() }))
+            }
+            (Some(_), None) => Err(de::Error::missing_field("code")),
+            (None, Some(_)) => Err(de::Error::missing_field("address")),
+        }
+    }
 }
 
 impl TraceOutput {
@@ -1042,6 +1070,16 @@ mod tests {
     }
 
     #[test]
+    fn test_trace_output_call_missing_or_null_output_field() {
+        for json in [r#"{ "gasUsed": "0x0" }"#, r#"{ "gasUsed": "0x0", "output": null }"#] {
+            let parsed: TraceOutput = serde_json::from_str(json).unwrap();
+            let call = parsed.as_call().unwrap();
+            assert_eq!(call.gas_used, 0);
+            assert_eq!(call.output, Bytes::default());
+        }
+    }
+
+    #[test]
     fn test_create_output_does_not_match_call_variant() {
         let json = r#"{
             "address": "0x0000000000000000000000000000000000000001",
@@ -1053,5 +1091,22 @@ mod tests {
             TraceOutput::Create(_) => {}
             TraceOutput::Call(_) => panic!("CreateOutput JSON deserialized as Call variant"),
         }
+    }
+
+    #[test]
+    fn test_trace_output_rejects_partial_create_output() {
+        let missing_code = r#"{
+            "address": "0x0000000000000000000000000000000000000001",
+            "gasUsed": "0x10"
+        }"#;
+        let err = serde_json::from_str::<TraceOutput>(missing_code).unwrap_err().to_string();
+        assert!(err.contains("code"), "{err}");
+
+        let missing_address = r#"{
+            "code": "0x6080",
+            "gasUsed": "0x10"
+        }"#;
+        let err = serde_json::from_str::<TraceOutput>(missing_address).unwrap_err().to_string();
+        assert!(err.contains("address"), "{err}");
     }
 }
