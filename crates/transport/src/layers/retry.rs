@@ -208,6 +208,13 @@ pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     avg_cost: u64,
 }
 
+impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
+    const fn initial_backoff(&self) -> Duration {
+        Duration::from_millis(self.initial_backoff)
+    }
+}
+
+/// Drop guard that releases the queued-request count even if the retry future is cancelled.
 #[derive(Debug)]
 struct QueuedRequest {
     requests_enqueued: Arc<AtomicU32>,
@@ -223,12 +230,6 @@ impl QueuedRequest {
 impl Drop for QueuedRequest {
     fn drop(&mut self) {
         self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
-    }
-}
-
-impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
-    const fn initial_backoff(&self) -> Duration {
-        Duration::from_millis(self.initial_backoff)
     }
 }
 
