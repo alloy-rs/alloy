@@ -446,6 +446,7 @@ pub struct CallOutput {
     #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// The output data of the call.
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub output: Bytes,
 }
 
@@ -463,13 +464,16 @@ pub struct CreateOutput {
 }
 
 /// Represents the output of a trace.
+///
+/// Variant order is significant: `Create` is tried first because `CallOutput`
+/// only requires `gasUsed`, so a create result would otherwise match `Call`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TraceOutput {
-    /// Output of a regular call transaction.
-    Call(CallOutput),
     /// Output of a CREATE transaction.
     Create(CreateOutput),
+    /// Output of a regular call transaction.
+    Call(CallOutput),
 }
 
 impl TraceOutput {
@@ -1028,5 +1032,26 @@ mod tests {
         let trace =
             serde_json::from_str::<TraceResultsWithTransactionHash>(reference_data).unwrap();
         assert_eq!(trace.full_trace.output, Bytes::default());
+    }
+
+    #[test]
+    fn test_call_output_missing_output_field() {
+        let json = r#"{ "gasUsed": "0x0" }"#;
+        let parsed: CallOutput = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.output, Bytes::default());
+    }
+
+    #[test]
+    fn test_create_output_does_not_match_call_variant() {
+        let json = r#"{
+            "address": "0x0000000000000000000000000000000000000001",
+            "code": "0x6080",
+            "gasUsed": "0x10"
+        }"#;
+        let parsed: TraceOutput = serde_json::from_str(json).unwrap();
+        match parsed {
+            TraceOutput::Create(_) => {}
+            TraceOutput::Call(_) => panic!("CreateOutput JSON deserialized as Call variant"),
+        }
     }
 }
