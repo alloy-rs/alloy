@@ -463,12 +463,8 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// (`calc_excess_blob_gas`).
 #[inline]
 pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
-    eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
-        parent_excess_blob_gas,
-        parent_blob_gas_used,
-        // base fee is not used in EIP-4844 excess blob gas calculation
-        0,
-    )
+    let next_excess_blob_gas = parent_excess_blob_gas + parent_blob_gas_used;
+    next_excess_blob_gas.saturating_sub(TARGET_DATA_GAS_PER_BLOCK_DENCUN)
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -476,7 +472,7 @@ pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_u
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`get_blob_gasprice`).
 #[inline]
-pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
+pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
     eip7840::BlobParams::cancun().calc_blob_fee(excess_blob_gas)
 }
 
@@ -491,25 +487,33 @@ pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 ///
 /// This function panics if `denominator` is zero.
 #[inline]
-pub const fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
+pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert!(denominator != 0, "attempt to divide by zero");
 
-    let mut i = 1;
-    let mut output = 0;
-    let mut numerator_accum = factor * denominator;
-    while numerator_accum > 0 {
-        output += numerator_accum;
+    use alloy_primitives::ruint::aliases::U512;
 
-        // Use checked multiplication to prevent overflow
-        let Some(val) = numerator_accum.checked_mul(numerator) else {
-            break;
+    let mut i = U512::from(1);
+    let denominator = U512::from(denominator);
+    let numerator = U512::from(numerator);
+    let mut output = U512::ZERO;
+    let mut numerator_accum = U512::from(factor) * denominator;
+
+    while numerator_accum > U512::ZERO {
+        let Some(next_output) = output.checked_add(numerator_accum) else {
+            return u128::MAX;
         };
+        output = next_output;
 
-        // Denominator is asserted as not zero at the start of the function.
-        numerator_accum = val / (denominator * i);
-        i += 1;
+        // Equivalent to: accum = (accum * numerator) / (denominator * i)
+        let Some(next_accum) = numerator_accum.checked_mul(numerator) else {
+            return u128::MAX;
+        };
+        numerator_accum = next_accum / denominator / i;
+
+        i += U512::from(1);
     }
-    output / denominator
+
+    (output / denominator).try_into().unwrap_or(u128::MAX)
 }
 
 #[cfg(test)]
@@ -519,6 +523,9 @@ mod tests {
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L27
     #[test]
     fn test_calc_excess_blob_gas() {
+        const ZERO_EXCESS: u64 = calc_excess_blob_gas(0, 0);
+        assert_eq!(ZERO_EXCESS, 0);
+
         for t @ &(excess, blobs, expected) in &[
             // The excess blob gas should not increase from zero if the used blob
             // slots are below - or equal - to the target.
@@ -583,6 +590,12 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_calc_blob_fee_pectra_large_input() {
+        let actual = crate::eip7691::calc_blob_gasprice(299453931);
+        assert_eq!(actual, 93359993185840258978230108);
+    }
+
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L78
     #[test]
     fn fake_exp() {
@@ -603,6 +616,9 @@ mod tests {
             (2, 5, 2, 23),   // approximate 24.36
             (1, 50000000, 2225652, 5709098764),
             (1, 380928, BLOB_GASPRICE_UPDATE_FRACTION.try_into().unwrap(), 1),
+            (0, 89, 1, 0),
+            (1, 299453931, 5007716, 93359993185840258978230108),
+            (1, 88, 1, 165162653699637111792770913913821835905),
         ] {
             let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
             assert_eq!(actual, expected, "test: {t:?}");
@@ -620,21 +636,18 @@ mod tests {
     }
 
     #[test]
-    fn fake_exp_handles_overflow() {
-        // Test with very large excess blob gas values that would cause overflow
-        let factor = 1u128; // BLOB_TX_MIN_BLOB_GASPRICE
-        let numerator = u64::MAX as u128; // Very large excess blob gas
-        let denominator = 5007716u128; // BLOB_GASPRICE_UPDATE_FRACTION_PECTRA
+    fn fake_exp_saturates_when_result_overflows_u128() {
+        assert_eq!(fake_exponential(100, 88, 1), u128::MAX);
+        assert_eq!(fake_exponential(1, u64::MAX as u128, 5007716), u128::MAX);
+    }
 
-        // This should not panic even with very large inputs
-        let result = fake_exponential(factor, numerator, denominator);
+    #[test]
+    fn osaka_excess_blob_gas_handles_large_blob_fee_comparison() {
+        let params = crate::eip7840::BlobParams::osaka();
+        let excess_blob_gas = crate::eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA as u64 * 88;
 
-        // The result should be a valid value (not panic)
-        assert!(result > 0);
+        let actual = params.next_block_excess_blob_gas_osaka(excess_blob_gas, 0, 1);
 
-        // Test with Prague parameters
-        let prague_params = crate::eip7840::BlobParams::prague();
-        // This should also not panic when excess_blob_gas is very large
-        let _blob_fee = prague_params.calc_blob_fee(u64::MAX);
+        assert_eq!(actual, excess_blob_gas - params.target_blob_gas_per_block());
     }
 }

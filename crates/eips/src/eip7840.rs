@@ -128,7 +128,7 @@ impl BlobParams {
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas`, `blob_gas_used` and `base_fee_per_gas`.
     #[inline]
-    pub const fn next_block_excess_blob_gas_osaka(
+    pub fn next_block_excess_blob_gas_osaka(
         &self,
         excess_blob_gas: u64,
         blob_gas_used: u64,
@@ -140,8 +140,10 @@ impl BlobParams {
             return 0;
         }
 
-        if self.blob_base_cost as u128 * base_fee_per_gas as u128
-            > DATA_GAS_PER_BLOB as u128 * self.calc_blob_fee(excess_blob_gas)
+        use alloy_primitives::ruint::aliases::U512;
+
+        if U512::from(self.blob_base_cost) * U512::from(base_fee_per_gas)
+            > U512::from(DATA_GAS_PER_BLOB) * U512::from(self.calc_blob_fee(excess_blob_gas))
         {
             let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
                 / self.max_blob_count;
@@ -153,7 +155,7 @@ impl BlobParams {
 
     /// Calculates the blob fee for block based on its `excess_blob_gas`.
     #[inline]
-    pub const fn calc_blob_fee(&self, excess_blob_gas: u64) -> u128 {
+    pub fn calc_blob_fee(&self, excess_blob_gas: u64) -> u128 {
         eip4844::fake_exponential(self.min_blob_fee, excess_blob_gas as u128, self.update_fraction)
     }
 }
