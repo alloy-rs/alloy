@@ -24,7 +24,7 @@ pub struct ConnectionHandle {
 
     /// Notification from the backend of a terminal error.
     ///
-    /// The carried [`TransportError`] is used by [`crate::PubSubService`] to
+    /// The carried [`TransportError`] is used by the pubsub service to
     /// decide whether to attempt reconnection. A
     /// [`TransportErrorKind::NonRetryable`] payload short-circuits the
     /// reconnect loop; any other error (including the default
