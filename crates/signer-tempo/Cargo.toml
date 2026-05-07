@@ -1,7 +1,6 @@
 [package]
 name = "alloy-signer-tempo"
 description = "Read-only Tempo wallet keystore reader for alloy"
-publish = false
 
 version.workspace = true
 edition.workspace = true
