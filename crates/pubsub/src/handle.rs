@@ -1,4 +1,5 @@
 use alloy_json_rpc::PubSubItem;
+use alloy_transport::{TransportError, TransportErrorKind};
 use serde_json::value::RawValue;
 use tokio::{
     sync::{
@@ -22,7 +23,15 @@ pub struct ConnectionHandle {
     pub(crate) from_socket: mpsc::UnboundedReceiver<PubSubItem>,
 
     /// Notification from the backend of a terminal error.
-    pub(crate) error: oneshot::Receiver<()>,
+    ///
+    /// The carried [`TransportError`] is used by [`crate::PubSubService`] to
+    /// decide whether to attempt reconnection. A
+    /// [`TransportErrorKind::NonRetryable`] payload short-circuits the
+    /// reconnect loop; any other error (including the default
+    /// [`TransportErrorKind::BackendGone`] sent by
+    /// [`ConnectionInterface::close_with_error`]) triggers the normal
+    /// reconnect-with-retries path.
+    pub(crate) error: oneshot::Receiver<TransportError>,
 
     /// Notify the backend of intentional shutdown.
     pub(crate) shutdown: oneshot::Sender<()>,
@@ -93,7 +102,7 @@ pub struct ConnectionInterface {
     pub(crate) to_frontend: mpsc::UnboundedSender<PubSubItem>,
 
     /// Notifies the frontend of a terminal error.
-    pub(crate) error: oneshot::Sender<()>,
+    pub(crate) error: oneshot::Sender<TransportError>,
 
     /// Causes local shutdown when sender is triggered or dropped.
     pub(crate) shutdown: oneshot::Receiver<()>,
@@ -120,8 +129,24 @@ impl ConnectionInterface {
         self.from_frontend.recv().await
     }
 
-    /// Close the interface, sending an error to the frontend.
+    /// Close the interface, signaling a generic backend-gone error to the
+    /// frontend.
+    ///
+    /// The pubsub service will attempt to reconnect using the configured
+    /// retry policy. Use [`Self::close_with_transport_error`] to opt out of
+    /// the reconnect loop on deterministic, non-retryable failures.
     pub fn close_with_error(self) {
-        let _ = self.error.send(());
+        let _ = self.error.send(TransportErrorKind::backend_gone());
+    }
+
+    /// Close the interface, signaling a specific transport error to the
+    /// frontend.
+    ///
+    /// Use [`TransportErrorKind::non_retryable_str`] /
+    /// [`TransportErrorKind::non_retryable`] to construct an error that
+    /// short-circuits the pubsub service's reconnect loop. Any other error
+    /// kind triggers the normal reconnect-with-retries path.
+    pub fn close_with_transport_error(self, err: TransportError) {
+        let _ = self.error.send(err);
     }
 }
