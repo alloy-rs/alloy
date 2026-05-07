@@ -16,6 +16,9 @@ pub struct InFlight {
 
     /// The channel to send the response on.
     pub tx: oneshot::Sender<TransportResult<Response>>,
+
+    /// Number of times this request has been re-issued across reconnects.
+    pub(crate) reconnect_count: u32,
 }
 
 impl fmt::Debug for InFlight {
@@ -24,6 +27,7 @@ impl fmt::Debug for InFlight {
             .field("request", &self.request)
             .field("channel_size", &self.channel_size)
             .field("tx_is_closed", &self.tx.is_closed())
+            .field("reconnect_count", &self.reconnect_count)
             .finish()
     }
 }
@@ -36,7 +40,7 @@ impl InFlight {
     ) -> (Self, oneshot::Receiver<TransportResult<Response>>) {
         let (tx, rx) = oneshot::channel();
 
-        (Self { request, channel_size, tx }, rx)
+        (Self { request, channel_size, tx, reconnect_count: 0 }, rx)
     }
 
     /// Check if the request is a subscription.
