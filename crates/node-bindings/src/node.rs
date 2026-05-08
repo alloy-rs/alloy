@@ -5,7 +5,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 /// How long we will wait for the node to indicate that it is ready.
-pub const NODE_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+pub const NODE_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Timeout for waiting for the node to add a peer.
 pub const NODE_DIAL_LOOP_TIMEOUT: Duration = Duration::from_secs(20);

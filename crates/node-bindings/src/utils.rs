@@ -1,12 +1,13 @@
 //! Utility functions for the node bindings.
 
+#[cfg(unix)]
+use std::time::{Duration, Instant};
 use std::{
     borrow::Cow,
     future::Future,
     net::{SocketAddr, TcpListener},
     path::PathBuf,
     process::Child,
-    time::{Duration, Instant},
 };
 use tempfile::TempDir;
 
@@ -19,6 +20,9 @@ pub(crate) struct GracefulShutdown;
 impl GracefulShutdown {
     /// Attempts graceful shutdown with SIGTERM, then SIGKILL after timeout.
     pub(crate) fn shutdown(child: &mut Child, timeout_secs: u64, process_name: &str) {
+        #[cfg(not(unix))]
+        let _ = timeout_secs;
+
         #[cfg(unix)]
         {
             unsafe {
