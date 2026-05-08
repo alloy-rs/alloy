@@ -37,9 +37,8 @@ impl GracefulShutdown {
             }
         }
 
-        match child.try_wait() {
-            Ok(Some(_)) => return,
-            Ok(None) | Err(_) => {}
+        if let Ok(Some(_)) = child.try_wait() {
+            return;
         }
 
         if let Err(err) = child.kill() {
