@@ -173,3 +173,9 @@ serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.20"
 tower-http = "0.6.1"
+
+mpp = { version = "0.10", default-features = false, features = ["client"] }
+
+# Temporary patch: feature-gate mpp's serde_json/preserve_order. Drop once upstream releases the fix.
+[patch.crates-io]
+mpp = { git = "https://github.com/stevencartavia/mpp-rs", branch = "fix/optional-preserve-order" }

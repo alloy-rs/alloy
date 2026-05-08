@@ -39,13 +39,25 @@ tokio = { workspace = true, features = ["sync", "rt", "time"] }
 rustls = { version = "0.23", default-features = false, optional = true }
 tokio-tungstenite = { workspace = true }
 
+# mpp does not currently build on wasm/wasi because its client requires
+# `Send` futures. Gate the dep so wasm builds don't pull it in even when
+# the `mpp` feature is enabled.
+[target.'cfg(not(any(target_family = "wasm", all(target_os = "wasi", target_env = "p1"))))'.dependencies]
+alloy-json-rpc = { workspace = true, optional = true }
+mpp = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
+
 # WASM only
 [target.'cfg(target_family = "wasm")'.dependencies]
 ws_stream_wasm = "0.7.4"
 
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "net", "time"] }
+
 [features]
-default = ["aws-lc-rs"]
+default = ["aws-lc-rs", "mpp"]
 aws-lc-rs = ["rustls-tls", "rustls?/aws-lc-rs"]
 ring = ["rustls-tls", "rustls?/ring"]
 native-tls = ["tokio-tungstenite/native-tls"]
 rustls-tls = ["dep:rustls", "tokio-tungstenite/rustls-tls-webpki-roots"]
+mpp = ["dep:mpp", "dep:alloy-json-rpc", "dep:serde"]

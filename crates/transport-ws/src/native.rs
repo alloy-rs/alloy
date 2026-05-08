@@ -10,7 +10,7 @@ use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream,
 };
 
-type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+pub(crate) type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
@@ -90,6 +90,21 @@ impl WsConnect {
         self.config.as_ref()
     }
 
+    /// Get the keepalive ping interval.
+    pub const fn keepalive_interval(&self) -> Duration {
+        self.keepalive_interval
+    }
+
+    /// Get the max number of retries before failing and exiting the connection.
+    pub const fn max_retries(&self) -> u32 {
+        self.max_retries
+    }
+
+    /// Get the base interval between retries.
+    pub const fn retry_interval(&self) -> Duration {
+        self.retry_interval
+    }
+
     /// Sets the max number of retries before failing and exiting the connection.
     /// Default is 10.
     pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
@@ -161,7 +176,7 @@ impl PubSubConnect for WsConnect {
 ///
 /// Required since rustls 0.23+ no longer auto-installs one.
 #[cfg(any(feature = "aws-lc-rs", feature = "ring"))]
-fn install_default_crypto_provider() {
+pub(crate) fn install_default_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_some() {
         return;
     }

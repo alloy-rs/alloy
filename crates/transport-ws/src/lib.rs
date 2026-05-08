@@ -22,6 +22,17 @@ mod wasm;
 #[cfg(target_family = "wasm")]
 pub use wasm::WsConnect;
 
+#[cfg(all(
+    feature = "mpp",
+    not(any(target_family = "wasm", all(target_os = "wasi", target_env = "p1")))
+))]
+pub mod mpp;
+#[cfg(all(
+    feature = "mpp",
+    not(any(target_family = "wasm", all(target_os = "wasi", target_env = "p1")))
+))]
+pub use mpp::MppWsConnect;
+
 /// The default keepalive interval in seconds.
 const DEFAULT_KEEPALIVE: u64 = 10;
 
