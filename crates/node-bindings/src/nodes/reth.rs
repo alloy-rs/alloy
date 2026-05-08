@@ -490,7 +490,13 @@ impl Reth {
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
+        let stdout = match child.stdout.take() {
+            Some(stdout) => stdout,
+            None => {
+                GracefulShutdown::shutdown(&mut child, 0, "reth");
+                return Err(NodeError::NoStdout);
+            }
+        };
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
@@ -503,14 +509,15 @@ impl Reth {
         let mut ports_started = false;
         let mut p2p_started = !self.discovery_enabled;
 
-        loop {
+        let startup = loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
-                let _ = child.kill();
-                return Err(NodeError::Timeout);
+                break Err(NodeError::Timeout);
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if let Err(err) = reader.read_line(&mut line) {
+                break Err(NodeError::ReadLineError(err));
+            }
 
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
@@ -532,8 +539,7 @@ impl Reth {
 
             // Encountered a critical error, exit early.
             if line.contains("ERROR") {
-                let _ = child.kill();
-                return Err(NodeError::Fatal(line));
+                break Err(NodeError::Fatal(line));
             }
 
             if http_port != 0 && ws_port != 0 && auth_port != 0 {
@@ -553,8 +559,13 @@ impl Reth {
 
             // If all ports have started we are ready to be queried.
             if ports_started && p2p_started {
-                break;
+                break Ok(());
             }
+        };
+
+        if let Err(err) = startup {
+            GracefulShutdown::shutdown(&mut child, 0, "reth");
+            return Err(err);
         }
 
         if self.keep_stdout {

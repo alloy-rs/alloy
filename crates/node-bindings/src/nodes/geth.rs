@@ -615,7 +615,13 @@ impl Geth {
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stderr = child.stderr.take().ok_or(NodeError::NoStderr)?;
+        let stderr = match child.stderr.take() {
+            Some(stderr) => stderr,
+            None => {
+                GracefulShutdown::shutdown(&mut child, 0, "geth");
+                return Err(NodeError::NoStderr);
+            }
+        };
 
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
@@ -625,14 +631,15 @@ impl Geth {
         let mut p2p_started = matches!(self.mode, NodeMode::Dev(_));
         let mut ports_started = false;
 
-        loop {
+        let startup = loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
-                let _ = child.kill();
-                return Err(NodeError::Timeout);
+                break Err(NodeError::Timeout);
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if let Err(err) = reader.read_line(&mut line) {
+                break Err(NodeError::ReadLineError(err));
+            }
 
             if matches!(self.mode, NodeMode::NonDev(_)) && line.contains("Started P2P networking") {
                 p2p_started = true;
@@ -664,14 +671,18 @@ impl Geth {
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
             // 127.0.0.1:8545: bind: address already in use
             if line.contains("Fatal:") {
-                let _ = child.kill();
-                return Err(NodeError::Fatal(line));
+                break Err(NodeError::Fatal(line));
             }
 
             // If all ports have started we are ready to be queried.
             if ports_started && p2p_started {
-                break;
+                break Ok(());
             }
+        };
+
+        if let Err(err) = startup {
+            GracefulShutdown::shutdown(&mut child, 0, "geth");
+            return Err(err);
         }
 
         if self.keep_err {

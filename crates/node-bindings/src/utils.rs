@@ -37,7 +37,14 @@ impl GracefulShutdown {
             }
         }
 
-        child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) | Err(_) => {}
+        }
+
+        if let Err(err) = child.kill() {
+            eprintln!("could not kill {process_name}: {err}");
+        }
         let _ = child.wait();
     }
 }
@@ -203,5 +210,14 @@ mod tests {
         GracefulShutdown::shutdown(&mut child, 0, "sh");
 
         assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn graceful_shutdown_ignores_already_exited_child() {
+        let mut child = std::process::Command::new("sh").arg("-c").arg("exit 0").spawn().unwrap();
+        let _ = child.wait().unwrap();
+
+        GracefulShutdown::shutdown(&mut child, 0, "sh");
     }
 }

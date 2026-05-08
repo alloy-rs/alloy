@@ -446,7 +446,13 @@ impl Anvil {
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
+        let stdout = match child.stdout.take() {
+            Some(stdout) => stdout,
+            None => {
+                GracefulShutdown::shutdown(&mut child, 0, "anvil");
+                return Err(NodeError::NoStdout);
+            }
+        };
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
@@ -457,14 +463,15 @@ impl Anvil {
         let mut is_private_key = false;
         let mut chain_id = None;
         let mut wallet = None;
-        loop {
+        let startup = loop {
             if start + timeout <= Instant::now() {
-                let _ = child.kill();
-                return Err(NodeError::Timeout);
+                break Err(NodeError::Timeout);
             }
 
             let mut line = String::new();
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if let Err(err) = reader.read_line(&mut line) {
+                break Err(NodeError::ReadLineError(err));
+            }
             trace!(target: "alloy::node::anvil", line);
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
@@ -472,7 +479,7 @@ impl Anvil {
                 if let Ok(addr) = SocketAddr::from_str(addr.trim()) {
                     port = addr.port();
                 }
-                break;
+                break Ok(());
             }
 
             if line.starts_with("Private Keys") {
@@ -480,11 +487,17 @@ impl Anvil {
             }
 
             if is_private_key && line.starts_with('(') {
-                let key_str =
-                    line.split("0x").last().ok_or(NodeError::ParsePrivateKeyError)?.trim();
-                let key_hex = hex::decode(key_str).map_err(NodeError::FromHexError)?;
-                let key = K256SecretKey::from_bytes((&key_hex[..]).into())
-                    .map_err(|_| NodeError::DeserializePrivateKeyError)?;
+                let Some((_, key_str)) = line.rsplit_once("0x") else {
+                    break Err(NodeError::ParsePrivateKeyError);
+                };
+                let key_hex = match hex::decode(key_str.trim()) {
+                    Ok(key_hex) => key_hex,
+                    Err(err) => break Err(NodeError::FromHexError(err)),
+                };
+                let key = match K256SecretKey::from_bytes((&key_hex[..]).into()) {
+                    Ok(key) => key,
+                    Err(_) => break Err(NodeError::DeserializePrivateKeyError),
+                };
                 addresses.push(Address::from_public_key(SigningKey::from(&key).verifying_key()));
                 private_keys.push(key);
             }
@@ -508,6 +521,11 @@ impl Anvil {
                 }
                 wallet = Some(w);
             }
+        };
+
+        if let Err(err) = startup {
+            GracefulShutdown::shutdown(&mut child, 0, "anvil");
+            return Err(err);
         }
 
         if self.keep_stdout {
