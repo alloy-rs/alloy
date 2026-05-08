@@ -26,6 +26,14 @@ pub use layers::{AuthLayer, AuthService};
 #[cfg(all(not(target_family = "wasm"), feature = "traceparent"))]
 pub use layers::{TraceParentLayer, TraceParentService};
 
+#[cfg(all(
+    not(target_family = "wasm"),
+    feature = "mpp",
+    feature = "reqwest",
+    not(all(target_os = "wasi", target_env = "p1"))
+))]
+pub use layers::mpp::{self, MppHttp};
+
 #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
 mod hyper_transport;
 #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]

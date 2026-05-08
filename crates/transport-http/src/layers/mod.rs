@@ -11,3 +11,6 @@ pub use auth::{AuthLayer, AuthService};
 mod trace;
 #[cfg(feature = "traceparent")]
 pub use trace::{TraceParentLayer, TraceParentService};
+
+#[cfg(all(feature = "mpp", feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
+pub mod mpp;

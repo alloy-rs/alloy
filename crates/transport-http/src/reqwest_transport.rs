@@ -45,34 +45,36 @@ impl Http<Client> {
             .send()
             .await
             .map_err(TransportErrorKind::custom)?;
-        let status = resp.status();
 
-        debug!(%status, "received response from server");
-
-        // Unpack data from the response body. We do this regardless of
-        // the status code, as we want to return the error in the body
-        // if there is one.
-        let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
-
-        if tracing::enabled!(tracing::Level::TRACE) {
-            trace!(body = %String::from_utf8_lossy(&body), "response body");
-        } else {
-            debug!(bytes = body.len(), "retrieved response body");
-        }
-
-        if !status.is_success() {
-            return Err(TransportErrorKind::http_error(
-                status.as_u16(),
-                String::from_utf8_lossy(&body).into_owned(),
-            ));
-        }
-
-        // Deserialize a Box<RawValue> from the body. If deserialization fails, return
-        // the body as a string in the error. The conversion to String
-        // is lossy and may not cover all the bytes in the body.
-        serde_json::from_slice(&body)
-            .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(&body)))
+        decode_response(resp).await
     }
+}
+
+/// Decode a [`reqwest::Response`] into a [`ResponsePacket`].
+pub(crate) async fn decode_response(resp: reqwest::Response) -> TransportResult<ResponsePacket> {
+    let status = resp.status();
+    debug!(%status, "received response from server");
+
+    let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
+
+    if tracing::enabled!(tracing::Level::TRACE) {
+        trace!(body = %String::from_utf8_lossy(&body), "response body");
+    } else {
+        debug!(bytes = body.len(), "retrieved response body");
+    }
+
+    if !status.is_success() {
+        return Err(TransportErrorKind::http_error(
+            status.as_u16(),
+            String::from_utf8_lossy(&body).into_owned(),
+        ));
+    }
+
+    // Deserialize a Box<RawValue> from the body. If deserialization fails, return
+    // the body as a string in the error. The conversion to String
+    // is lossy and may not cover all the bytes in the body.
+    serde_json::from_slice(&body)
+        .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(&body)))
 }
 
 impl Service<RequestPacket> for Http<reqwest::Client> {
