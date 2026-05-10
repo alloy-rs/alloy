@@ -92,13 +92,23 @@ impl TrezorSigner {
         derivation: DerivationType,
         chain_id: Option<ChainId>,
     ) -> Result<Self, TrezorError> {
+        Self::new_with_passphrase(derivation, chain_id, false).await
+    }
+
+    /// Instantiates a new Trezor signer with the option to skip the passphrase prompt.
+    #[instrument(ret)]
+    pub async fn new_with_passphrase(
+        derivation: DerivationType,
+        chain_id: Option<ChainId>,
+        skip_passphrase: bool,
+    ) -> Result<Self, TrezorError> {
         let mut signer = Self {
             derivation: derivation.clone(),
             chain_id,
             address: Address::ZERO,
             session_id: vec![],
         };
-        signer.initiate_session()?;
+        signer.initiate_session(skip_passphrase)?;
         signer.address = signer.get_address_with_path(&derivation).await?;
         Ok(signer)
     }
@@ -121,11 +131,13 @@ impl TrezorSigner {
         Ok(())
     }
 
-    fn initiate_session(&mut self) -> Result<(), TrezorError> {
+    fn initiate_session(&mut self, skip_passphrase: bool) -> Result<(), TrezorError> {
         let mut client = trezor_client::unique(false)?;
-        client.init_device(None)?;
 
-        let features = client.features().ok_or(TrezorError::Features)?;
+        let mut req = trezor_client::protos::Initialize::new();
+        req.set__skip_passphrase(skip_passphrase);
+
+        let features: trezor_client::Features = client.call(req, Box::new(|_, m| Ok(m)))?.ok()?;
         let version = semver::Version::new(
             features.major_version() as u64,
             features.minor_version() as u64,
