@@ -834,15 +834,8 @@ impl BlobTransactionSidecarEip7594 {
         let mut blob_cells = Vec::with_capacity(cell_mask.count());
         let mut selected_proofs = Vec::with_capacity(cell_mask.count());
         for cell_index in cell_mask.selected_indices() {
-            let cell = cells
-                .get(cell_index)
-                .expect("computed cells must contain one entry per extended blob cell");
-            let proof = proofs
-                .get(cell_index)
-                .expect("cell proofs must contain one entry per extended blob cell");
-
-            blob_cells.push(Some(Cell::new(cell.to_bytes())));
-            selected_proofs.push(Some(*proof));
+            blob_cells.push(cells.get(cell_index).map(|cell| Cell::new(cell.to_bytes())));
+            selected_proofs.push(proofs.get(cell_index).copied());
         }
 
         BlobCellsAndProofsV1 { blob_cells, proofs: selected_proofs }
