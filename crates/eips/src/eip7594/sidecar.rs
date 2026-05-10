@@ -537,59 +537,6 @@ impl core::fmt::Debug for BlobTransactionSidecarEip7594 {
     }
 }
 
-/// Cell indices requested by `engine_getBlobsV4`.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct BlobCellMask {
-    value: u128,
-}
-
-impl BlobCellMask {
-    /// Creates a mask from the Engine API 16-byte, big-endian bitarray.
-    #[inline]
-    pub fn new(indices_bitarray: B128) -> Self {
-        Self { value: u128::from(indices_bitarray) }
-    }
-
-    /// Creates a mask from the raw bit representation.
-    #[inline]
-    pub const fn from_bits(value: u128) -> Self {
-        Self { value }
-    }
-
-    /// Returns the raw bit representation.
-    #[inline]
-    pub const fn bits(self) -> u128 {
-        self.value
-    }
-
-    /// Returns the number of selected cells.
-    #[inline]
-    pub const fn count(self) -> usize {
-        self.value.count_ones() as usize
-    }
-
-    /// Returns true if the given cell index is selected.
-    #[inline]
-    pub const fn contains(self, index: usize) -> bool {
-        index < CELLS_PER_EXT_BLOB && self.value & (1u128 << index) != 0
-    }
-
-    /// Iterates selected cell indices in ascending order.
-    #[inline]
-    pub fn selected_indices(self) -> impl Iterator<Item = usize> {
-        let mut bits = self.value;
-        core::iter::from_fn(move || {
-            if bits == 0 {
-                return None;
-            }
-
-            let index = bits.trailing_zeros() as usize;
-            bits &= bits - 1;
-            Some(index)
-        })
-    }
-}
-
 impl BlobTransactionSidecarEip7594 {
     /// Constructs a new [BlobTransactionSidecarEip7594] from a set of blobs, commitments, and
     /// cell proofs.
@@ -1101,6 +1048,59 @@ impl Decodable7594 for BlobTransactionSidecarEip7594 {
             return Err(alloy_rlp::Error::Custom("invalid wrapper version"));
         }
         Self::rlp_decode_fields(buf)
+    }
+}
+
+/// Cell indices requested by `engine_getBlobsV4`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct BlobCellMask {
+    value: u128,
+}
+
+impl BlobCellMask {
+    /// Creates a mask from the Engine API 16-byte, big-endian bitarray.
+    #[inline]
+    pub fn new(indices_bitarray: B128) -> Self {
+        Self { value: u128::from(indices_bitarray) }
+    }
+
+    /// Creates a mask from the raw bit representation.
+    #[inline]
+    pub const fn from_bits(value: u128) -> Self {
+        Self { value }
+    }
+
+    /// Returns the raw bit representation.
+    #[inline]
+    pub const fn bits(self) -> u128 {
+        self.value
+    }
+
+    /// Returns the number of selected cells.
+    #[inline]
+    pub const fn count(self) -> usize {
+        self.value.count_ones() as usize
+    }
+
+    /// Returns true if the given cell index is selected.
+    #[inline]
+    pub const fn contains(self, index: usize) -> bool {
+        index < CELLS_PER_EXT_BLOB && self.value & (1u128 << index) != 0
+    }
+
+    /// Iterates selected cell indices in ascending order.
+    #[inline]
+    pub fn selected_indices(self) -> impl Iterator<Item = usize> {
+        let mut bits = self.value;
+        core::iter::from_fn(move || {
+            if bits == 0 {
+                return None;
+            }
+
+            let index = bits.trailing_zeros() as usize;
+            bits &= bits - 1;
+            Some(index)
+        })
     }
 }
 
