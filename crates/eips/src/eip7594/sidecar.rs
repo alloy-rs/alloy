@@ -829,11 +829,13 @@ impl BlobTransactionSidecarEip7594 {
         cells: &[c_kzg::Cell],
         proofs: &[Bytes48],
     ) -> BlobCellsAndProofsV1 {
+        // The response needs two owned vectors, and `count()` exactly matches
+        // `selected_indices()`, so this avoids reallocations while staying simple.
         let mut blob_cells = Vec::with_capacity(cell_mask.count());
         let mut selected_proofs = Vec::with_capacity(cell_mask.count());
         for cell_index in cell_mask.selected_indices() {
-            blob_cells.push(Some(Cell::new(cells[cell_index].to_bytes())));
-            selected_proofs.push(Some(proofs[cell_index]));
+            blob_cells.push(cells.get(cell_index).map(|cell| Cell::new(cell.to_bytes())));
+            selected_proofs.push(proofs.get(cell_index).copied());
         }
 
         BlobCellsAndProofsV1 { blob_cells, proofs: selected_proofs }
