@@ -424,19 +424,23 @@ mod saturating_base_fee_per_gas {
     use alloy_primitives::U256;
     use serde::{Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<S>(value: &Option<u64>, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(value: &Option<u64>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         alloy_serde::quantity::opt::serialize(value, serializer)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let opt: Option<U256> = Option::deserialize(deserializer)?;
-        Ok(opt.map(|v| v.try_into().unwrap_or(u64::MAX)))
+        if deserializer.is_human_readable() {
+            let opt: Option<U256> = Option::deserialize(deserializer)?;
+            Ok(opt.map(|v| v.try_into().unwrap_or(u64::MAX)))
+        } else {
+            alloy_serde::quantity::opt::deserialize(deserializer)
+        }
     }
 }
 
@@ -581,6 +585,26 @@ mod tests {
 }"#;
         let header: AnyHeader = serde_json::from_str(s).unwrap();
         assert_eq!(header.base_fee_per_gas, Some(u64::MAX));
+    }
+
+    // The saturating JSON path must not change the binary serde shape inherited
+    // from `alloy_serde::quantity::opt`.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn binary_roundtrip_preserves_base_fee() {
+        #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        struct BaseFee {
+            #[serde(with = "super::saturating_base_fee_per_gas")]
+            base_fee_per_gas: Option<u64>,
+        }
+
+        let header = BaseFee { base_fee_per_gas: Some(1_000_000_000) };
+        let encoded = bincode::serde::encode_to_vec(&header, bincode::config::legacy()).unwrap();
+        let (decoded, _) =
+            bincode::serde::decode_from_slice::<BaseFee, _>(&encoded, bincode::config::legacy())
+                .unwrap();
+
+        assert_eq!(decoded, header);
     }
 
     // Absent baseFeePerGas (pre-London) must still deserialize as None.
