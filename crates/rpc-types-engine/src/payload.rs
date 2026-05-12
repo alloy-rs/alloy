@@ -653,6 +653,11 @@ impl ExecutionPayloadV1 {
         self.into_block_raw_with_transactions_root_opt(None)
     }
 
+    /// Creates a [`Header`] from this payload without consuming it.
+    pub fn try_to_header(&self) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(None)
+    }
+
     /// Converts [`ExecutionPayloadV1`] to [`Block`] with raw [`Bytes`] transactions using the
     /// given `transactions_root`.
     ///
@@ -665,6 +670,15 @@ impl ExecutionPayloadV1 {
         self.into_block_raw_with_transactions_root_opt(Some(transactions_root))
     }
 
+    /// Creates a [`Header`] from this payload without consuming it, using the given
+    /// `transactions_root`.
+    pub fn try_to_header_with_transactions_root(
+        &self,
+        transactions_root: B256,
+    ) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(Some(transactions_root))
+    }
+
     /// Converts [`ExecutionPayloadV1`] to [`Block`] with raw [`Bytes`] transactions, optionally
     /// using the given `transactions_root`.
     ///
@@ -673,15 +687,31 @@ impl ExecutionPayloadV1 {
         self,
         transactions_root: Option<B256>,
     ) -> Result<Block<Bytes>, PayloadError> {
+        let header = self.try_to_header_with_transactions_root_opt(transactions_root)?;
+
+        Ok(Block {
+            header,
+            body: BlockBody { transactions: self.transactions, ommers: vec![], withdrawals: None },
+        })
+    }
+
+    /// Creates a [`Header`] from this payload without consuming it, optionally using the given
+    /// `transactions_root`.
+    ///
+    /// If `transactions_root` is `None`, it will be computed from the transactions.
+    pub fn try_to_header_with_transactions_root_opt(
+        &self,
+        transactions_root: Option<B256>,
+    ) -> Result<Header, PayloadError> {
         if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
-            return Err(PayloadError::ExtraData(self.extra_data));
+            return Err(PayloadError::ExtraData(self.extra_data.clone()));
         }
 
         let transactions_root = transactions_root.unwrap_or_else(|| {
             alloy_consensus::proofs::ordered_trie_root_encoded(&self.transactions)
         });
 
-        let header = Header {
+        Ok(Header {
             parent_hash: self.parent_hash,
             beneficiary: self.fee_recipient,
             state_root: self.state_root,
@@ -709,16 +739,11 @@ impl ExecutionPayloadV1 {
             requests_hash: None,
             block_access_list_hash: None,
             slot_number: None,
-            extra_data: self.extra_data,
+            extra_data: self.extra_data.clone(),
             // Defaults
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
             difficulty: Default::default(),
             nonce: Default::default(),
-        };
-
-        Ok(Block {
-            header,
-            body: BlockBody { transactions: self.transactions, ommers: vec![], withdrawals: None },
         })
     }
 
@@ -939,6 +964,11 @@ impl ExecutionPayloadV2 {
         self.into_block_raw_with_transactions_root_opt(None)
     }
 
+    /// Creates a [`Header`] from this payload without consuming it.
+    pub fn try_to_header(&self) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(None)
+    }
+
     /// Converts [`ExecutionPayloadV2`] to [`Block`] with raw [`Bytes`] transactions using the
     /// given `transactions_root`.
     ///
@@ -948,6 +978,15 @@ impl ExecutionPayloadV2 {
         transactions_root: B256,
     ) -> Result<Block<Bytes>, PayloadError> {
         self.into_block_raw_with_transactions_root_opt(Some(transactions_root))
+    }
+
+    /// Creates a [`Header`] from this payload without consuming it, using the given
+    /// `transactions_root`.
+    pub fn try_to_header_with_transactions_root(
+        &self,
+        transactions_root: B256,
+    ) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(Some(transactions_root))
     }
 
     /// Converts [`ExecutionPayloadV2`] to [`Block`] with raw [`Bytes`] transactions, optionally
@@ -965,6 +1004,21 @@ impl ExecutionPayloadV2 {
         base_sealed_block.body.withdrawals = Some(self.withdrawals.into());
         base_sealed_block.header.withdrawals_root = Some(withdrawals_root);
         Ok(base_sealed_block)
+    }
+
+    /// Creates a [`Header`] from this payload without consuming it, optionally using the given
+    /// `transactions_root`.
+    ///
+    /// If `transactions_root` is `None`, it will be computed from the transactions.
+    pub fn try_to_header_with_transactions_root_opt(
+        &self,
+        transactions_root: Option<B256>,
+    ) -> Result<Header, PayloadError> {
+        let mut header =
+            self.payload_inner.try_to_header_with_transactions_root_opt(transactions_root)?;
+        header.withdrawals_root =
+            Some(alloy_consensus::proofs::calculate_withdrawals_root(&self.withdrawals));
+        Ok(header)
     }
 }
 
@@ -1222,6 +1276,11 @@ impl ExecutionPayloadV3 {
         self.into_block_raw_with_transactions_root_opt(None)
     }
 
+    /// Creates a [`Header`] from this payload without consuming it.
+    pub fn try_to_header(&self) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(None)
+    }
+
     /// Converts [`ExecutionPayloadV3`] to [`Block`] with raw [`Bytes`] transactions using the
     /// given `transactions_root`.
     ///
@@ -1231,6 +1290,15 @@ impl ExecutionPayloadV3 {
         transactions_root: B256,
     ) -> Result<Block<Bytes>, PayloadError> {
         self.into_block_raw_with_transactions_root_opt(Some(transactions_root))
+    }
+
+    /// Creates a [`Header`] from this payload without consuming it, using the given
+    /// `transactions_root`.
+    pub fn try_to_header_with_transactions_root(
+        &self,
+        transactions_root: B256,
+    ) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(Some(transactions_root))
     }
 
     /// Converts [`ExecutionPayloadV3`] to [`Block`] with raw [`Bytes`] transactions, optionally
@@ -1248,6 +1316,23 @@ impl ExecutionPayloadV3 {
         base_block.header.excess_blob_gas = Some(self.excess_blob_gas);
 
         Ok(base_block)
+    }
+
+    /// Creates a [`Header`] from this payload without consuming it, optionally using the given
+    /// `transactions_root`.
+    ///
+    /// If `transactions_root` is `None`, it will be computed from the transactions.
+    pub fn try_to_header_with_transactions_root_opt(
+        &self,
+        transactions_root: Option<B256>,
+    ) -> Result<Header, PayloadError> {
+        let mut header =
+            self.payload_inner.try_to_header_with_transactions_root_opt(transactions_root)?;
+
+        header.blob_gas_used = Some(self.blob_gas_used);
+        header.excess_blob_gas = Some(self.excess_blob_gas);
+
+        Ok(header)
     }
 }
 
@@ -1664,13 +1749,12 @@ impl ExecutionPayloadV4 {
     /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
     /// without any conversion.
     pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
-        let mut base_block = self.payload_inner.into_block_raw()?;
+        self.into_block_raw_with_transactions_root_opt(None)
+    }
 
-        let block_access_list_hash = alloy_primitives::keccak256(&self.block_access_list);
-        base_block.header.block_access_list_hash = Some(block_access_list_hash);
-        base_block.header.slot_number = Some(self.slot_number);
-
-        Ok(base_block)
+    /// Creates a [`Header`] from this payload without consuming it.
+    pub fn try_to_header(&self) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(None)
     }
 
     /// Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions using the
@@ -1682,6 +1766,15 @@ impl ExecutionPayloadV4 {
         transactions_root: B256,
     ) -> Result<Block<Bytes>, PayloadError> {
         self.into_block_raw_with_transactions_root_opt(Some(transactions_root))
+    }
+
+    /// Creates a [`Header`] from this payload without consuming it, using the given
+    /// `transactions_root`.
+    pub fn try_to_header_with_transactions_root(
+        &self,
+        transactions_root: B256,
+    ) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(Some(transactions_root))
     }
 
     /// Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions, optionally
@@ -1699,6 +1792,23 @@ impl ExecutionPayloadV4 {
         base_block.header.slot_number = Some(self.slot_number);
 
         Ok(base_block)
+    }
+
+    /// Creates a [`Header`] from this payload without consuming it, optionally using the given
+    /// `transactions_root`.
+    ///
+    /// If `transactions_root` is `None`, it will be computed from the transactions.
+    pub fn try_to_header_with_transactions_root_opt(
+        &self,
+        transactions_root: Option<B256>,
+    ) -> Result<Header, PayloadError> {
+        let mut header =
+            self.payload_inner.try_to_header_with_transactions_root_opt(transactions_root)?;
+
+        header.block_access_list_hash = Some(keccak256(&self.block_access_list));
+        header.slot_number = Some(self.slot_number);
+
+        Ok(header)
     }
 }
 
@@ -2376,6 +2486,17 @@ impl ExecutionPayload {
         Ok(base_block)
     }
 
+    /// Creates a [`Header`] from this payload and sidecar without consuming the payload.
+    pub fn try_to_header_with_sidecar(
+        &self,
+        sidecar: &ExecutionPayloadSidecar,
+    ) -> Result<Header, PayloadError> {
+        let mut header = self.try_to_header()?;
+        header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
+        header.requests_hash = sidecar.requests_hash();
+        Ok(header)
+    }
+
     /// Converts [`ExecutionPayload`] to [`Block`].
     ///
     /// Caution: This does not set fields that are not part of the payload and only part of the
@@ -2416,6 +2537,18 @@ impl ExecutionPayload {
         self.into_block_raw_with_transactions_root_opt(None)
     }
 
+    /// Creates a [`Header`] from this payload without consuming it.
+    ///
+    /// Caution: This does not set fields that are not part of the payload and only part of the
+    /// [`ExecutionPayloadSidecar`]:
+    /// - parent_beacon_block_root
+    /// - requests_hash
+    ///
+    /// See also: [`ExecutionPayload::try_to_header_with_sidecar`]
+    pub fn try_to_header(&self) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(None)
+    }
+
     /// Converts [`ExecutionPayload`] to [`Block`] with raw [`Bytes`] transactions using the
     /// given `transactions_root`.
     ///
@@ -2425,6 +2558,17 @@ impl ExecutionPayload {
         transactions_root: B256,
     ) -> Result<Block<Bytes>, PayloadError> {
         self.into_block_raw_with_transactions_root_opt(Some(transactions_root))
+    }
+
+    /// Creates a [`Header`] from this payload without consuming it, using the given
+    /// `transactions_root`.
+    ///
+    /// See also [`ExecutionPayloadV1::try_to_header_with_transactions_root`].
+    pub fn try_to_header_with_transactions_root(
+        &self,
+        transactions_root: B256,
+    ) -> Result<Header, PayloadError> {
+        self.try_to_header_with_transactions_root_opt(Some(transactions_root))
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`] with raw [`Bytes`] transactions, optionally
@@ -2451,6 +2595,32 @@ impl ExecutionPayload {
         }
     }
 
+    /// Creates a [`Header`] from this payload without consuming it, optionally using the given
+    /// `transactions_root`.
+    ///
+    /// If `transactions_root` is `None`, it will be computed from the transactions.
+    ///
+    /// See also [`ExecutionPayloadV1::try_to_header_with_transactions_root_opt`].
+    pub fn try_to_header_with_transactions_root_opt(
+        &self,
+        transactions_root: Option<B256>,
+    ) -> Result<Header, PayloadError> {
+        match self {
+            Self::V1(payload) => {
+                payload.try_to_header_with_transactions_root_opt(transactions_root)
+            }
+            Self::V2(payload) => {
+                payload.try_to_header_with_transactions_root_opt(transactions_root)
+            }
+            Self::V3(payload) => {
+                payload.try_to_header_with_transactions_root_opt(transactions_root)
+            }
+            Self::V4(payload) => {
+                payload.try_to_header_with_transactions_root_opt(transactions_root)
+            }
+        }
+    }
+
     /// Converts [`ExecutionPayload`] to [`Block`] with raw [`Bytes`] transactions and sidecar
     /// using the given `transactions_root`.
     ///
@@ -2464,6 +2634,21 @@ impl ExecutionPayload {
         base_block.header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
         base_block.header.requests_hash = sidecar.requests_hash();
         Ok(base_block)
+    }
+
+    /// Creates a [`Header`] from this payload and sidecar without consuming the payload, using the
+    /// given `transactions_root`.
+    ///
+    /// See also [`Self::try_to_header_with_sidecar`].
+    pub fn try_to_header_with_sidecar_and_transactions_root(
+        &self,
+        sidecar: &ExecutionPayloadSidecar,
+        transactions_root: B256,
+    ) -> Result<Header, PayloadError> {
+        let mut header = self.try_to_header_with_transactions_root(transactions_root)?;
+        header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
+        header.requests_hash = sidecar.requests_hash();
+        Ok(header)
     }
 
     /// Returns a reference to the V1 payload.
@@ -3797,6 +3982,21 @@ impl ExecutionData {
         self.sidecar.parent_beacon_block_root()
     }
 
+    /// Creates a [`Header`] from this execution data without consuming it.
+    pub fn try_to_header(&self) -> Result<Header, PayloadError> {
+        self.payload.try_to_header_with_sidecar(&self.sidecar)
+    }
+
+    /// Creates a [`Header`] from this execution data without consuming it, using the given
+    /// `transactions_root`.
+    pub fn try_to_header_with_transactions_root(
+        &self,
+        transactions_root: B256,
+    ) -> Result<Header, PayloadError> {
+        self.payload
+            .try_to_header_with_sidecar_and_transactions_root(&self.sidecar, transactions_root)
+    }
+
     /// Return the withdrawals for the payload or attributes.
     pub const fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
         self.payload.withdrawals()
@@ -4880,6 +5080,40 @@ mod tests {
                 });
             let tx_root = block_normal.header.transactions_root;
 
+            let header = payload.try_to_header_with_sidecar(&sidecar).unwrap_or_else(|e| {
+                panic!("Failed to convert payload to header from {path:?}: {e}")
+            });
+            assert_eq!(header, block_normal.header, "header mismatch in {path:?}");
+
+            let header_with_root = payload
+                .try_to_header_with_sidecar_and_transactions_root(&sidecar, tx_root)
+                .unwrap_or_else(|e| {
+                    panic!("Failed to convert payload to header with root from {path:?}: {e}")
+                });
+            assert_eq!(
+                header_with_root, block_normal.header,
+                "header with transactions root mismatch in {path:?}"
+            );
+
+            let execution_data = ExecutionData::new(payload.clone(), sidecar.clone());
+            let execution_data_header = execution_data.try_to_header().unwrap_or_else(|e| {
+                panic!("Failed to convert execution data to header from {path:?}: {e}")
+            });
+            assert_eq!(
+                execution_data_header, block_normal.header,
+                "execution data header mismatch in {path:?}"
+            );
+            let execution_data_header_with_root =
+                execution_data.try_to_header_with_transactions_root(tx_root).unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to convert execution data to header with root from {path:?}: {e}"
+                    )
+                });
+            assert_eq!(
+                execution_data_header_with_root, block_normal.header,
+                "execution data header with transactions root mismatch in {path:?}"
+            );
+
             // Build using pre-computed transactions root
             let block_with_root =
                 payload.clone().into_block_raw_with_transactions_root(tx_root).unwrap();
@@ -4942,6 +5176,9 @@ mod tests {
         let fake_root = b256!("1111111111111111111111111111111111111111111111111111111111111111");
         assert_ne!(computed_root, fake_root);
 
+        let header = payload.try_to_header_with_transactions_root(fake_root).unwrap();
+        assert_eq!(header.transactions_root, fake_root);
+
         let block = payload.clone().into_block_raw_with_transactions_root(fake_root).unwrap();
         assert_eq!(block.header.transactions_root, fake_root);
 
@@ -4970,6 +5207,9 @@ mod tests {
 
         let fake_root = b256!("1111111111111111111111111111111111111111111111111111111111111111");
 
+        assert!(payload.try_to_header().is_err());
+        assert!(payload.try_to_header_with_transactions_root(fake_root).is_err());
+        assert!(payload.try_to_header_with_transactions_root_opt(Some(fake_root)).is_err());
         assert!(payload.clone().into_block_raw().is_err());
         assert!(payload.clone().into_block_raw_with_transactions_root(fake_root).is_err());
         assert!(payload.into_block_raw_with_transactions_root_opt(Some(fake_root)).is_err());
