@@ -226,8 +226,6 @@ pub struct SignedBidSubmissionV6 {
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
 #[cfg_attr(feature = "ssz", ssz(enum_behaviour = "transparent"))]
 pub enum SubmitBlockRequest {
-    /// Amsterdam [`SignedBidSubmissionV6`].
-    Amsterdam(SignedBidSubmissionV6),
     /// Fulu [`SignedBidSubmissionV5`].
     Fulu(SignedBidSubmissionV5),
     /// Electra [`SignedBidSubmissionV4`].
@@ -239,14 +237,6 @@ pub enum SubmitBlockRequest {
 }
 
 impl SubmitBlockRequest {
-    /// Returns the [`SignedBidSubmissionV6`] if this is [`Self::Amsterdam`]
-    pub const fn as_amsterdam(&self) -> Option<&SignedBidSubmissionV6> {
-        match self {
-            Self::Amsterdam(submission) => Some(submission),
-            _ => None,
-        }
-    }
-
     /// Returns the [`SignedBidSubmissionV2`] if this is [`Self::Capella`]
     pub const fn as_capella(&self) -> Option<&SignedBidSubmissionV2> {
         match self {
@@ -282,7 +272,6 @@ impl SubmitBlockRequest {
     /// Returns the underlying [`BidTrace`].
     pub const fn bid_trace(&self) -> &BidTrace {
         match self {
-            Self::Amsterdam(req) => &req.message,
             Self::Capella(req) => &req.message,
             Self::Deneb(req) => &req.message,
             Self::Electra(req) => &req.message,
@@ -309,11 +298,6 @@ impl From<SignedBidSubmissionV4> for SubmitBlockRequest {
 impl From<SignedBidSubmissionV5> for SubmitBlockRequest {
     fn from(value: SignedBidSubmissionV5) -> Self {
         Self::Fulu(value)
-    }
-}
-impl From<SignedBidSubmissionV6> for SubmitBlockRequest {
-    fn from(value: SignedBidSubmissionV6) -> Self {
-        Self::Amsterdam(value)
     }
 }
 
@@ -875,16 +859,6 @@ mod tests {
 
         assert_eq!(bid, deserialized);
         assert_eq!(json, serde_json::to_value(deserialized).unwrap());
-    }
-
-    #[test]
-    fn submit_block_request_decodes_amsterdam() {
-        let bid = amsterdam_bid_submission_v6();
-        let json = serde_json::to_string(&bid).unwrap();
-        let request = serde_json::from_str::<SubmitBlockRequest>(&json).unwrap();
-
-        assert_eq!(request.as_amsterdam(), Some(&bid));
-        assert_eq!(request.bid_trace(), &bid.message);
     }
 
     #[cfg(feature = "ssz")]
