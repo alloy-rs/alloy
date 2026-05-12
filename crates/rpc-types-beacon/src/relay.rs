@@ -399,14 +399,7 @@ impl BuilderBlockValidationRequestV4 {
     /// execution requests.
     #[cfg(all(feature = "sha2", feature = "ssz"))]
     pub fn into_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
-        // Compute versioned hashes from blob commitments
-        let versioned_hashes = self
-            .request
-            .blobs_bundle
-            .commitments
-            .iter()
-            .map(|commitment| alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice()))
-            .collect();
+        let versioned_hashes = self.request.blobs_bundle.versioned_hashes();
 
         // Create Cancun payload fields
         let cancun_fields = alloy_rpc_types_engine::CancunPayloadFields {
@@ -455,14 +448,7 @@ impl BuilderBlockValidationRequestV5 {
     /// execution requests.
     #[cfg(all(feature = "sha2", feature = "ssz"))]
     pub fn into_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
-        // Compute versioned hashes from blob commitments
-        let versioned_hashes = self
-            .request
-            .blobs_bundle
-            .commitments
-            .iter()
-            .map(|commitment| alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice()))
-            .collect();
+        let versioned_hashes = self.request.blobs_bundle.versioned_hashes();
 
         // Create Cancun payload fields
         let cancun_fields = alloy_rpc_types_engine::CancunPayloadFields {
@@ -511,14 +497,7 @@ impl BuilderBlockValidationRequestV6 {
     /// execution requests.
     #[cfg(all(feature = "sha2", feature = "ssz"))]
     pub fn into_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
-        // Compute versioned hashes from blob commitments
-        let versioned_hashes = self
-            .request
-            .blobs_bundle
-            .commitments
-            .iter()
-            .map(|commitment| alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice()))
-            .collect();
+        let versioned_hashes = self.request.blobs_bundle.versioned_hashes();
 
         // Create Cancun payload fields
         let cancun_fields = alloy_rpc_types_engine::CancunPayloadFields {
@@ -987,13 +966,7 @@ mod tests {
 
         let expected_payload = request.request.execution_payload.clone();
         let expected_parent_beacon_block_root = request.parent_beacon_block_root;
-        let expected_hashes: Vec<_> = request
-            .request
-            .blobs_bundle
-            .commitments
-            .iter()
-            .map(|commitment| alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice()))
-            .collect();
+        let expected_hashes = request.request.blobs_bundle.versioned_hashes();
 
         let execution_data = request.into_execution_data();
 
@@ -1075,13 +1048,7 @@ mod tests {
         // Store references before calling to_execution_data() which consumes self
         let expected_payload = request.request.execution_payload.clone();
         let expected_parent_beacon_block_root = request.parent_beacon_block_root;
-        let expected_hashes: Vec<_> = request
-            .request
-            .blobs_bundle
-            .commitments
-            .iter()
-            .map(|commitment| alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice()))
-            .collect();
+        let expected_hashes = request.request.blobs_bundle.versioned_hashes();
 
         // Test the convenience method
         let execution_data = request.into_execution_data();
@@ -1162,13 +1129,7 @@ mod tests {
         let expected_block_access_list =
             request.request.execution_payload.block_access_list.clone();
         let expected_parent_beacon_block_root = request.parent_beacon_block_root;
-        let expected_hashes: Vec<_> = request
-            .request
-            .blobs_bundle
-            .commitments
-            .iter()
-            .map(|commitment| alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice()))
-            .collect();
+        let expected_hashes = request.request.blobs_bundle.versioned_hashes();
 
         let execution_data = request.into_execution_data();
 
