@@ -3305,6 +3305,18 @@ pub struct PayloadAttributes {
         )
     )]
     pub slot_number: Option<u64>,
+    /// Gas limit of the current block enabled with Amsterdam fork.
+    ///
+    /// See <https://github.com/ethereum/execution-apis/pull/796>
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub target_gas_limit: Option<u64>,
 }
 
 #[cfg(feature = "ssz")]
@@ -3323,13 +3335,19 @@ impl PayloadAttributes {
         Self::ssz_v2_fixed_len() + <B256 as ssz::Encode>::ssz_fixed_len()
     }
 
-    fn ssz_v4_fixed_len() -> usize {
+    fn ssz_v4_slot_fixed_len() -> usize {
         Self::ssz_v3_fixed_len() + <u64 as ssz::Encode>::ssz_fixed_len()
     }
 
+    fn ssz_v4_target_fixed_len() -> usize {
+        Self::ssz_v4_slot_fixed_len() + <u64 as ssz::Encode>::ssz_fixed_len()
+    }
+
     fn ssz_fixed_section_len(&self) -> usize {
-        if self.slot_number.is_some() {
-            Self::ssz_v4_fixed_len()
+        if self.target_gas_limit.is_some() {
+            Self::ssz_v4_target_fixed_len()
+        } else if self.slot_number.is_some() {
+            Self::ssz_v4_slot_fixed_len()
         } else if self.parent_beacon_block_root.is_some() {
             Self::ssz_v3_fixed_len()
         } else if self.withdrawals.is_some() {
@@ -3364,8 +3382,12 @@ impl ssz::Encode for PayloadAttributes {
             encoder.append(&self.parent_beacon_block_root.unwrap_or_default());
         }
 
-        if fixed_section_len == Self::ssz_v4_fixed_len() {
+        if fixed_section_len >= Self::ssz_v4_slot_fixed_len() {
             encoder.append(&self.slot_number.unwrap_or_default());
+        }
+
+        if fixed_section_len == Self::ssz_v4_target_fixed_len() {
+            encoder.append(&self.target_gas_limit.unwrap_or_default());
         }
 
         encoder.finalize();
@@ -3406,6 +3428,7 @@ impl ssz::Decode for PayloadAttributes {
                 withdrawals: None,
                 parent_beacon_block_root: None,
                 slot_number: None,
+                target_gas_limit: None,
             });
         }
 
@@ -3441,6 +3464,7 @@ impl ssz::Decode for PayloadAttributes {
                     withdrawals: Some(decoder.decode_next()?),
                     parent_beacon_block_root: None,
                     slot_number: None,
+                    target_gas_limit: None,
                 })
             }
             offset if offset == Self::ssz_v3_fixed_len() => {
@@ -3454,9 +3478,10 @@ impl ssz::Decode for PayloadAttributes {
                     withdrawals: Some(decoder.decode_next()?),
                     parent_beacon_block_root: Some(decoder.decode_next()?),
                     slot_number: None,
+                    target_gas_limit: None,
                 })
             }
-            offset if offset == Self::ssz_v4_fixed_len() => {
+            offset if offset == Self::ssz_v4_slot_fixed_len() => {
                 builder.register_type::<B256>()?;
                 builder.register_type::<u64>()?;
                 let mut decoder = builder.build()?;
@@ -3468,6 +3493,23 @@ impl ssz::Decode for PayloadAttributes {
                     withdrawals: Some(decoder.decode_next()?),
                     parent_beacon_block_root: Some(decoder.decode_next()?),
                     slot_number: Some(decoder.decode_next()?),
+                    target_gas_limit: None,
+                })
+            }
+            offset if offset == Self::ssz_v4_target_fixed_len() => {
+                builder.register_type::<B256>()?;
+                builder.register_type::<u64>()?;
+                builder.register_type::<u64>()?;
+                let mut decoder = builder.build()?;
+
+                Ok(Self {
+                    timestamp: decoder.decode_next()?,
+                    prev_randao: decoder.decode_next()?,
+                    suggested_fee_recipient: decoder.decode_next()?,
+                    withdrawals: Some(decoder.decode_next()?),
+                    parent_beacon_block_root: Some(decoder.decode_next()?),
+                    slot_number: Some(decoder.decode_next()?),
+                    target_gas_limit: Some(decoder.decode_next()?),
                 })
             }
             offset => Err(ssz::DecodeError::BytesInvalid(format!(
@@ -4102,6 +4144,7 @@ mod tests {
             withdrawals: None,
             parent_beacon_block_root: None,
             slot_number: None,
+            target_gas_limit: None,
         };
         let decoded_v1 = PayloadAttributes::from_ssz_bytes(&v1.as_ssz_bytes()).unwrap();
         assert_eq!(decoded_v1, v1);
@@ -4113,6 +4156,7 @@ mod tests {
             withdrawals: Some(vec![withdrawal]),
             parent_beacon_block_root: None,
             slot_number: None,
+            target_gas_limit: None,
         };
         let decoded_v2 = PayloadAttributes::from_ssz_bytes(&v2.as_ssz_bytes()).unwrap();
         assert_eq!(decoded_v2, v2);
@@ -4124,6 +4168,7 @@ mod tests {
             withdrawals: Some(vec![withdrawal]),
             parent_beacon_block_root: Some(B256::with_last_byte(33)),
             slot_number: None,
+            target_gas_limit: None,
         };
         let decoded_v3 = PayloadAttributes::from_ssz_bytes(&v3.as_ssz_bytes()).unwrap();
         assert_eq!(decoded_v3, v3);
@@ -4135,6 +4180,7 @@ mod tests {
             withdrawals: Some(vec![withdrawal]),
             parent_beacon_block_root: Some(B256::with_last_byte(43)),
             slot_number: Some(44),
+            target_gas_limit: Some(45),
         };
         let decoded_v4 = PayloadAttributes::from_ssz_bytes(&v4.as_ssz_bytes()).unwrap();
         assert_eq!(decoded_v4, v4);
@@ -4159,6 +4205,7 @@ mod tests {
             withdrawals: None,
             parent_beacon_block_root: None,
             slot_number: None,
+            target_gas_limit: None,
         };
         assert_eq!(v1.as_ssz_bytes().len(), 60);
 
@@ -4169,6 +4216,7 @@ mod tests {
             withdrawals: Some(vec![withdrawal]),
             parent_beacon_block_root: None,
             slot_number: None,
+            target_gas_limit: None,
         };
         let bytes = v2.as_ssz_bytes();
         assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 64);
@@ -4180,6 +4228,7 @@ mod tests {
             withdrawals: Some(vec![withdrawal]),
             parent_beacon_block_root: Some(B256::with_last_byte(33)),
             slot_number: None,
+            target_gas_limit: None,
         };
         let bytes = v3.as_ssz_bytes();
         assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 96);
@@ -4191,9 +4240,10 @@ mod tests {
             withdrawals: Some(vec![withdrawal]),
             parent_beacon_block_root: Some(B256::with_last_byte(43)),
             slot_number: Some(44),
+            target_gas_limit: Some(45),
         };
         let bytes = v4.as_ssz_bytes();
-        assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 104);
+        assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 112);
     }
 
     #[test]
@@ -5023,23 +5073,26 @@ mod tests {
         let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
         assert_eq!(attrs.timestamp, 0x1234);
         assert!(attrs.slot_number.is_none());
+        assert!(attrs.target_gas_limit.is_none());
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_payload_attributes_with_hex_slot_number() {
+    fn serde_payload_attributes_with_hex_amsterdam_fields() {
         let json = r#"{
             "timestamp": "0x2",
             "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "suggestedFeeRecipient": "0x0000000000000000000000000000000000000000",
             "withdrawals": [],
             "parentBeaconBlockRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "slotNumber": "0x0"
+            "slotNumber": "0x0",
+            "targetGasLimit": "0x1c9c380"
         }"#;
 
         let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
         assert_eq!(attrs.timestamp, 0x2);
         assert_eq!(attrs.slot_number, Some(0));
+        assert_eq!(attrs.target_gas_limit, Some(30_000_000));
     }
 
     #[test]
