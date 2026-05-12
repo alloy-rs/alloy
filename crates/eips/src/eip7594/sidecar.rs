@@ -894,7 +894,9 @@ impl BlobTransactionSidecarEip7594 {
                 if blob_versioned_hash == *target_hash {
                     let maybe_blob = self.blobs.get(i);
                     let proof_range = i * CELLS_PER_EXT_BLOB..(i + 1) * CELLS_PER_EXT_BLOB;
-                    let maybe_proofs = Some(&self.cell_proofs[proof_range])
+                    let maybe_proofs = self
+                        .cell_proofs
+                        .get(proof_range)
                         .filter(|proofs| proofs.len() == CELLS_PER_EXT_BLOB);
                     if let Some((blob, proofs)) = maybe_blob.copied().zip(maybe_proofs) {
                         return Some((
@@ -1469,6 +1471,19 @@ mod tests {
             ])
         );
         assert_eq!(mask.matching_cells_from_computed_cells(&cells[..cells.len() - 1]), None);
+    }
+
+    #[test]
+    fn match_versioned_hashes_skips_incomplete_proof_chunks() {
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0x01)],
+            vec![Bytes48::repeat_byte(0x02)],
+            vec![Bytes48::repeat_byte(0x03)],
+        );
+        let versioned_hash = sidecar.versioned_hashes().next().unwrap();
+
+        let matches = sidecar.match_versioned_hashes(&[versioned_hash]).collect::<Vec<_>>();
+        assert!(matches.is_empty());
     }
 
     #[test]
