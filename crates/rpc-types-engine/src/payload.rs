@@ -3307,6 +3307,32 @@ pub struct PayloadAttributes {
     pub slot_number: Option<u64>,
 }
 
+impl PayloadAttributes {
+    /// Sets the timestamp for the payload attributes.
+    pub const fn with_timestamp(mut self, timestamp: u64) -> Self {
+        self.timestamp = timestamp;
+        self
+    }
+
+    /// Sets the withdrawals for the payload attributes.
+    pub fn with_withdrawals(mut self, withdrawals: Vec<Withdrawal>) -> Self {
+        self.withdrawals = Some(withdrawals);
+        self
+    }
+
+    /// Sets the parent beacon block root for the payload attributes.
+    pub const fn with_parent_beacon_block_root(mut self, parent_beacon_block_root: B256) -> Self {
+        self.parent_beacon_block_root = Some(parent_beacon_block_root);
+        self
+    }
+
+    /// Sets the slot number for the payload attributes.
+    pub const fn with_slot_number(mut self, slot_number: u64) -> Self {
+        self.slot_number = Some(slot_number);
+        self
+    }
+}
+
 #[cfg(feature = "ssz")]
 impl PayloadAttributes {
     fn ssz_v1_fixed_len() -> usize {
@@ -4081,6 +4107,28 @@ mod tests {
         assert!(status.latest_valid_hash.is_none());
         assert!(status.status.validation_error().is_none());
         assert_eq!(serde_json::to_string(&status).unwrap(), full);
+    }
+
+    #[test]
+    fn payload_attributes_builder_setters() {
+        let withdrawal = Withdrawal {
+            index: 1,
+            validator_index: 2,
+            address: Address::with_last_byte(3),
+            amount: 4,
+        };
+        let parent_beacon_block_root = B256::with_last_byte(5);
+
+        let attributes = PayloadAttributes::default()
+            .with_timestamp(10)
+            .with_withdrawals(vec![withdrawal])
+            .with_parent_beacon_block_root(parent_beacon_block_root)
+            .with_slot_number(6);
+
+        assert_eq!(attributes.timestamp, 10);
+        assert_eq!(attributes.withdrawals, Some(vec![withdrawal]));
+        assert_eq!(attributes.parent_beacon_block_root, Some(parent_beacon_block_root));
+        assert_eq!(attributes.slot_number, Some(6));
     }
 
     #[test]
