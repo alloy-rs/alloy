@@ -8,7 +8,7 @@ use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
     ffi::OsString,
-    fs::create_dir_all,
+    fs::{create_dir_all, File},
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
@@ -334,6 +334,9 @@ impl Reth {
     /// If this is set, reth will be initialized with `reth init` and the `--datadir` option will be
     /// set to the same value as `data_dir`.
     ///
+    /// This requires setting [`Reth::data_dir`] so both init and node startup point to the same
+    /// directory.
+    ///
     /// This is destructive and will overwrite any existing data in the data directory.
     pub fn genesis(mut self, genesis: Genesis) -> Self {
         self.genesis = Some(genesis);
@@ -387,6 +390,49 @@ impl Reth {
             .as_ref()
             .map_or_else(|| RETH.as_ref(), |bin| bin.as_os_str())
             .to_os_string();
+        if self.genesis.is_some() && self.chain_or_path.is_some() {
+            return Err(NodeError::GenesisError(
+                "`genesis` cannot be combined with `chain_or_path`".to_string(),
+            ));
+        }
+
+        let mut genesis_chain_path = None;
+
+        if let Some(genesis) = &self.genesis {
+            let data_dir = self.data_dir.as_ref().ok_or_else(|| {
+                NodeError::GenesisError(
+                    "`genesis` requires `data_dir` to run `reth init`".to_string(),
+                )
+            })?;
+            if !data_dir.exists() {
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
+            }
+
+            let genesis_path = data_dir.join("genesis.json");
+            let mut file = File::create(&genesis_path).map_err(|_| {
+                NodeError::GenesisError("could not create genesis file".to_string())
+            })?;
+            serde_json::to_writer_pretty(&mut file, genesis).map_err(|_| {
+                NodeError::GenesisError("could not write genesis to file".to_string())
+            })?;
+
+            let mut init_cmd = Command::new(&bin_path);
+            init_cmd.stdout(Stdio::null());
+            init_cmd.stderr(Stdio::null());
+            init_cmd.arg("init").arg("--datadir").arg(data_dir).arg("--chain").arg(&genesis_path);
+
+            let res = init_cmd
+                .spawn()
+                .map_err(NodeError::SpawnError)?
+                .wait()
+                .map_err(NodeError::WaitError)?;
+            if !res.success() {
+                return Err(NodeError::InitError);
+            }
+
+            genesis_chain_path = Some(genesis_path);
+        }
+
         let mut cmd = Command::new(&bin_path);
         // `reth` uses stdout for its logs
         cmd.stdout(Stdio::piped());
@@ -480,6 +526,8 @@ impl Reth {
 
         if let Some(chain_or_path) = self.chain_or_path {
             cmd.arg("--chain").arg(chain_or_path);
+        } else if let Some(genesis_path) = genesis_chain_path {
+            cmd.arg("--chain").arg(genesis_path);
         }
 
         // Disable color output to make parsing logs easier.
@@ -622,5 +670,11 @@ mod tests {
         assert_eq!(reth.genesis, None);
         assert!(reth.args.is_empty());
         assert!(!reth.keep_stdout);
+    }
+
+    #[test]
+    fn rejects_genesis_with_chain_or_path() {
+        let err = Reth::new().chain_or_path("sepolia").genesis(Genesis::default()).try_spawn();
+        assert!(matches!(err, Err(NodeError::GenesisError(_))));
     }
 }

@@ -2,6 +2,11 @@
 
 use alloy_genesis::Genesis;
 use alloy_node_bindings::{utils::run_with_tempdir_sync, Reth, RethInstance};
+use std::{
+    io::{Read, Write},
+    net::TcpStream,
+    time::Duration,
+};
 
 /// The default HTTP port for Reth.
 const DEFAULT_HTTP_PORT: u16 = 8545;
@@ -59,20 +64,18 @@ fn can_launch_reth_dev() {
 
 #[test]
 #[cfg_attr(windows, ignore = "no reth on windows")]
-fn can_launch_reth_dev_custom_genesis() {
+fn can_launch_reth_custom_genesis_chain_id() {
     if !ci_info::is_ci() {
         return;
     }
 
     run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-        let reth = Reth::new()
-            .dev()
-            .disable_discovery()
-            .data_dir(temp_dir_path)
-            .genesis(Genesis::default())
-            .spawn();
+        let mut genesis = Genesis::default();
+        genesis.config.chain_id = 31337;
 
-        assert_ports(&reth, true);
+        let reth = Reth::new().disable_discovery().data_dir(temp_dir_path).genesis(genesis).spawn();
+
+        assert_eq!(eth_chain_id(&reth), 31337);
     });
 }
 
@@ -188,4 +191,30 @@ fn assert_ports(reth: &RethInstance, dev: bool) {
         reth.p2p_port(),
         if dev { None } else { Some(DEFAULT_P2P_PORT + reth.instance() - 1) }
     );
+}
+
+fn eth_chain_id(reth: &RethInstance) -> u64 {
+    let mut stream = TcpStream::connect((reth.host(), reth.http_port())).unwrap();
+    stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+
+    let payload = r#"{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}"#;
+    let request = format!(
+        "POST / HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        reth.host(),
+        payload.len(),
+        payload
+    );
+    stream.write_all(request.as_bytes()).unwrap();
+    stream.shutdown(std::net::Shutdown::Write).unwrap();
+
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    let body = response.split_once("\r\n\r\n").map(|(_, body)| body).unwrap_or("");
+    let result = serde_json::from_str::<serde_json::Value>(body).unwrap()["result"]
+        .as_str()
+        .unwrap()
+        .trim_start_matches("0x")
+        .to_owned();
+
+    u64::from_str_radix(&result, 16).unwrap()
 }
