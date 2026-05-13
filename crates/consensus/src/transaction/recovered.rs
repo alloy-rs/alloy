@@ -246,7 +246,7 @@ pub trait SignerRecoverable {
     }
 
     /// Recover the signer via [`SignerRecoverable::recover_signer_unchecked`] and returns a
-    /// `Recovered<&Self>`
+    /// `Recovered<Self>`
     fn try_into_recovered_unchecked(self) -> Result<Recovered<Self>, RecoveryError>
     where
         Self: Sized,
