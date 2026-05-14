@@ -437,8 +437,9 @@ impl From<AnyRpcTransaction> for Recovered<AnyTxEnvelope> {
 
 impl From<AnyRpcTransaction> for WithOtherFields<TransactionRequest> {
     fn from(tx: AnyRpcTransaction) -> Self {
-        let req: TransactionRequest = tx.0.inner.into_recovered().into();
-        Self::new(req)
+        let (inner, other) = tx.into_parts();
+        let req: TransactionRequest = inner.into_recovered().into();
+        Self { inner: req, other }
     }
 }
 
@@ -576,5 +577,18 @@ mod tests {
 
         let _block: alloy_consensus::Block<TxEnvelope, alloy_consensus::Header> =
             block.try_into().unwrap();
+    }
+
+    #[test]
+    fn preserves_other_fields_when_converting_to_transaction_request() {
+        let rpc_tx = r#"{"blockHash":"0x8e38b4dbf6b11fcc3b9dee84fb7986e29ca0a02cecd8977c161ff7333329681e","blockNumber":"0xf4240","hash":"0xe9e91f1ee4b56c0df2e9f06c2b8c27c6076195a88a7b8537ba8313d80e6f124e","transactionIndex":"0x1","type":"0x0","nonce":"0x43eb","input":"0x","r":"0x3b08715b4403c792b8c7567edea634088bedcd7f60d9352b1f16c69830f3afd5","s":"0x10b9afb67d2ec8b956f0e1dbc07eb79152904f3a7bf789fc869db56320adfe09","chainId":"0x0","v":"0x1c","gas":"0xc350","from":"0x32be343b94f860124dc4fee278fdcbd38c102d88","to":"0xdf190dc7190dfba737d7777a163445b7fff16133","value":"0x6113a84987be800","gasPrice":"0xdf8475800","tempoFeePayer":"0x1234"}"#;
+
+        let tx: AnyRpcTransaction = serde_json::from_str(rpc_tx).unwrap();
+        let req: WithOtherFields<TransactionRequest> = tx.into();
+
+        assert_eq!(
+            req.other.get("tempoFeePayer").and_then(serde_json::Value::as_str),
+            Some("0x1234")
+        );
     }
 }
