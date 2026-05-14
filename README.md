@@ -230,12 +230,36 @@ Because these crates are primarily network-focused, we do not intend to support
 
 The following crates support `no_std`:
 
-| Crate               | Version Badge                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **alloy-eips**      | [![Crates.io](https://img.shields.io/crates/v/alloy-eips.svg)](https://crates.io/crates/alloy-eips)           |
-| **alloy-genesis**   | [![Crates.io](https://img.shields.io/crates/v/alloy-genesis.svg)](https://crates.io/crates/alloy-genesis)     |
-| **alloy-serde**     | [![Crates.io](https://img.shields.io/crates/v/alloy-serde.svg)](https://crates.io/crates/alloy-serde)         |
-| **alloy-consensus** | [![Crates.io](https://img.shields.io/crates/v/alloy-consensus.svg)](https://crates.io/crates/alloy-consensus) |
+| Crate                        | Version Badge                                    |
+| ---------------------------- | ------------------------------------------------ |
+| **alloy-eips**               | [![Crates.io][no-std-badge-01]][no-std-crate-01] |
+| **alloy-genesis**            | [![Crates.io][no-std-badge-02]][no-std-crate-02] |
+| **alloy-serde**              | [![Crates.io][no-std-badge-03]][no-std-crate-03] |
+| **alloy-consensus**          | [![Crates.io][no-std-badge-04]][no-std-crate-04] |
+| **alloy-consensus-any**      | [![Crates.io][no-std-badge-05]][no-std-crate-05] |
+| **alloy-network-primitives** | [![Crates.io][no-std-badge-06]][no-std-crate-06] |
+| **alloy-rpc-types-eth**      | [![Crates.io][no-std-badge-07]][no-std-crate-07] |
+| **alloy-rpc-types-debug**    | [![Crates.io][no-std-badge-08]][no-std-crate-08] |
+| **alloy-rpc-types-engine**   | [![Crates.io][no-std-badge-09]][no-std-crate-09] |
+
+[no-std-badge-01]: https://img.shields.io/crates/v/alloy-eips.svg
+[no-std-crate-01]: https://crates.io/crates/alloy-eips
+[no-std-badge-02]: https://img.shields.io/crates/v/alloy-genesis.svg
+[no-std-crate-02]: https://crates.io/crates/alloy-genesis
+[no-std-badge-03]: https://img.shields.io/crates/v/alloy-serde.svg
+[no-std-crate-03]: https://crates.io/crates/alloy-serde
+[no-std-badge-04]: https://img.shields.io/crates/v/alloy-consensus.svg
+[no-std-crate-04]: https://crates.io/crates/alloy-consensus
+[no-std-badge-05]: https://img.shields.io/crates/v/alloy-consensus-any.svg
+[no-std-crate-05]: https://crates.io/crates/alloy-consensus-any
+[no-std-badge-06]: https://img.shields.io/crates/v/alloy-network-primitives.svg
+[no-std-crate-06]: https://crates.io/crates/alloy-network-primitives
+[no-std-badge-07]: https://img.shields.io/crates/v/alloy-rpc-types-eth.svg
+[no-std-crate-07]: https://crates.io/crates/alloy-rpc-types-eth
+[no-std-badge-08]: https://img.shields.io/crates/v/alloy-rpc-types-debug.svg
+[no-std-crate-08]: https://crates.io/crates/alloy-rpc-types-debug
+[no-std-badge-09]: https://img.shields.io/crates/v/alloy-rpc-types-engine.svg
+[no-std-crate-09]: https://crates.io/crates/alloy-rpc-types-engine
 
 If you would like to add `no_std` support to a crate, please make sure to update
 `scripts/check_no_std.sh` as well.
