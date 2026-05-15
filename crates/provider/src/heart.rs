@@ -714,50 +714,6 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use alloy_network::Ethereum;
-    use futures::stream;
-    use tokio::sync::{oneshot, oneshot::error::TryRecvError};
-
-    type TestHeartbeat = Heartbeat<Ethereum, stream::Empty<<Ethereum as Network>::BlockResponse>>;
-
-    fn heartbeat() -> TestHeartbeat {
-        Heartbeat::new(stream::empty(), Arc::new(Paused::default()))
-    }
-
-    fn tx_watcher(
-        tx_hash: TxHash,
-        required_confirmations: u64,
-        timeout: Option<Duration>,
-        received_at_block: Option<u64>,
-    ) -> (TxWatcher, oneshot::Receiver<Result<(), WatchTxError>>) {
-        let (tx, rx) = oneshot::channel();
-        let config = PendingTransactionConfig::new(tx_hash)
-            .with_required_confirmations(required_confirmations)
-            .with_timeout(timeout);
-        (TxWatcher { config, received_at_block, tx }, rx)
-    }
-
-    #[test]
-    fn reaps_timed_out_waiting_confirmations() {
-        let mut heartbeat = heartbeat();
-        let tx_hash = TxHash::with_last_byte(1);
-        let (watcher, mut rx) = tx_watcher(tx_hash, 2, Some(Duration::ZERO), Some(1));
-
-        heartbeat.handle_watch_ix(watcher);
-        assert!(heartbeat.unconfirmed.is_empty());
-        assert_eq!(heartbeat.waiting_confs.len(), 1);
-
-        heartbeat.reap_timeouts();
-
-        assert!(heartbeat.waiting_confs.is_empty());
-        assert!(matches!(rx.try_recv(), Ok(Err(WatchTxError::Timeout))));
-        assert!(matches!(rx.try_recv(), Err(TryRecvError::Closed)));
-    }
-}
-
 #[cfg(target_family = "wasm")]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
@@ -817,5 +773,49 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Always reap timeouts
             self.reap_timeouts();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_network::Ethereum;
+    use futures::stream;
+    use tokio::sync::{oneshot, oneshot::error::TryRecvError};
+
+    type TestHeartbeat = Heartbeat<Ethereum, stream::Empty<<Ethereum as Network>::BlockResponse>>;
+
+    fn heartbeat() -> TestHeartbeat {
+        Heartbeat::new(stream::empty(), Arc::new(Paused::default()))
+    }
+
+    fn tx_watcher(
+        tx_hash: TxHash,
+        required_confirmations: u64,
+        timeout: Option<Duration>,
+        received_at_block: Option<u64>,
+    ) -> (TxWatcher, oneshot::Receiver<Result<(), WatchTxError>>) {
+        let (tx, rx) = oneshot::channel();
+        let config = PendingTransactionConfig::new(tx_hash)
+            .with_required_confirmations(required_confirmations)
+            .with_timeout(timeout);
+        (TxWatcher { config, received_at_block, tx }, rx)
+    }
+
+    #[test]
+    fn reaps_timed_out_waiting_confirmations() {
+        let mut heartbeat = heartbeat();
+        let tx_hash = TxHash::with_last_byte(1);
+        let (watcher, mut rx) = tx_watcher(tx_hash, 2, Some(Duration::ZERO), Some(1));
+
+        heartbeat.handle_watch_ix(watcher);
+        assert!(heartbeat.unconfirmed.is_empty());
+        assert_eq!(heartbeat.waiting_confs.len(), 1);
+
+        heartbeat.reap_timeouts();
+
+        assert!(heartbeat.waiting_confs.is_empty());
+        assert!(matches!(rx.try_recv(), Ok(Err(WatchTxError::Timeout))));
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Closed)));
     }
 }
