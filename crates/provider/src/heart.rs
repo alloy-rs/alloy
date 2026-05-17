@@ -524,11 +524,37 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         let to_reap = std::mem::replace(&mut self.reap_at, to_keep);
 
         for tx_hash in to_reap.values() {
-            if let Some(watcher) = self.unconfirmed.remove(tx_hash) {
+            if let Some(watcher) = self.remove_watcher(tx_hash) {
                 debug!(tx=%tx_hash, "reaped");
                 watcher.notify(Err(WatchTxError::Timeout));
             }
         }
+    }
+
+    fn remove_watcher(&mut self, tx_hash: &TxHash) -> Option<TxWatcher> {
+        self.unconfirmed.remove(tx_hash).or_else(|| self.remove_waiting_watcher(tx_hash))
+    }
+
+    fn remove_waiting_watcher(&mut self, tx_hash: &TxHash) -> Option<TxWatcher> {
+        let mut empty_key = None;
+        let mut removed = None;
+
+        for (confirmed_at, waiters) in &mut self.waiting_confs {
+            if let Some(idx) = waiters.iter().position(|watcher| &watcher.config.tx_hash == tx_hash)
+            {
+                removed = Some(waiters.remove(idx));
+                if waiters.is_empty() {
+                    empty_key = Some(*confirmed_at);
+                }
+                break;
+            }
+        }
+
+        if let Some(confirmed_at) = empty_key {
+            self.waiting_confs.remove(&confirmed_at);
+        }
+
+        removed
     }
 
     /// Reap transactions overridden by a chain gap (true reorg or resync after a pause).
@@ -582,38 +608,45 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             if confirmed_at <= current_height {
                 to_watch.notify(Ok(()));
             } else {
+                self.schedule_timeout(&to_watch);
                 self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
             }
             return;
         }
 
-        if let Some(timeout) = to_watch.config.timeout {
-            self.reap_at.insert(Instant::now() + timeout, to_watch.config.tx_hash);
-        }
         // Transaction may be confirmed already, check the lookbehind history first.
         // If so, insert it into the waiting list.
-        for (block_height, txs) in self.past_blocks.iter().rev() {
-            if txs.contains(&to_watch.config.tx_hash) {
-                let confirmations = to_watch.config.required_confirmations;
-                let confirmed_at = *block_height + confirmations - 1;
-                let current_height = self.past_blocks.back().map(|(h, _)| *h).unwrap();
+        let found_block = self.past_blocks.iter().rev().find_map(|(block_height, txs)| {
+            txs.contains(&to_watch.config.tx_hash).then_some(*block_height)
+        });
+        if let Some(block_height) = found_block {
+            let confirmations = to_watch.config.required_confirmations;
+            let confirmed_at = block_height + confirmations - 1;
+            let current_height = self.past_blocks.back().map(|(h, _)| *h).unwrap();
 
-                if confirmed_at <= current_height {
-                    to_watch.notify(Ok(()));
-                } else {
-                    debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-                    // Ensure reorg handling can move this watcher back if needed.
-                    let mut to_watch = to_watch;
-                    if to_watch.received_at_block.is_none() {
-                        to_watch.received_at_block = Some(*block_height);
-                    }
-                    self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
+            if confirmed_at <= current_height {
+                to_watch.notify(Ok(()));
+            } else {
+                debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
+                // Ensure reorg handling can move this watcher back if needed.
+                let mut to_watch = to_watch;
+                if to_watch.received_at_block.is_none() {
+                    to_watch.received_at_block = Some(block_height);
                 }
-                return;
+                self.schedule_timeout(&to_watch);
+                self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
             }
+            return;
         }
 
+        self.schedule_timeout(&to_watch);
         self.unconfirmed.insert(to_watch.config.tx_hash, to_watch);
+    }
+
+    fn schedule_timeout(&mut self, watcher: &TxWatcher) {
+        if let Some(timeout) = watcher.config.timeout {
+            self.reap_at.insert(Instant::now() + timeout, watcher.config.tx_hash);
+        }
     }
 
     fn add_to_waiting_list(&mut self, watcher: TxWatcher, block_height: u64) {
@@ -740,5 +773,49 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Always reap timeouts
             self.reap_timeouts();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_network::Ethereum;
+    use futures::stream;
+    use tokio::sync::{oneshot, oneshot::error::TryRecvError};
+
+    type TestHeartbeat = Heartbeat<Ethereum, stream::Empty<<Ethereum as Network>::BlockResponse>>;
+
+    fn heartbeat() -> TestHeartbeat {
+        Heartbeat::new(stream::empty(), Arc::new(Paused::default()))
+    }
+
+    fn tx_watcher(
+        tx_hash: TxHash,
+        required_confirmations: u64,
+        timeout: Option<Duration>,
+        received_at_block: Option<u64>,
+    ) -> (TxWatcher, oneshot::Receiver<Result<(), WatchTxError>>) {
+        let (tx, rx) = oneshot::channel();
+        let config = PendingTransactionConfig::new(tx_hash)
+            .with_required_confirmations(required_confirmations)
+            .with_timeout(timeout);
+        (TxWatcher { config, received_at_block, tx }, rx)
+    }
+
+    #[test]
+    fn reaps_timed_out_waiting_confirmations() {
+        let mut heartbeat = heartbeat();
+        let tx_hash = TxHash::with_last_byte(1);
+        let (watcher, mut rx) = tx_watcher(tx_hash, 2, Some(Duration::ZERO), Some(1));
+
+        heartbeat.handle_watch_ix(watcher);
+        assert!(heartbeat.unconfirmed.is_empty());
+        assert_eq!(heartbeat.waiting_confs.len(), 1);
+
+        heartbeat.reap_timeouts();
+
+        assert!(heartbeat.waiting_confs.is_empty());
+        assert!(matches!(rx.try_recv(), Ok(Err(WatchTxError::Timeout))));
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Closed)));
     }
 }
