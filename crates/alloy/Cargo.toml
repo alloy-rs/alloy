@@ -290,7 +290,8 @@ signer-mnemonic-all-languages = [
 signer-yubihsm = ["signer-local", "alloy-signer-local?/yubihsm"]
 secp256k1 = [
 	"alloy-consensus?/secp256k1",
-	"alloy-signer-local?/secp256k1"
+	"alloy-signer-local?/secp256k1",
+	"alloy-core/secp256k1"
 ]
 # transports
 transports = ["dep:alloy-transport"]
