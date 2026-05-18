@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Release 2.0.5
 - Release 2.0.5
+- Release 2.0.5
 - [eips] Move blob cell mask before serde compat ([#3972](https://github.com/alloy-rs/alloy/issues/3972))
 
 ### Other
