@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [signer-tempo] Add Tempo wallet keystore reader ([#3936](https://github.com/alloy-rs/alloy/issues/3936))
 
+### Miscellaneous Tasks
+
+- Release 2.0.5
+
 [`alloy`]: https://crates.io/crates/alloy
 [alloy]: https://crates.io/crates/alloy
 [`alloy-core`]: https://crates.io/crates/alloy-core
