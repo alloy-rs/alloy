@@ -40,6 +40,40 @@ pub type ExecutionPayloadBodiesV2 = Vec<Option<ExecutionPayloadBodyV2>>;
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct PayloadId(pub B64);
 
+#[cfg(feature = "ssz")]
+impl ssz::Encode for PayloadId {
+    fn is_ssz_fixed_len() -> bool {
+        <B64 as ssz::Encode>::is_ssz_fixed_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        <B64 as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        ssz::Encode::ssz_bytes_len(&self.0)
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        ssz::Encode::ssz_append(&self.0, buf);
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for PayloadId {
+    fn is_ssz_fixed_len() -> bool {
+        <B64 as ssz::Decode>::is_ssz_fixed_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        <B64 as ssz::Decode>::ssz_fixed_len()
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        <B64 as ssz::Decode>::from_ssz_bytes(bytes).map(Self)
+    }
+}
+
 // === impl PayloadId ===
 
 impl PayloadId {
@@ -3271,6 +3305,244 @@ pub struct PayloadAttributes {
         )
     )]
     pub slot_number: Option<u64>,
+    /// Gas limit of the current block enabled with Amsterdam fork.
+    ///
+    /// See <https://github.com/ethereum/execution-apis/pull/796>
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub target_gas_limit: Option<u64>,
+}
+
+impl PayloadAttributes {
+    /// Sets the timestamp for the payload attributes.
+    pub const fn with_timestamp(mut self, timestamp: u64) -> Self {
+        self.timestamp = timestamp;
+        self
+    }
+
+    /// Sets the withdrawals for the payload attributes.
+    pub fn with_withdrawals(mut self, withdrawals: Vec<Withdrawal>) -> Self {
+        self.withdrawals = Some(withdrawals);
+        self
+    }
+
+    /// Sets the parent beacon block root for the payload attributes.
+    pub const fn with_parent_beacon_block_root(mut self, parent_beacon_block_root: B256) -> Self {
+        self.parent_beacon_block_root = Some(parent_beacon_block_root);
+        self
+    }
+
+    /// Sets the slot number for the payload attributes.
+    pub const fn with_slot_number(mut self, slot_number: u64) -> Self {
+        self.slot_number = Some(slot_number);
+        self
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl PayloadAttributes {
+    fn ssz_v1_fixed_len() -> usize {
+        <u64 as ssz::Encode>::ssz_fixed_len()
+            + <B256 as ssz::Encode>::ssz_fixed_len()
+            + <Address as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_v2_fixed_len() -> usize {
+        Self::ssz_v1_fixed_len() + <Vec<Withdrawal> as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_v3_fixed_len() -> usize {
+        Self::ssz_v2_fixed_len() + <B256 as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_v4_slot_fixed_len() -> usize {
+        Self::ssz_v3_fixed_len() + <u64 as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_v4_target_fixed_len() -> usize {
+        Self::ssz_v4_slot_fixed_len() + <u64 as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_fixed_section_len(&self) -> usize {
+        if self.target_gas_limit.is_some() {
+            Self::ssz_v4_target_fixed_len()
+        } else if self.slot_number.is_some() {
+            Self::ssz_v4_slot_fixed_len()
+        } else if self.parent_beacon_block_root.is_some() {
+            Self::ssz_v3_fixed_len()
+        } else if self.withdrawals.is_some() {
+            Self::ssz_v2_fixed_len()
+        } else {
+            Self::ssz_v1_fixed_len()
+        }
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for PayloadAttributes {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let fixed_section_len = self.ssz_fixed_section_len();
+        let mut encoder = ssz::SszEncoder::container(buf, fixed_section_len);
+
+        encoder.append(&self.timestamp);
+        encoder.append(&self.prev_randao);
+        encoder.append(&self.suggested_fee_recipient);
+
+        if fixed_section_len >= Self::ssz_v2_fixed_len() {
+            let empty_withdrawals = Vec::new();
+            let withdrawals = self.withdrawals.as_ref().unwrap_or(&empty_withdrawals);
+            encoder.append(withdrawals);
+        }
+
+        if fixed_section_len >= Self::ssz_v3_fixed_len() {
+            encoder.append(&self.parent_beacon_block_root.unwrap_or_default());
+        }
+
+        if fixed_section_len >= Self::ssz_v4_slot_fixed_len() {
+            encoder.append(&self.slot_number.unwrap_or_default());
+        }
+
+        if fixed_section_len == Self::ssz_v4_target_fixed_len() {
+            encoder.append(&self.target_gas_limit.unwrap_or_default());
+        }
+
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        let fixed_section_len = self.ssz_fixed_section_len();
+        let withdrawals_len = if fixed_section_len >= Self::ssz_v2_fixed_len() {
+            self.withdrawals.as_ref().map(ssz::Encode::ssz_bytes_len).unwrap_or_default()
+        } else {
+            0
+        };
+
+        fixed_section_len + withdrawals_len
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for PayloadAttributes {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        if bytes.len() == Self::ssz_v1_fixed_len() {
+            let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+            builder.register_type::<u64>()?;
+            builder.register_type::<B256>()?;
+            builder.register_type::<Address>()?;
+
+            let mut decoder = builder.build()?;
+
+            return Ok(Self {
+                timestamp: decoder.decode_next()?,
+                prev_randao: decoder.decode_next()?,
+                suggested_fee_recipient: decoder.decode_next()?,
+                withdrawals: None,
+                parent_beacon_block_root: None,
+                slot_number: None,
+                target_gas_limit: None,
+            });
+        }
+
+        if bytes.len() < Self::ssz_v2_fixed_len() {
+            return Err(ssz::DecodeError::InvalidByteLength {
+                len: bytes.len(),
+                expected: Self::ssz_v2_fixed_len(),
+            });
+        }
+
+        let offset = u32::from_le_bytes([
+            bytes[Self::ssz_v1_fixed_len()],
+            bytes[Self::ssz_v1_fixed_len() + 1],
+            bytes[Self::ssz_v1_fixed_len() + 2],
+            bytes[Self::ssz_v1_fixed_len() + 3],
+        ]) as usize;
+
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<u64>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<Vec<Withdrawal>>()?;
+
+        match offset {
+            offset if offset == Self::ssz_v2_fixed_len() => {
+                let mut decoder = builder.build()?;
+
+                Ok(Self {
+                    timestamp: decoder.decode_next()?,
+                    prev_randao: decoder.decode_next()?,
+                    suggested_fee_recipient: decoder.decode_next()?,
+                    withdrawals: Some(decoder.decode_next()?),
+                    parent_beacon_block_root: None,
+                    slot_number: None,
+                    target_gas_limit: None,
+                })
+            }
+            offset if offset == Self::ssz_v3_fixed_len() => {
+                builder.register_type::<B256>()?;
+                let mut decoder = builder.build()?;
+
+                Ok(Self {
+                    timestamp: decoder.decode_next()?,
+                    prev_randao: decoder.decode_next()?,
+                    suggested_fee_recipient: decoder.decode_next()?,
+                    withdrawals: Some(decoder.decode_next()?),
+                    parent_beacon_block_root: Some(decoder.decode_next()?),
+                    slot_number: None,
+                    target_gas_limit: None,
+                })
+            }
+            offset if offset == Self::ssz_v4_slot_fixed_len() => {
+                builder.register_type::<B256>()?;
+                builder.register_type::<u64>()?;
+                let mut decoder = builder.build()?;
+
+                Ok(Self {
+                    timestamp: decoder.decode_next()?,
+                    prev_randao: decoder.decode_next()?,
+                    suggested_fee_recipient: decoder.decode_next()?,
+                    withdrawals: Some(decoder.decode_next()?),
+                    parent_beacon_block_root: Some(decoder.decode_next()?),
+                    slot_number: Some(decoder.decode_next()?),
+                    target_gas_limit: None,
+                })
+            }
+            offset if offset == Self::ssz_v4_target_fixed_len() => {
+                builder.register_type::<B256>()?;
+                builder.register_type::<u64>()?;
+                builder.register_type::<u64>()?;
+                let mut decoder = builder.build()?;
+
+                Ok(Self {
+                    timestamp: decoder.decode_next()?,
+                    prev_randao: decoder.decode_next()?,
+                    suggested_fee_recipient: decoder.decode_next()?,
+                    withdrawals: Some(decoder.decode_next()?),
+                    parent_beacon_block_root: Some(decoder.decode_next()?),
+                    slot_number: Some(decoder.decode_next()?),
+                    target_gas_limit: Some(decoder.decode_next()?),
+                })
+            }
+            offset => Err(ssz::DecodeError::BytesInvalid(format!(
+                "invalid PayloadAttributes SSZ fixed section offset: {offset}"
+            ))),
+        }
+    }
 }
 
 /// This structure contains the result of processing a payload or fork choice update.
@@ -3322,6 +3594,62 @@ impl PayloadStatus {
     /// Returns true if the payload status is invalid.
     pub const fn is_invalid(&self) -> bool {
         self.status.is_invalid()
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for PayloadStatus {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let validation_error =
+            self.status.validation_error().map(str::as_bytes).unwrap_or_default().to_vec();
+        let latest_valid_hash = self.latest_valid_hash.unwrap_or_default();
+        let offset = <u8 as ssz::Encode>::ssz_fixed_len()
+            + <B256 as ssz::Encode>::ssz_fixed_len()
+            + <Vec<u8> as ssz::Encode>::ssz_fixed_len();
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+
+        encoder.append(&self.status.ssz_code());
+        encoder.append(&latest_valid_hash);
+        encoder.append(&validation_error);
+
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        let validation_error_len = self.status.validation_error().map(str::len).unwrap_or_default();
+        <u8 as ssz::Encode>::ssz_fixed_len()
+            + <B256 as ssz::Encode>::ssz_fixed_len()
+            + <Vec<u8> as ssz::Encode>::ssz_fixed_len()
+            + validation_error_len
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for PayloadStatus {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<u8>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Vec<u8>>()?;
+
+        let mut decoder = builder.build()?;
+        let status_code: u8 = decoder.decode_next()?;
+        let latest_valid_hash: B256 = decoder.decode_next()?;
+        let validation_error: Vec<u8> = decoder.decode_next()?;
+
+        let status = PayloadStatusEnum::from_ssz_code(status_code, validation_error)?;
+        let latest_valid_hash = (!latest_valid_hash.is_zero()).then_some(latest_valid_hash);
+
+        Ok(Self { status, latest_valid_hash })
     }
 }
 
@@ -3418,6 +3746,50 @@ impl PayloadStatusEnum {
     /// Returns true if the payload status is invalid.
     pub const fn is_invalid(&self) -> bool {
         matches!(self, Self::Invalid { .. })
+    }
+
+    #[cfg(feature = "ssz")]
+    const fn ssz_code(&self) -> u8 {
+        match self {
+            Self::Valid => 0,
+            Self::Invalid { .. } => 1,
+            Self::Syncing => 2,
+            Self::Accepted => 3,
+        }
+    }
+
+    #[cfg(feature = "ssz")]
+    fn from_ssz_code(status_code: u8, validation_error: Vec<u8>) -> Result<Self, ssz::DecodeError> {
+        match status_code {
+            0 => {
+                if !validation_error.is_empty() {
+                    return Err(ssz::DecodeError::BytesInvalid(
+                        "unexpected validation error for VALID status".to_string(),
+                    ));
+                }
+                Ok(Self::Valid)
+            }
+            1 => String::from_utf8(validation_error)
+                .map(|validation_error| Self::Invalid { validation_error })
+                .map_err(|err| ssz::DecodeError::BytesInvalid(err.to_string())),
+            2 => {
+                if !validation_error.is_empty() {
+                    return Err(ssz::DecodeError::BytesInvalid(
+                        "unexpected validation error for SYNCING status".to_string(),
+                    ));
+                }
+                Ok(Self::Syncing)
+            }
+            3 => {
+                if !validation_error.is_empty() {
+                    return Err(ssz::DecodeError::BytesInvalid(
+                        "unexpected validation error for ACCEPTED status".to_string(),
+                    ));
+                }
+                Ok(Self::Accepted)
+            }
+            _ => Err(ssz::DecodeError::BytesInvalid("unknown payload status code".to_string())),
+        }
     }
 }
 
@@ -3777,6 +4149,198 @@ mod tests {
         assert!(status.latest_valid_hash.is_none());
         assert!(status.status.validation_error().is_none());
         assert_eq!(serde_json::to_string(&status).unwrap(), full);
+    }
+
+    #[test]
+    fn payload_attributes_builder_setters() {
+        let withdrawal = Withdrawal {
+            index: 1,
+            validator_index: 2,
+            address: Address::with_last_byte(3),
+            amount: 4,
+        };
+        let parent_beacon_block_root = B256::with_last_byte(5);
+
+        let attributes = PayloadAttributes::default()
+            .with_timestamp(10)
+            .with_withdrawals(vec![withdrawal])
+            .with_parent_beacon_block_root(parent_beacon_block_root)
+            .with_slot_number(6);
+
+        assert_eq!(attributes.timestamp, 10);
+        assert_eq!(attributes.withdrawals, Some(vec![withdrawal]));
+        assert_eq!(attributes.parent_beacon_block_root, Some(parent_beacon_block_root));
+        assert_eq!(attributes.slot_number, Some(6));
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_attributes_roundtrip_all_versions() {
+        use ssz::{Decode, Encode};
+
+        let withdrawal = Withdrawal {
+            index: 1,
+            validator_index: 2,
+            address: Address::with_last_byte(3),
+            amount: 4,
+        };
+
+        let v1 = PayloadAttributes {
+            timestamp: 10,
+            prev_randao: B256::with_last_byte(11),
+            suggested_fee_recipient: Address::with_last_byte(12),
+            withdrawals: None,
+            parent_beacon_block_root: None,
+            slot_number: None,
+            target_gas_limit: None,
+        };
+        let decoded_v1 = PayloadAttributes::from_ssz_bytes(&v1.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded_v1, v1);
+
+        let v2 = PayloadAttributes {
+            timestamp: 20,
+            prev_randao: B256::with_last_byte(21),
+            suggested_fee_recipient: Address::with_last_byte(22),
+            withdrawals: Some(vec![withdrawal]),
+            parent_beacon_block_root: None,
+            slot_number: None,
+            target_gas_limit: None,
+        };
+        let decoded_v2 = PayloadAttributes::from_ssz_bytes(&v2.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded_v2, v2);
+
+        let v3 = PayloadAttributes {
+            timestamp: 30,
+            prev_randao: B256::with_last_byte(31),
+            suggested_fee_recipient: Address::with_last_byte(32),
+            withdrawals: Some(vec![withdrawal]),
+            parent_beacon_block_root: Some(B256::with_last_byte(33)),
+            slot_number: None,
+            target_gas_limit: None,
+        };
+        let decoded_v3 = PayloadAttributes::from_ssz_bytes(&v3.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded_v3, v3);
+
+        let v4 = PayloadAttributes {
+            timestamp: 40,
+            prev_randao: B256::with_last_byte(41),
+            suggested_fee_recipient: Address::with_last_byte(42),
+            withdrawals: Some(vec![withdrawal]),
+            parent_beacon_block_root: Some(B256::with_last_byte(43)),
+            slot_number: Some(44),
+            target_gas_limit: Some(45),
+        };
+        let decoded_v4 = PayloadAttributes::from_ssz_bytes(&v4.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded_v4, v4);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_attributes_match_spec_container_offsets() {
+        use ssz::Encode;
+
+        let withdrawal = Withdrawal {
+            index: 1,
+            validator_index: 2,
+            address: Address::with_last_byte(3),
+            amount: 4,
+        };
+
+        let v1 = PayloadAttributes {
+            timestamp: 10,
+            prev_randao: B256::with_last_byte(11),
+            suggested_fee_recipient: Address::with_last_byte(12),
+            withdrawals: None,
+            parent_beacon_block_root: None,
+            slot_number: None,
+            target_gas_limit: None,
+        };
+        assert_eq!(v1.as_ssz_bytes().len(), 60);
+
+        let v2 = PayloadAttributes {
+            timestamp: 20,
+            prev_randao: B256::with_last_byte(21),
+            suggested_fee_recipient: Address::with_last_byte(22),
+            withdrawals: Some(vec![withdrawal]),
+            parent_beacon_block_root: None,
+            slot_number: None,
+            target_gas_limit: None,
+        };
+        let bytes = v2.as_ssz_bytes();
+        assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 64);
+
+        let v3 = PayloadAttributes {
+            timestamp: 30,
+            prev_randao: B256::with_last_byte(31),
+            suggested_fee_recipient: Address::with_last_byte(32),
+            withdrawals: Some(vec![withdrawal]),
+            parent_beacon_block_root: Some(B256::with_last_byte(33)),
+            slot_number: None,
+            target_gas_limit: None,
+        };
+        let bytes = v3.as_ssz_bytes();
+        assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 96);
+
+        let v4 = PayloadAttributes {
+            timestamp: 40,
+            prev_randao: B256::with_last_byte(41),
+            suggested_fee_recipient: Address::with_last_byte(42),
+            withdrawals: Some(vec![withdrawal]),
+            parent_beacon_block_root: Some(B256::with_last_byte(43)),
+            slot_number: Some(44),
+            target_gas_limit: Some(45),
+        };
+        let bytes = v4.as_ssz_bytes();
+        assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 112);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_status_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let statuses = [
+            PayloadStatus {
+                status: PayloadStatusEnum::Valid,
+                latest_valid_hash: Some(B256::with_last_byte(1)),
+            },
+            PayloadStatus {
+                status: PayloadStatusEnum::Invalid { validation_error: "bad payload".to_string() },
+                latest_valid_hash: Some(B256::with_last_byte(2)),
+            },
+            PayloadStatus { status: PayloadStatusEnum::Syncing, latest_valid_hash: None },
+            PayloadStatus { status: PayloadStatusEnum::Accepted, latest_valid_hash: None },
+        ];
+
+        for status in statuses {
+            let decoded = PayloadStatus::from_ssz_bytes(&status.as_ssz_bytes()).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_status_matches_eip8178_container() {
+        use ssz::{Decode, Encode};
+
+        let status = PayloadStatus {
+            status: PayloadStatusEnum::Invalid { validation_error: "bad payload".to_string() },
+            latest_valid_hash: None,
+        };
+        let spec = (1u8, B256::ZERO, b"bad payload".to_vec());
+
+        assert_eq!(status.as_ssz_bytes(), spec.as_ssz_bytes());
+        assert_eq!(PayloadStatus::from_ssz_bytes(&spec.as_ssz_bytes()).unwrap(), status);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_id_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let payload_id = PayloadId(B64::with_last_byte(42));
+        let decoded = PayloadId::from_ssz_bytes(&payload_id.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, payload_id);
     }
 
     #[test]
@@ -4557,23 +5121,26 @@ mod tests {
         let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
         assert_eq!(attrs.timestamp, 0x1234);
         assert!(attrs.slot_number.is_none());
+        assert!(attrs.target_gas_limit.is_none());
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_payload_attributes_with_hex_slot_number() {
+    fn serde_payload_attributes_with_hex_amsterdam_fields() {
         let json = r#"{
             "timestamp": "0x2",
             "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "suggestedFeeRecipient": "0x0000000000000000000000000000000000000000",
             "withdrawals": [],
             "parentBeaconBlockRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "slotNumber": "0x0"
+            "slotNumber": "0x0",
+            "targetGasLimit": "0x1c9c380"
         }"#;
 
         let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
         assert_eq!(attrs.timestamp, 0x2);
         assert_eq!(attrs.slot_number, Some(0));
+        assert_eq!(attrs.target_gas_limit, Some(30_000_000));
     }
 
     #[test]

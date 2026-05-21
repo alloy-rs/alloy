@@ -304,7 +304,7 @@ impl<T> Block<T> {
         self.header.hash
     }
 
-    /// Returns a sealed reference of the header: `Sealed<&Header>`
+    /// Returns a sealed reference of the header: `Sealed<&alloy_consensus::Header>`
     pub const fn sealed_header(&self) -> Sealed<&alloy_consensus::Header> {
         Sealed::new_unchecked(&self.header.inner, self.header.hash)
     }
