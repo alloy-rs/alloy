@@ -8,7 +8,7 @@ use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
     ffi::OsString,
-    fs::create_dir,
+    fs::create_dir_all,
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
@@ -115,7 +115,7 @@ impl RethInstance {
         self.data_dir.as_ref()
     }
 
-    /// Returns the genesis configuration used to configure this instance
+    /// Returns the genesis configuration supplied with [`Reth::genesis`], if any.
     pub const fn genesis(&self) -> Option<&Genesis> {
         self.genesis.as_ref()
     }
@@ -153,7 +153,7 @@ impl Drop for RethInstance {
 ///
 /// drop(reth); // this will kill the instance
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
     dev: bool,
@@ -173,6 +173,12 @@ pub struct Reth {
     genesis: Option<Genesis>,
     args: Vec<OsString>,
     keep_stdout: bool,
+}
+
+impl Default for Reth {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Reth {
@@ -289,7 +295,9 @@ impl Reth {
     }
 
     /// Sets the chain name or path to a chain spec for the Reth instance.
-    /// Passed through to `reth --chain <name-or-path>`.
+    ///
+    /// Passed through to `reth node --chain <name-or-path>`. To launch Reth with a custom genesis,
+    /// write the genesis or chain specification to disk and pass that path here.
     pub fn chain_or_path(mut self, chain_or_path: &str) -> Self {
         self.chain_or_path = Some(chain_or_path.to_string());
         self
@@ -309,8 +317,11 @@ impl Reth {
     }
 
     /// Sets the IPC path for the socket.
+    ///
+    /// This also enables IPC, as setting a path implies the intent to use IPC.
     pub fn ipc_path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.ipc_path = Some(path.into());
+        self.ipc_enabled = true;
         self
     }
 
@@ -320,12 +331,12 @@ impl Reth {
         self
     }
 
-    /// Sets the `genesis.json` for the Reth instance.
+    /// Stores the genesis configuration on the returned [`RethInstance`].
     ///
-    /// If this is set, reth will be initialized with `reth init` and the `--datadir` option will be
-    /// set to the same value as `data_dir`.
-    ///
-    /// This is destructive and will overwrite any existing data in the data directory.
+    /// The spawned node can be inspected through [`RethInstance::genesis`] to recover the genesis
+    /// value that was supplied to the builder. To launch Reth with a custom genesis or chain
+    /// specification, write that specification to disk and pass the path with
+    /// [`Reth::chain_or_path`].
     pub fn genesis(mut self, genesis: Genesis) -> Self {
         self.genesis = Some(genesis);
         self
@@ -457,7 +468,7 @@ impl Reth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 
@@ -590,5 +601,28 @@ mod tests {
             assert!(reth.endpoint().starts_with("http://localhost:"));
             assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
         }
+    }
+
+    #[test]
+    fn default_matches_new_semantics() {
+        let reth = Reth::default();
+
+        assert!(!reth.dev);
+        assert_eq!(reth.host, None);
+        assert_eq!(reth.http_port, DEFAULT_HTTP_PORT);
+        assert_eq!(reth.ws_port, DEFAULT_WS_PORT);
+        assert_eq!(reth.auth_port, DEFAULT_AUTH_PORT);
+        assert_eq!(reth.p2p_port, DEFAULT_P2P_PORT);
+        assert_eq!(reth.block_time, None);
+        assert!((1..200).contains(&reth.instance));
+        assert!(reth.discovery_enabled);
+        assert_eq!(reth.program, None);
+        assert_eq!(reth.ipc_path, None);
+        assert!(!reth.ipc_enabled);
+        assert_eq!(reth.data_dir, None);
+        assert_eq!(reth.chain_or_path, None);
+        assert_eq!(reth.genesis, None);
+        assert!(reth.args.is_empty());
+        assert!(!reth.keep_stdout);
     }
 }

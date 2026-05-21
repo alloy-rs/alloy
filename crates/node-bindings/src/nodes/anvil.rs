@@ -1,6 +1,6 @@
 //! Utilities for launching an Anvil instance.
 
-use crate::{NodeError, NODE_STARTUP_TIMEOUT};
+use crate::{utils::GracefulShutdown, NodeError, NODE_STARTUP_TIMEOUT};
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
@@ -124,21 +124,7 @@ impl AnvilInstance {
 
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
-        #[cfg(unix)]
-        {
-            // anvil has settings for dumping thing the state,cache on SIGTERM, so we try to kill it
-            // with sigterm
-            if let Ok(out) =
-                Command::new("kill").arg("-SIGTERM").arg(self.child.id().to_string()).output()
-            {
-                if out.status.success() {
-                    return;
-                }
-            }
-        }
-        if let Err(err) = self.child.kill() {
-            eprintln!("alloy-node-bindings: failed to kill anvil process: {}", err);
-        }
+        GracefulShutdown::shutdown(&mut self.child, 10, "anvil");
     }
 }
 

@@ -182,6 +182,22 @@ impl<T, H> Block<T, H> {
     }
 }
 
+impl<T: Encodable2718> Block<T, Header> {
+    /// Creates a new block from a header and an iterator of transactions.
+    ///
+    /// Computes and sets the `transactions_root` on the header automatically.
+    /// `ommers_hash` is set to [`EMPTY_OMMER_ROOT_HASH`](crate::EMPTY_OMMER_ROOT_HASH).
+    pub fn from_transactions(
+        mut header: Header,
+        transactions: impl IntoIterator<Item = T>,
+    ) -> Self {
+        let transactions: Vec<T> = transactions.into_iter().collect();
+        header.transactions_root = crate::proofs::calculate_transaction_root(&transactions);
+        header.ommers_hash = crate::EMPTY_OMMER_ROOT_HASH;
+        Self::new(header, BlockBody { transactions, ommers: Vec::new(), withdrawals: None })
+    }
+}
+
 impl<T, H> Default for Block<T, H>
 where
     H: Default,
@@ -508,71 +524,50 @@ mod tests {
 #[cfg(all(test, feature = "arbitrary"))]
 mod fuzz_tests {
     use super::*;
-    use alloy_primitives::Bytes;
-    use alloy_rlp::{Decodable, Encodable};
+    use crate::{EthereumTxEnvelope, TxEip4844};
+    use alloy_rlp::Encodable;
     use arbitrary::{Arbitrary, Unstructured};
+    use rand::Rng;
 
     #[test]
     fn fuzz_decode_sealed_block_roundtrip() {
-        let mut data = [0u8; 8192];
-        for (i, byte) in data.iter_mut().enumerate() {
-            *byte = (i.wrapping_mul(31).wrapping_add(17)) as u8;
+        for _ in 0..10 {
+            let mut bytes = [0u8; 1024 * 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+
+            let block = Block::<EthereumTxEnvelope<TxEip4844>>::arbitrary(&mut u).unwrap();
+            let expected_hash = block.header.hash_slow();
+
+            let mut encoded = Vec::new();
+            block.encode(&mut encoded);
+
+            let sealed =
+                Block::<EthereumTxEnvelope<TxEip4844>>::decode_sealed(&mut encoded.as_slice())
+                    .unwrap();
+            assert_eq!(sealed.hash(), expected_hash);
+            assert_eq!(*sealed.inner(), block);
         }
-
-        let mut success_count = 0;
-        for offset in 0..200 {
-            let slice = &data[offset..];
-            let mut u = Unstructured::new(slice);
-
-            if let Ok(block) = Block::<Bytes, Header>::arbitrary(&mut u) {
-                let expected_hash = block.header.hash_slow();
-
-                let mut encoded = Vec::new();
-                block.encode(&mut encoded);
-
-                let mut buf = encoded.as_slice();
-                if Block::<Bytes>::decode(&mut buf).is_ok() {
-                    let mut buf = encoded.as_slice();
-                    let sealed = Block::<Bytes>::decode_sealed(&mut buf).unwrap();
-
-                    assert_eq!(sealed.hash(), expected_hash);
-                    assert_eq!(*sealed.inner(), block);
-                    success_count += 1;
-                }
-            }
-        }
-        assert!(success_count > 0, "No blocks were successfully tested");
     }
 
     #[test]
     fn fuzz_header_decode_sealed_roundtrip() {
-        let mut data = [0u8; 4096];
-        for (i, byte) in data.iter_mut().enumerate() {
-            *byte = (i.wrapping_mul(37).wrapping_add(23)) as u8;
+        for _ in 0..200 {
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+
+            let header = Header::arbitrary(&mut u).unwrap();
+            let expected_hash = header.hash_slow();
+
+            let mut encoded = Vec::new();
+            header.encode(&mut encoded);
+
+            let mut buf = encoded.as_slice();
+            let sealed = Header::decode_sealed(&mut buf).unwrap();
+
+            assert_eq!(sealed.hash(), expected_hash);
+            assert_eq!(*sealed.inner(), header);
         }
-
-        let mut success_count = 0;
-        for offset in 0..200 {
-            let slice = &data[offset..];
-            let mut u = Unstructured::new(slice);
-
-            if let Ok(header) = Header::arbitrary(&mut u) {
-                let expected_hash = header.hash_slow();
-
-                let mut encoded = Vec::new();
-                header.encode(&mut encoded);
-
-                let mut buf = encoded.as_slice();
-                if Header::decode(&mut buf).is_ok() {
-                    let mut buf = encoded.as_slice();
-                    let sealed = Header::decode_sealed(&mut buf).unwrap();
-
-                    assert_eq!(sealed.hash(), expected_hash);
-                    assert_eq!(*sealed.inner(), header);
-                    success_count += 1;
-                }
-            }
-        }
-        assert!(success_count > 0, "No headers were successfully tested");
     }
 }

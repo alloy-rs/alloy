@@ -2,7 +2,9 @@ use alloy_json_rpc::{
     transform_response, try_deserialize_ok, Request, RequestMeta, RequestPacket, ResponsePacket,
     RpcRecv, RpcResult, RpcSend,
 };
-use alloy_transport::{BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportResult};
+use alloy_transport::{
+    BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportErrorKind, TransportResult,
+};
 use futures::FutureExt;
 use serde_json::value::RawValue;
 use std::{
@@ -100,7 +102,11 @@ where
                     let res = match task::ready!(fut.poll(cx)) {
                         Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
                         Err(e) => Ready(RpcResult::Err(e)),
-                        _ => panic!("received batch response from single request"),
+                        Ok(ResponsePacket::Batch(_)) => {
+                            Ready(RpcResult::Err(TransportErrorKind::custom_str(
+                                "received batch response from single request",
+                            )))
+                        }
                     };
                     self.set(Self::Complete);
                     return res;

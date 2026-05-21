@@ -42,9 +42,14 @@ pub struct BlobScheduleBlobParams {
     pub prague: BlobParams,
     /// Configuration for blob-related calculations for the Osaka hardfork.
     pub osaka: BlobParams,
-    /// Time-based scheduled updates to blob parameters.
+    /// All Time-based scheduled updates to blob parameters after Osaka.
     ///
     /// These are ordered by activation timestamps in natural order.
+    ///
+    /// This can include blobparams for hardforks after osaka (e.g. amsterdam) that are interleaved
+    /// with BPOs.
+    ///
+    /// Caution: It is expected that these are only activated at or after osaka.
     pub scheduled: Vec<(u64, BlobParams)>,
 }
 

@@ -386,7 +386,6 @@ impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
                     Ok(item) => return task::Poll::Ready(Some(item)),
                     Err(err) => {
                         debug!(value = ?value.get(), %err, %self.id, "failed deserializing subscription item");
-                        error!(%err, %self.id, "failed deserializing subscription item");
                         continue;
                     }
                 },

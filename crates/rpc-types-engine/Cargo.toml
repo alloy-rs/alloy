@@ -49,7 +49,7 @@ rand = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
 
 [features]
-default = ["jwt", "std", "serde"]
+default = ["std", "serde"]
 std = [
 	"alloy-consensus/std",
 	"derive_more/std",
@@ -69,6 +69,7 @@ serde = [
 	"rand?/serde",
 ]
 jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
+jwt-aws-lc-rs = ["jwt", "jsonwebtoken/aws_lc_rs"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg", "alloy-eips/kzg"]
 arbitrary = ["dep:arbitrary", "std", "alloy-primitives/arbitrary", "alloy-serde/arbitrary", "alloy-consensus/arbitrary", "alloy-eips/arbitrary"]
@@ -82,6 +83,7 @@ alloy-primitives = { workspace = true, features = [
 ] }
 alloy-consensus = { workspace = true, features = ["arbitrary"] }
 arbitrary = { workspace = true, features = ["derive"] }
+jsonwebtoken =  { workspace = true, features = ["aws_lc_rs"] }
 rand.workspace = true
 serde_json.workspace = true
 similar-asserts.workspace = true

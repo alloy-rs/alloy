@@ -298,6 +298,13 @@ where
     fn logs(&self) -> &[Self::Log] {
         self.receipt.logs()
     }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.receipt.into_logs()
+    }
 }
 
 impl<R> From<R> for ReceiptWithBloom<R>

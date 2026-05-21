@@ -110,6 +110,16 @@ pub trait EngineApi<N>: Send + Sync {
         payload_attributes: Option<PayloadAttributes>,
     ) -> TransportResult<ForkchoiceUpdated>;
 
+    /// Updates the execution layer client with the given fork choice, as specified for the
+    /// Amsterdam fork.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/amsterdam.md#engine_forkchoiceupdatedv4>
+    async fn fork_choice_updated_v4(
+        &self,
+        fork_choice_state: ForkchoiceState,
+        payload_attributes: Option<PayloadAttributes>,
+    ) -> TransportResult<ForkchoiceUpdated>;
+
     /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Paris fork.
     ///
@@ -236,19 +246,6 @@ pub trait EngineApi<N>: Send + Sync {
         start: u64,
         count: u64,
     ) -> TransportResult<ExecutionPayloadBodiesV2>;
-
-    /// Returns the Block Access Lists for the given block hashes.
-    ///
-    /// See also <https://eips.ethereum.org/EIPS/eip-7928>
-    async fn get_bals_by_hash_v1(
-        &self,
-        block_hashes: Vec<BlockHash>,
-    ) -> TransportResult<Vec<Bytes>>;
-
-    /// Returns the Block Access Lists for the given block range.
-    ///
-    /// See also <https://eips.ethereum.org/EIPS/eip-7928>
-    async fn get_bals_by_range_v1(&self, start: u64, count: u64) -> TransportResult<Vec<Bytes>>;
 
     /// Returns the requested blobs and their associated proofs for the given versioned hashes.
     ///
@@ -395,6 +392,16 @@ where
             .await
     }
 
+    async fn fork_choice_updated_v4(
+        &self,
+        fork_choice_state: ForkchoiceState,
+        payload_attributes: Option<PayloadAttributes>,
+    ) -> TransportResult<ForkchoiceUpdated> {
+        self.client()
+            .request("engine_forkchoiceUpdatedV4", (fork_choice_state, payload_attributes))
+            .await
+    }
+
     async fn get_payload_v1(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV1> {
         self.client().request("engine_getPayloadV1", (payload_id,)).await
     }
@@ -466,17 +473,6 @@ where
         self.client()
             .request("engine_getPayloadBodiesByRangeV2", (U64::from(start), U64::from(count)))
             .await
-    }
-
-    async fn get_bals_by_hash_v1(
-        &self,
-        block_hashes: Vec<BlockHash>,
-    ) -> TransportResult<Vec<Bytes>> {
-        self.client().request("engine_getBALsByHashV1", (block_hashes,)).await
-    }
-
-    async fn get_bals_by_range_v1(&self, start: u64, count: u64) -> TransportResult<Vec<Bytes>> {
-        self.client().request("engine_getBALsByRangeV1", (U64::from(start), U64::from(count))).await
     }
 
     async fn get_blobs_v1(

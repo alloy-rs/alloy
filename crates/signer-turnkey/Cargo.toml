@@ -31,7 +31,7 @@ alloy-signer.workspace = true
 async-trait.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-turnkey_client = "0.5"
+turnkey_client = "0.6"
 
 [dev-dependencies]
 k256 = { workspace = true, features = ["ecdsa"] }

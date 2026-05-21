@@ -60,7 +60,6 @@ futures-utils-wasm.workspace = true
 futures.workspace = true
 lru.workspace = true
 pin-project.workspace = true
-reqwest = { workspace = true, optional = true }
 serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -69,6 +68,9 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 either.workspace = true
 http = { workspace = true, optional = true }
+
+[target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
+reqwest = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
@@ -112,7 +114,10 @@ reqwest = [
 ]
 hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
 hyper-tls = ["hyper", "alloy-transport-http/hyper-tls"]
-ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
+ws-base = ["pubsub", "dep:alloy-transport-ws", "alloy-rpc-client/ws-base"]
+ws = ["ws-base", "alloy-rpc-client/ws", "alloy-transport-ws/aws-lc-rs"]
+ws-ring = ["ws-base", "alloy-rpc-client/ws-ring", "alloy-transport-ws/ring"]
+ws-native-tls = ["ws-base", "alloy-rpc-client/ws-native-tls", "alloy-transport-ws/native-tls"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
 reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
 reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
@@ -131,3 +136,4 @@ rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
 throttle = ["alloy-transport/throttle"]
 mev-api = ["dep:alloy-rpc-types-mev", "dep:http"]
+more-tuple-impls = []

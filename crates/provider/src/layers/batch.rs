@@ -261,6 +261,9 @@ impl<N: Network> CallBatchProviderInner<N> {
         if params.overrides.as_ref().is_some_and(|overrides| !overrides.is_empty()) {
             return false;
         }
+        if params.block_overrides().is_some_and(|overrides| !overrides.is_empty()) {
+            return false;
+        }
         let tx = params.data();
         if tx.to().is_none() {
             return false;
@@ -372,7 +375,18 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         let result = self.send_batch_inner(&pending).await;
         match result {
             Ok(results) => {
-                debug_assert_eq!(results.len(), pending.len());
+                if results.len() != pending.len() {
+                    let err = format!(
+                        "multicall batch response count mismatch: expected {}, got {}",
+                        pending.len(),
+                        results.len()
+                    );
+                    for msg in pending {
+                        let _ = msg.tx.send(Err(TransportErrorKind::custom_str(&err)));
+                    }
+                    return;
+                }
+
                 for (result, msg) in results.into_iter().zip(pending) {
                     let _ = msg.tx.send(Ok(result));
                 }
@@ -520,8 +534,9 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
+    use alloy_network::{Ethereum, TransactionBuilder};
     use alloy_primitives::{address, hex};
-    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_rpc_types_eth::{BlockOverrides, TransactionRequest};
     use alloy_transport::mock::Asserter;
 
     // https://etherscan.io/address/0xcA11bde05977b3631167028862bE2a173976CA11#code
@@ -567,6 +582,35 @@ mod tests {
         assert!(block_number_err.unwrap_err().to_string().contains("reverted"));
         assert!(chain_id_err.unwrap_err().to_string().contains("reverted"));
         assert!(asserter.read_q().is_empty(), "only 1 request should've been made");
+    }
+
+    #[tokio::test]
+    async fn batch_response_len_mismatch_errors_all_callers() {
+        let asserter = Asserter::new();
+        let provider =
+            ProviderBuilder::new().with_call_batching().connect_mocked_client(asserter.clone());
+
+        push_m3_success(&asserter, &[(true, 1.abi_encode())]);
+
+        let (block_number, chain_id) =
+            tokio::join!(provider.get_block_number(), provider.get_chain_id());
+
+        let block_number_err = block_number.unwrap_err().to_string();
+        let chain_id_err = chain_id.unwrap_err().to_string();
+        assert!(block_number_err.contains("response count mismatch"), "{block_number_err}");
+        assert!(chain_id_err.contains("response count mismatch"), "{chain_id_err}");
+        assert!(asserter.read_q().is_empty(), "only 1 request should've been made");
+    }
+
+    #[test]
+    fn should_not_batch_calls_with_block_overrides() {
+        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        let inner = CallBatchProviderInner::<Ethereum> { tx };
+        let params =
+            crate::EthCallParams::new(TransactionRequest::default().with_to(COUNTER_ADDRESS))
+                .with_block_overrides(BlockOverrides::default().with_number(U256::from(1)));
+
+        assert!(!inner.should_batch_call(&params));
     }
 
     #[tokio::test]

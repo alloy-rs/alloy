@@ -75,17 +75,17 @@ impl TransactionConditional {
         self.has_exceeded_block_number(block.number) || self.has_exceeded_timestamp(block.timestamp)
     }
 
-    /// Returns true if the configured max block number is lower or equal to the given
+    /// Returns true if the configured max block number is strictly lower than the given
     /// `block_number`
     pub const fn has_exceeded_block_number(&self, block_number: BlockNumber) -> bool {
         let Some(max_num) = self.block_number_max else { return false };
-        block_number >= max_num
+        block_number > max_num
     }
 
-    /// Returns true if the configured max timestamp is lower or equal to the given `timestamp`
+    /// Returns true if the configured max timestamp is strictly lower than the given `timestamp`
     pub const fn has_exceeded_timestamp(&self, timestamp: u64) -> bool {
         let Some(max_timestamp) = self.timestamp_max else { return false };
-        timestamp >= max_timestamp
+        timestamp > max_timestamp
     }
 
     /// Returns `true` if the transaction matches the given block attributes.

@@ -2,7 +2,7 @@ use alloy_json_rpc::RpcError;
 use alloy_transport::{BoxTransport, TransportConnect, TransportError, TransportErrorKind};
 use std::{str::FromStr, time::Duration};
 
-#[cfg(any(feature = "ws", feature = "ipc"))]
+#[cfg(any(feature = "ws-base", feature = "ipc"))]
 use alloy_pubsub::PubSubConnect;
 
 /// Connection string for built-in transports.
@@ -13,7 +13,7 @@ pub enum BuiltInConnectionString {
     #[cfg(any(feature = "reqwest", feature = "hyper"))]
     Http(url::Url),
     /// WebSocket transport.
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     Ws(url::Url, Option<alloy_transport::Authorization>),
     /// IPC transport.
     #[cfg(feature = "ipc")]
@@ -25,14 +25,14 @@ impl TransportConnect for BuiltInConnectionString {
         match self {
             #[cfg(any(feature = "reqwest", feature = "hyper"))]
             Self::Http(url) => alloy_transport::utils::guess_local_url(url),
-            #[cfg(feature = "ws")]
+            #[cfg(feature = "ws-base")]
             Self::Ws(url, _) => alloy_transport::utils::guess_local_url(url),
             #[cfg(feature = "ipc")]
             Self::Ipc(_) => true,
             #[cfg(not(any(
                 feature = "reqwest",
                 feature = "hyper",
-                feature = "ws",
+                feature = "ws-base",
                 feature = "ipc"
             )))]
             _ => false,
@@ -126,12 +126,25 @@ impl BuiltInConnectionString {
         let _ = &config; // Suppress unused warning for non-WS transports
         match self {
             // reqwest is enabled, hyper is not
-            #[cfg(all(not(feature = "hyper"), feature = "reqwest"))]
+            #[cfg(all(
+                not(feature = "hyper"),
+                feature = "reqwest",
+                not(all(target_os = "wasi", target_env = "p1"))
+            ))]
             Self::Http(url) => {
                 Ok(alloy_transport::Transport::boxed(
                     alloy_transport_http::Http::<reqwest::Client>::new(url.clone()),
                 ))
             }
+
+            #[cfg(all(
+                not(feature = "hyper"),
+                feature = "reqwest",
+                all(target_os = "wasi", target_env = "p1")
+            ))]
+            Self::Http(_) => Err(TransportErrorKind::custom_str(
+                "reqwest HTTP transport is not supported on wasm32-wasip1",
+            )),
 
             // hyper is enabled, reqwest is not
             #[cfg(feature = "hyper")]
@@ -139,7 +152,7 @@ impl BuiltInConnectionString {
                 alloy_transport_http::HyperTransport::new_hyper(url.clone()),
             )),
 
-            #[cfg(feature = "ws")]
+            #[cfg(feature = "ws-base")]
             Self::Ws(url, existing_auth) => {
                 let mut ws_connect = alloy_transport_ws::WsConnect::new(url.clone());
 
@@ -178,7 +191,7 @@ impl BuiltInConnectionString {
             #[cfg(not(any(
                 feature = "reqwest",
                 feature = "hyper",
-                feature = "ws",
+                feature = "ws-base",
                 feature = "ipc"
             )))]
             _ => Err(TransportErrorKind::custom_str(
@@ -208,7 +221,7 @@ impl BuiltInConnectionString {
     }
 
     /// Tries to parse the given string as a WebSocket URL.
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     pub fn try_as_ws(s: &str) -> Result<Self, TransportError> {
         let url = if s.starts_with("localhost:") || s.parse::<std::net::SocketAddr>().is_ok() {
             let s = format!("ws://{s}");
@@ -256,7 +269,7 @@ impl FromStr for BuiltInConnectionString {
         )));
         #[cfg(any(feature = "reqwest", feature = "hyper"))]
         let res = res.or_else(|_| Self::try_as_http(s));
-        #[cfg(feature = "ws")]
+        #[cfg(feature = "ws-base")]
         let res = res.or_else(|_| Self::try_as_ws(s));
         #[cfg(feature = "ipc")]
         let res = res.or_else(|_| Self::try_as_ipc(s));
@@ -275,10 +288,12 @@ pub struct ConnectionConfig {
     pub auth: Option<alloy_transport::Authorization>,
     /// Maximum number of connection retries.
     pub max_retries: Option<u32>,
-    /// Interval between connection retries.
+    /// Base interval between connection retries.
+    ///
+    /// WebSocket reconnect retries use capped exponential backoff from this base interval.
     pub retry_interval: Option<Duration>,
     /// WebSocket-specific configuration.
-    #[cfg(all(feature = "ws", not(target_family = "wasm")))]
+    #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
 }
 
@@ -289,7 +304,7 @@ impl ConnectionConfig {
             auth: None,
             max_retries: None,
             retry_interval: None,
-            #[cfg(all(feature = "ws", not(target_family = "wasm")))]
+            #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
             ws_config: None,
         }
     }
@@ -306,14 +321,16 @@ impl ConnectionConfig {
         self
     }
 
-    /// Set the retry interval.
+    /// Set the base retry interval.
+    ///
+    /// WebSocket reconnect retries use capped exponential backoff from this base interval.
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = Some(retry_interval);
         self
     }
 
     /// Set the WebSocket configuration.
-    #[cfg(all(feature = "ws", not(target_family = "wasm")))]
+    #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub const fn with_ws_config(mut self, config: alloy_transport_ws::WebSocketConfig) -> Self {
         self.ws_config = Some(config);
         self
@@ -360,7 +377,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     fn test_parsing_ws() {
         use alloy_transport::Authorization;
 
@@ -416,7 +433,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     fn test_ws_config_auth_priority() {
         use alloy_transport::Authorization;
 

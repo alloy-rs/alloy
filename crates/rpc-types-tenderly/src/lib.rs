@@ -14,6 +14,169 @@ use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{Address, Bloom, Bytes, FixedBytes, Log, I256, U256};
 use serde::{de::Error, Deserialize, Serialize};
 
+/// Tenderly RPC estimate gas result.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyEstimateGasResult {
+    /// The estimated gas limit for the transaction.
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas: u64,
+    /// The actual gas used by the transaction.
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_used: u64,
+}
+
+/// Gas price tier information for Tenderly RPC.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyGasPriceTier {
+    /// The maximum priority fee per gas.
+    #[serde(with = "alloy_serde::quantity")]
+    pub max_priority_fee_per_gas: u128,
+    /// The maximum fee per gas.
+    #[serde(with = "alloy_serde::quantity")]
+    pub max_fee_per_gas: u128,
+    /// The estimated wait time in milliseconds.
+    pub wait_time: u64,
+}
+
+/// Tenderly RPC gas price result.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyGasPriceResult {
+    /// The current block number.
+    #[serde(with = "alloy_serde::quantity")]
+    pub current_block_number: u64,
+    /// The base fee per gas.
+    #[serde(with = "alloy_serde::quantity")]
+    pub base_fee_per_gas: u128,
+    /// Gas price tiers for different urgency levels.
+    pub price: TenderlyGasPriceTiers,
+}
+
+/// Gas price tiers for different urgency levels.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyGasPriceTiers {
+    /// Low urgency tier.
+    pub low: TenderlyGasPriceTier,
+    /// Medium urgency tier.
+    pub medium: TenderlyGasPriceTier,
+    /// High urgency tier.
+    pub high: TenderlyGasPriceTier,
+}
+
+/// Decoded argument for Tenderly decode input.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyDecodedArgument {
+    /// Value of the argument.
+    #[serde(rename = "value")]
+    raw_value: serde_json::Value,
+    /// Type of the argument.
+    #[serde(rename = "type")]
+    raw_typ: serde_json::Value,
+    /// Name of the argument.
+    pub name: String,
+    /// True if the argument is indexed (for events).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indexed: Option<bool>,
+}
+
+impl TenderlyDecodedArgument {
+    /// Returns the parsed type of the decoded argument.
+    pub fn ty(&self) -> Option<DynSolType> {
+        let raw = self.raw_typ.as_str()?;
+        let Ok(ty) = raw.parse() else {
+            return None;
+        };
+        Some(ty)
+    }
+
+    /// Returns the parsed value of the decoded argument.
+    pub fn value(&self) -> Option<DynSolValue> {
+        let Ok(val) = DecodedValue::parse_dyn_value(&self.raw_value, &self.ty()?) else {
+            return None;
+        };
+        Some(val)
+    }
+}
+
+/// Tenderly RPC decode input result.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyDecodeInputResult {
+    /// Name of the decoded function or event.
+    pub name: String,
+    /// Confidence level of the decoding (0.0 to 1.0).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<f64>,
+    /// Decoded arguments.
+    pub decoded_arguments: Vec<TenderlyDecodedArgument>,
+}
+
+/// Function input type for Tenderly function signatures.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TenderlyFunctionInput {
+    /// Type of the input parameter.
+    #[serde(rename = "type")]
+    raw_typ: serde_json::Value,
+}
+
+impl TenderlyFunctionInput {
+    /// Returns the parsed type of the input parameter.
+    pub fn ty(&self) -> Option<DynSolType> {
+        let raw = self.raw_typ.as_str()?;
+        raw.parse().ok()
+    }
+}
+
+/// Function signature for Tenderly function signatures.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TenderlyFunctionSignature {
+    /// Name of the function.
+    pub name: String,
+    /// Input parameters of the function.
+    pub inputs: Vec<TenderlyFunctionInput>,
+}
+
+/// Parameters for Tenderly get transaction range request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyTransactionRangeParams {
+    /// The address to check transactions from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<Address>,
+    /// The address to check transactions to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to: Option<Address>,
+    /// The starting block number to search from.
+    pub from_block: BlockNumberOrTag,
+    /// The ending block number to search to.
+    pub to_block: BlockNumberOrTag,
+}
+
+/// Parameters for Tenderly get storage changes request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyStorageQueryParams {
+    /// The address of the contract to fetch storage changes for.
+    pub address: Address,
+    /// The storage slot offset to start querying from (hex string).
+    pub offset: U256,
+}
+
+/// Storage change entry for Tenderly get storage changes response.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TenderlyStorageChange {
+    /// Block number where the change occurred.
+    #[serde(with = "alloy_serde::quantity")]
+    pub block_number: u64,
+    /// New value of the storage slot.
+    pub value: FixedBytes<32>,
+}
+
 /// Tenderly RPC simulation result.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -84,10 +247,10 @@ impl DecodedValue {
     /// Returns the parsed type of the log input.
     pub fn ty(&self) -> Option<DynSolType> {
         let raw = self.raw_typ.as_str()?;
-        let Ok(typ) = raw.parse() else {
+        let Ok(ty) = raw.parse() else {
             return None;
         };
-        Some(typ)
+        Some(ty)
     }
 
     /// Returns the parsed type of the log input.
@@ -104,7 +267,8 @@ impl DecodedValue {
         Some(val)
     }
 
-    fn parse_dyn_value(
+    /// Parses a JSON value into a `DynSolValue` based on the given `DynSolType`.
+    pub(crate) fn parse_dyn_value(
         val: &serde_json::Value,
         ty: &DynSolType,
     ) -> Result<DynSolValue, serde_json::error::Error> {
@@ -385,7 +549,12 @@ pub struct ValueChange {
 
 #[cfg(test)]
 mod tests {
-    use crate::TenderlySimulationResult;
+    use alloy_dyn_abi::{DynSolType, DynSolValue};
+
+    use crate::{
+        TenderlyDecodeInputResult, TenderlyEstimateGasResult, TenderlyGasPriceResult,
+        TenderlySimulationResult,
+    };
 
     #[test]
     fn test_success_response() {
@@ -452,5 +621,133 @@ mod tests {
             serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
             input.split_whitespace().collect::<String>()
         );
+    }
+
+    #[test]
+    fn test_estimate_gas_response() {
+        let input = include_str!("../test_data/estimate_gas.json");
+        let parsed: TenderlyEstimateGasResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(parsed.gas, 0x12579);
+        assert_eq!(parsed.gas_used, 0xff06);
+
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
+    }
+
+    #[test]
+    fn test_gas_price_response() {
+        let input = include_str!("../test_data/gas_price.json");
+        let parsed: TenderlyGasPriceResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(parsed.current_block_number, 0x14a0bdb);
+        assert_eq!(parsed.base_fee_per_gas, 0xbcdd3e0f);
+        assert_eq!(parsed.price.low.max_priority_fee_per_gas, 0x27f840a);
+        assert_eq!(parsed.price.low.max_fee_per_gas, 0x1097c5d8b);
+        assert_eq!(parsed.price.low.wait_time, 36000);
+        assert_eq!(parsed.price.medium.max_priority_fee_per_gas, 0x9b4c5bb);
+        assert_eq!(parsed.price.medium.max_fee_per_gas, 0x1137c6003);
+        assert_eq!(parsed.price.medium.wait_time, 24000);
+        assert_eq!(parsed.price.high.max_priority_fee_per_gas, 0x10128f8e);
+        assert_eq!(parsed.price.high.max_fee_per_gas, 0x11c5174a8);
+        assert_eq!(parsed.price.high.wait_time, 12000);
+
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
+    }
+
+    #[test]
+    fn test_estimate_gas_bundle_response() {
+        let input = include_str!("../test_data/estimate_gas_bundle.json");
+        let parsed: Vec<TenderlyEstimateGasResult> = serde_json::from_str(input).unwrap();
+
+        assert_eq!(parsed.len(), 4);
+        assert_eq!(parsed[0].gas, 0x12579);
+        assert_eq!(parsed[0].gas_used, 0xff06);
+        assert_eq!(parsed[1].gas, 0x10918);
+        assert_eq!(parsed[1].gas_used, 0xb551);
+        assert_eq!(parsed[2].gas, 0xa621);
+        assert_eq!(parsed[2].gas_used, 0x6625);
+        assert_eq!(parsed[3].gas, 0x10649);
+        assert_eq!(parsed[3].gas_used, 0xb249);
+
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
+    }
+
+    #[test]
+    fn test_decode_input_response() {
+        let input = include_str!("../test_data/decode_input.json");
+        let parsed: TenderlyDecodeInputResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(parsed.name, "transfer");
+        assert_eq!(parsed.decoded_arguments.len(), 2);
+
+        // Test first argument (address)
+        let arg0 = &parsed.decoded_arguments[0];
+        assert_eq!(arg0.name, "arg0");
+        let ty0 = arg0.ty().expect("should parse address type");
+        assert!(matches!(ty0, DynSolType::Address));
+        let value0 = arg0.value().expect("should parse address value");
+        assert!(matches!(value0, DynSolValue::Address(_)));
+
+        // Test second argument (uint256)
+        let arg1 = &parsed.decoded_arguments[1];
+        assert_eq!(arg1.name, "arg1");
+        let ty1 = arg1.ty().expect("should parse uint256 type");
+        assert!(matches!(ty1, DynSolType::Uint(_)));
+        let value1 = arg1.value().expect("should parse uint256 value");
+        assert!(matches!(value1, DynSolValue::Uint(_, _)));
+
+        // Round-trip test: deserialize and serialize back to verify structure
+        let serialized = serde_json::to_string(&parsed).unwrap();
+        let reparsed: TenderlyDecodeInputResult = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(reparsed.name, parsed.name);
+        assert_eq!(reparsed.decoded_arguments.len(), parsed.decoded_arguments.len());
+    }
+
+    #[test]
+    fn test_decode_error_response() {
+        let input = include_str!("../test_data/decode_error.json");
+        let parsed: TenderlyDecodeInputResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(parsed.name, "ERC20InsufficientBalance");
+        assert_eq!(parsed.decoded_arguments.len(), 3);
+
+        // Test first argument (address)
+        let arg0 = &parsed.decoded_arguments[0];
+        assert_eq!(arg0.name, "arg0");
+        let ty0 = arg0.ty().expect("should parse address type");
+        assert!(matches!(ty0, DynSolType::Address));
+        let value0 = arg0.value().expect("should parse address value");
+        assert!(matches!(value0, DynSolValue::Address(_)));
+
+        // Test second argument (uint256)
+        let arg1 = &parsed.decoded_arguments[1];
+        assert_eq!(arg1.name, "arg1");
+        let ty1 = arg1.ty().expect("should parse uint256 type");
+        assert!(matches!(ty1, DynSolType::Uint(_)));
+        let value1 = arg1.value().expect("should parse uint256 value");
+        assert!(matches!(value1, DynSolValue::Uint(_, _)));
+
+        // Test third argument (uint256)
+        let arg2 = &parsed.decoded_arguments[2];
+        assert_eq!(arg2.name, "arg2");
+        let ty2 = arg2.ty().expect("should parse uint256 type");
+        assert!(matches!(ty2, DynSolType::Uint(_)));
+        let value2 = arg2.value().expect("should parse uint256 value");
+        assert!(matches!(value2, DynSolValue::Uint(_, _)));
+
+        // Round-trip test: deserialize and serialize back to verify structure
+        let serialized = serde_json::to_string(&parsed).unwrap();
+        let reparsed: TenderlyDecodeInputResult = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(reparsed.name, parsed.name);
+        assert_eq!(reparsed.decoded_arguments.len(), parsed.decoded_arguments.len());
     }
 }

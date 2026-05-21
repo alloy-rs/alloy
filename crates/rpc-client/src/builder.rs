@@ -1,5 +1,6 @@
 use crate::{BuiltInConnectionString, ConnectionConfig, RpcClient};
 use alloy_transport::{BoxTransport, IntoBoxTransport, TransportConnect, TransportResult};
+use std::str::FromStr;
 use tower::{
     layer::util::{Identity, Stack},
     Layer, ServiceBuilder,
@@ -49,7 +50,7 @@ impl<L> ClientBuilder<L> {
 
     /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
     /// HTTP transport.
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn http(self, url: url::Url) -> RpcClient
     where
         L: Layer<alloy_transport_http::Http<reqwest::Client>>,
@@ -63,7 +64,7 @@ impl<L> ClientBuilder<L> {
 
     /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
     /// HTTP transport using a pre-built `reqwest::Client`.
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn http_with_client(self, client: reqwest::Client, url: url::Url) -> RpcClient
     where
         L: Layer<alloy_transport_http::Http<reqwest::Client>>,
@@ -104,7 +105,7 @@ impl<L> ClientBuilder<L> {
 
     /// Connect a WS transport, producing an [`RpcClient`] with the provided
     /// connection.
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     pub async fn ws(self, ws_connect: alloy_transport_ws::WsConnect) -> TransportResult<RpcClient>
     where
         L: Layer<alloy_pubsub::PubSubFrontend>,
@@ -174,9 +175,11 @@ impl<L> ClientBuilder<L> {
         L: Layer<BoxTransport>,
         L::Service: IntoBoxTransport,
     {
-        let transport = BuiltInConnectionString::connect_with(s, config).await?;
+        let connect = BuiltInConnectionString::from_str(s)?;
+        let is_local = connect.is_local();
+        let transport = connect.connect_boxed_with(config).await?;
         let transport = self.builder.service(transport);
-        Ok(RpcClient::new(transport.into_box_transport(), false))
+        Ok(RpcClient::new(transport.into_box_transport(), is_local))
     }
 
     /// Connect a transport, producing an [`RpcClient`].

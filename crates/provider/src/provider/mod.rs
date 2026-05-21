@@ -4,7 +4,7 @@ pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParam
 mod get_block;
 #[cfg(feature = "pubsub")]
 pub use get_block::SubFullBlocks;
-pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks};
+pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks, WatchHeaders};
 
 mod watch_canonical_blocks_from;
 pub use watch_canonical_blocks_from::{

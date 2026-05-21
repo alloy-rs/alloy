@@ -26,12 +26,34 @@ cargo add alloy --features full
 Alternatively, you can add the following to your `Cargo.toml` file:
 
 ```toml
-alloy = { version = "1", features = ["full"] }
+alloy = { version = "2", features = ["full"] }
 ```
 
 For a more fine-grained control over the features you wish to include, you can add the individual crates to your `Cargo.toml` file, or use the `alloy` crate with the features you need.
 
 A comprehensive list of available features can be found on [docs.rs](https://docs.rs/crate/alloy/latest/features) or in the [`alloy` crate's `Cargo.toml`](https://github.com/alloy-rs/alloy/blob/main/crates/alloy/Cargo.toml).
+
+If you want to use `ProviderBuilder::connect_anvil*` helpers from the `alloy` meta-crate,
+enable the `provider-anvil-node` feature:
+
+```sh
+cargo add alloy --features provider-anvil-node
+```
+
+If you only need the `alloy::node_bindings` re-export, enable the `node-bindings` feature:
+
+```sh
+cargo add alloy --features node-bindings
+```
+
+If you are already using `full`, add `node-bindings` explicitly because `full` does not include it:
+
+```sh
+cargo add alloy --features "full,node-bindings"
+```
+
+If you depend on `alloy-provider` directly instead of the `alloy` meta-crate, enable the
+`anvil-node` feature there.
 
 ## Examples
 

@@ -13,10 +13,10 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct TraceFilter {
     /// From block
-    #[serde(with = "alloy_serde::quantity::opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub from_block: Option<u64>,
     /// To block
-    #[serde(with = "alloy_serde::quantity::opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub to_block: Option<u64>,
     /// From address
     #[serde(default)]
@@ -28,8 +28,10 @@ pub struct TraceFilter {
     #[serde(default)]
     pub mode: TraceFilterMode,
     /// Output offset
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub after: Option<u64>,
     /// Output amount
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<u64>,
 }
 
