@@ -2,8 +2,16 @@
 //! protocol.
 
 use super::EthereumTxEnvelope;
-use crate::{error::ValueError, Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
-use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, Encodable7594};
+use crate::{
+    error::ValueError, transaction::RlpEcdsaEncodableTx, Signed, TxEip4844, TxEip4844Variant,
+    TxEip4844WithSidecar, TxType,
+};
+use alloc::vec::Vec;
+use alloy_eips::{
+    eip7594::{BlobTransactionSidecarEip7594, Encodable7594},
+    Decodable2718, Encodable2718,
+};
+use alloy_rlp::{BufMut, Header};
 
 /// All possible transactions that can be included in a response to `GetPooledTransactions`.
 /// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
@@ -18,6 +26,94 @@ use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, Encodable7594};
 /// for PeerDAS data availability sampling.
 pub type PooledTransaction =
     EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>;
+
+impl PooledTransaction {
+    /// Returns the pre-eth/72 `PooledTransactions` response encoding length.
+    ///
+    /// This is the canonical EIP-2718 pooled transaction encoding with full blob payloads for
+    /// type 3 transactions.
+    pub fn pooled_response_pre_eth72_encoded_2718_len(&self) -> usize {
+        self.encode_2718_len()
+    }
+
+    /// Encodes this transaction for a pre-eth/72 `PooledTransactions` response.
+    ///
+    /// This preserves the full blob payloads for type 3 transactions.
+    pub fn pooled_response_pre_eth72_encode_2718(&self, out: &mut dyn BufMut) {
+        self.encode_2718(out);
+    }
+
+    /// Returns the pre-eth/72 `PooledTransactions` response encoding.
+    pub fn pooled_response_pre_eth72_encoded_2718(&self) -> Vec<u8> {
+        self.encoded_2718()
+    }
+
+    /// Decodes a pre-eth/72 `PooledTransactions` response item.
+    pub fn pooled_response_pre_eth72_decode_2718(
+        buf: &mut &[u8],
+    ) -> alloy_eips::eip2718::Eip2718Result<Self> {
+        <Self as Decodable2718>::decode_2718(buf)
+    }
+
+    /// Returns the eth/72 `PooledTransactions` response encoding length.
+    ///
+    /// EIP-8070 elides blob payloads for type 3 transactions requested via
+    /// `GetPooledTransactions` by encoding the blob sidecar's `blobs` field as RLP nil.
+    pub fn pooled_response_eth72_encoded_2718_len(&self) -> usize {
+        match self {
+            Self::Eip4844(tx) => {
+                let payload_length = tx.tx().tx.rlp_encoded_length_with_signature(tx.signature())
+                    + tx.tx().sidecar.rlp_encoded_sparse_fields_length();
+                1 + (Header { list: true, payload_length }).length_with_payload()
+            }
+            _ => self.encode_2718_len(),
+        }
+    }
+
+    /// Encodes this transaction for an eth/72 `PooledTransactions` response.
+    ///
+    /// Non-4844 transactions use their normal EIP-2718 encoding. For type 3 transactions, blob
+    /// payloads are replaced by an RLP nil literal while commitments and cell proofs are retained.
+    pub fn pooled_response_eth72_encode_2718(&self, out: &mut dyn BufMut) {
+        match self {
+            Self::Eip4844(tx) => {
+                let payload_length = tx.tx().tx.rlp_encoded_length_with_signature(tx.signature())
+                    + tx.tx().sidecar.rlp_encoded_sparse_fields_length();
+
+                out.put_u8(TxType::Eip4844 as u8);
+                Header { list: true, payload_length }.encode(out);
+                tx.tx().tx.rlp_encode_signed(tx.signature(), out);
+                tx.tx().sidecar.rlp_encode_sparse_fields(out);
+            }
+            _ => self.encode_2718(out),
+        }
+    }
+
+    /// Returns the eth/72 `PooledTransactions` response encoding.
+    pub fn pooled_response_eth72_encoded_2718(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(self.pooled_response_eth72_encoded_2718_len());
+        self.pooled_response_eth72_encode_2718(&mut out);
+        out
+    }
+
+    /// Decodes an eth/72 `PooledTransactions` response item.
+    ///
+    /// Sparse type 3 responses decode with an empty `blobs` vector and retain commitments and cell
+    /// proofs.
+    pub fn pooled_response_eth72_decode_2718(
+        buf: &mut &[u8],
+    ) -> alloy_eips::eip2718::Eip2718Result<Self> {
+        let tx = <Self as Decodable2718>::decode_2718(buf)?;
+
+        Ok(match tx {
+            Self::Eip4844(tx) => {
+                let (tx, signature, _) = tx.into_parts();
+                Signed::new_unhashed(tx, signature).into()
+            }
+            tx => tx,
+        })
+    }
+}
 
 impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844WithSidecar<T>> {
     /// Converts the transaction into [`EthereumTxEnvelope<TxEip4844Variant<T>>`].
@@ -263,8 +359,35 @@ mod tests {
             assert!(pooled_tx.is_eip4844());
 
             let encoded = pooled_tx.encoded_2718();
-            let decoded = PooledTransaction::decode_2718(&mut encoded.as_ref()).unwrap();
+            let pre_eth72_encoded = pooled_tx.pooled_response_pre_eth72_encoded_2718();
+            assert_eq!(pre_eth72_encoded, encoded);
+            assert_eq!(pooled_tx.pooled_response_pre_eth72_encoded_2718_len(), encoded.len());
+
+            let decoded =
+                PooledTransaction::pooled_response_pre_eth72_decode_2718(&mut encoded.as_ref())
+                    .unwrap();
             assert_eq!(pooled_tx, decoded);
+
+            let sparse_encoded = pooled_tx.pooled_response_eth72_encoded_2718();
+            assert_eq!(pooled_tx.pooled_response_eth72_encoded_2718_len(), sparse_encoded.len());
+            assert_ne!(encoded, sparse_encoded);
+
+            let decoded_sparse =
+                PooledTransaction::pooled_response_eth72_decode_2718(&mut sparse_encoded.as_ref())
+                    .unwrap();
+            let PooledTransaction::Eip4844(decoded_sparse) = decoded_sparse else {
+                panic!("Expected EIP-4844 transaction");
+            };
+            let decoded_sparse = decoded_sparse.tx();
+            assert!(decoded_sparse.sidecar.blobs.is_empty());
+            assert_eq!(
+                decoded_sparse.sidecar.commitments,
+                pooled_tx.as_eip4844().unwrap().tx().sidecar.commitments
+            );
+            assert_eq!(
+                decoded_sparse.sidecar.cell_proofs,
+                pooled_tx.as_eip4844().unwrap().tx().sidecar.cell_proofs
+            );
         }
     }
 }
