@@ -23,6 +23,9 @@ pub type Account = TrieAccount;
 mod block;
 pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header, HeaderInfo, HeaderRoots};
 
+mod indexed;
+pub use indexed::Indexed;
+
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
