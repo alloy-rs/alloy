@@ -76,7 +76,7 @@ impl<T> Indexed<T> {
 
     /// Converts from `&mut Indexed<T>` to `Indexed<&mut T>`.
     #[inline]
-    pub fn as_mut(&mut self) -> Indexed<&mut T> {
+    pub const fn as_mut(&mut self) -> Indexed<&mut T> {
         Indexed { index: self.index, value: &mut self.value }
     }
 
