@@ -334,7 +334,7 @@ enum MnemonicSignerIterState {
 }
 
 impl MnemonicSignerIter {
-    fn missing_phrase() -> Self {
+    const fn missing_phrase() -> Self {
         Self { state: MnemonicSignerIterState::MissingPhrase { yielded_error: false } }
     }
 }
