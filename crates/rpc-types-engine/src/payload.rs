@@ -2146,8 +2146,8 @@ impl TryFrom<BlobsBundleV2> for BlobsBundleV1 {
     }
 }
 
-/// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2], or
-/// [ExecutionPayloadV3].
+/// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2],
+/// [ExecutionPayloadV3], or [ExecutionPayloadV4].
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
