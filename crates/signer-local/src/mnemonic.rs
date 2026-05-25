@@ -265,6 +265,10 @@ impl<W: Wordlist> IntoIterator for MnemonicBuilder<W> {
     type IntoIter = MnemonicSignerIter;
 
     fn into_iter(self) -> Self::IntoIter {
+        if self.phrase.is_none() {
+            return MnemonicSignerIter::missing_phrase();
+        }
+
         self.build_parent_key()
             .expect("mnemonic phrase must be set for iteration")
             .children_from(self.derivation_path.last().copied().unwrap_or(0))
@@ -300,7 +304,9 @@ impl MnemonicKey {
     /// Creates an iterator that generates signers by incrementing the derivation index starting
     /// from the given index.
     pub fn children_from(&self, start: u32) -> MnemonicSignerIter {
-        MnemonicSignerIter { key: self.clone(), current_index: start }
+        MnemonicSignerIter {
+            state: MnemonicSignerIterState::Signers { key: self.clone(), current_index: start },
+        }
     }
 }
 
@@ -309,26 +315,49 @@ impl IntoIterator for MnemonicKey {
     type IntoIter = MnemonicSignerIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        MnemonicSignerIter { key: self, current_index: 0 }
+        MnemonicSignerIter {
+            state: MnemonicSignerIterState::Signers { key: self, current_index: 0 },
+        }
     }
 }
 
 /// Iterator that generates signers from a mnemonic phrase by incrementing the derivation index.
 #[derive(Debug, Clone)]
 pub struct MnemonicSignerIter {
-    key: MnemonicKey,
-    current_index: u32,
+    state: MnemonicSignerIterState,
+}
+
+#[derive(Debug, Clone)]
+enum MnemonicSignerIterState {
+    Signers { key: MnemonicKey, current_index: u32 },
+    MissingPhrase { yielded_error: bool },
+}
+
+impl MnemonicSignerIter {
+    fn missing_phrase() -> Self {
+        Self { state: MnemonicSignerIterState::MissingPhrase { yielded_error: false } }
+    }
 }
 
 impl Iterator for MnemonicSignerIter {
     type Item = Result<PrivateKeySigner, LocalSignerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = self.key.child(self.current_index).map(|child| child.signer());
-
-        self.current_index += 1;
-
-        Some(result)
+        match &mut self.state {
+            MnemonicSignerIterState::Signers { key, current_index } => {
+                let result = key.child(*current_index).map(|child| child.signer());
+                *current_index += 1;
+                Some(result)
+            }
+            MnemonicSignerIterState::MissingPhrase { yielded_error } => {
+                if *yielded_error {
+                    None
+                } else {
+                    *yielded_error = true;
+                    Some(Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()))
+                }
+            }
+        }
     }
 }
 
@@ -501,5 +530,17 @@ mod tests {
                 .unwrap();
             assert_eq!(signer.address, expected.address);
         }
+    }
+
+    #[test]
+    fn mnemonic_iterator_without_phrase_returns_error() {
+        let mut iter = MnemonicBuilder::<English>::default().into_iter();
+        let err = iter.next().unwrap().unwrap_err();
+
+        assert!(matches!(
+            err,
+            LocalSignerError::MnemonicBuilderError(MnemonicBuilderError::ExpectedPhraseNotFound)
+        ));
+        assert!(iter.next().is_none());
     }
 }
