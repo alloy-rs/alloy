@@ -1359,12 +1359,14 @@ impl ssz::Encode for ExecutionPayloadV3 {
 
 /// Execution payload V4 as defined in the Amsterdam fork.
 ///
-/// This extends [`ExecutionPayloadV3`] with the `block_access_list` field for [EIP-7928].
+/// This extends [`ExecutionPayloadV3`] with the `block_access_list` field for [EIP-7928] and the
+/// `slot_number` field for [EIP-7843].
 ///
 /// See also:
 /// <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#executionpayloadv4>
 ///
 /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+/// [EIP-7843]: https://eips.ethereum.org/EIPS/eip-7843
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
