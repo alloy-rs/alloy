@@ -37,6 +37,12 @@ use core::str::FromStr;
 use std::marker::PhantomData;
 use url::Url;
 
+#[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
+fn json_rpc_error_response(body: &[u8]) -> Option<alloy_json_rpc::ResponsePacket> {
+    let response = serde_json::from_slice::<alloy_json_rpc::ResponsePacket>(body).ok()?;
+    response.is_error().then_some(response)
+}
+
 /// Connection details for an HTTP transport.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[doc(hidden)]
@@ -117,5 +123,31 @@ impl<T> Http<T> {
     /// Get a reference to the URL.
     pub fn url(&self) -> &str {
         self.url.as_ref()
+    }
+}
+
+#[cfg(all(test, any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper"))))]
+mod tests {
+    #[test]
+    fn parses_json_rpc_errors_from_http_error_body() {
+        let body = br#"{
+            "jsonrpc": "2.0",
+            "id": 1766,
+            "error": {
+                "code": -32000,
+                "message": "filter not found"
+            }
+        }"#;
+
+        let response = super::json_rpc_error_response(body).expect("valid JSON-RPC error response");
+
+        assert!(response.is_error());
+        assert_eq!(response.first_error_code(), Some(-32000));
+        assert_eq!(response.first_error_message(), Some("filter not found"));
+    }
+
+    #[test]
+    fn ignores_non_json_rpc_error_body() {
+        assert!(super::json_rpc_error_response(b"too many requests").is_none());
     }
 }
