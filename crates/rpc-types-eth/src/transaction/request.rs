@@ -1087,8 +1087,8 @@ impl TransactionRequest {
         self,
     ) -> Result<alloy_consensus::EthereumTxEnvelope<TxEip4844>, ValueError<Self>> {
         let tx = self
-            .build_typed_tx()
-            .map_err(|req| ValueError::new(req, "Transaction is not buildable"))?;
+            .build_consensus_tx()
+            .map_err(|err| ValueError::new(err.tx, "Transaction is not buildable"))?;
         let signature = Signature::new(Default::default(), Default::default(), false);
         Ok(tx.into_signed(signature).into())
     }
