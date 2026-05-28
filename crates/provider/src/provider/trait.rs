@@ -1781,13 +1781,25 @@ mod tests {
         AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
     };
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
-    use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_primitives::{address, b256, bytes, keccak256, B256, U64};
     use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
-    use alloy_rpc_types_eth::{request::TransactionRequest, Block};
+    use alloy_rpc_types_eth::{request::TransactionRequest, Block, TransactionReceipt};
     use alloy_signer_local::PrivateKeySigner;
-    use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
-    use std::{io::Read, str::FromStr, time::Duration};
+    use alloy_transport::{
+        layers::{RetryBackoffLayer, RetryPolicy},
+        TransportError, TransportFut,
+    };
+    use std::{
+        io::Read,
+        str::FromStr,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        task::Poll,
+        time::Duration,
+    };
 
     // For layer transport tests
     use alloy_consensus::transaction::SignerRecoverable;
@@ -1805,6 +1817,118 @@ mod tests {
     use http_body_util::Full;
     #[cfg(feature = "hyper")]
     use tower::{Layer, Service};
+
+    #[derive(Clone, Default)]
+    struct StaleBlockNumberState {
+        receipt_calls: Arc<AtomicUsize>,
+    }
+
+    #[derive(Clone)]
+    struct StaleBlockNumberTransport {
+        state: StaleBlockNumberState,
+        tx_hash: B256,
+    }
+
+    impl StaleBlockNumberTransport {
+        fn new(tx_hash: B256) -> Self {
+            Self { state: StaleBlockNumberState::default(), tx_hash }
+        }
+
+        fn response<T: serde::Serialize>(
+            id: &alloy_json_rpc::Id,
+            value: &T,
+        ) -> alloy_json_rpc::Response {
+            let raw = serde_json::to_string(value).unwrap();
+            alloy_json_rpc::Response {
+                id: id.clone(),
+                payload: alloy_json_rpc::ResponsePayload::Success(
+                    serde_json::value::RawValue::from_string(raw).unwrap(),
+                ),
+            }
+        }
+
+        fn block(number: u64) -> Block {
+            let mut block: Block = Block::default();
+            block.header.inner.number = number;
+            block
+        }
+
+        fn mined_receipt(&self) -> TransactionReceipt {
+            serde_json::from_value(serde_json::json!({
+                "transactionHash": self.tx_hash,
+                "blockHash": B256::with_last_byte(0x11),
+                "blockNumber": "0x2",
+                "logsBloom": "0x00000000000000000000000000000000000800000000000000000000000800000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000",
+                "gasUsed": "0x5208",
+                "status": "0x1",
+                "contractAddress": null,
+                "cumulativeGasUsed": "0x5208",
+                "transactionIndex": "0x0",
+                "from": address!("1111111111111111111111111111111111111111"),
+                "to": address!("2222222222222222222222222222222222222222"),
+                "type": "0x2",
+                "effectiveGasPrice": "0x1",
+                "logs": []
+            }))
+            .unwrap()
+        }
+
+        fn handle_request(
+            &self,
+            req: &alloy_json_rpc::SerializedRequest,
+        ) -> alloy_json_rpc::Response {
+            match req.method() {
+                "eth_getTransactionReceipt" => {
+                    let call = self.state.receipt_calls.fetch_add(1, Ordering::Relaxed);
+                    let receipt = if call == 0 { None } else { Some(self.mined_receipt()) };
+                    Self::response(req.id(), &receipt)
+                }
+                "eth_blockNumber" => Self::response(req.id(), &U64::from(1_u64)),
+                "eth_getBlockByNumber" => {
+                    let params = req.params().expect("eth_getBlockByNumber requires params");
+                    let (tag, _full): (BlockNumberOrTag, bool) =
+                        serde_json::from_str(params.get()).unwrap();
+                    let number = match tag {
+                        BlockNumberOrTag::Number(number) => number,
+                        BlockNumberOrTag::Latest => 1,
+                        _ => unreachable!("unsupported block tag: {tag:?}"),
+                    };
+                    let block = Some(Self::block(number));
+                    Self::response(req.id(), &block)
+                }
+                other => panic!("unexpected RPC method: {other}"),
+            }
+        }
+    }
+
+    impl tower::Service<alloy_json_rpc::RequestPacket> for StaleBlockNumberTransport {
+        type Response = alloy_json_rpc::ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(
+            &mut self,
+            _cx: &mut std::task::Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, req: alloy_json_rpc::RequestPacket) -> Self::Future {
+            let this = self.clone();
+            Box::pin(async move {
+                Ok(match req {
+                    alloy_json_rpc::RequestPacket::Single(req) => {
+                        alloy_json_rpc::ResponsePacket::Single(this.handle_request(&req))
+                    }
+                    alloy_json_rpc::RequestPacket::Batch(reqs) => {
+                        alloy_json_rpc::ResponsePacket::Batch(
+                            reqs.iter().map(|r| this.handle_request(r)).collect(),
+                        )
+                    }
+                })
+            })
+        }
+    }
 
     #[tokio::test]
     async fn test_provider_builder() {
@@ -2204,6 +2328,30 @@ mod tests {
             .expect("Watching tx timed out")
             .expect("failed to await pending tx");
         assert_eq!(hash1, hash2);
+    }
+
+    #[tokio::test]
+    async fn test_watch_receipt_fallback_when_block_number_is_stale() {
+        let tx_hash = b256!("ea1093d492a1dcb1bef708f771a99a96ff05dcab81ca76c31940300177fcf49f");
+        let transport = StaleBlockNumberTransport::new(tx_hash);
+        let state = transport.state.clone();
+
+        let client = RpcClient::new(transport, true).with_poll_interval(Duration::from_millis(5));
+        let provider = ProviderBuilder::new().disable_recommended_fillers().connect_client(client);
+
+        let watched = tokio::time::timeout(
+            Duration::from_secs(1),
+            PendingTransactionBuilder::new(provider.root().clone(), tx_hash).watch(),
+        )
+        .await
+        .expect("watch timed out")
+        .expect("watch failed");
+
+        assert_eq!(watched, tx_hash);
+        assert!(
+            state.receipt_calls.load(Ordering::Relaxed) >= 2,
+            "watch should poll receipt when block number is stale",
+        );
     }
 
     #[tokio::test]
