@@ -126,7 +126,7 @@ tokio = "1"
 tokio-util = "0.7"
 tokio-stream = "0.1"
 tokio-test = "0.4"
-tokio-tungstenite = "0.28"
+tokio-tungstenite = "0.29"
 tower = { version = "0.5", features = ["util"] }
 
 # tracing
