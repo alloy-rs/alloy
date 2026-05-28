@@ -4,6 +4,7 @@ use crate::{
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcSend};
 use alloy_network::Network;
+use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{
     keccak256, Address, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
@@ -309,12 +310,17 @@ where
             let client = client
                 .upgrade()
                 .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
-            let result = client.request(req.method(), req.params()).await?;
+            let result: Option<N::TransactionResponse> =
+                client.request(req.method(), req.params()).await?;
 
             if let Some(ref tx) = result {
-                let json_str = serde_json::to_string(tx).map_err(TransportErrorKind::custom)?;
-                let hash = req.params_hash()?;
-                let _ = cache.put(hash, json_str);
+                // Pending transactions can transition to an included state with additional fields
+                // (e.g., block hash/number). Caching pending snapshots can hide these updates.
+                if tx.block_hash_num().is_some() {
+                    let json_str = serde_json::to_string(tx).map_err(TransportErrorKind::custom)?;
+                    let hash = req.params_hash()?;
+                    let _ = cache.put(hash, json_str);
+                }
             }
 
             Ok(result)
@@ -703,6 +709,46 @@ mod tests {
         let second = provider.get_transaction_by_hash(tx_hash).await.unwrap();
         assert_eq!(second, Some(tx));
         assert!(shared_cache.get(&cache_key).is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_transaction_by_hash_does_not_cache_pending() {
+        let cache_layer = CacheLayer::new(100);
+        let shared_cache = cache_layer.cache();
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .layer(cache_layer)
+            .connect_mocked_client(asserter.clone());
+
+        let tx_hash = b256!("018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f");
+        let req = RequestType::new("eth_getTransactionByHash", (tx_hash,));
+        let cache_key = req.params_hash().unwrap();
+
+        let pending_tx: Transaction = serde_json::from_str(
+            r#"{"hash":"0x018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f","nonce":"0x1","blockHash":null,"blockNumber":null,"transactionIndex":null,"from":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266","to":"0x5fbdb2315678afecb367f032d93f642f64180aa3","value":"0x0","gasPrice":"0x3a29f0f8","gas":"0x1c9c380","maxFeePerGas":"0xba43b7400","maxPriorityFeePerGas":"0x5f5e100","input":"0xd09de08a","r":"0xd309309a59a49021281cb6bb41d164c96eab4e50f0c1bd24c03ca336e7bc2bb7","s":"0x28a7f089143d0a1355ebeb2a1b9f0e5ad9eca4303021c1400d61bc23c9ac5319","v":"0x0","yParity":"0x0","chainId":"0x7a69","accessList":[],"type":"0x2"}"#,
+        )
+        .unwrap();
+
+        let mined_tx: Transaction = serde_json::from_str(
+            r#"{"hash":"0x018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f","nonce":"0x1","blockHash":"0x6e4e53d1de650d5a5ebed19b38321db369ef1dc357904284ecf4d89b8834969c","blockNumber":"0x2","transactionIndex":"0x0","from":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266","to":"0x5fbdb2315678afecb367f032d93f642f64180aa3","value":"0x0","gasPrice":"0x3a29f0f8","gas":"0x1c9c380","maxFeePerGas":"0xba43b7400","maxPriorityFeePerGas":"0x5f5e100","input":"0xd09de08a","r":"0xd309309a59a49021281cb6bb41d164c96eab4e50f0c1bd24c03ca336e7bc2bb7","s":"0x28a7f089143d0a1355ebeb2a1b9f0e5ad9eca4303021c1400d61bc23c9ac5319","v":"0x0","yParity":"0x0","chainId":"0x7a69","accessList":[],"type":"0x2"}"#,
+        )
+        .unwrap();
+
+        asserter.push_success(&Some(pending_tx.clone()));
+        asserter.push_success(&Some(mined_tx.clone()));
+
+        let first = provider.get_transaction_by_hash(tx_hash).await.unwrap();
+        assert_eq!(first, Some(pending_tx));
+        assert!(shared_cache.get(&cache_key).is_none());
+
+        let second = provider.get_transaction_by_hash(tx_hash).await.unwrap();
+        assert_eq!(second, Some(mined_tx.clone()));
+        assert!(shared_cache.get(&cache_key).is_some());
+
+        // Third call should be served from cache.
+        let third = provider.get_transaction_by_hash(tx_hash).await.unwrap();
+        assert_eq!(third, Some(mined_tx));
     }
 
     #[tokio::test]
