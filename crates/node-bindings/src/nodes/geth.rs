@@ -627,7 +627,7 @@ impl Geth {
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
-                let _ = child.kill();
+                GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Timeout);
             }
 
@@ -664,7 +664,7 @@ impl Geth {
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
             // 127.0.0.1:8545: bind: address already in use
             if line.contains("Fatal:") {
-                let _ = child.kill();
+                GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Fatal(line));
             }
 

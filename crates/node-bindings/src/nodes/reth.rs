@@ -507,7 +507,7 @@ impl Reth {
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
-                let _ = child.kill();
+                GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Timeout);
             }
 
@@ -534,7 +534,7 @@ impl Reth {
 
             // Encountered a critical error, exit early.
             if line.contains("ERROR") {
-                let _ = child.kill();
+                GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Fatal(line));
             }
 
