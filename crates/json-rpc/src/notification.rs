@@ -85,7 +85,7 @@ impl<'de> Deserialize<'de> for PubSubItem {
                 let mut error = None;
 
                 // Drain the map into the appropriate fields.
-                while let Ok(Some(key)) = map.next_key() {
+                while let Some(key) = map.next_key()? {
                     match key {
                         "id" => {
                             if id.is_some() {
