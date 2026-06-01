@@ -49,7 +49,16 @@ impl PollIntervalDelay {
     }
 }
 
-/// Future returned by [`WatchBlocksFromStream`] items.
+/// Future that fetches one block by number.
+///
+/// This is the item yielded by [`WatchBlocksFromStream`], and is also reused by
+/// [`WatchLogsFrom`](super::WatchLogsFrom) to fetch the block paired with a log batch. The future
+/// requests `eth_getBlockByNumber` with either transaction hashes or full transaction bodies,
+/// depending on [`BlockTransactionsKind`].
+///
+/// A `null` block response means the requested height is not available yet. In that case the future
+/// sleeps for the configured poll interval and retries the same height. Other transport/RPC errors
+/// are returned to the caller, so retry policy should be configured on the provider transport.
 #[pin_project]
 #[derive(Debug)]
 pub struct BlockFut<T>
@@ -70,16 +79,16 @@ enum BlockFutState<T>
 where
     T: BlockResponse + RpcRecv,
 {
+    /// Polling an `eth_getBlockByNumber` request for the target height.
     Request {
         #[pin]
         call: RpcCall<(BlockNumberOrTag, bool), Option<T>>,
     },
-    Sleeping {
-        delay: PollIntervalDelay,
-    },
-    Ready {
-        result: Option<TransportResult<T>>,
-    },
+    /// Waiting before retrying the same height after the node returned `null`.
+    Sleeping { delay: PollIntervalDelay },
+    /// Returning a prebuilt result, used when the parent stream cannot create a normal request.
+    Ready { result: Option<TransportResult<T>> },
+    /// Future has completed and must not be polled again.
     Complete,
 }
 
@@ -175,6 +184,12 @@ where
     }
 }
 
+/// Future that resolves a block tag into a numeric head height.
+///
+/// `WatchBlocksFromStream` and `WatchLogsFromStream` use this before yielding per-height futures so
+/// they only schedule work through the configured head tag. Numeric tags and `earliest` resolve
+/// immediately. `latest` uses `eth_blockNumber`; other tags use `eth_getBlockByNumber` and return
+/// the tagged block's header number.
 #[pin_project]
 #[derive(Debug)]
 pub(super) struct FetchHeadFut<HeaderResp>
@@ -191,17 +206,19 @@ enum FetchHeadFutState<HeaderResp>
 where
     HeaderResp: HeaderResponse + RpcRecv,
 {
+    /// Polling `eth_blockNumber` for a `latest` head.
     Latest {
         #[pin]
         call: RpcCall<[(); 0], U64>,
     },
+    /// Polling `eth_getBlockByNumber` for a non-latest tag such as finalized or safe.
     Tagged {
         #[pin]
         call: RpcCall<(BlockNumberOrTag, bool), Option<HeaderResp>>,
     },
-    Ready {
-        result: Option<TransportResult<u64>>,
-    },
+    /// Returning an immediately known height, such as a numeric tag or `earliest`.
+    Ready { result: Option<TransportResult<u64>> },
+    /// Future has completed and must not be polled again.
     Complete,
 }
 

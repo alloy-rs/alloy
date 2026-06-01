@@ -30,10 +30,11 @@ const MAX_REORG_DEPTH_DEFAULT: usize = 64;
 /// batches followed by
 /// [`CanonicalEvent::Added`] for the new canonical chain segment.
 ///
-/// Logs are fetched by exact block hash, so each emitted batch is internally consistent with the
-/// block it carries. If a later block reveals that an emitted batch was on a fork, the stream uses
-/// retained history to emit [`CanonicalEvent::Removed`] for that batch before adding the new
-/// canonical segment.
+/// The source stream fetches each block and a one-block log range concurrently, falling back to an
+/// exact block-hash log query when the range result is empty or ambiguous. This keeps each emitted
+/// batch internally consistent with the block it carries. If a later block reveals that an emitted
+/// batch was on a fork, the stream uses retained history to emit [`CanonicalEvent::Removed`] for
+/// that batch before adding the new canonical segment.
 ///
 /// Blocks with no matching logs are still emitted with an empty log vector. This keeps stream
 /// progress and [`max_reorg_depth`](Self::max_reorg_depth) aligned to block depth rather than log
@@ -138,9 +139,9 @@ enum WatchCanonicalLogsFromState<N: Network> {
 
 /// A stream of canonical log batches produced by [`WatchCanonicalLogsFrom`].
 ///
-/// The stream emits one item per block, wrapped in [`CanonicalEvent`]. Added batches are emitted
-/// with logs queried by exact block hash. Removed batches are served from retained history so the
-/// stream does not need to query logs for rolled-back blocks after a reorg.
+/// The stream emits one item per block, wrapped in [`CanonicalEvent`]. Added batches contain logs
+/// proven to match their block hash. Removed batches are served from retained history so the stream
+/// does not need to query logs for rolled-back blocks after a reorg.
 #[derive(Debug)]
 #[pin_project]
 pub struct WatchCanonicalLogsFromStream<N: Network> {

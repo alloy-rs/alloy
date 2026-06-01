@@ -885,9 +885,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Stream block log batches from a historical block.
     ///
-    /// This follows block numbers from `start_block`, fetches logs matching `filter` for each block
-    /// by block hash, and yields one future per block height. The future resolves to a block/log
-    /// batch: the block is fetched, then logs are queried by that block hash.
+    /// This follows block numbers from `start_block` and yields one future per block height. Each
+    /// future fetches the block and a one-block log range concurrently, using the range logs when
+    /// they match the fetched block hash and falling back to a block-hash log query when the range
+    /// result is empty or ambiguous.
     ///
     /// This stream does not perform canonical reconciliation after a batch has been emitted. Use
     /// [`watch_canonical_logs_from`](Self::watch_canonical_logs_from) if the caller needs removed
@@ -930,10 +931,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Stream canonical block log events from a historical block.
     ///
-    /// This follows canonical blocks from `start_block`, fetches logs matching `filter` for each
-    /// block by block hash, and emits block-scoped log batches. Removed events use retained logs
-    /// when a block is rolled back by a reorg. The filter's block option is replaced internally for
-    /// each exact block; use `start_block` and
+    /// This follows canonical blocks from `start_block` and emits block-scoped log batches.
+    /// Removed events use retained logs when a block is rolled back by a reorg. The filter's block
+    /// option is replaced internally for each exact block; use `start_block` and
     /// [`block_tag`](crate::provider::WatchCanonicalLogsFrom::block_tag) to configure range
     /// progress.
     ///

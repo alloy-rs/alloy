@@ -22,6 +22,8 @@ struct ChainState {
     logs: HashMap<B256, Vec<Log>>,
     head: u64,
     block_request_full: Vec<bool>,
+    log_request_block_hash: Vec<bool>,
+    range_logs_override: Option<Vec<Log>>,
     fail_logs: usize,
     reorg_after_log_success: Option<Vec<(Block, Vec<Log>)>>,
 }
@@ -39,6 +41,8 @@ impl MockChain {
                 logs: HashMap::new(),
                 head: 0,
                 block_request_full: Vec::new(),
+                log_request_block_hash: Vec::new(),
+                range_logs_override: None,
                 fail_logs: 0,
                 reorg_after_log_success: None,
             })),
@@ -95,8 +99,16 @@ impl MockChain {
         self.state.write().unwrap().reorg_after_log_success = Some(blocks);
     }
 
+    pub(crate) fn override_next_range_logs(&self, logs: Vec<Log>) {
+        self.state.write().unwrap().range_logs_override = Some(logs);
+    }
+
     pub(crate) fn block_request_full_flags(&self) -> Vec<bool> {
         self.state.read().unwrap().block_request_full.clone()
+    }
+
+    pub(crate) fn log_request_block_hash_flags(&self) -> Vec<bool> {
+        self.state.read().unwrap().log_request_block_hash.clone()
     }
 
     pub(crate) fn provider(&self) -> impl Provider {
@@ -150,16 +162,35 @@ impl MockChain {
                 )
             }
             "eth_getLogs" => {
+                let params = req.params().expect("eth_getLogs requires params");
+                let (filter,): (Filter,) = serde_json::from_str(params.get()).unwrap();
+                let block_hash = filter.get_block_hash();
+                state.log_request_block_hash.push(block_hash.is_some());
                 if state.fail_logs > 0 {
                     state.fail_logs -= 1;
                     alloy_json_rpc::ResponsePayload::internal_error_message(
                         "temporary log error".into(),
                     )
                 } else {
-                    let params = req.params().expect("eth_getLogs requires params");
-                    let (filter,): (Filter,) = serde_json::from_str(params.get()).unwrap();
-                    let hash = filter.get_block_hash().expect("logs are queried by block hash");
-                    if let Some(logs) = state.logs.get(&hash).cloned() {
+                    let logs = if let Some(hash) = block_hash {
+                        state.logs.get(&hash).cloned()
+                    } else if let Some(logs) = state.range_logs_override.take() {
+                        Some(logs)
+                    } else {
+                        let (from_block, to_block) = filter.extract_block_range();
+                        let number = match (from_block, to_block) {
+                            (Some(from), Some(to)) if from == to => from,
+                            other => panic!("logs are queried by exact block, got {other:?}"),
+                        };
+                        state
+                            .blocks
+                            .get(&number)
+                            .and_then(|block| state.logs.get(&block.header.hash))
+                            .cloned()
+                            .or(Some(Vec::new()))
+                    };
+
+                    if let Some(logs) = logs {
                         if let Some(blocks) = state.reorg_after_log_success.take() {
                             Self::apply_reorg(&mut state, &blocks);
                         }
