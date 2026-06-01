@@ -6,7 +6,7 @@
 use super::get_block::SubFullBlocks;
 use super::{
     DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom,
-    WatchCanonicalBlocksFrom, WatchHeaders,
+    WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchHeaders, WatchLogsFrom,
 };
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -881,6 +881,106 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```
     fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
         self.watch_blocks_from(start_block).canonical()
+    }
+
+    /// Stream block log batches from a historical block.
+    ///
+    /// This follows block numbers from `start_block`, fetches logs matching `filter` for each block
+    /// by block hash, and yields one future per block height. The future resolves to a block/log
+    /// batch: the block is fetched, then logs are queried by that block hash.
+    ///
+    /// This stream does not perform canonical reconciliation after a batch has been emitted. Use
+    /// [`watch_canonical_logs_from`](Self::watch_canonical_logs_from) if the caller needs removed
+    /// events when already-emitted blocks are rolled back by a later reorg.
+    ///
+    /// The filter's block option is replaced internally for each exact block; use `start_block` and
+    /// [`block_tag`](crate::provider::WatchLogsFrom::block_tag) to configure range progress.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .into_stream()
+    ///     .buffered(4);
+    ///
+    /// while let Some(batch) = stream.next().await {
+    ///     let block_logs = batch?;
+    ///     for log in block_logs.logs {
+    ///         let _ = log;
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom<N> {
+        WatchLogsFrom::new(self.weak_client(), start_block, filter.clone())
+    }
+
+    /// Stream canonical block log events from a historical block.
+    ///
+    /// This follows canonical blocks from `start_block`, fetches logs matching `filter` for each
+    /// block by block hash, and emits block-scoped log batches. Removed events use retained logs
+    /// when a block is rolled back by a reorg. The filter's block option is replaced internally for
+    /// each exact block; use `start_block` and
+    /// [`block_tag`](crate::provider::WatchCanonicalLogsFrom::block_tag) to configure range
+    /// progress.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{CanonicalEvent, Provider, ProviderBuilder};
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_canonical_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .rpc_concurrency(4)
+    ///     .max_reorg_depth(64)
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event {
+    ///         Ok(CanonicalEvent::Added(block_logs)) => {
+    ///             for log in block_logs.logs {
+    ///                 let _ = log;
+    ///             }
+    ///         }
+    ///         Ok(CanonicalEvent::Removed(block_logs)) => {
+    ///             for log in block_logs.logs {
+    ///                 let _ = log;
+    ///             }
+    ///         }
+    ///         Err(err) => eprintln!("canonical log stream failed: {err}"),
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_canonical_logs_from(
+        &self,
+        start_block: u64,
+        filter: &Filter,
+    ) -> WatchCanonicalLogsFrom<N> {
+        self.watch_logs_from(start_block, filter).canonical()
     }
 
     /// Watch for new pending transaction bodies by polling the provider with

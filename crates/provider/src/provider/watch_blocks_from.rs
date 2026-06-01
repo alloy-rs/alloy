@@ -26,22 +26,22 @@ use wasmtimer::{
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::{interval_at, Instant, Interval};
 
-const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
+pub(super) const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug)]
-struct PollIntervalDelay {
+pub(super) struct PollIntervalDelay {
     timer: Option<Interval>,
 }
 
 impl PollIntervalDelay {
-    fn new(poll_interval: Duration) -> Self {
+    pub(super) fn new(poll_interval: Duration) -> Self {
         if poll_interval.is_zero() {
             return Self { timer: None };
         }
         Self { timer: Some(interval_at(Instant::now() + poll_interval, poll_interval)) }
     }
 
-    fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+    pub(super) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         if let Some(timer) = &mut self.timer {
             ready!(timer.poll_tick(cx));
         }
@@ -177,7 +177,7 @@ where
 
 #[pin_project]
 #[derive(Debug)]
-struct FetchHeadFut<HeaderResp>
+pub(super) struct FetchHeadFut<HeaderResp>
 where
     HeaderResp: HeaderResponse + RpcRecv,
 {
@@ -209,7 +209,7 @@ impl<HeaderResp> FetchHeadFut<HeaderResp>
 where
     HeaderResp: HeaderResponse + RpcRecv,
 {
-    fn new(client: Arc<RpcClientInner>, tag: BlockNumberOrTag) -> Self {
+    pub(super) fn new(client: Arc<RpcClientInner>, tag: BlockNumberOrTag) -> Self {
         let state = match tag {
             BlockNumberOrTag::Number(number) => {
                 FetchHeadFutState::Ready { result: Some(Ok(number)) }
