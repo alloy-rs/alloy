@@ -102,7 +102,8 @@ pub use response::{
 
 mod result;
 pub use result::{
-    transform_response, transform_result, try_deserialize_ok, BorrowedRpcResult, RpcResult,
+    transform_response, transform_response_payload, transform_result, try_deserialize_ok,
+    BorrowedRpcResult, RpcResult,
 };
 
 /// An object that can be sent over RPC.
