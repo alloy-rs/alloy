@@ -49,6 +49,11 @@ pub enum TrezorError {
     /// Need to provide a chain ID for EIP-155 signing.
     #[error("missing Trezor signer chain ID")]
     MissingChainId,
+    /// Unsupported transaction type for Trezor signing.
+    #[error(
+        "Trezor transaction signing only supports legacy and EIP-1559 transactions; got transaction type 0x{0:02x}"
+    )]
+    UnsupportedTransactionType(u8),
     /// Could not retrieve device features.
     #[error("could not retrieve device features")]
     Features,

@@ -5,6 +5,120 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.5](https://github.com/alloy-rs/alloy/releases/tag/v2.0.5) - 2026-05-18
+
+### Bug Fixes
+
+- [ci] Satisfy zepter secp256k1 propagation ([#3993](https://github.com/alloy-rs/alloy/issues/3993))
+- [network] Preserve transaction request extra fields
+- [consensus] Correct recovered transaction docs ([#3984](https://github.com/alloy-rs/alloy/issues/3984))
+- [signer-ledger] Reject invalid derivation paths ([#3960](https://github.com/alloy-rs/alloy/issues/3960))
+- [consensus-any] Saturate baseFeePerGas above u64::MAX on deser ([#3741](https://github.com/alloy-rs/alloy/issues/3741)) ([#3976](https://github.com/alloy-rs/alloy/issues/3976))
+- [eips] Avoid panic in 7594 match_versioned_hashes ([#3975](https://github.com/alloy-rs/alloy/issues/3975))
+- [signer-trezor] Reject unsupported tx types ([#3959](https://github.com/alloy-rs/alloy/issues/3959))
+- [transport] Make retry queue count cancel-safe ([#3956](https://github.com/alloy-rs/alloy/issues/3956))
+- [signer-trezor] Dispatch EIP-1559 by tx type ([#3958](https://github.com/alloy-rs/alloy/issues/3958))
+- [rpc-types-trace] Default missing/null CallOutput.output to empty bytes ([#3931](https://github.com/alloy-rs/alloy/issues/3931))
+- [eip1559] Prevent divide-by-zero in next base fee calculation
+- [provider] Clean up failed impersonated sends ([#3944](https://github.com/alloy-rs/alloy/issues/3944))
+- Deduplicate AnyRpcTransaction conversion helpers ([#3947](https://github.com/alloy-rs/alloy/issues/3947))
+- [ci] Stabilize main red tests ([#3942](https://github.com/alloy-rs/alloy/issues/3942))
+
+### Dependencies
+
+- [deps] Bump github/codeql-action from 4.35.2 to 4.35.4 ([#3990](https://github.com/alloy-rs/alloy/issues/3990))
+- [deps] Bump taiki-e/install-action from 2.75.27 to 2.77.1
+- [deps] Bump crate-ci/typos from 1.45.0 to 1.46.0 ([#3965](https://github.com/alloy-rs/alloy/issues/3965))
+- [deps] Bump taiki-e/install-action from 2.75.20 to 2.75.27 ([#3964](https://github.com/alloy-rs/alloy/issues/3964))
+- [deps] Bump taiki-e/install-action from 2.75.15 to 2.75.20 ([#3946](https://github.com/alloy-rs/alloy/issues/3946))
+- [deps] Bump foundry-rs/foundry-toolchain from 1.7.0 to 1.8.0 ([#3945](https://github.com/alloy-rs/alloy/issues/3945))
+
+### Documentation
+
+- [rpc-types-eth] Correct sealed_header docs ([#3995](https://github.com/alloy-rs/alloy/issues/3995))
+- [node-bindings] Clarify Reth genesis behavior ([#3994](https://github.com/alloy-rs/alloy/issues/3994))
+- [eips] Document blob cell selection invariants ([#3973](https://github.com/alloy-rs/alloy/issues/3973))
+- [signer-tempo] Add changelog ([#3962](https://github.com/alloy-rs/alloy/issues/3962))
+
+### Features
+
+- [rpc-types-engine] Add payload attributes builders ([#3985](https://github.com/alloy-rs/alloy/issues/3985))
+- [rpc-types-beacon] Add builder validation request v6 ([#3981](https://github.com/alloy-rs/alloy/issues/3981))
+- [eips] Add EIP-7594 matching cell computation ([#3974](https://github.com/alloy-rs/alloy/issues/3974))
+- [rpc-types-engine] Add SSZ codecs for engine types ([#3970](https://github.com/alloy-rs/alloy/issues/3970))
+- [pubsub] Typed terminal-error channel ([#3963](https://github.com/alloy-rs/alloy/issues/3963))
+- [signer-tempo] Add Tempo wallet keystore reader ([#3936](https://github.com/alloy-rs/alloy/issues/3936))
+- [rpc-types-engine] Add sealed block execution data conversions ([#3955](https://github.com/alloy-rs/alloy/issues/3955))
+
+### Miscellaneous Tasks
+
+- Release 2.0.5
+- Release 2.0.5
+- Release 2.0.5
+- [eips] Move blob cell mask before serde compat ([#3972](https://github.com/alloy-rs/alloy/issues/3972))
+
+### Other
+
+- Update version in README ([#3943](https://github.com/alloy-rs/alloy/issues/3943))
+
+### Performance
+
+- [rpc-types-trace] Manually deserialize trace output ([#3957](https://github.com/alloy-rs/alloy/issues/3957))
+- [eips] Optimize c-kzg byte conversions ([#3954](https://github.com/alloy-rs/alloy/issues/3954))
+- [txpool] Use `split_once` instead of `collect::<Vec>` in deserialization ([#3926](https://github.com/alloy-rs/alloy/issues/3926))
+
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Bug Fixes
+
+- [rpc-types-engine] Remove non_exhaustive from testing build request ([#3940](https://github.com/alloy-rs/alloy/issues/3940))
+
+### Miscellaneous Tasks
+
+- Release 2.0.4
+
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
+
+### Features
+
+- [rpc-types-engine] Derive Default for testing build request ([#3939](https://github.com/alloy-rs/alloy/issues/3939))
+
+### Miscellaneous Tasks
+
+- Release 2.0.3
+
+## [2.0.2](https://github.com/alloy-rs/alloy/releases/tag/v2.0.2) - 2026-04-29
+
+### Bug Fixes
+
+- [provider] Return network blocks from anvil_mine_detailed ([#3928](https://github.com/alloy-rs/alloy/issues/3928))
+- [node-bindings] Use `create_dir_all` for datadir creation ([#3920](https://github.com/alloy-rs/alloy/issues/3920))
+- [pubsub] Back off reconnect retries ([#3919](https://github.com/alloy-rs/alloy/issues/3919))
+
+### Features
+
+- [eips] Add EIP-7594 cell matching helpers ([#3934](https://github.com/alloy-rs/alloy/issues/3934))
+- [eips] Add EIP-7594 sidecar cell helper ([#3933](https://github.com/alloy-rs/alloy/issues/3933))
+- [eips] Add blob cells response type ([#3932](https://github.com/alloy-rs/alloy/issues/3932))
+- [eips] Add SSZ support for blob proof types ([#3923](https://github.com/alloy-rs/alloy/issues/3923))
+- [eips] Add sidecar shrink_to_fit helpers ([#3918](https://github.com/alloy-rs/alloy/issues/3918))
+
+### Miscellaneous Tasks
+
+- Release 2.0.2
+- Release 2.0.2
+- [rpc-types-engine] Mark TestingBuildBlockRequestV1 non_exhaustive ([#3913](https://github.com/alloy-rs/alloy/issues/3913))
+
+### Performance
+
+- [eips] Compute EIP-7594 cells only for matches ([#3937](https://github.com/alloy-rs/alloy/issues/3937))
+- [serde] Avoid heap allocation in JsonStorageKey Display ([#3925](https://github.com/alloy-rs/alloy/issues/3925))
+
+### Refactor
+
+- [rpc-types-engine] Move v4 payload deserialize impl ([#3922](https://github.com/alloy-rs/alloy/issues/3922))
+- [transport-ws] Make TLS opts selectable through features ([#3915](https://github.com/alloy-rs/alloy/issues/3915))
+
 ## [2.0.1](https://github.com/alloy-rs/alloy/releases/tag/v2.0.1) - 2026-04-22
 
 ### Bug Fixes
@@ -29,6 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.0.1
 - Release 2.0.1
 - Release 2.0.1
 - Changed get_block_access_list_raw to accept BlockId ([#3907](https://github.com/alloy-rs/alloy/issues/3907))
