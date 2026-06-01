@@ -8,7 +8,7 @@ use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
     ffi::OsString,
-    fs::create_dir,
+    fs::create_dir_all,
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
@@ -115,7 +115,7 @@ impl RethInstance {
         self.data_dir.as_ref()
     }
 
-    /// Returns the genesis configuration used to configure this instance
+    /// Returns the genesis configuration supplied with [`Reth::genesis`], if any.
     pub const fn genesis(&self) -> Option<&Genesis> {
         self.genesis.as_ref()
     }
@@ -295,7 +295,9 @@ impl Reth {
     }
 
     /// Sets the chain name or path to a chain spec for the Reth instance.
-    /// Passed through to `reth --chain <name-or-path>`.
+    ///
+    /// Passed through to `reth node --chain <name-or-path>`. To launch Reth with a custom genesis,
+    /// write the genesis or chain specification to disk and pass that path here.
     pub fn chain_or_path(mut self, chain_or_path: &str) -> Self {
         self.chain_or_path = Some(chain_or_path.to_string());
         self
@@ -329,12 +331,12 @@ impl Reth {
         self
     }
 
-    /// Sets the `genesis.json` for the Reth instance.
+    /// Stores the genesis configuration on the returned [`RethInstance`].
     ///
-    /// If this is set, reth will be initialized with `reth init` and the `--datadir` option will be
-    /// set to the same value as `data_dir`.
-    ///
-    /// This is destructive and will overwrite any existing data in the data directory.
+    /// The spawned node can be inspected through [`RethInstance::genesis`] to recover the genesis
+    /// value that was supplied to the builder. To launch Reth with a custom genesis or chain
+    /// specification, write that specification to disk and pass the path with
+    /// [`Reth::chain_or_path`].
     pub fn genesis(mut self, genesis: Genesis) -> Self {
         self.genesis = Some(genesis);
         self
@@ -466,7 +468,7 @@ impl Reth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 

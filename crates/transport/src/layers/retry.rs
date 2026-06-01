@@ -214,6 +214,25 @@ impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
     }
 }
 
+/// Drop guard that releases the queued-request count even if the retry future is cancelled.
+#[derive(Debug)]
+struct QueuedRequest {
+    requests_enqueued: Arc<AtomicU32>,
+}
+
+impl QueuedRequest {
+    fn new(requests_enqueued: Arc<AtomicU32>) -> (Self, u64) {
+        let ahead_in_queue = requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
+        (Self { requests_enqueued }, ahead_in_queue)
+    }
+}
+
+impl Drop for QueuedRequest {
+    fn drop(&mut self) {
+        self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 impl<S, P> Service<RequestPacket> for RetryBackoffService<S, P>
 where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
@@ -237,7 +256,8 @@ where
         let this = self.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
         Box::pin(async move {
-            let ahead_in_queue = this.requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
+            let (_queued_request, ahead_in_queue) =
+                QueuedRequest::new(this.requests_enqueued.clone());
             let mut rate_limit_retry_number: u32 = 0;
             loop {
                 let err;
@@ -248,7 +268,6 @@ where
                         if let Some(e) = res.as_error() {
                             err = TransportError::ErrorResp(e.clone())
                         } else {
-                            this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                             return Ok(res);
                         }
                     }
@@ -259,7 +278,6 @@ where
                 if should_retry {
                     rate_limit_retry_number += 1;
                     if rate_limit_retry_number > this.max_rate_limit_retries {
-                        this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                         return Err(TransportErrorKind::custom_str(&format!(
                             "Max retries exceeded {err}"
                         )));
@@ -292,7 +310,6 @@ where
 
                     sleep(total_backoff).await;
                 } else {
-                    this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                     return Err(err);
                 }
             }
@@ -328,6 +345,26 @@ fn compute_unit_offset_in_secs(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn request_queue_count_decrements_when_future_is_dropped() {
+        let pending_service =
+            tower::service_fn(|_| -> TransportFut<'static> { Box::pin(std::future::pending()) });
+        let mut service = RetryBackoffLayer::new(1, 1, 1).layer(pending_service);
+        let requests_enqueued = service.requests_enqueued.clone();
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        let mut future = service.call(request);
+        assert!(futures::poll!(&mut future).is_pending());
+        assert_eq!(requests_enqueued.load(Ordering::SeqCst), 1);
+
+        drop(future);
+        assert_eq!(requests_enqueued.load(Ordering::SeqCst), 0);
+    }
 
     #[test]
     fn test_compute_units_per_second() {

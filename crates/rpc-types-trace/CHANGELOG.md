@@ -5,7 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0](https://github.com/alloy-rs/alloy/releases/tag/v2.0.0) - 2026-04-13
+## [2.0.5](https://github.com/alloy-rs/alloy/releases/tag/v2.0.5) - 2026-05-18
+
+### Bug Fixes
+
+- [rpc-types-trace] Default missing/null CallOutput.output to empty bytes ([#3931](https://github.com/alloy-rs/alloy/issues/3931))
+
+### Performance
+
+- [rpc-types-trace] Manually deserialize trace output ([#3957](https://github.com/alloy-rs/alloy/issues/3957))
+
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Miscellaneous Tasks
+
+- Release 2.0.4
+
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
+
+### Bug Fixes
+
+- [rpc-types-trace] Add 0x prefix to storage keys and values in `StructLog` ([#3891](https://github.com/alloy-rs/alloy/issues/3891))
 
 ### Features
 
@@ -14,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.0.3
+- Release 2.0.2
+- Release 2.0.1
+- Release 2.0.0
 - Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
 - Release 1.8.2
 

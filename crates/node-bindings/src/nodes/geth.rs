@@ -9,7 +9,7 @@ use alloy_primitives::Address;
 use k256::ecdsa::SigningKey;
 use std::{
     ffi::OsString,
-    fs::{create_dir, File},
+    fs::{create_dir_all, File},
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStderr, Command, Stdio},
@@ -574,7 +574,7 @@ impl Geth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 

@@ -96,7 +96,8 @@ impl Signer for LedgerSigner {
 
     #[inline]
     async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
-        let mut payload = Self::path_to_bytes(&self.derivation);
+        let mut payload =
+            Self::path_to_bytes(&self.derivation).map_err(alloy_signer::Error::other)?;
         // Ensure message length fits into u32 as required by Ledger APDU format.
         let msg_len_u32 = u32::try_from(message.len())
             .map_err(|_| alloy_signer::Error::other("message too long (>4GiB)"))?;
@@ -204,7 +205,7 @@ impl LedgerSigner {
         transport: &Ledger,
         derivation: &DerivationType,
     ) -> Result<Address, LedgerError> {
-        let data = APDUData::new(&Self::path_to_bytes(derivation));
+        let data = APDUData::new(&Self::path_to_bytes(derivation)?);
 
         let command = APDUCommand {
             cla: 0xe0,
@@ -260,7 +261,7 @@ impl LedgerSigner {
     /// Note that this does not apply EIP-155.
     #[doc(alias = "sign_transaction_rlp")]
     pub async fn sign_tx_rlp(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
-        let mut payload = Self::path_to_bytes(&self.derivation);
+        let mut payload = Self::path_to_bytes(&self.derivation)?;
         payload.extend_from_slice(tx_rlp);
         self.sign_payload(INS::SIGN, &payload).await
     }
@@ -282,7 +283,7 @@ impl LedgerSigner {
             return Err(LedgerError::UnsupportedAppVersion(EIP712_MIN_VERSION));
         }
 
-        let mut data = Self::path_to_bytes(&self.derivation);
+        let mut data = Self::path_to_bytes(&self.derivation)?;
         data.extend_from_slice(separator.as_slice());
         data.extend_from_slice(hash_struct.as_slice());
 
@@ -305,7 +306,7 @@ impl LedgerSigner {
         &self,
         auth: &alloy_eip7702::Authorization,
     ) -> Result<Signature, LedgerError> {
-        let path_bytes = Self::path_to_bytes(&self.derivation);
+        let path_bytes = Self::path_to_bytes(&self.derivation)?;
         let tlv_payload = crate::utils::make_eip7702_tlv(auth.chain_id, &auth.address, auth.nonce);
 
         let tlv_length = (tlv_payload.len() as u16).to_be_bytes();
@@ -378,7 +379,7 @@ impl LedgerSigner {
     }
 
     // helper which converts a derivation path to bytes
-    fn path_to_bytes(derivation: &DerivationType) -> Vec<u8> {
+    fn path_to_bytes(derivation: &DerivationType) -> Result<Vec<u8>, LedgerError> {
         let derivation = derivation.to_string();
         let elements = derivation.split('/').skip(1).collect::<Vec<_>>();
         let depth = elements.len();
@@ -386,7 +387,7 @@ impl LedgerSigner {
         let mut bytes = vec![depth as u8];
         for derivation_index in elements {
             let hardened = derivation_index.contains('\'');
-            let mut index = derivation_index.replace('\'', "").parse::<u32>().unwrap();
+            let mut index = derivation_index.replace('\'', "").parse::<u32>()?;
             if hardened {
                 index |= 0x80000000;
             }
@@ -394,7 +395,7 @@ impl LedgerSigner {
             bytes.extend(index.to_be_bytes());
         }
 
-        bytes
+        Ok(bytes)
     }
 }
 
@@ -442,6 +443,13 @@ mod tests {
         let version = ledger.version().await.unwrap();
         eprintln!("{version}");
         assert!(version.major >= 1);
+    }
+
+    #[test]
+    fn invalid_derivation_path_returns_error() {
+        let err = LedgerSigner::path_to_bytes(&DerivationType::Other("m/44'/invalid/0".into()))
+            .unwrap_err();
+        assert!(matches!(err, LedgerError::InvalidDerivationPath(_)));
     }
 
     #[tokio::test]

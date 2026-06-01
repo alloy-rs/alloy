@@ -5,7 +5,6 @@ use alloy_consensus::Blob;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
-use alloy_rpc_types_eth::Block;
 use alloy_transport::{TransportError, TransportResult};
 use futures::try_join;
 
@@ -144,7 +143,10 @@ pub trait AnvilApi<N: Network>: Send + Sync {
 
     /// Mine blocks, instantly and return the mined blocks.
     /// This will mine the blocks regardless of the configured mining mode.
-    async fn anvil_mine_detailed(&self, opts: Option<MineOptions>) -> TransportResult<Vec<Block>>;
+    async fn anvil_mine_detailed(
+        &self,
+        opts: Option<MineOptions>,
+    ) -> TransportResult<Vec<N::BlockResponse>>;
 
     /// Sets the backend rpc url.
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()>;
@@ -359,7 +361,10 @@ where
         self.client().request("evm_mine", (opts,)).await
     }
 
-    async fn anvil_mine_detailed(&self, opts: Option<MineOptions>) -> TransportResult<Vec<Block>> {
+    async fn anvil_mine_detailed(
+        &self,
+        opts: Option<MineOptions>,
+    ) -> TransportResult<Vec<N::BlockResponse>> {
         self.client().request("evm_mine_detailed", (opts,)).await
     }
 
@@ -450,13 +455,16 @@ where
             impersonate_future.await?;
         }
 
-        let tx_hash = self.anvil_send_impersonated_transaction(request).await?;
-        let pending = PendingTransactionBuilder::new(self.root().clone(), tx_hash);
+        let tx_hash = self.anvil_send_impersonated_transaction(request).await;
 
         if config.stop_impersonate {
-            self.anvil_stop_impersonating_account(from).await?;
+            let stop_result = self.anvil_stop_impersonating_account(from).await;
+            if tx_hash.is_ok() {
+                stop_result?;
+            }
         }
 
+        let pending = PendingTransactionBuilder::new(self.root().clone(), tx_hash?);
         Ok(pending)
     }
 }
@@ -510,12 +518,14 @@ mod tests {
         fillers::{ChainIdFiller, GasFiller},
         ProviderBuilder,
     };
-    use alloy_consensus::{SidecarBuilder, SimpleCoder};
+    use alloy_consensus::{BlockHeader, SidecarBuilder, SimpleCoder};
     use alloy_eips::BlockNumberOrTag;
-    use alloy_network::{TransactionBuilder, TransactionBuilder4844};
+    use alloy_network::{AnyNetwork, TransactionBuilder, TransactionBuilder4844};
+    use alloy_network_primitives::BlockResponse as _;
     use alloy_primitives::{address, B256};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::{sol, SolCall};
+    use alloy_transport::mock::Asserter;
 
     const FORK_URL: &str = "https://ethereum.reth.rs/rpc";
 
@@ -587,6 +597,25 @@ mod tests {
 
         let recipient_balance = provider.get_balance(to).await.unwrap();
         assert_eq!(recipient_balance, val);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_impersonated_send_stops_on_send_error() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&());
+        asserter.push_failure_msg("send failed");
+        asserter.push_success(&());
+
+        let tx = TransactionRequest::default().with_from(Address::random());
+        let err = provider
+            .anvil_send_impersonated_transaction_with_config(tx, ImpersonateConfig::default())
+            .await
+            .unwrap_err();
+
+        assert!(err.to_string().contains("send failed"));
+        assert!(asserter.read_q().is_empty(), "stop impersonation response should be consumed");
     }
 
     #[tokio::test]
@@ -1129,7 +1158,24 @@ mod tests {
         assert_eq!(num, start_num + 10);
 
         for (idx, block) in blocks.iter().enumerate() {
-            assert_eq!(block.header.number, start_num + idx as u64 + 1);
+            assert_eq!(block.header().number(), start_num + idx as u64 + 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_anvil_mine_detailed_with_any_network() {
+        let provider = ProviderBuilder::new().network::<AnyNetwork>().connect_anvil();
+
+        let start_num = provider.get_block_number().await.unwrap();
+
+        let blocks = provider
+            .anvil_mine_detailed(Some(MineOptions::Options { timestamp: None, blocks: Some(2) }))
+            .await
+            .unwrap();
+
+        assert_eq!(blocks.len(), 2);
+        for (idx, block) in blocks.iter().enumerate() {
+            assert_eq!(block.header().number(), start_num + idx as u64 + 1);
         }
     }
 
