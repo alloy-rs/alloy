@@ -152,6 +152,10 @@ where
         }
 
         if !status.is_success() {
+            if let Some(response) = crate::json_rpc_error_response(body.as_ref()) {
+                return Ok(response);
+            }
+
             return Err(TransportErrorKind::http_error(
                 status.as_u16(),
                 String::from_utf8_lossy(&body).into_owned(),
