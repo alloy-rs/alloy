@@ -395,9 +395,13 @@ pub struct ChainConfig {
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub osaka_time: Option<u64>,
 
-    /// Osaka switch time (None = no fork, 0 = already on amsterdam).
+    /// Amsterdam switch time (None = no fork, 0 = already on amsterdam).
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub amsterdam_time: Option<u64>,
+
+    /// Bogota switch time (None = no fork, 0 = already on bogota).
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
+    pub bogota_time: Option<u64>,
 
     /// BPO1 switch time (None = no fork, 0 = already on BPO1).
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
@@ -534,6 +538,8 @@ pub mod serde_bincode_compat {
         #[serde(default)]
         amsterdam_time: Option<u64>,
         #[serde(default)]
+        bogota_time: Option<u64>,
+        #[serde(default)]
         bpo1_time: Option<u64>,
         #[serde(default)]
         bpo2_time: Option<u64>,
@@ -587,6 +593,7 @@ pub mod serde_bincode_compat {
                 prague_time: value.prague_time,
                 osaka_time: value.osaka_time,
                 amsterdam_time: value.amsterdam_time,
+                bogota_time: value.bogota_time,
                 bpo1_time: value.bpo1_time,
                 bpo2_time: value.bpo2_time,
                 bpo3_time: value.bpo3_time,
@@ -635,6 +642,7 @@ pub mod serde_bincode_compat {
                 cancun_time: value.cancun_time,
                 prague_time: value.prague_time,
                 amsterdam_time: value.amsterdam_time,
+                bogota_time: value.bogota_time,
                 osaka_time: value.osaka_time,
                 bpo1_time: value.bpo1_time,
                 bpo2_time: value.bpo2_time,
@@ -749,6 +757,7 @@ pub mod serde_bincode_compat {
                 prague_time: None,
                 osaka_time: None,
                 amsterdam_time: None,
+                bogota_time: None,
                 bpo1_time: None,
                 bpo2_time: None,
                 bpo3_time: None,
@@ -807,6 +816,7 @@ pub mod serde_bincode_compat {
                 prague_time: None,
                 osaka_time: None,
                 amsterdam_time: None,
+                bogota_time: None,
                 bpo1_time: None,
                 bpo2_time: None,
                 bpo3_time: None,
@@ -909,6 +919,7 @@ impl ChainConfig {
         let mut osaka = None;
         let mut prague = None;
         let mut amsterdam = None;
+        let mut bogota = None;
         let mut scheduled = Vec::new();
 
         for (key, params) in &self.blob_schedule {
@@ -961,6 +972,11 @@ impl ChainConfig {
                         amsterdam = Some((timestamp, params));
                     }
                 }
+                "Bogota" => {
+                    if let Some(timestamp) = self.bogota_time {
+                        bogota = Some((timestamp, params));
+                    }
+                }
                 _ => (),
             }
         }
@@ -968,6 +984,7 @@ impl ChainConfig {
         // we must insert amsterdam last because otherwise the ordering is incorrect if all have 0
         // timestamp
         scheduled.extend(amsterdam);
+        scheduled.extend(bogota);
 
         scheduled.sort_by_key(|(timestamp, _)| *timestamp);
 
@@ -1095,6 +1112,7 @@ impl Default for ChainConfig {
             prague_time: None,
             osaka_time: None,
             amsterdam_time: None,
+            bogota_time: None,
             bpo1_time: None,
             bpo2_time: None,
             bpo3_time: None,
