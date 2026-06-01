@@ -308,16 +308,17 @@ pub struct BlockLogsFut<N: Network> {
 enum BlockLogsFutState<N: Network> {
     /// Polling the candidate block request and optimistic one-block range log request.
     ///
-    /// Either RPC may finish first, so completed results are stored in `block` and `logs` until
-    /// both are ready. The range log result is only accepted if it proves all logs belong to the
-    /// fetched block hash; otherwise the future transitions to [`FetchLogs`](Self::FetchLogs).
+    /// Either RPC may finish first, so completed results are stored in `block` and `range_logs`
+    /// until both are ready. The range log result is only accepted if it proves all logs
+    /// belong to the fetched block hash; otherwise the future transitions to
+    /// [`FetchLogs`](Self::FetchLogs).
     FetchBlockAndLogs {
         block: Option<TransportResult<N::BlockResponse>>,
-        logs: Option<TransportResult<Vec<Log>>>,
+        range_logs: Option<TransportResult<Vec<Log>>>,
         #[pin]
         block_fut: BlockFut<N::BlockResponse>,
         #[pin]
-        logs_fut: LogsOnceFut,
+        logs_call: RpcCall<(Filter,), Vec<Log>>,
     },
     /// Polling fallback logs pinned to the fetched block hash.
     ///
@@ -326,8 +327,10 @@ enum BlockLogsFutState<N: Network> {
     /// resolves.
     FetchLogs {
         block: Option<N::BlockResponse>,
+        block_number: u64,
+        block_hash: B256,
         #[pin]
-        fut: LogsOnceFut,
+        logs_call: RpcCall<(Filter,), Vec<Log>>,
     },
     /// Returning a prebuilt result, used when the parent stream cannot create a normal request.
     Ready { result: Option<TransportResult<BlockLogs<N>>> },
@@ -344,16 +347,16 @@ impl<N: Network> BlockLogsFut<N> {
         kind: BlockTransactionsKind,
     ) -> Self {
         let block_fut = Self::block_fut(&client, block_number, poll_interval, kind);
-        let logs_fut = LogsOnceFut::by_block_number(client.clone(), filter.clone(), block_number);
+        let logs_call = Self::logs_call(&client, filter.clone().select(block_number));
         Self {
             client: Some(client),
             block_number,
             filter,
             state: BlockLogsFutState::FetchBlockAndLogs {
                 block: None,
-                logs: None,
+                range_logs: None,
                 block_fut,
-                logs_fut,
+                logs_call,
             },
         }
     }
@@ -375,6 +378,10 @@ impl<N: Network> BlockLogsFut<N> {
     ) -> BlockFut<N::BlockResponse> {
         BlockFut::new(client.clone(), block_number, kind, poll_interval)
     }
+
+    fn logs_call(client: &Arc<RpcClientInner>, filter: Filter) -> RpcCall<(Filter,), Vec<Log>> {
+        client.request("eth_getLogs", (filter,))
+    }
 }
 
 impl<N: Network> Future for BlockLogsFut<N> {
@@ -385,7 +392,12 @@ impl<N: Network> Future for BlockLogsFut<N> {
 
         loop {
             match this.state.as_mut().project() {
-                BlockLogsFutStateProj::FetchBlockAndLogs { block, logs, block_fut, logs_fut } => {
+                BlockLogsFutStateProj::FetchBlockAndLogs {
+                    block,
+                    range_logs,
+                    block_fut,
+                    logs_call,
+                } => {
                     if block.is_none() {
                         if let Poll::Ready(result) = block_fut.poll(cx) {
                             *block = Some(result.and_then(|block| {
@@ -401,9 +413,9 @@ impl<N: Network> Future for BlockLogsFut<N> {
                         }
                     }
 
-                    if logs.is_none() {
-                        if let Poll::Ready(result) = logs_fut.poll(cx) {
-                            *logs = Some(result);
+                    if range_logs.is_none() {
+                        if let Poll::Ready(result) = logs_call.poll(cx) {
+                            *range_logs = Some(result);
                         }
                     }
 
@@ -413,14 +425,14 @@ impl<N: Network> Future for BlockLogsFut<N> {
                         return Poll::Ready(Err(err));
                     }
 
-                    if block.is_none() || logs.is_none() {
+                    if block.is_none() || range_logs.is_none() {
                         return Poll::Pending;
                     }
 
                     let Ok(block_result) = block.take().expect("checked block is ready") else {
                         unreachable!("block errors are handled above");
                     };
-                    let logs_result = logs.take().expect("checked logs are ready");
+                    let logs_result = range_logs.take().expect("checked logs are ready");
 
                     let block_number = block_result.header().number();
                     let block_hash = block_result.header().hash();
@@ -439,25 +451,32 @@ impl<N: Network> Future for BlockLogsFut<N> {
                             "provider was dropped",
                         )));
                     };
-                    let fut = LogsOnceFut::by_block_hash(
-                        client.clone(),
-                        this.filter.clone(),
+                    let logs_call = BlockLogsFut::<N>::logs_call(
+                        client,
+                        this.filter.clone().at_block_hash(block_hash),
+                    );
+                    this.state.set(BlockLogsFutState::FetchLogs {
+                        block: Some(block_result),
                         block_number,
                         block_hash,
-                    );
-                    this.state.set(BlockLogsFutState::FetchLogs { block: Some(block_result), fut });
+                        logs_call,
+                    });
                 }
-                BlockLogsFutStateProj::FetchLogs { block, fut } => match ready!(fut.poll(cx)) {
-                    Ok(logs) => {
-                        let block = block.take().expect("block is present while fetching logs");
-                        this.state.set(BlockLogsFutState::Complete);
-                        return Poll::Ready(Ok(BlockLogs { block, logs }));
+                BlockLogsFutStateProj::FetchLogs { block, block_number, block_hash, logs_call } => {
+                    match ready!(logs_call.poll(cx))
+                        .and_then(|logs| normalize_logs(logs, *block_number, *block_hash))
+                    {
+                        Ok(logs) => {
+                            let block = block.take().expect("block is present while fetching logs");
+                            this.state.set(BlockLogsFutState::Complete);
+                            return Poll::Ready(Ok(BlockLogs { block, logs }));
+                        }
+                        Err(err) => {
+                            this.state.set(BlockLogsFutState::Complete);
+                            return Poll::Ready(Err(err));
+                        }
                     }
-                    Err(err) => {
-                        this.state.set(BlockLogsFutState::Complete);
-                        return Poll::Ready(Err(err));
-                    }
-                },
+                }
                 BlockLogsFutStateProj::Ready { result } => {
                     let result = result.take().expect("polled BlockLogsFut after completion");
                     this.state.set(BlockLogsFutState::Complete);
@@ -465,96 +484,6 @@ impl<N: Network> Future for BlockLogsFut<N> {
                 }
                 BlockLogsFutStateProj::Complete => panic!("polled BlockLogsFut after completion"),
             }
-        }
-    }
-}
-
-/// Future that performs one `eth_getLogs` request.
-///
-/// `LogsOnceFut` is used in two modes:
-///
-/// - [`LogValidation::Range`] queries a single numeric block range and returns raw logs. The caller
-///   decides whether those logs prove they belong to the fetched block.
-/// - [`LogValidation::BlockHash`] queries by exact block hash and normalizes returned logs to that
-///   block number/hash, rejecting conflicting metadata.
-///
-/// The future wraps exactly one `eth_getLogs` RPC. It does not retry internally; provider-level
-/// retry layers are responsible for transport retry behavior.
-#[pin_project]
-#[derive(Debug)]
-struct LogsOnceFut {
-    validation: LogValidation,
-    #[pin]
-    state: LogsOnceFutState,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum LogValidation {
-    /// Return logs from a numeric one-block range without validation.
-    ///
-    /// The caller compares these logs with the concurrently fetched block and decides whether they
-    /// are precise enough to use.
-    Range,
-    /// Normalize logs from an exact block-hash query against the expected block metadata.
-    BlockHash { block_number: u64, block_hash: B256 },
-}
-
-#[pin_project(project = LogsOnceFutStateProj)]
-#[derive(Debug)]
-enum LogsOnceFutState {
-    /// Polling the in-flight `eth_getLogs` request.
-    ///
-    /// The request parameters depend on [`LogValidation`]: either a one-block numeric range or an
-    /// exact block hash.
-    Request {
-        #[pin]
-        call: RpcCall<(Filter,), Vec<Log>>,
-    },
-    /// Future has completed and must not be polled again.
-    Complete,
-}
-
-impl LogsOnceFut {
-    fn by_block_hash(
-        client: Arc<RpcClientInner>,
-        filter: Filter,
-        block_number: u64,
-        block_hash: B256,
-    ) -> Self {
-        let filter = filter.at_block_hash(block_hash);
-        Self {
-            validation: LogValidation::BlockHash { block_number, block_hash },
-            state: LogsOnceFutState::Request { call: client.request("eth_getLogs", (filter,)) },
-        }
-    }
-
-    fn by_block_number(client: Arc<RpcClientInner>, filter: Filter, block_number: u64) -> Self {
-        let filter = filter.select(block_number);
-        Self {
-            validation: LogValidation::Range,
-            state: LogsOnceFutState::Request { call: client.request("eth_getLogs", (filter,)) },
-        }
-    }
-}
-
-impl Future for LogsOnceFut {
-    type Output = TransportResult<Vec<Log>>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
-
-        match this.state.as_mut().project() {
-            LogsOnceFutStateProj::Request { call } => {
-                let result = ready!(call.poll(cx)).and_then(|logs| match *this.validation {
-                    LogValidation::Range => Ok(logs),
-                    LogValidation::BlockHash { block_number, block_hash } => {
-                        normalize_logs(logs, block_number, block_hash)
-                    }
-                });
-                this.state.set(LogsOnceFutState::Complete);
-                Poll::Ready(result)
-            }
-            LogsOnceFutStateProj::Complete => panic!("polled LogsOnceFut after completion"),
         }
     }
 }
