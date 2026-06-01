@@ -395,7 +395,7 @@ pub struct ChainConfig {
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub osaka_time: Option<u64>,
 
-    /// Osaka switch time (None = no fork, 0 = already on amsterdam).
+    /// Amsterdam switch time (None = no fork, 0 = already on amsterdam).
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub amsterdam_time: Option<u64>,
 
@@ -634,8 +634,8 @@ pub mod serde_bincode_compat {
                 shanghai_time: value.shanghai_time,
                 cancun_time: value.cancun_time,
                 prague_time: value.prague_time,
-                amsterdam_time: value.amsterdam_time,
                 osaka_time: value.osaka_time,
+                amsterdam_time: value.amsterdam_time,
                 bpo1_time: value.bpo1_time,
                 bpo2_time: value.bpo2_time,
                 bpo3_time: value.bpo3_time,
