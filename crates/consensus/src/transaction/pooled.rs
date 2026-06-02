@@ -3,8 +3,9 @@
 
 use super::EthereumTxEnvelope;
 use crate::{
-    error::ValueError, transaction::RlpEcdsaEncodableTx, Signed, TxEip4844, TxEip4844Variant,
-    TxEip4844WithSidecar, TxType,
+    error::ValueError,
+    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx},
+    Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxType,
 };
 use alloc::vec::Vec;
 use alloy_eips::{
@@ -103,15 +104,27 @@ impl PooledTransaction {
     pub fn pooled_response_eth72_decode_2718(
         buf: &mut &[u8],
     ) -> alloy_eips::eip2718::Eip2718Result<Self> {
-        let tx = <Self as Decodable2718>::decode_2718(buf)?;
+        if buf.first().copied() != Some(TxType::Eip4844 as u8) {
+            return <Self as Decodable2718>::decode_2718(buf);
+        }
 
-        Ok(match tx {
-            Self::Eip4844(tx) => {
-                let (tx, signature, _) = tx.into_parts();
-                Signed::new_unhashed(tx, signature).into()
-            }
-            tx => tx,
-        })
+        *buf = &buf[1..];
+
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString.into());
+        }
+        let remaining = buf.len();
+
+        let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
+        let sidecar = BlobTransactionSidecarEip7594::decode_sparse_7594(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength.into());
+        }
+
+        Ok(Signed::new_unhashed(TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar), signature)
+            .into())
     }
 }
 
@@ -178,10 +191,10 @@ impl<T: Encodable7594> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Transaction;
-    use alloy_eips::{Decodable2718, Encodable2718};
+    use crate::{transaction::RlpEcdsaDecodableTx, Transaction};
+    use alloy_eips::{eip7594::EIP_7594_WRAPPER_VERSION, Decodable2718, Encodable2718};
     use alloy_primitives::{address, hex, Bytes};
-    use alloy_rlp::Decodable;
+    use alloy_rlp::{Decodable, Header, EMPTY_STRING_CODE};
     use std::path::PathBuf;
 
     #[test]
@@ -256,6 +269,21 @@ mod tests {
         // we can also decode_enveloped
         let res = PooledTransaction::decode_2718(&mut &data[..]);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn eth72_non_4844_pooled_response_matches_canonical_encoding() {
+        let data = hex!("d30b02808083c5cdeb8783c5acfd9e407c565656");
+        let pooled_tx = PooledTransaction::decode_2718(&mut &data[..]).unwrap();
+
+        assert!(!pooled_tx.is_eip4844());
+        assert_eq!(pooled_tx.pooled_response_pre_eth72_encoded_2718(), data);
+        assert_eq!(pooled_tx.pooled_response_eth72_encoded_2718(), data);
+        assert_eq!(pooled_tx.pooled_response_eth72_encoded_2718_len(), data.len());
+
+        let decoded =
+            PooledTransaction::pooled_response_eth72_decode_2718(&mut data.as_ref()).unwrap();
+        assert_eq!(pooled_tx, decoded);
     }
 
     #[test]
@@ -389,5 +417,47 @@ mod tests {
                 pooled_tx.as_eip4844().unwrap().tx().sidecar.cell_proofs
             );
         }
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn eth72_pooled_transaction_encodes_blob_payloads_as_rlp_nil() {
+        type VariantPooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
+
+        let kzg_settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::default();
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/4844rlp");
+        let entry = std::fs::read_dir(path).expect("Unable to read folder").next().unwrap().unwrap();
+        let content = std::fs::read_to_string(entry.path()).unwrap();
+        let raw = hex::decode(content.trim()).unwrap();
+        let VariantPooledTransaction::Eip4844(tx) =
+            VariantPooledTransaction::decode_2718(&mut raw.as_ref()).unwrap()
+        else {
+            panic!("Expected EIP-4844 transaction");
+        };
+
+        let (tx_with_sidecar, sig, hash) = tx.into_parts();
+        let tx_eip7594 = tx_with_sidecar
+            .try_map_sidecar(|sidecar| sidecar.try_into_eip7594_with_settings(kzg_settings.get()))
+            .unwrap();
+        let pooled_tx: PooledTransaction = Signed::new_unchecked(tx_eip7594, sig, hash).into();
+        let sparse_encoded = pooled_tx.pooled_response_eth72_encoded_2718();
+        assert!(PooledTransaction::decode_2718(&mut sparse_encoded.as_ref()).is_err());
+        assert!(
+            PooledTransaction::pooled_response_eth72_decode_2718(&mut sparse_encoded.as_ref())
+                .is_ok()
+        );
+
+        let mut payload = sparse_encoded.as_slice();
+        assert_eq!(payload[0], TxType::Eip4844 as u8);
+        payload = &payload[1..];
+
+        let header = Header::decode(&mut payload).unwrap();
+        assert!(header.list);
+        let remaining = payload.len();
+        assert_eq!(remaining, header.payload_length);
+        let _ = TxEip4844::rlp_decode_with_signature(&mut payload).unwrap();
+
+        assert_eq!(payload[0], EIP_7594_WRAPPER_VERSION);
+        assert_eq!(payload[1], EMPTY_STRING_CODE);
     }
 }

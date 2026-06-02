@@ -1056,18 +1056,36 @@ impl BlobTransactionSidecarEip7594 {
     /// RLP decode the fields of a [BlobTransactionSidecarEip7594].
     #[doc(hidden)]
     pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let blobs = if buf.first().copied() == Some(EMPTY_STRING_CODE) {
-            *buf = &buf[1..];
-            Vec::new()
-        } else {
-            Decodable::decode(buf)?
-        };
-
         Ok(Self {
-            blobs,
+            blobs: Decodable::decode(buf)?,
             commitments: Decodable::decode(buf)?,
             cell_proofs: Decodable::decode(buf)?,
         })
+    }
+
+    /// RLP decode sparse EIP-7594 fields from an eth/72 `PooledTransactions` response.
+    #[doc(hidden)]
+    pub fn rlp_decode_sparse_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        if buf.first().copied() != Some(EMPTY_STRING_CODE) {
+            return Err(alloy_rlp::Error::Custom("expected nil sparse blob payloads"));
+        }
+        *buf = &buf[1..];
+
+        Ok(Self {
+            blobs: Vec::new(),
+            commitments: Decodable::decode(buf)?,
+            cell_proofs: Decodable::decode(buf)?,
+        })
+    }
+
+    /// RLP decode sparse EIP-7594 sidecar fields including the wrapper version.
+    #[doc(hidden)]
+    pub fn decode_sparse_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let wrapper_version: u8 = Decodable::decode(buf)?;
+        if wrapper_version != EIP_7594_WRAPPER_VERSION {
+            return Err(alloy_rlp::Error::Custom("invalid wrapper version"));
+        }
+        Self::rlp_decode_sparse_fields(buf)
     }
 
     /// Decodes the [BlobTransactionSidecarEip7594] from RLP bytes.
