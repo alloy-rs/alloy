@@ -4287,6 +4287,17 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_envelope_v1_response_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let payload = ssz_payload_v1();
+        let decoded = ExecutionPayloadV1::from_ssz_bytes(&payload.as_ssz_bytes()).unwrap();
+
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
     fn ssz_execution_payload_envelope_v2_roundtrip() {
         use ssz::{Decode, Encode};
 
