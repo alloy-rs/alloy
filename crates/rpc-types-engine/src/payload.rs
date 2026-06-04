@@ -414,10 +414,15 @@ impl ssz::Encode for ExecutionPayloadEnvelopeV4 {
     }
 
     fn ssz_bytes_len(&self) -> usize {
-        self.envelope_inner.execution_payload.ssz_bytes_len()
-            + self.envelope_inner.block_value.ssz_bytes_len()
+        let fixed_section_len = <ExecutionPayloadV3 as ssz::Encode>::ssz_fixed_len()
+            + <U256 as ssz::Encode>::ssz_fixed_len()
+            + <BlobsBundleV1 as ssz::Encode>::ssz_fixed_len()
+            + <bool as ssz::Encode>::ssz_fixed_len()
+            + <Requests as ssz::Encode>::ssz_fixed_len();
+
+        fixed_section_len
+            + self.envelope_inner.execution_payload.ssz_bytes_len()
             + self.envelope_inner.blobs_bundle.ssz_bytes_len()
-            + self.envelope_inner.should_override_builder.ssz_bytes_len()
             + self.execution_requests.ssz_bytes_len()
     }
 }
