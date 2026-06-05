@@ -2,7 +2,7 @@
 //!
 //! See also <https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2>
 
-use crate::{header::BeaconBlockHeader, BlsPublicKey, BlsSignature};
+use crate::{header::BeaconBlockHeader, requests::ExecutionRequestsV4, BlsPublicKey, BlsSignature};
 use alloy_primitives::{Bytes, FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -124,6 +124,22 @@ pub struct Attestation {
     pub data: AttestationData,
     /// BLS aggregate signature.
     pub signature: BlsSignature,
+}
+
+/// An Electra attestation, which adds `committee_bits` to the pre-Electra [`Attestation`] shape.
+///
+/// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#attestation>
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+pub struct ElectraAttestation {
+    /// Attester aggregation bits.
+    pub aggregation_bits: Bytes,
+    /// The attestation data.
+    pub data: AttestationData,
+    /// BLS aggregate signature.
+    pub signature: BlsSignature,
+    /// Committee aggregation bits, `Bitvector[MAX_COMMITTEES_PER_SLOT]` = 64 bits = fixed 8 bytes.
+    pub committee_bits: FixedBytes<8>,
 }
 
 /// An indexed attestation.
@@ -429,10 +445,10 @@ pub struct BeaconBlockBodyElectra<T = serde_json::Value> {
     pub graffiti: B256,
     /// Proposer slashings.
     pub proposer_slashings: Vec<ProposerSlashing>,
-    /// Attester slashings (Electra uses a different format).
+    /// Attester slashings.
     pub attester_slashings: Vec<AttesterSlashing>,
-    /// Attestations.
-    pub attestations: Vec<Attestation>,
+    /// Attestations (Electra carries `committee_bits`).
+    pub attestations: Vec<ElectraAttestation>,
     /// Deposits.
     pub deposits: Vec<Deposit>,
     /// Voluntary exits.
@@ -444,10 +460,12 @@ pub struct BeaconBlockBodyElectra<T = serde_json::Value> {
     /// BLS to execution changes.
     pub bls_to_execution_changes: Vec<SignedBlsToExecutionChange>,
     /// Blob KZG commitments.
-    pub blob_kzg_commitments: Vec<Bytes>,
+    ///
+    /// `List[KZGCommitment]`; each commitment is a fixed 48-byte value, so a fixed-element list.
+    pub blob_kzg_commitments: Vec<FixedBytes<48>>,
     /// Execution requests (new in Electra).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution_requests: Option<serde_json::Value>,
+    #[serde(default)]
+    pub execution_requests: ExecutionRequestsV4,
 }
 
 /// Type aliases for convenience.
@@ -575,6 +593,21 @@ mod ssz_impls {
         execution_payload: T,
         bls_to_execution_changes: Vec<SignedBlsToExecutionChange>,
         blob_kzg_commitments: Vec<FixedBytes<48>>,
+    });
+    impl_container_ssz!(BeaconBlockBodyElectra<T> {
+        randao_reveal: BlsSignature,
+        eth1_data: Eth1Data,
+        graffiti: B256,
+        proposer_slashings: Vec<ProposerSlashing>,
+        attester_slashings: Vec<AttesterSlashing>,
+        attestations: Vec<ElectraAttestation>,
+        deposits: Vec<Deposit>,
+        voluntary_exits: Vec<SignedVoluntaryExit>,
+        sync_aggregate: SyncAggregate,
+        execution_payload: T,
+        bls_to_execution_changes: Vec<SignedBlsToExecutionChange>,
+        blob_kzg_commitments: Vec<FixedBytes<48>>,
+        execution_requests: ExecutionRequestsV4,
     });
 }
 
@@ -1109,6 +1142,52 @@ mod tests {
                 .unwrap();
             assert_eq!(block, decoded);
             assert_eq!(decoded.message.body.execution_payload, payload);
+        }
+
+        /// Electra body roundtrips, including the Electra attestation shape and typed execution
+        /// requests.
+        #[test]
+        fn ssz_roundtrip_signed_block_electra_generic() {
+            let body = BeaconBlockBodyElectra {
+                randao_reveal: crate::BlsSignature::repeat_byte(0x70),
+                eth1_data: Eth1Data {
+                    deposit_root: B256::repeat_byte(0x71),
+                    deposit_count: 11,
+                    block_hash: B256::repeat_byte(0x72),
+                },
+                graffiti: B256::repeat_byte(0x73),
+                proposer_slashings: vec![],
+                attester_slashings: vec![],
+                attestations: vec![ElectraAttestation {
+                    aggregation_bits: Bytes::from_static(&[0x01]),
+                    data: AttestationData::default(),
+                    signature: crate::BlsSignature::repeat_byte(0x74),
+                    committee_bits: FixedBytes::repeat_byte(0x75),
+                }],
+                deposits: vec![],
+                voluntary_exits: vec![],
+                sync_aggregate: sample_sync_aggregate(),
+                execution_payload: DummyPayload { block_number: 7, data: Bytes::new() },
+                bls_to_execution_changes: vec![],
+                blob_kzg_commitments: vec![FixedBytes::repeat_byte(0xcc)],
+                execution_requests: ExecutionRequestsV4::default(),
+            };
+            let block = SignedBeaconBlock {
+                message: BeaconBlock {
+                    slot: 300,
+                    proposer_index: 7,
+                    parent_root: B256::repeat_byte(0x76),
+                    state_root: B256::repeat_byte(0x77),
+                    body,
+                },
+                signature: crate::BlsSignature::repeat_byte(0x78),
+            };
+            let encoded = block.as_ssz_bytes();
+            let decoded =
+                SignedBeaconBlock::<BeaconBlockBodyElectra<DummyPayload>>::from_ssz_bytes(&encoded)
+                    .unwrap();
+            assert_eq!(block, decoded);
+            assert_eq!(decoded.message.body.attestations.len(), 1);
         }
     }
 }
