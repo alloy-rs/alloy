@@ -204,7 +204,10 @@ impl JwtSecret {
         match hex::decode_to_array(hex) {
             Ok(b) => Ok(Self(b)),
             Err(hex::FromHexError::InvalidStringLength | hex::FromHexError::OddLength) => {
-                Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
+                Err(JwtError::InvalidLength(
+                    JWT_SECRET_LEN,
+                    hex.strip_prefix("0x").or_else(|| hex.strip_prefix("0X")).unwrap_or(hex).len(),
+                ))
             }
             Err(e) => Err(JwtError::JwtSecretHexDecodeError(e)),
         }
