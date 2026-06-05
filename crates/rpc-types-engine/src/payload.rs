@@ -194,10 +194,46 @@ impl ExecutionPayloadFieldV2 {
     }
 }
 
+#[cfg(feature = "ssz")]
+impl ssz::Encode for ExecutionPayloadFieldV2 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        match self {
+            Self::V1(payload) => payload.ssz_append(buf),
+            Self::V2(payload) => payload.ssz_append(buf),
+        }
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        match self {
+            Self::V1(payload) => payload.ssz_bytes_len(),
+            Self::V2(payload) => payload.ssz_bytes_len(),
+        }
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for ExecutionPayloadFieldV2 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        match <ExecutionPayloadV2 as ssz::Decode>::from_ssz_bytes(bytes) {
+            Ok(payload) => Ok(Self::V2(payload)),
+            Err(_) => <ExecutionPayloadV1 as ssz::Decode>::from_ssz_bytes(bytes).map(Self::V1),
+        }
+    }
+}
+
 /// This is the input to `engine_newPayloadV2`, which may or may not have a withdrawals field.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadInputV2 {
     /// The V1 execution payload
@@ -288,6 +324,7 @@ impl From<ExecutionPayloadInputV2> for ExecutionPayload {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadEnvelopeV2 {
     /// Execution payload, which could be either V1 or V2
@@ -317,6 +354,7 @@ impl ExecutionPayloadEnvelopeV2 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadEnvelopeV3 {
     /// Execution payload V3
@@ -350,6 +388,71 @@ pub struct ExecutionPayloadEnvelopeV4 {
     ///
     /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
     pub execution_requests: Requests,
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for ExecutionPayloadEnvelopeV4 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let offset = <ExecutionPayloadV3 as ssz::Encode>::ssz_fixed_len()
+            + <U256 as ssz::Encode>::ssz_fixed_len()
+            + <BlobsBundleV1 as ssz::Encode>::ssz_fixed_len()
+            + <bool as ssz::Encode>::ssz_fixed_len()
+            + <Requests as ssz::Encode>::ssz_fixed_len();
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+
+        encoder.append(&self.envelope_inner.execution_payload);
+        encoder.append(&self.envelope_inner.block_value);
+        encoder.append(&self.envelope_inner.blobs_bundle);
+        encoder.append(&self.envelope_inner.should_override_builder);
+        encoder.append(&self.execution_requests);
+
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        let fixed_section_len = <ExecutionPayloadV3 as ssz::Encode>::ssz_fixed_len()
+            + <U256 as ssz::Encode>::ssz_fixed_len()
+            + <BlobsBundleV1 as ssz::Encode>::ssz_fixed_len()
+            + <bool as ssz::Encode>::ssz_fixed_len()
+            + <Requests as ssz::Encode>::ssz_fixed_len();
+
+        fixed_section_len
+            + self.envelope_inner.execution_payload.ssz_bytes_len()
+            + self.envelope_inner.blobs_bundle.ssz_bytes_len()
+            + self.execution_requests.ssz_bytes_len()
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for ExecutionPayloadEnvelopeV4 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<ExecutionPayloadV3>()?;
+        builder.register_type::<U256>()?;
+        builder.register_type::<BlobsBundleV1>()?;
+        builder.register_type::<bool>()?;
+        builder.register_type::<Requests>()?;
+
+        let mut decoder = builder.build()?;
+        Ok(Self {
+            envelope_inner: ExecutionPayloadEnvelopeV3 {
+                execution_payload: decoder.decode_next()?,
+                block_value: decoder.decode_next()?,
+                blobs_bundle: decoder.decode_next()?,
+                should_override_builder: decoder.decode_next()?,
+            },
+            execution_requests: decoder.decode_next()?,
+        })
+    }
 }
 
 impl ExecutionPayloadEnvelopeV4 {
@@ -451,6 +554,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadEnvelopeV4 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadEnvelopeV5 {
     /// Execution payload V3
@@ -558,6 +662,7 @@ impl TryFrom<ExecutionPayloadEnvelopeV5> for ExecutionPayloadEnvelopeV4 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadEnvelopeV6 {
     /// Execution payload V4
@@ -4134,6 +4239,159 @@ mod tests {
         // Decode from SSZ - empty bundle should be valid
         let decoded: BlobsBundleV2 = ssz::Decode::from_ssz_bytes(&encoded).unwrap();
         assert_eq!(decoded, blobs_bundle_v2);
+    }
+
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_v1() -> ExecutionPayloadV1 {
+        ExecutionPayloadV1 {
+            parent_hash: B256::with_last_byte(1),
+            fee_recipient: Address::with_last_byte(2),
+            state_root: B256::with_last_byte(3),
+            receipts_root: B256::with_last_byte(4),
+            logs_bloom: Bloom::default(),
+            prev_randao: B256::with_last_byte(5),
+            block_number: 6,
+            gas_limit: 7,
+            gas_used: 8,
+            timestamp: 9,
+            extra_data: Bytes::from(vec![10, 11]),
+            base_fee_per_gas: U256::from(12),
+            block_hash: B256::with_last_byte(13),
+            transactions: vec![Bytes::from(vec![14, 15])],
+        }
+    }
+
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_v2() -> ExecutionPayloadV2 {
+        ExecutionPayloadV2 {
+            payload_inner: ssz_payload_v1(),
+            withdrawals: vec![Withdrawal {
+                index: 1,
+                validator_index: 2,
+                address: Address::with_last_byte(3),
+                amount: 4,
+            }],
+        }
+    }
+
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_v3() -> ExecutionPayloadV3 {
+        ExecutionPayloadV3 {
+            payload_inner: ssz_payload_v2(),
+            blob_gas_used: 16,
+            excess_blob_gas: 17,
+        }
+    }
+
+    #[cfg(feature = "ssz")]
+    fn ssz_payload_v4() -> ExecutionPayloadV4 {
+        ExecutionPayloadV4 {
+            payload_inner: ssz_payload_v3(),
+            block_access_list: Bytes::from(vec![18, 19]),
+            slot_number: 20,
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_envelope_v1_response_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let payload = ssz_payload_v1();
+        let decoded = ExecutionPayloadV1::from_ssz_bytes(&payload.as_ssz_bytes()).unwrap();
+
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_envelope_v2_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let envelope = ExecutionPayloadEnvelopeV2 {
+            execution_payload: ExecutionPayloadFieldV2::V2(ssz_payload_v2()),
+            block_value: U256::from(21),
+        };
+
+        let decoded = ExecutionPayloadEnvelopeV2::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, envelope);
+
+        let envelope = ExecutionPayloadEnvelopeV2 {
+            execution_payload: ExecutionPayloadFieldV2::V1(ssz_payload_v1()),
+            block_value: U256::from(22),
+        };
+
+        let decoded = ExecutionPayloadEnvelopeV2::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, envelope);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_envelope_v3_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let envelope = ExecutionPayloadEnvelopeV3 {
+            execution_payload: ssz_payload_v3(),
+            block_value: U256::from(23),
+            blobs_bundle: BlobsBundleV1::empty(),
+            should_override_builder: true,
+        };
+
+        let decoded = ExecutionPayloadEnvelopeV3::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, envelope);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_envelope_v4_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let envelope = ExecutionPayloadEnvelopeV4 {
+            envelope_inner: ExecutionPayloadEnvelopeV3 {
+                execution_payload: ssz_payload_v3(),
+                block_value: U256::from(24),
+                blobs_bundle: BlobsBundleV1::empty(),
+                should_override_builder: false,
+            },
+            execution_requests: Requests::from_requests([Bytes::from(vec![1, 2, 3])]),
+        };
+
+        let decoded = ExecutionPayloadEnvelopeV4::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, envelope);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_envelope_v5_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let envelope = ExecutionPayloadEnvelopeV5 {
+            execution_payload: ssz_payload_v3(),
+            block_value: U256::from(25),
+            blobs_bundle: BlobsBundleV2::empty(),
+            should_override_builder: true,
+            execution_requests: Requests::from_requests([Bytes::from(vec![4, 5, 6])]),
+        };
+
+        let decoded = ExecutionPayloadEnvelopeV5::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, envelope);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_envelope_v6_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let envelope = ExecutionPayloadEnvelopeV6 {
+            execution_payload: ssz_payload_v4(),
+            block_value: U256::from(26),
+            blobs_bundle: BlobsBundleV2::empty(),
+            should_override_builder: false,
+            execution_requests: Requests::from_requests([Bytes::from(vec![7, 8, 9])]),
+        };
+
+        let decoded = ExecutionPayloadEnvelopeV6::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, envelope);
     }
 
     #[test]
