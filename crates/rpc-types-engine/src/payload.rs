@@ -3171,6 +3171,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
 /// See also: <https://github.com/ethereum/execution-apis/blob/6452a6b194d7db269bf1dbd087a267251d3cc7f8/src/engine/shanghai.md#executionpayloadbodyv1>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadBodyV1 {
     /// Enveloped encoded transactions.
@@ -3217,6 +3218,7 @@ impl<T: Encodable2718, H> From<Block<T, H>> for ExecutionPayloadBodyV1 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadBodyV2 {
     /// Enveloped encoded transactions.
@@ -5176,6 +5178,48 @@ mod tests {
         let serialized = serde_json::to_string(&body).unwrap();
         let deserialized: ExecutionPayloadBodyV2 = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, body);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_body_v1_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let body = ExecutionPayloadBodyV1 {
+            transactions: vec![Bytes::from(vec![0x01, 0x02, 0x03])],
+            withdrawals: Some(vec![Withdrawal {
+                index: 1,
+                validator_index: 2,
+                address: Address::with_last_byte(3),
+                amount: 4,
+            }]),
+        };
+
+        let decoded = ExecutionPayloadBodyV1::from_ssz_bytes(&body.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, body);
+
+        let bodies: ExecutionPayloadBodiesV1 = vec![Some(body), None];
+        let decoded = ExecutionPayloadBodiesV1::from_ssz_bytes(&bodies.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, bodies);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_body_v2_roundtrip() {
+        use ssz::{Decode, Encode};
+
+        let body = ExecutionPayloadBodyV2 {
+            transactions: vec![Bytes::from(vec![0x04, 0x05, 0x06])],
+            withdrawals: None,
+            block_access_list: Some(Bytes::from(vec![0xaa, 0xbb, 0xcc])),
+        };
+
+        let decoded = ExecutionPayloadBodyV2::from_ssz_bytes(&body.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, body);
+
+        let bodies: ExecutionPayloadBodiesV2 = vec![Some(body), None];
+        let decoded = ExecutionPayloadBodiesV2::from_ssz_bytes(&bodies.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded, bodies);
     }
 
     #[test]
