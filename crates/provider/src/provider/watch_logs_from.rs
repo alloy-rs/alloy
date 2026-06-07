@@ -451,10 +451,8 @@ impl<N: Network> Future for BlockLogsFut<N> {
                             "provider was dropped",
                         )));
                     };
-                    let logs_call = BlockLogsFut::<N>::logs_call(
-                        client,
-                        this.filter.clone().at_block_hash(block_hash),
-                    );
+                    let logs_call =
+                        Self::logs_call(client, this.filter.clone().at_block_hash(block_hash));
                     this.state.set(BlockLogsFutState::FetchLogs {
                         block: Some(block_result),
                         block_number,
@@ -524,7 +522,7 @@ fn normalize_range_logs_if_matches(
 
     let all_logs_match = logs.iter().all(|log| {
         log.block_hash == Some(block_hash)
-            && !log.block_number.is_some_and(|number| number != block_number)
+            && log.block_number.is_none_or(|number| number == block_number)
     });
     if !all_logs_match {
         return None;
