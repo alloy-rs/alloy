@@ -2,8 +2,8 @@
 //!
 //! See also <https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2>
 
-use crate::{header::BeaconBlockHeader, BlsPublicKey, BlsSignature};
-use alloy_primitives::{Bytes, B256};
+use crate::{header::BeaconBlockHeader, requests::ExecutionRequestsV4, BlsPublicKey, BlsSignature};
+use alloy_primitives::{Bytes, FixedBytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -126,6 +126,22 @@ pub struct Attestation {
     pub signature: BlsSignature,
 }
 
+/// An Electra attestation, which adds `committee_bits` to the pre-Electra [`Attestation`] shape.
+///
+/// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#attestation>
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+pub struct ElectraAttestation {
+    /// Attester aggregation bits.
+    pub aggregation_bits: Bytes,
+    /// The attestation data.
+    pub data: AttestationData,
+    /// BLS aggregate signature.
+    pub signature: BlsSignature,
+    /// Committee aggregation bits, `Bitvector[MAX_COMMITTEES_PER_SLOT]` = 64 bits = fixed 8 bytes.
+    pub committee_bits: FixedBytes<8>,
+}
+
 /// An indexed attestation.
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#indexedattestation>
@@ -242,7 +258,9 @@ pub struct SignedVoluntaryExit {
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct SyncAggregate {
     /// Aggregation bits of sync committee participation.
-    pub sync_committee_bits: Bytes,
+    ///
+    /// `Bitvector[512]` = fixed 64 bytes; fixed-typed so the SSZ codec matches the wire format.
+    pub sync_committee_bits: FixedBytes<64>,
     /// BLS signature of the sync committee.
     pub sync_committee_signature: BlsSignature,
 }
@@ -409,7 +427,9 @@ pub struct BeaconBlockBodyDeneb<T = serde_json::Value> {
     /// BLS to execution changes.
     pub bls_to_execution_changes: Vec<SignedBlsToExecutionChange>,
     /// Blob KZG commitments (new in Deneb).
-    pub blob_kzg_commitments: Vec<Bytes>,
+    ///
+    /// `List[KZGCommitment]`; each commitment is a fixed 48-byte value, so a fixed-element list.
+    pub blob_kzg_commitments: Vec<FixedBytes<48>>,
 }
 
 /// The beacon block body for Electra.
@@ -425,10 +445,10 @@ pub struct BeaconBlockBodyElectra<T = serde_json::Value> {
     pub graffiti: B256,
     /// Proposer slashings.
     pub proposer_slashings: Vec<ProposerSlashing>,
-    /// Attester slashings (Electra uses a different format).
+    /// Attester slashings.
     pub attester_slashings: Vec<AttesterSlashing>,
-    /// Attestations.
-    pub attestations: Vec<Attestation>,
+    /// Attestations (Electra carries `committee_bits`).
+    pub attestations: Vec<ElectraAttestation>,
     /// Deposits.
     pub deposits: Vec<Deposit>,
     /// Voluntary exits.
@@ -440,10 +460,12 @@ pub struct BeaconBlockBodyElectra<T = serde_json::Value> {
     /// BLS to execution changes.
     pub bls_to_execution_changes: Vec<SignedBlsToExecutionChange>,
     /// Blob KZG commitments.
-    pub blob_kzg_commitments: Vec<Bytes>,
+    ///
+    /// `List[KZGCommitment]`; each commitment is a fixed 48-byte value, so a fixed-element list.
+    pub blob_kzg_commitments: Vec<FixedBytes<48>>,
     /// Execution requests (new in Electra).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution_requests: Option<serde_json::Value>,
+    #[serde(default)]
+    pub execution_requests: ExecutionRequestsV4,
 }
 
 /// Type aliases for convenience.
@@ -461,6 +483,133 @@ pub type SignedBeaconBlockDeneb<T = serde_json::Value> = SignedBeaconBlock<Beaco
 /// Type alias for Electra signed beacon block.
 pub type SignedBeaconBlockElectra<T = serde_json::Value> =
     SignedBeaconBlock<BeaconBlockBodyElectra<T>>;
+
+/// SSZ container codecs for the beacon block envelopes and post-merge bodies, generic over the
+/// execution payload `T` (`ssz_derive` can't add the required `T: Encode`/`T: Decode` bound).
+#[cfg(feature = "ssz")]
+mod ssz_impls {
+    use super::*;
+
+    /// Width of a field in the container's fixed section: its own length if fixed-size, else a
+    /// 4-byte offset into the variable section.
+    fn fixed_part_len<T: ssz::Encode>() -> usize {
+        if T::is_ssz_fixed_len() {
+            T::ssz_fixed_len()
+        } else {
+            ssz::BYTES_PER_LENGTH_OFFSET
+        }
+    }
+
+    /// Total bytes a field contributes: inline if fixed-size, else its offset plus the variable
+    /// payload.
+    fn field_len<T: ssz::Encode>(field: &T) -> usize {
+        if T::is_ssz_fixed_len() {
+            T::ssz_fixed_len()
+        } else {
+            ssz::BYTES_PER_LENGTH_OFFSET + field.ssz_bytes_len()
+        }
+    }
+
+    macro_rules! impl_container_ssz {
+        ($name:ident<$g:ident> { $($field:ident: $fty:ty),+ $(,)? }) => {
+            impl<$g: ssz::Encode> ssz::Encode for $name<$g> {
+                fn is_ssz_fixed_len() -> bool {
+                    false
+                }
+
+                fn ssz_bytes_len(&self) -> usize {
+                    0 $(+ field_len::<$fty>(&self.$field))+
+                }
+
+                fn ssz_append(&self, buf: &mut Vec<u8>) {
+                    let fixed_len = 0 $(+ fixed_part_len::<$fty>())+;
+                    let mut encoder = ssz::SszEncoder::container(buf, fixed_len);
+                    $(encoder.append(&self.$field);)+
+                    encoder.finalize();
+                }
+            }
+
+            impl<$g: ssz::Decode> ssz::Decode for $name<$g> {
+                fn is_ssz_fixed_len() -> bool {
+                    false
+                }
+
+                fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+                    let mut builder = ssz::SszDecoderBuilder::new(bytes);
+                    $(builder.register_type::<$fty>()?;)+
+                    let mut decoder = builder.build()?;
+                    Ok(Self { $($field: decoder.decode_next()?,)+ })
+                }
+            }
+        };
+    }
+
+    impl_container_ssz!(SignedBeaconBlock<T> {
+        message: BeaconBlock<T>,
+        signature: BlsSignature,
+    });
+    impl_container_ssz!(BeaconBlock<T> {
+        slot: u64,
+        proposer_index: u64,
+        parent_root: B256,
+        state_root: B256,
+        body: T,
+    });
+    impl_container_ssz!(BeaconBlockBodyBellatrix<T> {
+        randao_reveal: BlsSignature,
+        eth1_data: Eth1Data,
+        graffiti: B256,
+        proposer_slashings: Vec<ProposerSlashing>,
+        attester_slashings: Vec<AttesterSlashing>,
+        attestations: Vec<Attestation>,
+        deposits: Vec<Deposit>,
+        voluntary_exits: Vec<SignedVoluntaryExit>,
+        sync_aggregate: SyncAggregate,
+        execution_payload: T,
+    });
+    impl_container_ssz!(BeaconBlockBodyCapella<T> {
+        randao_reveal: BlsSignature,
+        eth1_data: Eth1Data,
+        graffiti: B256,
+        proposer_slashings: Vec<ProposerSlashing>,
+        attester_slashings: Vec<AttesterSlashing>,
+        attestations: Vec<Attestation>,
+        deposits: Vec<Deposit>,
+        voluntary_exits: Vec<SignedVoluntaryExit>,
+        sync_aggregate: SyncAggregate,
+        execution_payload: T,
+        bls_to_execution_changes: Vec<SignedBlsToExecutionChange>,
+    });
+    impl_container_ssz!(BeaconBlockBodyDeneb<T> {
+        randao_reveal: BlsSignature,
+        eth1_data: Eth1Data,
+        graffiti: B256,
+        proposer_slashings: Vec<ProposerSlashing>,
+        attester_slashings: Vec<AttesterSlashing>,
+        attestations: Vec<Attestation>,
+        deposits: Vec<Deposit>,
+        voluntary_exits: Vec<SignedVoluntaryExit>,
+        sync_aggregate: SyncAggregate,
+        execution_payload: T,
+        bls_to_execution_changes: Vec<SignedBlsToExecutionChange>,
+        blob_kzg_commitments: Vec<FixedBytes<48>>,
+    });
+    impl_container_ssz!(BeaconBlockBodyElectra<T> {
+        randao_reveal: BlsSignature,
+        eth1_data: Eth1Data,
+        graffiti: B256,
+        proposer_slashings: Vec<ProposerSlashing>,
+        attester_slashings: Vec<AttesterSlashing>,
+        attestations: Vec<ElectraAttestation>,
+        deposits: Vec<Deposit>,
+        voluntary_exits: Vec<SignedVoluntaryExit>,
+        sync_aggregate: SyncAggregate,
+        execution_payload: T,
+        bls_to_execution_changes: Vec<SignedBlsToExecutionChange>,
+        blob_kzg_commitments: Vec<FixedBytes<48>>,
+        execution_requests: ExecutionRequestsV4,
+    });
+}
 
 #[cfg(test)]
 mod tests {
@@ -528,7 +677,7 @@ mod tests {
                         "deposits": [],
                         "voluntary_exits": [],
                         "sync_aggregate": {
-                            "sync_committee_bits": "0x01",
+                            "sync_committee_bits": "0x71b7f7596e64ef7f7ef4f938e9f68abfbfe95bff09393315bb93bbec7f7ef27effa4c7f25ba7cbdb87efbbf73fdaebb9efefeb3ef7fff8effafdd7aff5677bfc",
                             "sync_committee_signature": "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505"
                         }
                     }
@@ -625,7 +774,7 @@ mod tests {
     #[test]
     fn serde_sync_aggregate() {
         let s = r#"{
-            "sync_committee_bits": "0x01",
+            "sync_committee_bits": "0x71b7f7596e64ef7f7ef4f938e9f68abfbfe95bff09393315bb93bbec7f7ef27effa4c7f25ba7cbdb87efbbf73fdaebb9efefeb3ef7fff8effafdd7aff5677bfc",
             "sync_committee_signature": "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505"
         }"#;
         let _aggregate: SyncAggregate = serde_json::from_str(s).unwrap();
@@ -778,7 +927,7 @@ mod tests {
         #[test]
         fn ssz_roundtrip_sync_aggregate() {
             let aggregate = SyncAggregate {
-                sync_committee_bits: Bytes::from_static(&[0x01, 0x02, 0x03]),
+                sync_committee_bits: FixedBytes::repeat_byte(0x01),
                 sync_committee_signature: crate::BlsSignature::repeat_byte(0x11),
             };
             let encoded = aggregate.as_ssz_bytes();
@@ -823,13 +972,222 @@ mod tests {
                 deposits: vec![],
                 voluntary_exits: vec![],
                 sync_aggregate: SyncAggregate {
-                    sync_committee_bits: Bytes::from_static(&[0xaa]),
+                    sync_committee_bits: FixedBytes::repeat_byte(0xaa),
                     sync_committee_signature: crate::BlsSignature::repeat_byte(0xbb),
                 },
             };
             let encoded = body.as_ssz_bytes();
             let decoded = BeaconBlockBodyAltair::from_ssz_bytes(&encoded).unwrap();
             assert_eq!(body, decoded);
+        }
+
+        /// Stand-in execution payload for the generic container tests.
+        #[derive(Debug, Clone, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+        struct DummyPayload {
+            block_number: u64,
+            data: Bytes,
+        }
+
+        fn sample_sync_aggregate() -> SyncAggregate {
+            SyncAggregate {
+                sync_committee_bits: FixedBytes::repeat_byte(0x01),
+                sync_committee_signature: crate::BlsSignature::repeat_byte(0x02),
+            }
+        }
+
+        /// `SyncAggregate` is a fixed 160-byte container (64-byte bits + 96-byte signature).
+        #[test]
+        fn sync_aggregate_is_fixed_160_bytes() {
+            assert!(<SyncAggregate as Encode>::is_ssz_fixed_len());
+            assert_eq!(<SyncAggregate as Decode>::ssz_fixed_len(), 160);
+            assert_eq!(sample_sync_aggregate().as_ssz_bytes().len(), 160);
+        }
+
+        #[test]
+        fn ssz_roundtrip_signed_block_bellatrix_generic() {
+            let body = BeaconBlockBodyBellatrix {
+                randao_reveal: crate::BlsSignature::repeat_byte(0x10),
+                eth1_data: Eth1Data {
+                    deposit_root: B256::repeat_byte(0x11),
+                    deposit_count: 7,
+                    block_hash: B256::repeat_byte(0x12),
+                },
+                graffiti: B256::repeat_byte(0x13),
+                proposer_slashings: vec![],
+                attester_slashings: vec![],
+                attestations: vec![],
+                deposits: vec![],
+                voluntary_exits: vec![],
+                sync_aggregate: sample_sync_aggregate(),
+                execution_payload: DummyPayload {
+                    block_number: 42,
+                    data: Bytes::from_static(&[1, 2, 3, 4]),
+                },
+            };
+            let block = SignedBeaconBlock {
+                message: BeaconBlock {
+                    slot: 100,
+                    proposer_index: 5,
+                    parent_root: B256::repeat_byte(0x20),
+                    state_root: B256::repeat_byte(0x21),
+                    body,
+                },
+                signature: crate::BlsSignature::repeat_byte(0x22),
+            };
+            let encoded = block.as_ssz_bytes();
+            let decoded =
+                SignedBeaconBlock::<BeaconBlockBodyBellatrix<DummyPayload>>::from_ssz_bytes(
+                    &encoded,
+                )
+                .unwrap();
+            assert_eq!(block, decoded);
+            assert_eq!(decoded.message.body.execution_payload.block_number, 42);
+        }
+
+        /// Deneb body roundtrips, including its fixed-48-byte KZG commitment list.
+        #[test]
+        fn ssz_roundtrip_signed_block_deneb_generic() {
+            let body = BeaconBlockBodyDeneb {
+                randao_reveal: crate::BlsSignature::repeat_byte(0x30),
+                eth1_data: Eth1Data {
+                    deposit_root: B256::repeat_byte(0x31),
+                    deposit_count: 9,
+                    block_hash: B256::repeat_byte(0x32),
+                },
+                graffiti: B256::repeat_byte(0x33),
+                proposer_slashings: vec![],
+                attester_slashings: vec![],
+                attestations: vec![],
+                deposits: vec![],
+                voluntary_exits: vec![],
+                sync_aggregate: sample_sync_aggregate(),
+                execution_payload: DummyPayload { block_number: 99, data: Bytes::new() },
+                bls_to_execution_changes: vec![],
+                blob_kzg_commitments: vec![
+                    FixedBytes::repeat_byte(0xaa),
+                    FixedBytes::repeat_byte(0xbb),
+                ],
+            };
+            let block = SignedBeaconBlock {
+                message: BeaconBlock {
+                    slot: 200,
+                    proposer_index: 6,
+                    parent_root: B256::repeat_byte(0x40),
+                    state_root: B256::repeat_byte(0x41),
+                    body,
+                },
+                signature: crate::BlsSignature::repeat_byte(0x42),
+            };
+            let encoded = block.as_ssz_bytes();
+            let decoded =
+                SignedBeaconBlock::<BeaconBlockBodyDeneb<DummyPayload>>::from_ssz_bytes(&encoded)
+                    .unwrap();
+            assert_eq!(block, decoded);
+            assert_eq!(decoded.message.body.blob_kzg_commitments.len(), 2);
+        }
+
+        /// Bellatrix envelope roundtrips with a real `ExecutionPayloadV1`.
+        #[test]
+        fn ssz_roundtrip_signed_block_bellatrix_real_payload() {
+            use alloy_primitives::{Address, Bloom, U256};
+            use alloy_rpc_types_engine::ExecutionPayloadV1;
+
+            let payload = ExecutionPayloadV1 {
+                parent_hash: B256::repeat_byte(0x01),
+                fee_recipient: Address::repeat_byte(0x02),
+                state_root: B256::repeat_byte(0x03),
+                receipts_root: B256::repeat_byte(0x04),
+                logs_bloom: Bloom::repeat_byte(0x05),
+                prev_randao: B256::repeat_byte(0x06),
+                block_number: 1234,
+                gas_limit: 30_000_000,
+                gas_used: 21_000,
+                timestamp: 1_700_000_000,
+                extra_data: Bytes::from_static(&[0xde, 0xad]),
+                base_fee_per_gas: U256::from(7u64),
+                block_hash: B256::repeat_byte(0x07),
+                transactions: vec![Bytes::from_static(&[0xc0, 0xff, 0xee])],
+            };
+            let body = BeaconBlockBodyBellatrix {
+                randao_reveal: crate::BlsSignature::repeat_byte(0x50),
+                eth1_data: Eth1Data {
+                    deposit_root: B256::repeat_byte(0x51),
+                    deposit_count: 3,
+                    block_hash: B256::repeat_byte(0x52),
+                },
+                graffiti: B256::repeat_byte(0x53),
+                proposer_slashings: vec![],
+                attester_slashings: vec![],
+                attestations: vec![],
+                deposits: vec![],
+                voluntary_exits: vec![],
+                sync_aggregate: sample_sync_aggregate(),
+                execution_payload: payload.clone(),
+            };
+            let block = SignedBeaconBlock {
+                message: BeaconBlock {
+                    slot: 4_700_000,
+                    proposer_index: 11,
+                    parent_root: B256::repeat_byte(0x60),
+                    state_root: B256::repeat_byte(0x61),
+                    body,
+                },
+                signature: crate::BlsSignature::repeat_byte(0x62),
+            };
+            let encoded = block.as_ssz_bytes();
+            let decoded =
+                SignedBeaconBlock::<BeaconBlockBodyBellatrix<ExecutionPayloadV1>>::from_ssz_bytes(
+                    &encoded,
+                )
+                .unwrap();
+            assert_eq!(block, decoded);
+            assert_eq!(decoded.message.body.execution_payload, payload);
+        }
+
+        /// Electra body roundtrips, including the Electra attestation shape and typed execution
+        /// requests.
+        #[test]
+        fn ssz_roundtrip_signed_block_electra_generic() {
+            let body = BeaconBlockBodyElectra {
+                randao_reveal: crate::BlsSignature::repeat_byte(0x70),
+                eth1_data: Eth1Data {
+                    deposit_root: B256::repeat_byte(0x71),
+                    deposit_count: 11,
+                    block_hash: B256::repeat_byte(0x72),
+                },
+                graffiti: B256::repeat_byte(0x73),
+                proposer_slashings: vec![],
+                attester_slashings: vec![],
+                attestations: vec![ElectraAttestation {
+                    aggregation_bits: Bytes::from_static(&[0x01]),
+                    data: AttestationData::default(),
+                    signature: crate::BlsSignature::repeat_byte(0x74),
+                    committee_bits: FixedBytes::repeat_byte(0x75),
+                }],
+                deposits: vec![],
+                voluntary_exits: vec![],
+                sync_aggregate: sample_sync_aggregate(),
+                execution_payload: DummyPayload { block_number: 7, data: Bytes::new() },
+                bls_to_execution_changes: vec![],
+                blob_kzg_commitments: vec![FixedBytes::repeat_byte(0xcc)],
+                execution_requests: ExecutionRequestsV4::default(),
+            };
+            let block = SignedBeaconBlock {
+                message: BeaconBlock {
+                    slot: 300,
+                    proposer_index: 7,
+                    parent_root: B256::repeat_byte(0x76),
+                    state_root: B256::repeat_byte(0x77),
+                    body,
+                },
+                signature: crate::BlsSignature::repeat_byte(0x78),
+            };
+            let encoded = block.as_ssz_bytes();
+            let decoded =
+                SignedBeaconBlock::<BeaconBlockBodyElectra<DummyPayload>>::from_ssz_bytes(&encoded)
+                    .unwrap();
+            assert_eq!(block, decoded);
+            assert_eq!(decoded.message.body.attestations.len(), 1);
         }
     }
 }
