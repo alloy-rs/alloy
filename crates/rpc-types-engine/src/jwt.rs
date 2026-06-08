@@ -151,6 +151,7 @@ pub struct Claims {
     pub iat: u64,
     /// The "exp" (expiration time) claim identifies the expiration time on or after which the JWT
     /// MUST NOT be accepted for processing.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub exp: Option<u64>,
 }
 
@@ -489,6 +490,29 @@ mod tests {
         let result = secret.validate(&jwt);
 
         assert!(matches!(result, Ok(())));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn omits_exp_claim_when_none() {
+        let secret = JwtSecret::random();
+        let claims = Claims { iat: get_current_timestamp(), exp: None };
+        let token = secret.encode(&claims).unwrap();
+
+        // Decode the payload (middle segment) without verification
+        use base64::Engine;
+        let payload = token.split('.').nth(1).unwrap();
+        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload).unwrap();
+        let payload = str::from_utf8(&payload).unwrap();
+
+        // RFC 7519 §4.1.4: "exp" is OPTIONAL — when absent it means no expiration.
+        // When present, it MUST be a NumericDate (a number), not null.
+        // Serializing `exp: None` as `"exp": null` produces a non-conforming JWT
+        // that is rejected by some execution clients (Besu).
+        assert!(
+            !payload.contains("\"exp\""),
+            "Claims with exp: None must omit the field, not serialize as null. Got: {payload}"
+        );
     }
 
     #[test]
