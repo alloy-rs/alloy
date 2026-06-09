@@ -151,7 +151,7 @@ pub struct Claims {
     pub iat: u64,
     /// The "exp" (expiration time) claim identifies the expiration time on or after which the JWT
     /// MUST NOT be accepted for processing.
-     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub exp: Option<u64>,
 }
 
