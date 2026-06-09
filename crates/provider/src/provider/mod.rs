@@ -8,8 +8,8 @@ pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks, WatchHeaders};
 
 mod watch_canonical_blocks_from;
 pub use watch_canonical_blocks_from::{
-    CanonicalBlockStore, CanonicalEvent, InMemoryStore, WatchCanonicalBlocksFrom,
-    WatchCanonicalBlocksFromStream,
+    CanonicalBlockStore, CanonicalEvent, InMemoryStore, InMemoryStoreInsertError,
+    WatchCanonicalBlocksFrom, WatchCanonicalBlocksFromStream,
 };
 
 mod watch_canonical_logs_from;

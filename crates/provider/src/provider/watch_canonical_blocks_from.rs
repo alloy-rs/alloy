@@ -1,7 +1,7 @@
 use crate::{transport::TransportErrorKind, WatchBlocksFrom, WatchBlocksFromStream};
 use alloy_consensus::BlockHeader;
 use alloy_eips::BlockNumberOrTag;
-use alloy_network::{BlockResponse as _, Network};
+use alloy_network::{BlockResponse, Network};
 use alloy_network_primitives::HeaderResponse;
 use alloy_transport::{TransportError, TransportResult};
 use futures::{stream::Buffered, Stream, StreamExt as _};
@@ -357,7 +357,9 @@ where
                     let removed = match fut.poll(cx) {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(err)) => {
-                            this.state.set(WatchCanonicalBlocksFromState::EmitError { err });
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError {
+                                err: TransportErrorKind::custom(err),
+                            });
                             continue;
                         }
                         Poll::Ready(Ok(None)) => {
@@ -398,7 +400,9 @@ where
                     let previous_tip = match fut.poll(cx) {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(err)) => {
-                            this.state.set(WatchCanonicalBlocksFromState::EmitError { err });
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError {
+                                err: TransportErrorKind::custom(err),
+                            });
                             continue;
                         }
                         Poll::Ready(Ok(previous_tip)) => previous_tip,
@@ -460,7 +464,9 @@ where
                     match fut.poll(cx) {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(err)) => {
-                            this.state.set(WatchCanonicalBlocksFromState::EmitError { err });
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError {
+                                err: TransportErrorKind::custom(err),
+                            });
                             continue;
                         }
                         Poll::Ready(Ok(())) => {}
@@ -496,21 +502,40 @@ where
 
 /// A store of previously emitted canonical blocks used to produce removed events on reorgs.
 pub trait CanonicalBlockStore<N: Network>: std::fmt::Debug + Send + Sync + 'static {
+    /// Error returned by [`insert_block`](Self::insert_block).
+    #[cfg(not(target_family = "wasm"))]
+    type InsertError: std::error::Error + Send + Sync + 'static;
+
+    /// Error returned by [`insert_block`](Self::insert_block).
+    #[cfg(target_family = "wasm")]
+    type InsertError: std::error::Error + 'static;
+
+    /// Error returned by [`get_block`](Self::get_block).
+    #[cfg(not(target_family = "wasm"))]
+    type GetError: std::error::Error + Send + Sync + 'static;
+
+    /// Error returned by [`get_block`](Self::get_block).
+    #[cfg(target_family = "wasm")]
+    type GetError: std::error::Error + 'static;
+
     /// Future returned by [`insert_block`](Self::insert_block).
     #[cfg(not(target_family = "wasm"))]
-    type InsertBlockFuture: Future<Output = TransportResult<()>> + Send + 'static;
+    type InsertBlockFuture: Future<Output = Result<(), Self::InsertError>> + Send + 'static;
 
     /// Future returned by [`insert_block`](Self::insert_block).
     #[cfg(target_family = "wasm")]
-    type InsertBlockFuture: Future<Output = TransportResult<()>> + 'static;
+    type InsertBlockFuture: Future<Output = Result<(), Self::InsertError>> + 'static;
 
     /// Future returned by [`get_block`](Self::get_block).
     #[cfg(not(target_family = "wasm"))]
-    type GetBlockFuture: Future<Output = TransportResult<Option<N::BlockResponse>>> + Send + 'static;
+    type GetBlockFuture: Future<Output = Result<Option<N::BlockResponse>, Self::GetError>>
+        + Send
+        + 'static;
 
     /// Future returned by [`get_block`](Self::get_block).
     #[cfg(target_family = "wasm")]
-    type GetBlockFuture: Future<Output = TransportResult<Option<N::BlockResponse>>> + 'static;
+    type GetBlockFuture: Future<Output = Result<Option<N::BlockResponse>, Self::GetError>>
+        + 'static;
 
     /// Records a newly emitted canonical block.
     fn insert_block(&mut self, block: N::BlockResponse) -> Self::InsertBlockFuture;
@@ -520,51 +545,80 @@ pub trait CanonicalBlockStore<N: Network>: std::fmt::Debug + Send + Sync + 'stat
 }
 
 /// In-memory canonical history store used by default by canonical watchers.
+///
+/// Stores the most recent `max_reorg_depth` blocks as a strictly sequential, contiguous chain.
+/// On insert, any retained block at a height `>=` the new block's height is dropped so the
+/// buffer continues to represent a single canonical chain after a reorg.
 #[derive(Debug)]
 pub struct InMemoryStore<T> {
-    inner: FixedBuf<(u64, T)>,
+    inner: FixedBuf<T>,
 }
 
 impl<T> InMemoryStore<T> {
     /// Creates an in-memory store retaining up to `max_reorg_depth` canonical items.
-    pub fn new(max_reorg_depth: usize) -> Self {
+    pub(crate) fn new(max_reorg_depth: usize) -> Self {
         Self { inner: FixedBuf::new(max_reorg_depth) }
     }
 }
 
 impl<T> InMemoryStore<T>
 where
-    T: Clone,
+    T: BlockResponse + Clone,
+    T::Header: BlockHeader,
 {
-    fn insert(&mut self, block_number: u64, item: T) -> TransportResult<()> {
-        self.inner.push((block_number, item));
+    fn insert(&mut self, block: T) -> Result<(), InMemoryStoreInsertError> {
+        let block_number = block.header().number();
+        while self.inner.last().is_some_and(|last| last.header().number() >= block_number) {
+            self.inner.pop();
+        }
+        if let Some(last) = self.inner.last() {
+            let expected = last.header().number() + 1;
+            if expected != block_number {
+                return Err(InMemoryStoreInsertError::OutOfOrder { expected, got: block_number });
+            }
+        }
+        self.inner.push(block);
         Ok(())
     }
 
-    fn get(&self, block_number: u64) -> TransportResult<Option<T>> {
-        Ok(self
-            .inner
-            .iter()
-            .rev()
-            .find(|(stored_number, _)| *stored_number == block_number)
-            .map(|(_, item)| item.clone()))
+    fn get(&self, block_number: u64) -> Option<T> {
+        let last_number = self.inner.last()?.header().number();
+        let offset = usize::try_from(last_number.checked_sub(block_number)?).ok()?;
+        let index = self.inner.len().checked_sub(1)?.checked_sub(offset)?;
+        self.inner.get(index).cloned()
     }
+}
+
+/// Error returned by [`InMemoryStore::insert_block`].
+#[derive(Debug, thiserror::Error)]
+pub enum InMemoryStoreInsertError {
+    /// Inserted block's height leaves a gap relative to the most recent retained block.
+    #[error(
+        "inserted block #{got} is out of order; expected sequential extension at #{expected}"
+    )]
+    OutOfOrder {
+        /// The block height that was expected next.
+        expected: u64,
+        /// The block height that was actually provided.
+        got: u64,
+    },
 }
 
 impl<N> CanonicalBlockStore<N> for InMemoryStore<N::BlockResponse>
 where
     N: Network,
 {
-    type InsertBlockFuture = std::future::Ready<TransportResult<()>>;
-    type GetBlockFuture = std::future::Ready<TransportResult<Option<N::BlockResponse>>>;
+    type InsertError = InMemoryStoreInsertError;
+    type GetError = std::convert::Infallible;
+    type InsertBlockFuture = std::future::Ready<Result<(), Self::InsertError>>;
+    type GetBlockFuture = std::future::Ready<Result<Option<N::BlockResponse>, Self::GetError>>;
 
     fn insert_block(&mut self, block: N::BlockResponse) -> Self::InsertBlockFuture {
-        let block_number = block.header().number();
-        std::future::ready(self.insert(block_number, block))
+        std::future::ready(self.insert(block))
     }
 
     fn get_block(&mut self, block_number: u64) -> Self::GetBlockFuture {
-        std::future::ready(self.get(block_number))
+        std::future::ready(Ok(self.get(block_number)))
     }
 }
 
@@ -599,12 +653,12 @@ impl<T> FixedBuf<T> {
         self.buf.back()
     }
 
-    pub(super) fn len(&self) -> usize {
-        self.buf.len()
+    pub(super) fn get(&self, index: usize) -> Option<&T> {
+        self.buf.get(index)
     }
 
-    pub(super) fn iter(&self) -> std::collections::vec_deque::Iter<'_, T> {
-        self.buf.iter()
+    pub(super) fn len(&self) -> usize {
+        self.buf.len()
     }
 }
 
@@ -763,8 +817,10 @@ mod tests {
     }
 
     impl CanonicalBlockStore<alloy_network::Ethereum> for FullHistoryBlockStore {
-        type InsertBlockFuture = std::future::Ready<TransportResult<()>>;
-        type GetBlockFuture = std::future::Ready<TransportResult<Option<Block>>>;
+        type InsertError = std::convert::Infallible;
+        type GetError = std::convert::Infallible;
+        type InsertBlockFuture = std::future::Ready<Result<(), Self::InsertError>>;
+        type GetBlockFuture = std::future::Ready<Result<Option<Block>, Self::GetError>>;
 
         fn insert_block(&mut self, block: Block) -> Self::InsertBlockFuture {
             self.blocks.insert(block.header.number, block);
