@@ -267,10 +267,8 @@ where
                     }
                 }
                 WatchCanonicalBlocksFromStateProj::Reconcile { .. } => {
-                    let WatchCanonicalBlocksFromStateProjOwn::Reconcile { next, pending } = this
-                        .state
-                        .as_mut()
-                        .project_replace(WatchCanonicalBlocksFromState::Done)
+                    let WatchCanonicalBlocksFromStateProjOwn::Reconcile { next, pending } =
+                        this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
                     else {
                         unreachable!()
                     };
@@ -418,8 +416,7 @@ where
                     };
                     *this.canonical_tip = previous_tip;
                     if this.canonical_tip.is_some() {
-                        this.state
-                            .set(WatchCanonicalBlocksFromState::Reconcile { next, pending });
+                        this.state.set(WatchCanonicalBlocksFromState::Reconcile { next, pending });
                     } else {
                         this.state.set(WatchCanonicalBlocksFromState::EmitError {
                             err: deep_reorg_block_error(),
@@ -428,10 +425,8 @@ where
                     return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
                 }
                 WatchCanonicalBlocksFromStateProj::EmitPending { .. } => {
-                    let WatchCanonicalBlocksFromStateProjOwn::EmitPending {
-                        mut pending,
-                        mut next,
-                    } = this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
+                    let WatchCanonicalBlocksFromStateProjOwn::EmitPending { mut pending, mut next } =
+                        this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
                     else {
                         unreachable!()
                     };
@@ -481,15 +476,12 @@ where
                         unreachable!()
                     };
                     *this.canonical_tip = Some(block.clone());
-                    this.state
-                        .set(WatchCanonicalBlocksFromState::EmitPending { pending, next });
+                    this.state.set(WatchCanonicalBlocksFromState::EmitPending { pending, next });
                     return Poll::Ready(Some(Ok(CanonicalEvent::Added(block))));
                 }
                 WatchCanonicalBlocksFromStateProj::EmitError { .. } => {
-                    let WatchCanonicalBlocksFromStateProjOwn::EmitError { err } = this
-                        .state
-                        .as_mut()
-                        .project_replace(WatchCanonicalBlocksFromState::Done)
+                    let WatchCanonicalBlocksFromStateProjOwn::EmitError { err } =
+                        this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
                     else {
                         unreachable!()
                     };
@@ -534,8 +526,7 @@ pub trait CanonicalBlockStore<N: Network>: std::fmt::Debug + Send + Sync + 'stat
 
     /// Future returned by [`get_block`](Self::get_block).
     #[cfg(target_family = "wasm")]
-    type GetBlockFuture: Future<Output = Result<Option<N::BlockResponse>, Self::GetError>>
-        + 'static;
+    type GetBlockFuture: Future<Output = Result<Option<N::BlockResponse>, Self::GetError>> + 'static;
 
     /// Records a newly emitted canonical block.
     fn insert_block(&mut self, block: N::BlockResponse) -> Self::InsertBlockFuture;
@@ -593,9 +584,7 @@ where
 #[derive(Debug, thiserror::Error)]
 pub enum InMemoryStoreInsertError {
     /// Inserted block's height leaves a gap relative to the most recent retained block.
-    #[error(
-        "inserted block #{got} is out of order; expected sequential extension at #{expected}"
-    )]
+    #[error("inserted block #{got} is out of order; expected sequential extension at #{expected}")]
     OutOfOrder {
         /// The block height that was expected next.
         expected: u64,
@@ -670,7 +659,7 @@ mod tests {
     use alloy_primitives::{B256, U64};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types_eth::Block;
-    use alloy_transport::{TransportError, TransportFut, TransportResult};
+    use alloy_transport::{TransportError, TransportFut};
     use futures::StreamExt;
     use std::{
         collections::HashMap,
