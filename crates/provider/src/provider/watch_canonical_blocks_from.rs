@@ -8,6 +8,7 @@ use futures::{stream::Buffered, Stream, StreamExt as _};
 use pin_project::pin_project;
 use std::{
     collections::VecDeque,
+    fmt,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
@@ -24,10 +25,14 @@ const MAX_REORG_DEPTH_DEFAULT: usize = 64;
 /// followed by [`CanonicalEvent::Added`] for the new canonical chain segment.
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
-pub struct WatchCanonicalBlocksFrom<N: Network> {
+pub struct WatchCanonicalBlocksFrom<N, S = InMemoryStore<<N as Network>::BlockResponse>>
+where
+    N: Network,
+    S: CanonicalBlockStore<N>,
+{
     watch_blocks_from: WatchBlocksFrom<N>,
     rpc_concurrency: usize,
-    max_reorg_depth: usize,
+    block_store: S,
 }
 
 /// An item emitted by the canonical block stream.
@@ -40,14 +45,20 @@ pub enum CanonicalEvent<T> {
 }
 
 impl<N: Network> WatchCanonicalBlocksFrom<N> {
-    pub(crate) const fn new(watch_blocks_from: WatchBlocksFrom<N>) -> Self {
+    pub(crate) fn new(watch_blocks_from: WatchBlocksFrom<N>) -> Self {
         Self {
             watch_blocks_from,
             rpc_concurrency: RPC_CONCURRENCY_DEFAULT,
-            max_reorg_depth: MAX_REORG_DEPTH_DEFAULT,
+            block_store: InMemoryStore::new(MAX_REORG_DEPTH_DEFAULT),
         }
     }
+}
 
+impl<N, S> WatchCanonicalBlocksFrom<N, S>
+where
+    N: Network,
+    S: CanonicalBlockStore<N>,
+{
     /// Streams canonical blocks with full transaction bodies.
     pub fn full(mut self) -> Self {
         self.watch_blocks_from = self.watch_blocks_from.full();
@@ -78,28 +89,46 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
         self
     }
 
-    /// Sets the maximum number of canonical blocks retained for reorg detection.
-    pub const fn max_reorg_depth(mut self, max_reorg_depth: usize) -> Self {
-        self.max_reorg_depth = if max_reorg_depth == 0 { 1 } else { max_reorg_depth };
-        self
+    /// Sets the store used to fetch previously emitted canonical blocks during reorg handling.
+    pub fn block_store<S2>(self, block_store: S2) -> WatchCanonicalBlocksFrom<N, S2>
+    where
+        S2: CanonicalBlockStore<N>,
+    {
+        WatchCanonicalBlocksFrom {
+            watch_blocks_from: self.watch_blocks_from,
+            rpc_concurrency: self.rpc_concurrency,
+            block_store,
+        }
     }
 
     /// Converts the builder into a stream of canonical block events.
-    pub fn into_stream(self) -> WatchCanonicalBlocksFromStream<N> {
-        let Self { watch_blocks_from, rpc_concurrency, max_reorg_depth } = self;
+    pub fn into_stream(self) -> WatchCanonicalBlocksFromStream<N, S> {
+        let Self { watch_blocks_from, rpc_concurrency, block_store } = self;
         let stream = watch_blocks_from.clone().into_stream().buffered(rpc_concurrency.max(1));
 
         WatchCanonicalBlocksFromStream {
             watch_blocks_from,
             stream,
-            buffer: FixedBuf::new(max_reorg_depth),
+            block_store,
+            canonical_tip: None,
             state: WatchCanonicalBlocksFromState::PollNext,
         }
     }
 }
 
-#[derive(Debug)]
-enum WatchCanonicalBlocksFromState<N: Network> {
+impl<N: Network> WatchCanonicalBlocksFrom<N, InMemoryStore<N::BlockResponse>> {
+    /// Sets the maximum number of canonical blocks retained by the default in-memory store.
+    pub fn max_reorg_depth(mut self, max_reorg_depth: usize) -> Self {
+        self.block_store = InMemoryStore::new(max_reorg_depth);
+        self
+    }
+}
+
+enum WatchCanonicalBlocksFromState<N, S>
+where
+    N: Network,
+    S: CanonicalBlockStore<N>,
+{
     /// Polling the next block from `watch_blocks_from(...).buffered(...)`.
     PollNext,
     /// Reconciling `next` with the canonical buffer by walking parents.
@@ -110,26 +139,99 @@ enum WatchCanonicalBlocksFromState<N: Network> {
         pending: VecDeque<N::BlockResponse>,
         fut: super::BlockFut<N::BlockResponse>,
     },
+    /// Polling an in-flight fetch for the rolled-back canonical block.
+    FetchingRemoved {
+        next: N::BlockResponse,
+        pending: VecDeque<N::BlockResponse>,
+        block_number: u64,
+        fut: Pin<Box<S::GetBlockFuture>>,
+    },
+    /// Polling an in-flight fetch for the new canonical tip after one rollback.
+    FetchingTipAfterRemoved {
+        next: N::BlockResponse,
+        pending: VecDeque<N::BlockResponse>,
+        removed: N::BlockResponse,
+        fut: Pin<Box<S::GetBlockFuture>>,
+    },
     /// Emitting `Added` events for `pending`, then `next`.
     EmitPending { pending: VecDeque<N::BlockResponse>, next: Option<N::BlockResponse> },
+    /// Polling an in-flight store insert before emitting an `Added` event.
+    StoringAdded {
+        pending: VecDeque<N::BlockResponse>,
+        next: Option<N::BlockResponse>,
+        block: N::BlockResponse,
+        fut: Pin<Box<S::InsertBlockFuture>>,
+    },
     /// Yield one terminal error item and then end the stream.
     EmitError { err: TransportError },
     /// Stream terminated.
     Done,
 }
 
+impl<N, S> fmt::Debug for WatchCanonicalBlocksFromState<N, S>
+where
+    N: Network,
+    S: CanonicalBlockStore<N>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PollNext => f.write_str("PollNext"),
+            Self::Reconcile { next, pending } => {
+                f.debug_struct("Reconcile").field("next", next).field("pending", pending).finish()
+            }
+            Self::FetchingParent { next, pending, .. } => f
+                .debug_struct("FetchingParent")
+                .field("next", next)
+                .field("pending", pending)
+                .finish_non_exhaustive(),
+            Self::FetchingRemoved { next, pending, block_number, .. } => f
+                .debug_struct("FetchingRemoved")
+                .field("next", next)
+                .field("pending", pending)
+                .field("block_number", block_number)
+                .finish_non_exhaustive(),
+            Self::FetchingTipAfterRemoved { next, pending, removed, .. } => f
+                .debug_struct("FetchingTipAfterRemoved")
+                .field("next", next)
+                .field("pending", pending)
+                .field("removed", removed)
+                .finish_non_exhaustive(),
+            Self::EmitPending { pending, next } => {
+                f.debug_struct("EmitPending").field("pending", pending).field("next", next).finish()
+            }
+            Self::StoringAdded { pending, next, block, .. } => f
+                .debug_struct("StoringAdded")
+                .field("pending", pending)
+                .field("next", next)
+                .field("block", block)
+                .finish_non_exhaustive(),
+            Self::EmitError { err } => f.debug_struct("EmitError").field("err", err).finish(),
+            Self::Done => f.write_str("Done"),
+        }
+    }
+}
+
 /// A stream of canonical block events produced by [`WatchCanonicalBlocksFrom`].
 #[derive(Debug)]
 #[pin_project]
-pub struct WatchCanonicalBlocksFromStream<N: Network> {
+pub struct WatchCanonicalBlocksFromStream<N, S = InMemoryStore<<N as Network>::BlockResponse>>
+where
+    N: Network,
+    S: CanonicalBlockStore<N>,
+{
     watch_blocks_from: WatchBlocksFrom<N>,
     #[pin]
     stream: Buffered<WatchBlocksFromStream<N>>,
-    buffer: FixedBuf<N::BlockResponse>,
-    state: WatchCanonicalBlocksFromState<N>,
+    block_store: S,
+    canonical_tip: Option<N::BlockResponse>,
+    state: WatchCanonicalBlocksFromState<N, S>,
 }
 
-impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
+impl<N, S> Stream for WatchCanonicalBlocksFromStream<N, S>
+where
+    N: Network,
+    S: CanonicalBlockStore<N>,
+{
     type Item = TransportResult<CanonicalEvent<N::BlockResponse>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -159,7 +261,7 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
                 },
                 WatchCanonicalBlocksFromState::Reconcile { next, pending } => {
                     let front = pending.front().unwrap_or(&next);
-                    let Some(canonical_tip) = this.buffer.last() else {
+                    let Some(canonical_tip) = this.canonical_tip.as_ref() else {
                         *this.state = WatchCanonicalBlocksFromState::EmitPending {
                             pending,
                             next: Some(next),
@@ -182,21 +284,14 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
                     let height = front.header().number();
                     let canonical_height = canonical_tip.header().number();
                     if canonical_height + 1 == height {
-                        let removed = this
-                            .buffer
-                            .pop()
-                            .expect("position is always < canonical buffer length");
-                        if this.buffer.len() == 0 {
-                            *this.state = WatchCanonicalBlocksFromState::EmitError {
-                                err: TransportErrorKind::custom_str(
-                                    "Deep reorg detected; no canonical history retained.",
-                                ),
-                            };
-                        } else {
-                            *this.state =
-                                WatchCanonicalBlocksFromState::Reconcile { next, pending };
-                        }
-                        return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
+                        let fut = Box::pin(this.block_store.get_block(canonical_height));
+                        *this.state = WatchCanonicalBlocksFromState::FetchingRemoved {
+                            next,
+                            pending,
+                            block_number: canonical_height,
+                            fut,
+                        };
+                        continue;
                     }
 
                     let Some(parent_height) = height.checked_sub(1) else {
@@ -241,20 +336,124 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
                         }
                     }
                 }
+                WatchCanonicalBlocksFromState::FetchingRemoved {
+                    next,
+                    pending,
+                    block_number,
+                    mut fut,
+                } => match fut.as_mut().poll(cx) {
+                    Poll::Pending => {
+                        *this.state = WatchCanonicalBlocksFromState::FetchingRemoved {
+                            next,
+                            pending,
+                            block_number,
+                            fut,
+                        };
+                        return Poll::Pending;
+                    }
+                    Poll::Ready(Err(err)) => {
+                        *this.state = WatchCanonicalBlocksFromState::EmitError { err };
+                    }
+                    Poll::Ready(Ok(None)) => {
+                        *this.state = WatchCanonicalBlocksFromState::EmitError {
+                            err: TransportErrorKind::custom_str(
+                                "Canonical block history is missing an expected block.",
+                            ),
+                        };
+                    }
+                    Poll::Ready(Ok(Some(removed))) => {
+                        let Some(parent_number) = block_number.checked_sub(1) else {
+                            *this.canonical_tip = None;
+                            *this.state = WatchCanonicalBlocksFromState::EmitError {
+                                err: deep_reorg_block_error(),
+                            };
+                            return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
+                        };
+                        let fut = Box::pin(this.block_store.get_block(parent_number));
+                        *this.state = WatchCanonicalBlocksFromState::FetchingTipAfterRemoved {
+                            next,
+                            pending,
+                            removed,
+                            fut,
+                        };
+                    }
+                },
+                WatchCanonicalBlocksFromState::FetchingTipAfterRemoved {
+                    next,
+                    pending,
+                    removed,
+                    mut fut,
+                } => match fut.as_mut().poll(cx) {
+                    Poll::Pending => {
+                        *this.state = WatchCanonicalBlocksFromState::FetchingTipAfterRemoved {
+                            next,
+                            pending,
+                            removed,
+                            fut,
+                        };
+                        return Poll::Pending;
+                    }
+                    Poll::Ready(Err(err)) => {
+                        *this.state = WatchCanonicalBlocksFromState::EmitError { err };
+                    }
+                    Poll::Ready(Ok(previous_tip)) => {
+                        *this.canonical_tip = previous_tip;
+                        *this.state = if this.canonical_tip.is_some() {
+                            WatchCanonicalBlocksFromState::Reconcile { next, pending }
+                        } else {
+                            WatchCanonicalBlocksFromState::EmitError {
+                                err: deep_reorg_block_error(),
+                            }
+                        };
+                        return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
+                    }
+                },
                 WatchCanonicalBlocksFromState::EmitPending { mut pending, mut next } => {
                     if let Some(block) = pending.pop_front() {
-                        this.buffer.push(block.clone());
-                        *this.state = WatchCanonicalBlocksFromState::EmitPending { pending, next };
-                        return Poll::Ready(Some(Ok(CanonicalEvent::Added(block))));
+                        let fut = Box::pin(this.block_store.insert_block(block.clone()));
+                        *this.state = WatchCanonicalBlocksFromState::StoringAdded {
+                            pending,
+                            next,
+                            block,
+                            fut,
+                        };
+                        continue;
                     }
 
                     if let Some(next) = next.take() {
-                        this.buffer.push(next.clone());
-                        *this.state = WatchCanonicalBlocksFromState::PollNext;
-                        return Poll::Ready(Some(Ok(CanonicalEvent::Added(next))));
+                        let fut = Box::pin(this.block_store.insert_block(next.clone()));
+                        *this.state = WatchCanonicalBlocksFromState::StoringAdded {
+                            pending,
+                            next: None,
+                            block: next,
+                            fut,
+                        };
+                        continue;
                     }
 
                     *this.state = WatchCanonicalBlocksFromState::PollNext;
+                }
+                WatchCanonicalBlocksFromState::StoringAdded { pending, next, block, mut fut } => {
+                    match fut.as_mut().poll(cx) {
+                        Poll::Pending => {
+                            *this.state = WatchCanonicalBlocksFromState::StoringAdded {
+                                pending,
+                                next,
+                                block,
+                                fut,
+                            };
+                            return Poll::Pending;
+                        }
+                        Poll::Ready(Err(err)) => {
+                            *this.state = WatchCanonicalBlocksFromState::EmitError { err };
+                        }
+                        Poll::Ready(Ok(())) => {
+                            *this.canonical_tip = Some(block.clone());
+                            *this.state =
+                                WatchCanonicalBlocksFromState::EmitPending { pending, next };
+                            return Poll::Ready(Some(Ok(CanonicalEvent::Added(block))));
+                        }
+                    }
                 }
                 WatchCanonicalBlocksFromState::EmitError { err } => {
                     *this.state = WatchCanonicalBlocksFromState::Done;
@@ -267,6 +466,84 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
             }
         }
     }
+}
+
+/// A store of previously emitted canonical blocks used to produce removed events on reorgs.
+pub trait CanonicalBlockStore<N: Network>: std::fmt::Debug + Send + Sync + 'static {
+    /// Future returned by [`insert_block`](Self::insert_block).
+    #[cfg(not(target_family = "wasm"))]
+    type InsertBlockFuture: Future<Output = TransportResult<()>> + Send + 'static;
+
+    /// Future returned by [`insert_block`](Self::insert_block).
+    #[cfg(target_family = "wasm")]
+    type InsertBlockFuture: Future<Output = TransportResult<()>> + 'static;
+
+    /// Future returned by [`get_block`](Self::get_block).
+    #[cfg(not(target_family = "wasm"))]
+    type GetBlockFuture: Future<Output = TransportResult<Option<N::BlockResponse>>> + Send + 'static;
+
+    /// Future returned by [`get_block`](Self::get_block).
+    #[cfg(target_family = "wasm")]
+    type GetBlockFuture: Future<Output = TransportResult<Option<N::BlockResponse>>> + 'static;
+
+    /// Records a newly emitted canonical block.
+    fn insert_block(&mut self, block: N::BlockResponse) -> Self::InsertBlockFuture;
+
+    /// Fetches a previously emitted canonical block by block number.
+    fn get_block(&mut self, block_number: u64) -> Self::GetBlockFuture;
+}
+
+/// In-memory canonical history store used by default by canonical watchers.
+#[derive(Debug)]
+pub struct InMemoryStore<T> {
+    inner: FixedBuf<(u64, T)>,
+}
+
+impl<T> InMemoryStore<T> {
+    /// Creates an in-memory store retaining up to `max_reorg_depth` canonical items.
+    pub fn new(max_reorg_depth: usize) -> Self {
+        Self { inner: FixedBuf::new(max_reorg_depth) }
+    }
+}
+
+impl<T> InMemoryStore<T>
+where
+    T: Clone,
+{
+    fn insert(&mut self, block_number: u64, item: T) -> TransportResult<()> {
+        self.inner.push((block_number, item));
+        Ok(())
+    }
+
+    fn get(&self, block_number: u64) -> TransportResult<Option<T>> {
+        Ok(self
+            .inner
+            .iter()
+            .rev()
+            .find(|(stored_number, _)| *stored_number == block_number)
+            .map(|(_, item)| item.clone()))
+    }
+}
+
+impl<N> CanonicalBlockStore<N> for InMemoryStore<N::BlockResponse>
+where
+    N: Network,
+{
+    type InsertBlockFuture = std::future::Ready<TransportResult<()>>;
+    type GetBlockFuture = std::future::Ready<TransportResult<Option<N::BlockResponse>>>;
+
+    fn insert_block(&mut self, block: N::BlockResponse) -> Self::InsertBlockFuture {
+        let block_number = block.header().number();
+        std::future::ready(self.insert(block_number, block))
+    }
+
+    fn get_block(&mut self, block_number: u64) -> Self::GetBlockFuture {
+        std::future::ready(self.get(block_number))
+    }
+}
+
+fn deep_reorg_block_error() -> TransportError {
+    TransportErrorKind::custom_str("Deep reorg detected; no canonical history retained.")
 }
 
 #[derive(Debug)]
@@ -299,6 +576,10 @@ impl<T> FixedBuf<T> {
     pub(super) fn len(&self) -> usize {
         self.buf.len()
     }
+
+    pub(super) fn iter(&self) -> std::collections::vec_deque::Iter<'_, T> {
+        self.buf.iter()
+    }
 }
 
 #[cfg(test)]
@@ -309,7 +590,7 @@ mod tests {
     use alloy_primitives::{B256, U64};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types_eth::Block;
-    use alloy_transport::{TransportError, TransportFut};
+    use alloy_transport::{TransportError, TransportFut, TransportResult};
     use futures::StreamExt;
     use std::{
         collections::HashMap,
@@ -444,6 +725,31 @@ mod tests {
         block
     }
 
+    #[derive(Debug, Default)]
+    struct FullHistoryBlockStore {
+        blocks: HashMap<u64, Block>,
+    }
+
+    impl FullHistoryBlockStore {
+        fn new() -> Self {
+            Self::default()
+        }
+    }
+
+    impl CanonicalBlockStore<alloy_network::Ethereum> for FullHistoryBlockStore {
+        type InsertBlockFuture = std::future::Ready<TransportResult<()>>;
+        type GetBlockFuture = std::future::Ready<TransportResult<Option<Block>>>;
+
+        fn insert_block(&mut self, block: Block) -> Self::InsertBlockFuture {
+            self.blocks.insert(block.header.number, block);
+            std::future::ready(Ok(()))
+        }
+
+        fn get_block(&mut self, block_number: u64) -> Self::GetBlockFuture {
+            std::future::ready(Ok(self.blocks.get(&block_number).cloned()))
+        }
+    }
+
     #[tokio::test]
     async fn emits_removed_then_added_on_reorg_within_buffer() {
         let chain = MockChain::new();
@@ -501,6 +807,57 @@ mod tests {
                 assert_eq!(block.header.hash, B256::with_last_byte(44));
             }
             other => panic!("expected Added(4), got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn custom_block_store_can_recover_reorg_beyond_default_memory_depth() {
+        let chain = MockChain::new();
+        chain.extend(&[block(1, 1, 0), block(2, 2, 1), block(3, 3, 2), block(4, 4, 3)]);
+
+        let provider = chain.provider();
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .canonical()
+            .rpc_concurrency(1)
+            .block_store(FullHistoryBlockStore::new())
+            .into_stream();
+
+        for expected in [1_u64, 2, 3, 4] {
+            let item =
+                timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+            match item {
+                CanonicalEvent::Added(block) => assert_eq!(block.header.number, expected),
+                other => panic!("expected Added({expected}), got {other:?}"),
+            }
+        }
+
+        chain.reorg(&[block(2, 22, 1), block(3, 33, 22), block(4, 44, 33), block(5, 55, 44)]);
+
+        for expected in [(4, 4), (3, 3), (2, 2)] {
+            let item =
+                timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+            match item {
+                CanonicalEvent::Removed(block) => {
+                    assert_eq!(block.header.number, expected.0);
+                    assert_eq!(block.header.hash, B256::with_last_byte(expected.1));
+                }
+                other => panic!("expected Removed({}), got {other:?}", expected.0),
+            }
+        }
+
+        for expected in [(2, 22), (3, 33), (4, 44), (5, 55)] {
+            let item =
+                timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+            match item {
+                CanonicalEvent::Added(block) => {
+                    assert_eq!(block.header.number, expected.0);
+                    assert_eq!(block.header.hash, B256::with_last_byte(expected.1));
+                }
+                other => panic!("expected Added({}), got {other:?}", expected.0),
+            }
         }
     }
 

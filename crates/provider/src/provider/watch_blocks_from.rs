@@ -327,7 +327,7 @@ impl<N: Network> WatchBlocksFrom<N> {
 
     /// Converts this builder into a canonical-stream builder that emits
     /// [`crate::CanonicalEvent`] deltas on reorgs.
-    pub const fn canonical(self) -> WatchCanonicalBlocksFrom<N> {
+    pub fn canonical(self) -> WatchCanonicalBlocksFrom<N> {
         WatchCanonicalBlocksFrom::new(self)
     }
 
