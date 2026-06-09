@@ -124,6 +124,10 @@ impl<N: Network> WatchCanonicalBlocksFrom<N, InMemoryStore<N::BlockResponse>> {
     }
 }
 
+#[pin_project(
+    project = WatchCanonicalBlocksFromStateProj,
+    project_replace = WatchCanonicalBlocksFromStateProjOwn,
+)]
 enum WatchCanonicalBlocksFromState<N, S>
 where
     N: Network,
@@ -137,6 +141,7 @@ where
     FetchingParent {
         next: N::BlockResponse,
         pending: VecDeque<N::BlockResponse>,
+        #[pin]
         fut: super::BlockFut<N::BlockResponse>,
     },
     /// Polling an in-flight fetch for the rolled-back canonical block.
@@ -144,14 +149,16 @@ where
         next: N::BlockResponse,
         pending: VecDeque<N::BlockResponse>,
         block_number: u64,
-        fut: Pin<Box<S::GetBlockFuture>>,
+        #[pin]
+        fut: S::GetBlockFuture,
     },
     /// Polling an in-flight fetch for the new canonical tip after one rollback.
     FetchingTipAfterRemoved {
         next: N::BlockResponse,
         pending: VecDeque<N::BlockResponse>,
         removed: N::BlockResponse,
-        fut: Pin<Box<S::GetBlockFuture>>,
+        #[pin]
+        fut: S::GetBlockFuture,
     },
     /// Emitting `Added` events for `pending`, then `next`.
     EmitPending { pending: VecDeque<N::BlockResponse>, next: Option<N::BlockResponse> },
@@ -160,7 +167,8 @@ where
         pending: VecDeque<N::BlockResponse>,
         next: Option<N::BlockResponse>,
         block: N::BlockResponse,
-        fut: Pin<Box<S::InsertBlockFuture>>,
+        #[pin]
+        fut: S::InsertBlockFuture,
     },
     /// Yield one terminal error item and then end the stream.
     EmitError { err: TransportError },
@@ -224,6 +232,7 @@ where
     stream: Buffered<WatchBlocksFromStream<N>>,
     block_store: S,
     canonical_tip: Option<N::BlockResponse>,
+    #[pin]
     state: WatchCanonicalBlocksFromState<N, S>,
 }
 
@@ -238,43 +247,49 @@ where
         let mut this = self.project();
 
         loop {
-            let state = std::mem::replace(this.state, WatchCanonicalBlocksFromState::Done);
-            match state {
-                WatchCanonicalBlocksFromState::PollNext => match this.stream.as_mut().poll_next(cx)
-                {
-                    Poll::Pending => {
-                        *this.state = WatchCanonicalBlocksFromState::PollNext;
-                        return Poll::Pending;
+            match this.state.as_mut().project() {
+                WatchCanonicalBlocksFromStateProj::Done => return Poll::Ready(None),
+                WatchCanonicalBlocksFromStateProj::PollNext => {
+                    match this.stream.as_mut().poll_next(cx) {
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(None) => {
+                            this.state.set(WatchCanonicalBlocksFromState::Done);
+                        }
+                        Poll::Ready(Some(Ok(next))) => {
+                            this.state.set(WatchCanonicalBlocksFromState::Reconcile {
+                                next,
+                                pending: VecDeque::new(),
+                            });
+                        }
+                        Poll::Ready(Some(Err(err))) => {
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError { err });
+                        }
                     }
-                    Poll::Ready(None) => {
-                        *this.state = WatchCanonicalBlocksFromState::Done;
-                    }
-                    Poll::Ready(Some(Ok(next))) => {
-                        *this.state = WatchCanonicalBlocksFromState::Reconcile {
-                            next,
-                            pending: VecDeque::new(),
-                        };
-                    }
-                    Poll::Ready(Some(Err(err))) => {
-                        *this.state = WatchCanonicalBlocksFromState::EmitError { err };
-                    }
-                },
-                WatchCanonicalBlocksFromState::Reconcile { next, pending } => {
+                }
+                WatchCanonicalBlocksFromStateProj::Reconcile { .. } => {
+                    let WatchCanonicalBlocksFromStateProjOwn::Reconcile { next, pending } = this
+                        .state
+                        .as_mut()
+                        .project_replace(WatchCanonicalBlocksFromState::Done)
+                    else {
+                        unreachable!()
+                    };
+
                     let front = pending.front().unwrap_or(&next);
                     let Some(canonical_tip) = this.canonical_tip.as_ref() else {
-                        *this.state = WatchCanonicalBlocksFromState::EmitPending {
+                        this.state.set(WatchCanonicalBlocksFromState::EmitPending {
                             pending,
                             next: Some(next),
-                        };
+                        });
                         continue;
                     };
 
                     let parent_hash = front.header().parent_hash();
                     if parent_hash == canonical_tip.header().hash() {
-                        *this.state = WatchCanonicalBlocksFromState::EmitPending {
+                        this.state.set(WatchCanonicalBlocksFromState::EmitPending {
                             pending,
                             next: Some(next),
-                        };
+                        });
                         continue;
                     }
 
@@ -284,184 +299,195 @@ where
                     let height = front.header().number();
                     let canonical_height = canonical_tip.header().number();
                     if canonical_height + 1 == height {
-                        let fut = Box::pin(this.block_store.get_block(canonical_height));
-                        *this.state = WatchCanonicalBlocksFromState::FetchingRemoved {
+                        let fut = this.block_store.get_block(canonical_height);
+                        this.state.set(WatchCanonicalBlocksFromState::FetchingRemoved {
                             next,
                             pending,
                             block_number: canonical_height,
                             fut,
-                        };
+                        });
                         continue;
                     }
 
                     let Some(parent_height) = height.checked_sub(1) else {
-                        *this.state = WatchCanonicalBlocksFromState::EmitError {
+                        this.state.set(WatchCanonicalBlocksFromState::EmitError {
                             err: TransportErrorKind::custom_str(
                                 "Cannot backfill parent for genesis block during canonical reconciliation.",
                             ),
-                        };
+                        });
                         continue;
                     };
 
                     let watch_blocks_from = this.watch_blocks_from.clone();
                     let fut = watch_blocks_from.get_block(parent_height);
-                    *this.state =
-                        WatchCanonicalBlocksFromState::FetchingParent { next, pending, fut };
+                    this.state.set(WatchCanonicalBlocksFromState::FetchingParent {
+                        next,
+                        pending,
+                        fut,
+                    });
                 }
-                WatchCanonicalBlocksFromState::FetchingParent { next, mut pending, mut fut } => {
-                    match Pin::new(&mut fut).poll(cx) {
-                        Poll::Pending => {
-                            *this.state = WatchCanonicalBlocksFromState::FetchingParent {
-                                next,
-                                pending,
-                                fut,
-                            };
-                            return Poll::Pending;
-                        }
+                WatchCanonicalBlocksFromStateProj::FetchingParent { fut, .. } => {
+                    let parent = match fut.poll(cx) {
+                        Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(err)) => {
-                            *this.state = WatchCanonicalBlocksFromState::EmitError { err };
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError { err });
+                            continue;
                         }
-                        Poll::Ready(Ok(parent)) => {
-                            let front = pending.front().unwrap_or(&next);
-                            if parent.header().hash() != front.header().parent_hash() {
-                                // Parent no longer matches: a second reorg happened while
-                                // reconciling. Abandon this item and continue with next blocks.
-                                *this.state = WatchCanonicalBlocksFromState::PollNext;
-                                continue;
-                            }
-
-                            pending.push_front(parent);
-                            *this.state =
-                                WatchCanonicalBlocksFromState::Reconcile { next, pending };
-                        }
+                        Poll::Ready(Ok(parent)) => parent,
+                    };
+                    let WatchCanonicalBlocksFromStateProjOwn::FetchingParent {
+                        next,
+                        mut pending,
+                        ..
+                    } = this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
+                    else {
+                        unreachable!()
+                    };
+                    let front = pending.front().unwrap_or(&next);
+                    if parent.header().hash() != front.header().parent_hash() {
+                        // Parent no longer matches: a second reorg happened while
+                        // reconciling. Abandon this item and continue with next blocks.
+                        this.state.set(WatchCanonicalBlocksFromState::PollNext);
+                        continue;
                     }
+                    pending.push_front(parent);
+                    this.state.set(WatchCanonicalBlocksFromState::Reconcile { next, pending });
                 }
-                WatchCanonicalBlocksFromState::FetchingRemoved {
-                    next,
-                    pending,
-                    block_number,
-                    mut fut,
-                } => match fut.as_mut().poll(cx) {
-                    Poll::Pending => {
-                        *this.state = WatchCanonicalBlocksFromState::FetchingRemoved {
-                            next,
-                            pending,
-                            block_number,
-                            fut,
-                        };
-                        return Poll::Pending;
-                    }
-                    Poll::Ready(Err(err)) => {
-                        *this.state = WatchCanonicalBlocksFromState::EmitError { err };
-                    }
-                    Poll::Ready(Ok(None)) => {
-                        *this.state = WatchCanonicalBlocksFromState::EmitError {
-                            err: TransportErrorKind::custom_str(
-                                "Canonical block history is missing an expected block.",
-                            ),
-                        };
-                    }
-                    Poll::Ready(Ok(Some(removed))) => {
-                        let Some(parent_number) = block_number.checked_sub(1) else {
-                            *this.canonical_tip = None;
-                            *this.state = WatchCanonicalBlocksFromState::EmitError {
-                                err: deep_reorg_block_error(),
-                            };
-                            return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
-                        };
-                        let fut = Box::pin(this.block_store.get_block(parent_number));
-                        *this.state = WatchCanonicalBlocksFromState::FetchingTipAfterRemoved {
-                            next,
-                            pending,
-                            removed,
-                            fut,
-                        };
-                    }
-                },
-                WatchCanonicalBlocksFromState::FetchingTipAfterRemoved {
-                    next,
-                    pending,
-                    removed,
-                    mut fut,
-                } => match fut.as_mut().poll(cx) {
-                    Poll::Pending => {
-                        *this.state = WatchCanonicalBlocksFromState::FetchingTipAfterRemoved {
-                            next,
-                            pending,
-                            removed,
-                            fut,
-                        };
-                        return Poll::Pending;
-                    }
-                    Poll::Ready(Err(err)) => {
-                        *this.state = WatchCanonicalBlocksFromState::EmitError { err };
-                    }
-                    Poll::Ready(Ok(previous_tip)) => {
-                        *this.canonical_tip = previous_tip;
-                        *this.state = if this.canonical_tip.is_some() {
-                            WatchCanonicalBlocksFromState::Reconcile { next, pending }
-                        } else {
-                            WatchCanonicalBlocksFromState::EmitError {
-                                err: deep_reorg_block_error(),
-                            }
-                        };
+                WatchCanonicalBlocksFromStateProj::FetchingRemoved { fut, .. } => {
+                    let removed = match fut.poll(cx) {
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(Err(err)) => {
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError { err });
+                            continue;
+                        }
+                        Poll::Ready(Ok(None)) => {
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError {
+                                err: TransportErrorKind::custom_str(
+                                    "Canonical block history is missing an expected block.",
+                                ),
+                            });
+                            continue;
+                        }
+                        Poll::Ready(Ok(Some(removed))) => removed,
+                    };
+                    let WatchCanonicalBlocksFromStateProjOwn::FetchingRemoved {
+                        next,
+                        pending,
+                        block_number,
+                        ..
+                    } = this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
+                    else {
+                        unreachable!()
+                    };
+                    let Some(parent_number) = block_number.checked_sub(1) else {
+                        *this.canonical_tip = None;
+                        this.state.set(WatchCanonicalBlocksFromState::EmitError {
+                            err: deep_reorg_block_error(),
+                        });
                         return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
+                    };
+                    let fut = this.block_store.get_block(parent_number);
+                    this.state.set(WatchCanonicalBlocksFromState::FetchingTipAfterRemoved {
+                        next,
+                        pending,
+                        removed,
+                        fut,
+                    });
+                }
+                WatchCanonicalBlocksFromStateProj::FetchingTipAfterRemoved { fut, .. } => {
+                    let previous_tip = match fut.poll(cx) {
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(Err(err)) => {
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError { err });
+                            continue;
+                        }
+                        Poll::Ready(Ok(previous_tip)) => previous_tip,
+                    };
+                    let WatchCanonicalBlocksFromStateProjOwn::FetchingTipAfterRemoved {
+                        next,
+                        pending,
+                        removed,
+                        ..
+                    } = this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
+                    else {
+                        unreachable!()
+                    };
+                    *this.canonical_tip = previous_tip;
+                    if this.canonical_tip.is_some() {
+                        this.state
+                            .set(WatchCanonicalBlocksFromState::Reconcile { next, pending });
+                    } else {
+                        this.state.set(WatchCanonicalBlocksFromState::EmitError {
+                            err: deep_reorg_block_error(),
+                        });
                     }
-                },
-                WatchCanonicalBlocksFromState::EmitPending { mut pending, mut next } => {
+                    return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
+                }
+                WatchCanonicalBlocksFromStateProj::EmitPending { .. } => {
+                    let WatchCanonicalBlocksFromStateProjOwn::EmitPending {
+                        mut pending,
+                        mut next,
+                    } = this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
+                    else {
+                        unreachable!()
+                    };
+
                     if let Some(block) = pending.pop_front() {
-                        let fut = Box::pin(this.block_store.insert_block(block.clone()));
-                        *this.state = WatchCanonicalBlocksFromState::StoringAdded {
+                        let fut = this.block_store.insert_block(block.clone());
+                        this.state.set(WatchCanonicalBlocksFromState::StoringAdded {
                             pending,
                             next,
                             block,
                             fut,
-                        };
+                        });
                         continue;
                     }
 
-                    if let Some(next) = next.take() {
-                        let fut = Box::pin(this.block_store.insert_block(next.clone()));
-                        *this.state = WatchCanonicalBlocksFromState::StoringAdded {
+                    if let Some(block) = next.take() {
+                        let fut = this.block_store.insert_block(block.clone());
+                        this.state.set(WatchCanonicalBlocksFromState::StoringAdded {
                             pending,
                             next: None,
-                            block: next,
+                            block,
                             fut,
-                        };
+                        });
                         continue;
                     }
 
-                    *this.state = WatchCanonicalBlocksFromState::PollNext;
+                    this.state.set(WatchCanonicalBlocksFromState::PollNext);
                 }
-                WatchCanonicalBlocksFromState::StoringAdded { pending, next, block, mut fut } => {
-                    match fut.as_mut().poll(cx) {
-                        Poll::Pending => {
-                            *this.state = WatchCanonicalBlocksFromState::StoringAdded {
-                                pending,
-                                next,
-                                block,
-                                fut,
-                            };
-                            return Poll::Pending;
-                        }
+                WatchCanonicalBlocksFromStateProj::StoringAdded { fut, .. } => {
+                    match fut.poll(cx) {
+                        Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(err)) => {
-                            *this.state = WatchCanonicalBlocksFromState::EmitError { err };
+                            this.state.set(WatchCanonicalBlocksFromState::EmitError { err });
+                            continue;
                         }
-                        Poll::Ready(Ok(())) => {
-                            *this.canonical_tip = Some(block.clone());
-                            *this.state =
-                                WatchCanonicalBlocksFromState::EmitPending { pending, next };
-                            return Poll::Ready(Some(Ok(CanonicalEvent::Added(block))));
-                        }
+                        Poll::Ready(Ok(())) => {}
                     }
+                    let WatchCanonicalBlocksFromStateProjOwn::StoringAdded {
+                        pending,
+                        next,
+                        block,
+                        ..
+                    } = this.state.as_mut().project_replace(WatchCanonicalBlocksFromState::Done)
+                    else {
+                        unreachable!()
+                    };
+                    *this.canonical_tip = Some(block.clone());
+                    this.state
+                        .set(WatchCanonicalBlocksFromState::EmitPending { pending, next });
+                    return Poll::Ready(Some(Ok(CanonicalEvent::Added(block))));
                 }
-                WatchCanonicalBlocksFromState::EmitError { err } => {
-                    *this.state = WatchCanonicalBlocksFromState::Done;
+                WatchCanonicalBlocksFromStateProj::EmitError { .. } => {
+                    let WatchCanonicalBlocksFromStateProjOwn::EmitError { err } = this
+                        .state
+                        .as_mut()
+                        .project_replace(WatchCanonicalBlocksFromState::Done)
+                    else {
+                        unreachable!()
+                    };
                     return Poll::Ready(Some(Err(err)));
-                }
-                WatchCanonicalBlocksFromState::Done => {
-                    *this.state = WatchCanonicalBlocksFromState::Done;
-                    return Poll::Ready(None);
                 }
             }
         }
