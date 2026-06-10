@@ -25,7 +25,7 @@ const MAX_REORG_DEPTH_DEFAULT: usize = 64;
 /// followed by [`CanonicalEvent::Added`] for the new canonical chain segment.
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
-pub struct WatchCanonicalBlocksFrom<N, S = InMemoryStore<<N as Network>::BlockResponse>>
+pub struct WatchCanonicalBlocksFrom<N, S = InMemoryCanonicalStore<<N as Network>::BlockResponse>>
 where
     N: Network,
     S: CanonicalStore<N::BlockResponse>,
@@ -49,7 +49,7 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
         Self {
             watch_blocks_from,
             rpc_concurrency: RPC_CONCURRENCY_DEFAULT,
-            block_store: InMemoryStore::<N::BlockResponse>::new(MAX_REORG_DEPTH_DEFAULT),
+            block_store: InMemoryCanonicalStore::<N::BlockResponse>::new(MAX_REORG_DEPTH_DEFAULT),
         }
     }
 }
@@ -116,10 +116,10 @@ where
     }
 }
 
-impl<N: Network> WatchCanonicalBlocksFrom<N, InMemoryStore<N::BlockResponse>> {
+impl<N: Network> WatchCanonicalBlocksFrom<N, InMemoryCanonicalStore<N::BlockResponse>> {
     /// Sets the maximum number of canonical blocks retained by the default in-memory store.
     pub fn max_reorg_depth(mut self, max_reorg_depth: usize) -> Self {
-        self.block_store = InMemoryStore::<N::BlockResponse>::new(max_reorg_depth);
+        self.block_store = InMemoryCanonicalStore::<N::BlockResponse>::new(max_reorg_depth);
         self
     }
 }
@@ -222,8 +222,10 @@ where
 /// A stream of canonical block events produced by [`WatchCanonicalBlocksFrom`].
 #[derive(Debug)]
 #[pin_project]
-pub struct WatchCanonicalBlocksFromStream<N, S = InMemoryStore<<N as Network>::BlockResponse>>
-where
+pub struct WatchCanonicalBlocksFromStream<
+    N,
+    S = InMemoryCanonicalStore<<N as Network>::BlockResponse>,
+> where
     N: Network,
     S: CanonicalStore<N::BlockResponse>,
 {
@@ -548,11 +550,11 @@ pub trait CanonicalStore<T>: std::fmt::Debug + Send + Sync + 'static {
 ///
 /// Stores the most recent `max_reorg_depth` items as a strictly sequential, contiguous chain.
 #[derive(Debug)]
-pub struct InMemoryStore<T> {
+pub struct InMemoryCanonicalStore<T> {
     inner: FixedBuf<T>,
 }
 
-impl<T> InMemoryStore<T>
+impl<T> InMemoryCanonicalStore<T>
 where
     T: BlockResponse,
     T::Header: BlockHeader,
@@ -563,9 +565,9 @@ where
     }
 }
 
-/// Error returned by [`InMemoryStore`] operations.
+/// Error returned by [`InMemoryCanonicalStore`] operations.
 #[derive(Debug, thiserror::Error)]
-pub enum InMemoryStoreError {
+pub enum InMemoryCanonicalStoreError {
     /// Pushed item's height leaves a gap relative to the most recent retained item.
     #[error("pushed item #{got} is out of order; expected sequential extension at #{expected}")]
     OutOfOrder {
@@ -576,12 +578,12 @@ pub enum InMemoryStoreError {
     },
 }
 
-impl<T> CanonicalStore<T> for InMemoryStore<T>
+impl<T> CanonicalStore<T> for InMemoryCanonicalStore<T>
 where
     T: BlockResponse + Clone + std::fmt::Debug + Send + Sync + 'static,
     T::Header: BlockHeader,
 {
-    type Error = InMemoryStoreError;
+    type Error = InMemoryCanonicalStoreError;
     type PushFuture = std::future::Ready<Result<(), Self::Error>>;
     type GetFuture = std::future::Ready<Result<Option<T>, Self::Error>>;
     type PopFuture = std::future::Ready<Result<Option<T>, Self::Error>>;
@@ -591,7 +593,7 @@ where
         if let Some(last) = self.inner.last() {
             let expected = last.header().number() + 1;
             if expected != block_number {
-                return std::future::ready(Err(InMemoryStoreError::OutOfOrder {
+                return std::future::ready(Err(InMemoryCanonicalStoreError::OutOfOrder {
                     expected,
                     got: block_number,
                 }));
@@ -835,7 +837,7 @@ mod tests {
 
     #[tokio::test]
     async fn in_memory_store_supports_block_logs() {
-        let mut store = InMemoryStore::<BlockLogs<alloy_network::Ethereum>>::new(2);
+        let mut store = InMemoryCanonicalStore::<BlockLogs<alloy_network::Ethereum>>::new(2);
         let block_logs = BlockLogs { block: block(1, 1, 0), logs: Vec::new() };
 
         store.push(block_logs.clone()).await.unwrap();

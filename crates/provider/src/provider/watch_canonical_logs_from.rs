@@ -1,5 +1,5 @@
 use super::{
-    BlockLogs, BlockLogsFut, CanonicalEvent, CanonicalStore, InMemoryStore, WatchLogsFrom,
+    BlockLogs, BlockLogsFut, CanonicalEvent, CanonicalStore, InMemoryCanonicalStore, WatchLogsFrom,
     WatchLogsFromStream,
 };
 use crate::transport::TransportErrorKind;
@@ -45,7 +45,7 @@ const MAX_REORG_DEPTH_DEFAULT: usize = 64;
 /// transport-level retry behavior.
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
-pub struct WatchCanonicalLogsFrom<N, S = InMemoryStore<BlockLogs<N>>>
+pub struct WatchCanonicalLogsFrom<N, S = InMemoryCanonicalStore<BlockLogs<N>>>
 where
     N: Network,
     S: CanonicalStore<BlockLogs<N>>,
@@ -60,7 +60,7 @@ impl<N: Network> WatchCanonicalLogsFrom<N> {
         Self {
             watch_logs_from,
             rpc_concurrency: RPC_CONCURRENCY_DEFAULT,
-            block_store: InMemoryStore::<BlockLogs<N>>::new(MAX_REORG_DEPTH_DEFAULT),
+            block_store: InMemoryCanonicalStore::<BlockLogs<N>>::new(MAX_REORG_DEPTH_DEFAULT),
         }
     }
 }
@@ -137,11 +137,11 @@ where
     }
 }
 
-impl<N: Network> WatchCanonicalLogsFrom<N, InMemoryStore<BlockLogs<N>>> {
+impl<N: Network> WatchCanonicalLogsFrom<N, InMemoryCanonicalStore<BlockLogs<N>>> {
     /// Sets the maximum number of canonical blocks and their logs retained by the default
     /// in-memory store.
     pub fn max_reorg_depth(mut self, max_reorg_depth: usize) -> Self {
-        self.block_store = InMemoryStore::<BlockLogs<N>>::new(max_reorg_depth);
+        self.block_store = InMemoryCanonicalStore::<BlockLogs<N>>::new(max_reorg_depth);
         self
     }
 }
@@ -248,7 +248,7 @@ where
 /// does not need to query logs for rolled-back blocks after a reorg.
 #[derive(Debug)]
 #[pin_project]
-pub struct WatchCanonicalLogsFromStream<N, S = InMemoryStore<BlockLogs<N>>>
+pub struct WatchCanonicalLogsFromStream<N, S = InMemoryCanonicalStore<BlockLogs<N>>>
 where
     N: Network,
     S: CanonicalStore<BlockLogs<N>>,
@@ -544,7 +544,7 @@ mod tests {
     };
     use crate::{CanonicalStore, Provider};
     use alloy_eips::BlockNumberOrTag;
-    use alloy_network::{BlockResponse as _, Ethereum};
+    use alloy_network::Ethereum;
     use alloy_rpc_types_eth::Filter;
     use futures::StreamExt;
     use std::{collections::HashMap, time::Duration};
@@ -577,7 +577,8 @@ mod tests {
         }
 
         fn pop(&mut self) -> Self::PopFuture {
-            let item = self.block_logs.keys().max().copied().and_then(|n| self.block_logs.remove(&n));
+            let item =
+                self.block_logs.keys().max().copied().and_then(|n| self.block_logs.remove(&n));
             std::future::ready(Ok(item))
         }
     }
