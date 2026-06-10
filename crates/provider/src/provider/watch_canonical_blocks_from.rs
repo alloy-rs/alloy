@@ -28,7 +28,7 @@ const MAX_REORG_DEPTH_DEFAULT: usize = 64;
 pub struct WatchCanonicalBlocksFrom<N, S = InMemoryStore<<N as Network>::BlockResponse>>
 where
     N: Network,
-    S: CanonicalBlockStore<N>,
+    S: CanonicalStore<N::BlockResponse>,
 {
     watch_blocks_from: WatchBlocksFrom<N>,
     rpc_concurrency: usize,
@@ -49,7 +49,7 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
         Self {
             watch_blocks_from,
             rpc_concurrency: RPC_CONCURRENCY_DEFAULT,
-            block_store: InMemoryStore::new(MAX_REORG_DEPTH_DEFAULT),
+            block_store: InMemoryStore::<N::BlockResponse>::new(MAX_REORG_DEPTH_DEFAULT),
         }
     }
 }
@@ -57,7 +57,7 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
 impl<N, S> WatchCanonicalBlocksFrom<N, S>
 where
     N: Network,
-    S: CanonicalBlockStore<N>,
+    S: CanonicalStore<N::BlockResponse>,
 {
     /// Streams canonical blocks with full transaction bodies.
     pub fn full(mut self) -> Self {
@@ -92,7 +92,7 @@ where
     /// Sets the store used to fetch previously emitted canonical blocks during reorg handling.
     pub fn block_store<S2>(self, block_store: S2) -> WatchCanonicalBlocksFrom<N, S2>
     where
-        S2: CanonicalBlockStore<N>,
+        S2: CanonicalStore<N::BlockResponse>,
     {
         WatchCanonicalBlocksFrom {
             watch_blocks_from: self.watch_blocks_from,
@@ -119,7 +119,7 @@ where
 impl<N: Network> WatchCanonicalBlocksFrom<N, InMemoryStore<N::BlockResponse>> {
     /// Sets the maximum number of canonical blocks retained by the default in-memory store.
     pub fn max_reorg_depth(mut self, max_reorg_depth: usize) -> Self {
-        self.block_store = InMemoryStore::new(max_reorg_depth);
+        self.block_store = InMemoryStore::<N::BlockResponse>::new(max_reorg_depth);
         self
     }
 }
@@ -131,7 +131,7 @@ impl<N: Network> WatchCanonicalBlocksFrom<N, InMemoryStore<N::BlockResponse>> {
 enum WatchCanonicalBlocksFromState<N, S>
 where
     N: Network,
-    S: CanonicalBlockStore<N>,
+    S: CanonicalStore<N::BlockResponse>,
 {
     /// Polling the next block from `watch_blocks_from(...).buffered(...)`.
     PollNext,
@@ -150,7 +150,7 @@ where
         pending: VecDeque<N::BlockResponse>,
         block_number: u64,
         #[pin]
-        fut: S::GetBlockFuture,
+        fut: S::PopFuture,
     },
     /// Polling an in-flight fetch for the new canonical tip after one rollback.
     FetchingTipAfterRemoved {
@@ -158,7 +158,7 @@ where
         pending: VecDeque<N::BlockResponse>,
         removed: N::BlockResponse,
         #[pin]
-        fut: S::GetBlockFuture,
+        fut: S::GetFuture,
     },
     /// Emitting `Added` events for `pending`, then `next`.
     EmitPending { pending: VecDeque<N::BlockResponse>, next: Option<N::BlockResponse> },
@@ -168,7 +168,7 @@ where
         next: Option<N::BlockResponse>,
         block: N::BlockResponse,
         #[pin]
-        fut: S::InsertBlockFuture,
+        fut: S::PushFuture,
     },
     /// Yield one terminal error item and then end the stream.
     EmitError { err: TransportError },
@@ -179,7 +179,7 @@ where
 impl<N, S> fmt::Debug for WatchCanonicalBlocksFromState<N, S>
 where
     N: Network,
-    S: CanonicalBlockStore<N>,
+    S: CanonicalStore<N::BlockResponse>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -225,7 +225,7 @@ where
 pub struct WatchCanonicalBlocksFromStream<N, S = InMemoryStore<<N as Network>::BlockResponse>>
 where
     N: Network,
-    S: CanonicalBlockStore<N>,
+    S: CanonicalStore<N::BlockResponse>,
 {
     watch_blocks_from: WatchBlocksFrom<N>,
     #[pin]
@@ -239,7 +239,7 @@ where
 impl<N, S> Stream for WatchCanonicalBlocksFromStream<N, S>
 where
     N: Network,
-    S: CanonicalBlockStore<N>,
+    S: CanonicalStore<N::BlockResponse>,
 {
     type Item = TransportResult<CanonicalEvent<N::BlockResponse>>;
 
@@ -297,7 +297,7 @@ where
                     let height = front.header().number();
                     let canonical_height = canonical_tip.header().number();
                     if canonical_height + 1 == height {
-                        let fut = this.block_store.get_block(canonical_height);
+                        let fut = this.block_store.pop(canonical_height);
                         this.state.set(WatchCanonicalBlocksFromState::FetchingRemoved {
                             next,
                             pending,
@@ -386,7 +386,7 @@ where
                         });
                         return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
                     };
-                    let fut = this.block_store.get_block(parent_number);
+                    let fut = this.block_store.get(parent_number);
                     this.state.set(WatchCanonicalBlocksFromState::FetchingTipAfterRemoved {
                         next,
                         pending,
@@ -432,7 +432,7 @@ where
                     };
 
                     if let Some(block) = pending.pop_front() {
-                        let fut = this.block_store.insert_block(block.clone());
+                        let fut = this.block_store.push(block.clone());
                         this.state.set(WatchCanonicalBlocksFromState::StoringAdded {
                             pending,
                             next,
@@ -443,7 +443,7 @@ where
                     }
 
                     if let Some(block) = next.take() {
-                        let fut = this.block_store.insert_block(block.clone());
+                        let fut = this.block_store.push(block.clone());
                         this.state.set(WatchCanonicalBlocksFromState::StoringAdded {
                             pending,
                             next: None,
@@ -492,99 +492,82 @@ where
     }
 }
 
-/// A store of previously emitted canonical blocks used to produce removed events on reorgs.
-pub trait CanonicalBlockStore<N: Network>: std::fmt::Debug + Send + Sync + 'static {
-    /// Error returned by [`insert_block`](Self::insert_block).
+/// A store of previously emitted canonical items used to produce removed events on reorgs.
+pub trait CanonicalStore<T>: std::fmt::Debug + Send + Sync + 'static {
+    /// Error returned by store operations.
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    /// Future returned by [`push`](Self::push).
     #[cfg(not(target_family = "wasm"))]
-    type InsertError: std::error::Error + Send + Sync + 'static;
+    type PushFuture: Future<Output = Result<(), Self::Error>> + Send + 'static;
 
-    /// Error returned by [`insert_block`](Self::insert_block).
+    /// Future returned by [`push`](Self::push).
     #[cfg(target_family = "wasm")]
-    type InsertError: std::error::Error + 'static;
+    type PushFuture: Future<Output = Result<(), Self::Error>> + 'static;
 
-    /// Error returned by [`get_block`](Self::get_block).
+    /// Future returned by [`get`](Self::get).
     #[cfg(not(target_family = "wasm"))]
-    type GetError: std::error::Error + Send + Sync + 'static;
+    type GetFuture: Future<Output = Result<Option<T>, Self::Error>> + Send + 'static;
 
-    /// Error returned by [`get_block`](Self::get_block).
+    /// Future returned by [`get`](Self::get).
     #[cfg(target_family = "wasm")]
-    type GetError: std::error::Error + 'static;
+    type GetFuture: Future<Output = Result<Option<T>, Self::Error>> + 'static;
 
-    /// Future returned by [`insert_block`](Self::insert_block).
+    /// Future returned by [`pop`](Self::pop).
     #[cfg(not(target_family = "wasm"))]
-    type InsertBlockFuture: Future<Output = Result<(), Self::InsertError>> + Send + 'static;
+    type PopFuture: Future<Output = Result<Option<T>, Self::Error>> + Send + 'static;
 
-    /// Future returned by [`insert_block`](Self::insert_block).
+    /// Future returned by [`pop`](Self::pop).
     #[cfg(target_family = "wasm")]
-    type InsertBlockFuture: Future<Output = Result<(), Self::InsertError>> + 'static;
+    type PopFuture: Future<Output = Result<Option<T>, Self::Error>> + 'static;
 
-    /// Future returned by [`get_block`](Self::get_block).
-    #[cfg(not(target_family = "wasm"))]
-    type GetBlockFuture: Future<Output = Result<Option<N::BlockResponse>, Self::GetError>>
-        + Send
-        + 'static;
+    /// Records a newly emitted canonical item.
+    ///
+    /// Only consecutive items are pushed. If this returns an error, the canonical stream yields
+    /// that error and then terminates before emitting the corresponding [`CanonicalEvent::Added`].
+    fn push(&mut self, item: T) -> Self::PushFuture;
 
-    /// Future returned by [`get_block`](Self::get_block).
-    #[cfg(target_family = "wasm")]
-    type GetBlockFuture: Future<Output = Result<Option<N::BlockResponse>, Self::GetError>> + 'static;
+    /// Fetches a previously emitted canonical item by block number.
+    ///
+    /// The stream calls this after a rollback to find the new retained tip. If this returns an
+    /// error, the stream yields that error and then terminates. Returning `Ok(None)` means the
+    /// retained history is missing the requested ancestor; the stream treats that as a deep reorg
+    /// and terminates after emitting any already-popped removed item.
+    fn get(&mut self, block_number: u64) -> Self::GetFuture;
 
-    /// Records a newly emitted canonical block.
-    fn insert_block(&mut self, block: N::BlockResponse) -> Self::InsertBlockFuture;
-
-    /// Fetches a previously emitted canonical block by block number.
-    fn get_block(&mut self, block_number: u64) -> Self::GetBlockFuture;
+    /// Removes and returns a previously emitted canonical item by block number.
+    ///
+    /// The stream calls this before emitting [`CanonicalEvent::Removed`]. If this returns an error,
+    /// the stream yields that error and then terminates before emitting the removed event.
+    /// Returning `Ok(None)` means the removed block is no longer available; the stream reports
+    /// missing canonical history and terminates.
+    fn pop(&mut self, block_number: u64) -> Self::PopFuture;
 }
 
 /// In-memory canonical history store used by default by canonical watchers.
 ///
-/// Stores the most recent `max_reorg_depth` blocks as a strictly sequential, contiguous chain.
-/// On insert, any retained block at a height `>=` the new block's height is dropped so the
-/// buffer continues to represent a single canonical chain after a reorg.
+/// Stores the most recent `max_reorg_depth` items as a strictly sequential, contiguous chain.
 #[derive(Debug)]
 pub struct InMemoryStore<T> {
     inner: FixedBuf<T>,
 }
 
-impl<T> InMemoryStore<T> {
+impl<T> InMemoryStore<T>
+where
+    T: BlockResponse,
+    T::Header: BlockHeader,
+{
     /// Creates an in-memory store retaining up to `max_reorg_depth` canonical items.
-    pub(crate) fn new(max_reorg_depth: usize) -> Self {
+    pub fn new(max_reorg_depth: usize) -> Self {
         Self { inner: FixedBuf::new(max_reorg_depth) }
     }
 }
 
-impl<T> InMemoryStore<T>
-where
-    T: BlockResponse + Clone,
-    T::Header: BlockHeader,
-{
-    fn insert(&mut self, block: T) -> Result<(), InMemoryStoreInsertError> {
-        let block_number = block.header().number();
-        while self.inner.last().is_some_and(|last| last.header().number() >= block_number) {
-            self.inner.pop();
-        }
-        if let Some(last) = self.inner.last() {
-            let expected = last.header().number() + 1;
-            if expected != block_number {
-                return Err(InMemoryStoreInsertError::OutOfOrder { expected, got: block_number });
-            }
-        }
-        self.inner.push(block);
-        Ok(())
-    }
-
-    fn get(&self, block_number: u64) -> Option<T> {
-        let last_number = self.inner.last()?.header().number();
-        let offset = usize::try_from(last_number.checked_sub(block_number)?).ok()?;
-        let index = self.inner.len().checked_sub(1)?.checked_sub(offset)?;
-        self.inner.get(index).cloned()
-    }
-}
-
-/// Error returned by [`InMemoryStore::insert_block`].
+/// Error returned by [`InMemoryStore`] operations.
 #[derive(Debug, thiserror::Error)]
-pub enum InMemoryStoreInsertError {
-    /// Inserted block's height leaves a gap relative to the most recent retained block.
-    #[error("inserted block #{got} is out of order; expected sequential extension at #{expected}")]
+pub enum InMemoryStoreError {
+    /// Pushed item's height leaves a gap relative to the most recent retained item.
+    #[error("pushed item #{got} is out of order; expected sequential extension at #{expected}")]
     OutOfOrder {
         /// The block height that was expected next.
         expected: u64,
@@ -593,21 +576,49 @@ pub enum InMemoryStoreInsertError {
     },
 }
 
-impl<N> CanonicalBlockStore<N> for InMemoryStore<N::BlockResponse>
+impl<T> CanonicalStore<T> for InMemoryStore<T>
 where
-    N: Network,
+    T: BlockResponse + Clone + std::fmt::Debug + Send + Sync + 'static,
+    T::Header: BlockHeader,
 {
-    type InsertError = InMemoryStoreInsertError;
-    type GetError = std::convert::Infallible;
-    type InsertBlockFuture = std::future::Ready<Result<(), Self::InsertError>>;
-    type GetBlockFuture = std::future::Ready<Result<Option<N::BlockResponse>, Self::GetError>>;
+    type Error = InMemoryStoreError;
+    type PushFuture = std::future::Ready<Result<(), Self::Error>>;
+    type GetFuture = std::future::Ready<Result<Option<T>, Self::Error>>;
+    type PopFuture = std::future::Ready<Result<Option<T>, Self::Error>>;
 
-    fn insert_block(&mut self, block: N::BlockResponse) -> Self::InsertBlockFuture {
-        std::future::ready(self.insert(block))
+    fn push(&mut self, item: T) -> Self::PushFuture {
+        let block_number = item.header().number();
+        if let Some(last) = self.inner.last() {
+            let expected = last.header().number() + 1;
+            if expected != block_number {
+                return std::future::ready(Err(InMemoryStoreError::OutOfOrder {
+                    expected,
+                    got: block_number,
+                }));
+            }
+        }
+        self.inner.push(item);
+        std::future::ready(Ok(()))
     }
 
-    fn get_block(&mut self, block_number: u64) -> Self::GetBlockFuture {
-        std::future::ready(Ok(self.get(block_number)))
+    fn get(&mut self, block_number: u64) -> Self::GetFuture {
+        let item = self.inner.last().and_then(|last| {
+            let offset = usize::try_from(last.header().number().checked_sub(block_number)?).ok()?;
+            let index = self.inner.len().checked_sub(1)?.checked_sub(offset)?;
+            self.inner.get(index).and_then(|stored| {
+                (stored.header().number() == block_number).then(|| stored.clone())
+            })
+        });
+        std::future::ready(Ok(item))
+    }
+
+    fn pop(&mut self, block_number: u64) -> Self::PopFuture {
+        let item = if self.inner.last().is_some_and(|last| last.header().number() == block_number) {
+            self.inner.pop()
+        } else {
+            None
+        };
+        std::future::ready(Ok(item))
     }
 }
 
@@ -654,7 +665,7 @@ impl<T> FixedBuf<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Provider, ProviderBuilder};
+    use crate::{BlockLogs, Provider, ProviderBuilder};
     use alloy_eips::BlockNumberOrTag;
     use alloy_primitives::{B256, U64};
     use alloy_rpc_client::RpcClient;
@@ -805,20 +816,41 @@ mod tests {
         }
     }
 
-    impl CanonicalBlockStore<alloy_network::Ethereum> for FullHistoryBlockStore {
-        type InsertError = std::convert::Infallible;
-        type GetError = std::convert::Infallible;
-        type InsertBlockFuture = std::future::Ready<Result<(), Self::InsertError>>;
-        type GetBlockFuture = std::future::Ready<Result<Option<Block>, Self::GetError>>;
+    impl CanonicalStore<Block> for FullHistoryBlockStore {
+        type Error = std::convert::Infallible;
+        type PushFuture = std::future::Ready<Result<(), Self::Error>>;
+        type GetFuture = std::future::Ready<Result<Option<Block>, Self::Error>>;
+        type PopFuture = std::future::Ready<Result<Option<Block>, Self::Error>>;
 
-        fn insert_block(&mut self, block: Block) -> Self::InsertBlockFuture {
-            self.blocks.insert(block.header.number, block);
+        fn push(&mut self, block: Block) -> Self::PushFuture {
+            let block_number = block.header().number();
+            self.blocks.insert(block_number, block);
             std::future::ready(Ok(()))
         }
 
-        fn get_block(&mut self, block_number: u64) -> Self::GetBlockFuture {
+        fn get(&mut self, block_number: u64) -> Self::GetFuture {
             std::future::ready(Ok(self.blocks.get(&block_number).cloned()))
         }
+
+        fn pop(&mut self, block_number: u64) -> Self::PopFuture {
+            std::future::ready(Ok(self.blocks.remove(&block_number)))
+        }
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_supports_block_logs() {
+        let mut store = InMemoryStore::<BlockLogs<alloy_network::Ethereum>>::new(2);
+        let block_logs = BlockLogs { block: block(1, 1, 0), logs: Vec::new() };
+
+        store.push(block_logs.clone()).await.unwrap();
+
+        let stored = store.get(1).await.unwrap().unwrap();
+        assert_eq!(stored.block.header.number, 1);
+        assert_eq!(stored.block.header.hash, B256::with_last_byte(1));
+
+        let removed = store.pop(1).await.unwrap().unwrap();
+        assert_eq!(removed.block.header.number, 1);
+        assert!(store.get(1).await.unwrap().is_none());
     }
 
     #[tokio::test]
