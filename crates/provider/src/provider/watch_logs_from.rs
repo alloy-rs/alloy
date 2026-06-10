@@ -36,13 +36,6 @@ pub struct BlockLogs<N: Network> {
     pub logs: Vec<Log>,
 }
 
-impl<N: Network> BlockLogs<N> {
-    /// Returns the header for the block these logs belong to.
-    pub fn header(&self) -> &N::HeaderResponse {
-        self.block.header()
-    }
-}
-
 impl<N: Network> BlockResponse for BlockLogs<N> {
     type Header = N::HeaderResponse;
     type Transaction = N::TransactionResponse;
@@ -152,7 +145,7 @@ impl<N: Network> WatchLogsFrom<N> {
 
     /// Converts this builder into a canonical-stream builder that emits
     /// [`CanonicalEvent`](crate::CanonicalEvent) deltas on reorgs.
-    pub const fn canonical(self) -> WatchCanonicalLogsFrom<N> {
+    pub fn canonical(self) -> WatchCanonicalLogsFrom<N> {
         WatchCanonicalLogsFrom::new(self)
     }
 

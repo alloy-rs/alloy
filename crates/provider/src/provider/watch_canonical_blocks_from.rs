@@ -231,7 +231,7 @@ where
     #[pin]
     stream: Buffered<WatchBlocksFromStream<N>>,
     block_store: S,
-    canonical_tip: Option<N::BlockResponse>,
+    canonical_tip: Option<N::HeaderResponse>,
     #[pin]
     state: WatchCanonicalBlocksFromState<N, S>,
 }
@@ -283,7 +283,7 @@ where
                     };
 
                     let parent_hash = front.header().parent_hash();
-                    if parent_hash == canonical_tip.header().hash() {
+                    if parent_hash == canonical_tip.hash() {
                         this.state.set(WatchCanonicalBlocksFromState::EmitPending {
                             pending,
                             next: Some(next),
@@ -295,9 +295,9 @@ where
                     // Because WatchBlocksFrom emits strictly sequential heights, we can
                     // remove the tip when heights are adjacent.
                     let height = front.header().number();
-                    let canonical_height = canonical_tip.header().number();
+                    let canonical_height = canonical_tip.number();
                     if canonical_height + 1 == height {
-                        let fut = this.block_store.pop(canonical_height);
+                        let fut = this.block_store.pop();
                         this.state.set(WatchCanonicalBlocksFromState::FetchingRemoved {
                             next,
                             pending,
@@ -414,7 +414,7 @@ where
                     else {
                         unreachable!()
                     };
-                    *this.canonical_tip = previous_tip;
+                    *this.canonical_tip = previous_tip.as_ref().map(|block| block.header().clone());
                     if this.canonical_tip.is_some() {
                         this.state.set(WatchCanonicalBlocksFromState::Reconcile { next, pending });
                     } else {
@@ -475,7 +475,7 @@ where
                     else {
                         unreachable!()
                     };
-                    *this.canonical_tip = Some(block.clone());
+                    *this.canonical_tip = Some(block.header().clone());
                     this.state.set(WatchCanonicalBlocksFromState::EmitPending { pending, next });
                     return Poll::Ready(Some(Ok(CanonicalEvent::Added(block))));
                 }
@@ -535,13 +535,13 @@ pub trait CanonicalStore<T>: std::fmt::Debug + Send + Sync + 'static {
     /// and terminates after emitting any already-popped removed item.
     fn get(&mut self, block_number: u64) -> Self::GetFuture;
 
-    /// Removes and returns a previously emitted canonical item by block number.
+    /// Removes and returns the most recently pushed canonical item.
     ///
-    /// The stream calls this before emitting [`CanonicalEvent::Removed`]. If this returns an error,
-    /// the stream yields that error and then terminates before emitting the removed event.
-    /// Returning `Ok(None)` means the removed block is no longer available; the stream reports
-    /// missing canonical history and terminates.
-    fn pop(&mut self, block_number: u64) -> Self::PopFuture;
+    /// The stream calls this before emitting [`CanonicalEvent::Removed`] to roll back the current
+    /// canonical tip. If this returns an error, the stream yields that error and then terminates
+    /// before emitting the removed event. Returning `Ok(None)` means the removed block is no longer
+    /// available; the stream reports missing canonical history and terminates.
+    fn pop(&mut self) -> Self::PopFuture;
 }
 
 /// In-memory canonical history store used by default by canonical watchers.
@@ -612,13 +612,8 @@ where
         std::future::ready(Ok(item))
     }
 
-    fn pop(&mut self, block_number: u64) -> Self::PopFuture {
-        let item = if self.inner.last().is_some_and(|last| last.header().number() == block_number) {
-            self.inner.pop()
-        } else {
-            None
-        };
-        std::future::ready(Ok(item))
+    fn pop(&mut self) -> Self::PopFuture {
+        std::future::ready(Ok(self.inner.pop()))
     }
 }
 
@@ -832,8 +827,9 @@ mod tests {
             std::future::ready(Ok(self.blocks.get(&block_number).cloned()))
         }
 
-        fn pop(&mut self, block_number: u64) -> Self::PopFuture {
-            std::future::ready(Ok(self.blocks.remove(&block_number)))
+        fn pop(&mut self) -> Self::PopFuture {
+            let item = self.blocks.keys().max().copied().and_then(|n| self.blocks.remove(&n));
+            std::future::ready(Ok(item))
         }
     }
 
@@ -848,7 +844,7 @@ mod tests {
         assert_eq!(stored.block.header.number, 1);
         assert_eq!(stored.block.header.hash, B256::with_last_byte(1));
 
-        let removed = store.pop(1).await.unwrap().unwrap();
+        let removed = store.pop().await.unwrap().unwrap();
         assert_eq!(removed.block.header.number, 1);
         assert!(store.get(1).await.unwrap().is_none());
     }
