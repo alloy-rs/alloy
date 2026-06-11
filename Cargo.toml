@@ -124,7 +124,7 @@ hyper-tls = "0.6.0"
 http-body-util = "0.1"
 tokio = "1"
 tokio-util = "0.7"
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", default-features = false }
 tokio-test = "0.4"
 tokio-tungstenite = "0.28"
 tower = { version = "0.5", features = ["util"] }
