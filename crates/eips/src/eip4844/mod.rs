@@ -504,11 +504,11 @@ pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u12
         };
         output = next_output;
 
-        // Equivalent to: accum = (accum * numerator) / (denominator * i)
+        // accum = (accum * numerator) / (denominator * i)
         let Some(next_accum) = numerator_accum.checked_mul(numerator) else {
             return u128::MAX;
         };
-        numerator_accum = next_accum / denominator / i;
+        numerator_accum = next_accum / (denominator * i);
 
         i += U512::from(1);
     }
