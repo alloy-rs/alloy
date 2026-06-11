@@ -4,6 +4,7 @@ use crate::{
     eip4844::{self, DATA_GAS_PER_BLOB},
     eip7594, eip7691, eip7892,
 };
+use alloy_primitives::U512;
 
 /// BLOB_BASE_COST represents the minimum execution gas required to include a blob in a block,
 /// as defined by [EIP-7918 (Decoupling Blob Gas from Execution Gas)](https://eips.ethereum.org/EIPS/eip-7918).
@@ -139,8 +140,6 @@ impl BlobParams {
         if next_excess_blob_gas < target_blob_gas {
             return 0;
         }
-
-        use alloy_primitives::ruint::aliases::U512;
 
         if U512::from(self.blob_base_cost) * U512::from(base_fee_per_gas)
             > U512::from(DATA_GAS_PER_BLOB) * U512::from(self.calc_blob_fee(excess_blob_gas))

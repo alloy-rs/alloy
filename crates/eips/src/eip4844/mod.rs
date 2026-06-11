@@ -26,7 +26,7 @@ mod sidecar;
 #[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
 
-use alloy_primitives::{b256, Bytes, FixedBytes, B256, U256};
+use alloy_primitives::{b256, Bytes, FixedBytes, B256, U256, U512};
 
 use crate::eip7840;
 
@@ -490,8 +490,6 @@ pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert!(denominator != 0, "attempt to divide by zero");
 
-    use alloy_primitives::ruint::aliases::U512;
-
     let mut i = U512::from(1);
     let denominator = U512::from(denominator);
     let numerator = U512::from(numerator);
@@ -562,6 +560,15 @@ mod tests {
         ] {
             let actual = calc_excess_blob_gas(excess, blobs * DATA_GAS_PER_BLOB);
             assert_eq!(actual, expected, "test: {t:?}");
+
+            // the inlined implementation must stay consistent with the osaka variant it
+            // previously delegated to
+            let osaka = eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
+                excess,
+                blobs * DATA_GAS_PER_BLOB,
+                0,
+            );
+            assert_eq!(actual, osaka, "osaka consistency: {t:?}");
         }
     }
 
@@ -639,6 +646,16 @@ mod tests {
     fn fake_exp_saturates_when_result_overflows_u128() {
         assert_eq!(fake_exponential(100, 88, 1), u128::MAX);
         assert_eq!(fake_exponential(1, u64::MAX as u128, 5007716), u128::MAX);
+    }
+
+    #[test]
+    fn fake_exp_no_spurious_saturation_for_large_factor() {
+        // `factor * denominator` exceeds u128 here, but the result is exactly `factor` since
+        // e^0 == 1; the widened intermediate math must not saturate
+        assert_eq!(
+            fake_exponential(u128::MAX - 1, 0, BLOB_GASPRICE_UPDATE_FRACTION),
+            u128::MAX - 1
+        );
     }
 
     #[test]
