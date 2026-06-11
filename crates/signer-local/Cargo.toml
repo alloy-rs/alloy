@@ -85,7 +85,8 @@ yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
 secp256k1 = [
 	"dep:secp256k1",
 	"alloy-consensus/secp256k1",
-	"yubihsm?/secp256k1"
+	"yubihsm?/secp256k1",
+	"alloy-primitives/secp256k1"
 ]
 
 eip712 = ["alloy-signer/eip712"]

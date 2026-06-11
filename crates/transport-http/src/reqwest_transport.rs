@@ -61,6 +61,10 @@ impl Http<Client> {
         }
 
         if !status.is_success() {
+            if let Some(response) = crate::json_rpc_error_response(&body) {
+                return Ok(response);
+            }
+
             return Err(TransportErrorKind::http_error(
                 status.as_u16(),
                 String::from_utf8_lossy(&body).into_owned(),

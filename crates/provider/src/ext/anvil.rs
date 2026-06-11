@@ -98,6 +98,15 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// process by calling `anvil_loadState`
     async fn anvil_dump_state(&self) -> TransportResult<Bytes>;
 
+    /// Like [`anvil_dump_state`](Self::anvil_dump_state) but also includes historical states of
+    /// accounts and storage at particular block hashes, allowing a reloaded node to serve RPC
+    /// calls for blocks prior to the one at which state was dumped.
+    ///
+    /// Equivalent to running anvil with `--preserve-historical-states` at startup.
+    ///
+    /// The returned buffer can be passed to [`anvil_load_state`](Self::anvil_load_state).
+    async fn anvil_dump_state_with_history(&self) -> TransportResult<Bytes>;
+
     /// Append chain state buffer to current chain. Will overwrite any conflicting addresses or
     /// storage.
     async fn anvil_load_state(&self, buf: Bytes) -> TransportResult<bool>;
@@ -307,6 +316,10 @@ where
 
     async fn anvil_dump_state(&self) -> TransportResult<Bytes> {
         self.client().request_noparams("anvil_dumpState").await
+    }
+
+    async fn anvil_dump_state_with_history(&self) -> TransportResult<Bytes> {
+        self.client().request("anvil_dumpState", (true,)).await
     }
 
     async fn anvil_load_state(&self, buf: Bytes) -> TransportResult<bool> {
@@ -890,6 +903,19 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil();
 
         let state = provider.anvil_dump_state().await.unwrap();
+
+        assert!(!state.is_empty());
+
+        let res = provider.anvil_load_state(state).await.unwrap();
+
+        assert!(res);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_dump_state_with_history() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let state = provider.anvil_dump_state_with_history().await.unwrap();
 
         assert!(!state.is_empty());
 

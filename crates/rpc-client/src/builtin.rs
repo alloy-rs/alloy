@@ -246,12 +246,17 @@ impl BuiltInConnectionString {
     /// the path does not exist.
     #[cfg(feature = "ipc")]
     pub fn try_as_ipc(s: &str) -> Result<Self, TransportError> {
+        let original = s;
         let s = s.strip_prefix("file://").or_else(|| s.strip_prefix("ipc://")).unwrap_or(s);
 
         // Check if it exists.
         let path = std::path::Path::new(s);
         let _meta = path.metadata().map_err(|e| {
-            let msg = format!("failed to read IPC path {}: {e}", path.display());
+            let msg = if original == s {
+                format!("failed to read IPC path '{}': {e}", path.display())
+            } else {
+                format!("failed to read IPC path '{}' from '{original}': {e}", path.display())
+            };
             TransportErrorKind::custom_str(&msg)
         })?;
 
@@ -400,6 +405,18 @@ mod test {
                 "ws://alice:pass@127.0.0.1:8545".parse::<Url>().unwrap(),
                 Some(Authorization::basic("alice", "pass"))
             )
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "ipc")]
+    #[cfg_attr(windows, ignore = "TODO: windows IPC")]
+    fn empty_ipc_path_error_includes_path() {
+        let err = BuiltInConnectionString::try_as_ipc("ipc://").unwrap_err().to_string();
+
+        assert!(
+            err.contains("failed to read IPC path '' from 'ipc://'"),
+            "unexpected IPC path error: {err}"
         );
     }
 
