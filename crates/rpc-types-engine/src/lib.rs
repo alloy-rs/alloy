@@ -15,6 +15,8 @@ pub use cancun::*;
 mod prague;
 pub use prague::*;
 mod sidecar;
+#[cfg(feature = "ssz")]
+pub mod ssz_engine_types;
 pub use sidecar::*;
 
 mod forkchoice;

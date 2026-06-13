@@ -40,6 +40,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 # ssz
 ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
+ssz_types = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
@@ -70,7 +71,7 @@ serde = [
 ]
 jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jwt-aws-lc-rs = ["jwt", "jsonwebtoken/aws_lc_rs"]
-ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
+ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "dep:ssz_types", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg", "alloy-eips/kzg"]
 arbitrary = ["dep:arbitrary", "std", "alloy-primitives/arbitrary", "alloy-serde/arbitrary", "alloy-consensus/arbitrary", "alloy-eips/arbitrary"]
 
