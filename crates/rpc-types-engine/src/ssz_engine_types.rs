@@ -1,7 +1,8 @@
 //! Experimental Engine API v2 REST-SSZ wire types.
 //!
 //! These types intentionally live apart from the legacy JSON-RPC Engine API types because their
-//! SSZ encodings are not wire-compatible. In particular, the draft
+//! SSZ encodings are not always wire-compatible. This module contains both shared endpoint types
+//! and fork-specific payload containers. In particular, the draft
 //! [`refactor.md`](https://github.com/ethereum/execution-apis/blob/refs/pull/793/head/src/engine/refactor.md)
 //! specifies a top-level list for V1-V3 blob requests while
 //! [`refactor-ssz.md`](https://github.com/ethereum/execution-apis/blob/refs/pull/793/head/src/engine/refactor-ssz.md)
@@ -9,16 +10,23 @@
 //! [execution-apis PR #793](https://github.com/ethereum/execution-apis/pull/793).
 
 use crate::{
-    BlobAndProofV1, BlobAndProofV2, BlobCellsAndProofsV1, ForkchoiceUpdated as LegacyForkchoice,
-    PayloadId, PayloadStatus as LegacyPayloadStatus, PayloadStatusEnum,
+    BlobAndProofV1, BlobAndProofV2, BlobCellsAndProofsV1, BlobsBundleV1, BlobsBundleV2,
+    ExecutionPayloadEnvelopeV4 as LegacyBuiltPayloadPrague, ExecutionPayloadV1, ExecutionPayloadV2,
+    ExecutionPayloadV3, ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated as LegacyForkchoice,
+    PayloadAttributes as LegacyPayloadAttributes, PayloadId, PayloadStatus as LegacyPayloadStatus,
+    PayloadStatusEnum,
 };
 use alloc::{
     boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
-use alloy_eips::eip4844::{Blob, Bytes48};
-use alloy_primitives::{B128, B256};
+use alloy_eips::{
+    eip4844::{Blob, Bytes48},
+    eip4895::Withdrawal,
+    eip7685::Requests,
+};
+use alloy_primitives::{Address, B128, B256, U256};
 #[cfg(feature = "ssz")]
 use ssz_types::{
     typenum::{U1, U1024, U128},
@@ -735,5 +743,787 @@ mod tests {
         assert!(Optional::<B256>::from_ssz_bytes(&[0; 64]).is_err());
         let variable_values = [8, 0, 0, 0, 8, 0, 0, 0];
         assert!(Optional::<ErrorBytes>::from_ssz_bytes(&variable_values).is_err());
+    }
+}
+
+// Fork-specific payload containers.
+
+/// Paris execution payload.
+pub type ExecutionPayloadParis = ExecutionPayloadV1;
+/// Shanghai execution payload.
+pub type ExecutionPayloadShanghai = ExecutionPayloadV2;
+/// Cancun execution payload.
+pub type ExecutionPayloadCancun = ExecutionPayloadV3;
+/// Prague execution payload.
+pub type ExecutionPayloadPrague = ExecutionPayloadV3;
+/// Osaka execution payload.
+pub type ExecutionPayloadOsaka = ExecutionPayloadV3;
+/// Amsterdam execution payload.
+pub type ExecutionPayloadAmsterdam = ExecutionPayloadV4;
+
+/// Paris payload attributes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct PayloadAttributesParis {
+    /// Payload timestamp.
+    pub timestamp: u64,
+    /// Previous RANDAO value.
+    pub prev_randao: B256,
+    /// Suggested fee recipient.
+    pub suggested_fee_recipient: Address,
+}
+
+/// Shanghai payload attributes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct PayloadAttributesShanghai {
+    /// Payload timestamp.
+    pub timestamp: u64,
+    /// Previous RANDAO value.
+    pub prev_randao: B256,
+    /// Suggested fee recipient.
+    pub suggested_fee_recipient: Address,
+    /// Withdrawals to include in the payload.
+    pub withdrawals: Vec<Withdrawal>,
+}
+
+/// Cancun payload attributes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct PayloadAttributesCancun {
+    /// Payload timestamp.
+    pub timestamp: u64,
+    /// Previous RANDAO value.
+    pub prev_randao: B256,
+    /// Suggested fee recipient.
+    pub suggested_fee_recipient: Address,
+    /// Withdrawals to include in the payload.
+    pub withdrawals: Vec<Withdrawal>,
+    /// Root of the parent beacon block.
+    pub parent_beacon_block_root: B256,
+}
+
+/// Prague uses the Cancun payload-attributes schema.
+pub type PayloadAttributesPrague = PayloadAttributesCancun;
+/// Osaka uses the Cancun payload-attributes schema.
+pub type PayloadAttributesOsaka = PayloadAttributesCancun;
+
+/// Amsterdam payload attributes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct PayloadAttributesAmsterdam {
+    /// Payload timestamp.
+    pub timestamp: u64,
+    /// Previous RANDAO value.
+    pub prev_randao: B256,
+    /// Suggested fee recipient.
+    pub suggested_fee_recipient: Address,
+    /// Withdrawals to include in the payload.
+    pub withdrawals: Vec<Withdrawal>,
+    /// Root of the parent beacon block.
+    pub parent_beacon_block_root: B256,
+    /// Consensus-layer slot number.
+    pub slot_number: u64,
+    /// Target gas limit.
+    pub target_gas_limit: u64,
+}
+
+/// Error converting legacy cross-fork payload attributes into a fork-specific SSZ container.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PayloadAttributesConversionError {
+    /// A field required by the selected fork is absent.
+    MissingField(&'static str),
+    /// A field from a later fork is populated and would be lost.
+    UnexpectedField(&'static str),
+}
+
+impl core::fmt::Display for PayloadAttributesConversionError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::MissingField(field) => {
+                write!(f, "missing required payload attributes field: {field}")
+            }
+            Self::UnexpectedField(field) => {
+                write!(f, "unexpected later-fork payload attributes field: {field}")
+            }
+        }
+    }
+}
+
+impl core::error::Error for PayloadAttributesConversionError {}
+
+const fn ensure_absent<T>(
+    value: &Option<T>,
+    field: &'static str,
+) -> Result<(), PayloadAttributesConversionError> {
+    if value.is_some() {
+        Err(PayloadAttributesConversionError::UnexpectedField(field))
+    } else {
+        Ok(())
+    }
+}
+
+fn require<T>(
+    value: Option<T>,
+    field: &'static str,
+) -> Result<T, PayloadAttributesConversionError> {
+    value.ok_or(PayloadAttributesConversionError::MissingField(field))
+}
+
+impl From<PayloadAttributesParis> for LegacyPayloadAttributes {
+    fn from(value: PayloadAttributesParis) -> Self {
+        Self {
+            timestamp: value.timestamp,
+            prev_randao: value.prev_randao,
+            suggested_fee_recipient: value.suggested_fee_recipient,
+            withdrawals: None,
+            parent_beacon_block_root: None,
+            slot_number: None,
+            target_gas_limit: None,
+        }
+    }
+}
+
+impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesParis {
+    type Error = PayloadAttributesConversionError;
+
+    fn try_from(value: LegacyPayloadAttributes) -> Result<Self, Self::Error> {
+        ensure_absent(&value.withdrawals, "withdrawals")?;
+        ensure_absent(&value.parent_beacon_block_root, "parent_beacon_block_root")?;
+        ensure_absent(&value.slot_number, "slot_number")?;
+        ensure_absent(&value.target_gas_limit, "target_gas_limit")?;
+        Ok(Self {
+            timestamp: value.timestamp,
+            prev_randao: value.prev_randao,
+            suggested_fee_recipient: value.suggested_fee_recipient,
+        })
+    }
+}
+
+impl From<PayloadAttributesShanghai> for LegacyPayloadAttributes {
+    fn from(value: PayloadAttributesShanghai) -> Self {
+        Self {
+            timestamp: value.timestamp,
+            prev_randao: value.prev_randao,
+            suggested_fee_recipient: value.suggested_fee_recipient,
+            withdrawals: Some(value.withdrawals),
+            parent_beacon_block_root: None,
+            slot_number: None,
+            target_gas_limit: None,
+        }
+    }
+}
+
+impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesShanghai {
+    type Error = PayloadAttributesConversionError;
+
+    fn try_from(value: LegacyPayloadAttributes) -> Result<Self, Self::Error> {
+        ensure_absent(&value.parent_beacon_block_root, "parent_beacon_block_root")?;
+        ensure_absent(&value.slot_number, "slot_number")?;
+        ensure_absent(&value.target_gas_limit, "target_gas_limit")?;
+        Ok(Self {
+            timestamp: value.timestamp,
+            prev_randao: value.prev_randao,
+            suggested_fee_recipient: value.suggested_fee_recipient,
+            withdrawals: require(value.withdrawals, "withdrawals")?,
+        })
+    }
+}
+
+impl From<PayloadAttributesCancun> for LegacyPayloadAttributes {
+    fn from(value: PayloadAttributesCancun) -> Self {
+        Self {
+            timestamp: value.timestamp,
+            prev_randao: value.prev_randao,
+            suggested_fee_recipient: value.suggested_fee_recipient,
+            withdrawals: Some(value.withdrawals),
+            parent_beacon_block_root: Some(value.parent_beacon_block_root),
+            slot_number: None,
+            target_gas_limit: None,
+        }
+    }
+}
+
+impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesCancun {
+    type Error = PayloadAttributesConversionError;
+
+    fn try_from(value: LegacyPayloadAttributes) -> Result<Self, Self::Error> {
+        ensure_absent(&value.slot_number, "slot_number")?;
+        ensure_absent(&value.target_gas_limit, "target_gas_limit")?;
+        Ok(Self {
+            timestamp: value.timestamp,
+            prev_randao: value.prev_randao,
+            suggested_fee_recipient: value.suggested_fee_recipient,
+            withdrawals: require(value.withdrawals, "withdrawals")?,
+            parent_beacon_block_root: require(
+                value.parent_beacon_block_root,
+                "parent_beacon_block_root",
+            )?,
+        })
+    }
+}
+
+impl From<PayloadAttributesAmsterdam> for LegacyPayloadAttributes {
+    fn from(value: PayloadAttributesAmsterdam) -> Self {
+        Self {
+            timestamp: value.timestamp,
+            prev_randao: value.prev_randao,
+            suggested_fee_recipient: value.suggested_fee_recipient,
+            withdrawals: Some(value.withdrawals),
+            parent_beacon_block_root: Some(value.parent_beacon_block_root),
+            slot_number: Some(value.slot_number),
+            target_gas_limit: Some(value.target_gas_limit),
+        }
+    }
+}
+
+impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesAmsterdam {
+    type Error = PayloadAttributesConversionError;
+
+    fn try_from(value: LegacyPayloadAttributes) -> Result<Self, Self::Error> {
+        Ok(Self {
+            timestamp: value.timestamp,
+            prev_randao: value.prev_randao,
+            suggested_fee_recipient: value.suggested_fee_recipient,
+            withdrawals: require(value.withdrawals, "withdrawals")?,
+            parent_beacon_block_root: require(
+                value.parent_beacon_block_root,
+                "parent_beacon_block_root",
+            )?,
+            slot_number: require(value.slot_number, "slot_number")?,
+            target_gas_limit: require(value.target_gas_limit, "target_gas_limit")?,
+        })
+    }
+}
+
+/// This structure maps to the Engine API v2 REST-SSZ payload-build response for Paris.
+///
+/// Unlike the legacy `engine_getPayloadV1` response, this includes the expected block value.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct BuiltPayloadParis {
+    /// Execution payload V1.
+    pub payload: ExecutionPayloadParis,
+    /// The expected value to be received by the fee recipient in wei.
+    pub block_value: U256,
+}
+
+/// This structure maps to the Engine API v2 REST-SSZ payload-build response for Shanghai.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct BuiltPayloadShanghai {
+    /// Execution payload V2.
+    pub payload: ExecutionPayloadShanghai,
+    /// The expected value to be received by the fee recipient in wei.
+    pub block_value: U256,
+    /// A suggestion from the execution layer whether this payload should be used instead of an
+    /// externally provided one.
+    pub should_override_builder: bool,
+}
+
+/// Engine API v2 REST-SSZ payload-build response for Cancun.
+///
+/// This is wire-compatible with the legacy [`crate::ExecutionPayloadEnvelopeV3`].
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
+pub type BuiltPayloadCancun = crate::ExecutionPayloadEnvelopeV3;
+
+/// This structure maps to the Engine API v2 REST-SSZ payload-build response for Prague.
+///
+/// Unlike the legacy [`crate::ExecutionPayloadEnvelopeV4`], `execution_requests` precedes
+/// `should_override_builder` in the normative SSZ field order.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct BuiltPayloadPrague {
+    /// Execution payload V3.
+    pub payload: ExecutionPayloadPrague,
+    /// The expected value to be received by the fee recipient in wei.
+    pub block_value: U256,
+    /// The blobs, commitments, and proofs associated with the executed payload.
+    pub blobs_bundle: BlobsBundleV1,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+    /// A suggestion from the execution layer whether this payload should be used instead of an
+    /// externally provided one.
+    pub should_override_builder: bool,
+}
+
+/// This structure maps to the Engine API v2 REST-SSZ payload-build response for Osaka.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct BuiltPayloadOsaka {
+    /// Execution payload V3.
+    pub payload: ExecutionPayloadOsaka,
+    /// The expected value to be received by the fee recipient in wei.
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 cell proofs associated with the executed payload.
+    pub blobs_bundle: BlobsBundleV2,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+    /// A suggestion from the execution layer whether this payload should be used instead of an
+    /// externally provided one.
+    pub should_override_builder: bool,
+}
+
+/// This structure maps to the Engine API v2 REST-SSZ payload-build response for Amsterdam.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct BuiltPayloadAmsterdam {
+    /// Execution payload V4.
+    pub payload: ExecutionPayloadAmsterdam,
+    /// The expected value to be received by the fee recipient in wei.
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 cell proofs associated with the executed payload.
+    pub blobs_bundle: BlobsBundleV2,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+    /// A suggestion from the execution layer whether this payload should be used instead of an
+    /// externally provided one.
+    pub should_override_builder: bool,
+}
+
+impl From<LegacyBuiltPayloadPrague> for BuiltPayloadPrague {
+    fn from(value: LegacyBuiltPayloadPrague) -> Self {
+        Self {
+            payload: value.envelope_inner.execution_payload,
+            block_value: value.envelope_inner.block_value,
+            blobs_bundle: value.envelope_inner.blobs_bundle,
+            execution_requests: value.execution_requests,
+            should_override_builder: value.envelope_inner.should_override_builder,
+        }
+    }
+}
+
+/// Paris payload-submission request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadEnvelopeParis {
+    /// Submitted execution payload.
+    pub payload: ExecutionPayloadParis,
+}
+
+/// Shanghai payload-submission request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadEnvelopeShanghai {
+    /// Submitted execution payload.
+    pub payload: ExecutionPayloadShanghai,
+}
+
+/// Cancun payload-submission request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadEnvelopeCancun {
+    /// Submitted execution payload.
+    pub payload: ExecutionPayloadCancun,
+    /// Root of the parent beacon block.
+    pub parent_beacon_block_root: B256,
+}
+
+/// Prague payload-submission request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadEnvelopePrague {
+    /// Submitted execution payload.
+    pub payload: ExecutionPayloadPrague,
+    /// Root of the parent beacon block.
+    pub parent_beacon_block_root: B256,
+    /// EIP-7685 execution requests.
+    pub execution_requests: Requests,
+}
+
+/// Osaka payload-submission request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadEnvelopeOsaka {
+    /// Submitted execution payload.
+    pub payload: ExecutionPayloadOsaka,
+    /// Root of the parent beacon block.
+    pub parent_beacon_block_root: B256,
+    /// EIP-7685 execution requests.
+    pub execution_requests: Requests,
+}
+
+/// This structure maps to the Engine API v2 REST-SSZ payload-submission request for Amsterdam.
+///
+/// This is distinct from the legacy [`crate::ExecutionPayloadEnvelopeV6`], which is the
+/// `engine_getPayloadV6` response.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#executionpayloadenvelope-per-fork>
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadEnvelopeAmsterdam {
+    /// Submitted execution payload.
+    pub payload: ExecutionPayloadAmsterdam,
+    /// Root of the parent beacon block.
+    pub parent_beacon_block_root: B256,
+    /// EIP-7685 execution requests.
+    pub execution_requests: Requests,
+}
+
+impl From<ExecutionPayloadParis> for ExecutionPayloadEnvelopeParis {
+    fn from(payload: ExecutionPayloadParis) -> Self {
+        Self { payload }
+    }
+}
+
+impl From<ExecutionPayloadShanghai> for ExecutionPayloadEnvelopeShanghai {
+    fn from(payload: ExecutionPayloadShanghai) -> Self {
+        Self { payload }
+    }
+}
+
+impl From<(ExecutionPayloadCancun, B256)> for ExecutionPayloadEnvelopeCancun {
+    fn from((payload, parent_beacon_block_root): (ExecutionPayloadCancun, B256)) -> Self {
+        Self { payload, parent_beacon_block_root }
+    }
+}
+
+impl From<(ExecutionPayloadPrague, B256, Requests)> for ExecutionPayloadEnvelopePrague {
+    fn from(
+        (payload, parent_beacon_block_root, execution_requests): (
+            ExecutionPayloadPrague,
+            B256,
+            Requests,
+        ),
+    ) -> Self {
+        Self { payload, parent_beacon_block_root, execution_requests }
+    }
+}
+
+impl From<(ExecutionPayloadOsaka, B256, Requests)> for ExecutionPayloadEnvelopeOsaka {
+    fn from(
+        (payload, parent_beacon_block_root, execution_requests): (
+            ExecutionPayloadOsaka,
+            B256,
+            Requests,
+        ),
+    ) -> Self {
+        Self { payload, parent_beacon_block_root, execution_requests }
+    }
+}
+
+impl From<(ExecutionPayloadAmsterdam, B256, Requests)> for ExecutionPayloadEnvelopeAmsterdam {
+    fn from(
+        (payload, parent_beacon_block_root, execution_requests): (
+            ExecutionPayloadAmsterdam,
+            B256,
+            Requests,
+        ),
+    ) -> Self {
+        Self { payload, parent_beacon_block_root, execution_requests }
+    }
+}
+
+/// Paris forkchoice-update request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ForkchoiceUpdateParis {
+    /// Current forkchoice state.
+    pub forkchoice_state: ForkchoiceState,
+    /// Optional Paris payload attributes.
+    pub payload_attributes: Optional<PayloadAttributesParis>,
+}
+
+/// Shanghai forkchoice-update request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ForkchoiceUpdateShanghai {
+    /// Current forkchoice state.
+    pub forkchoice_state: ForkchoiceState,
+    /// Optional Shanghai payload attributes.
+    pub payload_attributes: Optional<PayloadAttributesShanghai>,
+}
+
+/// Cancun forkchoice-update request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ForkchoiceUpdateCancun {
+    /// Current forkchoice state.
+    pub forkchoice_state: ForkchoiceState,
+    /// Optional Cancun payload attributes.
+    pub payload_attributes: Optional<PayloadAttributesCancun>,
+}
+
+/// Prague forkchoice-update request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ForkchoiceUpdatePrague {
+    /// Current forkchoice state.
+    pub forkchoice_state: ForkchoiceState,
+    /// Optional Prague payload attributes.
+    pub payload_attributes: Optional<PayloadAttributesPrague>,
+}
+
+/// Osaka forkchoice-update request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ForkchoiceUpdateOsaka {
+    /// Current forkchoice state.
+    pub forkchoice_state: ForkchoiceState,
+    /// Optional Osaka payload attributes.
+    pub payload_attributes: Optional<PayloadAttributesOsaka>,
+}
+
+/// Amsterdam forkchoice-update request.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ForkchoiceUpdateAmsterdam {
+    /// Current forkchoice state.
+    pub forkchoice_state: ForkchoiceState,
+    /// Optional Amsterdam payload attributes.
+    pub payload_attributes: Optional<PayloadAttributesAmsterdam>,
+    /// Optional `Bitvector[128]` custody-column selection.
+    pub custody_columns: Optional<B128>,
+}
+
+#[cfg(test)]
+mod payload_tests {
+    use super::*;
+    use alloy_primitives::{Address, Bloom, Bytes};
+    use ssz::{Decode, Encode};
+
+    fn payload_v1() -> ExecutionPayloadV1 {
+        ExecutionPayloadV1 {
+            parent_hash: B256::repeat_byte(1),
+            fee_recipient: Address::repeat_byte(2),
+            state_root: B256::repeat_byte(3),
+            receipts_root: B256::repeat_byte(4),
+            logs_bloom: Bloom::repeat_byte(5),
+            prev_randao: B256::repeat_byte(6),
+            block_number: 7,
+            gas_limit: 8,
+            gas_used: 9,
+            timestamp: 10,
+            extra_data: Bytes::from_static(&[11, 12]),
+            base_fee_per_gas: U256::from(13),
+            block_hash: B256::repeat_byte(14),
+            transactions: vec![Bytes::from_static(&[15, 16])],
+        }
+    }
+
+    fn payload_v2() -> ExecutionPayloadV2 {
+        ExecutionPayloadV2 { payload_inner: payload_v1(), withdrawals: vec![Withdrawal::default()] }
+    }
+
+    fn payload_v3() -> ExecutionPayloadV3 {
+        ExecutionPayloadV3 { payload_inner: payload_v2(), blob_gas_used: 17, excess_blob_gas: 18 }
+    }
+
+    fn payload_v4() -> ExecutionPayloadV4 {
+        ExecutionPayloadV4 {
+            payload_inner: payload_v3(),
+            block_access_list: Bytes::from_static(&[19, 20]),
+            slot_number: 21,
+        }
+    }
+
+    fn attributes_cancun() -> PayloadAttributesCancun {
+        PayloadAttributesCancun {
+            timestamp: 1,
+            prev_randao: B256::repeat_byte(2),
+            suggested_fee_recipient: Address::repeat_byte(3),
+            withdrawals: vec![Withdrawal::default()],
+            parent_beacon_block_root: B256::repeat_byte(4),
+        }
+    }
+
+    fn state() -> ForkchoiceState {
+        ForkchoiceState {
+            head_block_hash: B256::repeat_byte(1),
+            safe_block_hash: B256::repeat_byte(2),
+            finalized_block_hash: B256::repeat_byte(3),
+        }
+    }
+
+    fn assert_roundtrip<T>(value: &T)
+    where
+        T: Encode + Decode + PartialEq + core::fmt::Debug,
+    {
+        assert_eq!(T::from_ssz_bytes(&value.as_ssz_bytes()).unwrap(), *value);
+    }
+
+    #[test]
+    fn execution_payload_envelopes_roundtrip() {
+        assert_roundtrip(&ExecutionPayloadEnvelopeParis { payload: payload_v1() });
+        assert_roundtrip(&ExecutionPayloadEnvelopeShanghai { payload: payload_v2() });
+        assert_roundtrip(&ExecutionPayloadEnvelopeCancun {
+            payload: payload_v3(),
+            parent_beacon_block_root: B256::repeat_byte(1),
+        });
+        assert_roundtrip(&ExecutionPayloadEnvelopePrague {
+            payload: payload_v3(),
+            parent_beacon_block_root: B256::repeat_byte(1),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
+        });
+        assert_roundtrip(&ExecutionPayloadEnvelopeOsaka {
+            payload: payload_v3(),
+            parent_beacon_block_root: B256::repeat_byte(1),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
+        });
+        assert_roundtrip(&ExecutionPayloadEnvelopeAmsterdam {
+            payload: payload_v4(),
+            parent_beacon_block_root: B256::repeat_byte(1),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
+        });
+    }
+
+    #[test]
+    fn paris_submission_is_a_single_field_container() {
+        let payload = payload_v1();
+        let payload_bytes = payload.as_ssz_bytes();
+        let envelope = ExecutionPayloadEnvelopeParis { payload };
+        let encoded = envelope.as_ssz_bytes();
+        assert_eq!(&encoded[..4], &4u32.to_le_bytes());
+        assert_eq!(&encoded[4..], payload_bytes);
+    }
+
+    #[test]
+    fn built_payloads_roundtrip() {
+        assert_roundtrip(&BuiltPayloadParis { payload: payload_v1(), block_value: U256::from(1) });
+        assert_roundtrip(&BuiltPayloadShanghai {
+            payload: payload_v2(),
+            block_value: U256::from(1),
+            should_override_builder: true,
+        });
+        assert_roundtrip(&BuiltPayloadCancun {
+            execution_payload: payload_v3(),
+            block_value: U256::from(1),
+            blobs_bundle: BlobsBundleV1::empty(),
+            should_override_builder: true,
+        });
+        assert_roundtrip(&BuiltPayloadPrague {
+            payload: payload_v3(),
+            block_value: U256::from(1),
+            blobs_bundle: BlobsBundleV1::empty(),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
+            should_override_builder: true,
+        });
+        assert_roundtrip(&BuiltPayloadOsaka {
+            payload: payload_v3(),
+            block_value: U256::from(1),
+            blobs_bundle: BlobsBundleV2::empty(),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
+            should_override_builder: true,
+        });
+        assert_roundtrip(&BuiltPayloadAmsterdam {
+            payload: payload_v4(),
+            block_value: U256::from(1),
+            blobs_bundle: BlobsBundleV2::empty(),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
+            should_override_builder: true,
+        });
+    }
+
+    #[test]
+    fn prague_requests_precede_should_override_builder() {
+        let value = BuiltPayloadPrague {
+            payload: payload_v3(),
+            block_value: U256::from(1),
+            blobs_bundle: BlobsBundleV1::empty(),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[0xaa, 0xbb])]),
+            should_override_builder: true,
+        };
+        let encoded = value.as_ssz_bytes();
+        assert_eq!(encoded[48], 1);
+        assert_eq!(&encoded[encoded.len() - 2..], &[0xaa, 0xbb]);
+    }
+
+    #[test]
+    fn forkchoice_updates_roundtrip() {
+        let paris = PayloadAttributesParis {
+            timestamp: 1,
+            prev_randao: B256::repeat_byte(2),
+            suggested_fee_recipient: Address::repeat_byte(3),
+        };
+        let shanghai = PayloadAttributesShanghai {
+            timestamp: 1,
+            prev_randao: B256::repeat_byte(2),
+            suggested_fee_recipient: Address::repeat_byte(3),
+            withdrawals: vec![Withdrawal::default()],
+        };
+        let amsterdam = PayloadAttributesAmsterdam {
+            timestamp: 1,
+            prev_randao: B256::repeat_byte(2),
+            suggested_fee_recipient: Address::repeat_byte(3),
+            withdrawals: vec![Withdrawal::default()],
+            parent_beacon_block_root: B256::repeat_byte(4),
+            slot_number: 5,
+            target_gas_limit: 6,
+        };
+        assert_roundtrip(&ForkchoiceUpdateParis {
+            forkchoice_state: state(),
+            payload_attributes: Optional::some(paris),
+        });
+        assert_roundtrip(&ForkchoiceUpdateShanghai {
+            forkchoice_state: state(),
+            payload_attributes: Optional::some(shanghai),
+        });
+        assert_roundtrip(&ForkchoiceUpdateCancun {
+            forkchoice_state: state(),
+            payload_attributes: Optional::some(attributes_cancun()),
+        });
+        assert_roundtrip(&ForkchoiceUpdatePrague {
+            forkchoice_state: state(),
+            payload_attributes: Optional::some(attributes_cancun()),
+        });
+        assert_roundtrip(&ForkchoiceUpdateOsaka {
+            forkchoice_state: state(),
+            payload_attributes: Optional::some(attributes_cancun()),
+        });
+        assert_roundtrip(&ForkchoiceUpdateAmsterdam {
+            forkchoice_state: state(),
+            payload_attributes: Optional::some(amsterdam),
+            custody_columns: Optional::some(B128::repeat_byte(0xa5)),
+        });
+    }
+
+    #[test]
+    fn payload_attributes_legacy_conversions_preserve_fork_shape() {
+        let cancun = attributes_cancun();
+        let legacy = LegacyPayloadAttributes::from(cancun.clone());
+        assert_eq!(PayloadAttributesCancun::try_from(legacy).unwrap(), cancun);
+
+        let amsterdam = PayloadAttributesAmsterdam {
+            timestamp: 1,
+            prev_randao: B256::repeat_byte(2),
+            suggested_fee_recipient: Address::repeat_byte(3),
+            withdrawals: vec![Withdrawal::default()],
+            parent_beacon_block_root: B256::repeat_byte(4),
+            slot_number: 5,
+            target_gas_limit: 6,
+        };
+        let legacy = LegacyPayloadAttributes::from(amsterdam.clone());
+        assert_eq!(PayloadAttributesAmsterdam::try_from(legacy).unwrap(), amsterdam);
+    }
+
+    #[test]
+    fn payload_attributes_legacy_conversions_reject_loss() {
+        let mut legacy = LegacyPayloadAttributes::default();
+        assert_eq!(
+            PayloadAttributesShanghai::try_from(legacy.clone()),
+            Err(PayloadAttributesConversionError::MissingField("withdrawals"))
+        );
+
+        legacy.withdrawals = Some(vec![]);
+        legacy.parent_beacon_block_root = Some(B256::ZERO);
+        assert_eq!(
+            PayloadAttributesShanghai::try_from(legacy),
+            Err(PayloadAttributesConversionError::UnexpectedField("parent_beacon_block_root"))
+        );
+    }
+
+    #[test]
+    fn amsterdam_forkchoice_appends_custody_columns() {
+        let value = ForkchoiceUpdateAmsterdam {
+            forkchoice_state: state(),
+            payload_attributes: Optional::none(),
+            custody_columns: Optional::some(B128::repeat_byte(0xa5)),
+        };
+        let encoded = value.as_ssz_bytes();
+        assert_eq!(&encoded[..96], &state().as_ssz_bytes());
+        assert_eq!(&encoded[104..], B128::repeat_byte(0xa5).as_slice());
     }
 }
