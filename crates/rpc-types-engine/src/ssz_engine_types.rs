@@ -586,171 +586,6 @@ impl TryFrom<Vec<Option<BlobCellsAndProofsV1>>> for BlobsV4Response {
     }
 }
 
-#[cfg(all(test, feature = "ssz"))]
-mod tests {
-    use super::*;
-    use alloy_eips::eip7594::Cell;
-    use ssz::{Decode, Encode};
-
-    fn request(hashes: Vec<B256>) -> BlobsV1Request {
-        BlobsV1Request { versioned_hashes: hashes.try_into().unwrap() }
-    }
-
-    fn blob_v2(byte: u8) -> BlobAndProofV2 {
-        BlobAndProofV2 {
-            blob: Box::new(Blob::repeat_byte(byte)),
-            proofs: vec![Bytes48::repeat_byte(byte)],
-        }
-    }
-
-    #[test]
-    fn v1_v3_requests_are_single_field_containers() {
-        let request = request(vec![B256::repeat_byte(0x42)]);
-        let encoded = request.as_ssz_bytes();
-        assert_eq!(&encoded[..4], &4u32.to_le_bytes());
-        assert_eq!(&encoded[4..], B256::repeat_byte(0x42).as_slice());
-
-        let _: BlobsV2Request = BlobsV2Request::from_ssz_bytes(&encoded).unwrap();
-        let _: BlobsV3Request = BlobsV3Request::from_ssz_bytes(&encoded).unwrap();
-    }
-
-    #[test]
-    fn requests_reject_more_than_128_hashes() {
-        assert!(
-            VariableList::<B256, U128>::try_from(vec![B256::ZERO; MAX_BLOBS_REQUEST + 1]).is_err()
-        );
-
-        let mut encoded = 4u32.to_le_bytes().to_vec();
-        encoded.extend(vec![0; (MAX_BLOBS_REQUEST + 1) * 32]);
-        assert!(BlobsV1Request::from_ssz_bytes(&encoded).is_err());
-    }
-
-    #[test]
-    fn v4_request_roundtrip_preserves_bitvector() {
-        let request = BlobsV4Request {
-            versioned_hashes: vec![B256::repeat_byte(0x11)].try_into().unwrap(),
-            indices_bitarray: B128::repeat_byte(0xa5),
-        };
-        assert_eq!(BlobsV4Request::from_ssz_bytes(&request.as_ssz_bytes()).unwrap(), request);
-    }
-
-    #[test]
-    fn optional_hash_distinguishes_none_from_zero() {
-        assert_ne!(
-            Optional::<B256>::none().as_ssz_bytes(),
-            Optional::some(B256::ZERO).as_ssz_bytes()
-        );
-    }
-
-    #[test]
-    fn optional_error_distinguishes_none_from_empty() {
-        assert_ne!(
-            Optional::<ErrorBytes>::none().as_ssz_bytes(),
-            Optional::some(ErrorBytes::empty()).as_ssz_bytes()
-        );
-    }
-
-    #[test]
-    fn validation_error_enforces_max_bytes() {
-        let status = PayloadStatus {
-            status: PayloadStatusEnum::Invalid {
-                validation_error: "x".repeat(MAX_ERROR_BYTES + 1),
-            },
-            latest_valid_hash: Optional::none(),
-        };
-        assert!(PayloadStatus::try_from(LegacyPayloadStatus {
-            status: status.status.clone(),
-            latest_valid_hash: None,
-        })
-        .is_err());
-        assert!(ErrorBytes::from_ssz_bytes(&vec![b'x'; MAX_ERROR_BYTES + 1]).is_err());
-    }
-
-    #[test]
-    fn every_payload_status_roundtrips() {
-        for status in [
-            PayloadStatusEnum::Valid,
-            PayloadStatusEnum::Invalid { validation_error: "invalid".into() },
-            PayloadStatusEnum::Syncing,
-            PayloadStatusEnum::Accepted,
-        ] {
-            let value = PayloadStatus { status, latest_valid_hash: Optional::some(B256::ZERO) };
-            assert_eq!(PayloadStatus::from_ssz_bytes(&value.as_ssz_bytes()).unwrap(), value);
-        }
-    }
-
-    #[test]
-    fn optional_payload_id_distinguishes_none_from_zero() {
-        let status =
-            PayloadStatus { status: PayloadStatusEnum::Valid, latest_valid_hash: Optional::none() };
-        let none = ForkchoiceUpdateResponse {
-            payload_status: status.clone(),
-            payload_id: Optional::none(),
-        };
-        let zero = ForkchoiceUpdateResponse {
-            payload_status: status,
-            payload_id: Optional::some(PayloadId::default()),
-        };
-        assert_ne!(none.as_ssz_bytes(), zero.as_ssz_bytes());
-    }
-
-    #[test]
-    fn forkchoice_conversion_rejects_accepted() {
-        let legacy = LegacyForkchoice::from_status(PayloadStatusEnum::Accepted);
-        assert_eq!(
-            ForkchoiceUpdateResponse::try_from(legacy),
-            Err(ConversionError::AcceptedForkchoice)
-        );
-    }
-
-    #[test]
-    fn blob_response_conversions_preserve_availability_and_order() {
-        let v1 = BlobsV1Response::try_from(vec![None]).unwrap();
-        assert!(!v1.entries[0].available);
-        assert_eq!(v1.entries[0].contents, zero_blob_v1());
-
-        let v2 = BlobsV2Response::try_from(vec![blob_v2(1), blob_v2(2)]).unwrap();
-        assert!(v2.entries.iter().all(|entry| entry.available));
-
-        let v3 = BlobsV3Response::try_from(vec![Some(blob_v2(1)), None, Some(blob_v2(3))]).unwrap();
-        assert_eq!(
-            v3.entries.iter().map(|entry| entry.available).collect::<Vec<_>>(),
-            [true, false, true]
-        );
-        assert_eq!(v3.entries[2].contents.blob.as_slice(), Blob::repeat_byte(3).as_slice());
-
-        let partial = BlobCellsAndProofsV1 {
-            blob_cells: vec![Some(Cell::repeat_byte(1)), None],
-            proofs: vec![Some(Bytes48::repeat_byte(2)), None],
-        };
-        let v4 = BlobsV4Response::try_from(vec![None, Some(partial.clone())]).unwrap();
-        assert!(!v4.entries[0].available);
-        assert!(v4.entries[1].available);
-        assert_eq!(v4.entries[1].contents, partial);
-    }
-
-    #[test]
-    fn variable_blob_response_roundtrips_with_entry_offsets() {
-        let response =
-            BlobsV3Response::try_from(vec![Some(blob_v2(1)), None, Some(blob_v2(3))]).unwrap();
-        let encoded = response.as_ssz_bytes();
-        assert_eq!(&encoded[..4], &4u32.to_le_bytes());
-        assert_eq!(BlobsV3Response::from_ssz_bytes(&encoded).unwrap(), response);
-    }
-
-    #[test]
-    fn blob_responses_reject_more_than_128_entries() {
-        assert!(BlobsV4Response::try_from(vec![None; MAX_BLOBS_REQUEST + 1]).is_err());
-    }
-
-    #[test]
-    fn optional_decoding_rejects_more_than_one_value() {
-        assert!(Optional::<B256>::from_ssz_bytes(&[0; 64]).is_err());
-        let variable_values = [8, 0, 0, 0, 8, 0, 0, 0];
-        assert!(Optional::<ErrorBytes>::from_ssz_bytes(&variable_values).is_err());
-    }
-}
-
 // Fork-specific payload containers.
 
 /// Paris execution payload.
@@ -1880,5 +1715,170 @@ mod payload_tests {
         let encoded = value.as_ssz_bytes();
         assert_eq!(&encoded[..96], &state().as_ssz_bytes());
         assert_eq!(&encoded[104..], B128::repeat_byte(0xa5).as_slice());
+    }
+}
+
+#[cfg(all(test, feature = "ssz"))]
+mod tests {
+    use super::*;
+    use alloy_eips::eip7594::Cell;
+    use ssz::{Decode, Encode};
+
+    fn request(hashes: Vec<B256>) -> BlobsV1Request {
+        BlobsV1Request { versioned_hashes: hashes.try_into().unwrap() }
+    }
+
+    fn blob_v2(byte: u8) -> BlobAndProofV2 {
+        BlobAndProofV2 {
+            blob: Box::new(Blob::repeat_byte(byte)),
+            proofs: vec![Bytes48::repeat_byte(byte)],
+        }
+    }
+
+    #[test]
+    fn v1_v3_requests_are_single_field_containers() {
+        let request = request(vec![B256::repeat_byte(0x42)]);
+        let encoded = request.as_ssz_bytes();
+        assert_eq!(&encoded[..4], &4u32.to_le_bytes());
+        assert_eq!(&encoded[4..], B256::repeat_byte(0x42).as_slice());
+
+        let _: BlobsV2Request = BlobsV2Request::from_ssz_bytes(&encoded).unwrap();
+        let _: BlobsV3Request = BlobsV3Request::from_ssz_bytes(&encoded).unwrap();
+    }
+
+    #[test]
+    fn requests_reject_more_than_128_hashes() {
+        assert!(
+            VariableList::<B256, U128>::try_from(vec![B256::ZERO; MAX_BLOBS_REQUEST + 1]).is_err()
+        );
+
+        let mut encoded = 4u32.to_le_bytes().to_vec();
+        encoded.extend(vec![0; (MAX_BLOBS_REQUEST + 1) * 32]);
+        assert!(BlobsV1Request::from_ssz_bytes(&encoded).is_err());
+    }
+
+    #[test]
+    fn v4_request_roundtrip_preserves_bitvector() {
+        let request = BlobsV4Request {
+            versioned_hashes: vec![B256::repeat_byte(0x11)].try_into().unwrap(),
+            indices_bitarray: B128::repeat_byte(0xa5),
+        };
+        assert_eq!(BlobsV4Request::from_ssz_bytes(&request.as_ssz_bytes()).unwrap(), request);
+    }
+
+    #[test]
+    fn optional_hash_distinguishes_none_from_zero() {
+        assert_ne!(
+            Optional::<B256>::none().as_ssz_bytes(),
+            Optional::some(B256::ZERO).as_ssz_bytes()
+        );
+    }
+
+    #[test]
+    fn optional_error_distinguishes_none_from_empty() {
+        assert_ne!(
+            Optional::<ErrorBytes>::none().as_ssz_bytes(),
+            Optional::some(ErrorBytes::empty()).as_ssz_bytes()
+        );
+    }
+
+    #[test]
+    fn validation_error_enforces_max_bytes() {
+        let status = PayloadStatus {
+            status: PayloadStatusEnum::Invalid {
+                validation_error: "x".repeat(MAX_ERROR_BYTES + 1),
+            },
+            latest_valid_hash: Optional::none(),
+        };
+        assert!(PayloadStatus::try_from(LegacyPayloadStatus {
+            status: status.status.clone(),
+            latest_valid_hash: None,
+        })
+        .is_err());
+        assert!(ErrorBytes::from_ssz_bytes(&vec![b'x'; MAX_ERROR_BYTES + 1]).is_err());
+    }
+
+    #[test]
+    fn every_payload_status_roundtrips() {
+        for status in [
+            PayloadStatusEnum::Valid,
+            PayloadStatusEnum::Invalid { validation_error: "invalid".into() },
+            PayloadStatusEnum::Syncing,
+            PayloadStatusEnum::Accepted,
+        ] {
+            let value = PayloadStatus { status, latest_valid_hash: Optional::some(B256::ZERO) };
+            assert_eq!(PayloadStatus::from_ssz_bytes(&value.as_ssz_bytes()).unwrap(), value);
+        }
+    }
+
+    #[test]
+    fn optional_payload_id_distinguishes_none_from_zero() {
+        let status =
+            PayloadStatus { status: PayloadStatusEnum::Valid, latest_valid_hash: Optional::none() };
+        let none = ForkchoiceUpdateResponse {
+            payload_status: status.clone(),
+            payload_id: Optional::none(),
+        };
+        let zero = ForkchoiceUpdateResponse {
+            payload_status: status,
+            payload_id: Optional::some(PayloadId::default()),
+        };
+        assert_ne!(none.as_ssz_bytes(), zero.as_ssz_bytes());
+    }
+
+    #[test]
+    fn forkchoice_conversion_rejects_accepted() {
+        let legacy = LegacyForkchoice::from_status(PayloadStatusEnum::Accepted);
+        assert_eq!(
+            ForkchoiceUpdateResponse::try_from(legacy),
+            Err(ConversionError::AcceptedForkchoice)
+        );
+    }
+
+    #[test]
+    fn blob_response_conversions_preserve_availability_and_order() {
+        let v1 = BlobsV1Response::try_from(vec![None]).unwrap();
+        assert!(!v1.entries[0].available);
+        assert_eq!(v1.entries[0].contents, zero_blob_v1());
+
+        let v2 = BlobsV2Response::try_from(vec![blob_v2(1), blob_v2(2)]).unwrap();
+        assert!(v2.entries.iter().all(|entry| entry.available));
+
+        let v3 = BlobsV3Response::try_from(vec![Some(blob_v2(1)), None, Some(blob_v2(3))]).unwrap();
+        assert_eq!(
+            v3.entries.iter().map(|entry| entry.available).collect::<Vec<_>>(),
+            [true, false, true]
+        );
+        assert_eq!(v3.entries[2].contents.blob.as_slice(), Blob::repeat_byte(3).as_slice());
+
+        let partial = BlobCellsAndProofsV1 {
+            blob_cells: vec![Some(Cell::repeat_byte(1)), None],
+            proofs: vec![Some(Bytes48::repeat_byte(2)), None],
+        };
+        let v4 = BlobsV4Response::try_from(vec![None, Some(partial.clone())]).unwrap();
+        assert!(!v4.entries[0].available);
+        assert!(v4.entries[1].available);
+        assert_eq!(v4.entries[1].contents, partial);
+    }
+
+    #[test]
+    fn variable_blob_response_roundtrips_with_entry_offsets() {
+        let response =
+            BlobsV3Response::try_from(vec![Some(blob_v2(1)), None, Some(blob_v2(3))]).unwrap();
+        let encoded = response.as_ssz_bytes();
+        assert_eq!(&encoded[..4], &4u32.to_le_bytes());
+        assert_eq!(BlobsV3Response::from_ssz_bytes(&encoded).unwrap(), response);
+    }
+
+    #[test]
+    fn blob_responses_reject_more_than_128_entries() {
+        assert!(BlobsV4Response::try_from(vec![None; MAX_BLOBS_REQUEST + 1]).is_err());
+    }
+
+    #[test]
+    fn optional_decoding_rejects_more_than_one_value() {
+        assert!(Optional::<B256>::from_ssz_bytes(&[0; 64]).is_err());
+        let variable_values = [8, 0, 0, 0, 8, 0, 0, 0];
+        assert!(Optional::<ErrorBytes>::from_ssz_bytes(&variable_values).is_err());
     }
 }
