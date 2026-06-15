@@ -11,6 +11,8 @@
 
 use crate::{
     BlobAndProofV1, BlobAndProofV2, BlobCellsAndProofsV1, BlobsBundleV1, BlobsBundleV2,
+    ExecutionPayloadBodyV1 as LegacyExecutionPayloadBodyV1,
+    ExecutionPayloadBodyV2 as LegacyExecutionPayloadBodyV2,
     ExecutionPayloadEnvelopeV4 as LegacyBuiltPayloadPrague, ExecutionPayloadV1, ExecutionPayloadV2,
     ExecutionPayloadV3, ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated as LegacyForkchoice,
     PayloadAttributes as LegacyPayloadAttributes, PayloadId, PayloadStatus as LegacyPayloadStatus,
@@ -26,10 +28,10 @@ use alloy_eips::{
     eip4895::Withdrawal,
     eip7685::Requests,
 };
-use alloy_primitives::{Address, B128, B256, U256};
+use alloy_primitives::{Address, Bytes, B128, B256, U256};
 #[cfg(feature = "ssz")]
 use ssz_types::{
-    typenum::{U1, U1024, U128},
+    typenum::{U1, U1024, U128, U32},
     VariableList,
 };
 
@@ -38,6 +40,9 @@ pub const MAX_BLOBS_REQUEST: usize = 128;
 
 /// Maximum UTF-8 byte length of a payload validation error.
 pub const MAX_ERROR_BYTES: usize = 1024;
+
+/// Maximum number of entries in a REST-SSZ historical bodies request or response.
+pub const MAX_BODIES_REQUEST: usize = 32;
 
 type ErrorBytes = VariableList<u8, U1024>;
 
@@ -1279,6 +1284,249 @@ pub struct ForkchoiceUpdateAmsterdam {
     pub custody_columns: Optional<B128>,
 }
 
+/// Fork-specific execution payload body for Paris.
+#[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadBodyParis {
+    /// Enveloped encoded transactions.
+    pub transactions: Vec<Bytes>,
+}
+
+/// Fork-specific execution payload body for Shanghai.
+#[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadBodyShanghai {
+    /// Enveloped encoded transactions.
+    pub transactions: Vec<Bytes>,
+    /// Withdrawals included in the block.
+    pub withdrawals: Vec<Withdrawal>,
+}
+
+/// Cancun uses the Shanghai execution-payload-body schema.
+pub type ExecutionPayloadBodyCancun = ExecutionPayloadBodyShanghai;
+/// Prague uses the Shanghai execution-payload-body schema.
+pub type ExecutionPayloadBodyPrague = ExecutionPayloadBodyShanghai;
+/// Osaka uses the Shanghai execution-payload-body schema.
+pub type ExecutionPayloadBodyOsaka = ExecutionPayloadBodyShanghai;
+
+/// Fork-specific execution payload body for Amsterdam.
+#[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct ExecutionPayloadBodyAmsterdam {
+    /// Enveloped encoded transactions.
+    pub transactions: Vec<Bytes>,
+    /// Withdrawals included in the block.
+    pub withdrawals: Vec<Withdrawal>,
+    /// RLP-encoded EIP-7928 block access list.
+    pub block_access_list: Bytes,
+}
+
+/// Error converting legacy cross-fork execution payload bodies into fork-specific containers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExecutionPayloadBodyConversionError {
+    /// A field required by the selected fork is absent.
+    MissingField(&'static str),
+    /// A field from a later fork is populated and would be lost.
+    UnexpectedField(&'static str),
+}
+
+impl core::fmt::Display for ExecutionPayloadBodyConversionError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::MissingField(field) => {
+                write!(f, "missing required execution payload body field: {field}")
+            }
+            Self::UnexpectedField(field) => {
+                write!(f, "unexpected later-fork execution payload body field: {field}")
+            }
+        }
+    }
+}
+
+impl core::error::Error for ExecutionPayloadBodyConversionError {}
+
+impl From<ExecutionPayloadBodyParis> for LegacyExecutionPayloadBodyV1 {
+    fn from(value: ExecutionPayloadBodyParis) -> Self {
+        Self { transactions: value.transactions, withdrawals: None }
+    }
+}
+
+impl TryFrom<LegacyExecutionPayloadBodyV1> for ExecutionPayloadBodyParis {
+    type Error = ExecutionPayloadBodyConversionError;
+
+    fn try_from(value: LegacyExecutionPayloadBodyV1) -> Result<Self, Self::Error> {
+        if value.withdrawals.is_some() {
+            return Err(ExecutionPayloadBodyConversionError::UnexpectedField("withdrawals"));
+        }
+        Ok(Self { transactions: value.transactions })
+    }
+}
+
+impl From<ExecutionPayloadBodyShanghai> for LegacyExecutionPayloadBodyV1 {
+    fn from(value: ExecutionPayloadBodyShanghai) -> Self {
+        Self { transactions: value.transactions, withdrawals: Some(value.withdrawals) }
+    }
+}
+
+impl TryFrom<LegacyExecutionPayloadBodyV1> for ExecutionPayloadBodyShanghai {
+    type Error = ExecutionPayloadBodyConversionError;
+
+    fn try_from(value: LegacyExecutionPayloadBodyV1) -> Result<Self, Self::Error> {
+        Ok(Self {
+            transactions: value.transactions,
+            withdrawals: value
+                .withdrawals
+                .ok_or(ExecutionPayloadBodyConversionError::MissingField("withdrawals"))?,
+        })
+    }
+}
+
+impl From<ExecutionPayloadBodyAmsterdam> for LegacyExecutionPayloadBodyV2 {
+    fn from(value: ExecutionPayloadBodyAmsterdam) -> Self {
+        Self {
+            transactions: value.transactions,
+            withdrawals: Some(value.withdrawals),
+            block_access_list: Some(value.block_access_list),
+        }
+    }
+}
+
+impl TryFrom<LegacyExecutionPayloadBodyV2> for ExecutionPayloadBodyAmsterdam {
+    type Error = ExecutionPayloadBodyConversionError;
+
+    fn try_from(value: LegacyExecutionPayloadBodyV2) -> Result<Self, Self::Error> {
+        Ok(Self {
+            transactions: value.transactions,
+            withdrawals: value
+                .withdrawals
+                .ok_or(ExecutionPayloadBodyConversionError::MissingField("withdrawals"))?,
+            block_access_list: value
+                .block_access_list
+                .ok_or(ExecutionPayloadBodyConversionError::MissingField("block_access_list"))?,
+        })
+    }
+}
+
+/// REST-SSZ historical bodies-by-hash request.
+///
+/// This is a single-field container, not a bare SSZ list.
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct BodiesByHashRequest {
+    /// Requested block hashes.
+    pub block_hashes: VariableList<B256, U32>,
+}
+
+/// Historical body response entry with explicit availability.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BodyEntry<T> {
+    /// Whether the body is available and belongs to the requested fork.
+    pub available: bool,
+    /// Fork-specific body, ignored when `available` is false.
+    pub body: T,
+}
+
+impl<T: ssz::Encode> ssz::Encode for BodyEntry<T> {
+    fn is_ssz_fixed_len() -> bool {
+        T::is_ssz_fixed_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        if T::is_ssz_fixed_len() {
+            1 + T::ssz_fixed_len()
+        } else {
+            1 + ssz::BYTES_PER_LENGTH_OFFSET
+        }
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        1 + if T::is_ssz_fixed_len() {
+            self.body.ssz_bytes_len()
+        } else {
+            ssz::BYTES_PER_LENGTH_OFFSET + self.body.ssz_bytes_len()
+        }
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let fixed_len = 1 + if T::is_ssz_fixed_len() {
+            T::ssz_fixed_len()
+        } else {
+            ssz::BYTES_PER_LENGTH_OFFSET
+        };
+        let mut encoder = ssz::SszEncoder::container(buf, fixed_len);
+        encoder.append(&self.available);
+        encoder.append(&self.body);
+        encoder.finalize();
+    }
+}
+
+impl<T: ssz::Decode> ssz::Decode for BodyEntry<T> {
+    fn is_ssz_fixed_len() -> bool {
+        T::is_ssz_fixed_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        if T::is_ssz_fixed_len() {
+            1 + T::ssz_fixed_len()
+        } else {
+            1 + ssz::BYTES_PER_LENGTH_OFFSET
+        }
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+        builder.register_type::<bool>()?;
+        builder.register_type::<T>()?;
+        let mut decoder = builder.build()?;
+        Ok(Self { available: decoder.decode_next()?, body: decoder.decode_next()? })
+    }
+}
+
+/// Bounded REST-SSZ historical bodies response.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BodiesResponse<T> {
+    /// Body entries in request or range order.
+    pub entries: VariableList<BodyEntry<T>, U32>,
+}
+
+/// Paris historical bodies response.
+pub type BodiesResponseParis = BodiesResponse<ExecutionPayloadBodyParis>;
+/// Shanghai historical bodies response.
+pub type BodiesResponseShanghai = BodiesResponse<ExecutionPayloadBodyShanghai>;
+/// Cancun historical bodies response.
+pub type BodiesResponseCancun = BodiesResponse<ExecutionPayloadBodyCancun>;
+/// Prague historical bodies response.
+pub type BodiesResponsePrague = BodiesResponse<ExecutionPayloadBodyPrague>;
+/// Osaka historical bodies response.
+pub type BodiesResponseOsaka = BodiesResponse<ExecutionPayloadBodyOsaka>;
+/// Amsterdam historical bodies response.
+pub type BodiesResponseAmsterdam = BodiesResponse<ExecutionPayloadBodyAmsterdam>;
+
+impl<T: ssz::Encode> ssz::Encode for BodiesResponse<T> {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        ssz::BYTES_PER_LENGTH_OFFSET + self.entries.ssz_bytes_len()
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let mut encoder = ssz::SszEncoder::container(buf, ssz::BYTES_PER_LENGTH_OFFSET);
+        encoder.append(&self.entries);
+        encoder.finalize();
+    }
+}
+
+impl<T: ssz::Decode + 'static> ssz::Decode for BodiesResponse<T> {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+        builder.register_type::<VariableList<BodyEntry<T>, U32>>()?;
+        let mut decoder = builder.build()?;
+        Ok(Self { entries: decoder.decode_next()? })
+    }
+}
+
 #[cfg(test)]
 mod payload_tests {
     use super::*;
@@ -1513,6 +1761,113 @@ mod payload_tests {
             PayloadAttributesShanghai::try_from(legacy),
             Err(PayloadAttributesConversionError::UnexpectedField("parent_beacon_block_root"))
         );
+    }
+
+    #[test]
+    fn bodies_by_hash_is_a_bounded_single_field_container() {
+        let request =
+            BodiesByHashRequest { block_hashes: vec![B256::repeat_byte(0x42)].try_into().unwrap() };
+        let encoded = request.as_ssz_bytes();
+        assert_eq!(&encoded[..4], &4u32.to_le_bytes());
+        assert_eq!(&encoded[4..], B256::repeat_byte(0x42).as_slice());
+        assert_eq!(BodiesByHashRequest::from_ssz_bytes(&encoded).unwrap(), request);
+
+        assert!(
+            VariableList::<B256, U32>::try_from(vec![B256::ZERO; MAX_BODIES_REQUEST + 1]).is_err()
+        );
+    }
+
+    #[test]
+    fn fork_specific_bodies_roundtrip_without_optional_fields() {
+        let paris = BodiesResponseParis {
+            entries: vec![BodyEntry {
+                available: true,
+                body: ExecutionPayloadBodyParis { transactions: vec![Bytes::from_static(&[1, 2])] },
+            }]
+            .try_into()
+            .unwrap(),
+        };
+        assert_roundtrip(&paris);
+
+        let shanghai = BodiesResponseShanghai {
+            entries: vec![BodyEntry {
+                available: true,
+                body: ExecutionPayloadBodyShanghai {
+                    transactions: vec![Bytes::from_static(&[3, 4])],
+                    withdrawals: vec![Withdrawal::default()],
+                },
+            }]
+            .try_into()
+            .unwrap(),
+        };
+        assert_roundtrip(&shanghai);
+
+        let amsterdam = BodiesResponseAmsterdam {
+            entries: vec![BodyEntry {
+                available: false,
+                body: ExecutionPayloadBodyAmsterdam {
+                    transactions: vec![Bytes::from_static(&[5, 6])],
+                    withdrawals: vec![Withdrawal::default()],
+                    block_access_list: Bytes::from_static(&[7, 8]),
+                },
+            }]
+            .try_into()
+            .unwrap(),
+        };
+        assert_roundtrip(&amsterdam);
+    }
+
+    #[test]
+    fn legacy_body_conversions_preserve_fork_shape() {
+        let paris = ExecutionPayloadBodyParis { transactions: vec![Bytes::from_static(&[1, 2])] };
+        let legacy = LegacyExecutionPayloadBodyV1::from(paris.clone());
+        assert_eq!(ExecutionPayloadBodyParis::try_from(legacy).unwrap(), paris);
+
+        let shanghai = ExecutionPayloadBodyShanghai {
+            transactions: vec![Bytes::from_static(&[3, 4])],
+            withdrawals: vec![Withdrawal::default()],
+        };
+        let legacy = LegacyExecutionPayloadBodyV1::from(shanghai.clone());
+        assert_eq!(ExecutionPayloadBodyShanghai::try_from(legacy).unwrap(), shanghai);
+
+        let amsterdam = ExecutionPayloadBodyAmsterdam {
+            transactions: vec![Bytes::from_static(&[5, 6])],
+            withdrawals: vec![Withdrawal::default()],
+            block_access_list: Bytes::from_static(&[7, 8]),
+        };
+        let legacy = LegacyExecutionPayloadBodyV2::from(amsterdam.clone());
+        assert_eq!(ExecutionPayloadBodyAmsterdam::try_from(legacy).unwrap(), amsterdam);
+    }
+
+    #[test]
+    fn legacy_body_conversions_reject_wrong_fork_shape() {
+        let legacy =
+            LegacyExecutionPayloadBodyV1 { transactions: vec![], withdrawals: Some(vec![]) };
+        assert_eq!(
+            ExecutionPayloadBodyParis::try_from(legacy),
+            Err(ExecutionPayloadBodyConversionError::UnexpectedField("withdrawals"))
+        );
+
+        let legacy = LegacyExecutionPayloadBodyV2 {
+            transactions: vec![],
+            withdrawals: Some(vec![]),
+            block_access_list: None,
+        };
+        assert_eq!(
+            ExecutionPayloadBodyAmsterdam::try_from(legacy),
+            Err(ExecutionPayloadBodyConversionError::MissingField("block_access_list"))
+        );
+    }
+
+    #[test]
+    fn bodies_response_rejects_more_than_32_entries() {
+        let entry = BodyEntry { available: false, body: ExecutionPayloadBodyParis::default() };
+        assert!(VariableList::<BodyEntry<ExecutionPayloadBodyParis>, U32>::try_from(vec![
+            entry;
+            MAX_BODIES_REQUEST
+                + 1
+        ])
+        .is_err());
     }
 
     #[test]
