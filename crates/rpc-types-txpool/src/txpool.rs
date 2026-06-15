@@ -9,18 +9,6 @@ use serde::{
 };
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
-fn serialize_address_map<S, V>(map: &BTreeMap<Address, V>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-    V: Serialize,
-{
-    let mut serialized = serializer.serialize_map(Some(map.len()))?;
-    for (address, value) in map {
-        serialized.serialize_entry(address.to_checksum_buffer(None).as_str(), value)?;
-    }
-    serialized.end()
-}
-
 /// Transaction summary as found in the Txpool Inspection property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TxpoolInspectSummary {
@@ -257,6 +245,18 @@ pub struct TxpoolStatus {
     /// number of queued tx
     #[serde(with = "alloy_serde::quantity")]
     pub queued: u64,
+}
+
+fn serialize_address_map<S, V>(map: &BTreeMap<Address, V>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    V: Serialize,
+{
+    let mut serialized = serializer.serialize_map(Some(map.len()))?;
+    for (address, value) in map {
+        serialized.serialize_entry(address.to_checksum_buffer(None).as_str(), value)?;
+    }
+    serialized.end()
 }
 
 #[cfg(test)]
