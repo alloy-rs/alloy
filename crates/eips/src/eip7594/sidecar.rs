@@ -7,7 +7,7 @@ use crate::{
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{B128, B256};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header, EMPTY_STRING_CODE};
 
 use super::{Decodable7594, Encodable7594};
 use crate::eip4844::VersionedHashIter;
@@ -998,6 +998,14 @@ impl BlobTransactionSidecarEip7594 {
         1 + self.blobs.length() + self.commitments.length() + self.cell_proofs.length()
     }
 
+    /// Outputs the RLP length of [BlobTransactionSidecarEip7594] fields when blob payloads are
+    /// elided for an eth/72 `PooledTransactions` response.
+    #[doc(hidden)]
+    pub fn rlp_encoded_sparse_fields_length(&self) -> usize {
+        // wrapper version + nil blobs + commitments + cell proofs
+        1 + 1 + self.commitments.length() + self.cell_proofs.length()
+    }
+
     /// Encodes the inner [BlobTransactionSidecarEip7594] fields as RLP bytes, __without__ a
     /// RLP header.
     ///
@@ -1013,6 +1021,17 @@ impl BlobTransactionSidecarEip7594 {
         out.put_u8(EIP_7594_WRAPPER_VERSION);
         // Encode the blobs, commitments, and cell proofs
         self.blobs.encode(out);
+        self.commitments.encode(out);
+        self.cell_proofs.encode(out);
+    }
+
+    /// Encodes EIP-7594 fields for an eth/72 `PooledTransactions` response, replacing blob
+    /// payloads with an RLP nil literal while retaining commitments and cell proofs.
+    #[inline]
+    #[doc(hidden)]
+    pub fn rlp_encode_sparse_fields(&self, out: &mut dyn BufMut) {
+        out.put_u8(EIP_7594_WRAPPER_VERSION);
+        out.put_u8(EMPTY_STRING_CODE);
         self.commitments.encode(out);
         self.cell_proofs.encode(out);
     }
@@ -1042,6 +1061,31 @@ impl BlobTransactionSidecarEip7594 {
             commitments: Decodable::decode(buf)?,
             cell_proofs: Decodable::decode(buf)?,
         })
+    }
+
+    /// RLP decode sparse EIP-7594 fields from an eth/72 `PooledTransactions` response.
+    #[doc(hidden)]
+    pub fn rlp_decode_sparse_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        if buf.first().copied() != Some(EMPTY_STRING_CODE) {
+            return Err(alloy_rlp::Error::Custom("expected nil sparse blob payloads"));
+        }
+        *buf = &buf[1..];
+
+        Ok(Self {
+            blobs: Vec::new(),
+            commitments: Decodable::decode(buf)?,
+            cell_proofs: Decodable::decode(buf)?,
+        })
+    }
+
+    /// RLP decode sparse EIP-7594 sidecar fields including the wrapper version.
+    #[doc(hidden)]
+    pub fn decode_sparse_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let wrapper_version: u8 = Decodable::decode(buf)?;
+        if wrapper_version != EIP_7594_WRAPPER_VERSION {
+            return Err(alloy_rlp::Error::Custom("invalid wrapper version"));
+        }
+        Self::rlp_decode_sparse_fields(buf)
     }
 
     /// Decodes the [BlobTransactionSidecarEip7594] from RLP bytes.
