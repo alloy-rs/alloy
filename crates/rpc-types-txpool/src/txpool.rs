@@ -127,10 +127,10 @@ impl Serialize for TxpoolInspectSummary {
 #[serde(bound(serialize = "T: Serialize"))]
 pub struct TxpoolContent<T = Transaction> {
     /// pending tx
-    #[serde(serialize_with = "serialize_address_map")]
+    #[serde(serialize_with = "serialize_checksum_address_map")]
     pub pending: BTreeMap<Address, BTreeMap<String, T>>,
     /// queued tx
-    #[serde(serialize_with = "serialize_address_map")]
+    #[serde(serialize_with = "serialize_checksum_address_map")]
     pub queued: BTreeMap<Address, BTreeMap<String, T>>,
 }
 
@@ -223,10 +223,10 @@ impl<T> Default for TxpoolContentFrom<T> {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolInspect {
     /// pending tx
-    #[serde(serialize_with = "serialize_address_map")]
+    #[serde(serialize_with = "serialize_checksum_address_map")]
     pub pending: BTreeMap<Address, BTreeMap<String, TxpoolInspectSummary>>,
     /// queued tx
-    #[serde(serialize_with = "serialize_address_map")]
+    #[serde(serialize_with = "serialize_checksum_address_map")]
     pub queued: BTreeMap<Address, BTreeMap<String, TxpoolInspectSummary>>,
 }
 
@@ -247,7 +247,14 @@ pub struct TxpoolStatus {
     pub queued: u64,
 }
 
-fn serialize_address_map<S, V>(map: &BTreeMap<Address, V>, serializer: S) -> Result<S::Ok, S::Error>
+/// Serializes address map keys as EIP-55 checksum addresses, matching geth's use of
+/// [`account.Hex()`](https://github.com/ethereum/go-ethereum/blob/e2164cc78c690367e2ca0b24cae982c3ab44bb4e/internal/ethapi/api.go#L221)
+/// and its [`Address.Hex()`](https://github.com/ethereum/go-ethereum/blob/e2164cc78c690367e2ca0b24cae982c3ab44bb4e/common/types.go#L260)
+/// implementation.
+fn serialize_checksum_address_map<S, V>(
+    map: &BTreeMap<Address, V>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
     V: Serialize,
