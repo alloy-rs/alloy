@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.1.0
 - Group weekly dependabot updates ([#4035](https://github.com/alloy-rs/alloy/issues/4035))
 - Fixed amsterdam docs and sequence in chain config ([#4021](https://github.com/alloy-rs/alloy/issues/4021))
 - Replaced typed tx with consensus tx in build_typed_simulate_tx… ([#4015](https://github.com/alloy-rs/alloy/issues/4015))
