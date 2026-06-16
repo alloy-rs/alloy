@@ -122,13 +122,12 @@ pub fn calc_next_block_base_fee(
         // increased base fee.
         core::cmp::Ordering::Greater => {
             // Calculate the increase in base fee based on the formula defined by EIP-1559.
-            base_fee
-                + (core::cmp::max(
-                    // Ensure a minimum increase of 1.
-                    1,
-                    base_fee as u128 * (gas_used - gas_target) as u128
-                        / (gas_target as u128 * base_fee_params.max_change_denominator),
-                ) as u64)
+            base_fee.saturating_add(core::cmp::max(
+                // Ensure a minimum increase of 1.
+                1,
+                base_fee as u128 * (gas_used - gas_target) as u128
+                    / (gas_target as u128 * base_fee_params.max_change_denominator),
+            ) as u64)
         }
         // If the gas used in the current block is less than the gas target, calculate a new
         // decreased base fee.
@@ -342,5 +341,13 @@ mod tests {
         let p = BaseFeeParams::ethereum();
         // gas_target = 1 / 2 = 0; gas_used > 0 used to hit a divide-by-zero in the increase path.
         assert_eq!(calc_next_block_base_fee(1, 1, 1_000_000_000, p), 1_000_000_000);
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_max_base_fee_on_increase() {
+        let p = BaseFeeParams::ethereum();
+        // base_fee can reach u64::MAX (saturated on deserialization); with gas_used above
+        // target the increase term is added on top, which used to overflow `u64`.
+        assert_eq!(calc_next_block_base_fee(30_000_000, 30_000_000, u64::MAX, p), u64::MAX);
     }
 }
