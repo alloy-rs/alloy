@@ -73,7 +73,15 @@ jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jwt-aws-lc-rs = ["jwt", "jsonwebtoken/aws_lc_rs"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "dep:ssz_types", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg", "alloy-eips/kzg"]
-arbitrary = ["dep:arbitrary", "std", "alloy-primitives/arbitrary", "alloy-serde/arbitrary", "alloy-consensus/arbitrary", "alloy-eips/arbitrary"]
+arbitrary = [
+	"dep:arbitrary",
+	"std",
+	"alloy-primitives/arbitrary",
+	"alloy-serde/arbitrary",
+	"alloy-consensus/arbitrary",
+	"alloy-eips/arbitrary",
+	"ssz_types?/arbitrary"
+]
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [

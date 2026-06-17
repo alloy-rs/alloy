@@ -134,7 +134,7 @@ pub struct PayloadStatus {
     pub latest_valid_hash: Optional<B256>,
 }
 
-fn status_code(status: &PayloadStatusEnum) -> u8 {
+const fn status_code(status: &PayloadStatusEnum) -> u8 {
     match status {
         PayloadStatusEnum::Valid => 0,
         PayloadStatusEnum::Invalid { .. } => 1,
@@ -2029,7 +2029,7 @@ mod tests {
             latest_valid_hash: Optional::none(),
         };
         assert!(PayloadStatus::try_from(LegacyPayloadStatus {
-            status: status.status.clone(),
+            status: status.status,
             latest_valid_hash: None,
         })
         .is_err());
