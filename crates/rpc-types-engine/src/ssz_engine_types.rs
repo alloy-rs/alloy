@@ -10,11 +10,15 @@
 //! [execution-apis PR #793](https://github.com/ethereum/execution-apis/pull/793).
 
 use crate::{
-    BlobAndProofV1, BlobAndProofV2, BlobCellsAndProofsV1, BlobsBundleV1, BlobsBundleV2,
+    BlobAndProofV1, BlobAndProofV2, BlobsBundleV1, BlobsBundleV2,
     ExecutionPayloadBodyV1 as LegacyExecutionPayloadBodyV1,
     ExecutionPayloadBodyV2 as LegacyExecutionPayloadBodyV2,
-    ExecutionPayloadEnvelopeV4 as LegacyBuiltPayloadPrague, ExecutionPayloadV1, ExecutionPayloadV2,
-    ExecutionPayloadV3, ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated as LegacyForkchoice,
+    ExecutionPayloadEnvelopeV2 as LegacyBuiltPayloadShanghai,
+    ExecutionPayloadEnvelopeV4 as LegacyBuiltPayloadPrague,
+    ExecutionPayloadEnvelopeV5 as LegacyBuiltPayloadOsaka,
+    ExecutionPayloadEnvelopeV6 as LegacyBuiltPayloadAmsterdam, ExecutionPayloadFieldV2,
+    ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3, ExecutionPayloadV4,
+    ForkchoiceState, ForkchoiceUpdated as LegacyForkchoice,
     PayloadAttributes as LegacyPayloadAttributes, PayloadId, PayloadStatus as LegacyPayloadStatus,
     PayloadStatusEnum,
 };
@@ -26,6 +30,7 @@ use alloc::{
 use alloy_eips::{
     eip4844::{Blob, Bytes48},
     eip4895::Withdrawal,
+    eip7594::{Cell, CELLS_PER_EXT_BLOB},
     eip7685::Requests,
 };
 use alloy_primitives::{Address, Bytes, B128, B256, U256};
@@ -249,6 +254,12 @@ impl TryFrom<LegacyPayloadStatus> for PayloadStatus {
     }
 }
 
+impl From<PayloadStatus> for LegacyPayloadStatus {
+    fn from(value: PayloadStatus) -> Self {
+        Self { status: value.status, latest_valid_hash: value.latest_valid_hash.into() }
+    }
+}
+
 /// Engine API v2 REST-SSZ forkchoice update response.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ForkchoiceUpdateResponse {
@@ -309,6 +320,12 @@ impl TryFrom<LegacyForkchoice> for ForkchoiceUpdateResponse {
             return Err(ConversionError::AcceptedForkchoice);
         }
         Ok(Self { payload_status, payload_id: value.payload_id.into() })
+    }
+}
+
+impl From<ForkchoiceUpdateResponse> for LegacyForkchoice {
+    fn from(value: ForkchoiceUpdateResponse) -> Self {
+        Self { payload_status: value.payload_status.into(), payload_id: value.payload_id.into() }
     }
 }
 
@@ -484,7 +501,64 @@ pub type BlobsV2Response = BlobsResponse<BlobAndProofV2>;
 /// V3 partial cell-proof response.
 pub type BlobsV3Response = BlobsResponse<BlobAndProofV2>;
 /// V4 partial cell-range response.
-pub type BlobsV4Response = BlobsResponse<BlobCellsAndProofsV1>;
+pub type BlobsV4Response = BlobsResponse<BlobCellsAndProofs>;
+
+/// Blob cells and proofs with REST-SSZ optional cell positions.
+///
+/// This uses [`Optional`] (`List[T, 1]`) for per-cell nullability, not Rust [`Option`]'s SSZ
+/// union encoding.
+#[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode)]
+pub struct BlobCellsAndProofs {
+    /// Requested blob cells.
+    pub blob_cells: VariableList<Optional<Cell>, U128>,
+    /// KZG proofs for the requested blob cells.
+    pub proofs: VariableList<Optional<Bytes48>, U128>,
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for BlobCellsAndProofs {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        #[derive(ssz_derive::Decode)]
+        struct Raw {
+            blob_cells: VariableList<Optional<Cell>, U128>,
+            proofs: VariableList<Optional<Bytes48>, U128>,
+        }
+
+        let raw = Raw::from_ssz_bytes(bytes)?;
+
+        if raw.blob_cells.len() > CELLS_PER_EXT_BLOB {
+            return Err(ssz::DecodeError::BytesInvalid(format!(
+                "Invalid BlobCellsAndProofs: expected at most {CELLS_PER_EXT_BLOB} blob cells, got {}",
+                raw.blob_cells.len()
+            )));
+        }
+
+        if raw.blob_cells.len() != raw.proofs.len() {
+            return Err(ssz::DecodeError::BytesInvalid(format!(
+                "Invalid BlobCellsAndProofs: blob_cells length {} does not match proofs length {}",
+                raw.blob_cells.len(),
+                raw.proofs.len()
+            )));
+        }
+
+        if raw
+            .blob_cells
+            .iter()
+            .zip(raw.proofs.iter())
+            .any(|(cell, proof)| cell.is_some() != proof.is_some())
+        {
+            return Err(ssz::DecodeError::BytesInvalid(
+                "Invalid BlobCellsAndProofs: blob_cells and proofs must have matching optional positions".into(),
+            ));
+        }
+
+        Ok(Self { blob_cells: raw.blob_cells, proofs: raw.proofs })
+    }
+}
 
 #[cfg(feature = "ssz")]
 impl<T: ssz::Encode> ssz::Encode for BlobsResponse<T> {
@@ -570,15 +644,15 @@ impl TryFrom<Vec<Option<BlobAndProofV2>>> for BlobsV3Response {
     }
 }
 
-impl TryFrom<Vec<Option<BlobCellsAndProofsV1>>> for BlobsV4Response {
+impl TryFrom<Vec<Option<BlobCellsAndProofs>>> for BlobsV4Response {
     type Error = ssz_types::Error;
 
-    fn try_from(value: Vec<Option<BlobCellsAndProofsV1>>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<Option<BlobCellsAndProofs>>) -> Result<Self, Self::Error> {
         let entries = value
             .into_iter()
             .map(|value| match value {
                 Some(contents) => BlobEntry { available: true, contents },
-                None => BlobEntry { available: false, contents: BlobCellsAndProofsV1::default() },
+                None => BlobEntry { available: false, contents: BlobCellsAndProofs::default() },
             })
             .collect::<Vec<_>>()
             .try_into()?;
@@ -848,6 +922,9 @@ pub struct BuiltPayloadParis {
 
 /// This structure maps to the Engine API v2 REST-SSZ payload-build response for Shanghai.
 ///
+/// This follows the legacy `engine_getPayloadV2` payload-build response shape: execution payload
+/// plus block value only. `should_override_builder` starts at Cancun.
+///
 /// See also:
 /// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
@@ -856,9 +933,6 @@ pub struct BuiltPayloadShanghai {
     pub payload: ExecutionPayloadShanghai,
     /// The expected value to be received by the fee recipient in wei.
     pub block_value: U256,
-    /// A suggestion from the execution layer whether this payload should be used instead of an
-    /// externally provided one.
-    pub should_override_builder: bool,
 }
 
 /// Engine API v2 REST-SSZ payload-build response for Cancun.
@@ -935,6 +1009,49 @@ pub struct BuiltPayloadAmsterdam {
     pub should_override_builder: bool,
 }
 
+/// Error converting legacy payload-build envelopes into fork-specific REST-SSZ containers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BuiltPayloadConversionError {
+    /// The legacy envelope carried an execution payload from a different fork.
+    UnexpectedPayloadFork(&'static str),
+}
+
+impl core::fmt::Display for BuiltPayloadConversionError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::UnexpectedPayloadFork(fork) => {
+                write!(f, "unexpected execution payload fork: {fork}")
+            }
+        }
+    }
+}
+
+impl core::error::Error for BuiltPayloadConversionError {}
+
+impl From<BuiltPayloadShanghai> for LegacyBuiltPayloadShanghai {
+    fn from(value: BuiltPayloadShanghai) -> Self {
+        Self {
+            execution_payload: ExecutionPayloadFieldV2::V2(value.payload),
+            block_value: value.block_value,
+        }
+    }
+}
+
+impl TryFrom<LegacyBuiltPayloadShanghai> for BuiltPayloadShanghai {
+    type Error = BuiltPayloadConversionError;
+
+    fn try_from(value: LegacyBuiltPayloadShanghai) -> Result<Self, Self::Error> {
+        match value.execution_payload {
+            ExecutionPayloadFieldV2::V2(payload) => {
+                Ok(Self { payload, block_value: value.block_value })
+            }
+            ExecutionPayloadFieldV2::V1(_) => {
+                Err(BuiltPayloadConversionError::UnexpectedPayloadFork("Paris"))
+            }
+        }
+    }
+}
+
 impl From<LegacyBuiltPayloadPrague> for BuiltPayloadPrague {
     fn from(value: LegacyBuiltPayloadPrague) -> Self {
         Self {
@@ -943,6 +1060,68 @@ impl From<LegacyBuiltPayloadPrague> for BuiltPayloadPrague {
             blobs_bundle: value.envelope_inner.blobs_bundle,
             execution_requests: value.execution_requests,
             should_override_builder: value.envelope_inner.should_override_builder,
+        }
+    }
+}
+
+impl From<BuiltPayloadPrague> for LegacyBuiltPayloadPrague {
+    fn from(value: BuiltPayloadPrague) -> Self {
+        Self {
+            envelope_inner: crate::ExecutionPayloadEnvelopeV3 {
+                execution_payload: value.payload,
+                block_value: value.block_value,
+                blobs_bundle: value.blobs_bundle,
+                should_override_builder: value.should_override_builder,
+            },
+            execution_requests: value.execution_requests,
+        }
+    }
+}
+
+impl From<LegacyBuiltPayloadOsaka> for BuiltPayloadOsaka {
+    fn from(value: LegacyBuiltPayloadOsaka) -> Self {
+        Self {
+            payload: value.execution_payload,
+            block_value: value.block_value,
+            blobs_bundle: value.blobs_bundle,
+            execution_requests: value.execution_requests,
+            should_override_builder: value.should_override_builder,
+        }
+    }
+}
+
+impl From<BuiltPayloadOsaka> for LegacyBuiltPayloadOsaka {
+    fn from(value: BuiltPayloadOsaka) -> Self {
+        Self {
+            execution_payload: value.payload,
+            block_value: value.block_value,
+            blobs_bundle: value.blobs_bundle,
+            should_override_builder: value.should_override_builder,
+            execution_requests: value.execution_requests,
+        }
+    }
+}
+
+impl From<LegacyBuiltPayloadAmsterdam> for BuiltPayloadAmsterdam {
+    fn from(value: LegacyBuiltPayloadAmsterdam) -> Self {
+        Self {
+            payload: value.execution_payload,
+            block_value: value.block_value,
+            blobs_bundle: value.blobs_bundle,
+            execution_requests: value.execution_requests,
+            should_override_builder: value.should_override_builder,
+        }
+    }
+}
+
+impl From<BuiltPayloadAmsterdam> for LegacyBuiltPayloadAmsterdam {
+    fn from(value: BuiltPayloadAmsterdam) -> Self {
+        Self {
+            execution_payload: value.payload,
+            block_value: value.block_value,
+            blobs_bundle: value.blobs_bundle,
+            should_override_builder: value.should_override_builder,
+            execution_requests: value.execution_requests,
         }
     }
 }
@@ -1469,7 +1648,6 @@ mod payload_tests {
         assert_roundtrip(&BuiltPayloadShanghai {
             payload: payload_v2(),
             block_value: U256::from(1),
-            should_override_builder: true,
         });
         assert_roundtrip(&BuiltPayloadCancun {
             execution_payload: payload_v3(),
@@ -1498,6 +1676,66 @@ mod payload_tests {
             execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
             should_override_builder: true,
         });
+    }
+
+    #[test]
+    fn shanghai_built_payload_has_no_builder_override() {
+        let payload = payload_v2();
+        let payload_len = payload.ssz_bytes_len();
+        let value = BuiltPayloadShanghai { payload, block_value: U256::from(1) };
+        let encoded = value.as_ssz_bytes();
+
+        assert_eq!(&encoded[..4], &36u32.to_le_bytes());
+        assert_eq!(encoded.len(), 36 + payload_len);
+    }
+
+    #[test]
+    fn legacy_built_payload_conversions_preserve_fields() {
+        let shanghai = BuiltPayloadShanghai { payload: payload_v2(), block_value: U256::from(1) };
+        let legacy = LegacyBuiltPayloadShanghai::from(shanghai.clone());
+        assert_eq!(BuiltPayloadShanghai::try_from(legacy).unwrap(), shanghai);
+
+        let prague = BuiltPayloadPrague {
+            payload: payload_v3(),
+            block_value: U256::from(2),
+            blobs_bundle: BlobsBundleV1::empty(),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[3, 4])]),
+            should_override_builder: true,
+        };
+        let legacy = LegacyBuiltPayloadPrague::from(prague.clone());
+        assert_eq!(BuiltPayloadPrague::from(legacy), prague);
+
+        let osaka = BuiltPayloadOsaka {
+            payload: payload_v3(),
+            block_value: U256::from(5),
+            blobs_bundle: BlobsBundleV2::empty(),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[6, 7])]),
+            should_override_builder: true,
+        };
+        let legacy = LegacyBuiltPayloadOsaka::from(osaka.clone());
+        assert_eq!(BuiltPayloadOsaka::from(legacy), osaka);
+
+        let amsterdam = BuiltPayloadAmsterdam {
+            payload: payload_v4(),
+            block_value: U256::from(8),
+            blobs_bundle: BlobsBundleV2::empty(),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[9, 10])]),
+            should_override_builder: true,
+        };
+        let legacy = LegacyBuiltPayloadAmsterdam::from(amsterdam.clone());
+        assert_eq!(BuiltPayloadAmsterdam::from(legacy), amsterdam);
+    }
+
+    #[test]
+    fn legacy_shanghai_built_payload_rejects_paris_payload() {
+        let legacy = LegacyBuiltPayloadShanghai {
+            execution_payload: ExecutionPayloadFieldV2::V1(payload_v1()),
+            block_value: U256::from(1),
+        };
+        assert_eq!(
+            BuiltPayloadShanghai::try_from(legacy),
+            Err(BuiltPayloadConversionError::UnexpectedPayloadFork("Paris"))
+        );
     }
 
     #[test]
@@ -1851,9 +2089,13 @@ mod tests {
         );
         assert_eq!(v3.entries[2].contents.blob.as_slice(), Blob::repeat_byte(3).as_slice());
 
-        let partial = BlobCellsAndProofsV1 {
-            blob_cells: vec![Some(Cell::repeat_byte(1)), None],
-            proofs: vec![Some(Bytes48::repeat_byte(2)), None],
+        let partial = BlobCellsAndProofs {
+            blob_cells: vec![Optional::some(Cell::repeat_byte(1)), Optional::none()]
+                .try_into()
+                .unwrap(),
+            proofs: vec![Optional::some(Bytes48::repeat_byte(2)), Optional::none()]
+                .try_into()
+                .unwrap(),
         };
         let v4 = BlobsV4Response::try_from(vec![None, Some(partial.clone())]).unwrap();
         assert!(!v4.entries[0].available);
@@ -1868,6 +2110,18 @@ mod tests {
         let encoded = response.as_ssz_bytes();
         assert_eq!(&encoded[..4], &4u32.to_le_bytes());
         assert_eq!(BlobsV3Response::from_ssz_bytes(&encoded).unwrap(), response);
+    }
+
+    #[test]
+    fn blob_cells_and_proofs_uses_rest_optional() {
+        let value = BlobCellsAndProofs {
+            blob_cells: vec![Optional::some(Cell::repeat_byte(1))].try_into().unwrap(),
+            proofs: vec![Optional::some(Bytes48::repeat_byte(2))].try_into().unwrap(),
+        };
+        let encoded = value.as_ssz_bytes();
+
+        assert_eq!(BlobCellsAndProofs::from_ssz_bytes(&encoded).unwrap(), value);
+        assert!(!encoded[8..].starts_with(&[1, 0, 0, 0]));
     }
 
     #[test]
