@@ -5,12 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.5](https://github.com/alloy-rs/alloy/releases/tag/v2.0.5) - 2026-05-18
+## [2.1.0](https://github.com/alloy-rs/alloy/releases/tag/v2.1.0) - 2026-06-16
 
 ### Bug Fixes
 
 - [provider] Clean up failed impersonated sends ([#3944](https://github.com/alloy-rs/alloy/issues/3944))
 - [ci] Stabilize main red tests ([#3942](https://github.com/alloy-rs/alloy/issues/3942))
+
+### Features
+
+- Provider::watch_canonical_logs_from ([#4022](https://github.com/alloy-rs/alloy/issues/4022))
+- [provider] Add anvil_dump_state_with_history to AnvilApi ([#4025](https://github.com/alloy-rs/alloy/issues/4025))
+- `Provider::watch_blocks_from` and `Provider::watch_canonical_blocks_from` ([#3722](https://github.com/alloy-rs/alloy/issues/3722))
+
+### Miscellaneous Tasks
+
+- Release 2.0.5
+
+### Other
+
+- Avoid caching pending tx snapshots by hash ([#4001](https://github.com/alloy-rs/alloy/issues/4001))
 
 ## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
 
