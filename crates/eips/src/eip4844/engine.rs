@@ -1,8 +1,10 @@
 //! Misc types related to the 4844
 
+#[cfg(feature = "ssz")]
+use crate::eip7594::CELLS_PER_EXT_BLOB;
 use crate::{
     eip4844::{Blob, Bytes48},
-    eip7594::{Cell, CELLS_PER_EXT_BLOB},
+    eip7594::Cell,
 };
 use alloc::{boxed::Box, vec::Vec};
 

@@ -270,17 +270,17 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
 }
 
 #[derive(Debug)]
-struct FixedBuf<T> {
+pub(super) struct FixedBuf<T> {
     buf: VecDeque<T>,
 }
 
 impl<T> FixedBuf<T> {
-    fn new(capacity: usize) -> Self {
+    pub(super) fn new(capacity: usize) -> Self {
         Self { buf: VecDeque::with_capacity(capacity.max(1)) }
     }
 
     /// Pushes `item` and discards the oldest item if the buffer is full.
-    fn push(&mut self, item: T) {
+    pub(super) fn push(&mut self, item: T) {
         if self.buf.len() == self.buf.capacity() {
             self.buf.pop_front();
         }
@@ -288,15 +288,15 @@ impl<T> FixedBuf<T> {
     }
 
     /// Returns the most recent item, if any.
-    fn pop(&mut self) -> Option<T> {
+    pub(super) fn pop(&mut self) -> Option<T> {
         self.buf.pop_back()
     }
 
-    fn last(&self) -> Option<&T> {
+    pub(super) fn last(&self) -> Option<&T> {
         self.buf.back()
     }
 
-    fn len(&self) -> usize {
+    pub(super) fn len(&self) -> usize {
         self.buf.len()
     }
 }

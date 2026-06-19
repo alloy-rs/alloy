@@ -644,6 +644,7 @@ pub mod serde_bincode_compat {
                 amsterdam_time: value.amsterdam_time,
                 bogota_time: value.bogota_time,
                 osaka_time: value.osaka_time,
+                amsterdam_time: value.amsterdam_time,
                 bpo1_time: value.bpo1_time,
                 bpo2_time: value.bpo2_time,
                 bpo3_time: value.bpo3_time,
