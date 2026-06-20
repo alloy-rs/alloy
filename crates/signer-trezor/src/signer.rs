@@ -1,5 +1,6 @@
 use super::types::{DerivationType, TrezorError};
 use alloy_consensus::SignableTransaction;
+use alloy_dyn_abi::TypedData;
 use alloy_primitives::{
     hex, normalize_v, Address, ChainId, Signature, SignatureError, TxKind, B256, U256,
 };
@@ -48,6 +49,16 @@ impl Signer for TrezorSigner {
     #[inline]
     async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
         self.sign_message_inner(message).await.map_err(alloy_signer::Error::other)
+    }
+
+    #[inline]
+    async fn sign_dynamic_typed_data(
+        &self,
+        payload: &TypedData,
+    ) -> Result<Signature> {
+        self.sign_typed_data_inner(payload)
+            .await
+            .map_err(alloy_signer::Error::other)
     }
 
     #[inline]
@@ -205,6 +216,57 @@ impl TrezorSigner {
         let apath = Self::convert_path(&self.derivation);
         let signature = client.ethereum_sign_message(message.into(), apath)?;
         signature_from_trezor(signature)
+    }
+
+    async fn sign_typed_data_inner(
+        &self,
+        data: &TypedData,
+    ) -> Result<Signature, TrezorError> {
+        let mut types_json: serde_json::Map<String, serde_json::Value> =
+            serde_json::to_value(&data.resolver)
+                .map_err(TrezorError::Eip712)?
+                .as_object()
+                .cloned()
+                .unwrap_or_default();
+
+        let domain_json =
+            serde_json::to_value(&data.domain).map_err(TrezorError::Eip712)?;
+
+        if !types_json.contains_key("EIP712Domain") {
+            let mut domain_fields = Vec::new();
+            let domain = &data.domain;
+            if domain.name.is_some() {
+                domain_fields.push(serde_json::json!({"name": "name", "type": "string"}));
+            }
+            if domain.version.is_some() {
+                domain_fields.push(serde_json::json!({"name": "version", "type": "string"}));
+            }
+            if domain.chain_id.is_some() {
+                domain_fields.push(serde_json::json!({"name": "chainId", "type": "uint256"}));
+            }
+            if domain.verifying_contract.is_some() {
+                domain_fields.push(serde_json::json!({"name": "verifyingContract", "type": "address"}));
+            }
+            if domain.salt.is_some() {
+                domain_fields.push(serde_json::json!({"name": "salt", "type": "bytes32"}));
+            }
+            types_json.insert(
+                "EIP712Domain".to_string(),
+                serde_json::Value::Array(domain_fields),
+            );
+        }
+
+        let mut client = self.get_client()?;
+        let path = Self::convert_path(&self.derivation);
+
+        let sig = client.ethereum_sign_typed_data(
+            path,
+            &data.primary_type,
+            &types_json,
+            &domain_json,
+            &data.message,
+        )?;
+        signature_from_trezor(sig)
     }
 
     // helper which converts a derivation path to [u32]

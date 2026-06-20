@@ -24,16 +24,18 @@ workspace = true
 
 [dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
+alloy-dyn-abi = { workspace = true, features = ["std", "eip712"] }
 alloy-network.workspace = true
 alloy-primitives.workspace = true
-alloy-signer.workspace = true
+alloy-signer = { workspace = true, features = ["eip712"] }
 
-trezor-client = { version = "=0.1.5", default-features = false, features = [
+trezor-client = { version = "=0.1.6", default-features = false, features = [
     "ethereum",
 ] }
 
 async-trait.workspace = true
 semver.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 

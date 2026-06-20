@@ -54,6 +54,9 @@ pub enum TrezorError {
         "Trezor transaction signing only supports legacy and EIP-1559 transactions; got transaction type 0x{0:02x}"
     )]
     UnsupportedTransactionType(u8),
+    /// EIP-712 serialization error.
+    #[error(transparent)]
+    Eip712(serde_json::Error),
     /// Could not retrieve device features.
     #[error("could not retrieve device features")]
     Features,
