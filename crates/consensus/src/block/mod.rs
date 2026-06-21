@@ -180,6 +180,30 @@ impl<T, H> Block<T, H> {
     {
         block_rlp::HelperRef::from_parts(header, body).length()
     }
+
+    /// Serializes a [`Block`] from references to its header and body.
+    ///
+    /// This uses the same serde representation as [`Block`] without constructing or cloning an
+    /// owned block.
+    #[cfg(feature = "serde")]
+    pub fn serialize_ref<S>(
+        header: &H,
+        body: &BlockBody<T, H>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        H: serde::Serialize,
+        BlockBody<T, H>: serde::Serialize,
+        S: serde::Serializer,
+    {
+        #[derive(serde::Serialize)]
+        struct BlockRef<'a, H, B> {
+            header: &'a H,
+            body: &'a B,
+        }
+
+        serde::Serialize::serialize(&BlockRef { header, body }, serializer)
+    }
 }
 
 impl<T: Encodable2718> Block<T, Header> {
@@ -450,6 +474,24 @@ mod tests {
     fn can_convert_block() {
         let block: Block<Signed<TxLegacy>> = Block::default();
         let _: Block<TxEnvelope> = block.convert_transactions();
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serialize_ref_matches_block_serde() {
+        let block: Block<TxEnvelope> = Block::default();
+
+        let expected = serde_json::to_value(&block).unwrap();
+        let mut serialized = Vec::new();
+        Block::serialize_ref(
+            &block.header,
+            &block.body,
+            &mut serde_json::Serializer::new(&mut serialized),
+        )
+        .unwrap();
+        let actual: serde_json::Value = serde_json::from_slice(&serialized).unwrap();
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
