@@ -142,7 +142,7 @@ impl LocalSigner<SigningKey> {
         R: Rng + CryptoRng,
         S: AsRef<[u8]>,
     {
-        let (secret, uuid) = eth_keystore::new(dir, rng, password, name)?;
+        let (secret, uuid) = super::keystore::new(dir, rng, password, name)?;
         Ok((Self::from_slice(&secret)?, uuid))
     }
 
@@ -153,7 +153,7 @@ impl LocalSigner<SigningKey> {
         P: AsRef<Path>,
         S: AsRef<[u8]>,
     {
-        let secret = eth_keystore::decrypt_key(keypath, password)?;
+        let secret = super::keystore::decrypt_key(keypath, password)?;
         Ok(Self::from_slice(&secret)?)
     }
 
@@ -176,7 +176,7 @@ impl LocalSigner<SigningKey> {
         S: AsRef<[u8]>,
     {
         let pk = pk.as_ref();
-        let uuid = eth_keystore::encrypt_key(keypath, rng, pk, password, name)?;
+        let uuid = super::keystore::encrypt_key(keypath, rng, pk, password, name)?;
         Ok((Self::from_slice(pk)?, uuid))
     }
 }
@@ -311,11 +311,9 @@ mod tests {
     #[test]
     #[cfg(feature = "keystore-geth-compat")]
     fn test_encrypted_json_keystore_with_address() {
-        // create and store an encrypted JSON keystore in this directory
-
         use std::fs::File;
 
-        use eth_keystore::EthKeystore;
+        use crate::EthKeystore;
         let dir = tempdir().unwrap();
         let mut rng = rand::thread_rng();
         let (key, uuid) =
@@ -325,7 +323,8 @@ mod tests {
         let file = File::open(path).unwrap();
         let keystore = serde_json::from_reader::<_, EthKeystore>(file).unwrap();
 
-        assert!(!keystore.address.is_zero());
+        assert!(keystore.address.is_some());
+        assert_eq!(keystore.address.unwrap(), key.address());
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
     }
