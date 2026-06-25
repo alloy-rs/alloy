@@ -1436,6 +1436,20 @@ pub struct BodyEntry<T> {
     pub body: T,
 }
 
+impl<T> BodyEntry<T> {
+    /// Creates an available body entry.
+    pub fn available(body: T) -> Self {
+        Self { available: true, body }
+    }
+}
+
+impl<T: Default> BodyEntry<T> {
+    /// Creates an unavailable body entry.
+    pub fn unavailable() -> Self {
+        Self { available: false, body: T::default() }
+    }
+}
+
 impl<T: ssz::Encode> ssz::Encode for BodyEntry<T> {
     fn is_ssz_fixed_len() -> bool {
         T::is_ssz_fixed_len()
@@ -1497,6 +1511,46 @@ impl<T: ssz::Decode> ssz::Decode for BodyEntry<T> {
 pub struct BodiesResponse<T> {
     /// Body entries in request or range order.
     pub entries: VariableList<BodyEntry<T>, U32>,
+}
+
+/// Error constructing a bounded REST-SSZ historical bodies response.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BodiesResponseConversionError {
+    /// The response contains more entries than the SSZ response limit.
+    TooManyEntries,
+}
+
+impl core::fmt::Display for BodiesResponseConversionError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::TooManyEntries => f.write_str("too many payload body entries"),
+        }
+    }
+}
+
+impl core::error::Error for BodiesResponseConversionError {}
+
+impl<T: Default> BodiesResponse<T> {
+    /// Creates a response from optional legacy bodies.
+    ///
+    /// Missing bodies, or bodies that do not convert to the requested fork container, are encoded
+    /// as unavailable entries.
+    pub fn from_optional_bodies<LegacyBody>(
+        bodies: Vec<Option<LegacyBody>>,
+        convert: impl Fn(LegacyBody) -> Option<T>,
+    ) -> Result<Self, BodiesResponseConversionError> {
+        let entries = bodies
+            .into_iter()
+            .map(|body| match body.and_then(&convert) {
+                Some(body) => BodyEntry::available(body),
+                None => BodyEntry::unavailable(),
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .map_err(|_| BodiesResponseConversionError::TooManyEntries)?;
+
+        Ok(Self { entries })
+    }
 }
 
 /// Paris historical bodies response.
