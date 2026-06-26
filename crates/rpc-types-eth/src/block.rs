@@ -192,7 +192,7 @@ impl<T, H> Block<T, H> {
         }
     }
 
-    /// Consumes the block and only returns the rpc header.
+    /// Consumes the block and returns its header.
     ///
     /// To obtain the underlying [`alloy_consensus::Header`] use [`Block::into_consensus_header`].
     pub fn into_header(self) -> H {
@@ -285,7 +285,7 @@ impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
     /// Constructs an "uncle block" from the provided header.
     ///
     /// This function creates a new [`Block`] structure for uncle blocks (ommer blocks),
-    /// using the provided [`alloy_consensus::Header`].
+    /// using the provided header.
     pub fn uncle_from_header(header: H) -> Self {
         let block = alloy_consensus::Block::<TxEnvelope, H>::uncle(header);
         let size = U256::from(block.length());
@@ -851,6 +851,19 @@ mod tests {
         let mut bytes = [0u8; 1024];
         rand::thread_rng().fill(bytes.as_mut_slice());
         let _: Header = Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
+
+    #[test]
+    fn header_response_num_hash() {
+        let number = 42;
+        let hash = B256::with_last_byte(1);
+        let header = Header {
+            hash,
+            inner: alloy_consensus::Header { number, ..Default::default() },
+            ..Default::default()
+        };
+
+        assert_eq!(header.num_hash(), BlockNumHash::new(number, hash));
     }
 
     #[test]
