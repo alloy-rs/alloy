@@ -1,5 +1,6 @@
 use crate::{
-    utils, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+    utils, BlockReceiptsParams, ParamsWithBlock, Provider, ProviderCall, ProviderLayer,
+    RootProvider, RpcWithBlock,
 };
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcSend};
@@ -159,8 +160,9 @@ where
     fn get_block_receipts(
         &self,
         block: BlockId,
-    ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
-        let req = RequestType::new("eth_getBlockReceipts", (block,)).with_block_id(block);
+    ) -> ProviderCall<(BlockReceiptsParams,), Option<Vec<N::ReceiptResponse>>> {
+        let req = RequestType::new("eth_getBlockReceipts", (BlockReceiptsParams::from(block),))
+            .with_block_id(block);
 
         let redirect = req.has_block_tag();
 

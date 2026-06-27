@@ -7,8 +7,8 @@ use crate::GetSubscription;
 use crate::{
     heart::PendingTransactionError,
     utils::{Eip1559Estimation, Eip1559Estimator},
-    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
-    ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    BlockReceiptsParams, EthCall, PendingTransaction, PendingTransactionBuilder,
+    PendingTransactionConfig, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
@@ -184,7 +184,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     fn get_block_receipts(
         &self,
         block: BlockId,
-    ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
+    ) -> ProviderCall<(BlockReceiptsParams,), Option<Vec<N::ReceiptResponse>>> {
         self.0.get_block_receipts(block)
     }
 

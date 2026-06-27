@@ -5,8 +5,8 @@
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
 use super::{
-    DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom,
-    WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchHeaders, WatchLogsFrom,
+    BlockReceiptsParams, DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks,
+    WatchBlocksFrom, WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchHeaders, WatchLogsFrom,
 };
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -465,8 +465,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_block_receipts(
         &self,
         block: BlockId,
-    ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
-        self.client().request("eth_getBlockReceipts", (block,)).into()
+    ) -> ProviderCall<(BlockReceiptsParams,), Option<Vec<N::ReceiptResponse>>> {
+        self.client().request("eth_getBlockReceipts", (BlockReceiptsParams::from(block),)).into()
     }
 
     /// Gets the EIP-7928 block access list by [`BlockId`].

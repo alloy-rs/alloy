@@ -1,3 +1,6 @@
+mod block_receipts;
+pub use block_receipts::BlockReceiptsParams;
+
 mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
