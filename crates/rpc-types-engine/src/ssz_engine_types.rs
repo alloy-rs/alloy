@@ -4,9 +4,7 @@
 //! SSZ encodings are not always wire-compatible. This module contains the shared endpoint
 //! containers and fork-specific payload containers from
 //! [execution-apis PR #793](https://github.com/ethereum/execution-apis/pull/793), plus the
-//! experimental witness response type from
-//! [execution-apis PR #773](https://github.com/ethereum/execution-apis/pull/773) where it reuses
-//! the PR #793 REST-SSZ status encoding.
+//! experimental payload-with-witness response type that extends the same REST-SSZ model.
 
 use crate::{
     BlobAndProofV1, BlobAndProofV2, BlobsBundleV1, BlobsBundleV2,
@@ -35,7 +33,7 @@ use alloy_eips::{
 use alloy_primitives::{Address, Bytes, B128, B256, U256};
 #[cfg(feature = "ssz")]
 use ssz_types::{
-    typenum::{U1, U1024, U1048576, U128, U16777216, U256 as U256Type, U32, U65536},
+    typenum::{U1, U1024, U1048576, U128, U32},
     VariableList,
 };
 
@@ -48,26 +46,29 @@ pub const MAX_ERROR_BYTES: usize = 1024;
 /// Maximum number of entries in a REST-SSZ historical bodies request or response.
 pub const MAX_BODIES_REQUEST: usize = 32;
 
-// These limits follow the pinned execution-specs witness schema. They intentionally differ by
-// field: state may contain many trie nodes, codes has fewer but larger bytecode entries, and
-// headers is a small ancestor-header list.
-/// Maximum number of trie nodes in an execution witness (`2^20`).
-pub const MAX_WITNESS_NODES: usize = 1_048_576;
+/// Maximum number of items per execution-witness field (`2^20`).
+pub const MAX_WITNESS_ITEMS: usize = 1_048_576;
 
-/// Maximum byte length of a trie node in an execution witness (`2^20`).
-pub const MAX_BYTES_PER_WITNESS_NODE: usize = 1_048_576;
+/// Maximum byte length of a single execution-witness item (`2^20`).
+pub const MAX_WITNESS_ITEM_BYTES: usize = 1_048_576;
 
-/// Maximum number of contract bytecodes in an execution witness (`2^16`).
-pub const MAX_WITNESS_CODES: usize = 65_536;
+/// Maximum number of trie nodes in an execution witness.
+pub const MAX_WITNESS_NODES: usize = MAX_WITNESS_ITEMS;
 
-/// Maximum byte length of a contract bytecode in an execution witness (`2^24`).
-pub const MAX_BYTES_PER_WITNESS_CODE: usize = 16_777_216;
+/// Maximum byte length of a trie node in an execution witness.
+pub const MAX_BYTES_PER_WITNESS_NODE: usize = MAX_WITNESS_ITEM_BYTES;
 
-/// Maximum number of RLP-encoded headers in an execution witness (`2^8`).
-pub const MAX_WITNESS_HEADERS: usize = 256;
+/// Maximum number of contract bytecodes in an execution witness.
+pub const MAX_WITNESS_CODES: usize = MAX_WITNESS_ITEMS;
 
-/// Maximum byte length of an RLP-encoded header in an execution witness (`2^10`).
-pub const MAX_BYTES_PER_WITNESS_HEADER: usize = 1_024;
+/// Maximum byte length of a contract bytecode in an execution witness.
+pub const MAX_BYTES_PER_WITNESS_CODE: usize = MAX_WITNESS_ITEM_BYTES;
+
+/// Maximum number of RLP-encoded headers in an execution witness.
+pub const MAX_WITNESS_HEADERS: usize = MAX_WITNESS_ITEMS;
+
+/// Maximum byte length of an RLP-encoded header in an execution witness.
+pub const MAX_BYTES_PER_WITNESS_HEADER: usize = MAX_WITNESS_ITEM_BYTES;
 
 type ErrorBytes = VariableList<u8, U1024>;
 
@@ -353,12 +354,12 @@ impl From<ForkchoiceUpdateResponse> for LegacyForkchoice {
 pub type WitnessNodeV1 = VariableList<u8, U1048576>;
 
 /// A bounded contract-code byte list in an [`ExecutionWitnessV1`].
-pub type WitnessCodeV1 = VariableList<u8, U16777216>;
+pub type WitnessCodeV1 = VariableList<u8, U1048576>;
 
 /// A bounded RLP-encoded header byte list in an [`ExecutionWitnessV1`].
-pub type WitnessHeaderV1 = VariableList<u8, U1024>;
+pub type WitnessHeaderV1 = VariableList<u8, U1048576>;
 
-/// Canonical execution witness for `new-payload-with-witness` version 1.
+/// Canonical execution witness for `POST /{fork}/payloads/witness`.
 ///
 /// `state` and `codes` are produced in lexicographic ascending byte order. `headers` are
 /// RLP-encoded and ordered by ascending block number; consecutive headers must be parent-linked.
@@ -370,26 +371,31 @@ pub struct ExecutionWitnessV1 {
     /// Hashed trie-node preimages required during execution and state-root recomputation.
     pub state: VariableList<WitnessNodeV1, U1048576>,
     /// Contract bytecode preimages created or accessed during execution.
-    pub codes: VariableList<WitnessCodeV1, U65536>,
+    pub codes: VariableList<WitnessCodeV1, U1048576>,
     /// RLP-encoded ancestor headers used for pre-state and `BLOCKHASH` correctness proofs.
-    pub headers: VariableList<WitnessHeaderV1, U256Type>,
+    pub headers: VariableList<WitnessHeaderV1, U1048576>,
 }
 
-/// REST-SSZ response for `new-payload-with-witness` version 1.
+/// Canonical execution witness for `POST /{fork}/payloads/witness`.
+pub type ExecutionWitness = ExecutionWitnessV1;
+
+/// REST-SSZ response for `POST /{fork}/payloads/witness`.
 ///
 /// This models only the response body. Endpoint routing, request handling, and HTTP error mapping
-/// belong to the caller. The payload status uses the Engine REST-SSZ status encoding from
-/// execution-apis PR #793; the witness is present only when the payload status is `VALID`.
+/// belong to the caller. The witness uses the Engine REST-SSZ `Optional[T]` encoding from
+/// execution-apis PR #793 and is present only when the payload status is `VALID`.
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode)]
-pub struct NewPayloadWithWitnessResponseV1 {
+pub struct PayloadStatusWithWitness {
     /// Result of processing the submitted payload.
     pub payload_status: PayloadStatus,
-    /// Execution witness produced for a valid payload, encoded with Rust `Option`'s SSZ union
-    /// representation.
-    pub witness: Option<ExecutionWitnessV1>,
+    /// Execution witness produced for a valid payload.
+    pub witness: Optional<ExecutionWitnessV1>,
 }
 
-impl ssz::Decode for NewPayloadWithWitnessResponseV1 {
+/// Backwards-compatible alias for the experimental witness response name.
+pub type NewPayloadWithWitnessResponseV1 = PayloadStatusWithWitness;
+
+impl ssz::Decode for PayloadStatusWithWitness {
     fn is_ssz_fixed_len() -> bool {
         false
     }
@@ -397,7 +403,7 @@ impl ssz::Decode for NewPayloadWithWitnessResponseV1 {
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
         let mut builder = ssz::SszDecoderBuilder::new(bytes);
         builder.register_type::<PayloadStatus>()?;
-        builder.register_type::<Option<ExecutionWitnessV1>>()?;
+        builder.register_type::<Optional<ExecutionWitnessV1>>()?;
         let mut decoder = builder.build()?;
         let response =
             Self { payload_status: decoder.decode_next()?, witness: decoder.decode_next()? };
@@ -2091,36 +2097,36 @@ mod tests {
     }
 
     #[test]
-    fn new_payload_with_witness_response_roundtrips() {
-        let valid = NewPayloadWithWitnessResponseV1 {
+    fn payload_status_with_witness_roundtrips() {
+        let valid = PayloadStatusWithWitness {
             payload_status: PayloadStatus {
                 status: PayloadStatusEnum::Valid,
                 latest_valid_hash: Optional::some(B256::repeat_byte(0x42)),
             },
-            witness: Some(witness()),
+            witness: Optional::some(witness()),
         };
         assert_roundtrip(&valid);
 
-        let without_witness = NewPayloadWithWitnessResponseV1 {
+        let without_witness = PayloadStatusWithWitness {
             payload_status: PayloadStatus {
                 status: PayloadStatusEnum::Syncing,
                 latest_valid_hash: Optional::none(),
             },
-            witness: None,
+            witness: Optional::none(),
         };
         assert_roundtrip(&without_witness);
     }
 
     #[test]
-    fn new_payload_with_witness_rejects_witness_for_nonvalid_status() {
-        let response = NewPayloadWithWitnessResponseV1 {
+    fn payload_status_with_witness_rejects_witness_for_nonvalid_status() {
+        let response = PayloadStatusWithWitness {
             payload_status: PayloadStatus {
                 status: PayloadStatusEnum::Syncing,
                 latest_valid_hash: Optional::none(),
             },
-            witness: Some(witness()),
+            witness: Optional::some(witness()),
         };
-        assert!(NewPayloadWithWitnessResponseV1::from_ssz_bytes(&response.as_ssz_bytes()).is_err());
+        assert!(PayloadStatusWithWitness::from_ssz_bytes(&response.as_ssz_bytes()).is_err());
     }
 
     #[test]
@@ -2128,15 +2134,15 @@ mod tests {
         let witness_bytes = witness().as_ssz_bytes();
         assert!(ExecutionWitnessV1::from_ssz_bytes(&witness_bytes[..11]).is_err());
 
-        let response = NewPayloadWithWitnessResponseV1 {
+        let response = PayloadStatusWithWitness {
             payload_status: PayloadStatus {
                 status: PayloadStatusEnum::Valid,
                 latest_valid_hash: Optional::none(),
             },
-            witness: Some(witness()),
+            witness: Optional::some(witness()),
         };
         let response_bytes = response.as_ssz_bytes();
-        assert!(NewPayloadWithWitnessResponseV1::from_ssz_bytes(&response_bytes[..7]).is_err());
+        assert!(PayloadStatusWithWitness::from_ssz_bytes(&response_bytes[..7]).is_err());
     }
     fn request(hashes: Vec<B256>) -> BlobsV1Request {
         BlobsV1Request { versioned_hashes: hashes.try_into().unwrap() }
