@@ -72,4 +72,8 @@ pub const CAPABILITIES: &[&str] = &[
     "engine_getPayloadBodiesByRangeV1",
     "engine_getPayloadBodiesByHashV2",
     "engine_getPayloadBodiesByRangeV2",
+    "engine_getBALsByHashV1",
+    "engine_getBALsByRangeV1",
+    "engine_getBlobsV1",
+    "engine_getBlobsV2",
 ];
