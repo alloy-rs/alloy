@@ -28,6 +28,7 @@ alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 alloy-consensus = { workspace = true, features = ["serde"] }
 alloy-eips = { workspace = true, features = ["serde"] }
+alloy-rpc-types-debug = { workspace = true, optional = true }
 
 # misc
 derive_more = { workspace = true, features = ["display"] }
@@ -71,7 +72,14 @@ serde = [
 ]
 jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jwt-aws-lc-rs = ["jwt", "jsonwebtoken/aws_lc_rs"]
-ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "dep:ssz_types", "alloy-eips/ssz"]
+ssz = [
+    "std",
+    "dep:alloy-rpc-types-debug",
+    "dep:ethereum_ssz",
+    "dep:ethereum_ssz_derive",
+    "dep:ssz_types",
+    "alloy-eips/ssz",
+]
 kzg = ["alloy-consensus/kzg", "alloy-eips/kzg"]
 arbitrary = [
 	"dep:arbitrary",

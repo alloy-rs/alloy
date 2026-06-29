@@ -392,8 +392,43 @@ pub struct PayloadStatusWithWitness {
     pub witness: Optional<ExecutionWitnessV1>,
 }
 
+impl PayloadStatusWithWitness {
+    /// Creates a response, converting the witness into the REST-SSZ `Optional[T]` representation.
+    pub fn new(payload_status: PayloadStatus, witness: Option<ExecutionWitnessV1>) -> Self {
+        Self { payload_status, witness: witness.into() }
+    }
+}
+
 /// Backwards-compatible alias for the experimental witness response name.
 pub type NewPayloadWithWitnessResponseV1 = PayloadStatusWithWitness;
+
+impl TryFrom<alloy_rpc_types_debug::ExecutionWitness> for ExecutionWitnessV1 {
+    type Error = ConversionError;
+
+    fn try_from(value: alloy_rpc_types_debug::ExecutionWitness) -> Result<Self, Self::Error> {
+        let state = value
+            .state
+            .into_iter()
+            .map(|bytes| WitnessNodeV1::new(bytes.to_vec()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let codes = value
+            .codes
+            .into_iter()
+            .map(|bytes| WitnessCodeV1::new(bytes.to_vec()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let headers = value
+            .headers
+            .into_iter()
+            .map(|bytes| WitnessHeaderV1::new(bytes.to_vec()))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Self {
+            state: VariableList::new(state)?,
+            codes: VariableList::new(codes)?,
+            headers: VariableList::new(headers)?,
+        })
+    }
+}
 
 impl ssz::Decode for PayloadStatusWithWitness {
     fn is_ssz_fixed_len() -> bool {
@@ -2086,6 +2121,95 @@ mod tests {
                 .unwrap(),
             headers: vec![WitnessHeaderV1::try_from(vec![0x06]).unwrap()].try_into().unwrap(),
         }
+    }
+
+    fn valid_status() -> PayloadStatus {
+        PayloadStatus { status: PayloadStatusEnum::Valid, latest_valid_hash: Optional::none() }
+    }
+
+    #[test]
+    fn debug_execution_witness_converts_to_ssz_witness() {
+        let debug_witness = alloy_rpc_types_debug::ExecutionWitness {
+            state: vec![Bytes::from_static(&[0x01, 0x02])],
+            codes: vec![Bytes::from_static(&[0x03])],
+            keys: vec![],
+            headers: vec![Bytes::from_static(&[0x04, 0x05, 0x06])],
+        };
+
+        let witness = ExecutionWitnessV1::try_from(debug_witness).unwrap();
+
+        assert_eq!(Vec::from(witness.state[0].clone()), vec![0x01, 0x02]);
+        assert_eq!(Vec::from(witness.codes[0].clone()), vec![0x03]);
+        assert_eq!(Vec::from(witness.headers[0].clone()), vec![0x04, 0x05, 0x06]);
+    }
+
+    #[test]
+    fn debug_execution_witness_keys_are_ignored() {
+        let without_keys = alloy_rpc_types_debug::ExecutionWitness {
+            state: vec![Bytes::from_static(&[0x01])],
+            codes: vec![],
+            keys: vec![],
+            headers: vec![],
+        };
+        let with_keys = alloy_rpc_types_debug::ExecutionWitness {
+            keys: vec![Bytes::from_static(&[0xaa, 0xbb])],
+            ..without_keys.clone()
+        };
+
+        assert_eq!(
+            ExecutionWitnessV1::try_from(with_keys).unwrap(),
+            ExecutionWitnessV1::try_from(without_keys).unwrap()
+        );
+    }
+
+    #[test]
+    fn debug_execution_witness_rejects_oversized_inner_item() {
+        let debug_witness = alloy_rpc_types_debug::ExecutionWitness {
+            state: vec![Bytes::from(vec![0; MAX_WITNESS_ITEM_BYTES + 1])],
+            codes: vec![],
+            keys: vec![],
+            headers: vec![],
+        };
+
+        assert!(matches!(
+            ExecutionWitnessV1::try_from(debug_witness),
+            Err(ConversionError::Bounds(_))
+        ));
+    }
+
+    #[test]
+    fn debug_execution_witness_rejects_too_many_items() {
+        let debug_witness = alloy_rpc_types_debug::ExecutionWitness {
+            state: vec![Bytes::new(); MAX_WITNESS_ITEMS + 1],
+            codes: vec![],
+            keys: vec![],
+            headers: vec![],
+        };
+
+        assert!(matches!(
+            ExecutionWitnessV1::try_from(debug_witness),
+            Err(ConversionError::Bounds(_))
+        ));
+    }
+
+    #[test]
+    fn payload_status_with_witness_new_encodes_present_rest_optional() {
+        let witness = witness();
+        let response = PayloadStatusWithWitness::new(valid_status(), Some(witness.clone()));
+
+        assert!(response.witness.is_some());
+        assert_eq!(response.witness.as_ssz_bytes(), Optional::some(witness).as_ssz_bytes());
+    }
+
+    #[test]
+    fn payload_status_with_witness_new_encodes_empty_rest_optional() {
+        let response = PayloadStatusWithWitness::new(valid_status(), None);
+
+        assert!(response.witness.is_none());
+        assert_eq!(
+            response.witness.as_ssz_bytes(),
+            Optional::<ExecutionWitnessV1>::none().as_ssz_bytes()
+        );
     }
 
     #[test]
