@@ -1,13 +1,12 @@
 //! Experimental Engine API v2 REST-SSZ wire types.
 //!
 //! These types intentionally live apart from the legacy JSON-RPC Engine API types because their
-//! SSZ encodings are not always wire-compatible. This module contains both shared endpoint types
-//! and fork-specific payload containers. In particular, the draft
-//! [`refactor.md`](https://github.com/ethereum/execution-apis/blob/refs/pull/793/head/src/engine/refactor.md)
-//! specifies a top-level list for V1-V3 blob requests while
-//! [`refactor-ssz.md`](https://github.com/ethereum/execution-apis/blob/refs/pull/793/head/src/engine/refactor-ssz.md)
-//! specifies the single-field containers implemented here. See
-//! [execution-apis PR #793](https://github.com/ethereum/execution-apis/pull/793).
+//! SSZ encodings are not always wire-compatible. This module contains the shared endpoint
+//! containers and fork-specific payload containers from
+//! [execution-apis PR #793](https://github.com/ethereum/execution-apis/pull/793), plus the
+//! experimental witness response type from
+//! [execution-apis PR #773](https://github.com/ethereum/execution-apis/pull/773) where it reuses
+//! the PR #793 REST-SSZ status encoding.
 
 use crate::{
     BlobAndProofV1, BlobAndProofV2, BlobsBundleV1, BlobsBundleV2,
@@ -49,22 +48,25 @@ pub const MAX_ERROR_BYTES: usize = 1024;
 /// Maximum number of entries in a REST-SSZ historical bodies request or response.
 pub const MAX_BODIES_REQUEST: usize = 32;
 
-/// Maximum number of trie nodes in an execution witness.
+// These limits follow the pinned execution-specs witness schema. They intentionally differ by
+// field: state may contain many trie nodes, codes has fewer but larger bytecode entries, and
+// headers is a small ancestor-header list.
+/// Maximum number of trie nodes in an execution witness (`2^20`).
 pub const MAX_WITNESS_NODES: usize = 1_048_576;
 
-/// Maximum byte length of a trie node in an execution witness.
+/// Maximum byte length of a trie node in an execution witness (`2^20`).
 pub const MAX_BYTES_PER_WITNESS_NODE: usize = 1_048_576;
 
-/// Maximum number of contract bytecodes in an execution witness.
+/// Maximum number of contract bytecodes in an execution witness (`2^16`).
 pub const MAX_WITNESS_CODES: usize = 65_536;
 
-/// Maximum byte length of a contract bytecode in an execution witness.
+/// Maximum byte length of a contract bytecode in an execution witness (`2^24`).
 pub const MAX_BYTES_PER_WITNESS_CODE: usize = 16_777_216;
 
-/// Maximum number of RLP-encoded headers in an execution witness.
+/// Maximum number of RLP-encoded headers in an execution witness (`2^8`).
 pub const MAX_WITNESS_HEADERS: usize = 256;
 
-/// Maximum byte length of an RLP-encoded header in an execution witness.
+/// Maximum byte length of an RLP-encoded header in an execution witness (`2^10`).
 pub const MAX_BYTES_PER_WITNESS_HEADER: usize = 1_024;
 
 type ErrorBytes = VariableList<u8, U1024>;
@@ -375,13 +377,15 @@ pub struct ExecutionWitnessV1 {
 
 /// REST-SSZ response for `new-payload-with-witness` version 1.
 ///
-/// The witness is absent unless the payload status is `VALID`. This models only the response;
-/// the final request envelope and path belong to the broader Engine REST-SSZ API work in #793.
+/// This models only the response body. Endpoint routing, request handling, and HTTP error mapping
+/// belong to the caller. The payload status uses the Engine REST-SSZ status encoding from
+/// execution-apis PR #793; the witness is present only when the payload status is `VALID`.
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode)]
 pub struct NewPayloadWithWitnessResponseV1 {
     /// Result of processing the submitted payload.
     pub payload_status: PayloadStatus,
-    /// Execution witness produced for a valid payload, encoded as an SSZ union.
+    /// Execution witness produced for a valid payload, encoded with Rust `Option`'s SSZ union
+    /// representation.
     pub witness: Option<ExecutionWitnessV1>,
 }
 
@@ -988,9 +992,6 @@ impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesAmsterdam {
 /// This structure maps to the Engine API v2 REST-SSZ payload-build response for Paris.
 ///
 /// Unlike the legacy `engine_getPayloadV1` response, this includes the expected block value.
-///
-/// See also:
-/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
 pub struct BuiltPayloadParis {
     /// Execution payload V1.
@@ -1003,9 +1004,6 @@ pub struct BuiltPayloadParis {
 ///
 /// This follows the legacy `engine_getPayloadV2` payload-build response shape: execution payload
 /// plus block value only. `should_override_builder` starts at Cancun.
-///
-/// See also:
-/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
 pub struct BuiltPayloadShanghai {
     /// Execution payload V2.
@@ -1016,19 +1014,14 @@ pub struct BuiltPayloadShanghai {
 
 /// Engine API v2 REST-SSZ payload-build response for Cancun.
 ///
-/// This is wire-compatible with the legacy [`crate::ExecutionPayloadEnvelopeV3`].
-///
-/// See also:
-/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
+/// This is wire-compatible with the legacy `engine_getPayloadV3` response envelope,
+/// [`crate::ExecutionPayloadEnvelopeV3`].
 pub type BuiltPayloadCancun = crate::ExecutionPayloadEnvelopeV3;
 
 /// This structure maps to the Engine API v2 REST-SSZ payload-build response for Prague.
 ///
 /// Unlike the legacy [`crate::ExecutionPayloadEnvelopeV4`], `execution_requests` precedes
 /// `should_override_builder` in the normative SSZ field order.
-///
-/// See also:
-/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
 pub struct BuiltPayloadPrague {
     /// Execution payload V3.
@@ -1047,9 +1040,6 @@ pub struct BuiltPayloadPrague {
 }
 
 /// This structure maps to the Engine API v2 REST-SSZ payload-build response for Osaka.
-///
-/// See also:
-/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
 pub struct BuiltPayloadOsaka {
     /// Execution payload V3.
@@ -1068,9 +1058,6 @@ pub struct BuiltPayloadOsaka {
 }
 
 /// This structure maps to the Engine API v2 REST-SSZ payload-build response for Amsterdam.
-///
-/// See also:
-/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#builtpayload-per-fork>
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
 pub struct BuiltPayloadAmsterdam {
     /// Execution payload V4.
@@ -1254,9 +1241,6 @@ pub struct ExecutionPayloadEnvelopeOsaka {
 ///
 /// This is distinct from the legacy [`crate::ExecutionPayloadEnvelopeV6`], which is the
 /// `engine_getPayloadV6` response.
-///
-/// See also:
-/// <https://github.com/ethereum/execution-apis/blob/83151eead3f87a354718f5765063f7817bde1628/src/engine/refactor-ssz.md#executionpayloadenvelope-per-fork>
 #[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
 pub struct ExecutionPayloadEnvelopeAmsterdam {
     /// Submitted execution payload.
@@ -1674,8 +1658,8 @@ impl<T: ssz::Decode + 'static> ssz::Decode for BodiesResponse<T> {
     }
 }
 
-#[cfg(test)]
-mod payload_tests {
+#[cfg(all(test, feature = "ssz"))]
+mod tests {
     use super::*;
     use alloy_primitives::{Address, Bloom, Bytes};
     use ssz::{Decode, Encode};
@@ -2154,14 +2138,6 @@ mod payload_tests {
         let response_bytes = response.as_ssz_bytes();
         assert!(NewPayloadWithWitnessResponseV1::from_ssz_bytes(&response_bytes[..7]).is_err());
     }
-}
-
-#[cfg(all(test, feature = "ssz"))]
-mod tests {
-    use super::*;
-    use alloy_eips::eip7594::Cell;
-    use ssz::{Decode, Encode};
-
     fn request(hashes: Vec<B256>) -> BlobsV1Request {
         BlobsV1Request { versioned_hashes: hashes.try_into().unwrap() }
     }
