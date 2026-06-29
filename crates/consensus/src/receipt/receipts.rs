@@ -1,18 +1,22 @@
 use crate::receipt::{
-    Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
+    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt,
+    RlpEncodableReceipt, TxReceipt,
 };
 use alloc::{vec, vec::Vec};
-use alloy_eips::eip2718::Encodable2718;
+use alloy_eips::{
+    eip2718::{Eip2718Result, Encodable2718},
+    Decodable2718, Typed2718,
+};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::fmt;
-use derive_more::{From, IntoIterator};
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceipt", alias = "TxReceipt")]
 pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
@@ -27,20 +31,44 @@ pub struct Receipt<T = Log> {
     pub logs: Vec<T>,
 }
 
+impl<T> Receipt<T> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type
+    pub fn map_logs<U>(self, f: impl FnMut(T) -> U) -> Receipt<U> {
+        let Self { status, cumulative_gas_used, logs } = self;
+        Receipt { status, cumulative_gas_used, logs: logs.into_iter().map(f).collect() }
+    }
+}
+
 impl<T> Receipt<T>
 where
     T: AsRef<Log>,
 {
-    /// Calculates [`Log`]'s bloom filter. this is slow operation and [ReceiptWithBloom] can
-    /// be used to cache this value.
+    /// Calculates [`Log`]'s bloom filter. This is slow operation and
+    /// [`ReceiptWithBloom`] can be used to cache this value.
     pub fn bloom_slow(&self) -> Bloom {
         self.logs.iter().map(AsRef::as_ref).collect()
     }
 
-    /// Calculates the bloom filter for the receipt and returns the [ReceiptWithBloom] container
-    /// type.
+    /// Calculates the bloom filter for the receipt and returns the
+    /// [`ReceiptWithBloom`] container type.
     pub fn with_bloom(self) -> ReceiptWithBloom<Self> {
         ReceiptWithBloom { logs_bloom: self.bloom_slow(), receipt: self }
+    }
+}
+
+impl<T> Receipt<T>
+where
+    T: Into<Log>,
+{
+    /// Converts a [`Receipt`] with a custom log type into a [`Receipt`] with the primitives [`Log`]
+    /// type by converting the logs.
+    ///
+    /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
+    /// type.
+    pub fn into_primitives_receipt(self) -> Receipt<Log> {
+        self.map_logs(Into::into)
     }
 }
 
@@ -68,6 +96,13 @@ where
 
     fn logs(&self) -> &[Self::Log] {
         &self.logs
+    }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.logs
     }
 }
 
@@ -147,8 +182,17 @@ impl<T> From<ReceiptWithBloom<Self>> for Receipt<T> {
     }
 }
 
-/// Receipt containing result of transaction execution.
-#[derive(Clone, Debug, PartialEq, Eq, Default, From, IntoIterator)]
+/// A collection of receipts organized as a two-dimensional vector.
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::From,
+    derive_more::IntoIterator,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Receipts<T> {
     /// A two-dimensional vector of [`Receipt`] instances.
@@ -157,12 +201,12 @@ pub struct Receipts<T> {
 
 impl<T> Receipts<T> {
     /// Returns the length of the [`Receipts`] vector.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.receipt_vec.len()
     }
 
     /// Returns `true` if the [`Receipts`] vector is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.receipt_vec.is_empty()
     }
 
@@ -200,6 +244,12 @@ impl<T: Decodable> Decodable for Receipts<T> {
     }
 }
 
+impl<T> Default for Receipts<T> {
+    fn default() -> Self {
+        Self { receipt_vec: Default::default() }
+    }
+}
+
 /// [`Receipt`] with calculated bloom filter.
 ///
 /// This convenience type allows us to lazily calculate the bloom filter for a
@@ -209,6 +259,7 @@ impl<T: Decodable> Decodable for Receipts<T> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceiptWithBloom", alias = "TxReceiptWithBloom")]
 pub struct ReceiptWithBloom<T = Receipt<Log>> {
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -247,6 +298,13 @@ where
     fn logs(&self) -> &[Self::Log] {
         self.receipt.logs()
     }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.receipt.into_logs()
+    }
 }
 
 impl<R> From<R> for ReceiptWithBloom<R>
@@ -260,6 +318,14 @@ where
 }
 
 impl<R> ReceiptWithBloom<R> {
+    /// Converts the receipt type by applying the given closure to it.
+    ///
+    /// Returns the type with the new receipt type.
+    pub fn map_receipt<U>(self, f: impl FnOnce(R) -> U) -> ReceiptWithBloom<U> {
+        let Self { receipt, logs_bloom } = self;
+        ReceiptWithBloom { receipt: f(receipt), logs_bloom }
+    }
+
     /// Create new [ReceiptWithBloom]
     pub const fn new(receipt: R, logs_bloom: Bloom) -> Self {
         Self { receipt, logs_bloom }
@@ -268,6 +334,33 @@ impl<R> ReceiptWithBloom<R> {
     /// Consume the structure, returning the receipt and the bloom filter
     pub fn into_components(self) -> (R, Bloom) {
         (self.receipt, self.logs_bloom)
+    }
+
+    /// Returns a reference to the bloom.
+    pub const fn bloom_ref(&self) -> &Bloom {
+        &self.logs_bloom
+    }
+}
+
+impl<L> ReceiptWithBloom<Receipt<L>> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type.
+    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> ReceiptWithBloom<Receipt<U>> {
+        let Self { receipt, logs_bloom } = self;
+        ReceiptWithBloom { receipt: receipt.map_logs(f), logs_bloom }
+    }
+
+    /// Converts a [`ReceiptWithBloom`] with a custom log type into a [`ReceiptWithBloom`] with the
+    /// primitives [`Log`] type by converting the logs.
+    ///
+    /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
+    /// type.
+    pub fn into_primitives_receipt(self) -> ReceiptWithBloom<Receipt<Log>>
+    where
+        L: Into<Log>,
+    {
+        self.map_logs(Into::into)
     }
 }
 
@@ -287,20 +380,35 @@ impl<R: RlpDecodableReceipt> Decodable for ReceiptWithBloom<R> {
     }
 }
 
+impl<R: Typed2718> Typed2718 for ReceiptWithBloom<R> {
+    fn ty(&self) -> u8 {
+        self.receipt.ty()
+    }
+}
+
 impl<R> Encodable2718 for ReceiptWithBloom<R>
 where
     R: Eip2718EncodableReceipt + Send + Sync,
 {
-    fn type_flag(&self) -> Option<u8> {
-        (!self.receipt.is_legacy()).then_some(self.receipt.ty())
-    }
-
     fn encode_2718_len(&self) -> usize {
         self.receipt.eip2718_encoded_length_with_bloom(&self.logs_bloom)
     }
 
     fn encode_2718(&self, out: &mut dyn BufMut) {
         self.receipt.eip2718_encode_with_bloom(&self.logs_bloom, out);
+    }
+}
+
+impl<R> Decodable2718 for ReceiptWithBloom<R>
+where
+    R: Eip2718DecodableReceipt,
+{
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        R::typed_decode_with_bloom(ty, buf)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        R::fallback_decode_with_bloom(buf)
     }
 }
 
@@ -311,6 +419,109 @@ where
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self { receipt: R::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
+    }
+}
+
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(crate) mod serde_bincode_compat {
+    use alloc::borrow::Cow;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::Receipt`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{serde_bincode_compat, Receipt};
+    /// use serde::{de::DeserializeOwned, Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data<T: Serialize + DeserializeOwned + Clone + 'static> {
+    ///     #[serde_as(as = "serde_bincode_compat::Receipt<'_, T>")]
+    ///     receipt: Receipt<T>,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct Receipt<'a, T: Clone = alloy_primitives::Log> {
+        logs: Cow<'a, [T]>,
+        status: bool,
+        cumulative_gas_used: u64,
+    }
+
+    impl<'a, T: Clone> From<&'a super::Receipt<T>> for Receipt<'a, T> {
+        fn from(value: &'a super::Receipt<T>) -> Self {
+            Self {
+                logs: Cow::Borrowed(&value.logs),
+                // OP has no post state root variant
+                status: value.status.coerce_status(),
+                cumulative_gas_used: value.cumulative_gas_used,
+            }
+        }
+    }
+
+    impl<'a, T: Clone> From<Receipt<'a, T>> for super::Receipt<T> {
+        fn from(value: Receipt<'a, T>) -> Self {
+            Self {
+                status: value.status.into(),
+                cumulative_gas_used: value.cumulative_gas_used,
+                logs: value.logs.into_owned(),
+            }
+        }
+    }
+
+    impl<T: Serialize + Clone> SerializeAs<super::Receipt<T>> for Receipt<'_, T> {
+        fn serialize_as<S>(source: &super::Receipt<T>, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Receipt::<'_, T>::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de, T: Deserialize<'de> + Clone> DeserializeAs<'de, super::Receipt<T>> for Receipt<'de, T> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::Receipt<T>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Receipt::<'_, T>::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::{serde_bincode_compat, Receipt};
+        use alloy_primitives::Log;
+        use arbitrary::Arbitrary;
+        use bincode::config;
+        use rand::Rng;
+        use serde::{de::DeserializeOwned, Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        #[test]
+        fn test_receipt_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data<T: Serialize + DeserializeOwned + Clone + 'static> {
+                #[serde_as(as = "serde_bincode_compat::Receipt<'_,T>")]
+                receipt: Receipt<T>,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut data = Data {
+                receipt: Receipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
+            };
+            // ensure we don't have an invalid poststate variant
+            data.receipt.status = data.receipt.status.coerce_status().into();
+
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data<Log>, _>(&encoded, config::legacy())
+                    .unwrap();
+            assert_eq!(decoded, data);
+        }
     }
 }
 
@@ -371,7 +582,7 @@ mod test {
     }
 
     #[test]
-    fn rountrip_encodable_eip1559() {
+    fn roundtrip_encodable_eip1559() {
         let receipts =
             Receipts { receipt_vec: vec![vec![ReceiptEnvelope::Eip1559(Default::default())]] };
 

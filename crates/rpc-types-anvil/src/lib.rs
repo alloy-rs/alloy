@@ -4,9 +4,9 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
-use alloy_primitives::{BlockHash, Bytes, ChainId, TxHash, B256, U256};
+use alloy_primitives::{BlockHash, Bytes, ChainId, B256, U256};
 use alloy_rpc_types_eth::TransactionRequest;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
@@ -78,6 +78,10 @@ pub struct NodeInfo {
     pub environment: NodeEnvironment,
     /// Info about the node's fork configuration
     pub fork_config: NodeForkConfig,
+    /// The network type this node is running (e.g., "tempo" for Tempo mode).
+    /// `None` for standard Ethereum.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
 }
 
 /// The current block environment of the node.
@@ -85,13 +89,16 @@ pub struct NodeInfo {
 #[serde(rename_all = "camelCase")]
 pub struct NodeEnvironment {
     /// Base fee of the current block
-    pub base_fee: U256,
+    #[serde(with = "alloy_serde::quantity")]
+    pub base_fee: u128,
     /// Chain id of the node.
     pub chain_id: ChainId,
     /// Configured block gas limit
-    pub gas_limit: U256,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_limit: u64,
     /// Configured gas price
-    pub gas_price: U256,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_price: u128,
 }
 
 /// The node's fork configuration.
@@ -112,8 +119,12 @@ pub struct NodeForkConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Metadata {
-    /// client version
+    /// Client version
     pub client_version: String,
+    /// Client SemVer compatible version
+    pub client_semver: Option<String>,
+    /// Client commit SHA hash
+    pub client_commit_sha: Option<String>,
     /// Chain id of the node.
     pub chain_id: ChainId,
     /// Unique instance id
@@ -138,7 +149,7 @@ pub struct ForkedNetwork {
     /// Block number of the forked chain
     pub fork_block_number: u64,
     /// Block hash of the forked chain
-    pub fork_block_hash: TxHash,
+    pub fork_block_hash: BlockHash,
 }
 
 /// Additional `evm_mine` options

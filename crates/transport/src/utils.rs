@@ -13,15 +13,15 @@ where
     to_raw_value(s).map_err(TransportError::ser_err)
 }
 
-/// Guess whether the URL is local, based on the hostname.
+/// Guess whether the URL is local, based on the hostname or IP.
 ///
-/// The output of this function is best-efforts, and should be checked if
-/// possible. It simply returns `true` if the connection has no hostname,
-/// or the hostname is `localhost` or `127.0.0.1`.
+/// Best-effort heuristic: returns `true` if the connection has no hostname, or
+/// the host is `localhost`, `127.0.0.1`, or the IPv6 loopback `::1`.
 pub fn guess_local_url(s: impl AsRef<str>) -> bool {
     fn _guess_local_url(url: &str) -> bool {
         url.parse::<Url>().is_ok_and(|url| {
-            url.host_str().map_or(true, |host| host == "localhost" || host == "127.0.0.1")
+            url.host_str()
+                .is_none_or(|host| host == "localhost" || host == "127.0.0.1" || host == "::1")
         })
     }
     _guess_local_url(s.as_ref())
@@ -31,12 +31,13 @@ pub fn guess_local_url(s: impl AsRef<str>) -> bool {
 pub trait Spawnable {
     /// Spawn the future as a task.
     ///
-    /// In WASM this will be a `wasm-bindgen-futures::spawn_local` call, while
-    /// in native it will be a `tokio::spawn` call.
+    /// In wasm32-unknown-unknown this will be a `wasm-bindgen-futures::spawn_local` call,
+    /// in wasm32-wasip1 it will be a `tokio::task::spawn_local` call,
+    /// and native will be a `tokio::spawn` call.
     fn spawn_task(self);
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 impl<T> Spawnable for T
 where
     T: Future<Output = ()> + Send + 'static,
@@ -46,7 +47,7 @@ where
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 impl<T> Spawnable for T
 where
     T: Future<Output = ()> + 'static,
@@ -57,5 +58,15 @@ where
 
         #[cfg(feature = "wasm-bindgen")]
         wasm_bindgen_futures::spawn_local(self);
+    }
+}
+
+#[cfg(all(target_family = "wasm", target_os = "wasi"))]
+impl<T> Spawnable for T
+where
+    T: Future<Output = ()> + 'static,
+{
+    fn spawn_task(self) {
+        tokio::task::spawn_local(self);
     }
 }

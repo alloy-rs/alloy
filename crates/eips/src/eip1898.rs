@@ -35,7 +35,7 @@ impl BlockWithParent {
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(rename = "camelCase"))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct RpcBlockHash {
     /// A block hash
     pub block_hash: BlockHash,
@@ -171,7 +171,7 @@ impl serde::Serialize for BlockNumberOrTag {
         S: serde::Serializer,
     {
         match *self {
-            Self::Number(x) => serializer.serialize_str(&format!("0x{x:x}")),
+            Self::Number(x) => alloy_serde::quantity::serialize(&x, serializer),
             Self::Latest => serializer.serialize_str("latest"),
             Self::Finalized => serializer.serialize_str("finalized"),
             Self::Safe => serializer.serialize_str("safe"),
@@ -229,6 +229,122 @@ impl fmt::Display for BlockNumberOrTag {
 impl fmt::Debug for BlockNumberOrTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
+    }
+}
+
+/// This is a helper type to allow for lenient parsing of block numbers.
+///
+/// The eth json-rpc spec requires quantities to be hex encoded, which [`BlockNumberOrTag`] strictly
+/// enforces.
+///
+/// This type can be used if you want to allow for lenient parsing of block numbers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+pub struct LenientBlockNumberOrTag(BlockNumberOrTag);
+
+impl LenientBlockNumberOrTag {
+    /// Creates a new [`LenientBlockNumberOrTag`] from a [`BlockNumberOrTag`].
+    pub const fn new(block_number_or_tag: BlockNumberOrTag) -> Self {
+        Self(block_number_or_tag)
+    }
+
+    /// Returns the inner [`BlockNumberOrTag`].
+    pub const fn into_inner(self) -> BlockNumberOrTag {
+        self.0
+    }
+}
+
+impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
+    fn from(value: LenientBlockNumberOrTag) -> Self {
+        value.0
+    }
+}
+impl From<BlockNumberOrTag> for LenientBlockNumberOrTag {
+    fn from(value: BlockNumberOrTag) -> Self {
+        Self(value)
+    }
+}
+
+impl From<LenientBlockNumberOrTag> for BlockId {
+    fn from(value: LenientBlockNumberOrTag) -> Self {
+        value.into_inner().into()
+    }
+}
+
+/// A module that deserializes either a BlockNumberOrTag, or a simple number.
+#[cfg(feature = "serde")]
+pub mod lenient_block_number_or_tag {
+    use super::{BlockNumberOrTag, LenientBlockNumberOrTag};
+    use core::fmt;
+    use serde::{
+        de::{self, Visitor},
+        Deserialize, Deserializer,
+    };
+
+    /// Following the spec the block parameter is either:
+    ///
+    /// > HEX String - an integer block number
+    /// > Integer - a block number
+    /// > String "latest" - for the latest mined block
+    /// > String "finalized" - for the finalized block
+    /// > String "safe" - for the safe head block
+    /// > String "earliest" for the earliest/genesis block
+    /// > String "pending" - for the pending state/transactions
+    ///
+    /// and with EIP-1898:
+    /// > blockNumber: QUANTITY - a block number
+    /// > blockHash: DATA - a block hash
+    ///
+    /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
+    ///
+    /// EIP-1898 does not all calls that use `BlockNumber` like `eth_getBlockByNumber` and doesn't
+    /// list raw integers as supported.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<BlockNumberOrTag, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        LenientBlockNumberOrTag::deserialize(deserializer).map(Into::into)
+    }
+
+    impl<'de> Deserialize<'de> for LenientBlockNumberOrTag {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct LenientBlockNumberVisitor;
+
+            impl<'de> Visitor<'de> for LenientBlockNumberVisitor {
+                type Value = LenientBlockNumberOrTag;
+
+                fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    formatter.write_str("a block number or tag, or a u64")
+                }
+
+                fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    Ok(LenientBlockNumberOrTag(v.into()))
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    // Attempt to parse as a numeric string
+                    if let Ok(num) = v.parse::<u64>() {
+                        return Ok(LenientBlockNumberOrTag(BlockNumberOrTag::Number(num)));
+                    }
+
+                    BlockNumberOrTag::deserialize(de::value::StrDeserializer::<E>::new(v))
+                        .map(LenientBlockNumberOrTag)
+                        .map_err(de::Error::custom)
+                }
+            }
+
+            deserializer.deserialize_any(LenientBlockNumberVisitor)
+        }
     }
 }
 
@@ -489,7 +605,7 @@ impl<'de> serde::Deserialize<'de> for BlockId {
             where
                 E: serde::de::Error,
             {
-                // Since there is no way to clearly distinguish between a DATA parameter and a QUANTITY parameter. A str is therefor deserialized into a Block Number: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
+                // Since there is no way to clearly distinguish between a DATA parameter and a QUANTITY parameter. A str is therefore deserialized into a Block Number: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
                 // However, since the hex string should be a QUANTITY, we can safely assume that if the len is 66 bytes, it is in fact a hash, ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/rpc/types.go#L184-L184>
                 if v.len() == 66 {
                     Ok(v.parse::<B256>().map_err(serde::de::Error::custom)?.into())
@@ -542,7 +658,7 @@ impl<'de> serde::Deserialize<'de> for BlockId {
                     }
                 }
 
-                #[allow(clippy::option_if_let_else)]
+                #[expect(clippy::option_if_let_else)]
                 if let Some(number) = number {
                     Ok(number.into())
                 } else if let Some(block_hash) = block_hash {
@@ -794,8 +910,8 @@ impl Decodable for HashOrNumber {
 impl fmt::Display for HashOrNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Hash(hash) => write!(f, "{}", hash),
-            Self::Number(num) => write!(f, "{}", num),
+            Self::Hash(hash) => write!(f, "{hash}"),
+            Self::Number(num) => write!(f, "{num}"),
         }
     }
 }
@@ -866,6 +982,22 @@ mod tests {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
         assert_eq!(serialized, "\"0x1\"");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn block_number_or_tag_serialization() {
+        let number = BlockNumberOrTag::Number(0);
+        assert_eq!(serde_json::to_string(&number).unwrap(), "\"0x0\"");
+
+        let number = BlockNumberOrTag::Number(16);
+        assert_eq!(serde_json::to_string(&number).unwrap(), "\"0x10\"");
+
+        let latest = BlockNumberOrTag::Latest;
+        assert_eq!(serde_json::to_string(&latest).unwrap(), "\"latest\"");
+
+        let pending = BlockNumberOrTag::Pending;
+        assert_eq!(serde_json::to_string(&pending).unwrap(), "\"pending\"");
     }
 
     #[test]
@@ -1400,6 +1532,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_block_id_from_str() {
         // Valid hexadecimal block ID (with 0x prefix)
         let hex_id = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
@@ -1430,5 +1563,246 @@ mod tests {
         let invalid_string = "invalid_block_id";
         let parsed_invalid_string = BlockId::from_str(invalid_string);
         assert!(parsed_invalid_string.is_err());
+    }
+
+    /// Check parsing according to EIP-1898.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn can_parse_blockid_u64() {
+        let num = serde_json::json!(
+            {"blockNumber": "0xaf"}
+        );
+
+        let id = serde_json::from_value::<BlockId>(num);
+        assert_eq!(id.unwrap(), BlockId::from(175));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn can_parse_block_hash() {
+        let block_hash =
+            B256::from_str("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+                .unwrap();
+        let block_hash_json = serde_json::json!(
+            { "blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"}
+        );
+        let id = serde_json::from_value::<BlockId>(block_hash_json).unwrap();
+        assert_eq!(id, BlockId::from(block_hash,));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn can_parse_block_hash_with_canonical() {
+        let block_hash =
+            B256::from_str("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+                .unwrap();
+        let block_id = BlockId::Hash(RpcBlockHash::from_hash(block_hash, Some(true)));
+        let block_hash_json = serde_json::json!(
+            { "blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3", "requireCanonical": true }
+        );
+        let id = serde_json::from_value::<BlockId>(block_hash_json).unwrap();
+        assert_eq!(id, block_id)
+    }
+    #[test]
+    #[cfg(feature = "serde")]
+    fn can_parse_blockid_tags() {
+        let tags = [
+            ("latest", BlockNumberOrTag::Latest),
+            ("finalized", BlockNumberOrTag::Finalized),
+            ("safe", BlockNumberOrTag::Safe),
+            ("pending", BlockNumberOrTag::Pending),
+        ];
+        for (value, tag) in tags {
+            let num = serde_json::json!({ "blockNumber": value });
+            let id = serde_json::from_value::<BlockId>(num);
+            assert_eq!(id.unwrap(), BlockId::from(tag))
+        }
+    }
+    #[test]
+    #[cfg(feature = "serde")]
+    fn repeated_keys_is_err() {
+        let num = serde_json::json!({"blockNumber": 1, "requireCanonical": true, "requireCanonical": false});
+        assert!(serde_json::from_value::<BlockId>(num).is_err());
+        let num =
+            serde_json::json!({"blockNumber": 1, "requireCanonical": true, "blockNumber": 23});
+        assert!(serde_json::from_value::<BlockId>(num).is_err());
+    }
+
+    /// Serde tests
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_blockid_tags() {
+        let block_ids = [
+            BlockNumberOrTag::Latest,
+            BlockNumberOrTag::Finalized,
+            BlockNumberOrTag::Safe,
+            BlockNumberOrTag::Pending,
+        ]
+        .map(BlockId::from);
+        for block_id in &block_ids {
+            let serialized = serde_json::to_string(&block_id).unwrap();
+            let deserialized: BlockId = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(deserialized, *block_id)
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_blockid_number() {
+        let block_id = BlockId::from(100u64);
+        let serialized = serde_json::to_string(&block_id).unwrap();
+        let deserialized: BlockId = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, block_id)
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_blockid_hash() {
+        let block_id = BlockId::from(B256::default());
+        let serialized = serde_json::to_string(&block_id).unwrap();
+        let deserialized: BlockId = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, block_id)
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_blockid_hash_from_str() {
+        let val = "\"0x898753d8fdd8d92c1907ca21e68c7970abd290c647a202091181deec3f30a0b2\"";
+        let block_hash: B256 = serde_json::from_str(val).unwrap();
+        let block_id: BlockId = serde_json::from_str(val).unwrap();
+        assert_eq!(block_id, BlockId::Hash(block_hash.into()));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_rpc_payload_block_tag() {
+        let payload = r#"{"method":"eth_call","params":[{"to":"0xebe8efa441b9302a0d7eaecc277c09d20d684540","data":"0x45848dfc"},"latest"],"id":1,"jsonrpc":"2.0"}"#;
+        let value: serde_json::Value = serde_json::from_str(payload).unwrap();
+        let block_id_param = value.pointer("/params/1").unwrap();
+        let block_id: BlockId = serde_json::from_value::<BlockId>(block_id_param.clone()).unwrap();
+        assert_eq!(BlockId::Number(BlockNumberOrTag::Latest), block_id);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_rpc_payload_block_object() {
+        let example_payload = r#"{"method":"eth_call","params":[{"to":"0xebe8efa441b9302a0d7eaecc277c09d20d684540","data":"0x45848dfc"},{"blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"}],"id":1,"jsonrpc":"2.0"}"#;
+        let value: serde_json::Value = serde_json::from_str(example_payload).unwrap();
+        let block_id_param = value.pointer("/params/1").unwrap().to_string();
+        let block_id: BlockId = serde_json::from_str::<BlockId>(&block_id_param).unwrap();
+        let hash =
+            B256::from_str("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+                .unwrap();
+        assert_eq!(BlockId::from(hash), block_id);
+        let serialized = serde_json::to_string(&BlockId::from(hash)).unwrap();
+        assert_eq!("{\"blockHash\":\"0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3\"}", serialized)
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_rpc_payload_block_number() {
+        let example_payload = r#"{"method":"eth_call","params":[{"to":"0xebe8efa441b9302a0d7eaecc277c09d20d684540","data":"0x45848dfc"},{"blockNumber": "0x0"}],"id":1,"jsonrpc":"2.0"}"#;
+        let value: serde_json::Value = serde_json::from_str(example_payload).unwrap();
+        let block_id_param = value.pointer("/params/1").unwrap().to_string();
+        let block_id: BlockId = serde_json::from_str::<BlockId>(&block_id_param).unwrap();
+        assert_eq!(BlockId::from(0u64), block_id);
+        let serialized = serde_json::to_string(&BlockId::from(0u64)).unwrap();
+        assert_eq!("\"0x0\"", serialized)
+    }
+
+    #[test]
+    #[should_panic]
+    #[cfg(feature = "serde")]
+    fn serde_rpc_payload_block_number_duplicate_key() {
+        let payload = r#"{"blockNumber": "0x132", "blockNumber": "0x133"}"#;
+        let parsed_block_id = serde_json::from_str::<BlockId>(payload);
+        parsed_block_id.unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_rpc_payload_block_hash() {
+        let payload = r#"{"blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"}"#;
+        let parsed = serde_json::from_str::<BlockId>(payload).unwrap();
+        let expected = BlockId::from(
+            B256::from_str("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+                .unwrap(),
+        );
+        assert_eq!(parsed, expected);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_blocknumber_non_0xprefix() {
+        let s = "\"2\"";
+        let err = serde_json::from_str::<BlockNumberOrTag>(s).unwrap_err();
+        assert_eq!(err.to_string(), HexStringMissingPrefixError::default().to_string());
+    }
+
+    #[cfg(feature = "serde")]
+    #[derive(Debug, serde::Deserialize, PartialEq)]
+    struct TestLenientStruct {
+        #[serde(deserialize_with = "super::lenient_block_number_or_tag::deserialize")]
+        block: BlockNumberOrTag,
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_lenient_block_number_or_tag() {
+        // Test parsing numeric strings
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "0x1"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(1));
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "123"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(123));
+
+        // Test parsing tags
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "latest"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Latest);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "finalized"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Finalized);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "safe"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Safe);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "earliest"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Earliest);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "pending"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Pending);
+
+        // Test parsing raw numbers (not strings)
+        let lenient_struct: TestLenientStruct = serde_json::from_str(r#"{"block": 123}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(123));
+
+        let lenient_struct: TestLenientStruct = serde_json::from_str(r#"{"block": 0}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(0));
+
+        // Test invalid inputs
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": "invalid"}"#).is_err());
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": null}"#).is_err());
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": {}}"#).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_lenient_block_number_or_tag_wrapper() {
+        // Test the LenientBlockNumberOrTag wrapper directly
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"latest\"").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Latest);
+
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("123").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Number(123));
+
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"0x1\"").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Number(1));
     }
 }

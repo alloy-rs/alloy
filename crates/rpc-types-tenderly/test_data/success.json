@@ -1,0 +1,128 @@
+{
+  "status": true,
+  "gasUsed": "0xe1a5",
+  "cumulativeGasUsed": "0xe1a5",
+  "blockNumber": "0x129d59a",
+  "type": "0x2",
+  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000010000000020000000000000000000800000000000000000000000010000000000000000000004000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000020000000002000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000",
+  "logs": [
+    {
+      "name": "Transfer",
+      "anonymous": false,
+      "inputs": [
+        {
+          "value": "0x0000000000000000000000000000000000000000",
+          "type": "address",
+          "name": "src",
+          "indexed": true
+        },
+        {
+          "value": "0xe58b9ee93700a616b50509c8292977fa7a0f8ce1",
+          "type": "address",
+          "name": "dst",
+          "indexed": true
+        },
+        {
+          "value": "2000000000000000000",
+          "type": "uint256",
+          "name": "wad",
+          "indexed": false
+        }
+      ],
+      "raw": {
+        "address": "0x6b175474e89094c44da98b954eedeac495271d0f",
+        "topics": [
+          "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x000000000000000000000000e58b9ee93700a616b50509c8292977fa7a0f8ce1"
+        ],
+        "data": "0x0000000000000000000000000000000000000000000000001bc16d674ec80000"
+      }
+    }
+  ],
+  "trace": [
+    {
+      "type": "CALL",
+      "from": "0xe2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+      "to": "0x6b175474e89094c44da98b954eedeac495271d0f",
+      "gas": "0x23c2e0c0",
+      "gasUsed": "0x7c65",
+      "value": "0x0",
+      "input": "0x40c10f19000000000000000000000000e58b9ee93700a616b50509c8292977fa7a0f8ce10000000000000000000000000000000000000000000000001bc16d674ec80000",
+      "decodedInput": [
+        {
+          "value": "0xe58b9ee93700a616b50509c8292977fa7a0f8ce1",
+          "type": "address",
+          "name": "usr",
+          "indexed": false
+        },
+        {
+          "value": "2000000000000000000",
+          "type": "uint256",
+          "name": "wad",
+          "indexed": false
+        }
+      ],
+      "method": "mint",
+      "output": "0x",
+      "subtraces": 0,
+      "traceAddress": []
+    }
+  ],
+  "assetChanges": [
+    {
+      "assetInfo": {
+        "standard": "ERC20",
+        "type": "Fungible",
+        "contractAddress": "0x6b175474e89094c44da98b954eedeac495271d0f",
+        "symbol": "dai",
+        "name": "Dai",
+        "logo": "https://coin-images.coingecko.com/coins/images/9956/large/Badge_Dai.png?1696509996",
+        "decimals": 18,
+        "dollarValue": "1"
+      },
+      "type": "Mint",
+      "to": "0xe58b9ee93700a616b50509c8292977fa7a0f8ce1",
+      "rawAmount": "0x1bc16d674ec80000",
+      "amount": "2",
+      "dollarValue": "2"
+    }
+  ],
+  "balanceChanges": [
+    {
+      "address": "0xe58b9ee93700a616b50509c8292977fa7a0f8ce1",
+      "dollarValue": "2",
+      "transfers": [
+        0
+      ]
+    }
+  ],
+  "stateChanges": [
+    {
+      "address": "0x6b175474e89094c44da98b954eedeac495271d0f",
+      "storage": [
+        {
+          "slot": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "previousValue": "0x00000000000000000000000000000000000000000a633fa9d3eb778f953ef8bb",
+          "newValue": "0x00000000000000000000000000000000000000000a633fa9eface4f6e406f8bb"
+        },
+        {
+          "slot": "0x9b5472766fd311751f6a33c8e30061e20a26259ca626cf5a2feaadf96903cd9e",
+          "previousValue": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "newValue": "0x0000000000000000000000000000000000000000000000001bc16d674ec80000"
+        }
+      ]
+    },
+    {
+      "address": "0xe2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+      "nonce": {
+        "previousValue": "0x0",
+        "newValue": "0x1"
+      },
+      "balance": {
+        "previousValue": "0x3635c9adc5dea00000",
+        "newValue": "0x3635c3a43c59a6540f"
+      }
+    }
+  ]
+}

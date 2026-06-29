@@ -6,9 +6,8 @@ use alloy_rpc_types_txpool::{TxpoolContent, TxpoolContentFrom, TxpoolInspect, Tx
 use alloy_transport::TransportResult;
 
 /// Txpool namespace rpc interface.
-#[allow(unused, unreachable_pub)]
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait TxPoolApi<N: Network = Ethereum>: Send + Sync {
     /// Returns the content of the transaction pool.
     ///
@@ -45,8 +44,8 @@ pub trait TxPoolApi<N: Network = Ethereum>: Send + Sync {
     async fn txpool_status(&self) -> TransportResult<TxpoolStatus>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<P, N> TxPoolApi<N> for P
 where
     P: Provider<N>,
@@ -83,7 +82,7 @@ mod tests {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
                 let content = provider.txpool_content().await.unwrap();
                 assert_eq!(content, TxpoolContent::default());
             })
@@ -97,7 +96,7 @@ mod tests {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
                 let content = provider.txpool_content_from(Address::default()).await.unwrap();
                 assert_eq!(content, TxpoolContentFrom::default());
             })
@@ -111,7 +110,7 @@ mod tests {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
                 let content = provider.txpool_inspect().await.unwrap();
                 assert_eq!(content, TxpoolInspect::default());
             })
@@ -125,7 +124,7 @@ mod tests {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
                 let content = provider.txpool_status().await.unwrap();
                 assert_eq!(content, TxpoolStatus::default());
             })

@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 
 /// Container type for `trace_call` arguments
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct TraceCallRequest {
+pub struct TraceCallRequest<TxReq = TransactionRequest> {
     /// call request object
-    pub call: TransactionRequest,
+    pub call: TxReq,
     /// trace types
     pub trace_types: HashSet<TraceType>,
     /// Optional: blockId
@@ -22,9 +22,9 @@ pub struct TraceCallRequest {
     pub block_overrides: Option<Box<BlockOverrides>>,
 }
 
-impl TraceCallRequest {
-    /// Returns a new [`TraceCallRequest`] given a [`TransactionRequest`] and [`HashSet<TraceType>`]
-    pub fn new(call: TransactionRequest) -> Self {
+impl<TxReq> TraceCallRequest<TxReq> {
+    /// Returns a new [`TraceCallRequest`] with the `call`.
+    pub fn new(call: TxReq) -> Self {
         Self {
             call,
             trace_types: HashSet::default(),

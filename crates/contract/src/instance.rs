@@ -35,13 +35,13 @@ impl<P, N> ContractInstance<P, N> {
 
     /// Sets the contract's address.
     #[inline]
-    pub fn set_address(&mut self, address: Address) {
+    pub const fn set_address(&mut self, address: Address) {
         self.address = address;
     }
 
     /// Returns a new contract instance at `address`.
     #[inline]
-    pub fn at(mut self, address: Address) -> Self {
+    pub const fn at(mut self, address: Address) -> Self {
         self.set_address(address);
         self
     }
@@ -82,7 +82,7 @@ impl<P: Provider<N>, N: Network> ContractInstance<P, N> {
         &self,
         name: &str,
         args: &[DynSolValue],
-    ) -> Result<CallBuilder<(), &P, Function, N>> {
+    ) -> Result<CallBuilder<&P, Function, N>> {
         let function = self.interface.get_from_name(name)?;
         CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
@@ -92,13 +92,13 @@ impl<P: Provider<N>, N: Network> ContractInstance<P, N> {
         &self,
         selector: &Selector,
         args: &[DynSolValue],
-    ) -> Result<CallBuilder<(), &P, Function, N>> {
+    ) -> Result<CallBuilder<&P, Function, N>> {
         let function = self.interface.get_from_selector(selector)?;
         CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
 
     /// Returns an [`Event`] builder with the provided filter.
-    pub const fn event<E: SolEvent>(&self, filter: Filter) -> Event<(), &P, E, N> {
+    pub const fn event<E: SolEvent>(&self, filter: Filter) -> Event<&P, E, N> {
         Event::new(&self.provider, filter)
     }
 }
@@ -127,7 +127,7 @@ mod tests {
 
     #[tokio::test]
     async fn contract_interface() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let abi_str = r#"[{"inputs":[],"name":"counter","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"increment","outputs":[],"stateMutability":"nonpayable","type":"function"}]"#;
         let abi = serde_json::from_str::<JsonAbi>(abi_str).unwrap();
@@ -153,5 +153,11 @@ mod tests {
 
         let result = contract.function("counter", &[]).unwrap().call().await.unwrap();
         assert_eq!(result[0].as_uint().unwrap().0, U256::from(1));
+
+        // do the same with `eth_sendRawTransactionSync`
+        let _ = contract.function("increment", &[]).unwrap().send_sync().await.unwrap();
+
+        let result = contract.function("counter", &[]).unwrap().call().await.unwrap();
+        assert_eq!(result[0].as_uint().unwrap().0, U256::from(2));
     }
 }

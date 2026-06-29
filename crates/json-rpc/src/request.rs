@@ -1,5 +1,6 @@
-use crate::{common::Id, RpcObject, RpcParam};
+use crate::{common::Id, RpcBorrow, RpcSend};
 use alloy_primitives::{keccak256, B256};
+use http::Extensions;
 use serde::{
     de::{DeserializeOwned, MapAccess},
     ser::SerializeMap,
@@ -9,7 +10,7 @@ use serde_json::value::RawValue;
 use std::{borrow::Cow, marker::PhantomData, mem::MaybeUninit};
 
 /// `RequestMeta` contains the [`Id`] and method name of a request.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct RequestMeta {
     /// The method name.
     pub method: Cow<'static, str>,
@@ -17,12 +18,15 @@ pub struct RequestMeta {
     pub id: Id,
     /// Whether the request is a subscription, other than `eth_subscribe`.
     is_subscription: bool,
+    /// Optional extensions for the request that can be used by middleware
+    /// or other components to attach additional metadata.
+    extensions: Extensions,
 }
 
 impl RequestMeta {
     /// Create a new `RequestMeta`.
-    pub const fn new(method: Cow<'static, str>, id: Id) -> Self {
-        Self { method, id, is_subscription: false }
+    pub fn new(method: Cow<'static, str>, id: Id) -> Self {
+        Self { method, id, is_subscription: false, extensions: Extensions::new() }
     }
 
     /// Returns `true` if the request is a subscription.
@@ -32,16 +36,53 @@ impl RequestMeta {
 
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.set_subscription_status(true);
     }
 
     /// Setter for `is_subscription`. Indicates to RPC clients that the request
     /// triggers a stream of notifications.
-    pub fn set_subscription_status(&mut self, sub: bool) {
+    pub const fn set_subscription_status(&mut self, sub: bool) {
         self.is_subscription = sub;
     }
+
+    /// Returns a reference to the request extensions.
+    ///
+    /// These can be used to attach additional metadata to the request
+    /// that can be used by middleware or other components.
+    pub const fn extensions(&self) -> &Extensions {
+        &self.extensions
+    }
+
+    /// Returns a mutable reference to the request extensions.
+    ///
+    /// These can be used to attach additional metadata to the request
+    /// that can be used by middleware or other components.
+    pub const fn extensions_mut(&mut self) -> &mut Extensions {
+        &mut self.extensions
+    }
+
+    /// Returns a reference to the request headers, if any.
+    pub fn headers(&self) -> Option<&http::HeaderMap> {
+        self.extensions.get::<http::HeaderMap>()
+    }
+
+    /// Returns a mutable reference to the request headers, inserting an empty
+    /// header map if one does not already exist.
+    pub fn headers_mut(&mut self) -> &mut http::HeaderMap {
+        self.extensions.get_or_insert_default::<http::HeaderMap>()
+    }
 }
+
+impl PartialEq for RequestMeta {
+    fn eq(&self, other: &Self) -> bool {
+        self.method == other.method
+            && self.id == other.id
+            && self.is_subscription == other.is_subscription
+    }
+}
+
+impl Eq for RequestMeta {}
 
 /// A JSON-RPC 2.0 request object.
 ///
@@ -73,13 +114,13 @@ impl<Params> Request<Params> {
 
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription()
     }
 
     /// Setter for `is_subscription`. Indicates to RPC clients that the request
     /// triggers a stream of notifications.
-    pub fn set_subscription_status(&mut self, sub: bool) {
+    pub const fn set_subscription_status(&mut self, sub: bool) {
         self.meta.set_subscription_status(sub);
     }
 
@@ -89,6 +130,14 @@ impl<Params> Request<Params> {
         map: impl FnOnce(Params) -> NewParams,
     ) -> Request<NewParams> {
         Request { meta: self.meta, params: map(self.params) }
+    }
+
+    /// Change the metadata of the request.
+    pub fn map_meta<F>(self, f: F) -> Self
+    where
+        F: FnOnce(RequestMeta) -> RequestMeta,
+    {
+        Self { meta: f(self.meta), params: self.params }
     }
 }
 
@@ -105,7 +154,7 @@ pub type PartiallySerializedRequest = Request<Box<RawValue>>;
 
 impl<Params> Request<Params>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     /// Serialize the request parameters as a boxed [`RawValue`].
     ///
@@ -126,7 +175,7 @@ where
 impl<Params> Request<&Params>
 where
     Params: ToOwned,
-    Params::Owned: RpcParam,
+    Params::Owned: RpcSend,
 {
     /// Clone the request, including the request parameters.
     pub fn into_owned_params(self) -> Request<Params::Owned> {
@@ -164,7 +213,7 @@ where
 // `jsonrpc` field
 impl<Params> Serialize for Request<Params>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -188,7 +237,7 @@ where
 
 impl<'de, Params> Deserialize<'de> for Request<Params>
 where
-    Params: RpcObject,
+    Params: RpcBorrow<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -197,7 +246,7 @@ where
         struct Visitor<Params>(PhantomData<Params>);
         impl<'de, Params> serde::de::Visitor<'de> for Visitor<Params>
         where
-            Params: RpcObject,
+            Params: RpcBorrow<'de>,
         {
             type Value = Request<Params>;
 
@@ -242,8 +291,7 @@ where
                             let version: String = map.next_value()?;
                             if version != "2.0" {
                                 return Err(serde::de::Error::custom(format!(
-                                    "unsupported JSON-RPC version: {}",
-                                    version
+                                    "unsupported JSON-RPC version: {version}"
                                 )));
                             }
                             jsonrpc = Some(());
@@ -295,9 +343,9 @@ pub struct SerializedRequest {
     request: Box<RawValue>,
 }
 
-impl<Params> std::convert::TryFrom<Request<Params>> for SerializedRequest
+impl<Params> TryFrom<Request<Params>> for SerializedRequest
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     type Error = serde_json::Error;
 
@@ -312,6 +360,22 @@ impl SerializedRequest {
         &self.meta
     }
 
+    /// Returns a mutable reference to the request metadata (ID and Method).
+    pub const fn meta_mut(&mut self) -> &mut RequestMeta {
+        &mut self.meta
+    }
+
+    /// Returns a reference to the request headers, if any.
+    pub fn headers(&self) -> Option<&http::HeaderMap> {
+        self.meta.headers()
+    }
+
+    /// Returns a mutable reference to the request headers, inserting an empty
+    /// header map if one does not already exist.
+    pub fn headers_mut(&mut self) -> &mut http::HeaderMap {
+        self.meta.headers_mut()
+    }
+
     /// Returns the request ID.
     pub const fn id(&self) -> &Id {
         &self.meta.id
@@ -322,9 +386,17 @@ impl SerializedRequest {
         &self.meta.method
     }
 
+    /// Returns the request method.
+    pub fn method_clone(&self) -> Cow<'static, str> {
+        match &self.meta.method {
+            Cow::Borrowed(b) => Cow::Borrowed(b),
+            Cow::Owned(o) => Cow::Owned(o.clone()),
+        }
+    }
+
     /// Mark the request as a non-standard subscription (i.e. not
     /// `eth_subscribe`)
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription();
     }
 
@@ -390,6 +462,7 @@ impl Serialize for SerializedRequest {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::RpcObject;
 
     fn test_inner<T: RpcObject + PartialEq>(t: T) {
         let ser = serde_json::to_string(&t).unwrap();

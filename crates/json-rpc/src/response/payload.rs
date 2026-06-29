@@ -1,4 +1,4 @@
-use crate::{ErrorPayload, RpcObject};
+use crate::{ErrorPayload, RpcSend};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::value::{to_raw_value, RawValue};
 use std::borrow::{Borrow, Cow};
@@ -78,7 +78,7 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// and additional data.
     pub const fn internal_error_with_obj(data: ErrData) -> Self
     where
-        ErrData: RpcObject,
+        ErrData: RpcSend,
     {
         Self::Failure(ErrorPayload::internal_error_with_obj(data))
     }
@@ -90,7 +90,7 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
         data: ErrData,
     ) -> Self
     where
-        ErrData: RpcObject,
+        ErrData: RpcSend,
     {
         Self::Failure(ErrorPayload::internal_error_with_message_and_obj(message, data))
     }
@@ -111,6 +111,24 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
         }
     }
 
+    /// Converts this type into a [`Result`] returning the [`ErrorPayload`] as `Err`.
+    pub fn try_into_success(self) -> Result<Payload, ErrorPayload<ErrData>> {
+        match self {
+            Self::Success(res) => Ok(res),
+            Self::Failure(error) => Err(error),
+        }
+    }
+
+    /// Returns the error code if this a [`ResponsePayload::Failure`]
+    pub fn error_code(&self) -> Option<i64> {
+        self.as_error().map(|err| err.code)
+    }
+
+    /// Returns the error data if this a [`ResponsePayload::Failure`]
+    pub fn error_data(&self) -> Option<&ErrData> {
+        self.as_error().and_then(|err| err.data.as_ref())
+    }
+
     /// Returns `true` if the response payload is a success.
     pub const fn is_success(&self) -> bool {
         matches!(self, Self::Success(_))
@@ -124,8 +142,8 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
 
 impl<Payload, ErrData> ResponsePayload<Payload, ErrData>
 where
-    Payload: RpcObject,
-    ErrData: RpcObject,
+    Payload: RpcSend,
+    ErrData: RpcSend,
 {
     /// Convert the inner types into a [`RawValue`] by serializing them.
     pub fn serialize_payload(&self) -> serde_json::Result<ResponsePayload> {

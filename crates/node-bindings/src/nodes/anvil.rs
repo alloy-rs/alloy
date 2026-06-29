@@ -1,6 +1,11 @@
 //! Utilities for launching an Anvil instance.
 
+use crate::{utils::GracefulShutdown, NodeError, NODE_STARTUP_TIMEOUT};
+use alloy_hardforks::EthereumHardfork;
+use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
+use alloy_signer::Signer;
+use alloy_signer_local::LocalSigner;
 use k256::{ecdsa::SigningKey, SecretKey as K256SecretKey};
 use std::{
     ffi::OsString,
@@ -13,10 +18,9 @@ use std::{
 };
 use url::Url;
 
-use crate::NodeError;
-
-/// How long we will wait for anvil to indicate that it is ready.
-const ANVIL_STARTUP_TIMEOUT_MILLIS: u64 = 10_000;
+/// anvil's default ipc path
+pub const DEFAULT_IPC_ENDPOINT: &str =
+    if cfg!(unix) { "/tmp/anvil.ipc" } else { r"\\.\pipe\anvil.ipc" };
 
 /// An anvil CLI instance. Will close the instance when dropped.
 ///
@@ -26,6 +30,9 @@ pub struct AnvilInstance {
     child: Child,
     private_keys: Vec<K256SecretKey>,
     addresses: Vec<Address>,
+    wallet: Option<EthereumWallet>,
+    ipc_path: Option<String>,
+    host: String,
     port: u16,
     chain_id: Option<ChainId>,
 }
@@ -37,7 +44,7 @@ impl AnvilInstance {
     }
 
     /// Returns a mutable reference to the child process.
-    pub fn child_mut(&mut self) -> &mut Child {
+    pub const fn child_mut(&mut self) -> &mut Child {
         &mut self.child
     }
 
@@ -46,9 +53,29 @@ impl AnvilInstance {
         &self.private_keys
     }
 
+    /// Convenience function that returns the first key.
+    ///
+    /// # Panics
+    ///
+    /// If this instance does not contain any keys
+    #[track_caller]
+    pub fn first_key(&self) -> &K256SecretKey {
+        self.private_keys.first().unwrap()
+    }
+
+    /// Returns the private key for the given index.
+    pub fn nth_key(&self, idx: usize) -> Option<&K256SecretKey> {
+        self.private_keys.get(idx)
+    }
+
     /// Returns the addresses used to instantiate this instance
     pub fn addresses(&self) -> &[Address] {
         &self.addresses
+    }
+
+    /// Returns the host of this instance
+    pub fn host(&self) -> &str {
+        &self.host
     }
 
     /// Returns the port of this instance
@@ -65,12 +92,17 @@ impl AnvilInstance {
     /// Returns the HTTP endpoint of this instance
     #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.port)
+        format!("http://{}:{}", self.host, self.port)
     }
 
     /// Returns the Websocket endpoint of this instance
     pub fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.port)
+        format!("ws://{}:{}", self.host, self.port)
+    }
+
+    /// Returns the IPC path
+    pub fn ipc_path(&self) -> &str {
+        self.ipc_path.as_deref().unwrap_or(DEFAULT_IPC_ENDPOINT)
     }
 
     /// Returns the HTTP endpoint url of this instance
@@ -83,11 +115,16 @@ impl AnvilInstance {
     pub fn ws_endpoint_url(&self) -> Url {
         Url::parse(&self.ws_endpoint()).unwrap()
     }
+
+    /// Returns the [`EthereumWallet`] of this instance generated from anvil dev accounts.
+    pub fn wallet(&self) -> Option<EthereumWallet> {
+        self.wallet.clone()
+    }
 }
 
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
-        self.child.kill().expect("could not kill anvil");
+        GracefulShutdown::shutdown(&mut self.child, 10, "anvil");
     }
 }
 
@@ -116,16 +153,20 @@ impl Drop for AnvilInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Anvil {
     program: Option<PathBuf>,
+    host: Option<String>,
     port: Option<u16>,
     // If the block_time is an integer, f64::to_string() will output without a decimal point
     // which allows this to be backwards compatible.
     block_time: Option<f64>,
     chain_id: Option<ChainId>,
     mnemonic: Option<String>,
+    ipc_path: Option<String>,
     fork: Option<String>,
     fork_block_number: Option<u64>,
     args: Vec<OsString>,
+    envs: Vec<(OsString, OsString)>,
     timeout: Option<u64>,
+    keep_stdout: bool,
 }
 
 impl Anvil {
@@ -171,13 +212,27 @@ impl Anvil {
         self
     }
 
+    /// Sets the host which will be used when the `anvil` instance is launched.
+    pub fn host<T: Into<String>>(mut self, host: T) -> Self {
+        self.host = Some(host.into());
+        self
+    }
+
     /// Sets the port which will be used when the `anvil` instance is launched.
     pub fn port<T: Into<u16>>(mut self, port: T) -> Self {
         self.port = Some(port.into());
         self
     }
 
+    /// Sets the path for the ipc server
+    pub fn ipc_path(mut self, path: impl Into<String>) -> Self {
+        self.ipc_path = Some(path.into());
+        self
+    }
+
     /// Sets the chain_id the `anvil` instance will use.
+    ///
+    /// If not set, the instance defaults to chain id `31337`.
     pub const fn chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = Some(chain_id);
         self
@@ -219,6 +274,64 @@ impl Anvil {
         self
     }
 
+    /// Select the [`EthereumHardfork`] to start anvil with.
+    pub fn hardfork(mut self, hardfork: EthereumHardfork) -> Self {
+        self = self.args(["--hardfork", hardfork.to_string().as_str()]);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Paris`].
+    pub fn paris(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Paris);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Cancun`].
+    pub fn cancun(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Cancun);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Shanghai`].
+    pub fn shanghai(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Shanghai);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Prague`].
+    pub fn prague(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Prague);
+        self
+    }
+
+    /// Instantiate `anvil` with the `--odyssey` flag.
+    pub fn odyssey(mut self) -> Self {
+        self = self.arg("--odyssey");
+        self
+    }
+
+    /// Instantiate `anvil` with the `--auto-impersonate` flag.
+    pub fn auto_impersonate(mut self) -> Self {
+        self = self.arg("--auto-impersonate");
+        self
+    }
+
+    /// Adds an argument to pass to the `anvil`.
+    pub fn push_arg<T: Into<OsString>>(&mut self, arg: T) {
+        self.args.push(arg.into());
+    }
+
+    /// Adds multiple arguments to pass to the `anvil`.
+    pub fn extend_args<I, S>(&mut self, args: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        for arg in args {
+            self.push_arg(arg);
+        }
+    }
+
     /// Adds an argument to pass to the `anvil`.
     pub fn arg<T: Into<OsString>>(mut self, arg: T) -> Self {
         self.args.push(arg.into());
@@ -237,9 +350,41 @@ impl Anvil {
         self
     }
 
+    /// Adds an environment variable to pass to the `anvil`.
+    pub fn env<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<OsString>,
+        V: Into<OsString>,
+    {
+        self.envs.push((key.into(), value.into()));
+        self
+    }
+
+    /// Adds multiple environment variables to pass to the `anvil`.
+    pub fn envs<I, K, V>(mut self, envs: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<OsString>,
+        V: Into<OsString>,
+    {
+        for (key, value) in envs {
+            self = self.env(key, value);
+        }
+        self
+    }
+
     /// Sets the timeout which will be used when the `anvil` instance is launched.
+    /// Units: milliseconds.
     pub const fn timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
+        self
+    }
+
+    /// Keep the handle to anvil's stdout in order to read from it.
+    ///
+    /// Caution: if the stdout handle isn't used, this can end up blocking.
+    pub const fn keep_stdout(mut self) -> Self {
+        self.keep_stdout = true;
         self
     }
 
@@ -257,6 +402,19 @@ impl Anvil {
     pub fn try_spawn(self) -> Result<AnvilInstance, NodeError> {
         let mut cmd = self.program.as_ref().map_or_else(|| Command::new("anvil"), Command::new);
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
+
+        // disable nightly warning
+        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "")
+            // disable color in logs
+            .env("NO_COLOR", "1");
+
+        // set additional environment variables
+        cmd.envs(self.envs);
+
+        if let Some(ref host) = self.host {
+            cmd.arg("--host").arg(host);
+        }
+
         let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());
 
@@ -280,29 +438,34 @@ impl Anvil {
             cmd.arg("--fork-block-number").arg(fork_block_number.to_string());
         }
 
+        if let Some(ipc_path) = &self.ipc_path {
+            cmd.arg("--ipc").arg(ipc_path);
+        }
+
         cmd.args(self.args);
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stdout = child.stdout.take().ok_or(NodeError::NoStderr)?;
+        let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
+        let timeout = self.timeout.map(Duration::from_millis).unwrap_or(NODE_STARTUP_TIMEOUT);
 
         let mut private_keys = Vec::new();
         let mut addresses = Vec::new();
         let mut is_private_key = false;
         let mut chain_id = None;
+        let mut wallet = None;
         loop {
-            if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
-                <= Instant::now()
-            {
+            if start + timeout <= Instant::now() {
+                let _ = child.kill();
                 return Err(NodeError::Timeout);
             }
 
             let mut line = String::new();
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
-            trace!(target: "anvil", line);
+            trace!(target: "alloy::node::anvil", line);
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
                 // parse the actual port
@@ -332,12 +495,33 @@ impl Anvil {
                     chain_id = Some(chain);
                 };
             }
+
+            if !private_keys.is_empty() {
+                let mut private_keys = private_keys.iter().map(|key| {
+                    let mut signer = LocalSigner::from(key.clone());
+                    signer.set_chain_id(chain_id);
+                    signer
+                });
+                let mut w = EthereumWallet::new(private_keys.next().unwrap());
+                for pk in private_keys {
+                    w.register_signer(pk);
+                }
+                wallet = Some(w);
+            }
+        }
+
+        if self.keep_stdout {
+            // re-attach the stdout handle if requested
+            child.stdout = Some(reader.into_inner());
         }
 
         Ok(AnvilInstance {
             child,
             private_keys,
             addresses,
+            wallet,
+            ipc_path: self.ipc_path,
+            host: self.host.unwrap_or_else(|| "localhost".to_string()),
             port,
             chain_id: self.chain_id.or(chain_id),
         })
@@ -354,5 +538,30 @@ mod test {
         //even though the block time is a f64, it should be passed as a whole number
         let anvil = Anvil::new().block_time(12);
         assert_eq!(anvil.block_time.unwrap().to_string(), "12");
+    }
+
+    #[test]
+    fn spawn_and_drop() {
+        let _ = Anvil::new().block_time(12).try_spawn().map(drop);
+    }
+
+    #[test]
+    fn can_set_host() {
+        let anvil = Anvil::new().host("0.0.0.0").block_time(12).try_spawn();
+        if let Ok(anvil) = anvil {
+            assert_eq!(anvil.host(), "0.0.0.0");
+            assert!(anvil.endpoint().starts_with("http://0.0.0.0:"));
+            assert!(anvil.ws_endpoint().starts_with("ws://0.0.0.0:"));
+        }
+    }
+
+    #[test]
+    fn default_host_is_localhost() {
+        let anvil = Anvil::new().block_time(12).try_spawn();
+        if let Ok(anvil) = anvil {
+            assert_eq!(anvil.host(), "localhost");
+            assert!(anvil.endpoint().starts_with("http://localhost:"));
+            assert!(anvil.ws_endpoint().starts_with("ws://localhost:"));
+        }
     }
 }

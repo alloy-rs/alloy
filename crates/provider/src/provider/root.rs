@@ -42,7 +42,7 @@ pub fn builder<N: Network>() -> ProviderBuilder<Identity, Identity, N> {
 
 impl<N: Network> RootProvider<N> {
     /// Creates a new HTTP root provider from the given URL.
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http(url: url::Url) -> Self {
         Self::new(RpcClient::new_http(url))
     }
@@ -59,38 +59,16 @@ impl<N: Network> RootProvider<N> {
         Self::connect_with(s.parse::<BuiltInConnectionString>()?).await
     }
 
-    /// Creates a new root provider from the provided connection details.
-    #[deprecated(since = "0.9.0", note = "use `connect` instead")]
-    pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
-        Self::connect(s).await
-    }
-
     /// Connects to a transport with the given connector.
     pub async fn connect_with<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
         ClientBuilder::default().connect_with(conn).await.map(Self::new)
     }
-
-    /// Connects to a boxed transport with the given connector.
-    #[deprecated(
-        since = "0.9.0",
-        note = "`RootProvider` is now always boxed, use `connect_with` instead"
-    )]
-    pub async fn connect_boxed<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
-        Self::connect_with(conn).await
-    }
 }
 
 impl<N: Network> RootProvider<N> {
-    /// Boxes the inner client.
-    #[deprecated(since = "0.9.0", note = "`RootProvider` is now always boxed")]
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn boxed(self) -> Self {
-        self
-    }
-
     /// Gets the subscription corresponding to the given RPC subscription ID.
     #[cfg(feature = "pubsub")]
-    pub async fn get_subscription<R: alloy_json_rpc::RpcReturn>(
+    pub async fn get_subscription<R: alloy_json_rpc::RpcRecv>(
         &self,
         id: alloy_primitives::B256,
     ) -> alloy_transport::TransportResult<Subscription<R>> {
@@ -112,11 +90,12 @@ impl<N: Network> RootProvider<N> {
     }
 
     #[inline]
-    pub(crate) fn get_heart(&self) -> &HeartbeatHandle<N> {
+    pub(crate) fn get_heart(&self) -> &HeartbeatHandle {
         self.inner.heart.get_or_init(|| {
             let new_blocks = NewBlocks::<N>::new(self.inner.weak_client());
+            let paused = new_blocks.paused.clone();
             let stream = new_blocks.into_stream();
-            Heartbeat::new(Box::pin(stream)).spawn()
+            Heartbeat::<N, _>::new(Box::pin(stream), paused).spawn()
         })
     }
 }
@@ -125,7 +104,7 @@ impl<N: Network> RootProvider<N> {
 /// base of every provider stack.
 pub(crate) struct RootProviderInner<N: Network = Ethereum> {
     client: RpcClient,
-    heart: OnceLock<HeartbeatHandle<N>>,
+    heart: OnceLock<HeartbeatHandle>,
     _network: PhantomData<N>,
 }
 

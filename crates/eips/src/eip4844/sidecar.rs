@@ -1,15 +1,20 @@
 //! EIP-4844 sidecar type
 
-use crate::eip4844::{
-    kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
-    BYTES_PER_PROOF,
+use crate::{
+    eip4844::{
+        kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
+        BYTES_PER_PROOF,
+    },
+    eip7594::{Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
 #[cfg(any(test, feature = "arbitrary"))]
-use crate::eip4844::MAX_BLOBS_PER_BLOCK;
+use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
+#[cfg(feature = "kzg")]
+use crate::eip4844::{AsAlloy, AsCkzg};
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
@@ -31,13 +36,11 @@ pub struct IndexedBlobHash {
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.
-    #[cfg_attr(
-        all(debug_assertions, feature = "serde"),
-        serde(deserialize_with = "deserialize_blobs")
-    )]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "crate::eip4844::deserialize_blobs"))]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
@@ -77,6 +80,42 @@ impl BlobTransactionSidecar {
                 None
             })
         })
+    }
+
+    /// Converts this EIP-4844 sidecar into an EIP-7594 sidecar.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<crate::eip7594::BlobTransactionSidecarEip7594, c_kzg::Error> {
+        use crate::eip7594::CELLS_PER_EXT_BLOB;
+
+        if let [blob] = self.blobs.as_slice() {
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+            let cell_proofs = c_kzg::KzgProof::boxed_slice_as_alloy(kzg_proofs).into();
+            return Ok(crate::eip7594::BlobTransactionSidecarEip7594::new(
+                self.blobs,
+                self.commitments,
+                cell_proofs,
+            ));
+        }
+
+        let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
+
+        for blob in self.blobs.iter() {
+            // Compute cells and their KZG proofs for this blob
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+            cell_proofs.extend_from_slice(c_kzg::KzgProof::slice_as_alloy(kzg_proofs.as_ref()));
+        }
+
+        Ok(crate::eip7594::BlobTransactionSidecarEip7594::new(
+            self.blobs,
+            self.commitments,
+            cell_proofs,
+        ))
     }
 }
 
@@ -143,7 +182,8 @@ impl BlobTransactionSidecarItem {
         let proof = c_kzg::Bytes48::from_bytes(self.kzg_proof.as_slice())
             .map_err(BlobTransactionValidationError::KZGError)?;
 
-        let result = c_kzg::KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
+        let result = settings
+            .verify_blob_kzg_proof(&blob, &commitment, &proof)
             .map_err(BlobTransactionValidationError::KZGError)?;
 
         result.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
@@ -177,7 +217,7 @@ impl BlobTransactionSidecarItem {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK)?;
+        let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK_DENCUN)?;
         let mut blobs = Vec::with_capacity(num_blobs);
         for _ in 0..num_blobs {
             blobs.push(Blob::arbitrary(u)?);
@@ -200,6 +240,14 @@ impl BlobTransactionSidecar {
         Self { blobs, commitments, proofs }
     }
 
+    /// Shrinks the sidecar vectors to fit their current contents.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.blobs.shrink_to_fit();
+        self.commitments.shrink_to_fit();
+        self.proofs.shrink_to_fit();
+    }
+
     /// Creates a new instance from the given KZG types.
     #[cfg(feature = "kzg")]
     pub fn from_kzg(
@@ -207,19 +255,10 @@ impl BlobTransactionSidecar {
         commitments: Vec<c_kzg::Bytes48>,
         proofs: Vec<c_kzg::Bytes48>,
     ) -> Self {
-        // transmutes the vec of items, see also [core::mem::transmute](https://doc.rust-lang.org/std/mem/fn.transmute.html)
-        unsafe fn transmute_vec<U, T>(input: Vec<T>) -> Vec<U> {
-            let mut v = core::mem::ManuallyDrop::new(input);
-            Vec::from_raw_parts(v.as_mut_ptr() as *mut U, v.len(), v.capacity())
-        }
-
-        // SAFETY: all types have the same size and alignment
-        unsafe {
-            let blobs = transmute_vec::<Blob, c_kzg::Blob>(blobs);
-            let commitments = transmute_vec::<Bytes48, c_kzg::Bytes48>(commitments);
-            let proofs = transmute_vec::<Bytes48, c_kzg::Bytes48>(proofs);
-            Self { blobs, commitments, proofs }
-        }
+        let blobs = Blob::vec_from_ckzg(blobs);
+        let commitments = Bytes48::vec_from_ckzg(commitments);
+        let proofs = Bytes48::vec_from_ckzg(proofs);
+        Self { blobs, commitments, proofs }
     }
 
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
@@ -255,8 +294,6 @@ impl BlobTransactionSidecar {
         for (versioned_hash, commitment) in
             blob_versioned_hashes.iter().zip(self.commitments.iter())
         {
-            let commitment = c_kzg::KzgCommitment::from(commitment.0);
-
             // calculate & verify versioned hash
             let calculated_versioned_hash = kzg_to_versioned_hash(commitment.as_slice());
             if *versioned_hash != calculated_versioned_hash {
@@ -267,26 +304,20 @@ impl BlobTransactionSidecar {
             }
         }
 
-        // SAFETY: ALL types have the same size
-        let res = unsafe {
-            c_kzg::KzgProof::verify_blob_kzg_proof_batch(
-                // blobs
-                core::mem::transmute::<&[Blob], &[c_kzg::Blob]>(self.blobs.as_slice()),
-                // commitments
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.commitments.as_slice()),
-                // proofs
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.proofs.as_slice()),
-                proof_settings,
+        let res = proof_settings
+            .verify_blob_kzg_proof_batch(
+                Blob::slice_as_ckzg(self.blobs.as_slice()),
+                Bytes48::slice_as_ckzg(self.commitments.as_slice()),
+                Bytes48::slice_as_ckzg(self.proofs.as_slice()),
             )
-        }
-        .map_err(BlobTransactionValidationError::KZGError)?;
+            .map_err(BlobTransactionValidationError::KZGError)?;
 
         res.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> impl Iterator<Item = B256> + '_ {
-        self.commitments.iter().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
+        VersionedHashIter::new(&self.commitments)
     }
 
     /// Returns the versioned hash for the blob at the given index, if it
@@ -295,40 +326,89 @@ impl BlobTransactionSidecar {
         self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
     }
 
+    /// Returns the index of the versioned hash in the commitments vector.
+    pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
+        self.commitments
+            .iter()
+            .position(|commitment| kzg_to_versioned_hash(commitment.as_slice()) == *hash)
+    }
+
+    /// Returns the blob corresponding to the versioned hash, if it exists.
+    pub fn blob_by_versioned_hash(&self, hash: &B256) -> Option<&Blob> {
+        self.versioned_hash_index(hash).and_then(|index| self.blobs.get(index))
+    }
+
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
     #[inline]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.blobs.len() * BYTES_PER_BLOB + // blobs
             self.commitments.len() * BYTES_PER_COMMITMENT + // commitments
             self.proofs.len() * BYTES_PER_PROOF // proofs
     }
 
-    /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs.
+    /// Tries to create a new [`BlobTransactionSidecar`] from the hex encoded blob str.
+    ///
+    /// See also [`Blob::from_hex`](c_kzg::Blob::from_hex)
     #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
-    pub fn try_from_blobs(blobs: Vec<c_kzg::Blob>) -> Result<Self, c_kzg::Error> {
+    pub fn try_from_blobs_hex<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<str>,
+    {
+        let mut converted = Vec::new();
+        for blob in blobs {
+            converted.push(crate::eip4844::utils::hex_to_blob(blob)?);
+        }
+        Self::try_from_blobs(converted)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecar`] from the given blob
+    /// bytes.
+    ///
+    /// See also [`Blob::from_bytes`](c_kzg::Blob::from_bytes)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_bytes<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<[u8]>,
+    {
+        let mut converted = Vec::new();
+        for blob in blobs {
+            converted.push(crate::eip4844::utils::bytes_to_blob(blob)?);
+        }
+        Self::try_from_blobs(converted)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs
+    /// and KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        let mut commitments = Vec::with_capacity(blobs.len());
+        let mut proofs = Vec::with_capacity(blobs.len());
+        for blob in &blobs {
+            let blob = blob.as_ckzg();
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let proof = settings.compute_blob_kzg_proof(blob, &commitment.to_bytes())?;
+
+            commitments.push(Bytes48::from_ckzg(commitment.to_bytes()));
+            proofs.push(Bytes48::from_ckzg(proof.to_bytes()));
+        }
+
+        Ok(Self::new(blobs, commitments, proofs))
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs.
+    ///
+    /// This uses the global/default KZG settings, see also
+    /// [`EnvKzgSettings::Default`](crate::eip4844::env_settings::EnvKzgSettings).
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs(blobs: Vec<Blob>) -> Result<Self, c_kzg::Error> {
         use crate::eip4844::env_settings::EnvKzgSettings;
-        use c_kzg::{KzgCommitment, KzgProof};
 
-        let kzg_settings = EnvKzgSettings::Default;
-
-        let commitments = blobs
-            .iter()
-            .map(|blob| {
-                KzgCommitment::blob_to_kzg_commitment(&blob.clone(), kzg_settings.get())
-                    .map(|blob| blob.to_bytes())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let proofs = blobs
-            .iter()
-            .zip(commitments.iter())
-            .map(|(blob, commitment)| {
-                KzgProof::compute_blob_kzg_proof(blob, commitment, kzg_settings.get())
-                    .map(|blob| blob.to_bytes())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(Self::from_kzg(blobs, commitments, proofs))
+        Self::try_from_blobs_with_settings(blobs, EnvKzgSettings::Default.get())
     }
 
     /// Outputs the RLP length of the [BlobTransactionSidecar] fields, without
@@ -418,20 +498,43 @@ impl Decodable for BlobTransactionSidecar {
     }
 }
 
-// Helper function to deserialize boxed blobs
-#[cfg(all(debug_assertions, feature = "serde"))]
-fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    use serde::Deserialize;
+impl Encodable7594 for BlobTransactionSidecar {
+    fn encode_7594_len(&self) -> usize {
+        self.rlp_encoded_fields_length()
+    }
 
-    let raw_blobs = Vec::<alloy_primitives::Bytes>::deserialize(deserializer)?;
+    fn encode_7594(&self, out: &mut dyn BufMut) {
+        self.rlp_encode_fields(out);
+    }
+}
+
+impl Decodable7594 for BlobTransactionSidecar {
+    fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Self::rlp_decode_fields(buf)
+    }
+}
+
+/// Helper function to deserialize boxed blobs from an existing [`MapAccess`]
+///
+/// [`MapAccess`]: serde::de::MapAccess
+#[cfg(all(debug_assertions, feature = "serde"))]
+pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
+    map_access: &mut M,
+) -> Result<Vec<Blob>, M::Error> {
+    let raw_blobs: Vec<alloy_primitives::Bytes> = map_access.next_value()?;
     let mut blobs = Vec::with_capacity(raw_blobs.len());
     for blob in raw_blobs {
         blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
     }
     Ok(blobs)
+}
+
+#[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
+pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
+    map_access: &mut M,
+) -> Result<Vec<Blob>, M::Error> {
+    map_access.next_value()
 }
 
 /// An error that can occur when validating a [BlobTransactionSidecar::validate].
@@ -464,16 +567,16 @@ impl core::fmt::Display for BlobTransactionValidationError {
         match self {
             Self::InvalidProof => f.write_str("invalid KZG proof"),
             Self::KZGError(err) => {
-                write!(f, "KZG error: {:?}", err)
+                write!(f, "KZG error: {err:?}")
             }
             Self::NotBlobTransaction(err) => {
-                write!(f, "unable to verify proof for non blob transaction: {}", err)
+                write!(f, "unable to verify proof for non blob transaction: {err}")
             }
             Self::MissingSidecar => {
                 f.write_str("eip4844 tx variant without sidecar being used for verification.")
             }
             Self::WrongVersionedHash { have, expected } => {
-                write!(f, "wrong versioned hash: have {}, expected {}", have, expected)
+                write!(f, "wrong versioned hash: have {have}, expected {expected}")
             }
         }
     }
@@ -483,6 +586,29 @@ impl core::fmt::Display for BlobTransactionValidationError {
 impl From<c_kzg::Error> for BlobTransactionValidationError {
     fn from(source: c_kzg::Error) -> Self {
         Self::KZGError(source)
+    }
+}
+
+/// Iterator that returns versioned hashes from commitments.
+#[derive(Debug, Clone)]
+pub struct VersionedHashIter<'a> {
+    /// The iterator over KZG commitments from which versioned hashes are generated.
+    commitments: core::slice::Iter<'a, Bytes48>,
+}
+
+impl<'a> Iterator for VersionedHashIter<'a> {
+    type Item = B256;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.commitments.next().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    }
+}
+
+// Constructor method for VersionedHashIter
+impl<'a> VersionedHashIter<'a> {
+    /// Creates a new iterator over commitments to generate versioned hashes.
+    pub fn new(commitments: &'a [Bytes48]) -> Self {
+        Self { commitments: commitments.iter() }
     }
 }
 

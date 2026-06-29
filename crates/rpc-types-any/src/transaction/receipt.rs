@@ -1,10 +1,271 @@
 use alloy_consensus_any::AnyReceiptEnvelope;
+use alloy_network_primitives::ReceiptResponse;
+use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_rpc_types_eth::{Log, TransactionReceipt};
-use alloy_serde::WithOtherFields;
+use alloy_serde::{OtherFields, WithOtherFields};
+use core::ops::{Deref, DerefMut};
+use serde::{Deserialize, Serialize};
 
-/// Alias for a catch-all receipt type.
+/// A catch-all receipt type for handling receipts on multiple networks.
 #[doc(alias = "AnyTxReceipt")]
-pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnyTransactionReceipt(pub WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>);
+
+impl AnyTransactionReceipt {
+    /// Creates a new [`AnyTransactionReceipt`].
+    pub const fn new(inner: WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>) -> Self {
+        Self(inner)
+    }
+
+    /// Splits the receipt into its inner receipt and unknown fields.
+    pub fn into_parts(self) -> (TransactionReceipt<AnyReceiptEnvelope<Log>>, OtherFields) {
+        let WithOtherFields { inner, other } = self.0;
+        (inner, other)
+    }
+
+    /// Consumes the type and returns the wrapped receipt.
+    pub fn into_inner(self) -> TransactionReceipt<AnyReceiptEnvelope<Log>> {
+        self.0.into_inner()
+    }
+
+    /// Returns true if the transaction was successful.
+    #[inline]
+    pub fn is_success(&self) -> bool {
+        self.0.inner.status()
+    }
+
+    /// Returns the contract address if this was a deployment transaction.
+    #[inline]
+    pub const fn deployed_contract(&self) -> Option<Address> {
+        self.0.inner.contract_address
+    }
+
+    /// Returns the transaction hash.
+    #[inline]
+    pub const fn transaction_hash(&self) -> TxHash {
+        self.0.inner.transaction_hash
+    }
+
+    /// Alias for [`transaction_hash`](Self::transaction_hash).
+    #[inline]
+    pub const fn tx_hash(&self) -> TxHash {
+        self.transaction_hash()
+    }
+
+    /// Returns the logs from this receipt.
+    #[inline]
+    pub fn logs(&self) -> &[Log] {
+        self.0.inner.logs()
+    }
+
+    /// Returns the block hash if available.
+    #[inline]
+    pub const fn block_hash(&self) -> Option<BlockHash> {
+        self.0.inner.block_hash
+    }
+
+    /// Returns the block number if available.
+    #[inline]
+    pub const fn block_number(&self) -> Option<u64> {
+        self.0.inner.block_number
+    }
+
+    /// Returns the gas used by this transaction.
+    #[inline]
+    pub const fn gas_used(&self) -> u64 {
+        self.0.inner.gas_used
+    }
+
+    /// Returns the cumulative gas used up to this transaction in the block.
+    #[inline]
+    pub fn cumulative_gas_used(&self) -> u64 {
+        self.0.inner.cumulative_gas_used()
+    }
+
+    /// Returns the effective gas price.
+    #[inline]
+    pub const fn effective_gas_price(&self) -> u128 {
+        self.0.inner.effective_gas_price
+    }
+
+    /// Returns a reference to the unknown fields.
+    #[inline]
+    pub const fn other_fields(&self) -> &OtherFields {
+        &self.0.other
+    }
+
+    /// Returns a mutable reference to the unknown fields.
+    #[inline]
+    pub const fn other_fields_mut(&mut self) -> &mut OtherFields {
+        &mut self.0.other
+    }
+
+    /// Deserializes the unknown fields into a concrete type.
+    #[inline]
+    pub fn deserialize_other<T>(&self) -> Result<T, serde_json::Error>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        self.0.other.clone().deserialize_into()
+    }
+
+    /// Maps the inner receipt envelope to a different type.
+    ///
+    /// [`OtherFields`] are discarded while mapping.
+    #[inline]
+    pub fn map_inner<U, F>(self, f: F) -> TransactionReceipt<U>
+    where
+        F: FnOnce(AnyReceiptEnvelope<Log>) -> U,
+    {
+        let WithOtherFields { inner, .. } = self.0;
+        inner.map_inner(f)
+    }
+
+    /// Applies a fallible mapping function to the inner receipt envelope.
+    ///
+    /// [`OtherFields`] are discarded while mapping.
+    #[inline]
+    pub fn try_map_inner<U, E, F>(self, f: F) -> Result<TransactionReceipt<U>, E>
+    where
+        F: FnOnce(AnyReceiptEnvelope<Log>) -> Result<U, E>,
+    {
+        let WithOtherFields { inner, .. } = self.0;
+        Ok(TransactionReceipt {
+            inner: f(inner.inner)?,
+            transaction_hash: inner.transaction_hash,
+            transaction_index: inner.transaction_index,
+            block_hash: inner.block_hash,
+            block_number: inner.block_number,
+            gas_used: inner.gas_used,
+            effective_gas_price: inner.effective_gas_price,
+            blob_gas_used: inner.blob_gas_used,
+            blob_gas_price: inner.blob_gas_price,
+            from: inner.from,
+            to: inner.to,
+            contract_address: inner.contract_address,
+        })
+    }
+
+    /// Converts the receipt into a different envelope type.
+    ///
+    /// [`OtherFields`] are discarded while mapping.
+    #[inline]
+    pub fn convert<U>(self) -> TransactionReceipt<U>
+    where
+        U: From<AnyReceiptEnvelope<Log>>,
+    {
+        self.map_inner(U::from)
+    }
+
+    /// Tries to convert the receipt into a different envelope type.
+    ///
+    /// [`OtherFields`] are discarded while mapping.
+    #[inline]
+    pub fn try_convert<U>(
+        self,
+    ) -> Result<TransactionReceipt<U>, <U as TryFrom<AnyReceiptEnvelope<Log>>>::Error>
+    where
+        U: TryFrom<AnyReceiptEnvelope<Log>>,
+    {
+        self.try_map_inner(U::try_from)
+    }
+}
+
+impl Deref for AnyTransactionReceipt {
+    type Target = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for AnyTransactionReceipt {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>> for AnyTransactionReceipt {
+    fn from(value: WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<TransactionReceipt<AnyReceiptEnvelope<Log>>> for AnyTransactionReceipt {
+    fn from(value: TransactionReceipt<AnyReceiptEnvelope<Log>>) -> Self {
+        Self(WithOtherFields::new(value))
+    }
+}
+
+impl From<AnyTransactionReceipt> for WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>> {
+    fn from(value: AnyTransactionReceipt) -> Self {
+        value.0
+    }
+}
+
+impl From<AnyTransactionReceipt> for TransactionReceipt<AnyReceiptEnvelope<Log>> {
+    fn from(value: AnyTransactionReceipt) -> Self {
+        value.0.into_inner()
+    }
+}
+
+impl ReceiptResponse for AnyTransactionReceipt {
+    fn contract_address(&self) -> Option<Address> {
+        self.0.inner.contract_address
+    }
+
+    fn status(&self) -> bool {
+        self.0.inner.status()
+    }
+
+    fn block_hash(&self) -> Option<BlockHash> {
+        self.0.inner.block_hash
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.0.inner.block_number
+    }
+
+    fn transaction_hash(&self) -> TxHash {
+        self.0.inner.transaction_hash
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.0.inner.transaction_index
+    }
+
+    fn gas_used(&self) -> u64 {
+        self.0.inner.gas_used
+    }
+
+    fn effective_gas_price(&self) -> u128 {
+        self.0.inner.effective_gas_price
+    }
+
+    fn blob_gas_used(&self) -> Option<u64> {
+        self.0.inner.blob_gas_used
+    }
+
+    fn blob_gas_price(&self) -> Option<u128> {
+        self.0.inner.blob_gas_price
+    }
+
+    fn from(&self) -> Address {
+        self.0.inner.from
+    }
+
+    fn to(&self) -> Option<Address> {
+        self.0.inner.to
+    }
+
+    fn cumulative_gas_used(&self) -> u64 {
+        self.0.inner.cumulative_gas_used()
+    }
+
+    fn state_root(&self) -> Option<B256> {
+        self.0.inner.state_root()
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -77,7 +338,7 @@ mod test {
             b256!("2bc7cb4648e847712e39abd42178e35214a70bb15c568d604687661b9539b4c2")
         );
 
-        let other: OpOtherFields = receipt.other.deserialize_into().unwrap();
+        let other: OpOtherFields = receipt.deserialize_other().unwrap();
         assert_eq!(other.l1_base_fee_scalar, "0x558");
         assert_eq!(other.l1_blob_base_fee, "0x1");
         assert_eq!(other.l1_blob_base_fee_scalar, "0xc5fc5");
@@ -140,7 +401,7 @@ mod test {
             b256!("5aeca744e0c1f6d7f68641aedd394ac4b6e18cbeac3f8b3c81056c0e51a61cf3")
         );
 
-        let other: ArbOtherFields = receipt.other.deserialize_into().unwrap();
+        let other: ArbOtherFields = receipt.deserialize_other().unwrap();
         assert_eq!(other.gas_used_for_l1, "0x2c906");
         assert_eq!(other.l1_block_number, "0x1323b96");
     }

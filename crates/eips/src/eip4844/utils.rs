@@ -3,6 +3,8 @@
 //!
 //! [`SidecarCoder`]: crate::eip4844::builder::SidecarCoder
 
+#[cfg(feature = "kzg")]
+use crate::eip4844::Blob;
 use crate::eip4844::{FIELD_ELEMENT_BYTES_USIZE, USABLE_BITS_PER_FIELD_ELEMENT};
 
 /// Determine whether a slice of bytes can be contained in a field element.
@@ -25,6 +27,33 @@ pub const fn minimum_fe_for_bytes(bytes: usize) -> usize {
 /// Calculate the number of field elements required to store the given data.
 pub const fn minimum_fe(data: &[u8]) -> usize {
     minimum_fe_for_bytes(data.len())
+}
+
+/// Maps a slice of bytes to a blob returning a [`c_kzg::Error`] if the bytes
+/// cannot be mapped. This is a helper for sidecar construction, and mimics the
+/// exact behavior of [`c_kzg::Error`] as of v2.1.1.
+#[cfg(feature = "kzg")]
+pub fn bytes_to_blob<B: AsRef<[u8]>>(blob: B) -> Result<Blob, c_kzg::Error> {
+    let b_ref = blob.as_ref();
+    Blob::try_from(b_ref).map_err(|_| {
+        // mimic c_kzg error
+        c_kzg::Error::InvalidBytesLength(format!(
+            "Invalid byte length. Expected {} got {}",
+            crate::eip4844::BYTES_PER_BLOB,
+            b_ref.len(),
+        ))
+    })
+}
+
+/// Maps a hex string to a blob returning a [`c_kzg::Error`] if the hex
+/// cannot be mapped. This is a helper for sidecar construction, and mimics the
+/// exact behavior of [`c_kzg::Error`] as of v2.1.1.
+#[cfg(feature = "kzg")]
+pub fn hex_to_blob<B: AsRef<str>>(blob: B) -> Result<Blob, c_kzg::Error> {
+    let b_ref = blob.as_ref();
+    alloy_primitives::hex::decode(b_ref)
+        .map_err(|e| c_kzg::Error::InvalidHexFormat(format!("Failed to decode hex: {}", e)))
+        .and_then(bytes_to_blob)
 }
 
 /// A wrapper for a slice of bytes that is a whole, valid field element.

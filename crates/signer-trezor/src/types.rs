@@ -21,7 +21,7 @@ pub enum DerivationType {
 impl fmt::Display for DerivationType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            Self::TrezorLive(index) => write!(f, "m/44'/60'/{index}'/0/0"),
+            Self::TrezorLive(index) => write!(f, "m/44'/60'/0'/0/{index}"),
             Self::Other(inner) => f.write_str(inner),
         }
     }
@@ -49,6 +49,11 @@ pub enum TrezorError {
     /// Need to provide a chain ID for EIP-155 signing.
     #[error("missing Trezor signer chain ID")]
     MissingChainId,
+    /// Unsupported transaction type for Trezor signing.
+    #[error(
+        "Trezor transaction signing only supports legacy and EIP-1559 transactions; got transaction type 0x{0:02x}"
+    )]
+    UnsupportedTransactionType(u8),
     /// Could not retrieve device features.
     #[error("could not retrieve device features")]
     Features,

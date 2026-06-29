@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+use alloy_consensus::transaction::TransactionMeta;
 use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 
 /// Ethereum Log emitted by a transaction
@@ -51,6 +53,11 @@ impl<T> Log<T> {
     pub const fn data(&self) -> &T {
         &self.inner.data
     }
+
+    /// Consumes the type and returns the wrapped [`alloy_primitives::Log`]
+    pub fn into_inner(self) -> alloy_primitives::Log<T> {
+        self.inner
+    }
 }
 
 impl Log<LogData> {
@@ -74,7 +81,7 @@ impl Log<LogData> {
 
     /// Decode the log data into a typed log.
     pub fn log_decode<T: alloy_sol_types::SolEvent>(&self) -> alloy_sol_types::Result<Log<T>> {
-        let decoded = T::decode_log(&self.inner, false)?;
+        let decoded = T::decode_log(&self.inner)?;
         Ok(Log {
             inner: decoded,
             block_hash: self.block_hash,
@@ -85,6 +92,63 @@ impl Log<LogData> {
             log_index: self.log_index,
             removed: self.removed,
         })
+    }
+
+    /// Decode the log data with validation into a typed log.
+    pub fn log_decode_validate<T: alloy_sol_types::SolEvent>(
+        &self,
+    ) -> alloy_sol_types::Result<Log<T>> {
+        let decoded = T::decode_log_validate(&self.inner)?;
+        Ok(Log {
+            inner: decoded,
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            block_timestamp: self.block_timestamp,
+            transaction_hash: self.transaction_hash,
+            transaction_index: self.transaction_index,
+            log_index: self.log_index,
+            removed: self.removed,
+        })
+    }
+
+    /// Creates a collection of RPC logs from transaction receipt logs.
+    ///
+    /// This function takes raw consensus logs and enriches them with RPC metadata
+    /// needed for API responses, including block information and proper indexing.
+    ///
+    /// # Arguments
+    ///
+    /// * `previous_log_count` - The total number of logs from previous transactions in the same
+    ///   block. Used to calculate the correct `log_index` for each log.
+    /// * `meta` - Transaction metadata containing block hash, number, timestamp, and transaction
+    ///   information needed to populate the RPC log fields.
+    /// * `logs` - An iterator of consensus logs to be converted into RPC logs.
+    ///
+    /// # Returns
+    ///
+    /// A vector of RPC logs with all metadata fields populated, ready to be included in the
+    /// transaction receipt.
+    pub fn collect_for_receipt<I, T>(
+        previous_log_count: usize,
+        meta: TransactionMeta,
+        logs: I,
+    ) -> Vec<Log<T>>
+    where
+        I: IntoIterator<Item = alloy_primitives::Log<T>>,
+    {
+        logs.into_iter()
+            .enumerate()
+            .map(|(tx_log_idx, log)| Log {
+                inner: log,
+                block_hash: Some(meta.block_hash),
+                block_number: Some(meta.block_number),
+                block_timestamp: Some(meta.timestamp),
+                transaction_hash: Some(meta.tx_hash),
+                transaction_index: Some(meta.index),
+                log_index: Some((previous_log_count + tx_log_idx) as u64),
+                removed: false,
+            })
+            .collect()
     }
 }
 
@@ -148,6 +212,12 @@ impl<T> AsRef<T> for Log<T> {
 impl<T> AsMut<T> for Log<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.inner.data
+    }
+}
+
+impl<L> From<Log<L>> for alloy_primitives::Log<L> {
+    fn from(value: Log<L>) -> Self {
+        value.into_inner()
     }
 }
 

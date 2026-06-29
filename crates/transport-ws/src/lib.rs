@@ -4,25 +4,26 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[macro_use]
 extern crate tracing;
 
 use alloy_pubsub::ConnectionInterface;
+use std::time::Duration;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 mod native;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 pub use native::{WebSocketConfig, WsConnect};
 
-#[cfg(not(target_arch = "wasm32"))]
-use rustls as _;
-
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 mod wasm;
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 pub use wasm::WsConnect;
+
+/// The default keepalive interval in seconds.
+const DEFAULT_KEEPALIVE: u64 = 10;
 
 /// An ongoing connection to a backend.
 ///
@@ -37,11 +38,24 @@ pub struct WsBackend<T> {
 
     /// The interface to the connection.
     pub(crate) interface: ConnectionInterface,
+
+    /// The keepalive interval for sending pings.
+    pub(crate) keepalive_interval: Duration,
 }
 
 impl<T> WsBackend<T> {
+    /// Create a new [`WsBackend`] from an already-established socket, a [`ConnectionInterface`],
+    /// and a keepalive interval.
+    pub const fn from_socket(
+        socket: T,
+        interface: ConnectionInterface,
+        keepalive_interval: Duration,
+    ) -> Self {
+        Self { socket, interface, keepalive_interval }
+    }
+
     /// Handle inbound text from the websocket.
-    #[allow(clippy::result_unit_err)]
+    #[expect(clippy::result_unit_err)]
     pub fn handle_text(&mut self, text: &str) -> Result<(), ()> {
         trace!(%text, "received message from websocket");
 

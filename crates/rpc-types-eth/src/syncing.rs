@@ -16,8 +16,8 @@ pub struct SyncInfo {
     pub warp_chunks_amount: Option<U256>,
     /// Warp sync snapshot chunks processed.
     pub warp_chunks_processed: Option<U256>,
-    /// The details of the sync stages as an hashmap
-    /// where the key is the name of the stage and the value is the block number.
+    /// The details of the sync stages as a list of entries; each `Stage` contains the
+    /// stage name and the latest processed block for that stage.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub stages: Option<Vec<Stage>>,
 }
@@ -183,6 +183,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_sync_info_serialization() {
         let sync_info = SyncInfo {
             starting_block: U256::from(0x3cbed5),
@@ -204,6 +205,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_peer_info_serialization() {
         let peer_info = PeerInfo {
             id: Some("peer_id_123".to_string()),
@@ -231,6 +233,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_sync_status_serialization() {
         let sync_status = SyncStatus::Info(Box::new(SyncInfo {
             starting_block: U256::from(0x3cbed5),

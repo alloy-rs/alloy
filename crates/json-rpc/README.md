@@ -14,7 +14,7 @@ an arbitrary parameters object. The parameters object may be omitted if empty.
 
 Any object that may be Serialized and Cloned may be used as RPC Parameters.
 
-Requests are sent via transports (see [alloy-transports]). This results in 1 of
+Requests are sent via transports (see [alloy-transport]). This results in 1 of
 3 outcomes, captured in the `RpcResult<E>` enum:
 
 - `Ok(Response)` - The request was successful, and the server returned a
@@ -25,7 +25,7 @@ Requests are sent via transports (see [alloy-transports]). This results in 1 of
 - `Err(E)` - Some client-side error prevented the request from being received
   by the server, or prevented the response from being processed. This indicates a client-side or transport-related error.
 
-[alloy-transports]: ../transports
+[alloy-transport]: ../transport
 
 ### Limitations
 

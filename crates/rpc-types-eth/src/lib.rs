@@ -4,11 +4,10 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 
 #[macro_use]
-#[allow(unused_imports)]
 extern crate alloc;
 
 pub use alloy_eips::eip4895::{Withdrawal, Withdrawals};
@@ -57,7 +56,7 @@ pub use transaction::*;
 mod work;
 pub use work::Work;
 
-/// This module provides implementations for EIP-4337.
+/// This module provides implementations for ERC-4337.
 pub mod erc4337;
 pub use erc4337::{
     PackedUserOperation, SendUserOperation, SendUserOperationResponse, UserOperation,

@@ -16,7 +16,7 @@ const DEFAULT_AUTH_PORT: u16 = 8551;
 const DEFAULT_P2P_PORT: u16 = 30303;
 
 #[test]
-#[cfg_attr(windows, ignore)]
+#[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth() {
     if !ci_info::is_ci() {
         return;
@@ -30,7 +30,7 @@ fn can_launch_reth() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore)]
+#[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth_sepolia() {
     if !ci_info::is_ci() {
         return;
@@ -44,7 +44,7 @@ fn can_launch_reth_sepolia() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore)]
+#[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth_dev() {
     if !ci_info::is_ci() {
         return;
@@ -58,7 +58,7 @@ fn can_launch_reth_dev() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore)]
+#[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth_dev_custom_genesis() {
     if !ci_info::is_ci() {
         return;
@@ -77,7 +77,7 @@ fn can_launch_reth_dev_custom_genesis() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore)]
+#[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth_dev_custom_blocktime() {
     if !ci_info::is_ci() {
         return;
@@ -96,7 +96,7 @@ fn can_launch_reth_dev_custom_blocktime() {
 }
 
 #[test]
-#[cfg_attr(windows, ignore)]
+#[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth_p2p_instances() {
     if !ci_info::is_ci() {
         return;
@@ -118,7 +118,7 @@ fn can_launch_reth_p2p_instances() {
 // Tests that occupy the same port are combined so they are ran sequentially, to prevent
 // flakiness.
 #[test]
-#[cfg_attr(windows, ignore)]
+#[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth_custom_ports() {
     if !ci_info::is_ci() {
         return;

@@ -1,14 +1,17 @@
-use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType, Typed2718};
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
+use crate::{SignableTransaction, Transaction, TxType};
+use alloy_eips::{
+    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+};
+use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::mem;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip1559Transaction", alias = "TransactionEip1559", alias = "Eip1559Tx")]
 pub struct TxEip1559 {
     /// EIP-155: Simple replay attack protection
@@ -27,11 +30,9 @@ pub struct TxEip1559 {
         serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
     )]
     pub gas_limit: u64,
-    /// A scalar value equal to the maximum
-    /// amount of gas that should be used in executing
-    /// this transaction. This is paid up-front, before any
-    /// computation is done and may not be increased
-    /// later; formally Tg.
+    /// A scalar value equal to the maximum total fee per unit of gas
+    /// the sender is willing to pay. The actual fee paid per gas is
+    /// the minimum of this and `base_fee + max_priority_fee_per_gas`.
     ///
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
@@ -63,9 +64,14 @@ pub struct TxEip1559 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
+    // Deserialize with `alloy_serde::null_as_default` to also accept a `null` value
+    // instead of an (empty) array. This is due to certain RPC providers (e.g., Filecoin's)
+    // sometimes returning `null` instead of an empty array `[]`.
+    // More details in <https://github.com/alloy-rs/alloy/pull/2450>.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub access_list: AccessList,
-    /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
-    /// Some). pub init: An unlimited size byte array specifying the
+    /// Input has two uses depending if `to` field is Create or Call.
+    /// pub init: An unlimited size byte array specifying the
     /// EVM-code for the account initialisation procedure CREATE,
     /// data: An unlimited size byte array specifying the
     /// input data of the message call, formally Td.
@@ -75,7 +81,7 @@ pub struct TxEip1559 {
 impl TxEip1559 {
     /// Get the transaction type
     #[doc(alias = "transaction_type")]
-    pub(crate) const fn tx_type() -> TxType {
+    pub const fn tx_type() -> TxType {
         TxType::Eip1559
     }
 
@@ -83,21 +89,11 @@ impl TxEip1559 {
     /// transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u64>() + // gas_limit
-        mem::size_of::<u128>() + // max_fee_per_gas
-        mem::size_of::<u128>() + // max_priority_fee_per_gas
-        self.to.size() + // to
-        mem::size_of::<U256>() + // value
-        self.access_list.size() + // access_list
-        self.input.len() // input
+        size_of::<Self>() + self.access_list.size() + self.input.len()
     }
 }
 
-impl RlpEcdsaTx for TxEip1559 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
+impl RlpEcdsaEncodableTx for TxEip1559 {
     /// Outputs the length of the transaction's fields, without a RLP header.
     fn rlp_encoded_fields_length(&self) -> usize {
         self.chain_id.length()
@@ -124,6 +120,10 @@ impl RlpEcdsaTx for TxEip1559 {
         self.input.0.encode(out);
         self.access_list.encode(out);
     }
+}
+
+impl RlpEcdsaDecodableTx for TxEip1559 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     /// Decodes the inner [TxEip1559] fields from RLP bytes.
     ///
@@ -196,17 +196,11 @@ impl Transaction for TxEip1559 {
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
-            // if the tip is greater than the max priority fee per gas, set it to the max
-            // priority fee per gas + base fee
-            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
-            if tip > self.max_priority_fee_per_gas {
-                self.max_priority_fee_per_gas + base_fee as u128
-            } else {
-                // otherwise return the max fee per gas
-                self.max_fee_per_gas
-            }
-        })
+        alloy_eips::eip1559::calc_effective_gas_price(
+            self.max_fee_per_gas,
+            self.max_priority_fee_per_gas,
+            base_fee,
+        )
     }
 
     #[inline]
@@ -256,6 +250,12 @@ impl Typed2718 for TxEip1559 {
     }
 }
 
+impl IsTyped2718 for TxEip1559 {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x02)
+    }
+}
+
 impl SignableTransaction<Signature> for TxEip1559 {
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = chain_id;
@@ -268,11 +268,6 @@ impl SignableTransaction<Signature> for TxEip1559 {
 
     fn payload_len_for_signature(&self) -> usize {
         self.length() + 1
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let tx_hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, tx_hash)
     }
 }
 
@@ -383,6 +378,7 @@ pub(super) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -405,8 +401,9 @@ pub(super) mod serde_bincode_compat {
                     .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }
@@ -415,11 +412,12 @@ pub(super) mod serde_bincode_compat {
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use super::TxEip1559;
-    use crate::{transaction::RlpEcdsaTx, SignableTransaction};
-    use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{
-        address, b256, hex, Address, PrimitiveSignature as Signature, B256, U256,
+    use crate::{
+        transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx},
+        SignableTransaction,
     };
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
 
     #[test]
     fn recover_signer_eip1559() {
@@ -469,6 +467,40 @@ mod tests {
                 max_priority_fee_per_gas: 0x3b9aca00,
                 access_list: AccessList::default(),
             };
+
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        );
+
+        let mut buf = vec![];
+        tx.rlp_encode_signed(&sig, &mut buf);
+        let decoded = TxEip1559::rlp_decode_signed(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
+        assert_eq!(*decoded.hash(), hash);
+    }
+
+    #[test]
+    fn json_decode_eip1559_null_access_list() {
+        let hash: B256 = b256!("0ec0b6a2df4d87424e5f6ad2a654e27aaeb7dac20ae9e8385cc09087ad532ee0");
+
+        let tx_json = r#"
+        {
+            "chainId": "0x1",
+            "nonce": "0x42",
+            "gas": "0xad62",
+            "to": "0x6069a6c32cf691f5982febae4faf8a6f3ab2f0f6",
+            "value": "0x0",
+            "input": "0xa22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000",
+            "maxFeePerGas": "0x4a817c800",
+            "maxPriorityFeePerGas": "0x3b9aca00",
+            "accessList": null
+        }
+        "#;
+        // Make sure that we can decode a `null` accessList
+        let tx: TxEip1559 = serde_json::from_str(tx_json).unwrap();
+        assert_eq!(tx.access_list, AccessList::default());
 
         let sig = Signature::from_scalars_and_parity(
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),

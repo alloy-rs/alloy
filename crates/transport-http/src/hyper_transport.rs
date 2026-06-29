@@ -10,10 +10,18 @@ use hyper::{
     header, Request, Response,
 };
 use hyper_util::client::legacy::Error;
+use itertools::Itertools;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
-use tower::Service;
-use tracing::{debug, debug_span, trace, Instrument};
+use tower::{Layer, Service};
+use tracing::{debug, debug_span, instrument, trace, Instrument};
 
+#[cfg(feature = "hyper-tls")]
+type Hyper = hyper_util::client::legacy::Client<
+    hyper_tls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
+    http_body_util::Full<::hyper::body::Bytes>,
+>;
+
+#[cfg(not(feature = "hyper-tls"))]
 type Hyper = hyper_util::client::legacy::Client<
     hyper_util::client::legacy::connect::HttpConnector,
     http_body_util::Full<::hyper::body::Bytes>,
@@ -49,9 +57,13 @@ impl HyperClient {
     pub fn new() -> Self {
         let executor = hyper_util::rt::TokioExecutor::new();
 
+        #[cfg(feature = "hyper-tls")]
+        let service = hyper_util::client::legacy::Client::builder(executor)
+            .build(hyper_tls::HttpsConnector::new());
+
+        #[cfg(not(feature = "hyper-tls"))]
         let service =
             hyper_util::client::legacy::Client::builder(executor).build_http::<Full<Bytes>>();
-
         Self { service, _pd: PhantomData }
     }
 }
@@ -67,6 +79,28 @@ impl<B, S> HyperClient<B, S> {
     pub const fn with_service(service: S) -> Self {
         Self { service, _pd: PhantomData }
     }
+
+    /// Apply a tower [`Layer`] to this client's service.
+    ///
+    /// This allows you to compose middleware layers following the tower pattern.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// #use alloy_transport_http::HyperClient;
+    /// #use alloy_transport_http::AuthLayer;
+    /// #use alloy_rpc_types_engine::JwtSecret;
+    ///
+    /// let secret = JwtSecret::random();
+    /// let client = HyperClient::new()
+    ///     .layer(AuthLayer::new(secret));
+    /// ```
+    pub fn layer<L>(self, layer: L) -> HyperClient<B, L::Service>
+    where
+        L: Layer<S>,
+    {
+        HyperClient::with_service(layer.layer(self.service))
+    }
 }
 
 impl<B, S, ResBody> Http<HyperClient<B, S>>
@@ -79,18 +113,25 @@ where
     ResBody::Error: std::error::Error + Send + Sync + 'static,
     ResBody::Data: Send,
 {
+    #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
     async fn do_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         debug!(count = req.len(), "sending request packet to server");
+
+        let mut builder = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri(self.url.as_str())
+            .header(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"));
+
+        // Add any additional headers from the request packet.
+        for (name, value) in req.headers().iter() {
+            builder = builder.header(name, value);
+        }
+
         let ser = req.serialize().map_err(TransportError::ser_err)?;
         // convert the Box<RawValue> into a hyper request<B>
         let body = ser.get().as_bytes().to_owned().into();
 
-        let req = hyper::Request::builder()
-            .method(hyper::Method::POST)
-            .uri(self.url.as_str())
-            .header(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"))
-            .body(body)
-            .expect("request parts are invalid");
+        let req = builder.body(body).map_err(TransportErrorKind::custom)?;
 
         let mut service = self.client.service;
         let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
@@ -104,10 +145,17 @@ where
         // if there is one.
         let body = resp.into_body().collect().await.map_err(TransportErrorKind::custom)?.to_bytes();
 
-        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-        trace!(body = %String::from_utf8_lossy(&body), "response body");
+        if tracing::enabled!(tracing::Level::TRACE) {
+            trace!(body = %String::from_utf8_lossy(&body), "response body");
+        } else {
+            debug!(bytes = body.len(), "retrieved response body");
+        }
 
-        if status != hyper::StatusCode::OK {
+        if !status.is_success() {
+            if let Some(response) = crate::json_rpc_error_response(body.as_ref()) {
+                return Ok(response);
+            }
+
             return Err(TransportErrorKind::http_error(
                 status.as_u16(),
                 String::from_utf8_lossy(&body).into_owned(),
@@ -144,36 +192,15 @@ where
     type Future = TransportFut<'static>;
 
     #[inline]
-    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        (&*self).poll_ready(cx)
-    }
-
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        (&*self).call(req)
-    }
-}
-
-impl<B, S> Service<RequestPacket> for &Http<HyperClient<B, S>>
-where
-    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
-    S::Future: Send,
-    S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
-{
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
-
-    #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         // `hyper` always returns `Ok(())`.
         task::Poll::Ready(Ok(()))
     }
 
+    #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
         let span = debug_span!("HyperTransport", url = %this.url);
-        Box::pin(this.do_hyper(req).instrument(span))
+        Box::pin(this.do_hyper(req).instrument(span.or_current()))
     }
 }

@@ -1,11 +1,14 @@
 //! Utilities for launching a Reth dev-mode instance.
 
-use crate::{utils::extract_endpoint, NodeError, NODE_STARTUP_TIMEOUT};
+use crate::{
+    utils::{extract_endpoint, GracefulShutdown},
+    NodeError, NODE_STARTUP_TIMEOUT,
+};
 use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
     ffi::OsString,
-    fs::create_dir,
+    fs::create_dir_all,
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
@@ -37,6 +40,7 @@ const DEFAULT_P2P_PORT: u16 = 30303;
 #[derive(Debug)]
 pub struct RethInstance {
     pid: Child,
+    host: String,
     instance: u16,
     http_port: u16,
     ws_port: u16,
@@ -48,6 +52,11 @@ pub struct RethInstance {
 }
 
 impl RethInstance {
+    /// Returns the host of this instance.
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
     /// Returns the instance number of this instance.
     pub const fn instance(&self) -> u16 {
         self.instance
@@ -77,17 +86,17 @@ impl RethInstance {
     /// Returns the HTTP endpoint of this instance.
     #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.http_port)
+        format!("http://{}:{}", self.host, self.http_port)
     }
 
     /// Returns the Websocket endpoint of this instance.
     pub fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.ws_port)
+        format!("ws://{}:{}", self.host, self.ws_port)
     }
 
     /// Returns the IPC endpoint of this instance.
     pub fn ipc_endpoint(&self) -> String {
-        self.ipc.clone().map_or_else(|| "reth.ipc".to_string(), |ipc| ipc.display().to_string())
+        self.ipc.as_ref().map_or_else(|| "reth.ipc".to_string(), |ipc| ipc.display().to_string())
     }
 
     /// Returns the HTTP endpoint url of this instance.
@@ -106,7 +115,7 @@ impl RethInstance {
         self.data_dir.as_ref()
     }
 
-    /// Returns the genesis configuration used to configure this instance
+    /// Returns the genesis configuration supplied with [`Reth::genesis`], if any.
     pub const fn genesis(&self) -> Option<&Genesis> {
         self.genesis.as_ref()
     }
@@ -122,7 +131,7 @@ impl RethInstance {
 
 impl Drop for RethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill reth");
+        GracefulShutdown::shutdown(&mut self.pid, 10, "reth");
     }
 }
 
@@ -144,10 +153,11 @@ impl Drop for RethInstance {
 ///
 /// drop(reth); // this will kill the instance
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
     dev: bool,
+    host: Option<String>,
     http_port: u16,
     ws_port: u16,
     auth_port: u16,
@@ -162,6 +172,13 @@ pub struct Reth {
     chain_or_path: Option<String>,
     genesis: Option<Genesis>,
     args: Vec<OsString>,
+    keep_stdout: bool,
+}
+
+impl Default for Reth {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Reth {
@@ -173,6 +190,7 @@ impl Reth {
     pub fn new() -> Self {
         Self {
             dev: false,
+            host: None,
             http_port: DEFAULT_HTTP_PORT,
             ws_port: DEFAULT_WS_PORT,
             auth_port: DEFAULT_AUTH_PORT,
@@ -187,6 +205,7 @@ impl Reth {
             chain_or_path: None,
             genesis: None,
             args: Vec::new(),
+            keep_stdout: false,
         }
     }
 
@@ -218,6 +237,14 @@ impl Reth {
     /// Enable `dev` mode for the Reth instance.
     pub const fn dev(mut self) -> Self {
         self.dev = true;
+        self
+    }
+
+    /// Sets the host which will be used when the `reth` instance is launched.
+    ///
+    /// Defaults to `localhost`.
+    pub fn host<T: Into<String>>(mut self, host: T) -> Self {
+        self.host = Some(host.into());
         self
     }
 
@@ -267,7 +294,10 @@ impl Reth {
         self
     }
 
-    /// Sets the chain id for the Reth instance.
+    /// Sets the chain name or path to a chain spec for the Reth instance.
+    ///
+    /// Passed through to `reth node --chain <name-or-path>`. To launch Reth with a custom genesis,
+    /// write the genesis or chain specification to disk and pass that path here.
     pub fn chain_or_path(mut self, chain_or_path: &str) -> Self {
         self.chain_or_path = Some(chain_or_path.to_string());
         self
@@ -287,8 +317,11 @@ impl Reth {
     }
 
     /// Sets the IPC path for the socket.
+    ///
+    /// This also enables IPC, as setting a path implies the intent to use IPC.
     pub fn ipc_path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.ipc_path = Some(path.into());
+        self.ipc_enabled = true;
         self
     }
 
@@ -298,14 +331,22 @@ impl Reth {
         self
     }
 
-    /// Sets the `genesis.json` for the Reth instance.
+    /// Stores the genesis configuration on the returned [`RethInstance`].
     ///
-    /// If this is set, reth will be initialized with `reth init` and the `--datadir` option will be
-    /// set to the same value as `data_dir`.
-    ///
-    /// This is destructive and will overwrite any existing data in the data directory.
+    /// The spawned node can be inspected through [`RethInstance::genesis`] to recover the genesis
+    /// value that was supplied to the builder. To launch Reth with a custom genesis or chain
+    /// specification, write that specification to disk and pass the path with
+    /// [`Reth::chain_or_path`].
     pub fn genesis(mut self, genesis: Genesis) -> Self {
         self.genesis = Some(genesis);
+        self
+    }
+
+    /// Keep the handle to reth's stdout in order to read from it.
+    ///
+    /// Caution: if the stdout handle isn't used, this can end up blocking.
+    pub const fn keep_stdout(mut self) -> Self {
+        self.keep_stdout = true;
         self
     }
 
@@ -397,9 +438,17 @@ impl Reth {
         cmd.arg("--http");
         cmd.arg("--http.api").arg(API);
 
+        if let Some(ref host) = self.host {
+            cmd.arg("--http.addr").arg(host);
+        }
+
         // Open the WS API.
         cmd.arg("--ws");
         cmd.arg("--ws.api").arg(API);
+
+        if let Some(ref host) = self.host {
+            cmd.arg("--ws.addr").arg(host);
+        }
 
         // Configure the IPC path if it is set.
         if let Some(ipc) = &self.ipc_path {
@@ -419,7 +468,7 @@ impl Reth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 
@@ -510,10 +559,14 @@ impl Reth {
             }
         }
 
-        child.stdout = Some(reader.into_inner());
+        if self.keep_stdout {
+            // re-attach the stdout handle if requested
+            child.stdout = Some(reader.into_inner());
+        }
 
         Ok(RethInstance {
             pid: child,
+            host: self.host.unwrap_or_else(|| "localhost".to_string()),
             instance: self.instance,
             http_port,
             ws_port,
@@ -523,5 +576,53 @@ impl Reth {
             auth_port: Some(auth_port),
             genesis: self.genesis,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_set_host() {
+        let reth = Reth::new().host("0.0.0.0").dev().try_spawn();
+        if let Ok(reth) = reth {
+            assert_eq!(reth.host(), "0.0.0.0");
+            assert!(reth.endpoint().starts_with("http://0.0.0.0:"));
+            assert!(reth.ws_endpoint().starts_with("ws://0.0.0.0:"));
+        }
+    }
+
+    #[test]
+    fn default_host_is_localhost() {
+        let reth = Reth::new().dev().try_spawn();
+        if let Ok(reth) = reth {
+            assert_eq!(reth.host(), "localhost");
+            assert!(reth.endpoint().starts_with("http://localhost:"));
+            assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
+        }
+    }
+
+    #[test]
+    fn default_matches_new_semantics() {
+        let reth = Reth::default();
+
+        assert!(!reth.dev);
+        assert_eq!(reth.host, None);
+        assert_eq!(reth.http_port, DEFAULT_HTTP_PORT);
+        assert_eq!(reth.ws_port, DEFAULT_WS_PORT);
+        assert_eq!(reth.auth_port, DEFAULT_AUTH_PORT);
+        assert_eq!(reth.p2p_port, DEFAULT_P2P_PORT);
+        assert_eq!(reth.block_time, None);
+        assert!((1..200).contains(&reth.instance));
+        assert!(reth.discovery_enabled);
+        assert_eq!(reth.program, None);
+        assert_eq!(reth.ipc_path, None);
+        assert!(!reth.ipc_enabled);
+        assert_eq!(reth.data_dir, None);
+        assert_eq!(reth.chain_or_path, None);
+        assert_eq!(reth.genesis, None);
+        assert!(reth.args.is_empty());
+        assert!(!reth.keep_stdout);
     }
 }

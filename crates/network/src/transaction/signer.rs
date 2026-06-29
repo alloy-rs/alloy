@@ -1,6 +1,7 @@
-use crate::{Network, TransactionBuilder};
+use crate::{Network, NetworkTransactionBuilder, TransactionBuilder};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::Address;
+use alloy_signer::{Signer, SignerSync};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 use futures_utils_wasm::impl_future;
@@ -74,8 +75,8 @@ pub trait NetworkWallet<N: Network>: std::fmt::Debug + Send + Sync {
 ///
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 /// [`ChainId`]: alloy_primitives::ChainId
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[auto_impl(&, &mut, Box, Rc, Arc)]
 #[doc(alias = "TransactionSigner")]
 pub trait TxSigner<Signature> {
@@ -117,4 +118,27 @@ pub trait TxSignerSync<Signature> {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature>;
+}
+
+/// A unifying trait for asynchronous Ethereum signers that combine the functionalities of both
+/// [`Signer`] and [`TxSigner`].
+///
+/// This trait enables dynamic dispatch (e.g., using `Box<dyn FullSigner>`) for types that combine
+/// both asynchronous Ethereum signing and transaction signing functionalities.
+pub trait FullSigner<S>: Signer<S> + TxSigner<S> {}
+impl<T, S> FullSigner<S> for T where T: Signer<S> + TxSigner<S> {}
+
+/// A unifying trait for synchronous Ethereum signers that implement both [`SignerSync`] and
+/// [`TxSignerSync`].
+///
+/// This trait enables dynamic dispatch (e.g., using `Box<dyn FullSignerSync>`) for types that
+/// combine both synchronous Ethereum signing and transaction signing functionalities.
+pub trait FullSignerSync<S>: SignerSync<S> + TxSignerSync<S> {}
+impl<T, S> FullSignerSync<S> for T where T: SignerSync<S> + TxSignerSync<S> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct _ObjectSafe(Box<dyn FullSigner<()>>, Box<dyn FullSignerSync<()>>);
 }

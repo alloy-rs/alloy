@@ -1,12 +1,12 @@
 use crate::RawSubscription;
 use alloy_json_rpc::SerializedRequest;
 use alloy_primitives::B256;
+use parking_lot::Mutex;
 use serde_json::value::RawValue;
-use std::{fmt, hash::Hash};
+use std::{fmt, hash::Hash, ops::DerefMut};
 use tokio::sync::broadcast;
 
 /// An active subscription.
-#[derive(Clone)]
 pub(crate) struct ActiveSubscription {
     /// Cached hash of the request, used for sorting and equality.
     pub(crate) local_id: B256,
@@ -14,6 +14,14 @@ pub(crate) struct ActiveSubscription {
     pub(crate) request: SerializedRequest,
     /// The channel via which notifications are broadcast.
     pub(crate) tx: broadcast::Sender<Box<RawValue>>,
+    /// The initial channel via which notifications are received.
+    ///
+    /// This is stored so that we don't drop any notifications between initializing
+    /// using [`ActiveSubscription::new`] and [`ActiveSubscription::subscribe`]. Ref: <https://github.com/alloy-rs/alloy/issues/2187>
+    ///
+    /// This is wrapped in a [`Mutex`] to allow for mutable access to the receiver without making
+    /// [`ActiveSubscription::subscribe`] require mutable self.
+    pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
 }
 
 // NB: We implement this to prevent any incorrect future implementations.
@@ -58,8 +66,8 @@ impl ActiveSubscription {
     /// Create a new active subscription.
     pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
         let local_id = request.params_hash();
-        let (tx, _rx) = broadcast::channel(channel_size);
-        Self { request, local_id, tx }
+        let (tx, rx) = broadcast::channel(channel_size);
+        Self { request, local_id, tx, rx: Mutex::new(Some(rx)) }
     }
 
     /// Serialize the request as a boxed [`RawValue`].
@@ -71,7 +79,20 @@ impl ActiveSubscription {
 
     /// Get a subscription.
     pub(crate) fn subscribe(&self) -> RawSubscription {
-        RawSubscription { rx: self.tx.subscribe(), local_id: self.local_id }
+        if self.tx.is_empty() {
+            // If there are no pending notifications, we can subscribe directly and return a new
+            // subscriber.
+            return RawSubscription { rx: self.tx.subscribe(), local_id: self.local_id };
+        }
+
+        // If there are pending notifications, we need to ensure that they are not dropped.
+        // Hence, we first try to return the initial receiver (if it exists), which will receive
+        // those pending notifications.
+        // Ref: <https://github.com/alloy-rs/alloy/issues/2187>
+        RawSubscription {
+            rx: self.rx.lock().deref_mut().take().unwrap_or_else(|| self.tx.subscribe()),
+            local_id: self.local_id,
+        }
     }
 
     /// Notify the subscription channel of a new value, if any receiver exists.

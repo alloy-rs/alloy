@@ -14,9 +14,9 @@ exclude.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
-    "-Zunstable-options",
-    "--generate-link-to-definition",
-    "--show-type-layout",
+	"-Zunstable-options",
+	"--generate-link-to-definition",
+	"--show-type-layout",
 ]
 
 [lints]
@@ -30,10 +30,30 @@ alloy-trie = { workspace = true, features = ["ethereum"] }
 
 # serde
 serde.workspace = true
+serde_with = { workspace = true, optional = true }
+
+# borsh
+borsh = { workspace = true, optional = true, features = ["derive"] }
 
 [dev-dependencies]
+bincode = { workspace = true, features = ["serde"] }
 serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std", "alloy-serde/std", "serde/std", "alloy-trie/std"]
+std = [
+	"alloy-primitives/std",
+	"alloy-serde/std",
+	"serde/std",
+	"alloy-trie/std",
+	"alloy-eips/std",
+	"serde_json/std",
+	"serde_with?/std",
+	"borsh?/std"
+]
+serde-bincode-compat = ["dep:serde_with", "alloy-eips/serde-bincode-compat"]
+borsh = [
+	"dep:borsh",
+	"alloy-primitives/borsh",
+	"alloy-eips/borsh",
+]

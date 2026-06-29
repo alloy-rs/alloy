@@ -3,8 +3,8 @@
 # Note: intended for use only with CI (x86_64 Ubuntu, MacOS or Windows)
 set -e
 
-GETH_BUILD=${GETH_BUILD:-"1.14.8-a9523b64"}
-RETH_BUILD=${RETH_BUILD:-"1.0.6"}
+GETH_BUILD=${GETH_BUILD:-"1.15.5-4263936a"}
+RETH_BUILD=${RETH_BUILD:-"1.3.4"}
 
 BIN_DIR=${BIN_DIR:-"$HOME/bin"}
 
@@ -19,9 +19,12 @@ main() {
     fi
 
     install_geth &
+    local geth_pid=$!
     install_reth &
+    local reth_pid=$!
 
-    wait
+    wait $geth_pid || { echo "install_geth failed"; exit 1; }
+    wait $reth_pid || { echo "install_reth failed"; exit 1; }
 }
 
 # Installs geth from https://geth.ethereum.org/downloads

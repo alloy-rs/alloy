@@ -1,7 +1,7 @@
 use crate::{client::RpcClientInner, ClientRef};
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcParam,
-    RpcReturn, SerializedRequest,
+    transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcRecv,
+    RpcSend, SerializedRequest,
 };
 use alloy_primitives::map::HashMap;
 use alloy_transport::{
@@ -80,7 +80,7 @@ impl<Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>> for Waiter<Re
 
 impl<Resp, Output, Map> std::future::Future for Waiter<Resp, Output, Map>
 where
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Map: FnOnce(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
@@ -99,14 +99,13 @@ where
 }
 
 #[pin_project::pin_project(project = CallStateProj)]
-#[allow(unnameable_types, missing_debug_implementations)]
+#[expect(unnameable_types, missing_debug_implementations)]
 pub enum BatchFuture {
     Prepared {
         transport: BoxTransport,
         requests: RequestPacket,
         channels: ChannelMap,
     },
-    SerError(Option<TransportError>),
     AwaitingResponse {
         channels: ChannelMap,
         #[pin]
@@ -135,7 +134,7 @@ impl<'a> BatchRequest<'a> {
         rx
     }
 
-    fn push<Params: RpcParam, Resp: RpcReturn>(
+    fn push<Params: RpcSend, Resp: RpcRecv>(
         &mut self,
         request: Request<Params>,
     ) -> TransportResult<Waiter<Resp>> {
@@ -148,7 +147,7 @@ impl<'a> BatchRequest<'a> {
     /// ### Errors
     ///
     /// If the request cannot be serialized, this will return an error.
-    pub fn add_call<Params: RpcParam, Resp: RpcReturn>(
+    pub fn add_call<Params: RpcSend, Resp: RpcRecv>(
         &mut self,
         method: impl Into<Cow<'static, str>>,
         params: &Params,
@@ -244,20 +243,6 @@ impl BatchFuture {
         self.set(Self::Complete);
         Poll::Ready(Ok(()))
     }
-
-    fn poll_ser_error(
-        mut self: Pin<&mut Self>,
-        _cx: &mut task::Context<'_>,
-    ) -> Poll<<Self as Future>::Output> {
-        let e = if let CallStateProj::SerError(e) = self.as_mut().project() {
-            e.take().expect("no error")
-        } else {
-            unreachable!("Called poll_ser_error in incorrect state")
-        };
-
-        self.set(Self::Complete);
-        Poll::Ready(Err(e))
-    }
 }
 
 impl Future for BatchFuture {
@@ -272,10 +257,6 @@ impl Future for BatchFuture {
             return self.poll_awaiting_response(cx);
         }
 
-        if matches!(*self.as_mut(), Self::SerError(_)) {
-            return self.poll_ser_error(cx);
-        }
-
-        panic!("Called poll on CallState in invalid state")
+        panic!("Called poll on BatchFuture in invalid state")
     }
 }

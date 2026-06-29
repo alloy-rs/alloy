@@ -1,7 +1,6 @@
 use crate::{poller::PollerBuilder, BatchRequest, ClientBuilder, RpcCall};
-use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
-use alloy_transport::{BoxTransport, IntoBoxTransport};
-use alloy_transport_http::Http;
+use alloy_json_rpc::{Id, Request, RpcRecv, RpcSend};
+use alloy_transport::{mock::Asserter, BoxTransport, IntoBoxTransport};
 use std::{
     borrow::Cow,
     ops::Deref,
@@ -21,6 +20,9 @@ pub type ClientRef<'a> = &'a RpcClientInner;
 
 /// Parameter type of a JSON-RPC request with no parameters.
 pub type NoParams = [(); 0];
+
+#[cfg(feature = "pubsub")]
+type MaybePubsub = Option<alloy_pubsub::PubSubFrontend>;
 
 /// A JSON-RPC client.
 ///
@@ -45,17 +47,77 @@ impl RpcClient {
 }
 
 impl RpcClient {
+    /// Creates a new [`RpcClient`] with the given transport.
+    pub fn new(t: impl IntoBoxTransport, is_local: bool) -> Self {
+        Self::new_maybe_pubsub(
+            t,
+            is_local,
+            #[cfg(feature = "pubsub")]
+            None,
+        )
+    }
+
+    /// Create a new [`RpcClient`] with a transport that returns mocked responses from the given
+    /// [`Asserter`].
+    pub fn mocked(asserter: Asserter) -> Self {
+        Self::new(alloy_transport::mock::MockTransport::new(asserter), true)
+    }
+
     /// Create a new [`RpcClient`] with an HTTP transport.
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http(url: reqwest::Url) -> Self {
-        let http = Http::new(url);
+        let http = alloy_transport_http::Http::new(url);
         let is_local = http.guess_local();
         Self::new(http, is_local)
     }
 
-    /// Creates a new [`RpcClient`] with the given transport.
-    pub fn new(t: impl IntoBoxTransport, is_local: bool) -> Self {
-        Self(Arc::new(RpcClientInner::new(t, is_local)))
+    /// Create a new [`RpcClient`] with an HTTP transport using a pre-built [`reqwest::Client`].
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
+    pub fn new_http_with_client(client: reqwest::Client, url: reqwest::Url) -> Self {
+        let http = alloy_transport_http::Http::with_client(client, url);
+        let is_local = http.guess_local();
+        Self::new(http, is_local)
+    }
+
+    /// Creates a new [`RpcClient`] with the given transport and a `MaybePubsub`.
+    fn new_maybe_pubsub(
+        t: impl IntoBoxTransport,
+        is_local: bool,
+        #[cfg(feature = "pubsub")] pubsub: MaybePubsub,
+    ) -> Self {
+        Self(Arc::new(RpcClientInner::new_maybe_pubsub(
+            t,
+            is_local,
+            #[cfg(feature = "pubsub")]
+            pubsub,
+        )))
+    }
+
+    /// Creates the [`RpcClient`] with the `main_transport` (ipc, ws, http) and a `layer` closure.
+    ///
+    /// The `layer` fn is intended to be [`tower::ServiceBuilder::service`] that layers the
+    /// transport services. The `main_transport` is expected to the type that actually emits the
+    /// request object: `PubSubFrontend`. This exists so that we can intercept the
+    /// `PubSubFrontend` which we need for [`RpcClientInner::pubsub_frontend`].
+    ///
+    /// This workaround exists because due to how [`tower::ServiceBuilder::service`] collapses into
+    /// a [`BoxTransport`] we wouldn't be obtain the `MaybePubsub` by downcasting the layered
+    /// `transport`.
+    pub(crate) fn new_layered<F, T, R>(is_local: bool, main_transport: T, layer: F) -> Self
+    where
+        F: FnOnce(T) -> R,
+        T: IntoBoxTransport,
+        R: IntoBoxTransport,
+    {
+        #[cfg(feature = "pubsub")]
+        {
+            let t = main_transport.clone().into_box_transport();
+            let maybe_pubsub = t.as_any().downcast_ref::<alloy_pubsub::PubSubFrontend>().cloned();
+            Self::new_maybe_pubsub(layer(main_transport), is_local, maybe_pubsub)
+        }
+
+        #[cfg(not(feature = "pubsub"))]
+        Self::new(layer(main_transport), is_local)
     }
 
     /// Creates a new [`RpcClient`] with the given inner client.
@@ -85,8 +147,8 @@ impl RpcClient {
 
     /// Sets the poll interval for the client in milliseconds.
     ///
-    /// Note: This will only set the poll interval for the client if it is the only reference to the
-    /// inner client. If the reference is held by many, then it will not update the poll interval.
+    /// Note: `RpcClient` internally wraps an `Arc<RpcClientInner>`, so updating the poll interval
+    /// changes it for all `RpcClient` handles that share the same inner client.
     pub fn with_poll_interval(self, poll_interval: Duration) -> Self {
         self.inner().set_poll_interval(poll_interval);
         self
@@ -101,17 +163,10 @@ impl RpcClient {
         params: Params,
     ) -> PollerBuilder<Params, Resp>
     where
-        Params: RpcParam + 'static,
-        Resp: RpcReturn + Clone,
+        Params: RpcSend + 'static,
+        Resp: RpcRecv + Clone,
     {
         PollerBuilder::new(self.get_weak(), method, params)
-    }
-
-    /// Boxes the transport.
-    #[deprecated(since = "0.9.0", note = "`RpcClient` is now always boxed")]
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn boxed(self) -> Self {
-        self
     }
 
     /// Create a new [`BatchRequest`] builder.
@@ -146,6 +201,14 @@ impl Deref for RpcClient {
 pub struct RpcClientInner {
     /// The underlying transport.
     pub(crate) transport: BoxTransport,
+    /// Stores a handle to the PubSub service if pubsub.
+    ///
+    /// We store this _transport_ because if built through the [`ClientBuilder`] with an additional
+    /// layer the actual transport can be an arbitrary type and we would be unable to obtain the
+    /// `PubSubFrontend` by downcasting the `transport`. For example
+    /// `RetryTransport<PubSubFrontend>`.
+    #[cfg(feature = "pubsub")]
+    pub(crate) pubsub: MaybePubsub,
     /// `true` if the transport is local.
     pub(crate) is_local: bool,
     /// The next request ID to use.
@@ -163,9 +226,25 @@ impl RpcClientInner {
     pub fn new(t: impl IntoBoxTransport, is_local: bool) -> Self {
         Self {
             transport: t.into_box_transport(),
+            #[cfg(feature = "pubsub")]
+            pubsub: None,
             is_local,
             id: AtomicU64::new(0),
             poll_interval: if is_local { AtomicU64::new(250) } else { AtomicU64::new(7000) },
+        }
+    }
+
+    /// Create a new [`RpcClient`] with the given transport and an optional handle to the
+    /// `PubSubFrontend`.
+    pub(crate) fn new_maybe_pubsub(
+        t: impl IntoBoxTransport,
+        is_local: bool,
+        #[cfg(feature = "pubsub")] pubsub: MaybePubsub,
+    ) -> Self {
+        Self {
+            #[cfg(feature = "pubsub")]
+            pubsub,
+            ..Self::new(t, is_local)
         }
     }
 
@@ -194,7 +273,7 @@ impl RpcClientInner {
 
     /// Returns a mutable reference to the underlying transport.
     #[inline]
-    pub fn transport_mut(&mut self) -> &mut BoxTransport {
+    pub const fn transport_mut(&mut self) -> &mut BoxTransport {
         &mut self.transport
     }
 
@@ -209,6 +288,9 @@ impl RpcClientInner {
     #[inline]
     #[track_caller]
     pub fn pubsub_frontend(&self) -> Option<&alloy_pubsub::PubSubFrontend> {
+        if let Some(pubsub) = &self.pubsub {
+            return Some(pubsub);
+        }
         self.transport.as_any().downcast_ref::<alloy_pubsub::PubSubFrontend>()
     }
 
@@ -230,7 +312,7 @@ impl RpcClientInner {
     ///
     /// To send a request, use [`RpcClientInner::request`] and await the returned [`RpcCall`].
     #[inline]
-    pub fn make_request<Params: RpcParam>(
+    pub fn make_request<Params: RpcSend>(
         &self,
         method: impl Into<Cow<'static, str>>,
         params: Params,
@@ -251,7 +333,7 @@ impl RpcClientInner {
 
     /// Set the `is_local` flag.
     #[inline]
-    pub fn set_local(&mut self, is_local: bool) {
+    pub const fn set_local(&mut self, is_local: bool) {
         self.is_local = is_local;
     }
 
@@ -278,7 +360,7 @@ impl RpcClientInner {
     /// This means that if a serializer error occurs, it will not be caught until the call is
     /// awaited.
     #[doc(alias = "prepare")]
-    pub fn request<Params: RpcParam, Resp: RpcReturn>(
+    pub fn request<Params: RpcSend, Resp: RpcRecv>(
         &self,
         method: impl Into<Cow<'static, str>>,
         params: Params,
@@ -290,19 +372,11 @@ impl RpcClientInner {
     /// Prepares an [`RpcCall`] with no parameters.
     ///
     /// See [`request`](Self::request) for more details.
-    pub fn request_noparams<Resp: RpcReturn>(
+    pub fn request_noparams<Resp: RpcRecv>(
         &self,
         method: impl Into<Cow<'static, str>>,
     ) -> RpcCall<NoParams, Resp> {
         self.request(method, [])
-    }
-
-    /// Type erase the service in the transport, allowing it to be used in a
-    /// generic context.
-    #[deprecated(since = "0.9.0", note = "`RpcClientInner` is now always boxed")]
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn boxed(self) -> Self {
-        self
     }
 }
 
@@ -336,7 +410,7 @@ mod pubsub_impl {
     }
 
     impl RpcClient {
-        /// Connect to a transport via a [`PubSubConnect`] implementor.
+        /// Connect to a transport via a [`PubSubConnect`] implementer.
         pub async fn connect_pubsub<C: PubSubConnect>(connect: C) -> TransportResult<Self> {
             ClientBuilder::default().pubsub(connect).await
         }

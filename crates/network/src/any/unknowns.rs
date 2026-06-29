@@ -70,6 +70,12 @@ impl From<TxType> for AnyTxType {
     }
 }
 
+impl Typed2718 for AnyTxType {
+    fn ty(&self) -> u8 {
+        self.0
+    }
+}
+
 /// Memoization for deserialization of [`UnknownTxEnvelope`],
 /// [`UnknownTypedTransaction`] [`AnyTxEnvelope`], [`AnyTypedTransaction`].
 /// Setting these manually is discouraged, however the fields are left public
@@ -78,7 +84,7 @@ impl From<TxType> for AnyTxType {
 /// [`AnyTxEnvelope`]: crate::AnyTxEnvelope
 /// [`AnyTypedTransaction`]: crate::AnyTypedTransaction
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub struct DeserMemo {
     pub input: OnceLock<Bytes>,
     pub access_list: OnceLock<AccessList>,
@@ -151,7 +157,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn priority_fee_or_price(&self) -> u128 {
-        self.gas_price().or(self.max_priority_fee_per_gas()).unwrap_or_default()
+        self.max_priority_fee_per_gas().or(self.gas_price()).unwrap_or_default()
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
@@ -159,22 +165,16 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
             return gas_price;
         }
 
-        base_fee.map_or(self.max_fee_per_gas(), |base_fee| {
-            // if the tip is greater than the max priority fee per gas, set it to the max
-            // priority fee per gas + base fee
-            let max_fee = self.max_fee_per_gas();
-            if max_fee == 0 {
-                return 0;
-            }
-            let Some(max_prio_fee) = self.max_priority_fee_per_gas() else { return max_fee };
-            let tip = max_fee.saturating_sub(base_fee as u128);
-            if tip > max_prio_fee {
-                max_prio_fee + base_fee as u128
-            } else {
-                // otherwise return the max fee per gas
-                max_fee
-            }
-        })
+        let max_fee = self.max_fee_per_gas();
+        if max_fee == 0 {
+            return 0;
+        }
+
+        let Some(max_prio_fee) = self.max_priority_fee_per_gas() else {
+            return max_fee;
+        };
+
+        alloy_eips::eip1559::calc_effective_gas_price(max_fee, max_prio_fee, base_fee)
     }
 
     #[inline]
@@ -200,7 +200,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn is_create(&self) -> bool {
-        self.fields.get("to").map_or(true, |v| v.is_null())
+        self.fields.get("to").is_none_or(|v| v.is_null())
     }
 
     #[inline]
@@ -410,7 +410,7 @@ mod tests {
 
         let tx: AnyRpcTransaction = serde_json::from_str(input).unwrap();
 
-        let AnyTxEnvelope::Unknown(inner) = tx.inner.inner.clone() else {
+        let AnyTxEnvelope::Unknown(inner) = tx.inner.inner.inner().clone() else {
             panic!("expected unknown envelope");
         };
 
@@ -426,5 +426,41 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&tx).unwrap()).unwrap();
 
         assert_eq!(tx, roundrip_tx);
+    }
+
+    /// <https://github.com/alloy-rs/alloy/issues/2842>
+    #[test]
+    fn gas_price_saturation() {
+        let tx_json_with_saturate = serde_json::json!({
+            "type": "0x78",
+            "nonce": "0x1",
+            // A gas price larger than u128::MAX.
+            "gasPrice": "0x30783134626639633464372e3333333333333333333333333333333333333333",
+            "gas": "0x5208",
+            "to": "0x0000000000000000000000000000000000000000",
+            "value": "0x0",
+            "input": "0x",
+            "from": "0x0000000000000000000000000000000000000000"
+        });
+        let tx: alloy_rpc_types_eth::Transaction<UnknownTypedTransaction> =
+            serde_json::from_value(tx_json_with_saturate).unwrap();
+        assert!(tx.inner.gas_price().is_none());
+        assert_eq!(tx.effective_gas_price, Some(u128::MAX));
+
+        let tx_json_no_saturate = serde_json::json!({
+            "type": "0x78",
+            "nonce": "0x1",
+            // A normal gas price.
+            "gasPrice": "0x3b9aca00",
+            "gas": "0x5208",
+            "to": "0x0000000000000000000000000000000000000000",
+            "value": "0x0",
+            "input": "0x",
+            "from": "0x0000000000000000000000000000000000000000"
+        });
+        let tx: alloy_rpc_types_eth::Transaction<UnknownTypedTransaction> =
+            serde_json::from_value(tx_json_no_saturate).unwrap();
+        assert!(tx.inner.gas_price().is_some_and(|g| g == 1_000_000_000));
+        assert!(tx.effective_gas_price.is_some_and(|g| g == 1_000_000_000));
     }
 }

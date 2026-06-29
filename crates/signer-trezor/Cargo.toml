@@ -28,7 +28,7 @@ alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
-trezor-client = { version = "=0.1.4", default-features = false, features = [
+trezor-client = { version = "=0.1.5", default-features = false, features = [
     "ethereum",
 ] }
 

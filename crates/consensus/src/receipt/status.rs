@@ -4,6 +4,7 @@ use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Error, Header};
 /// Captures the result of a transaction execution.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub enum Eip658Value {
     /// A boolean `statusCode` introduced by [EIP-658].
     ///
@@ -27,6 +28,11 @@ impl Eip658Value {
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     pub const fn coerce_status(&self) -> bool {
         matches!(self, Self::Eip658(true) | Self::PostState(_))
+    }
+
+    /// Coerce this variant into a [`Eip658Value::Eip658`] with [`Self::coerce_status`].
+    pub const fn coerced_eip658(&mut self) {
+        *self = Self::Eip658(self.coerce_status())
     }
 
     /// Returns true if the transaction was a pre-[EIP-658] transaction.

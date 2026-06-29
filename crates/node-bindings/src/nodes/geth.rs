@@ -1,7 +1,7 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    utils::{extract_endpoint, extract_value, unused_port},
+    utils::{extract_endpoint, extract_value, unused_port, GracefulShutdown},
     NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
@@ -9,7 +9,7 @@ use alloy_primitives::Address;
 use k256::ecdsa::SigningKey;
 use std::{
     ffi::OsString,
-    fs::{create_dir, File},
+    fs::{create_dir_all, File},
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStderr, Command, Stdio},
@@ -68,6 +68,7 @@ impl Default for PrivateNetOptions {
 #[derive(Debug)]
 pub struct GethInstance {
     pid: Child,
+    host: String,
     port: u16,
     p2p_port: Option<u16>,
     auth_port: Option<u16>,
@@ -78,6 +79,11 @@ pub struct GethInstance {
 }
 
 impl GethInstance {
+    /// Returns the host of this instance
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
     /// Returns the port of this instance
     pub const fn port(&self) -> u16 {
         self.port
@@ -96,12 +102,12 @@ impl GethInstance {
     /// Returns the HTTP endpoint of this instance
     #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.port)
+        format!("http://{}:{}", self.host, self.port)
     }
 
     /// Returns the Websocket endpoint of this instance
     pub fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.port)
+        format!("ws://{}:{}", self.host, self.port)
     }
 
     /// Returns the IPC endpoint of this instance
@@ -169,7 +175,7 @@ impl GethInstance {
 
 impl Drop for GethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill geth");
+        GracefulShutdown::shutdown(&mut self.pid, 10, "geth");
     }
 }
 
@@ -195,6 +201,7 @@ impl Drop for GethInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Geth {
     program: Option<PathBuf>,
+    host: Option<String>,
     port: Option<u16>,
     authrpc_port: Option<u16>,
     ipc_path: Option<PathBuf>,
@@ -202,6 +209,7 @@ pub struct Geth {
     data_dir: Option<PathBuf>,
     chain_id: Option<u64>,
     insecure_unlock: bool,
+    keep_err: bool,
     genesis: Option<Genesis>,
     mode: NodeMode,
     clique_private_key: Option<SigningKey>,
@@ -210,8 +218,6 @@ pub struct Geth {
 
 impl Geth {
     /// Creates an empty Geth builder.
-    ///
-    /// The mnemonic is chosen randomly.
     pub fn new() -> Self {
         Self::default()
     }
@@ -274,6 +280,14 @@ impl Geth {
     /// [GethInstance::port] will return the port that was chosen.
     pub fn port<T: Into<u16>>(mut self, port: T) -> Self {
         self.port = Some(port.into());
+        self
+    }
+
+    /// Sets the host which will be used when the `geth` instance is launched.
+    ///
+    /// Defaults to `localhost`.
+    pub fn host<T: Into<String>>(mut self, host: T) -> Self {
+        self.host = Some(host.into());
         self
     }
 
@@ -341,8 +355,11 @@ impl Geth {
     }
 
     /// Sets the IPC path for the socket.
+    ///
+    /// This also enables IPC, as setting a path implies the intent to use IPC.
     pub fn ipc_path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.ipc_path = Some(path.into());
+        self.ipc_enabled = true;
         self
     }
 
@@ -367,6 +384,30 @@ impl Geth {
     pub const fn authrpc_port(mut self, port: u16) -> Self {
         self.authrpc_port = Some(port);
         self
+    }
+
+    /// Keep the handle to geth's stderr in order to read from it.
+    ///
+    /// Caution: if the stderr handle isn't used, this can end up blocking.
+    pub const fn keep_stderr(mut self) -> Self {
+        self.keep_err = true;
+        self
+    }
+
+    /// Adds an argument to pass to the `geth`.
+    pub fn push_arg<T: Into<OsString>>(&mut self, arg: T) {
+        self.args.push(arg.into());
+    }
+
+    /// Adds multiple arguments to pass to the `geth`.
+    pub fn extend_args<I, S>(&mut self, args: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        for arg in args {
+            self.push_arg(arg);
+        }
     }
 
     /// Adds an argument to pass to `geth`.
@@ -426,10 +467,18 @@ impl Geth {
         cmd.arg("--http.port").arg(&port_s);
         cmd.arg("--http.api").arg(API);
 
+        if let Some(ref host) = self.host {
+            cmd.arg("--http.addr").arg(host);
+        }
+
         // Open the WS API
         cmd.arg("--ws");
         cmd.arg("--ws.port").arg(port_s);
         cmd.arg("--ws.api").arg(API);
+
+        if let Some(ref host) = self.host {
+            cmd.arg("--ws.addr").arg(host);
+        }
 
         // pass insecure unlock flag if set
         let is_clique = self.is_clique();
@@ -464,11 +513,6 @@ impl Geth {
                 let extra_data_bytes =
                     [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
                 genesis.extra_data = extra_data_bytes.into();
-
-                // we must set the etherbase if using clique
-                // need to use format! / Debug here because the Address Display impl doesn't show
-                // the entire address
-                cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
             }
 
             let clique_addr = self.clique_address().ok_or_else(|| {
@@ -490,10 +534,8 @@ impl Geth {
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
-            let temp_genesis_dir_path = tempdir().map_err(NodeError::CreateDirError)?.into_path();
-
-            // create a temp dir to store the genesis file
-            let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
+            let temp_genesis_dir = tempdir().map_err(NodeError::CreateDirError)?;
+            let temp_genesis_path = temp_genesis_dir.path().join("genesis.json");
 
             // create the genesis file
             let mut file = File::create(&temp_genesis_path).map_err(|_| {
@@ -524,10 +566,7 @@ impl Geth {
                 return Err(NodeError::InitError);
             }
 
-            // clean up the temp dir which is now persisted
-            std::fs::remove_dir_all(temp_genesis_dir_path).map_err(|_| {
-                NodeError::GenesisError("could not remove genesis temp dir".to_string())
-            })?;
+            // temp_genesis_dir is dropped here, automatically cleaning up
         }
 
         if let Some(data_dir) = &self.data_dir {
@@ -535,7 +574,7 @@ impl Geth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 
@@ -635,10 +674,28 @@ impl Geth {
             }
         }
 
-        child.stderr = Some(reader.into_inner());
+        if self.keep_err {
+            // re-attach the stderr handle if requested
+            child.stderr = Some(reader.into_inner());
+        } else {
+            // We need to consume the stderr otherwise geth is non-responsive and RPC server results
+            // in connection refused.
+            // See: <https://github.com/alloy-rs/alloy/issues/2091#issuecomment-2676134147>
+            std::thread::spawn(move || {
+                let mut buf = String::new();
+                loop {
+                    buf.clear();
+                    match reader.read_line(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {}
+                    }
+                }
+            });
+        }
 
         Ok(GethInstance {
             pid: child,
+            host: self.host.unwrap_or_else(|| "localhost".to_string()),
             port,
             ipc: self.ipc_path,
             data_dir: self.data_dir,
@@ -647,5 +704,30 @@ impl Geth {
             genesis: self.genesis,
             clique_private_key: self.clique_private_key,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_set_host() {
+        let geth = Geth::new().host("0.0.0.0").dev().try_spawn();
+        if let Ok(geth) = geth {
+            assert_eq!(geth.host(), "0.0.0.0");
+            assert!(geth.endpoint().starts_with("http://0.0.0.0:"));
+            assert!(geth.ws_endpoint().starts_with("ws://0.0.0.0:"));
+        }
+    }
+
+    #[test]
+    fn default_host_is_localhost() {
+        let geth = Geth::new().dev().try_spawn();
+        if let Ok(geth) = geth {
+            assert_eq!(geth.host(), "localhost");
+            assert!(geth.endpoint().starts_with("http://localhost:"));
+            assert!(geth.ws_endpoint().starts_with("ws://localhost:"));
+        }
     }
 }

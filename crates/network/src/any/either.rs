@@ -1,13 +1,14 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
 use alloy_consensus::{
-    Signed, Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702,
-    TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
+    error::ValueError, transaction::Either, SignableTransaction, Signed,
+    Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope,
+    TxLegacy, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip7702::SignedAuthorization,
 };
-use alloy_primitives::{Bytes, ChainId, B256, U256};
+use alloy_primitives::{bytes::BufMut, Bytes, ChainId, Signature, B256, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 use alloy_serde::WithOtherFields;
 
@@ -20,6 +21,20 @@ pub enum AnyTypedTransaction {
     Ethereum(TypedTransaction),
     /// A transaction with unknown type.
     Unknown(UnknownTypedTransaction),
+}
+
+#[cold]
+#[track_caller]
+fn panic_unknown_transaction_signing(ty: u8) -> ! {
+    panic!("unknown transaction type 0x{ty:02x} cannot be signed via AnyTypedTransaction")
+}
+
+#[cold]
+#[track_caller]
+fn panic_unknown_transaction_encoding(ty: u8) -> ! {
+    panic!(
+        "Attempted to encode unknown transaction type 0x{ty:02x}. This is not a bug in alloy. To encode or decode unknown transaction types, use a custom Transaction type and a custom Network implementation. See https://docs.rs/alloy-network/latest/alloy_network/ for network documentation."
+    )
 }
 
 impl From<UnknownTypedTransaction> for AnyTypedTransaction {
@@ -203,6 +218,29 @@ impl Typed2718 for AnyTypedTransaction {
     }
 }
 
+impl SignableTransaction<Signature> for AnyTypedTransaction {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.set_chain_id(chain_id),
+            Self::Unknown(unknown_tx) => panic_unknown_transaction_signing(unknown_tx.ty()),
+        }
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.encode_for_signing(out),
+            Self::Unknown(unknown_tx) => panic_unknown_transaction_signing(unknown_tx.ty()),
+        }
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.payload_len_for_signature(),
+            Self::Unknown(unknown_tx) => panic_unknown_transaction_signing(unknown_tx.ty()),
+        }
+    }
+}
+
 /// Transaction envelope for a catch-all network.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -214,7 +252,36 @@ pub enum AnyTxEnvelope {
     Unknown(UnknownTxEnvelope),
 }
 
+impl From<Signed<AnyTypedTransaction>> for AnyTxEnvelope {
+    fn from(value: Signed<AnyTypedTransaction>) -> Self {
+        let sig = *value.signature();
+        let tx = value.strip_signature();
+        match tx {
+            AnyTypedTransaction::Ethereum(typed_tx) => Self::Ethereum(match typed_tx {
+                TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(tx.into_signed(sig)),
+                TypedTransaction::Eip2930(tx) => TxEnvelope::Eip2930(tx.into_signed(sig)),
+                TypedTransaction::Eip1559(tx) => TxEnvelope::Eip1559(tx.into_signed(sig)),
+                TypedTransaction::Eip4844(tx) => TxEnvelope::Eip4844(tx.into_signed(sig)),
+                TypedTransaction::Eip7702(tx) => TxEnvelope::Eip7702(tx.into_signed(sig)),
+            }),
+            AnyTypedTransaction::Unknown(unknown_tx) => {
+                panic_unknown_transaction_signing(unknown_tx.ty())
+            }
+        }
+    }
+}
+
 impl AnyTxEnvelope {
+    /// Returns true if this is the ethereum transaction variant
+    pub const fn is_ethereum(&self) -> bool {
+        matches!(self, Self::Ethereum(_))
+    }
+
+    /// Returns true if this is the unknown transaction variant
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown(_))
+    }
+
     /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
     pub const fn as_envelope(&self) -> Option<&TxEnvelope> {
         match self {
@@ -223,12 +290,98 @@ impl AnyTxEnvelope {
         }
     }
 
+    /// Returns the inner [`UnknownTxEnvelope`] if it is an unknown variant.
+    pub const fn as_unknown(&self) -> Option<&UnknownTxEnvelope> {
+        match self {
+            Self::Unknown(inner) => Some(inner),
+            Self::Ethereum(_) => None,
+        }
+    }
+
     /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
     /// If the transaction is not an Ethereum transaction, it is returned as an error.
-    pub fn try_into_envelope(self) -> Result<TxEnvelope, Self> {
+    pub fn try_into_envelope(self) -> Result<TxEnvelope, ValueError<Self>> {
         match self {
             Self::Ethereum(inner) => Ok(inner),
+            this => Err(ValueError::new_static(this, "unknown transaction envelope")),
+        }
+    }
+
+    /// Returns the inner [`UnknownTxEnvelope`], if it is an unknown transaction.
+    /// If the transaction is not an unknown transaction, it is returned as an error.
+    pub fn try_into_unknown(self) -> Result<UnknownTxEnvelope, Self> {
+        match self {
+            Self::Unknown(inner) => Ok(inner),
             this => Err(this),
+        }
+    }
+
+    /// Attempts to convert the [`UnknownTxEnvelope`] into `Either::Right` if this is an unknown
+    /// variant.
+    ///
+    /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
+    /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_network::any::AnyTxEnvelope;
+    /// # use alloy_consensus::transaction::Either;
+    /// # // Assuming you have a custom type: struct CustomTx;
+    /// # // impl TryFrom<alloy_network::any::UnknownTxEnvelope> for CustomTx { ... }
+    /// # fn example(envelope: AnyTxEnvelope) -> Result<(), Box<dyn std::error::Error>> {
+    /// # struct CustomTx;
+    /// # impl TryFrom<alloy_network::any::UnknownTxEnvelope> for CustomTx {
+    /// #     type Error = String;
+    /// #     fn try_from(_: alloy_network::any::UnknownTxEnvelope) -> Result<Self, Self::Error> {
+    /// #         Ok(CustomTx)
+    /// #     }
+    /// # }
+    /// match envelope.try_into_either::<CustomTx>()? {
+    ///     Either::Left(eth_tx) => { /* Ethereum transaction */ }
+    ///     Either::Right(custom_tx) => { /* Custom transaction */ }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_either<T>(self) -> Result<Either<TxEnvelope, T>, T::Error>
+    where
+        T: TryFrom<UnknownTxEnvelope>,
+    {
+        self.try_map_unknown(|inner| inner.try_into())
+    }
+
+    /// Attempts to convert the [`UnknownTxEnvelope`] into `Either::Right` if this is an
+    /// [`AnyTxEnvelope::Unknown`].
+    ///
+    /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
+    /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    ///
+    /// Use this for custom conversion logic when [`try_into_either`](Self::try_into_either) is
+    /// insufficient.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_network::any::AnyTxEnvelope;
+    /// # use alloy_consensus::transaction::Either;
+    /// # use alloy_primitives::B256;
+    /// # fn example(envelope: AnyTxEnvelope) -> Result<(), Box<dyn std::error::Error>> {
+    /// let result = envelope.try_map_unknown(|unknown| Ok::<B256, String>(unknown.hash))?;
+    /// match result {
+    ///     Either::Left(eth_tx) => { /* Ethereum */ }
+    ///     Either::Right(hash) => { /* Unknown tx hash */ }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_map_unknown<T, E>(
+        self,
+        f: impl FnOnce(UnknownTxEnvelope) -> Result<T, E>,
+    ) -> Result<Either<TxEnvelope, T>, E> {
+        match self {
+            Self::Ethereum(tx) => Ok(Either::Left(tx)),
+            Self::Unknown(tx) => Ok(Either::Right(f(tx)?)),
         }
     }
 
@@ -271,6 +424,36 @@ impl AnyTxEnvelope {
             _ => None,
         }
     }
+
+    /// Returns true if the transaction is a legacy transaction.
+    #[inline]
+    pub const fn is_legacy(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Legacy(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-2930 transaction.
+    #[inline]
+    pub const fn is_eip2930(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip2930(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-1559 transaction.
+    #[inline]
+    pub const fn is_eip1559(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip1559(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-4844 transaction.
+    #[inline]
+    pub const fn is_eip4844(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip4844(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-7702 transaction.
+    #[inline]
+    pub const fn is_eip7702(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip7702(_)))
+    }
 }
 
 impl Typed2718 for AnyTxEnvelope {
@@ -283,17 +466,10 @@ impl Typed2718 for AnyTxEnvelope {
 }
 
 impl Encodable2718 for AnyTxEnvelope {
-    fn type_flag(&self) -> Option<u8> {
-        match self {
-            Self::Ethereum(t) => t.type_flag(),
-            Self::Unknown(inner) => Some(inner.ty()),
-        }
-    }
-
     fn encode_2718_len(&self) -> usize {
         match self {
             Self::Ethereum(t) => t.encode_2718_len(),
-            Self::Unknown(_) => 1,
+            Self::Unknown(inner) => panic_unknown_transaction_encoding(inner.ty()),
         }
     }
 
@@ -301,12 +477,7 @@ impl Encodable2718 for AnyTxEnvelope {
     fn encode_2718(&self, out: &mut dyn alloy_primitives::bytes::BufMut) {
         match self {
             Self::Ethereum(t) => t.encode_2718(out),
-            Self::Unknown(inner) => {
-                panic!(
-                    "Attempted to encode unknown transaction type: {}. This is not a bug in alloy. To encode or decode unknown transaction types, use a custom Transaction type and a custom Network implementation. See https://docs.rs/alloy-network/latest/alloy_network/ for network documentation.",
-                    inner.as_ref().ty
-                )
-            }
+            Self::Unknown(inner) => panic_unknown_transaction_encoding(inner.ty()),
         }
     }
 
@@ -458,5 +629,61 @@ impl TransactionTrait for AnyTxEnvelope {
             Self::Ethereum(inner) => inner.authorization_list(),
             Self::Unknown(inner) => inner.authorization_list(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::AnyTxType;
+    use std::str::FromStr;
+
+    fn unknown_inner_tx() -> UnknownTypedTransaction {
+        UnknownTypedTransaction {
+            ty: AnyTxType(0x7e),
+            fields: Default::default(),
+            memo: Default::default(),
+        }
+    }
+
+    fn unknown_tx() -> AnyTypedTransaction {
+        AnyTypedTransaction::Unknown(unknown_inner_tx())
+    }
+
+    fn unknown_envelope() -> AnyTxEnvelope {
+        AnyTxEnvelope::Unknown(UnknownTxEnvelope { hash: B256::ZERO, inner: unknown_inner_tx() })
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot be signed via AnyTypedTransaction")]
+    fn unknown_transaction_signature_hash_panics() {
+        let tx = unknown_tx();
+        let _ = tx.signature_hash();
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot be signed via AnyTypedTransaction")]
+    fn signed_unknown_transaction_cannot_convert_to_envelope() {
+        let tx = unknown_tx();
+        let sig = Signature::from_str(
+            "48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b",
+        )
+        .unwrap();
+
+        let _: AnyTxEnvelope = tx.into_signed(sig).into();
+    }
+
+    #[test]
+    #[should_panic(expected = "Attempted to encode unknown transaction type")]
+    fn unknown_transaction_encode_2718_len_panics() {
+        let envelope = unknown_envelope();
+        let _ = envelope.encode_2718_len();
+    }
+
+    #[test]
+    #[should_panic(expected = "Attempted to encode unknown transaction type")]
+    fn unknown_transaction_encoded_2718_panics() {
+        let envelope = unknown_envelope();
+        let _ = envelope.encoded_2718();
     }
 }

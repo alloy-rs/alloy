@@ -29,3 +29,4 @@ serde_json = { workspace = true, features = ["std", "raw_value"] }
 thiserror = { workspace = true, features = ["std"] }
 tracing.workspace = true
 alloy-sol-types.workspace = true
+http.workspace = true

@@ -20,9 +20,7 @@ please join us!
 ## Conduct
 
 The Alloy project adheres to the [Rust Code of Conduct][coc]. This describes
-the _minimum_ behavior expected from all contributors. Instances of violations
-of the Code of Conduct can be reported by contacting the project team at
-[james@prestwich](mailto:james@prestwi.ch).
+the _minimum_ behavior expected from all contributors.
 
 [coc]: https://www.rust-lang.org/policies/code-of-conduct
 

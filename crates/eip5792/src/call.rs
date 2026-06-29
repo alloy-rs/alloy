@@ -1,5 +1,4 @@
 use alloy_primitives::{map::HashMap, Address, Bytes, ChainId, U256};
-use std::vec::Vec;
 
 /// Request that a wallet submits a batch of calls in `wallet_sendCalls`
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

@@ -5,34 +5,31 @@ use alloy_transport::{TransportError, TransportErrorKind, TransportFut, Transpor
 use futures::{future::try_join_all, FutureExt, TryFutureExt};
 use std::{
     future::Future,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
 };
 use tokio::sync::{mpsc, oneshot};
+use tracing::{debug, debug_span, Instrument};
 
 /// A `PubSubFrontend` is [`Transport`] composed of a channel to a running
 /// PubSub service.
 ///
 /// [`Transport`]: alloy_transport::Transport
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PubSubFrontend {
     tx: mpsc::UnboundedSender<PubSubInstruction>,
     /// The number of items to buffer in new subscription channels. Defaults to
     /// 16. See [`tokio::sync::broadcast::channel`] for a description.
-    channel_size: AtomicUsize,
-}
-
-impl Clone for PubSubFrontend {
-    fn clone(&self) -> Self {
-        let channel_size = self.channel_size.load(Ordering::Relaxed);
-        Self { tx: self.tx.clone(), channel_size: AtomicUsize::new(channel_size) }
-    }
+    channel_size: Arc<AtomicUsize>,
 }
 
 impl PubSubFrontend {
     /// Create a new frontend.
-    pub(crate) const fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
-        Self { tx, channel_size: AtomicUsize::new(16) }
+    pub fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
+        Self { tx, channel_size: Arc::new(AtomicUsize::new(16)) }
     }
 
     /// Get the subscription ID for a local ID.
@@ -46,7 +43,9 @@ impl PubSubFrontend {
             backend_tx
                 .send(PubSubInstruction::GetSub(id, tx))
                 .map_err(|_| TransportErrorKind::backend_gone())?;
-            rx.await.map_err(|_| TransportErrorKind::backend_gone())
+            rx.await
+                .map_err(|_| TransportErrorKind::backend_gone())?
+                .map_or_else(|| Err(TransportErrorKind::custom_str("subscription not found")), Ok)
         }
     }
 
@@ -64,13 +63,22 @@ impl PubSubFrontend {
     ) -> impl Future<Output = TransportResult<Response>> + Send + 'static {
         let tx = self.tx.clone();
         let channel_size = self.channel_size.load(Ordering::Relaxed);
+        let method_name = req.method_clone();
 
         async move {
+            debug!("sending request to backend");
             let (in_flight, rx) = InFlight::new(req, channel_size);
             tx.send(PubSubInstruction::Request(in_flight))
                 .map_err(|_| TransportErrorKind::backend_gone())?;
-            rx.await.map_err(|_| TransportErrorKind::backend_gone())?
+            let resp = rx.await.map_err(|_| TransportErrorKind::backend_gone())?;
+            if tracing::enabled!(tracing::Level::TRACE) {
+                trace!(?resp, "retrieved response");
+            } else {
+                debug!(resp=?resp.as_ref().map(|_| ()), "retrieved response");
+            };
+            resp
         }
+        .instrument(debug_span!("request", %method_name))
     }
 
     /// Send a packet of requests, by breaking it up into individual requests.
@@ -104,22 +112,6 @@ impl PubSubFrontend {
 }
 
 impl tower::Service<RequestPacket> for PubSubFrontend {
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
-
-    #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        (&*self).poll_ready(cx)
-    }
-
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        (&*self).call(req)
-    }
-}
-
-impl tower::Service<RequestPacket> for &PubSubFrontend {
     type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;

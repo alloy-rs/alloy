@@ -1,4 +1,4 @@
-use alloy_json_rpc::{RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_rpc_client::{RpcCall, Waiter};
 use alloy_transport::TransportResult;
 use futures::FutureExt;
@@ -11,6 +11,13 @@ use std::{
 };
 use tokio::sync::oneshot;
 
+#[cfg(not(target_family = "wasm"))]
+/// Boxed future type used in [`ProviderCall`] for non-wasm targets.
+pub type BoxedFut<Output> = Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>;
+
+#[cfg(target_family = "wasm")]
+/// Boxed future type used in [`ProviderCall`] for wasm targets.
+pub type BoxedFut<Output> = Pin<Box<dyn Future<Output = TransportResult<Output>>>>;
 /// The primary future type for the [`Provider`].
 ///
 /// This future abstracts over several potential data sources. It allows
@@ -24,8 +31,8 @@ use tokio::sync::oneshot;
 #[pin_project(project = ProviderCallProj)]
 pub enum ProviderCall<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// An underlying call to an RPC server.
@@ -33,15 +40,15 @@ where
     /// A waiter for a batched call to a remote RPC server.
     Waiter(Waiter<Resp, Output, Map>),
     /// A boxed future.
-    BoxedFuture(Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>),
+    BoxedFuture(BoxedFut<Output>),
     /// The output, produces synchronously.
     Ready(Option<TransportResult<Output>>),
 }
 
 impl<Params, Resp, Output, Map> ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Instantiate a new [`ProviderCall`] from the output.
@@ -63,7 +70,7 @@ where
     }
 
     /// Fallible cast to mutable [`RpcCall`]
-    pub fn as_mut_rpc_call(&mut self) -> Option<&mut RpcCall<Params, Resp, Output, Map>> {
+    pub const fn as_mut_rpc_call(&mut self) -> Option<&mut RpcCall<Params, Resp, Output, Map>> {
         match self {
             Self::RpcCall(call) => Some(call),
             _ => None,
@@ -84,7 +91,7 @@ where
     }
 
     /// Fallible cast to mutable [`Waiter`]
-    pub fn as_mut_waiter(&mut self) -> Option<&mut Waiter<Resp, Output, Map>> {
+    pub const fn as_mut_waiter(&mut self) -> Option<&mut Waiter<Resp, Output, Map>> {
         match self {
             Self::Waiter(waiter) => Some(waiter),
             _ => None,
@@ -97,9 +104,7 @@ where
     }
 
     /// Fallible cast to a boxed future.
-    pub const fn as_boxed_future(
-        &self,
-    ) -> Option<&Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>> {
+    pub const fn as_boxed_future(&self) -> Option<&BoxedFut<Output>> {
         match self {
             Self::BoxedFuture(fut) => Some(fut),
             _ => None,
@@ -156,9 +161,9 @@ where
 
 impl<Params, Resp, Output, Map> ProviderCall<&Params, Resp, Output, Map>
 where
-    Params: RpcParam + ToOwned,
-    Params::Owned: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend + ToOwned,
+    Params::Owned: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
@@ -176,8 +181,8 @@ where
 
 impl<Params, Resp> std::fmt::Debug for ProviderCall<Params, Resp>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -192,8 +197,8 @@ where
 impl<Params, Resp, Output, Map> From<RpcCall<Params, Resp, Output, Map>>
     for ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     fn from(call: RpcCall<Params, Resp, Output, Map>) -> Self {
@@ -203,22 +208,21 @@ where
 
 impl<Params, Resp> From<Waiter<Resp>> for ProviderCall<Params, Resp, Resp, fn(Resp) -> Resp>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn from(waiter: Waiter<Resp>) -> Self {
         Self::Waiter(waiter)
     }
 }
 
-impl<Params, Resp, Output, Map> From<Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>>
-    for ProviderCall<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> From<BoxedFut<Output>> for ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
-    fn from(fut: Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>) -> Self {
+    fn from(fut: BoxedFut<Output>) -> Self {
         Self::BoxedFuture(fut)
     }
 }
@@ -226,8 +230,8 @@ where
 impl<Params, Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>>
     for ProviderCall<Params, Resp>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn from(rx: oneshot::Receiver<TransportResult<Box<RawValue>>>) -> Self {
         Waiter::from(rx).into()
@@ -236,8 +240,8 @@ where
 
 impl<Params, Resp, Output, Map> Future for ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {

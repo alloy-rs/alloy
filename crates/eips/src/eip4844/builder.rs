@@ -1,19 +1,58 @@
-use crate::eip4844::Blob;
-#[cfg(feature = "kzg")]
-use c_kzg::{KzgCommitment, KzgProof};
-
 use crate::eip4844::{
-    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES_USIZE,
+    utils::WholeFe, Blob, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES_USIZE,
 };
 use alloc::vec::Vec;
+use core::cmp;
 
-#[cfg(feature = "kzg")]
-use crate::eip4844::env_settings::EnvKzgSettings;
 #[cfg(any(feature = "kzg", feature = "arbitrary"))]
 use crate::eip4844::BlobTransactionSidecar;
 #[cfg(feature = "kzg")]
-use crate::eip4844::Bytes48;
-use core::cmp;
+use crate::{eip4844::env_settings::EnvKzgSettings, eip7594::BlobTransactionSidecarEip7594};
+
+/// Describes types that can be built from blobs and KZG settings.
+///
+/// This trait primarily exists to allow inference of the output type of
+/// [`SidecarBuilder::build`], and should generally not be implemented outside
+/// of this crate.
+#[cfg(feature = "kzg")]
+pub trait BuildableSidecar {
+    /// Build the sidecar from the blobs and KZG settings.
+    fn build_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error>
+    where
+        Self: Sized;
+
+    /// Build the sidecar from the blobs with default (Ethereum Mainnet) KZG
+    /// settings.
+    fn build(blobs: Vec<Blob>) -> Result<Self, c_kzg::Error>
+    where
+        Self: Sized,
+    {
+        Self::build_with_settings(blobs, EnvKzgSettings::Default.get())
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl BuildableSidecar for BlobTransactionSidecar {
+    fn build_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        Self::try_from_blobs_with_settings(blobs, settings)
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl BuildableSidecar for BlobTransactionSidecarEip7594 {
+    fn build_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        Self::try_from_blobs_with_settings(blobs, settings)
+    }
+}
 
 /// A builder for creating a [`BlobTransactionSidecar`].
 ///
@@ -50,12 +89,13 @@ impl PartialSidecar {
     }
 
     /// Get a reference to the blobs currently in the builder.
+    #[allow(clippy::missing_const_for_fn)]
     pub fn blobs(&self) -> &[Blob] {
         &self.blobs
     }
 
     /// Get the number of unused field elements that have been allocated
-    fn free_fe(&self) -> usize {
+    const fn free_fe(&self) -> usize {
         self.blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize - self.fe
     }
 
@@ -372,41 +412,67 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         self.coder.code(&mut self.inner, data);
     }
 
+    /// Build the sidecar from the data, with default (Ethereum Mainnet)
+    /// settings.
+    ///
+    /// # Note
+    ///
+    /// The output type is inferred, and should generally be either
+    /// [`BlobTransactionSidecar`] or [`BlobTransactionSidecarEip7594`].
+    #[cfg(feature = "kzg")]
+    pub fn build<U: BuildableSidecar>(self) -> Result<U, c_kzg::Error> {
+        self.build_with_settings(EnvKzgSettings::Default.get())
+    }
+
+    /// Build the sidecar from the data with the provided settings.
+    ///
+    /// # Note
+    ///
+    /// The output type is inferred, and should generally be either
+    /// [`BlobTransactionSidecar`] or [`BlobTransactionSidecarEip7594`].
+    #[cfg(feature = "kzg")]
+    pub fn build_with_settings<U: BuildableSidecar>(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<U, c_kzg::Error> {
+        U::build_with_settings(self.inner.blobs, settings)
+    }
+
     /// Build the sidecar from the data with the provided settings.
     #[cfg(feature = "kzg")]
-    pub fn build_with_settings(
+    pub fn build_4844_with_settings(
         self,
         settings: &c_kzg::KzgSettings,
     ) -> Result<BlobTransactionSidecar, c_kzg::Error> {
-        let mut commitments = Vec::with_capacity(self.inner.blobs.len());
-        let mut proofs = Vec::with_capacity(self.inner.blobs.len());
-        for blob in &self.inner.blobs {
-            // SAFETY: same size
-            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-            let commitment = KzgCommitment::blob_to_kzg_commitment(blob, settings)?;
-            let proof = KzgProof::compute_blob_kzg_proof(blob, &commitment.to_bytes(), settings)?;
-
-            // SAFETY: same size
-            unsafe {
-                commitments
-                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
-                proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(proof.to_bytes()));
-            }
-        }
-
-        Ok(BlobTransactionSidecar::new(self.inner.blobs, commitments, proofs))
+        BlobTransactionSidecar::build_with_settings(self.inner.blobs, settings)
     }
 
     /// Build the sidecar from the data, with default (Ethereum Mainnet)
     /// settings.
     #[cfg(feature = "kzg")]
-    pub fn build(self) -> Result<BlobTransactionSidecar, c_kzg::Error> {
-        self.build_with_settings(EnvKzgSettings::Default.get())
+    pub fn build_4844(self) -> Result<BlobTransactionSidecar, c_kzg::Error> {
+        self.build_4844_with_settings(EnvKzgSettings::Default.get())
     }
 
     /// Take the blobs from the builder, without committing them to a KZG proof.
     pub fn take(self) -> Vec<Blob> {
         self.inner.blobs
+    }
+
+    /// Build the sidecar for eip-7594 from the data, with default (Ethereum Mainnet)
+    /// settings.
+    #[cfg(feature = "kzg")]
+    pub fn build_7594(self) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+        self.build_7594_with_settings(EnvKzgSettings::Default.get())
+    }
+
+    /// Build the sidecar for eip-7594 from the data with the provided settings.
+    #[cfg(feature = "kzg")]
+    pub fn build_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+        BlobTransactionSidecarEip7594::build_with_settings(self.inner.blobs, settings)
     }
 }
 

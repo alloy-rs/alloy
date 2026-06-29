@@ -1,5 +1,5 @@
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{hex, Address, ChainId, PrimitiveSignature as Signature, B256};
+use alloy_primitives::{hex, Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use aws_sdk_kms::{
@@ -91,10 +91,14 @@ pub enum AwsSignerError {
     /// Thrown when the AWS KMS API returns a response without a public key.
     #[error("public key not found in response")]
     PublicKeyNotFound,
+
+    /// Failed to recover signature parity for the given digest and public key.
+    #[error("failed to recover signature parity from KMS signature")]
+    SignatureRecoveryFailed,
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl alloy_network::TxSigner<Signature> for AwsSigner {
     fn address(&self) -> Address {
         self.address
@@ -110,10 +114,9 @@ impl alloy_network::TxSigner<Signature> for AwsSigner {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for AwsSigner {
-    #[instrument(err)]
     #[allow(clippy::blocks_in_conditions)] // tracing::instrument on async fn
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_digest_inner(hash).await.map_err(alloy_signer::Error::other)
@@ -134,6 +137,8 @@ impl Signer for AwsSigner {
         self.chain_id = chain_id;
     }
 }
+
+alloy_network::impl_into_wallet!(AwsSigner);
 
 impl AwsSigner {
     /// Instantiate a new signer from an existing `Client` and key ID.
@@ -180,7 +185,7 @@ impl AwsSigner {
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;
-        Ok(sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey))
+        sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey)
     }
 }
 
@@ -228,18 +233,18 @@ fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
     hash: &B256,
     pubkey: &VerifyingKey,
-) -> Signature {
+) -> Result<Signature, AwsSignerError> {
     let signature = Signature::from_signature_and_parity(sig, false);
     if check_candidate(&signature, hash, pubkey) {
-        return signature;
+        return Ok(signature);
     }
 
     let signature = signature.with_parity(true);
     if check_candidate(&signature, hash, pubkey) {
-        return signature;
+        return Ok(signature);
     }
 
-    panic!("bad sig");
+    Err(AwsSignerError::SignatureRecoveryFailed)
 }
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.

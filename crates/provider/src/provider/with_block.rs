@@ -1,5 +1,5 @@
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_primitives::B256;
 use alloy_rpc_client::RpcCall;
 use alloy_transport::TransportResult;
@@ -9,14 +9,21 @@ use crate::ProviderCall;
 
 /// Helper struct that houses the params along with the BlockId.
 #[derive(Debug, Clone)]
-pub struct ParamsWithBlock<Params: RpcParam> {
+pub struct ParamsWithBlock<Params: RpcSend> {
     /// The params to be sent to the RPC call.
     pub params: Params,
     /// The block id to be used for the RPC call.
     pub block_id: BlockId,
 }
 
-impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {
+impl<Params: RpcSend> ParamsWithBlock<Params> {
+    /// Create a new instance of `ParamsWithBlock`.
+    pub const fn new(params: Params, block_id: BlockId) -> Self {
+        Self { params, block_id }
+    }
+}
+
+impl<Params: RpcSend> serde::Serialize for ParamsWithBlock<Params> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -42,11 +49,11 @@ impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {
 type ProviderCallProducer<Params, Resp, Output, Map> =
     Box<dyn Fn(BlockId) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
 
-/// Container for varous types of calls dependent on a block id.
+/// Container for various types of calls dependent on a block id.
 enum WithBlockInner<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// [RpcCall] which params are getting wrapped into [ParamsWithBlock] once the block id is set.
@@ -57,8 +64,8 @@ where
 
 impl<Params, Resp, Output, Map> core::fmt::Debug for WithBlockInner<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -78,8 +85,8 @@ where
 #[derive(Debug)]
 pub struct RpcWithBlock<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output + Clone,
 {
     inner: WithBlockInner<Params, Resp, Output, Map>,
@@ -88,8 +95,8 @@ where
 
 impl<Params, Resp, Output, Map> RpcWithBlock<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output + Clone,
 {
     /// Create a new [`RpcWithBlock`] from a [`RpcCall`].
@@ -110,8 +117,8 @@ where
 impl<Params, Resp, Output, Map> From<RpcCall<Params, Resp, Output, Map>>
     for RpcWithBlock<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output + Clone,
 {
     fn from(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
@@ -121,8 +128,8 @@ where
 
 impl<F, Params, Resp, Output, Map> From<F> for RpcWithBlock<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output + Clone,
     F: Fn(BlockId) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map> + Send + 'static,
 {
@@ -133,8 +140,8 @@ where
 
 impl<Params, Resp, Output, Map> RpcWithBlock<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output + Clone,
 {
     /// Set the block id.
@@ -188,8 +195,8 @@ where
 
 impl<Params, Resp, Output, Map> IntoFuture for RpcWithBlock<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output + Clone,
 {
@@ -201,7 +208,7 @@ where
         match self.inner {
             WithBlockInner::RpcCall(rpc_call) => {
                 let block_id = self.block_id;
-                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock { params, block_id });
+                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock::new(params, block_id));
                 ProviderCall::RpcCall(rpc_call)
             }
             WithBlockInner::ProviderCall(get_call) => get_call(self.block_id),

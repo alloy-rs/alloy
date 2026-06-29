@@ -29,9 +29,10 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-gcloud-sdk = { version = "0.25", features = [
+gcloud-sdk = { workspace = true, features = [
     "google-cloud-kms-v1",
     "google-longrunning",
+    "tls-webpki-roots",
 ] }
 k256 = { workspace = true, features = ["pem"] }
 spki.workspace = true

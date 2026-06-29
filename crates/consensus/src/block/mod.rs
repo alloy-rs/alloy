@@ -3,13 +3,19 @@
 mod header;
 pub use header::{BlockHeader, Header};
 
+mod traits;
+pub use traits::EthBlock;
+
+mod meta;
+pub use meta::{HeaderInfo, HeaderRoots};
+
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
-use crate::{Transaction, Typed2718};
+use crate::Transaction;
 use alloc::vec::Vec;
-use alloy_eips::eip4895::Withdrawals;
-use alloy_primitives::B256;
+use alloy_eips::{eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718, Typed2718};
+use alloy_primitives::{keccak256, Sealable, Sealed, B256};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -20,18 +26,19 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 ///
 /// See p2p block encoding reference: <https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-encoding-and-validity>
 #[derive(Debug, Clone, PartialEq, Eq, derive_more::Deref)]
-#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Block<T, H = Header> {
     /// Block header.
     #[deref]
     pub header: H,
     /// Block body.
-    pub body: BlockBody<T>,
+    pub body: BlockBody<T, H>,
 }
 
 impl<T, H> Block<T, H> {
     /// Creates a new block with the given header and body.
-    pub const fn new(header: H, body: BlockBody<T>) -> Self {
+    pub const fn new(header: H, body: BlockBody<T, H>) -> Self {
         Self { header, body }
     }
 
@@ -46,18 +53,39 @@ impl<T, H> Block<T, H> {
     }
 
     /// Consumes the block and returns the body.
-    pub fn into_body(self) -> BlockBody<T> {
+    pub fn into_body(self) -> BlockBody<T, H> {
         self.body
     }
 
     /// Converts the block's header type by applying a function to it.
-    pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
-        Block { header: f(self.header), body: self.body }
+    pub fn map_header<U>(self, mut f: impl FnMut(H) -> U) -> Block<T, U> {
+        Block { header: f(self.header), body: self.body.map_ommers(f) }
     }
 
     /// Converts the block's header type by applying a fallible function to it.
-    pub fn try_map_header<U, E>(self, f: impl FnOnce(H) -> Result<U, E>) -> Result<Block<T, U>, E> {
-        Ok(Block { header: f(self.header)?, body: self.body })
+    pub fn try_map_header<U, E>(
+        self,
+        mut f: impl FnMut(H) -> Result<U, E>,
+    ) -> Result<Block<T, U>, E> {
+        Ok(Block { header: f(self.header)?, body: self.body.try_map_ommers(f)? })
+    }
+
+    /// Converts the block's transaction type to the given alternative that is `From<T>`
+    pub fn convert_transactions<U>(self) -> Block<U, H>
+    where
+        U: From<T>,
+    {
+        self.map_transactions(U::from)
+    }
+
+    /// Converts the block's transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the block with the new transaction type if all conversions were successful.
+    pub fn try_convert_transactions<U>(self) -> Result<Block<U, H>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map_transactions(U::try_from)
     }
 
     /// Converts the block's transaction type by applying a function to each transaction.
@@ -95,6 +123,79 @@ impl<T, H> Block<T, H> {
             },
         })
     }
+
+    /// Converts the transactions in the block's body to `WithEncoded<T>` by encoding them via
+    /// [`Encodable2718`]
+    pub fn into_with_encoded2718(self) -> Block<WithEncoded<T>, H>
+    where
+        T: Encodable2718,
+    {
+        self.map_transactions(|tx| tx.into_encoded())
+    }
+
+    /// Replaces the header of the block.
+    ///
+    /// Note: This method only replaces the main block header. If you need to transform
+    /// the ommer headers as well, use [`map_header`](Self::map_header) instead.
+    pub fn with_header(mut self, header: H) -> Self {
+        self.header = header;
+        self
+    }
+
+    /// Encodes the [`Block`] given header and block body.
+    ///
+    /// Returns the rlp encoded block.
+    ///
+    /// This is equivalent to `block.encode`.
+    pub fn rlp_encoded_from_parts(header: &H, body: &BlockBody<T, H>) -> Vec<u8>
+    where
+        H: Encodable,
+        T: Encodable,
+    {
+        let helper = block_rlp::HelperRef::from_parts(header, body);
+        let mut buf = Vec::with_capacity(helper.length());
+        helper.encode(&mut buf);
+        buf
+    }
+
+    /// Encodes the [`Block`] given header and block body
+    ///
+    /// This is equivalent to `block.encode`.
+    pub fn rlp_encode_from_parts(
+        header: &H,
+        body: &BlockBody<T, H>,
+        out: &mut dyn alloy_rlp::bytes::BufMut,
+    ) where
+        H: Encodable,
+        T: Encodable,
+    {
+        block_rlp::HelperRef::from_parts(header, body).encode(out)
+    }
+
+    /// Returns the RLP encoded length of the block's header and body.
+    pub fn rlp_length_for(header: &H, body: &BlockBody<T, H>) -> usize
+    where
+        H: Encodable,
+        T: Encodable,
+    {
+        block_rlp::HelperRef::from_parts(header, body).length()
+    }
+}
+
+impl<T: Encodable2718> Block<T, Header> {
+    /// Creates a new block from a header and an iterator of transactions.
+    ///
+    /// Computes and sets the `transactions_root` on the header automatically.
+    /// `ommers_hash` is set to [`EMPTY_OMMER_ROOT_HASH`](crate::EMPTY_OMMER_ROOT_HASH).
+    pub fn from_transactions(
+        mut header: Header,
+        transactions: impl IntoIterator<Item = T>,
+    ) -> Self {
+        let transactions: Vec<T> = transactions.into_iter().collect();
+        header.transactions_root = crate::proofs::calculate_transaction_root(&transactions);
+        header.ommers_hash = crate::EMPTY_OMMER_ROOT_HASH;
+        Self::new(header, BlockBody { transactions, ommers: Vec::new(), withdrawals: None })
+    }
 }
 
 impl<T, H> Default for Block<T, H>
@@ -106,7 +207,7 @@ where
     }
 }
 
-impl<T, H> From<Block<T, H>> for BlockBody<T> {
+impl<T, H> From<Block<T, H>> for BlockBody<T, H> {
     fn from(block: Block<T, H>) -> Self {
         block.into_body()
     }
@@ -127,24 +228,25 @@ where
 ///
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
-#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[rlp(trailing)]
-pub struct BlockBody<T> {
+pub struct BlockBody<T, H = Header> {
     /// Transactions in this block.
     pub transactions: Vec<T>,
     /// Ommers/uncles header.
-    pub ommers: Vec<Header>,
+    pub ommers: Vec<H>,
     /// Block withdrawals.
     pub withdrawals: Option<Withdrawals>,
 }
 
-impl<T> Default for BlockBody<T> {
+impl<T, H> Default for BlockBody<T, H> {
     fn default() -> Self {
         Self { transactions: Vec::new(), ommers: Vec::new(), withdrawals: None }
     }
 }
 
-impl<T> BlockBody<T> {
+impl<T, H> BlockBody<T, H> {
     /// Returns an iterator over all transactions.
     #[inline]
     pub fn transactions(&self) -> impl Iterator<Item = &T> + '_ {
@@ -152,15 +254,24 @@ impl<T> BlockBody<T> {
     }
 
     /// Create a [`Block`] from the body and its header.
-    pub const fn into_block(self, header: Header) -> Block<T> {
+    pub const fn into_block(self, header: H) -> Block<T, H> {
         Block { header, body: self }
     }
-}
 
-impl<T> BlockBody<T> {
     /// Calculate the ommers root for the block body.
-    pub fn calculate_ommers_root(&self) -> B256 {
+    pub fn calculate_ommers_root(&self) -> B256
+    where
+        H: Encodable,
+    {
         crate::proofs::calculate_ommers_root(&self.ommers)
+    }
+
+    /// Returns an iterator over the hashes of the ommers in the block body.
+    pub fn ommers_hashes(&self) -> impl Iterator<Item = B256> + '_
+    where
+        H: Sealable,
+    {
+        self.ommers.iter().map(|h| h.hash_slow())
     }
 
     /// Calculate the withdrawals root for the block body, if withdrawals exist. If there are no
@@ -168,9 +279,30 @@ impl<T> BlockBody<T> {
     pub fn calculate_withdrawals_root(&self) -> Option<B256> {
         self.withdrawals.as_ref().map(|w| crate::proofs::calculate_withdrawals_root(w))
     }
+
+    /// Converts the body's ommers type by applying a function to it.
+    pub fn map_ommers<U>(self, f: impl FnMut(H) -> U) -> BlockBody<T, U> {
+        BlockBody {
+            transactions: self.transactions,
+            ommers: self.ommers.into_iter().map(f).collect(),
+            withdrawals: self.withdrawals,
+        }
+    }
+
+    /// Converts the body's ommers type by applying a fallible function to it.
+    pub fn try_map_ommers<U, E>(
+        self,
+        f: impl FnMut(H) -> Result<U, E>,
+    ) -> Result<BlockBody<T, U>, E> {
+        Ok(BlockBody {
+            transactions: self.transactions,
+            ommers: self.ommers.into_iter().map(f).collect::<Result<Vec<_>, _>>()?,
+            withdrawals: self.withdrawals,
+        })
+    }
 }
 
-impl<T: Transaction> BlockBody<T> {
+impl<T: Transaction, H> BlockBody<T, H> {
     /// Returns an iterator over all blob versioned hashes from the block body.
     #[inline]
     pub fn blob_versioned_hashes_iter(&self) -> impl Iterator<Item = &B256> + '_ {
@@ -178,7 +310,7 @@ impl<T: Transaction> BlockBody<T> {
     }
 }
 
-impl<T: Typed2718> BlockBody<T> {
+impl<T: Typed2718, H> BlockBody<T, H> {
     /// Returns whether or not the block body contains any blob transactions.
     #[inline]
     pub fn has_eip4844_transactions(&self) -> bool {
@@ -208,17 +340,28 @@ mod block_rlp {
     struct Helper<T, H> {
         header: H,
         transactions: Vec<T>,
-        ommers: Vec<Header>,
+        ommers: Vec<H>,
         withdrawals: Option<Withdrawals>,
     }
 
     #[derive(RlpEncodable)]
     #[rlp(trailing)]
-    struct HelperRef<'a, T, H> {
-        header: &'a H,
-        transactions: &'a Vec<T>,
-        ommers: &'a Vec<Header>,
-        withdrawals: Option<&'a Withdrawals>,
+    pub(crate) struct HelperRef<'a, T, H> {
+        pub(crate) header: &'a H,
+        pub(crate) transactions: &'a Vec<T>,
+        pub(crate) ommers: &'a Vec<H>,
+        pub(crate) withdrawals: Option<&'a Withdrawals>,
+    }
+
+    impl<'a, T, H> HelperRef<'a, T, H> {
+        pub(crate) const fn from_parts(header: &'a H, body: &'a BlockBody<T, H>) -> Self {
+            Self {
+                header,
+                transactions: &body.transactions,
+                ommers: &body.ommers,
+                withdrawals: body.withdrawals.as_ref(),
+            }
+        }
     }
 
     impl<'a, T, H> From<&'a Block<T, H>> for HelperRef<'a, T, H> {
@@ -246,25 +389,185 @@ mod block_rlp {
             Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })
         }
     }
+
+    impl<T: Decodable, H: Decodable> Block<T, H> {
+        /// Decodes the block from RLP, computing the header hash directly from the RLP bytes.
+        ///
+        /// This is more efficient than decoding the block and then sealing it, as the header
+        /// hash is computed from the raw RLP bytes without re-encoding.
+        pub fn decode_sealed(buf: &mut &[u8]) -> alloy_rlp::Result<Sealed<Self>> {
+            // Decode the outer block list header
+            let block_rlp_head = alloy_rlp::Header::decode(buf)?;
+            if !block_rlp_head.list {
+                return Err(alloy_rlp::Error::UnexpectedString);
+            }
+
+            // Decode header and compute hash from raw RLP bytes
+            let header_start = *buf;
+            let header = H::decode(buf)?;
+            let header_hash = keccak256(&header_start[..header_start.len() - buf.len()]);
+
+            // Decode remaining body fields
+            let transactions = Vec::<T>::decode(buf)?;
+            let ommers = Vec::<H>::decode(buf)?;
+            let withdrawals = if buf.is_empty() { None } else { Some(Decodable::decode(buf)?) };
+
+            let block = Self { header, body: BlockBody { transactions, ommers, withdrawals } };
+
+            Ok(Sealed::new_unchecked(block, header_hash))
+        }
+    }
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T> arbitrary::Arbitrary<'a> for BlockBody<T>
+impl<'a, T, H> arbitrary::Arbitrary<'a> for BlockBody<T, H>
 where
     T: arbitrary::Arbitrary<'a>,
+    H: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // first generate up to 100 txs
-        // first generate a reasonable amount of txs
         let transactions = (0..u.int_in_range(0..=100)?)
             .map(|_| T::arbitrary(u))
             .collect::<arbitrary::Result<Vec<_>>>()?;
 
         // then generate up to 2 ommers
         let ommers = (0..u.int_in_range(0..=1)?)
-            .map(|_| Header::arbitrary(u))
+            .map(|_| H::arbitrary(u))
             .collect::<arbitrary::Result<Vec<_>>>()?;
 
         Ok(Self { transactions, ommers, withdrawals: u.arbitrary()? })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Signed, TxEnvelope, TxLegacy};
+    use alloy_rlp::Encodable;
+
+    #[test]
+    fn can_convert_block() {
+        let block: Block<Signed<TxLegacy>> = Block::default();
+        let _: Block<TxEnvelope> = block.convert_transactions();
+    }
+
+    #[test]
+    fn decode_sealed_produces_correct_hash() {
+        let block: Block<TxEnvelope> = Block::default();
+        let expected_hash = block.header.hash_slow();
+
+        let mut encoded = Vec::new();
+        block.encode(&mut encoded);
+
+        let mut buf = encoded.as_slice();
+        let sealed = Block::<TxEnvelope>::decode_sealed(&mut buf).unwrap();
+
+        assert_eq!(sealed.hash(), expected_hash);
+        assert_eq!(*sealed.inner(), block);
+    }
+
+    #[test]
+    fn header_decode_sealed_produces_correct_hash() {
+        let header = Header::default();
+        let expected_hash = header.hash_slow();
+
+        let mut encoded = Vec::new();
+        header.encode(&mut encoded);
+
+        let mut buf = encoded.as_slice();
+        let sealed = Header::decode_sealed(&mut buf).unwrap();
+
+        assert_eq!(sealed.hash(), expected_hash);
+        assert_eq!(*sealed.inner(), header);
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn decode_sealed_roundtrip_with_transactions() {
+        use crate::{SignableTransaction, TxLegacy};
+        use alloy_primitives::{Address, Signature, TxKind, U256};
+
+        let tx = TxLegacy {
+            nonce: 1,
+            gas_price: 100,
+            gas_limit: 21000,
+            to: TxKind::Call(Address::ZERO),
+            value: U256::from(1000),
+            input: Default::default(),
+            chain_id: Some(1),
+        };
+        let sig = Signature::new(U256::from(1), U256::from(2), false);
+        let signed = tx.into_signed(sig);
+        let envelope: TxEnvelope = signed.into();
+
+        let block = Block {
+            header: Header { number: 42, gas_limit: 30_000_000, ..Default::default() },
+            body: BlockBody { transactions: vec![envelope], ommers: vec![], withdrawals: None },
+        };
+
+        let expected_hash = block.header.hash_slow();
+
+        let mut encoded = Vec::new();
+        block.encode(&mut encoded);
+
+        let mut buf = encoded.as_slice();
+        let sealed = Block::<TxEnvelope>::decode_sealed(&mut buf).unwrap();
+
+        assert_eq!(sealed.hash(), expected_hash);
+        assert_eq!(sealed.header.number, 42);
+        assert_eq!(sealed.body.transactions.len(), 1);
+        assert!(buf.is_empty());
+    }
+}
+
+#[cfg(all(test, feature = "arbitrary"))]
+mod fuzz_tests {
+    use super::*;
+    use crate::{EthereumTxEnvelope, TxEip4844};
+    use alloy_rlp::Encodable;
+    use arbitrary::{Arbitrary, Unstructured};
+    use rand::Rng;
+
+    #[test]
+    fn fuzz_decode_sealed_block_roundtrip() {
+        for _ in 0..10 {
+            let mut bytes = [0u8; 1024 * 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+
+            let block = Block::<EthereumTxEnvelope<TxEip4844>>::arbitrary(&mut u).unwrap();
+            let expected_hash = block.header.hash_slow();
+
+            let mut encoded = Vec::new();
+            block.encode(&mut encoded);
+
+            let sealed =
+                Block::<EthereumTxEnvelope<TxEip4844>>::decode_sealed(&mut encoded.as_slice())
+                    .unwrap();
+            assert_eq!(sealed.hash(), expected_hash);
+            assert_eq!(*sealed.inner(), block);
+        }
+    }
+
+    #[test]
+    fn fuzz_header_decode_sealed_roundtrip() {
+        for _ in 0..200 {
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+
+            let header = Header::arbitrary(&mut u).unwrap();
+            let expected_hash = header.hash_slow();
+
+            let mut encoded = Vec::new();
+            header.encode(&mut encoded);
+
+            let mut buf = encoded.as_slice();
+            let sealed = Header::decode_sealed(&mut buf).unwrap();
+
+            assert_eq!(sealed.hash(), expected_hash);
+            assert_eq!(*sealed.inner(), header);
+        }
     }
 }

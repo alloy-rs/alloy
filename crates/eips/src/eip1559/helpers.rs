@@ -1,5 +1,71 @@
 use crate::eip1559::{constants::GAS_LIMIT_BOUND_DIVISOR, BaseFeeParams};
 
+/// Calculates the effective gas price for a dynamic fee transaction.
+///
+/// This is a utility function for EIP-1559 and similar transactions that use dynamic fees.
+///
+/// For EIP-1559 transactions, the effective gas price is calculated as:
+/// - If no base fee: returns `max_fee_per_gas`
+/// - If base fee exists: returns `min(max_fee_per_gas, max_priority_fee_per_gas + base_fee)`
+///
+/// This ensures that the total fee doesn't exceed the maximum fee per gas, while also
+/// ensuring that the priority fee doesn't exceed the maximum priority fee per gas.
+#[inline]
+pub fn calc_effective_gas_price(
+    max_fee_per_gas: u128,
+    max_priority_fee_per_gas: u128,
+    base_fee: Option<u64>,
+) -> u128 {
+    base_fee.map_or(max_fee_per_gas, |base_fee| {
+        // if the tip is greater than the max priority fee per gas, set it to the max
+        // priority fee per gas + base fee
+        let tip = max_fee_per_gas.saturating_sub(base_fee as u128);
+        if tip > max_priority_fee_per_gas {
+            max_priority_fee_per_gas + base_fee as u128
+        } else {
+            // otherwise return the max fee per gas
+            max_fee_per_gas
+        }
+    })
+}
+
+/// Return type of EIP1155 gas fee estimator.
+///
+/// Contains EIP-1559 fields
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct Eip1559Estimation {
+    /// The max fee per gas.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub max_fee_per_gas: u128,
+    /// The max priority fee per gas.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub max_priority_fee_per_gas: u128,
+}
+
+impl Eip1559Estimation {
+    /// Scales the [`Eip1559Estimation`] by the given percentage value.
+    ///
+    /// ```
+    /// use alloy_eips::eip1559::Eip1559Estimation;
+    /// let est =
+    ///     Eip1559Estimation { max_fee_per_gas: 100, max_priority_fee_per_gas: 100 }.scaled_by_pct(10);
+    /// assert_eq!(est.max_fee_per_gas, 110);
+    /// assert_eq!(est.max_priority_fee_per_gas, 110);
+    /// ```
+    pub const fn scale_by_pct(&mut self, pct: u64) {
+        self.max_fee_per_gas = self.max_fee_per_gas * (100 + pct as u128) / 100;
+        self.max_priority_fee_per_gas = self.max_priority_fee_per_gas * (100 + pct as u128) / 100;
+    }
+
+    /// Consumes the type and returns the scaled estimation.
+    pub const fn scaled_by_pct(mut self, pct: u64) -> Self {
+        self.scale_by_pct(pct);
+        self
+    }
+}
+
 /// Calculate the base fee for the next block based on the EIP-1559 specification.
 ///
 /// This function calculates the base fee for the next block according to the rules defined in the
@@ -29,8 +95,24 @@ pub fn calc_next_block_base_fee(
     base_fee: u64,
     base_fee_params: BaseFeeParams,
 ) -> u64 {
+    let elasticity = base_fee_params.elasticity_multiplier;
+    let max_change_denominator = base_fee_params.max_change_denominator;
+
+    // Without these checks, `gas_limit / elasticity` or the EIP-1559 update term can divide by
+    // zero (e.g. elasticity or denominator set to zero from misconfiguration / malformed
+    // Holocene header data, or `gas_limit < elasticity` on chains that do not enforce a minimum
+    // gas limit). Nethermind returns the parent base fee unchanged in these cases; see
+    // `DefaultBaseFeeCalculator` in Nethermind.Core.
+    if elasticity == 0 || max_change_denominator == 0 {
+        return base_fee;
+    }
+
     // Calculate the target gas by dividing the gas limit by the elasticity multiplier.
-    let gas_target = gas_limit / base_fee_params.elasticity_multiplier as u64;
+    let gas_target = (gas_limit as u128 / elasticity) as u64;
+
+    if gas_target == 0 {
+        return base_fee;
+    }
 
     match gas_used.cmp(&gas_target) {
         // If the gas used in the current block is equal to the gas target, the base fee remains the
@@ -238,5 +320,27 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_zero_elasticity() {
+        let p = BaseFeeParams::new(8, 0);
+        assert_eq!(calc_next_block_base_fee(1, 30_000_000, 1_000_000_000, p), 1_000_000_000);
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_zero_denominator() {
+        let p = BaseFeeParams::new(0, 2);
+        assert_eq!(
+            calc_next_block_base_fee(15_000_000, 30_000_000, 1_000_000_000, p),
+            1_000_000_000
+        );
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_gas_limit_below_elasticity() {
+        let p = BaseFeeParams::ethereum();
+        // gas_target = 1 / 2 = 0; gas_used > 0 used to hit a divide-by-zero in the increase path.
+        assert_eq!(calc_next_block_base_fee(1, 1, 1_000_000_000, p), 1_000_000_000);
     }
 }

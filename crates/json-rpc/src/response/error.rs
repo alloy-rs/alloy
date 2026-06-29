@@ -1,5 +1,5 @@
 use alloy_primitives::Bytes;
-use alloy_sol_types::SolInterface;
+use alloy_sol_types::{SolError, SolInterface};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
@@ -14,7 +14,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::RpcObject;
+use crate::RpcSend;
 
 const INTERNAL_ERROR: Cow<'static, str> = Cow::Borrowed("Internal error");
 
@@ -68,7 +68,7 @@ impl<E> ErrorPayload<E> {
     /// and additional data.
     pub const fn internal_error_with_obj(data: E) -> Self
     where
-        E: RpcObject,
+        E: RpcSend,
     {
         Self { code: -32603, message: INTERNAL_ERROR, data: Some(data) }
     }
@@ -76,7 +76,7 @@ impl<E> ErrorPayload<E> {
     /// Create a new error payload for an internal error with a custom message
     pub const fn internal_error_with_message_and_obj(message: Cow<'static, str>, data: E) -> Self
     where
-        E: RpcObject,
+        E: RpcSend,
     {
         Self { code: -32603, message, data: Some(data) }
     }
@@ -111,6 +111,17 @@ impl<E> ErrorPayload<E> {
             return true;
         }
 
+        // This is a websocket specific error for too many concurrent requests on the same
+        // connection <https://github.com/ithacaxyz/relay/issues/1352>
+        if self.code == 1008 {
+            return true;
+        }
+
+        // This is retryable cloudflare error <https://github.com/foundry-rs/foundry/issues/11667>
+        if self.code == -32055 {
+            return true;
+        }
+
         match self.message.as_ref() {
             // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
             "header not found" => true,
@@ -122,6 +133,7 @@ impl<E> ErrorPayload<E> {
                     || msg.contains("too many requests")
                     || msg.contains("credits limited")
                     || msg.contains("request limit")
+                    || msg.contains("maximum number of concurrent requests")
             }
         }
     }
@@ -129,7 +141,7 @@ impl<E> ErrorPayload<E> {
 
 impl<T> From<T> for ErrorPayload<T>
 where
-    T: std::error::Error + RpcObject,
+    T: std::error::Error + RpcSend,
 {
     fn from(value: T) -> Self {
         Self { code: -32603, message: INTERNAL_ERROR, data: Some(value) }
@@ -138,7 +150,7 @@ where
 
 impl<E> ErrorPayload<E>
 where
-    E: RpcObject,
+    E: RpcSend,
 {
     /// Serialize the inner data into a [`RawValue`].
     pub fn serialize_payload(&self) -> serde_json::Result<ErrorPayload> {
@@ -172,7 +184,7 @@ impl<ErrData: fmt::Display> fmt::Display for ErrorPayload<ErrData> {
             "error code {}: {}{}",
             self.code,
             self.message,
-            self.data.as_ref().map(|data| format!(", data: {}", data)).unwrap_or_default()
+            self.data.as_ref().map(|data| format!(", data: {data}")).unwrap_or_default()
         )
     }
 }
@@ -329,14 +341,14 @@ where
         }
     }
 
-    /// Attempt to extract revert data from the JsonRpcError be recursively
+    /// Attempt to extract revert data from the JSON-RPC error by recursively
     /// traversing the error's data field
     ///
-    /// This returns the first hex it finds in the data object, and its
-    /// behavior may change with `serde_json` internal changes.
+    /// Returns the first hex string found in the data object; behavior may change
+    /// with `serde_json` internal changes.
     ///
-    /// If no hex object is found, it will return an empty bytes IFF the error
-    /// is a revert
+    /// If no hex value is found, returns `None` even if the message indicates a
+    /// revert.
     ///
     /// Inspired by ethers-js logic:
     /// <https://github.com/ethers-io/ethers.js/blob/9f990c57f0486728902d4b8e049536f2bb3487ee/packages/providers/src.ts/json-rpc-provider.ts#L25-L53>
@@ -349,9 +361,15 @@ where
         }
     }
 
-    /// Extracts revert data and tries decoding it into given custom errors set.
-    pub fn as_decoded_error<E: SolInterface>(&self, validate: bool) -> Option<E> {
-        self.as_revert_data().and_then(|data| E::abi_decode(&data, validate).ok())
+    /// Extracts revert data and tries decoding it into given custom errors set present in the
+    /// [`SolInterface`].
+    pub fn as_decoded_interface_error<E: SolInterface>(&self) -> Option<E> {
+        self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
+    }
+
+    /// Extracts revert data and tries decoding it into custom [`SolError`].
+    pub fn as_decoded_error<E: SolError>(&self) -> Option<E> {
+        self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
     }
 }
 
@@ -401,6 +419,7 @@ mod test {
     #[test]
     fn custom_error_decoding() {
         sol!(
+            #[derive(Debug, PartialEq, Eq)]
             library Errors {
                 error SomeCustomError(uint256 a);
             }
@@ -410,8 +429,36 @@ mod test {
         let payload: ErrorPayload = serde_json::from_str(json).unwrap();
 
         let Errors::ErrorsErrors::SomeCustomError(value) =
-            payload.as_decoded_error::<Errors::ErrorsErrors>(false).unwrap();
+            payload.as_decoded_interface_error::<Errors::ErrorsErrors>().unwrap();
 
         assert_eq!(value.a, U256::from(1));
+
+        let decoded_err = payload.as_decoded_error::<Errors::SomeCustomError>().unwrap();
+
+        assert_eq!(decoded_err, Errors::SomeCustomError { a: U256::from(1) });
+    }
+
+    #[test]
+    fn max_concurrent_requests() {
+        let json = r#"{"code":1008,"message":"You have exceeded the maximum number of concurrent requests on a single WebSocket. At most 200 concurrent requests are allowed per WebSocket."}"#;
+        let payload: ErrorPayload = serde_json::from_str(json).unwrap();
+        assert!(payload.is_retry_err());
+    }
+
+    #[test]
+    fn extract_transaction_hash_box_raw_value() {
+        use crate::RpcError;
+        use alloy_primitives::B256;
+        use serde_json::value::RawValue;
+
+        let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        let json = format!(r#"{{"code":5,"message":"insufficient funds","data":"{}"}}"#, tx_hash);
+
+        let error_payload: ErrorPayload = serde_json::from_str(&json).unwrap();
+        let rpc_error: RpcError<(), Box<RawValue>> = RpcError::ErrorResp(error_payload);
+
+        let extracted_hash = rpc_error.tx_hash_data();
+        assert!(extracted_hash.is_some());
+        assert_eq!(extracted_hash.unwrap(), tx_hash.parse::<B256>().unwrap());
     }
 }

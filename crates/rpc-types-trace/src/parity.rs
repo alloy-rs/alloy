@@ -3,7 +3,8 @@
 //! See <https://openethereum.github.io/JSONRPC-trace-module>
 
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256, U64};
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
+use alloy_rpc_types_eth::BlockNumHash;
+use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -122,6 +123,30 @@ impl<T> Delta<T> {
     /// Returns true if the value is changed
     pub const fn is_changed(&self) -> bool {
         matches!(self, Self::Changed(_))
+    }
+
+    /// Returns the value if the delta is [`Delta::Added`]
+    pub const fn as_added(&self) -> Option<&T> {
+        match self {
+            Self::Added(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Returns the value if the delta is [`Delta::Removed`]
+    pub const fn as_removed(&self) -> Option<&T> {
+        match self {
+            Self::Removed(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`ChangedType`] if the delta is [`Delta::Changed`]
+    pub const fn as_changed(&self) -> Option<&ChangedType<T>> {
+        match self {
+            Self::Changed(changed) => Some(changed),
+            _ => None,
+        }
     }
 }
 
@@ -243,6 +268,18 @@ impl Action {
             Self::Reward(_) => ActionType::Reward,
         }
     }
+
+    /// Returns true if this action contains the given address.
+    pub fn contains_address(&self, address: Address) -> bool {
+        match self {
+            Self::Call(CallAction { from, to, .. }) => *from == address || *to == address,
+            Self::Create(CreateAction { from, .. }) => *from == address,
+            Self::Reward(RewardAction { author, .. }) => *author == address,
+            Self::Selfdestruct(SelfdestructAction { address: destroyed, .. }) => {
+                *destroyed == address
+            }
+        }
+    }
 }
 
 /// An external action type.
@@ -279,6 +316,19 @@ pub enum CallType {
     StaticCall,
     /// Authorized call
     AuthCall,
+}
+
+impl core::fmt::Display for CallType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::None => write!(f, "NONE"),
+            Self::Call => write!(f, "CALL"),
+            Self::CallCode => write!(f, "CALLCODE"),
+            Self::DelegateCall => write!(f, "DELEGATECALL"),
+            Self::StaticCall => write!(f, "STATICCALL"),
+            Self::AuthCall => write!(f, "AUTHCALL"),
+        }
+    }
 }
 
 /// Represents a certain [CallType] of a _call_ or message transaction.
@@ -356,6 +406,26 @@ pub struct RewardAction {
     pub value: U256,
 }
 
+impl RewardAction {
+    /// Helper to construct a [`LocalizedTransactionTrace`] that describes a reward to the block
+    /// beneficiary.
+    pub const fn into_localized_trace(self, block: BlockNumHash) -> LocalizedTransactionTrace {
+        LocalizedTransactionTrace {
+            block_hash: Some(block.hash),
+            block_number: Some(block.number),
+            transaction_hash: None,
+            transaction_position: None,
+            trace: TransactionTrace {
+                trace_address: vec![],
+                subtraces: 0,
+                action: Action::Reward(self),
+                error: None,
+                result: None,
+            },
+        }
+    }
+}
+
 /// Represents a _selfdestruct_ action fka `suicide`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -376,6 +446,7 @@ pub struct CallOutput {
     #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// The output data of the call.
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub output: Bytes,
 }
 
@@ -393,13 +464,44 @@ pub struct CreateOutput {
 }
 
 /// Represents the output of a trace.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum TraceOutput {
-    /// Output of a regular call transaction.
-    Call(CallOutput),
     /// Output of a CREATE transaction.
     Create(CreateOutput),
+    /// Output of a regular call transaction.
+    Call(CallOutput),
+}
+
+impl<'de> Deserialize<'de> for TraceOutput {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct OutputFields {
+            address: Option<Address>,
+            code: Option<Bytes>,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_used: u64,
+            output: Option<Bytes>,
+        }
+
+        let OutputFields { address, code, gas_used, output } =
+            OutputFields::deserialize(deserializer)?;
+
+        match (address, code) {
+            (Some(address), Some(code)) => {
+                Ok(Self::Create(CreateOutput { address, code, gas_used }))
+            }
+            (None, None) => {
+                Ok(Self::Call(CallOutput { gas_used, output: output.unwrap_or_default() }))
+            }
+            (Some(_), None) => Err(de::Error::missing_field("code")),
+            (None, Some(_)) => Err(de::Error::missing_field("address")),
+        }
+    }
 }
 
 impl TraceOutput {
@@ -409,6 +511,27 @@ impl TraceOutput {
             Self::Call(call) => &call.output,
             Self::Create(create) => &create.code,
         }
+    }
+
+    /// Returns the [`CallOutput`] if it is [`TraceOutput::Call`]
+    pub const fn as_call(&self) -> Option<&CallOutput> {
+        match self {
+            Self::Call(output) => Some(output),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`CreateOutput`] if it is [`TraceOutput::Create`]
+    pub const fn as_create(&self) -> Option<&CreateOutput> {
+        match self {
+            Self::Create(output) => Some(output),
+            _ => None,
+        }
+    }
+
+    /// Returns the address of the created contract if this is a CREATE trace.
+    pub fn created_contract(&self) -> Option<Address> {
+        self.as_create().map(|create| create.address)
     }
 
     /// Consumes the output of this trace.
@@ -428,7 +551,7 @@ impl TraceOutput {
     }
 
     /// Sets the gas used by this trace.
-    pub fn set_gas_used(&mut self, gas_used: u64) {
+    pub const fn set_gas_used(&mut self, gas_used: u64) {
         match self {
             Self::Call(call) => call.gas_used = gas_used,
             Self::Create(create) => create.gas_used = gas_used,
@@ -459,6 +582,19 @@ pub struct TransactionTrace {
     pub trace_address: Vec<usize>,
 }
 
+impl TransactionTrace {
+    /// Returns true if this trace contains the given address in its action or result.
+    pub fn contains_address(&self, address: Address) -> bool {
+        if self.action.contains_address(address) {
+            return true;
+        }
+
+        let Some(out) = &self.result else { return false };
+
+        out.created_contract() == Some(address)
+    }
+}
+
 /// A wrapper for [TransactionTrace] that includes additional information about the transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -481,6 +617,23 @@ pub struct LocalizedTransactionTrace {
     /// Transaction index within the block, None if pending.
     #[doc(alias = "tx_position", alias = "transaction_index", alias = "tx_index")]
     pub transaction_position: Option<u64>,
+}
+
+impl LocalizedTransactionTrace {
+    /// Sets the gas used of this trace.
+    ///
+    /// This is intended to manually set the root trace's gas used to the actual gas used by the
+    /// transaction, e.g. for geth's [`FlatCallFrame`](crate::geth::call::FlatCallFrame)
+    pub const fn set_gas_used(&mut self, gas_used: u64) {
+        if let Some(res) = self.trace.result.as_mut() {
+            res.set_gas_used(gas_used);
+        }
+    }
+
+    /// Returns true if this trace contains the given address in its action or result.
+    pub fn contains_address(&self, address: Address) -> bool {
+        self.trace.contains_address(address)
+    }
 }
 
 // Implement Serialize manually to ensure consistent ordering of fields to match other client's
@@ -675,7 +828,7 @@ mod tests {
 
     #[test]
     fn test_serialization_order() {
-        let test_cases = vec![
+        let test_cases = [
             TraceTestCase {
                 trace: LocalizedTransactionTrace {
                     trace: TransactionTrace {
@@ -907,5 +1060,53 @@ mod tests {
         let trace =
             serde_json::from_str::<TraceResultsWithTransactionHash>(reference_data).unwrap();
         assert_eq!(trace.full_trace.output, Bytes::default());
+    }
+
+    #[test]
+    fn test_call_output_missing_output_field() {
+        let json = r#"{ "gasUsed": "0x0" }"#;
+        let parsed: CallOutput = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.output, Bytes::default());
+    }
+
+    #[test]
+    fn test_trace_output_call_missing_or_null_output_field() {
+        for json in [r#"{ "gasUsed": "0x0" }"#, r#"{ "gasUsed": "0x0", "output": null }"#] {
+            let parsed: TraceOutput = serde_json::from_str(json).unwrap();
+            let call = parsed.as_call().unwrap();
+            assert_eq!(call.gas_used, 0);
+            assert_eq!(call.output, Bytes::default());
+        }
+    }
+
+    #[test]
+    fn test_create_output_does_not_match_call_variant() {
+        let json = r#"{
+            "address": "0x0000000000000000000000000000000000000001",
+            "code": "0x6080",
+            "gasUsed": "0x10"
+        }"#;
+        let parsed: TraceOutput = serde_json::from_str(json).unwrap();
+        match parsed {
+            TraceOutput::Create(_) => {}
+            TraceOutput::Call(_) => panic!("CreateOutput JSON deserialized as Call variant"),
+        }
+    }
+
+    #[test]
+    fn test_trace_output_rejects_partial_create_output() {
+        let missing_code = r#"{
+            "address": "0x0000000000000000000000000000000000000001",
+            "gasUsed": "0x10"
+        }"#;
+        let err = serde_json::from_str::<TraceOutput>(missing_code).unwrap_err().to_string();
+        assert!(err.contains("code"), "{err}");
+
+        let missing_address = r#"{
+            "code": "0x6080",
+            "gasUsed": "0x10"
+        }"#;
+        let err = serde_json::from_str::<TraceOutput>(missing_address).unwrap_err().to_string();
+        assert!(err.contains("address"), "{err}");
     }
 }

@@ -1,21 +1,20 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType, Typed2718};
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
+use crate::{SignableTransaction, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
+    eip2718::IsTyped2718,
     eip2930::AccessList,
     eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization},
+    Typed2718,
 };
-use alloy_primitives::{
-    Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
-};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::mem;
-
-use super::RlpEcdsaTx;
 
 /// A transaction with a priority fee ([EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Eip7702Transaction", alias = "TransactionEip7702", alias = "Eip7702Tx")]
 pub struct TxEip7702 {
@@ -35,11 +34,9 @@ pub struct TxEip7702 {
         serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
     )]
     pub gas_limit: u64,
-    /// A scalar value equal to the maximum
-    /// amount of gas that should be used in executing
-    /// this transaction. This is paid up-front, before any
-    /// computation is done and may not be increased
-    /// later; formally Tg.
+    /// A scalar value equal to the maximum total fee per unit of gas
+    /// the sender is willing to pay. The actual fee paid per gas is
+    /// the minimum of this and `base_fee + max_priority_fee_per_gas`.
     ///
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
@@ -74,10 +71,7 @@ pub struct TxEip7702 {
     /// the code referenced by `address`. These also include a `chain_id` (which
     /// can be set to zero and not evaluated) as well as an optional `nonce`.
     pub authorization_list: Vec<SignedAuthorization>,
-    /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
-    /// Some). pub init: An unlimited size byte array specifying the
-    /// EVM-code for the account initialisation procedure CREATE,
-    /// data: An unlimited size byte array specifying the
+    /// An unlimited size byte array specifying the
     /// input data of the message call, formally Td.
     pub input: Bytes,
 }
@@ -92,22 +86,14 @@ impl TxEip7702 {
     /// Calculates a heuristic for the in-memory size of the [TxEip7702] transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u64>() + // gas_limit
-        mem::size_of::<u128>() + // max_fee_per_gas
-        mem::size_of::<u128>() + // max_priority_fee_per_gas
-        mem::size_of::<Address>() + // to
-        mem::size_of::<U256>() + // value
-        self.access_list.size() + // access_list
-        self.input.len() + // input
-        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>() // authorization_list
+        size_of::<Self>()
+            + self.access_list.size()
+            + self.input.len()
+            + self.authorization_list.capacity() * size_of::<SignedAuthorization>()
     }
 }
 
-impl RlpEcdsaTx for TxEip7702 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
+impl RlpEcdsaEncodableTx for TxEip7702 {
     /// Outputs the length of the transaction's fields, without a RLP header.
     #[doc(hidden)]
     fn rlp_encoded_fields_length(&self) -> usize {
@@ -135,6 +121,10 @@ impl RlpEcdsaTx for TxEip7702 {
         self.access_list.encode(out);
         self.authorization_list.encode(out);
     }
+}
+
+impl RlpEcdsaDecodableTx for TxEip7702 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
@@ -194,17 +184,11 @@ impl Transaction for TxEip7702 {
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
-            // if the tip is greater than the max priority fee per gas, set it to the max
-            // priority fee per gas + base fee
-            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
-            if tip > self.max_priority_fee_per_gas {
-                self.max_priority_fee_per_gas + base_fee as u128
-            } else {
-                // otherwise return the max fee per gas
-                self.max_fee_per_gas
-            }
-        })
+        alloy_eips::eip1559::calc_effective_gas_price(
+            self.max_fee_per_gas,
+            self.max_priority_fee_per_gas,
+            base_fee,
+        )
     }
 
     #[inline]
@@ -261,17 +245,17 @@ impl SignableTransaction<Signature> for TxEip7702 {
     fn payload_len_for_signature(&self) -> usize {
         self.length() + 1
     }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let tx_hash = self.tx_hash(&signature);
-
-        Signed::new_unchecked(self, signature, tx_hash)
-    }
 }
 
 impl Typed2718 for TxEip7702 {
     fn ty(&self) -> u8 {
         TxType::Eip7702 as u8
+    }
+}
+
+impl IsTyped2718 for TxEip7702 {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x04)
     }
 }
 
@@ -384,6 +368,7 @@ pub(super) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -406,8 +391,9 @@ pub(super) mod serde_bincode_compat {
                     .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }
@@ -418,7 +404,7 @@ mod tests {
     use super::*;
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, PrimitiveSignature as Signature, U256};
+    use alloy_primitives::{address, b256, hex, Address, Signature, U256};
 
     #[test]
     fn encode_decode_eip7702() {

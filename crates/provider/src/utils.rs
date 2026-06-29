@@ -1,6 +1,20 @@
 //! Provider-related utilities.
 
-use alloy_primitives::{U128, U64};
+use crate::{
+    fillers::{BlobGasFiller, ChainIdFiller, GasFiller, JoinFill, NonceFiller},
+    Identity,
+};
+use alloy_json_rpc::RpcRecv;
+use alloy_network::BlockResponse;
+use alloy_primitives::{B256, U128, U64};
+use alloy_rpc_client::WeakClient;
+use alloy_transport::{TransportError, TransportResult};
+use std::{
+    fmt::{self, Formatter},
+    sync::Arc,
+};
+
+pub use alloy_eips::eip1559::Eip1559Estimation;
 
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
 pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
@@ -14,13 +28,66 @@ pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
 /// An estimator function for EIP1559 fees.
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
 
-/// Return type of EIP1155 gas fee estimator.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Eip1559Estimation {
-    /// The base fee per gas.
-    pub max_fee_per_gas: u128,
-    /// The max priority fee per gas.
-    pub max_priority_fee_per_gas: u128,
+/// A trait responsible for estimating EIP-1559 values
+pub trait Eip1559EstimatorFn: Send + Sync + Unpin {
+    /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
+    fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation;
+}
+
+/// EIP-1559 estimator variants
+#[derive(Default, Clone)]
+pub enum Eip1559Estimator {
+    /// Uses the builtin estimator
+    #[default]
+    Default,
+    /// Uses a custom estimator
+    Custom(Arc<dyn Eip1559EstimatorFn>),
+}
+
+impl Eip1559Estimator {
+    /// Creates a new estimator from a closure
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Sync + Unpin + 'static,
+    {
+        Self::new_estimator(f)
+    }
+
+    /// Creates a new estimate fn
+    pub fn new_estimator<F: Eip1559EstimatorFn + 'static>(f: F) -> Self {
+        Self::Custom(Arc::new(f))
+    }
+
+    /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
+    pub fn estimate(self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
+        match self {
+            Self::Default => eip1559_default_estimator(base_fee, rewards),
+            Self::Custom(val) => val.estimate(base_fee, rewards),
+        }
+    }
+}
+
+impl<F> Eip1559EstimatorFn for F
+where
+    F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Sync + Unpin,
+{
+    fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
+        (self)(base_fee, rewards)
+    }
+}
+
+impl fmt::Debug for Eip1559Estimator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Eip1559Estimator")
+            .field(
+                "estimator",
+                &match self {
+                    Self::Default => "default",
+                    Self::Custom(_) => "custom",
+                },
+            )
+            .finish()
+    }
 }
 
 fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
@@ -42,7 +109,7 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
 
 /// The default EIP-1559 fee estimator.
 ///
-/// Based on the work by [MetaMask](https://github.com/MetaMask/core/blob/main/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56);
+/// Based on the work by [MetaMask](https://github.com/MetaMask/core/blob/0fd4b397e7237f104d1c81579a0c4321624d076b/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56);
 /// constants for "medium" priority level are used.
 pub fn eip1559_default_estimator(
     base_fee_per_gas: u128,
@@ -65,6 +132,58 @@ pub(crate) fn convert_u128(r: U128) -> u128 {
 pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
 }
+
+pub(crate) fn convert_to_hashes<BlockResp: alloy_network::BlockResponse>(
+    r: Option<BlockResp>,
+) -> Option<BlockResp> {
+    r.map(|mut block| {
+        if block.transactions().is_empty() {
+            block.transactions_mut().convert_to_hashes();
+        }
+
+        block
+    })
+}
+
+/// Fetches full blocks for a list of block hashes
+pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
+    hashes: Vec<B256>,
+    client: WeakClient,
+    full: bool,
+) -> TransportResult<Vec<Option<BlockResp>>> {
+    let client = client.upgrade().ok_or(TransportError::local_usage_str("client dropped"))?;
+    let blocks = futures::future::try_join_all(hashes.into_iter().map(|hash| {
+        client
+            .request::<_, Option<BlockResp>>("eth_getBlockByHash", (hash, full))
+            .map_resp(|resp| if !full { convert_to_hashes(resp) } else { resp })
+    }))
+    .await?;
+    Ok(blocks)
+}
+
+/// Fetches headers for a list of block hashes.
+pub(crate) async fn hashes_to_headers<
+    HeaderResp: alloy_network_primitives::HeaderResponse + RpcRecv,
+>(
+    hashes: Vec<B256>,
+    client: WeakClient,
+) -> TransportResult<Vec<Option<HeaderResp>>> {
+    let client = client.upgrade().ok_or(TransportError::local_usage_str("client dropped"))?;
+    let headers = futures::future::try_join_all(
+        hashes
+            .into_iter()
+            .map(|hash| client.request::<_, Option<HeaderResp>>("eth_getHeaderByHash", (hash,))),
+    )
+    .await?;
+    Ok(headers)
+}
+
+/// Helper type representing the joined recommended fillers i.e [`GasFiller`],
+/// [`BlobGasFiller`], [`NonceFiller`], and [`ChainIdFiller`].
+pub type JoinedRecommendedFillers = JoinFill<
+    Identity,
+    JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+>;
 
 #[cfg(test)]
 mod tests {

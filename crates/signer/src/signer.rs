@@ -1,9 +1,8 @@
 use crate::Result;
-use alloy_primitives::{
-    eip191_hash_message, Address, ChainId, PrimitiveSignature as Signature, B256,
-};
+use alloy_primitives::{eip191_hash_message, Address, ChainId, Signature, B256};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
+pub use either::Either;
 
 #[cfg(feature = "eip712")]
 use alloy_dyn_abi::eip712::TypedData;
@@ -20,8 +19,8 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 /// Synchronous signers should implement both this trait and [`SignerSync`].
 ///
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[auto_impl(&mut, Box)]
 pub trait Signer<Sig = Signature> {
     /// Signs the given hash.
@@ -52,8 +51,12 @@ pub trait Signer<Sig = Signature> {
         self.sign_hash(&payload.eip712_signing_hash(domain)).await
     }
 
-    /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically
-    /// sized.
+    /// Encodes and signs the typed data according to [EIP-712] using dynamically-typed data.
+    ///
+    /// Unlike [`Signer::sign_typed_data`], this method works with unsized Signers (trait objects
+    /// like `Box<dyn Signer>`).
+    ///
+    /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
     #[inline]
     async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Sig> {
@@ -119,8 +122,10 @@ pub trait SignerSync<Sig = Signature> {
         self.sign_hash_sync(&payload.eip712_signing_hash(domain))
     }
 
-    /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically
-    /// sized.
+    /// Encodes and signs the typed data according to [EIP-712] using dynamically-typed data.
+    ///
+    /// Unlike [`SignerSync::sign_typed_data_sync`], this method works with unsized Signers (trait
+    /// objects like `Box<dyn SignerSync>`).
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
@@ -132,6 +137,63 @@ pub trait SignerSync<Sig = Signature> {
 
     /// Returns the signer's chain ID.
     fn chain_id_sync(&self) -> Option<ChainId>;
+}
+
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
+impl<A, B, Sig> Signer<Sig> for Either<A, B>
+where
+    A: Signer<Sig> + Send + Sync,
+    B: Signer<Sig> + Send + Sync,
+    Sig: Send,
+{
+    async fn sign_hash(&self, hash: &B256) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_hash(hash).await,
+            Self::Right(signer) => signer.sign_hash(hash).await,
+        }
+    }
+
+    fn address(&self) -> Address {
+        match self {
+            Self::Left(signer) => signer.address(),
+            Self::Right(signer) => signer.address(),
+        }
+    }
+
+    fn chain_id(&self) -> Option<ChainId> {
+        match self {
+            Self::Left(signer) => signer.chain_id(),
+            Self::Right(signer) => signer.chain_id(),
+        }
+    }
+
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
+        match self {
+            Self::Left(signer) => signer.set_chain_id(chain_id),
+            Self::Right(signer) => signer.set_chain_id(chain_id),
+        }
+    }
+}
+
+impl<A, B, Sig> SignerSync<Sig> for Either<A, B>
+where
+    A: SignerSync<Sig>,
+    B: SignerSync<Sig>,
+{
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_hash_sync(hash),
+            Self::Right(signer) => signer.sign_hash_sync(hash),
+        }
+    }
+
+    fn chain_id_sync(&self) -> Option<ChainId> {
+        match self {
+            Self::Left(signer) => signer.chain_id_sync(),
+            Self::Right(signer) => signer.chain_id_sync(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -214,8 +276,8 @@ mod tests {
 
         struct UnimplementedSigner;
 
-        #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-        #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+        #[cfg_attr(target_family = "wasm", async_trait(?Send))]
+        #[cfg_attr(not(target_family = "wasm"), async_trait)]
         impl Signer for UnimplementedSigner {
             async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))

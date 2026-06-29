@@ -1,4 +1,4 @@
-use crate::{common::Id, RpcObject};
+use crate::{common::Id, RpcSend};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     ser::SerializeMap,
@@ -44,7 +44,7 @@ impl BorrowedResponse<'_> {
     /// Convert this borrowed response to an owned response by copying the data
     /// from the deserializer (if necessary).
     pub fn into_owned(self) -> Response {
-        Response { id: self.id.clone(), payload: self.payload.into_owned() }
+        Response { id: self.id, payload: self.payload.into_owned() }
     }
 }
 
@@ -82,10 +82,15 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
         }
     }
 
+    /// Returns the payload of this response
+    pub const fn payload(&self) -> &ResponsePayload<Payload, ErrData> {
+        &self.payload
+    }
+
     /// Create a new error response for an internal error with additional data.
     pub const fn internal_error_with_obj(id: Id, data: ErrData) -> Self
     where
-        ErrData: RpcObject,
+        ErrData: RpcSend,
     {
         Self { id, payload: ResponsePayload::Failure(ErrorPayload::internal_error_with_obj(data)) }
     }
@@ -98,7 +103,7 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
         data: ErrData,
     ) -> Self
     where
-        ErrData: RpcObject,
+        ErrData: RpcSend,
     {
         Self {
             id,
@@ -117,12 +122,17 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
     pub const fn is_error(&self) -> bool {
         self.payload.is_error()
     }
+
+    /// Returns the error code if the payload of this response is an [`ErrorPayload`].
+    pub fn error_code(&self) -> Option<i64> {
+        self.payload().error_code()
+    }
 }
 
 impl<Payload, ErrData> Response<Payload, ErrData>
 where
-    Payload: RpcObject,
-    ErrData: RpcObject,
+    Payload: RpcSend,
+    ErrData: RpcSend,
 {
     /// Serialize the payload of this response.
     pub fn serialize_payload(&self) -> serde_json::Result<Response> {
@@ -346,6 +356,24 @@ mod test {
                 "message": "Invalid Request"
             },
             "id": null
+        }"#;
+        let response: super::Response = serde_json::from_str(response).unwrap();
+        assert_eq!(response.id, super::Id::None);
+        assert!(matches!(response.payload, super::ResponsePayload::Failure(_)));
+    }
+
+    #[test]
+    fn serde_unknown() {
+        let response = r#"{
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32600,
+                "message": "Invalid Request"
+            },
+            "id": null,
+            "dummy": null,
+            "abc": 5,
+            "value": "hello"
         }"#;
         let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);

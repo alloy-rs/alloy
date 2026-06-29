@@ -22,7 +22,7 @@
 //! assert_eq!(val, deserialized);
 //! ```
 
-use crate::alloc::string::{String, ToString};
+use crate::alloc::string::String;
 use core::{fmt, str::FromStr};
 use serde::{Deserialize, Deserializer, Serializer};
 
@@ -32,7 +32,7 @@ where
     T: fmt::Display,
     S: Serializer,
 {
-    serializer.collect_str(&value.to_string())
+    serializer.collect_str(value)
 }
 
 /// Deserialize a quoted string to a type `T` using [FromStr].

@@ -44,6 +44,9 @@ pub enum LedgerError {
     /// [`semver`] error.
     #[error(transparent)]
     SemVerError(#[from] semver::Error),
+    /// Invalid derivation path.
+    #[error("invalid derivation path")]
+    InvalidDerivationPath(#[from] std::num::ParseIntError),
     /// Signature Error
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),
@@ -60,17 +63,20 @@ pub enum LedgerError {
     },
 }
 
-pub(crate) const P1_FIRST: u8 = 0x00;
+pub(crate) const P1_FIRST_0: u8 = 0x00;
+pub(crate) const P1_FIRST_1: u8 = 0x01;
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(non_camel_case_types, dead_code)]
+#[expect(non_camel_case_types)]
+#[allow(dead_code)] // Some variants are only used with certain features.
 pub(crate) enum INS {
     GET_PUBLIC_KEY = 0x02,
     SIGN = 0x04,
     GET_APP_CONFIGURATION = 0x06,
     SIGN_PERSONAL_MESSAGE = 0x08,
     SIGN_ETH_EIP_712 = 0x0C,
+    SIGN_EIP7702_AUTHORIZATION = 0x34,
 }
 
 impl fmt::Display for INS {
@@ -81,13 +87,14 @@ impl fmt::Display for INS {
             Self::GET_APP_CONFIGURATION => write!(f, "GET_APP_CONFIGURATION"),
             Self::SIGN_PERSONAL_MESSAGE => write!(f, "SIGN_PERSONAL_MESSAGE"),
             Self::SIGN_ETH_EIP_712 => write!(f, "SIGN_ETH_EIP_712"),
+            Self::SIGN_EIP7702_AUTHORIZATION => write!(f, "SIGN_EIP7702_AUTHORIZATION"),
         }
     }
 }
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub(crate) enum P1 {
     NON_CONFIRM = 0x00,
     MORE = 0x80,
@@ -95,7 +102,7 @@ pub(crate) enum P1 {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub(crate) enum P2 {
     NO_CHAINCODE = 0x00,
 }

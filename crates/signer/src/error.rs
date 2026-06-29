@@ -1,6 +1,6 @@
 use alloy_primitives::{hex, ChainId};
 use k256::ecdsa;
-use std::fmt;
+use std::{fmt, fmt::Display};
 use thiserror::Error;
 
 /// Result type alias for [`Error`](enum@Error).
@@ -45,6 +45,12 @@ impl Error {
     #[cold]
     pub fn other(error: impl Into<Box<dyn std::error::Error + Send + Sync + 'static>>) -> Self {
         Self::Other(error.into())
+    }
+
+    /// Constructs a new [`Other`](Self::Other) with an error message.
+    #[cold]
+    pub fn message(err: impl Display) -> Self {
+        Self::Other(err.to_string().into())
     }
 
     /// Returns `true` if the error is [`UnsupportedOperation`](Self::UnsupportedOperation).

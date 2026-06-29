@@ -1,30 +1,34 @@
 use crate::{CallDecoder, Error, EthCall, Result};
+use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Ethereum, Network, TransactionBuilder, TransactionBuilder4844};
-use alloy_network_primitives::ReceiptResponse;
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
-use alloy_sol_types::SolCall;
-use std::{
-    future::{Future, IntoFuture},
-    marker::PhantomData,
-    pin::Pin,
+use alloy_network::{
+    eip2718::Encodable2718, Ethereum, IntoWallet, Network, NetworkTransactionBuilder,
+    TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError,
+    TxSigner,
 };
+use alloy_network_primitives::ReceiptResponse;
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_provider::{PendingTransactionBuilder, Provider};
+use alloy_rpc_types_eth::{
+    state::StateOverride, AccessList, BlobTransactionSidecar, BlobTransactionSidecarEip7594,
+    BlockId, SignedAuthorization,
+};
+use alloy_sol_types::SolCall;
+use std::marker::PhantomData;
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
 
 /// [`CallBuilder`] using a [`SolCall`] type as the call decoder.
 // NOTE: please avoid changing this type due to its use in the `sol!` macro.
-pub type SolCallBuilder<T, P, C, N = Ethereum> = CallBuilder<T, P, PhantomData<C>, N>;
+pub type SolCallBuilder<P, C, N = Ethereum> = CallBuilder<P, PhantomData<C>, N>;
 
 /// [`CallBuilder`] using a [`Function`] as the call decoder.
-pub type DynCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, Function, N>;
+pub type DynCallBuilder<P, N = Ethereum> = CallBuilder<P, Function, N>;
 
 /// [`CallBuilder`] that does not have a call decoder.
-pub type RawCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, (), N>;
+pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
 
 /// A builder for sending a transaction via `eth_sendTransaction`, or calling a contract via
 /// `eth_call`.
@@ -74,13 +78,13 @@ pub type RawCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, (), N>;
 /// // Through `contract.<function_name>(args...)`
 /// let a = U256::ZERO;
 /// let b = true;
-/// let builder: SolCallBuilder<_, _, MyContract::doStuffCall, _> = contract.doStuff(a, b);
+/// let builder: SolCallBuilder<_, MyContract::doStuffCall, _> = contract.doStuff(a, b);
 /// let MyContract::doStuffReturn { c: _, d: _ } = builder.call().await?;
 ///
 /// // Through `contract.call_builder(&<FunctionCall { args... }>)`:
 /// // (note that this is discouraged because it's inherently less type-safe)
 /// let call = MyContract::doStuffCall { a, b };
-/// let builder: SolCallBuilder<_, _, MyContract::doStuffCall, _> = contract.call_builder(&call);
+/// let builder: SolCallBuilder<_, MyContract::doStuffCall, _> = contract.call_builder(&call);
 /// let MyContract::doStuffReturn { c: _, d: _ } = builder.call().await?;
 /// # Ok(())
 /// # }
@@ -106,16 +110,16 @@ pub type RawCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, (), N>;
 /// let contract: ContractInstance<_, _> = interface.connect(address, &provider);
 ///
 /// // Build and call the function:
-/// let call_builder: DynCallBuilder<(), _, _> = contract.function("doStuff", &[U256::ZERO.into(), true.into()])?;
+/// let call_builder: DynCallBuilder<_, _> = contract.function("doStuff", &[U256::ZERO.into(), true.into()])?;
 /// let result: Vec<DynSolValue> = call_builder.call().await?;
 ///
 /// // You can also decode the output manually. Get the raw bytes:
 /// let raw_result: Bytes = call_builder.call_raw().await?;
 /// // Or, equivalently:
-/// let raw_builder: RawCallBuilder<(), _, _> = call_builder.clone().clear_decoder();
+/// let raw_builder: RawCallBuilder<_, _> = call_builder.clone().clear_decoder();
 /// let raw_result: Bytes = raw_builder.call().await?;
 /// // Decode the raw bytes:
-/// let decoded_result: Vec<DynSolValue> = call_builder.decode_output(raw_result, false)?;
+/// let decoded_result: Vec<DynSolValue> = call_builder.decode_output(raw_result)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -123,32 +127,117 @@ pub type RawCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, (), N>;
 /// [sol]: alloy_sol_types::sol
 #[derive(Clone)]
 #[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
-pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
-    request: N::TransactionRequest,
+pub struct CallBuilder<P, D, N: Network = Ethereum> {
+    pub(crate) request: N::TransactionRequest,
     block: BlockId,
     state: Option<StateOverride>,
     /// The provider.
     // NOTE: This is public due to usage in `sol!`, please avoid changing it.
     pub provider: P,
     decoder: D,
-    fake_transport: PhantomData<T>,
 }
 
-impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
+impl<P, D, N: Network> CallBuilder<P, D, N> {
     /// Converts the call builder to the inner transaction request
     pub fn into_transaction_request(self) -> N::TransactionRequest {
         self.request
     }
+
+    /// Builds and returns a RLP-encoded unsigned transaction from the call that can be signed.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_provider::ProviderBuilder;
+    /// # use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///     #[sol(rpc, bytecode = "0x")]
+    ///    contract Counter {
+    ///        uint128 public counter;
+    ///
+    ///        function increment() external {
+    ///            counter += 1;
+    ///        }
+    ///    }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+    ///
+    ///     let my_contract = Counter::deploy(provider).await.unwrap();
+    ///
+    ///     let call = my_contract.increment();
+    ///
+    ///     let unsigned_raw_tx: Vec<u8> = call.build_unsigned_raw_transaction().unwrap();
+    ///
+    ///     assert!(!unsigned_raw_tx.is_empty())
+    /// }
+    /// ```
+    pub fn build_unsigned_raw_transaction(self) -> Result<Vec<u8>, TransactionBuilderError<N>>
+    where
+        N::UnsignedTx: SignableTransaction<Signature>,
+    {
+        let tx = self.request.build_unsigned().map_err(|e| e.error)?;
+        Ok(tx.encoded_for_signing())
+    }
+
+    /// Build a RLP-encoded signed raw transaction for the call that can be sent to the network
+    /// using [`Provider::send_raw_transaction`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{ProviderBuilder, Provider};
+    /// # use alloy_sol_types::sol;
+    /// # use alloy_signer_local::PrivateKeySigner;
+    ///
+    /// sol! {
+    ///    #[sol(rpc, bytecode = "0x")]
+    ///   contract Counter {
+    ///      uint128 public counter;
+    ///
+    ///     function increment() external {
+    ///        counter += 1;
+    ///    }
+    ///  }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+    ///
+    ///     let my_contract = Counter::deploy(&provider).await.unwrap();
+    ///
+    ///     let call = my_contract.increment();
+    ///
+    ///     let pk_signer: PrivateKeySigner = "0x..".parse().unwrap();
+    ///     let signed_raw_tx: Vec<u8> = call.build_raw_transaction(pk_signer).await.unwrap();
+    ///
+    ///     let tx = provider.send_raw_transaction(&signed_raw_tx).await.unwrap();
+    /// }
+    /// ```
+    pub async fn build_raw_transaction<S>(
+        self,
+        signer: S,
+    ) -> Result<Vec<u8>, TransactionBuilderError<N>>
+    where
+        S: TxSigner<Signature> + IntoWallet<N>,
+    {
+        let tx = self.request.build(&signer.into_wallet()).await?;
+        Ok(tx.encoded_2718())
+    }
 }
 
-impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
+impl<P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<P, D, N> {
     fn as_ref(&self) -> &N::TransactionRequest {
         &self.request
     }
 }
 
 // See [`ContractInstance`].
-impl<T, P: Provider<N>, N: Network> DynCallBuilder<T, P, N> {
+impl<P: Provider<N>, N: Network> DynCallBuilder<P, N> {
     pub(crate) fn new_dyn(
         provider: P,
         address: &Address,
@@ -162,23 +251,10 @@ impl<T, P: Provider<N>, N: Network> DynCallBuilder<T, P, N> {
         )
         .to(*address))
     }
-
-    /// Clears the decoder, returning a raw call builder.
-    #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<T, P, N> {
-        RawCallBuilder {
-            request: self.request,
-            block: self.block,
-            state: self.state,
-            provider: self.provider,
-            decoder: (),
-            fake_transport: PhantomData,
-        }
-    }
 }
 
 #[doc(hidden)]
-impl<'a, T, P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<T, &'a P, C, N> {
+impl<'a, P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<&'a P, C, N> {
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     pub fn new_sol(provider: &'a P, address: &Address, call: &C) -> Self {
@@ -186,22 +262,21 @@ impl<'a, T, P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<T, &'a P, C, 
     }
 }
 
-impl<T, P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<T, P, C, N> {
+impl<P: Provider<N>, D, N: Network> CallBuilder<P, D, N> {
     /// Clears the decoder, returning a raw call builder.
     #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<T, P, N> {
+    pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
         RawCallBuilder {
             request: self.request,
             block: self.block,
             state: self.state,
             provider: self.provider,
             decoder: (),
-            fake_transport: PhantomData,
         }
     }
 }
 
-impl<T, P: Provider<N>, N: Network> RawCallBuilder<T, P, N> {
+impl<P: Provider<N>, N: Network> RawCallBuilder<P, N> {
     /// Sets the decoder to the provided [`SolCall`].
     ///
     /// Converts the raw call builder into a sol call builder.
@@ -245,28 +320,27 @@ impl<T, P: Provider<N>, N: Network> RawCallBuilder<T, P, N> {
     /// # stringify!(
     /// let provider = ...;
     /// # );
-    /// # let provider = alloy_provider::ProviderBuilder::new().on_anvil();
+    /// # let provider = alloy_provider::ProviderBuilder::new().connect_anvil();
     /// let call_builder = MyContract::deploy_builder(&provider)
     ///     .with_sol_decoder::<MyContract::constructorReturnCall>();
     /// let result = call_builder.call().await?;
-    /// assert_eq!(result.s, MyContract::MyStruct { a: 42, b: true });
+    /// assert_eq!(result, MyContract::MyStruct { a: 42, b: true });
     /// # Ok(())
     /// # }
     /// ```
     #[inline]
-    pub fn with_sol_decoder<C: SolCall>(self) -> SolCallBuilder<T, P, C, N> {
+    pub fn with_sol_decoder<C: SolCall>(self) -> SolCallBuilder<P, C, N> {
         SolCallBuilder {
             request: self.request,
             block: self.block,
             state: self.state,
             provider: self.provider,
             decoder: PhantomData::<C>,
-            fake_transport: PhantomData,
         }
     }
 }
 
-impl<T, P: Provider<N>, N: Network> RawCallBuilder<T, P, N> {
+impl<P: Provider<N>, N: Network> RawCallBuilder<P, N> {
     /// Creates a new call builder with the provided provider and ABI encoded input.
     ///
     /// Will not decode the output of the call, meaning that [`call`](Self::call) will behave the
@@ -286,7 +360,7 @@ impl<T, P: Provider<N>, N: Network> RawCallBuilder<T, P, N> {
     }
 }
 
-impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
+impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     fn new_inner_deploy(provider: P, input: Bytes, decoder: D) -> Self {
         Self {
             request: <N::TransactionRequest>::default().with_deploy_code(input),
@@ -294,7 +368,6 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
             provider,
             block: BlockId::default(),
             state: None,
-            fake_transport: PhantomData,
         }
     }
 
@@ -305,7 +378,6 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
             provider,
             block: BlockId::default(),
             state: None,
-            fake_transport: PhantomData,
         }
     }
 
@@ -338,13 +410,17 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     where
         N::TransactionRequest: TransactionBuilder4844,
     {
-        self.request.set_blob_sidecar(blob_sidecar);
+        self.request.set_blob_sidecar_4844(blob_sidecar);
         self
     }
 
-    /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
-    pub fn legacy(self) -> Self {
-        todo!()
+    /// Sets the EIP-7594 `sidecar` field in the transaction to the provided value.
+    pub fn sidecar_7594(mut self, sidecar: BlobTransactionSidecarEip7594) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder4844,
+    {
+        self.request.set_blob_sidecar_7594(sidecar);
+        self
     }
 
     /// Sets the `gas` field in the transaction to the provided value
@@ -388,6 +464,15 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
         self
     }
 
+    /// Sets the `authorization_list` in the transaction to the provided value
+    pub fn authorization_list(mut self, authorization_list: Vec<SignedAuthorization>) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder7702,
+    {
+        self.request.set_authorization_list(authorization_list);
+        self
+    }
+
     /// Sets the `value` field in the transaction to the provided value
     pub fn value(mut self, value: U256) -> Self {
         self.request.set_value(value);
@@ -420,8 +505,8 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// # Note
     ///
     /// Not all client implementations will support this as a parameter to `eth_call`.
-    pub fn state(mut self, state: StateOverride) -> Self {
-        self.state = Some(state);
+    pub fn state(mut self, state: impl Into<StateOverride>) -> Self {
+        self.state = Some(state.into());
         self
     }
 
@@ -433,8 +518,8 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// Returns the estimated gas cost for the underlying transaction to be executed
     /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u64> {
-        let mut estimate = self.provider.estimate_gas(&self.request);
-        if let Some(state) = &self.state {
+        let mut estimate = self.provider.estimate_gas(self.request.clone());
+        if let Some(state) = self.state.clone() {
             estimate = estimate.overrides(state);
         }
         estimate.block(self.block).await.map_err(Into::into)
@@ -447,7 +532,7 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    pub fn call(&self) -> EthCall<'_, '_, D, N> {
+    pub fn call(&self) -> EthCall<'_, D, N> {
         self.call_raw().with_decoder(&self.decoder)
     }
 
@@ -457,9 +542,9 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub fn call_raw(&self) -> EthCall<'_, '_, (), N> {
-        let call = self.provider.call(&self.request).block(self.block);
-        let call = match &self.state {
+    pub fn call_raw(&self) -> EthCall<'_, (), N> {
+        let call = self.provider.call(self.request.clone()).block(self.block);
+        let call = match self.state.clone() {
             Some(state) => call.overrides(state),
             None => call,
         };
@@ -468,8 +553,8 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
 
     /// Decodes the output of a contract function using the provided decoder.
     #[inline]
-    pub fn decode_output(&self, data: Bytes, validate: bool) -> Result<D::CallOutput> {
-        self.decoder.abi_decode_output(data, validate)
+    pub fn decode_output(&self, data: Bytes) -> Result<D::CallOutput> {
+        self.decoder.abi_decode_output(data)
     }
 
     /// Broadcasts the underlying transaction to the network as a deployment transaction, returning
@@ -488,6 +573,39 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
         }
         let pending_tx = self.send().await?;
         let receipt = pending_tx.get_receipt().await?;
+        if !receipt.status() {
+            return Err(Error::ContractNotDeployed);
+        }
+        receipt.contract_address().ok_or(Error::ContractNotDeployed)
+    }
+
+    /// Broadcasts the underlying transaction to the network as a deployment transaction and waits
+    /// for the receipt, returning the address of the deployed contract.
+    ///
+    /// This uses `eth_sendRawTransactionSync` ([EIP-7966](https://eips.ethereum.org/EIPS/eip-7966)),
+    /// which returns the transaction receipt in the same request rather than just the transaction
+    /// hash.
+    ///
+    /// Returns an error if the transaction is not a deployment transaction, or if the contract
+    /// address is not found in the deployment transaction's receipt.
+    ///
+    /// For more fine-grained control over the deployment process, use
+    /// [`deploy`](Self::deploy) instead.
+    ///
+    /// Note that the deployment address can be pre-calculated if the `from` address and `nonce` are
+    /// known using [`calculate_create_address`](Self::calculate_create_address).
+    ///
+    /// # Note
+    ///
+    /// Not all providers and clients support `eth_sendRawTransactionSync` yet.
+    pub async fn deploy_sync(&self) -> Result<Address> {
+        if !self.request.kind().is_some_and(|to| to.is_create()) {
+            return Err(Error::NotADeploymentTransaction);
+        }
+        let receipt = self.send_sync().await?;
+        if !receipt.status() {
+            return Err(Error::ContractNotDeployed);
+        }
         receipt.contract_address().ok_or(Error::ContractNotDeployed)
     }
 
@@ -499,6 +617,23 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
         Ok(self.provider.send_transaction(self.request.clone()).await?)
     }
 
+    /// Broadcasts the underlying transaction to the network and waits for the receipt.
+    ///
+    /// This uses `eth_sendRawTransactionSync` ([EIP-7966](https://eips.ethereum.org/EIPS/eip-7966)),
+    /// which returns the transaction receipt in the same request rather than just the transaction
+    /// hash.
+    ///
+    /// Returns the transaction receipt if the transaction was confirmed.
+    ///
+    /// See [`Provider::send_transaction_sync`] for more information.
+    ///
+    /// # Note
+    ///
+    /// Not all providers and clients support `eth_sendRawTransactionSync` yet.
+    pub async fn send_sync(&self) -> Result<N::ReceiptResponse> {
+        Ok(self.provider.send_transaction_sync(self.request.clone()).await?)
+    }
+
     /// Calculates the address that will be created by the transaction, if any.
     ///
     /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
@@ -508,51 +643,20 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     }
 }
 
-impl<T, P: Clone, D, N: Network> CallBuilder<T, &P, D, N> {
+impl<P: Clone, D, N: Network> CallBuilder<&P, D, N> {
     /// Clones the provider and returns a new builder with the cloned provider.
-    pub fn with_cloned_provider(self) -> CallBuilder<T, P, D, N> {
+    pub fn with_cloned_provider(self) -> CallBuilder<P, D, N> {
         CallBuilder {
             request: self.request,
             block: self.block,
             state: self.state,
             provider: self.provider.clone(),
             decoder: self.decoder,
-            fake_transport: PhantomData,
         }
     }
 }
 
-/// [`CallBuilder`] can be turned into a [`Future`] automatically with `.await`.
-///
-/// Defaults to calling [`CallBuilder::call`].
-///
-/// # Note
-///
-/// This requires `Self: 'static` due to a current limitation in the Rust type system, namely that
-/// the associated future type, the returned future, must be a concrete type (`Box<dyn Future ...>`)
-/// and cannot be an opaque type (`impl Future ...`) because `impl Trait` in this position is not
-/// stable yet. See [rust-lang/rust#63063](https://github.com/rust-lang/rust/issues/63063).
-impl<T, P, D, N> IntoFuture for CallBuilder<T, P, D, N>
-where
-    T: Send + Sync,
-    P: Provider<N>,
-    D: CallDecoder + Send + Sync + Unpin,
-    N: Network,
-    Self: 'static,
-{
-    type Output = Result<D::CallOutput>;
-    #[cfg(target_arch = "wasm32")]
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output>>>;
-    #[cfg(not(target_arch = "wasm32"))]
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send>>;
-
-    #[inline]
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move { self.call().await })
-    }
-}
-
-impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, N> {
+impl<P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<P, D, N> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CallBuilder")
@@ -568,12 +672,14 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
 mod tests {
     use super::*;
     use alloy_consensus::Transaction;
+    use alloy_network::EthereumWallet;
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
-    use alloy_provider::{
-        layers::AnvilProvider, Provider, ProviderBuilder, RootProvider, WalletProvider,
-    };
-    use alloy_rpc_types_eth::AccessListItem;
+    use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
+    use alloy_rpc_types_eth::{AccessListItem, Authorization};
+    use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
+    use futures::Future;
 
     #[test]
     fn empty_constructor() {
@@ -584,7 +690,7 @@ mod tests {
             }
         }
 
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let call_builder = EmptyConstructor::deploy_builder(&provider);
         assert_eq!(*call_builder.calldata(), bytes!("6942"));
     }
@@ -620,10 +726,8 @@ mod tests {
     }
 
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
-    #[allow(clippy::type_complexity)]
-    fn build_call_builder(
-    ) -> CallBuilder<(), AnvilProvider<RootProvider>, PhantomData<MyContract::doStuffCall>> {
-        let provider = ProviderBuilder::new().on_anvil();
+    fn build_call_builder() -> CallBuilder<impl Provider, PhantomData<MyContract::doStuffCall>> {
+        let provider = ProviderBuilder::new().connect_anvil();
         let contract = MyContract::new(Address::ZERO, provider);
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
         call_builder
@@ -673,6 +777,22 @@ mod tests {
     }
 
     #[test]
+    fn change_authorization_list() {
+        let authorization_list = vec![SignedAuthorization::new_unchecked(
+            Authorization { chain_id: U256::from(1337), address: Address::ZERO, nonce: 0 },
+            0,
+            U256::ZERO,
+            U256::ZERO,
+        )];
+        let call_builder = build_call_builder().authorization_list(authorization_list.clone());
+        assert_eq!(
+            call_builder.request.authorization_list.expect("authorization_list should be set"),
+            authorization_list,
+            "Authorization list of the transaction should have been set to our authorization list"
+        );
+    }
+
+    #[test]
     fn change_access_list() {
         let access_list = AccessList::from(vec![AccessListItem {
             address: Address::ZERO,
@@ -688,7 +808,7 @@ mod tests {
 
     #[test]
     fn call_encoding() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let contract = MyContract::new(Address::ZERO, &&provider).with_cloned_provider();
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
         assert_eq!(
@@ -706,7 +826,7 @@ mod tests {
 
     #[test]
     fn deploy_encoding() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let bytecode = &MyContract::BYTECODE[..];
         let call_builder = MyContract::deploy_builder(&provider, false);
         assert_eq!(
@@ -730,7 +850,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let expected_address = provider.default_signer_address().create(0);
         let my_contract = MyContract::deploy(provider, true).await.unwrap();
@@ -738,8 +858,8 @@ mod tests {
 
         let my_state_builder = my_contract.myState();
         assert_eq!(my_state_builder.calldata()[..], MyContract::myStateCall {}.abi_encode(),);
-        let result: MyContract::myStateReturn = my_state_builder.call().await.unwrap();
-        assert!(result.myState);
+        let my_state = my_state_builder.call().await.unwrap();
+        assert!(my_state);
 
         let do_stuff_builder = my_contract.doStuff(U256::from(0x69), true);
         assert_eq!(
@@ -756,7 +876,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call_with_priority() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
         let counter_contract = Counter::deploy(provider.clone()).await.unwrap();
         let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
         let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();
@@ -778,15 +898,138 @@ mod tests {
             .expect("tx not included");
         assert_eq!(
             transaction.max_fee_per_gas(),
-            max_fee_per_gas.to(),
+            max_fee_per_gas.to::<u128>(),
             "max_fee_per_gas of the transaction should be set to the right value"
         );
         assert_eq!(
             transaction
                 .max_priority_fee_per_gas()
                 .expect("max_priority_fee_per_gas of the transaction should be set"),
-            max_priority_fee_per_gas.to(),
+            max_priority_fee_per_gas.to::<u128>(),
             "max_priority_fee_per_gas of the transaction should be set to the right value"
         )
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn deploy_and_call_with_priority_sync() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let counter_address =
+            Counter::deploy_builder(provider.clone()).deploy_sync().await.unwrap();
+        let counter_contract = Counter::new(counter_address, provider.clone());
+        let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
+        let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();
+        let receipt = counter_contract
+            .increment()
+            .max_fee_per_gas(max_fee_per_gas.to())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to())
+            .send_sync()
+            .await
+            .expect("Could not send transaction");
+        let transaction_hash = receipt.transaction_hash;
+        let transaction = provider
+            .get_transaction_by_hash(transaction_hash)
+            .await
+            .expect("failed to fetch tx")
+            .expect("tx not included");
+        assert_eq!(
+            transaction.max_fee_per_gas(),
+            max_fee_per_gas.to::<u128>(),
+            "max_fee_per_gas of the transaction should be set to the right value"
+        );
+        assert_eq!(
+            transaction
+                .max_priority_fee_per_gas()
+                .expect("max_priority_fee_per_gas of the transaction should be set"),
+            max_priority_fee_per_gas.to::<u128>(),
+            "max_priority_fee_per_gas of the transaction should be set to the right value"
+        )
+    }
+
+    sol! {
+        #[sol(rpc, bytecode = "6080604052348015600e575f80fd5b506101448061001c5f395ff3fe60806040526004361061001d575f3560e01c8063785d04f514610021575b5f80fd5b61003461002f3660046100d5565b610036565b005b5f816001600160a01b0316836040515f6040518083038185875af1925050503d805f811461007f576040519150601f19603f3d011682016040523d82523d5f602084013e610084565b606091505b50509050806100d05760405162461bcd60e51b81526020600482015260146024820152734661696c656420746f2073656e64206d6f6e657960601b604482015260640160405180910390fd5b505050565b5f80604083850312156100e6575f80fd5b8235915060208301356001600160a01b0381168114610103575f80fd5b80915050925092905056fea2646970667358221220188e65dcedbc4bd68fdebc795292d5a9bf643385f138383969a28f796ff8858664736f6c63430008190033")]
+        contract SendMoney {
+            function send(uint256 amount, address target) external payable {
+                (bool success, ) = target.call{value: amount}("");
+                require(success, "Failed to send money");
+            }
+        }
+    }
+
+    // <https://github.com/alloy-rs/alloy/issues/1942>
+    #[tokio::test]
+    async fn fill_eth_call() {
+        let anvil = Anvil::new().spawn();
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+
+        let wallet = EthereumWallet::new(pk);
+
+        let wallet_provider =
+            ProviderBuilder::new().wallet(wallet).connect_http(anvil.endpoint_url());
+
+        let contract = SendMoney::deploy(wallet_provider.clone()).await.unwrap();
+
+        let tx = contract
+            .send(U256::from(1000000), Address::with_last_byte(1))
+            .into_transaction_request()
+            .value(U256::from(1000000));
+
+        assert!(tx.from.is_none());
+
+        let std_provider = ProviderBuilder::new().connect_http(anvil.endpoint_url());
+        let should_fail = std_provider.estimate_gas(tx.clone()).await.is_err();
+
+        assert!(should_fail);
+
+        let gas = wallet_provider.estimate_gas(tx).await.unwrap();
+
+        assert_eq!(gas, 56555);
+    }
+
+    #[test]
+    fn change_sidecar_7594() {
+        use alloy_consensus::Blob;
+
+        let sidecar =
+            BlobTransactionSidecarEip7594::new(vec![Blob::repeat_byte(0xAB)], vec![], vec![]);
+        let call_builder = build_call_builder().sidecar_7594(sidecar.clone());
+
+        let set_sidecar = call_builder
+            .request
+            .sidecar
+            .expect("sidecar should be set")
+            .into_eip7594()
+            .expect("sidecar should be EIP-7594 variant");
+
+        assert_eq!(set_sidecar, sidecar, "EIP-7594 sidecar should match the one we set");
+    }
+
+    #[tokio::test]
+    async fn decode_eth_call_ret_bytes() {
+        sol! {
+            #[derive(Debug, PartialEq)]
+            #[sol(rpc, bytecode = "0x6080604052348015600e575f5ffd5b506101578061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80630d1d2c641461002d575b5f5ffd5b61003561004b565b6040516100429190610108565b60405180910390f35b61005361007b565b6040518060400160405280602a67ffffffffffffffff16815260200160011515815250905090565b60405180604001604052805f67ffffffffffffffff1681526020015f151581525090565b5f67ffffffffffffffff82169050919050565b6100bb8161009f565b82525050565b5f8115159050919050565b6100d5816100c1565b82525050565b604082015f8201516100ef5f8501826100b2565b50602082015161010260208501826100cc565b50505050565b5f60408201905061011b5f8301846100db565b9291505056fea264697066735822122039acc87c027f3bddf6806ff9914411d4245bdc708bca36a07138a37b1b98573464736f6c634300081c0033")]
+            contract RetStruct {
+                struct MyStruct {
+                    uint64 a;
+                    bool b;
+                }
+
+                function retStruct() external pure returns (MyStruct memory) {
+                    return MyStruct(42, true);
+                }
+            }
+        }
+
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let contract = RetStruct::deploy(provider.clone()).await.unwrap();
+
+        let tx = contract.retStruct().into_transaction_request();
+
+        let result =
+            provider.call(tx).decode_resp::<RetStruct::retStructCall>().await.unwrap().unwrap();
+
+        assert_eq!(result, RetStruct::MyStruct { a: 42, b: true });
     }
 }

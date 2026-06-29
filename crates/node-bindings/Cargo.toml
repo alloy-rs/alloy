@@ -25,6 +25,10 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["std", "k256", "serde"] }
 alloy-genesis.workspace = true
+alloy-network.workspace = true
+alloy-signer-local.workspace = true
+alloy-signer.workspace = true
+alloy-hardforks.workspace = true
 k256.workspace = true
 rand.workspace = true
 serde_json = { workspace = true, features = ["std"] }
@@ -32,6 +36,10 @@ tempfile.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 url.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 
 [dev-dependencies]
 ci_info.workspace = true

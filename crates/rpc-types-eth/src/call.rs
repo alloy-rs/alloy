@@ -6,20 +6,26 @@ use alloc::{
 use alloy_primitives::Bytes;
 
 /// Bundle of transactions
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct Bundle {
+pub struct Bundle<TxReq = TransactionRequest> {
     /// All transactions to execute
-    pub transactions: Vec<TransactionRequest>,
+    pub transactions: Vec<TxReq>,
     /// Block overrides to apply
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_override: Option<BlockOverrides>,
 }
 
-impl From<Vec<TransactionRequest>> for Bundle {
-    /// Converts a `TransactionRequest` into a `Bundle`.
-    fn from(tx_request: Vec<TransactionRequest>) -> Self {
+impl<TxReq> Default for Bundle<TxReq> {
+    fn default() -> Self {
+        Self { transactions: Vec::new(), block_override: None }
+    }
+}
+
+impl<TxReq> From<Vec<TxReq>> for Bundle<TxReq> {
+    /// Converts `tx_request`s into a `Bundle`.
+    fn from(tx_request: Vec<TxReq>) -> Self {
         Self { transactions: tx_request, block_override: None }
     }
 }
@@ -119,8 +125,7 @@ impl<'de> serde::Deserialize<'de> for TransactionIndex {
         match isize::deserialize(deserializer)? {
             -1 => Ok(Self::All),
             idx if idx < -1 => Err(serde::de::Error::custom(format!(
-                "Invalid transaction index, expected -1 or positive integer, got {}",
-                idx
+                "Invalid transaction index, expected -1 or positive integer, got {idx}"
             ))),
             idx => Ok(Self::Index(idx as usize)),
         }

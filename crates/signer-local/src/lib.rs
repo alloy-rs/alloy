@@ -4,11 +4,11 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use alloy_consensus::SignableTransaction;
-use alloy_network::{TxSigner, TxSignerSync};
-use alloy_primitives::{Address, ChainId, PrimitiveSignature as Signature, B256};
+use alloy_network::{impl_into_wallet, TxSigner, TxSignerSync};
+use alloy_primitives::{Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
@@ -20,9 +20,12 @@ pub use error::LocalSignerError;
 #[cfg(feature = "mnemonic")]
 mod mnemonic;
 #[cfg(feature = "mnemonic")]
-pub use mnemonic::{MnemonicBuilder, MnemonicBuilderError};
+pub use mnemonic::{MnemonicBuilder, MnemonicBuilderError, MnemonicKey, MnemonicSignerIter};
 
 mod private_key;
+
+#[cfg(feature = "secp256k1")]
+mod secp256k1;
 
 #[cfg(feature = "yubihsm")]
 mod yubi;
@@ -33,21 +36,18 @@ pub use yubihsm;
 #[cfg(feature = "mnemonic")]
 pub use coins_bip39;
 
+#[cfg(feature = "secp256k1")]
+pub use self::secp256k1::Secp256k1Credential;
+
 /// A signer instantiated with a locally stored private key.
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
-#[doc(hidden)]
-#[deprecated(note = "use `PrivateKeySigner` instead")]
-pub type LocalWallet = PrivateKeySigner;
-
+/// A signer instantiated with a locally stored private key, using the `secp256k1` crate.
+#[cfg(feature = "secp256k1")]
+pub type Secp256k1Signer = LocalSigner<Secp256k1Credential>;
 /// A signer instantiated with a YubiHSM.
 #[cfg(feature = "yubihsm")]
 pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
-
-#[cfg(feature = "yubihsm")]
-#[doc(hidden)]
-#[deprecated(note = "use `YubiSigner` instead")]
-pub type YubiWallet = YubiSigner;
 
 /// An Ethereum private-public key pair which can be used for signing messages.
 ///
@@ -91,8 +91,8 @@ pub struct LocalSigner<C> {
     pub(crate) chain_id: Option<ChainId>,
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for LocalSigner<C> {
     #[inline]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
@@ -173,8 +173,8 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigne
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl<C> TxSigner<Signature> for LocalSigner<C>
 where
     C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync,
@@ -208,6 +208,8 @@ where
         sign_transaction_with_chain_id!(self, tx, self.sign_hash_sync(&tx.signature_hash()))
     }
 }
+
+impl_into_wallet!(@[C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync + 'static] LocalSigner<C>);
 
 #[cfg(test)]
 mod test {

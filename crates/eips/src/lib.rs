@@ -4,10 +4,9 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[allow(unused_imports)]
 #[macro_use]
 extern crate alloc;
 
@@ -20,7 +19,10 @@ pub use eip1898::{
     RpcBlockHash,
 };
 
+pub mod eip2124;
+
 pub mod eip2718;
+pub use eip2718::{Decodable2718, Encodable2718, Typed2718};
 
 pub mod eip2930;
 
@@ -40,6 +42,9 @@ pub mod eip7002;
 
 pub mod eip7251;
 
+pub mod eip7594;
+pub mod eip7623;
+
 pub mod eip7685;
 
 pub mod eip7691;
@@ -47,3 +52,13 @@ pub mod eip7691;
 pub mod eip7702;
 
 pub mod eip7840;
+
+pub mod eip7892;
+
+pub mod eip7825;
+
+pub use eip7892::{BlobScheduleBlobParams, BlobScheduleEntry};
+
+pub mod eip7910;
+
+pub mod eip7928;

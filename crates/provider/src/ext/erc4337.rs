@@ -10,8 +10,8 @@ use alloy_transport::TransportResult;
 ///
 /// This module provides support for the `eth_sendUserOperation` RPC method
 /// as defined in ERC-4337.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait Erc4337Api<N>: Send + Sync {
     /// Sends a user operation to the bundler, as defined in ERC-4337.
     ///
@@ -43,8 +43,8 @@ pub trait Erc4337Api<N>: Send + Sync {
     ) -> TransportResult<UserOperationGasEstimation>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> Erc4337Api<N> for P
 where
     N: Network,

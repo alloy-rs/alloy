@@ -1,9 +1,8 @@
 use crate::Log;
-use alloc::vec::Vec;
 use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType};
-use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
+use alloy_sol_types::SolEvent;
 
 /// Transaction receipt
 ///
@@ -11,11 +10,11 @@ use alloy_primitives::{Address, BlockHash, TxHash, B256};
 /// consensus data and metadata.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TxReceipt")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
-    /// The receipt envelope, which contains the consensus receipt data..
+    /// The receipt envelope, which contains the consensus receipt data.
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: T,
     /// Transaction Hash.
@@ -67,10 +66,70 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     pub to: Option<Address>,
     /// Contract address created, or None if not a deployment.
     pub contract_address: Option<Address>,
-    /// The authorization list is a list of tuples that store the address to code which the signer
-    /// desires to execute in the context of their EOA.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub authorization_list: Option<Vec<SignedAuthorization>>,
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T> serde::Deserialize<'de> for TransactionReceipt<T>
+where
+    T: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ReceiptDeserHelper<T = ReceiptEnvelope<Log>> {
+            #[serde(flatten)]
+            inner: T,
+            transaction_hash: TxHash,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            transaction_index: Option<u64>,
+            #[serde(default)]
+            block_hash: Option<BlockHash>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            block_number: Option<u64>,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_used: u64,
+            // Optional fields for gas prices
+            // 1. Use effectiveGasPrice if present
+            // 2. Fallback to use gasPrice
+            // 3. Default to 0 if neither is present
+            #[serde(default, alias = "gasPrice", with = "alloy_serde::quantity::opt")]
+            effective_gas_price: Option<u128>,
+            #[serde(
+                default,
+                skip_serializing_if = "Option::is_none",
+                with = "alloy_serde::quantity::opt"
+            )]
+            blob_gas_used: Option<u64>,
+            #[serde(
+                default,
+                skip_serializing_if = "Option::is_none",
+                with = "alloy_serde::quantity::opt"
+            )]
+            blob_gas_price: Option<u128>,
+            from: Address,
+            to: Option<Address>,
+            contract_address: Option<Address>,
+        }
+
+        let helper = ReceiptDeserHelper::deserialize(deserializer)?;
+        Ok(Self {
+            inner: helper.inner,
+            transaction_hash: helper.transaction_hash,
+            transaction_index: helper.transaction_index,
+            block_hash: helper.block_hash,
+            block_number: helper.block_number,
+            gas_used: helper.gas_used,
+            effective_gas_price: helper.effective_gas_price.unwrap_or(0),
+            blob_gas_used: helper.blob_gas_used,
+            blob_gas_price: helper.blob_gas_price,
+            from: helper.from,
+            to: helper.to,
+            contract_address: helper.contract_address,
+        })
+    }
 }
 
 impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
@@ -96,17 +155,6 @@ impl TransactionReceipt {
     pub const fn transaction_type(&self) -> TxType {
         self.inner.tx_type()
     }
-
-    /// Calculates the address that will be created by the transaction, if any.
-    ///
-    /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
-    /// the `from` field is not set.
-    pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {
-        if self.to.is_some() {
-            return None;
-        }
-        Some(self.from.create(nonce))
-    }
 }
 
 impl<T> TransactionReceipt<T> {
@@ -128,8 +176,76 @@ impl<T> TransactionReceipt<T> {
             from: self.from,
             to: self.to,
             contract_address: self.contract_address,
-            authorization_list: self.authorization_list,
         }
+    }
+
+    /// Consumes the type and returns the wrapped receipt.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+
+    /// Calculates the address that will be created by the transaction, if any.
+    ///
+    /// Returns `None` if the transaction is not a contract creation (the `to` field is set).
+    pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {
+        if self.to.is_some() {
+            return None;
+        }
+        Some(self.from.create(nonce))
+    }
+}
+
+impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type.
+    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> TransactionReceipt<ReceiptEnvelope<U>> {
+        self.map_inner(|inner| inner.map_logs(f))
+    }
+
+    /// Converts the transaction receipt's [`ReceiptEnvelope`] with a custom log type into a
+    /// [`ReceiptEnvelope`] with the primitives [`alloy_primitives::Log`] type by converting the
+    /// logs.
+    pub fn into_primitives_receipt(
+        self,
+    ) -> TransactionReceipt<ReceiptEnvelope<alloy_primitives::Log>>
+    where
+        L: Into<alloy_primitives::Log>,
+    {
+        self.map_logs(Into::into)
+    }
+}
+
+impl<T: TxReceipt> TransactionReceipt<T> {
+    /// Get the receipt logs.
+    pub fn logs(&self) -> &[T::Log] {
+        self.inner.logs()
+    }
+}
+impl<T: TxReceipt<Log: AsRef<alloy_primitives::Log>>> TransactionReceipt<T> {
+    /// Attempts to decode the logs to the provided log type.
+    ///
+    /// Returns the first log that decodes successfully.
+    ///
+    /// Returns None, if none of the logs could be decoded to the provided log type or if there
+    /// are no logs.
+    pub fn decoded_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
+        self.logs().iter().find_map(|log| E::decode_log(log.as_ref()).ok())
+    }
+    /// Attempts to decode the first log in the receipt to the provided log type.
+    /// Returns `None` if there are no logs or if decoding fails.
+    pub fn decode_first_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
+        self.logs().first().and_then(|log| E::decode_log(log.as_ref()).ok())
+    }
+
+    /// Decode the log at the given index as the given SolEvent type.
+    pub fn decode_nth_log<E: SolEvent>(&self, idx: usize) -> Option<alloy_primitives::Log<E>> {
+        self.logs().get(idx).and_then(|log| E::decode_log(log.as_ref()).ok())
+    }
+
+    /// Decode the last log in the receipt.
+    pub fn decode_last_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
+        self.logs().last().and_then(|log| E::decode_log(log.as_ref()).ok())
     }
 }
 
@@ -182,16 +298,18 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
         self.to
     }
 
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.authorization_list.as_deref()
-    }
-
     fn cumulative_gas_used(&self) -> u64 {
         self.inner.cumulative_gas_used()
     }
 
     fn state_root(&self) -> Option<B256> {
         self.inner.status_or_post_state().as_post_state()
+    }
+}
+
+impl From<TransactionReceipt> for TransactionReceipt<ReceiptEnvelope<alloy_primitives::Log>> {
+    fn from(value: TransactionReceipt) -> Self {
+        value.into_primitives_receipt()
     }
 }
 
@@ -300,5 +418,27 @@ mod test {
             receipt.transaction_hash,
             b256!("ea1093d492a1dcb1bef708f771a99a96ff05dcab81ca76c31940300177fcf49f")
         );
+    }
+
+    // <https://github.com/alloy-rs/alloy/issues/2019>
+    #[test]
+    fn no_effective_gas_price_deser() {
+        // <https://xdcscan.com/tx/0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837>
+        let json = r#"{"blockHash":"0x0fe66313f8b3f8d88d19ac13b05de0f6e0ef7fcb3293db0869062493ff98f9db","blockNumber":"0x4d34901","contractAddress":null,"cumulativeGasUsed":"0x157e6","from":"0x7ee0d8c9a1374e3d5ce33d48cd09578251af708f","gasUsed":"0x157e6","logs":[{"address":"0x03396fe4e58a0778679e2731564f064fa5256c6e","topics":["0x4736edcab43476194077e25fadaf13bbfb18c7db442202d616b41fd1d549dc9c","0x0000000000000000000000000000000000000000000000000e3762762ff00800","0x0000000000000000000000000000000000000000000000000000000067179cea"],"data":"0x","blockNumber":"0x4d34901","transactionHash":"0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837","transactionIndex":"0x0","blockHash":"0x0fe66313f8b3f8d88d19ac13b05de0f6e0ef7fcb3293db0869062493ff98f9db","logIndex":"0x0","removed":false}],"logsBloom":"0x00000400000000000000000000000000000400010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000080000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000010000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000004000000000000000000000000000000000000000000040000000000000000000000000000000000000000010000000000000000000000000000000","status":"0x1","to":"0x03396fe4e58a0778679e2731564f064fa5256c6e","transactionHash":"0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837","transactionIndex":"0x0","type":"0x0"}"#;
+
+        let receipt: TransactionReceipt = serde_json::from_str(json).unwrap();
+
+        assert_eq!(receipt.effective_gas_price, 0);
+
+        let with_gas_price = r#"{"blockHash":"0x0fe66313f8b3f8d88d19ac13b05de0f6e0ef7fcb3293db0869062493ff98f9db","blockNumber":"0x4d34901","contractAddress":null,"cumulativeGasUsed":"0x157e6","from":"0x7ee0d8c9a1374e3d5ce33d48cd09578251af708f","gasUsed":"0x157e6","gasPrice":"0x2e90edd00","logs":[{"address":"0x03396fe4e58a0778679e2731564f064fa5256c6e","topics":["0x4736edcab43476194077e25fadaf13bbfb18c7db442202d616b41fd1d549dc9c","0x0000000000000000000000000000000000000000000000000e3762762ff00800","0x0000000000000000000000000000000000000000000000000000000067179cea"],"data":"0x","blockNumber":"0x4d34901","transactionHash":"0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837","transactionIndex":"0x0","blockHash":"0x0fe66313f8b3f8d88d19ac13b05de0f6e0ef7fcb3293db0869062493ff98f9db","logIndex":"0x0","removed":false}],"logsBloom":"0x00000400000000000000000000000000000400010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000080000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000010000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000004000000000000000000000000000000000000000000040000000000000000000000000000000000000000010000000000000000000000000000000","status":"0x1","to":"0x03396fe4e58a0778679e2731564f064fa5256c6e","transactionHash":"0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837","transactionIndex":"0x0","type":"0x0"}"#;
+
+        let receipt_with_gas_price: TransactionReceipt =
+            serde_json::from_str(with_gas_price).unwrap();
+
+        assert_eq!(receipt_with_gas_price.effective_gas_price, 12500000000);
+
+        let proper_receipt = r#"{"blockHash":"0x0fe66313f8b3f8d88d19ac13b05de0f6e0ef7fcb3293db0869062493ff98f9db","blockNumber":"0x4d34901","contractAddress":null,"cumulativeGasUsed":"0x157e6","from":"0x7ee0d8c9a1374e3d5ce33d48cd09578251af708f","gasUsed":"0x157e6","effectiveGasPrice":"0x2e90edd00","logs":[{"address":"0x03396fe4e58a0778679e2731564f064fa5256c6e","topics":["0x4736edcab43476194077e25fadaf13bbfb18c7db442202d616b41fd1d549dc9c","0x0000000000000000000000000000000000000000000000000e3762762ff00800","0x0000000000000000000000000000000000000000000000000000000067179cea"],"data":"0x","blockNumber":"0x4d34901","transactionHash":"0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837","transactionIndex":"0x0","blockHash":"0x0fe66313f8b3f8d88d19ac13b05de0f6e0ef7fcb3293db0869062493ff98f9db","logIndex":"0x0","removed":false}],"logsBloom":"0x00000400000000000000000000000000000400010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000080000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000010000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000004000000000000000000000000000000000000000000040000000000000000000000000000000000000000010000000000000000000000000000000","status":"0x1","to":"0x03396fe4e58a0778679e2731564f064fa5256c6e","transactionHash":"0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837","transactionIndex":"0x0","type":"0x0"}"#;
+        let proper_receipt: TransactionReceipt = serde_json::from_str(proper_receipt).unwrap();
+        assert_eq!(proper_receipt.effective_gas_price, 12500000000);
     }
 }

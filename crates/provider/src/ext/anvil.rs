@@ -1,15 +1,16 @@
 //! This module extends the Ethereum JSON-RPC provider with the Anvil namespace's RPC methods.
 
-use crate::Provider;
-use alloy_network::Network;
-use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
+use crate::{PendingTransactionBuilder, Provider};
+use alloy_consensus::Blob;
+use alloy_network::{Network, TransactionBuilder};
+use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
-use alloy_rpc_types_eth::Block;
-use alloy_transport::TransportResult;
+use alloy_transport::{TransportError, TransportResult};
+use futures::try_join;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait AnvilApi<N: Network>: Send + Sync {
     // Not implemented:
     // - anvil_enable_traces: Not implemented in the Anvil RPC API.
@@ -21,8 +22,17 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Stops impersonating an account if previously set with `anvil_impersonateAccount`.
     async fn anvil_stop_impersonating_account(&self, address: Address) -> TransportResult<()>;
 
-    /// If set to true will make every account impersonated.
+    /// If set to `true`, impersonates all accounts.
     async fn anvil_auto_impersonate_account(&self, enabled: bool) -> TransportResult<()>;
+
+    /// Impersonates the `from` address in the given transaction request, optionally funds the
+    /// sender, sends the transaction, and optionally stops impersonating after execution based
+    /// on the provided config.
+    async fn anvil_send_impersonated_transaction_with_config(
+        &self,
+        request: N::TransactionRequest,
+        config: ImpersonateConfig,
+    ) -> TransportResult<PendingTransactionBuilder<N>>;
 
     /// Returns true if auto mining is enabled, and false.
     async fn anvil_get_auto_mine(&self) -> TransportResult<bool>;
@@ -34,8 +44,8 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Mines a series of blocks.
     async fn anvil_mine(
         &self,
-        num_blocks: Option<U256>,
-        interval: Option<U256>,
+        num_blocks: Option<u64>,
+        interval: Option<u64>,
     ) -> TransportResult<()>;
 
     /// Sets the mining behavior to interval with the given interval (seconds).
@@ -62,7 +72,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     async fn anvil_set_code(&self, address: Address, code: Bytes) -> TransportResult<()>;
 
     /// Sets the nonce of an address.
-    async fn anvil_set_nonce(&self, address: Address, nonce: U256) -> TransportResult<()>;
+    async fn anvil_set_nonce(&self, address: Address, nonce: u64) -> TransportResult<()>;
 
     /// Writes a single slot of the account's storage.
     async fn anvil_set_storage_at(
@@ -76,10 +86,10 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     async fn anvil_set_logging(&self, enable: bool) -> TransportResult<()>;
 
     /// Set the minimum gas price for the node.
-    async fn anvil_set_min_gas_price(&self, gas: U256) -> TransportResult<()>;
+    async fn anvil_set_min_gas_price(&self, gas: u128) -> TransportResult<()>;
 
     /// Sets the base fee of the next block.
-    async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: U256) -> TransportResult<()>;
+    async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: u128) -> TransportResult<()>;
 
     /// Sets the coinbase address.
     async fn anvil_set_coinbase(&self, address: Address) -> TransportResult<()>;
@@ -87,6 +97,15 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Create a buffer that represents all state on the chain, which can be loaded to separate
     /// process by calling `anvil_loadState`
     async fn anvil_dump_state(&self) -> TransportResult<Bytes>;
+
+    /// Like [`anvil_dump_state`](Self::anvil_dump_state) but also includes historical states of
+    /// accounts and storage at particular block hashes, allowing a reloaded node to serve RPC
+    /// calls for blocks prior to the one at which state was dumped.
+    ///
+    /// Equivalent to running anvil with `--preserve-historical-states` at startup.
+    ///
+    /// The returned buffer can be passed to [`anvil_load_state`](Self::anvil_load_state).
+    async fn anvil_dump_state_with_history(&self) -> TransportResult<Bytes>;
 
     /// Append chain state buffer to current chain. Will overwrite any conflicting addresses or
     /// storage.
@@ -109,7 +128,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     async fn anvil_revert(&self, id: U256) -> TransportResult<bool>;
 
     /// Jump forward in time by the given amount of time, in seconds.
-    async fn anvil_increase_time(&self, seconds: U256) -> TransportResult<i64>;
+    async fn anvil_increase_time(&self, seconds: u64) -> TransportResult<i64>;
 
     /// Similar to `evm_increaseTime` but takes the exact timestamp that you want in the next block.
     async fn anvil_set_next_block_timestamp(&self, timestamp: u64) -> TransportResult<()>;
@@ -119,7 +138,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     async fn anvil_set_time(&self, timestamp: u64) -> TransportResult<u64>;
 
     /// Set the next block gas limit.
-    async fn anvil_set_block_gas_limit(&self, gas_limit: U256) -> TransportResult<bool>;
+    async fn anvil_set_block_gas_limit(&self, gas_limit: u64) -> TransportResult<bool>;
 
     /// Sets an interval for the block timestamp.
     async fn anvil_set_block_timestamp_interval(&self, seconds: u64) -> TransportResult<()>;
@@ -133,7 +152,10 @@ pub trait AnvilApi<N: Network>: Send + Sync {
 
     /// Mine blocks, instantly and return the mined blocks.
     /// This will mine the blocks regardless of the configured mining mode.
-    async fn anvil_mine_detailed(&self, opts: Option<MineOptions>) -> TransportResult<Vec<Block>>;
+    async fn anvil_mine_detailed(
+        &self,
+        opts: Option<MineOptions>,
+    ) -> TransportResult<Vec<N::BlockResponse>>;
 
     /// Sets the backend rpc url.
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()>;
@@ -141,15 +163,65 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Reorg the chain
     async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()>;
 
+    /// Rollback the chain
+    async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()>;
+
+    /// Retrieves a blob by its versioned hash.
+    async fn anvil_get_blob_by_versioned_hash(
+        &self,
+        versioned_hash: B256,
+    ) -> TransportResult<Option<Blob>>;
+
+    /// Retrieves blobs by transaction hash.
+    async fn anvil_get_blobs_by_tx_hash(
+        &self,
+        tx_hash: TxHash,
+    ) -> TransportResult<Option<Vec<Blob>>>;
+
     /// Execute a transaction regardless of signature status.
     async fn eth_send_unsigned_transaction(
         &self,
         request: N::TransactionRequest,
     ) -> TransportResult<TxHash>;
+
+    /// Executes a transaction and waits for it to be mined, returning the receipt.
+    async fn eth_send_transaction_sync(
+        &self,
+        request: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse>;
+
+    /// Sends a raw transaction and waits for it to be mined, returning the receipt.
+    async fn eth_send_raw_transaction_sync(
+        &self,
+        request: Bytes,
+    ) -> TransportResult<N::ReceiptResponse>;
+
+    /// Sets impersonated transaction
+    async fn anvil_send_impersonated_transaction(
+        &self,
+        request: N::TransactionRequest,
+    ) -> TransportResult<TxHash>;
+
+    /// Modifies the ERC20 balance of an account.
+    async fn anvil_deal_erc20(
+        &self,
+        address: Address,
+        token_address: Address,
+        balance: U256,
+    ) -> TransportResult<()>;
+
+    /// Modifies the ERC20 allowance of an account.
+    async fn anvil_set_erc20_allowance(
+        &self,
+        owner: Address,
+        spender: Address,
+        token: Address,
+        allowance: U256,
+    ) -> TransportResult<()>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> AnvilApi<N> for P
 where
     N: Network,
@@ -177,10 +249,12 @@ where
 
     async fn anvil_mine(
         &self,
-        num_blocks: Option<U256>,
-        interval: Option<U256>,
+        num_blocks: Option<u64>,
+        interval: Option<u64>,
     ) -> TransportResult<()> {
-        self.client().request("anvil_mine", (num_blocks, interval)).await
+        self.client()
+            .request("anvil_mine", (num_blocks.map(U64::from), interval.map(U64::from)))
+            .await
     }
 
     async fn anvil_set_interval_mining(&self, secs: u64) -> TransportResult<()> {
@@ -211,8 +285,8 @@ where
         self.client().request("anvil_setCode", (address, code)).await
     }
 
-    async fn anvil_set_nonce(&self, address: Address, nonce: U256) -> TransportResult<()> {
-        self.client().request("anvil_setNonce", (address, nonce)).await
+    async fn anvil_set_nonce(&self, address: Address, nonce: u64) -> TransportResult<()> {
+        self.client().request("anvil_setNonce", (address, U64::from(nonce))).await
     }
 
     async fn anvil_set_storage_at(
@@ -228,12 +302,12 @@ where
         self.client().request("anvil_setLoggingEnabled", (enable,)).await
     }
 
-    async fn anvil_set_min_gas_price(&self, gas: U256) -> TransportResult<()> {
-        self.client().request("anvil_setMinGasPrice", (gas,)).await
+    async fn anvil_set_min_gas_price(&self, gas: u128) -> TransportResult<()> {
+        self.client().request("anvil_setMinGasPrice", (U128::from(gas),)).await
     }
 
-    async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: U256) -> TransportResult<()> {
-        self.client().request("anvil_setNextBlockBaseFeePerGas", (basefee,)).await
+    async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: u128) -> TransportResult<()> {
+        self.client().request("anvil_setNextBlockBaseFeePerGas", (U128::from(basefee),)).await
     }
 
     async fn anvil_set_coinbase(&self, address: Address) -> TransportResult<()> {
@@ -242,6 +316,10 @@ where
 
     async fn anvil_dump_state(&self) -> TransportResult<Bytes> {
         self.client().request_noparams("anvil_dumpState").await
+    }
+
+    async fn anvil_dump_state_with_history(&self) -> TransportResult<Bytes> {
+        self.client().request("anvil_dumpState", (true,)).await
     }
 
     async fn anvil_load_state(&self, buf: Bytes) -> TransportResult<bool> {
@@ -268,8 +346,8 @@ where
         self.client().request("evm_revert", (id,)).await
     }
 
-    async fn anvil_increase_time(&self, seconds: U256) -> TransportResult<i64> {
-        self.client().request("evm_increaseTime", (seconds,)).await
+    async fn anvil_increase_time(&self, seconds: u64) -> TransportResult<i64> {
+        self.client().request("evm_increaseTime", (U64::from(seconds),)).await
     }
 
     async fn anvil_set_next_block_timestamp(&self, seconds: u64) -> TransportResult<()> {
@@ -280,8 +358,8 @@ where
         self.client().request("evm_setTime", (timestamp,)).await
     }
 
-    async fn anvil_set_block_gas_limit(&self, gas_limit: U256) -> TransportResult<bool> {
-        self.client().request("evm_setBlockGasLimit", (gas_limit,)).await
+    async fn anvil_set_block_gas_limit(&self, gas_limit: u64) -> TransportResult<bool> {
+        self.client().request("evm_setBlockGasLimit", (U64::from(gas_limit),)).await
     }
 
     async fn anvil_set_block_timestamp_interval(&self, seconds: u64) -> TransportResult<()> {
@@ -296,7 +374,10 @@ where
         self.client().request("evm_mine", (opts,)).await
     }
 
-    async fn anvil_mine_detailed(&self, opts: Option<MineOptions>) -> TransportResult<Vec<Block>> {
+    async fn anvil_mine_detailed(
+        &self,
+        opts: Option<MineOptions>,
+    ) -> TransportResult<Vec<N::BlockResponse>> {
         self.client().request("evm_mine_detailed", (opts,)).await
     }
 
@@ -308,29 +389,167 @@ where
         self.client().request("anvil_reorg", options).await
     }
 
+    async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()> {
+        self.client().request("anvil_rollback", (depth,)).await
+    }
+
+    async fn anvil_get_blob_by_versioned_hash(&self, hash: B256) -> TransportResult<Option<Blob>> {
+        self.client().request("anvil_getBlobByHash", (hash,)).await
+    }
+
+    async fn anvil_get_blobs_by_tx_hash(&self, hash: TxHash) -> TransportResult<Option<Vec<Blob>>> {
+        self.client().request("anvil_getBlobsByTransactionHash", (hash,)).await
+    }
+
     async fn eth_send_unsigned_transaction(
         &self,
         request: N::TransactionRequest,
     ) -> TransportResult<TxHash> {
         self.client().request("eth_sendUnsignedTransaction", (request,)).await
     }
+
+    async fn eth_send_transaction_sync(
+        &self,
+        request: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.client().request("eth_sendTransactionSync", (request,)).await
+    }
+
+    async fn eth_send_raw_transaction_sync(
+        &self,
+        request: Bytes,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.client().request("eth_sendRawTransactionSync", (request,)).await
+    }
+
+    async fn anvil_send_impersonated_transaction(
+        &self,
+        request: N::TransactionRequest,
+    ) -> TransportResult<TxHash> {
+        self.client().request("eth_sendTransaction", (request,)).await
+    }
+
+    async fn anvil_deal_erc20(
+        &self,
+        address: Address,
+        token_address: Address,
+        balance: U256,
+    ) -> TransportResult<()> {
+        self.client().request("anvil_dealERC20", (address, token_address, balance)).await
+    }
+
+    async fn anvil_set_erc20_allowance(
+        &self,
+        owner: Address,
+        spender: Address,
+        token: Address,
+        allowance: U256,
+    ) -> TransportResult<()> {
+        self.client().request("anvil_setERC20Allowance", (owner, spender, token, allowance)).await
+    }
+
+    async fn anvil_send_impersonated_transaction_with_config(
+        &self,
+        request: N::TransactionRequest,
+        config: ImpersonateConfig,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        let from = request.from().ok_or_else(|| {
+            TransportError::from(alloy_transport::TransportErrorKind::Custom(
+                "TransactionRequest must have a `from` address set.".to_string().into(),
+            ))
+        })?;
+
+        let impersonate_future = self.anvil_impersonate_account(from);
+
+        if let Some(amount) = config.fund_amount {
+            let fund_future = self.anvil_set_balance(from, amount);
+            try_join!(fund_future, impersonate_future)?;
+        } else {
+            impersonate_future.await?;
+        }
+
+        let tx_hash = self.anvil_send_impersonated_transaction(request).await;
+
+        if config.stop_impersonate {
+            let stop_result = self.anvil_stop_impersonating_account(from).await;
+            if tx_hash.is_ok() {
+                stop_result?;
+            }
+        }
+
+        let pending = PendingTransactionBuilder::new(self.root().clone(), tx_hash?);
+        Ok(pending)
+    }
+}
+
+/// Configuration for impersonated transactions, including optional funding and whether to stop
+/// impersonation.
+#[derive(Debug, Clone)]
+pub struct ImpersonateConfig {
+    /// Optional amount of ETH to fund the impersonated account.
+    pub fund_amount: Option<U256>,
+    /// Whether to stop impersonating after the transaction is sent.
+    pub stop_impersonate: bool,
+}
+
+impl Default for ImpersonateConfig {
+    fn default() -> Self {
+        Self { fund_amount: None, stop_impersonate: true }
+    }
+}
+
+impl ImpersonateConfig {
+    /// Set the impersonation to continue after the transaction.
+    pub const fn keep_impersonate(mut self) -> Self {
+        self.stop_impersonate = false;
+        self
+    }
+
+    /// Set the impersonation to stop after the transaction.
+    pub const fn stop_impersonate(mut self) -> Self {
+        self.stop_impersonate = true;
+        self
+    }
+
+    /// Set the funding amount for the impersonated account.
+    pub const fn fund(mut self, amount: U256) -> Self {
+        self.fund_amount = Some(amount);
+        self
+    }
+
+    /// Clear the funding amount.
+    pub const fn no_fund(mut self) -> Self {
+        self.fund_amount = None;
+        self
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{
+        fillers::{ChainIdFiller, GasFiller},
+        ProviderBuilder,
+    };
+    use alloy_consensus::{BlockHeader, SidecarBuilder, SimpleCoder};
     use alloy_eips::BlockNumberOrTag;
-    use alloy_network::TransactionBuilder;
-    use alloy_network_primitives::BlockTransactionsKind;
-    use alloy_primitives::B256;
+    use alloy_network::{AnyNetwork, TransactionBuilder, TransactionBuilder4844};
+    use alloy_network_primitives::BlockResponse as _;
+    use alloy_primitives::{address, B256};
     use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_sol_types::{sol, SolCall};
+    use alloy_transport::mock::Asserter;
 
-    // use alloy_node_bindings::Anvil; (to be used in `test_anvil_reset`)
+    const FORK_URL: &str = "https://ethereum.reth.rs/rpc";
 
     #[tokio::test]
     async fn test_anvil_impersonate_account_stop_impersonating_account() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_simple_nonce_management()
+            .filler(GasFiller::default())
+            .filler(ChainIdFiller::default())
+            .connect_anvil();
 
         let impersonate = Address::random();
         let to = Address::random();
@@ -365,8 +584,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_anvil_impersonated_send_with_config() {
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_simple_nonce_management()
+            .filler(GasFiller::default())
+            .filler(ChainIdFiller::default())
+            .connect_anvil();
+
+        let impersonate = Address::random();
+        let to = Address::random();
+        let val = U256::from(1337);
+        let funding = U256::from(1e18 as u64);
+
+        let tx = TransactionRequest::default().with_from(impersonate).with_to(to).with_value(val);
+
+        let config = ImpersonateConfig { fund_amount: Some(funding), stop_impersonate: true };
+
+        let pending = provider
+            .anvil_send_impersonated_transaction_with_config(tx.clone(), config)
+            .await
+            .expect("impersonated send failed");
+        let receipt = pending.get_receipt().await.unwrap();
+        assert_eq!(receipt.from, impersonate);
+
+        let recipient_balance = provider.get_balance(to).await.unwrap();
+        assert_eq!(recipient_balance, val);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_impersonated_send_stops_on_send_error() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&());
+        asserter.push_failure_msg("send failed");
+        asserter.push_success(&());
+
+        let tx = TransactionRequest::default().with_from(Address::random());
+        let err = provider
+            .anvil_send_impersonated_transaction_with_config(tx, ImpersonateConfig::default())
+            .await
+            .unwrap_err();
+
+        assert!(err.to_string().contains("send failed"));
+        assert!(asserter.read_q().is_empty(), "stop impersonation response should be consumed");
+    }
+
+    #[tokio::test]
     async fn test_anvil_auto_impersonate_account() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_simple_nonce_management()
+            .filler(GasFiller::default())
+            .filler(ChainIdFiller::default())
+            .connect_anvil();
 
         let impersonate = Address::random();
         let to = Address::random();
@@ -404,7 +676,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_get_auto_mine_set_auto_mine() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         provider.anvil_set_auto_mine(false).await.unwrap();
 
@@ -419,11 +691,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_mine() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        provider.anvil_mine(Some(U256::from(10)), None).await.unwrap();
+        provider.anvil_mine(Some(10), None).await.unwrap();
 
         let num = provider.get_block_number().await.unwrap();
 
@@ -432,7 +704,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_set_interval_mining() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         provider.anvil_set_interval_mining(1).await.unwrap();
 
@@ -447,7 +719,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_drop_transaction() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         provider.anvil_set_auto_mine(false).await.unwrap();
 
@@ -475,7 +747,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_drop_all_transactions() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         provider.anvil_set_auto_mine(false).await.unwrap();
 
@@ -502,33 +774,26 @@ mod tests {
         provider.anvil_drop_all_transactions().await.unwrap();
     }
 
-    // TODO: Fix this test, `chain_id` is not being set correctly.
-    // #[tokio::test]
-    // async fn test_anvil_reset() {
-    //     let fork1 = Anvil::default().chain_id(777).spawn();
-    //     let fork2 = Anvil::default().chain_id(888).spawn();
+    #[tokio::test]
+    async fn test_anvil_reset() {
+        let provider = ProviderBuilder::new().connect_anvil();
 
-    //     let provider = ProviderBuilder::new()
-    //         .on_anvil_with_config(|config| config.fork(fork1.endpoint_url().to_string()));
+        let alice = Address::random();
+        let balance = U256::from(1e18 as u64);
+        provider.anvil_set_balance(alice, balance).await.unwrap();
 
-    //     let chain_id = provider.get_chain_id().await.unwrap();
-    //     assert_eq!(chain_id, 777);
+        let current_balance = provider.get_balance(alice).await.unwrap();
+        assert_eq!(current_balance, balance);
 
-    //     provider
-    //         .anvil_reset(Some(Forking {
-    //             json_rpc_url: Some(fork2.endpoint_url().to_string()),
-    //             block_number: Some(0),
-    //         }))
-    //         .await
-    //         .unwrap();
+        provider.anvil_reset(None).await.unwrap();
 
-    //     let chain_id = provider.get_chain_id().await.unwrap();
-    //     assert_eq!(chain_id, 888);
-    // }
+        let reset_balance = provider.get_balance(alice).await.unwrap();
+        assert_eq!(reset_balance, U256::ZERO);
+    }
 
     #[tokio::test]
     async fn test_anvil_set_chain_id() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let chain_id = 1337;
         provider.anvil_set_chain_id(chain_id).await.unwrap();
@@ -539,7 +804,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_set_balance() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let address = Address::random();
         let balance = U256::from(1337);
@@ -551,7 +816,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_set_code() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let address = Address::random();
         provider.anvil_set_code(address, Bytes::from("0xbeef")).await.unwrap();
@@ -562,19 +827,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_set_nonce() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let address = Address::random();
-        let nonce = U256::from(1337);
+        let nonce = 1337;
         provider.anvil_set_nonce(address, nonce).await.unwrap();
 
         let new_nonce = provider.get_transaction_count(address).await.unwrap();
-        assert_eq!(new_nonce, nonce.to::<u64>());
+        assert_eq!(new_nonce, nonce);
     }
 
     #[tokio::test]
     async fn test_anvil_set_storage_at() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let address = Address::random();
         let slot = U256::from(1337);
@@ -587,18 +852,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_set_logging() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         provider.anvil_set_logging(true).await.unwrap();
     }
 
     #[tokio::test]
     async fn test_anvil_set_min_gas_price() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let gas = U256::from(1337);
 
-        if let Err(e) = provider.anvil_set_min_gas_price(gas).await {
+        if let Err(e) = provider.anvil_set_min_gas_price(gas.try_into().unwrap()).await {
             assert_eq!(
                 e.to_string(),
                 "server returned an error response: error code -32602: anvil_setMinGasPrice is not supported when EIP-1559 is active"
@@ -608,42 +873,34 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_set_next_block_base_fee_per_gas() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
-        let basefee = U256::from(1337);
+        let basefee = 1337;
         provider.anvil_set_next_block_base_fee_per_gas(basefee).await.unwrap();
 
         provider.evm_mine(None).await.unwrap();
 
-        let block = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block_by_number(BlockNumberOrTag::Latest).await.unwrap().unwrap();
 
-        assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u64>()));
+        assert_eq!(block.header.base_fee_per_gas, Some(basefee as u64));
     }
 
     #[tokio::test]
     async fn test_anvil_set_coinbase() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let coinbase = Address::random();
         provider.anvil_set_coinbase(coinbase).await.unwrap();
 
         provider.evm_mine(None).await.unwrap();
 
-        let block = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block_by_number(BlockNumberOrTag::Latest).await.unwrap().unwrap();
         assert_eq!(block.header.beneficiary, coinbase);
     }
 
     #[tokio::test]
     async fn test_anvil_dump_state_load_state() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let state = provider.anvil_dump_state().await.unwrap();
 
@@ -655,14 +912,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_anvil_node_info() {
-        let provider = ProviderBuilder::new().on_anvil();
+    async fn test_anvil_dump_state_with_history() {
+        let provider = ProviderBuilder::new().connect_anvil();
 
-        let latest_block = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let state = provider.anvil_dump_state_with_history().await.unwrap();
+
+        assert!(!state.is_empty());
+
+        let res = provider.anvil_load_state(state).await.unwrap();
+
+        assert!(res);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_node_info() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest).await.unwrap().unwrap();
 
         provider.evm_mine(None).await.unwrap();
 
@@ -673,7 +940,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_metadata() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let client_version = provider.get_client_version().await.unwrap();
         let chain_id = provider.get_chain_id().await.unwrap();
@@ -686,7 +953,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_remove_pool_transactions() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         provider.anvil_set_auto_mine(false).await.unwrap();
 
@@ -715,7 +982,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_snapshot_revert() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let snapshot_id = provider.anvil_snapshot().await.unwrap();
 
@@ -751,27 +1018,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_increase_time() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let timestamp = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .get_block_by_number(BlockNumberOrTag::Latest)
             .await
             .unwrap()
             .unwrap()
             .header
             .timestamp;
 
-        let seconds = provider.anvil_increase_time(U256::from(1337)).await.unwrap();
+        let seconds = provider.anvil_increase_time(1337).await.unwrap();
 
         assert_eq!(timestamp as i64 + seconds, timestamp as i64 + 1337_i64);
     }
 
     #[tokio::test]
     async fn test_anvil_set_next_block_timestamp() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let timestamp = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .get_block_by_number(BlockNumberOrTag::Latest)
             .await
             .unwrap()
             .unwrap()
@@ -782,50 +1049,44 @@ mod tests {
 
         provider.evm_mine(None).await.unwrap();
 
-        let latest_block = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest).await.unwrap().unwrap();
         assert_eq!(latest_block.header.timestamp, timestamp + 1337);
     }
 
     #[tokio::test]
     async fn test_anvil_set_time() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         provider.anvil_set_time(0).await.unwrap();
 
         let seconds = provider.anvil_set_time(1001).await.unwrap();
 
-        assert_eq!(seconds, 1);
+        assert_eq!(seconds, 1001);
     }
 
     #[tokio::test]
     async fn test_anvil_set_block_gas_limit() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
-        let block_gas_limit = U256::from(1337);
+        let block_gas_limit = 1337;
         assert!(provider.anvil_set_block_gas_limit(block_gas_limit).await.unwrap());
 
         provider.evm_mine(None).await.unwrap();
 
-        let latest_block = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(block_gas_limit.to::<u64>(), latest_block.header.gas_limit);
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest).await.unwrap().unwrap();
+        assert_eq!(block_gas_limit, latest_block.header.gas_limit);
     }
 
     #[tokio::test]
     async fn test_anvil_block_timestamp_interval() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         provider.anvil_set_block_timestamp_interval(1).await.unwrap();
 
         let start_timestamp = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .get_block_by_number(BlockNumberOrTag::Latest)
             .await
             .unwrap()
             .unwrap()
@@ -836,11 +1097,8 @@ mod tests {
 
         provider.evm_mine(None).await.unwrap();
 
-        let latest_block = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest).await.unwrap().unwrap();
 
         assert_eq!(latest_block.header.timestamp, start_timestamp + 1);
 
@@ -849,7 +1107,7 @@ mod tests {
         provider.evm_mine(None).await.unwrap();
 
         let start_timestamp = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .get_block_by_number(BlockNumberOrTag::Latest)
             .await
             .unwrap()
             .unwrap()
@@ -858,22 +1116,19 @@ mod tests {
 
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-        let latest_block = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest).await.unwrap().unwrap();
 
         assert_eq!(latest_block.header.timestamp, start_timestamp);
     }
 
     #[tokio::test]
     async fn test_evm_mine_single_block() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        for (idx, _) in std::iter::repeat(()).take(10).enumerate() {
+        for (idx, _) in std::iter::repeat_n((), 10).enumerate() {
             provider.evm_mine(None).await.unwrap();
             let num = provider.get_block_number().await.unwrap();
             assert_eq!(num, start_num + idx as u64 + 1);
@@ -883,29 +1138,28 @@ mod tests {
         assert_eq!(num, start_num + 10);
     }
 
-    // TODO: Fix this test, only a single block is being mined regardless of the `blocks` parameter.
-    // #[tokio::test]
-    // async fn test_evm_mine_with_configuration() {
-    //     let provider = ProviderBuilder::new().on_anvil();
-
-    //     let start_num = provider.get_block_number().await.unwrap();
-
-    //     provider
-    //         .evm_mine(Some(MineOptions::Options { timestamp: Some(100), blocks: Some(10) }))
-    //         .await
-    //         .unwrap();
-
-    //     let num = provider.get_block_number().await.unwrap();
-    //     assert_eq!(num, start_num + 10);
-    // }
-
     #[tokio::test]
-    async fn test_anvil_mine_detailed_single_block() {
-        let provider = ProviderBuilder::new().on_anvil();
+    async fn test_evm_mine_with_configuration() {
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        for (idx, _) in std::iter::repeat(()).take(10).enumerate() {
+        provider
+            .evm_mine(Some(MineOptions::Options { timestamp: None, blocks: Some(10) }))
+            .await
+            .unwrap();
+
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(num, start_num + 10);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_mine_detailed_single_block() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let start_num = provider.get_block_number().await.unwrap();
+
+        for (idx, _) in std::iter::repeat_n((), 10).enumerate() {
             provider.anvil_mine_detailed(None).await.unwrap();
             let num = provider.get_block_number().await.unwrap();
             assert_eq!(num, start_num + idx as u64 + 1);
@@ -915,32 +1169,45 @@ mod tests {
         assert_eq!(num, start_num + 10);
     }
 
-    // TODO: Fix this test, only a single block is being mined regardless of the `blocks` parameter.
-    // #[tokio::test]
-    // async fn test_anvil_mine_detailed_with_configuration() {
-    //     let provider = ProviderBuilder::new().on_anvil();
+    #[tokio::test]
+    async fn test_anvil_mine_detailed_with_configuration() {
+        let provider = ProviderBuilder::new().connect_anvil();
 
-    //     let start_num = provider.get_block_number().await.unwrap();
+        let start_num = provider.get_block_number().await.unwrap();
 
-    //     let blocks = provider
-    //         .anvil_mine_detailed(Some(MineOptions::Options {
-    //             timestamp: Some(100),
-    //             blocks: Some(10),
-    //         }))
-    //         .await
-    //         .unwrap();
+        let blocks = provider
+            .anvil_mine_detailed(Some(MineOptions::Options { timestamp: None, blocks: Some(10) }))
+            .await
+            .unwrap();
 
-    //     let num = provider.get_block_number().await.unwrap();
-    //     assert_eq!(num, start_num + 10);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(num, start_num + 10);
 
-    //     for (idx, block) in blocks.iter().enumerate() {
-    //         assert_eq!(block.header.number, Some(start_num + idx as u64 + 1));
-    //     }
-    // }
+        for (idx, block) in blocks.iter().enumerate() {
+            assert_eq!(block.header().number(), start_num + idx as u64 + 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_anvil_mine_detailed_with_any_network() {
+        let provider = ProviderBuilder::new().network::<AnyNetwork>().connect_anvil();
+
+        let start_num = provider.get_block_number().await.unwrap();
+
+        let blocks = provider
+            .anvil_mine_detailed(Some(MineOptions::Options { timestamp: None, blocks: Some(2) }))
+            .await
+            .unwrap();
+
+        assert_eq!(blocks.len(), 2);
+        for (idx, block) in blocks.iter().enumerate() {
+            assert_eq!(block.header().number(), start_num + idx as u64 + 1);
+        }
+    }
 
     #[tokio::test]
     async fn test_anvil_set_rpc_url() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let url = "https://example.com".to_string();
         provider.anvil_set_rpc_url(url.clone()).await.unwrap();
@@ -948,31 +1215,41 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_reorg() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         // Mine two blocks
-        provider.anvil_mine(Some(U256::from(2)), None).await.unwrap();
+        provider.anvil_mine(Some(2), None).await.unwrap();
 
-        let reorged_block = provider
-            .get_block_by_number(2.into(), BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let reorged_block = provider.get_block_by_number(2.into()).await.unwrap().unwrap();
         provider.anvil_reorg(ReorgOptions { depth: 1, tx_block_pairs: Vec::new() }).await.unwrap();
 
-        let new_block = provider
-            .get_block_by_number(2.into(), BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let new_block = provider.get_block_by_number(2.into()).await.unwrap().unwrap();
 
         assert_eq!(reorged_block.header.number, new_block.header.number);
         assert_ne!(reorged_block.header.hash, new_block.header.hash);
     }
 
     #[tokio::test]
+    #[ignore]
+    async fn test_anvil_rollback() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        // Mine two blocks
+        provider.anvil_mine(Some(2), None).await.unwrap();
+
+        let target_height = provider.get_block_by_number(1.into()).await.unwrap().unwrap();
+
+        provider.anvil_rollback(Some(1)).await.unwrap();
+
+        let new_head =
+            provider.get_block_by_number(BlockNumberOrTag::Latest).await.unwrap().unwrap();
+
+        assert_eq!(target_height, new_head);
+    }
+
+    #[tokio::test]
     async fn test_eth_send_unsigned_transaction() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let alice = Address::random();
         let bob = Address::random();
@@ -997,5 +1274,138 @@ mod tests {
         let res = provider.get_transaction_receipt(tx_hash).await.unwrap().unwrap();
         assert_eq!(res.from, alice);
         assert_eq!(res.to, Some(bob));
+    }
+
+    #[tokio::test]
+    async fn test_anvil_get_blob_by_versioned_hash() {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let provider = ProviderBuilder::new()
+                        .connect_anvil_with_wallet_and_config(|anvil| {
+                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                        })
+                        .unwrap();
+
+                    let accounts = provider.get_accounts().await.unwrap();
+                    let alice = accounts[0];
+                    let bob = accounts[1];
+                    let sidecar: SidecarBuilder<SimpleCoder> =
+                        SidecarBuilder::from_slice(b"Blobs are fun!");
+                    let sidecar = sidecar.build_4844().unwrap();
+
+                    let tx = TransactionRequest::default()
+                        .with_from(alice)
+                        .with_to(bob)
+                        .with_blob_sidecar_4844(sidecar.clone());
+
+                    let pending_tx = provider.send_transaction(tx).await.unwrap();
+                    let _receipt = pending_tx.get_receipt().await.unwrap();
+                    let hash = sidecar.versioned_hash_for_blob(0).unwrap();
+
+                    let blob =
+                        provider.anvil_get_blob_by_versioned_hash(hash).await.unwrap().unwrap();
+
+                    assert_eq!(blob, sidecar.blobs[0]);
+                });
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_anvil_get_blobs_by_tx_hash() {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let provider = ProviderBuilder::new()
+                        .connect_anvil_with_wallet_and_config(|anvil| {
+                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                        })
+                        .unwrap();
+
+                    let accounts = provider.get_accounts().await.unwrap();
+                    let alice = accounts[0];
+                    let bob = accounts[1];
+                    let sidecar: SidecarBuilder<SimpleCoder> =
+                        SidecarBuilder::from_slice(b"Blobs are fun!");
+                    let sidecar = sidecar.build_4844().unwrap();
+
+                    let tx = TransactionRequest::default()
+                        .with_from(alice)
+                        .with_to(bob)
+                        .with_blob_sidecar_4844(sidecar.clone());
+
+                    let pending_tx = provider.send_transaction(tx).await.unwrap();
+                    let receipt = pending_tx.get_receipt().await.unwrap();
+                    let tx_hash = receipt.transaction_hash;
+
+                    let blobs =
+                        provider.anvil_get_blobs_by_tx_hash(tx_hash).await.unwrap().unwrap();
+
+                    assert_eq!(blobs, sidecar.blobs);
+                });
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_anvil_deal_erc20() {
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
+        let user = Address::random();
+        let amount = U256::from(1e18 as u64);
+
+        provider.anvil_deal_erc20(user, dai, amount).await.unwrap();
+
+        sol! {
+            function balanceOf(address owner) view returns (uint256);
+        }
+
+        let balance_of_call = balanceOfCall::new((user,));
+        let input = balanceOfCall::abi_encode(&balance_of_call);
+
+        let result = provider
+            .call(TransactionRequest::default().with_to(dai).with_input(input))
+            .await
+            .unwrap();
+        let balance = balanceOfCall::abi_decode_returns(&result).unwrap();
+
+        assert_eq!(balance, amount);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_set_erc20_allowance() {
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
+        let owner = Address::random();
+        let spender = Address::random();
+        let amount = U256::from(1e18 as u64);
+
+        provider.anvil_set_erc20_allowance(owner, spender, dai, amount).await.unwrap();
+
+        sol! {
+            function allowance(address owner, address spender) view returns (uint256);
+        }
+
+        let allowance_call = allowanceCall::new((owner, spender));
+        let input = allowanceCall::abi_encode(&allowance_call);
+
+        let result = provider
+            .call(TransactionRequest::default().with_to(dai).with_input(input))
+            .await
+            .unwrap();
+        let allowance = allowanceCall::abi_decode_returns(&result).unwrap();
+
+        assert_eq!(allowance, amount);
     }
 }

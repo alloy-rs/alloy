@@ -58,7 +58,7 @@ impl Serialize for InclusionListStatusV1 {
     where
         S: Serializer,
     {
-        let mut map = serializer.serialize_map(Some(3))?;
+        let mut map = serializer.serialize_map(Some(2))?;
         map.serialize_entry("status", self.status.as_str())?;
         map.serialize_entry("validationError", &self.status.validation_error())?;
         map.end()
@@ -88,7 +88,11 @@ pub struct InclusionListSummaryEntryV1 {
 
 impl fmt::Display for InclusionListSummaryEntryV1 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "InclusionListEntryV1 {{ address: {}, nonce: {} }}", self.address, self.nonce)
+        write!(
+            f,
+            "InclusionListSummaryEntryV1 {{ address: {}, nonce: {} }}",
+            self.address, self.nonce
+        )
     }
 }
 

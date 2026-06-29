@@ -39,6 +39,14 @@ pub enum TransportErrorKind {
     /// Custom error.
     #[error("{0}")]
     Custom(#[source] Box<dyn StdError + Send + Sync + 'static>),
+
+    /// Deterministic, terminal failure that retry loops should not retry.
+    ///
+    /// Use this when the operation is guaranteed to fail again on retry —
+    /// for example a malformed request, a permission error, or any other
+    /// protocol-level failure that is not a transient socket / IO problem.
+    #[error("{0}")]
+    NonRetryable(#[source] Box<dyn StdError + Send + Sync + 'static>),
 }
 
 impl TransportErrorKind {
@@ -56,6 +64,21 @@ impl TransportErrorKind {
     /// Instantiate a new `TransportError` from a custom error.
     pub fn custom(err: impl StdError + Send + Sync + 'static) -> TransportError {
         RpcError::Transport(Self::Custom(Box::new(err)))
+    }
+
+    /// Instantiate a new non-retryable `TransportError` from a string.
+    pub fn non_retryable_str(err: &str) -> TransportError {
+        RpcError::Transport(Self::NonRetryable(err.into()))
+    }
+
+    /// Instantiate a new non-retryable `TransportError` from a custom error.
+    pub fn non_retryable(err: impl StdError + Send + Sync + 'static) -> TransportError {
+        RpcError::Transport(Self::NonRetryable(Box::new(err)))
+    }
+
+    /// Returns true if this is [`TransportErrorKind::NonRetryable`].
+    pub const fn is_non_retryable(&self) -> bool {
+        matches!(self, Self::NonRetryable(_))
     }
 
     /// Instantiate a new `TransportError` from a missing ID.
@@ -78,6 +101,37 @@ impl TransportErrorKind {
         RpcError::Transport(Self::HttpError(HttpError { status, body }))
     }
 
+    /// Returns true if this is [`TransportErrorKind::PubsubUnavailable`].
+    pub const fn is_pubsub_unavailable(&self) -> bool {
+        matches!(self, Self::PubsubUnavailable)
+    }
+
+    /// Returns true if this is [`TransportErrorKind::BackendGone`].
+    pub const fn is_backend_gone(&self) -> bool {
+        matches!(self, Self::BackendGone)
+    }
+
+    /// Returns true if this is [`TransportErrorKind::HttpError`].
+    pub const fn is_http_error(&self) -> bool {
+        matches!(self, Self::HttpError(_))
+    }
+
+    /// Returns the [`HttpError`] if this is [`TransportErrorKind::HttpError`].
+    pub const fn as_http_error(&self) -> Option<&HttpError> {
+        match self {
+            Self::HttpError(err) => Some(err),
+            _ => None,
+        }
+    }
+
+    /// Returns the custom error if this is [`TransportErrorKind::Custom`].
+    pub const fn as_custom(&self) -> Option<&(dyn StdError + Send + Sync + 'static)> {
+        match self {
+            Self::Custom(err) => Some(&**err),
+            _ => None,
+        }
+    }
+
     /// Analyzes the [TransportErrorKind] and decides if the request should be retried based on the
     /// variant.
     pub fn is_retry_err(&self) -> bool {
@@ -98,7 +152,10 @@ impl TransportErrorKind {
 
 /// Type for holding HTTP errors such as 429 rate limit error.
 #[derive(Debug, thiserror::Error)]
-#[error("HTTP error {status} with body: {body}")]
+#[error(
+    "HTTP error {status} with {}",
+    if body.is_empty() { "empty body".to_string() } else { format!("body: {body}") }
+)]
 pub struct HttpError {
     /// The HTTP status code.
     pub status: u16,
@@ -163,6 +220,7 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
 
     fn backoff_hint(&self) -> Option<std::time::Duration> {
         if let Self::ErrorResp(resp) = self {
+            // try to extract backoff from the error data (infura-style)
             let data = resp.try_data_as::<serde_json::Value>();
             if let Some(Ok(data)) = data {
                 // if daily rate limit exceeded, infura returns the requested backoff in the error
@@ -176,8 +234,29 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
                     return Some(std::time::Duration::from_secs(seconds as u64 + 1));
                 }
             }
+
+            // try to extract backoff from the error message, e.g. "try again in 4ms"
+            if let Some(duration) = parse_retry_after(&resp.message) {
+                return Some(duration);
+            }
         }
         None
+    }
+}
+
+/// Parses a duration from messages like "try again in 4ms", "try again in 1s".
+fn parse_retry_after(message: &str) -> Option<std::time::Duration> {
+    let after = message.split_once("try again in ")?.1.trim_start();
+
+    let digits_len = after.as_bytes().iter().take_while(|b| b.is_ascii_digit()).count();
+    let (digits, rest) = after.split_at(digits_len);
+    let value: u64 = digits.parse().ok()?;
+
+    let unit = rest.trim().trim_end_matches(|c: char| c.is_ascii_punctuation());
+    match unit {
+        "ms" => Some(std::time::Duration::from_millis(value)),
+        "s" => Some(std::time::Duration::from_secs(value)),
+        _ => None,
     }
 }
 
@@ -188,6 +267,47 @@ mod tests {
     #[test]
     fn test_retry_error() {
         let err = "{\"code\":-32007,\"message\":\"100/second request limit reached - reduce calls per second or upgrade your account at quicknode.com\"}";
+        let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
+        assert!(TransportError::ErrorResp(err).is_retryable());
+    }
+
+    #[test]
+    fn test_retry_error_rate_limited() {
+        let err = r#"{"code":-32005,"message":"rate limited, try again in 4ms","data":null}"#;
+        let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
+        let err = TransportError::ErrorResp(err);
+        assert!(err.is_retryable());
+        assert_eq!(err.backoff_hint(), Some(std::time::Duration::from_millis(4)));
+    }
+
+    #[test]
+    fn parse_retry_after_millis() {
+        assert_eq!(
+            parse_retry_after("try again in 4ms"),
+            Some(std::time::Duration::from_millis(4))
+        );
+        assert_eq!(
+            parse_retry_after("rate limited, try again in 100ms"),
+            Some(std::time::Duration::from_millis(100))
+        );
+    }
+
+    #[test]
+    fn parse_retry_after_seconds() {
+        assert_eq!(parse_retry_after("try again in 2s"), Some(std::time::Duration::from_secs(2)));
+    }
+
+    #[test]
+    fn parse_retry_after_none() {
+        assert_eq!(parse_retry_after("some other error"), None);
+        assert_eq!(parse_retry_after("try again in"), None);
+        assert_eq!(parse_retry_after("try again in ms"), None);
+        assert_eq!(parse_retry_after("try again in 4us"), None);
+    }
+
+    #[test]
+    fn test_retry_error_429() {
+        let err = r#"{"code":429,"event":-33200,"message":"Too Many Requests","details":"You have surpassed your allowed throughput limit. Reduce the amount of requests per second or upgrade for more capacity."}"#;
         let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
         assert!(TransportError::ErrorResp(err).is_retryable());
     }

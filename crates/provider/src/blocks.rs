@@ -5,19 +5,58 @@ use alloy_transport::RpcError;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
-use std::{marker::PhantomData, num::NonZeroUsize};
+use std::{
+    marker::PhantomData,
+    num::NonZeroUsize,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 #[cfg(feature = "pubsub")]
 use futures::{future::Either, FutureExt};
 
 /// The size of the block cache.
-const BLOCK_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) };
+const BLOCK_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(10).unwrap();
 
 /// Maximum number of retries for fetching a block.
 const MAX_RETRIES: usize = 3;
 
 /// Default block number for when we don't have a block yet.
 const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
+
+#[derive(Default)]
+pub(crate) struct Paused {
+    is_paused: AtomicBool,
+    notify: tokio::sync::Notify,
+}
+
+impl Paused {
+    pub(crate) fn is_paused(&self) -> bool {
+        self.is_paused.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn set_paused(&self, paused: bool) {
+        self.is_paused.store(paused, Ordering::Release);
+        if !paused {
+            self.notify.notify_waiters();
+        }
+    }
+
+    /// Waits until the paused state is changed to `false`.
+    ///
+    /// Returns `true` if the method actually waited for the paused state to become unpaused,
+    /// or `false` if it was already unpaused when called.
+    async fn wait(&self) -> bool {
+        if !self.is_paused() {
+            return false;
+        }
+        self.notify.notified().await;
+        debug_assert!(!self.is_paused());
+        true
+    }
+}
 
 /// Streams new blocks from the client.
 pub(crate) struct NewBlocks<N: Network = Ethereum> {
@@ -28,6 +67,7 @@ pub(crate) struct NewBlocks<N: Network = Ethereum> {
     next_yield: BlockNumber,
     /// LRU cache of known blocks. Only used by the polling task.
     known_blocks: LruCache<BlockNumber, N::BlockResponse>,
+    pub(crate) paused: Arc<Paused>,
     _phantom: PhantomData<N>,
 }
 
@@ -37,6 +77,7 @@ impl<N: Network> NewBlocks<N> {
             client,
             next_yield: NO_BLOCK_NUMBER,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
+            paused: Arc::default(),
             _phantom: PhantomData,
         }
     }
@@ -71,6 +112,8 @@ impl<N: Network> NewBlocks<N> {
     async fn into_subscription_stream(
         self,
     ) -> Option<impl Stream<Item = N::BlockResponse> + 'static> {
+        use alloy_consensus::BlockHeader;
+
         let Some(client) = self.client.upgrade() else {
             debug!("client dropped");
             return None;
@@ -93,15 +136,26 @@ impl<N: Network> NewBlocks<N> {
                 return None;
             }
         };
-        Some(sub.into_typed::<N::BlockResponse>().into_stream())
+        let stream =
+            sub.into_typed::<N::HeaderResponse>().into_stream().map(|header| header.number());
+        Some(self.into_block_stream(stream))
     }
 
-    fn into_poll_stream(mut self) -> impl Stream<Item = N::BlockResponse> + 'static {
-        stream! {
+    fn into_poll_stream(self) -> impl Stream<Item = N::BlockResponse> + 'static {
         // Spawned lazily on the first `poll`.
-        let poll_task_builder: PollerBuilder<NoParams, U64> =
-            PollerBuilder::new(self.client.clone(), "eth_blockNumber", []);
-        let mut poll_task = poll_task_builder.spawn().into_stream_raw();
+        let stream =
+            PollerBuilder::<NoParams, U64>::new(self.client.clone(), "eth_blockNumber", [])
+                .into_stream()
+                .map(|n| n.to());
+
+        self.into_block_stream(stream)
+    }
+
+    fn into_block_stream(
+        mut self,
+        mut numbers_stream: impl Stream<Item = u64> + Unpin + 'static,
+    ) -> impl Stream<Item = N::BlockResponse> + 'static {
+        stream! {
         'task: loop {
             // Clear any buffered blocks.
             while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
@@ -110,24 +164,22 @@ impl<N: Network> NewBlocks<N> {
                 yield known_block;
             }
 
+            // If we're paused, wait until we're unpaused.
+            // Once unpaused, reset `self.next_yield` to ignore the blocks that were included while we were paused.
+            let unpaused = self.paused.wait().await;
+
             // Get the tip.
-            let block_number = match poll_task.next().await {
-                Some(Ok(block_number)) => block_number,
-                Some(Err(err)) => {
-                    // This is fine.
-                    debug!(%err, "polling stream lagged");
-                    continue 'task;
-                }
-                None => {
-                    debug!("polling stream ended");
-                    break 'task;
-                }
+            let Some(block_number) = numbers_stream.next().await else {
+                debug!("polling stream ended");
+                break 'task;
             };
-            let block_number = block_number.to::<u64>();
             trace!(%block_number, "got block number");
-            if self.next_yield == NO_BLOCK_NUMBER {
+            if self.next_yield == NO_BLOCK_NUMBER || unpaused {
                 assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
-                self.next_yield = block_number;
+                // this stream can be initialized after the first tx was sent,
+                // to avoid the edge case where the tx is mined immediately, we should apply an
+                // offset to the initial fetch so that we fetch tip - 1
+                self.next_yield = block_number.saturating_sub(1);
             } else if block_number < self.next_yield {
                 debug!(block_number, self.next_yield, "not advanced yet");
                 continue 'task;
@@ -141,29 +193,32 @@ impl<N: Network> NewBlocks<N> {
 
             // Then try to fill as many blocks as possible.
             // TODO: Maybe use `join_all`
-            let mut retries = MAX_RETRIES;
             for number in self.next_yield..=block_number {
                 debug!(number, "fetching block");
-                let block = match client.request("eth_getBlockByNumber", (U64::from(number), false)).await {
-                    Ok(Some(block)) => block,
-                    Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
-                        debug!(number, %err, "failed to fetch block, retrying");
-                        retries -= 1;
-                        continue;
+                let mut retries = MAX_RETRIES;
+                let block = loop {
+                    match client.request("eth_getBlockByNumber", (U64::from(number), false)).await {
+                        Ok(Some(block)) => break Some(block),
+                        Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
+                            debug!(number, %err, "failed to fetch block, retrying");
+                            retries -= 1;
+                        }
+                        Ok(None) if retries > 0 => {
+                            debug!(number, "failed to fetch block (doesn't exist), retrying");
+                            retries -= 1;
+                        }
+                        Err(err) => {
+                            error!(number, %err, "failed to fetch block");
+                            break None;
+                        }
+                        Ok(None) => {
+                            error!(number, "failed to fetch block (doesn't exist)");
+                            break None;
+                        }
                     }
-                    Ok(None) if retries > 0 => {
-                        debug!(number, "failed to fetch block (doesn't exist), retrying");
-                        retries -= 1;
-                        continue;
-                    }
-                    Err(err) => {
-                        error!(number, %err, "failed to fetch block");
-                        break 'task;
-                    }
-                    Ok(None) => {
-                        error!(number, "failed to fetch block (doesn't exist)");
-                        break 'task;
-                    }
+                };
+                let Some(block) = block else {
+                    break;
                 };
                 self.known_blocks.put(number, block);
                 if self.known_blocks.len() == BLOCK_CACHE_SIZE.get() {
@@ -182,7 +237,6 @@ mod tests {
     use super::*;
     use crate::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::U256;
     use std::{future::Future, time::Duration};
 
     async fn timeout<T: Future>(future: T) -> T::Output {
@@ -198,7 +252,7 @@ mod tests {
         yield_block(false).await;
     }
     #[tokio::test]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     async fn yield_block_ws() {
         yield_block(true).await;
     }
@@ -206,7 +260,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
 
         let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
-        let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
+        let provider = ProviderBuilder::new().connect(&url).await.unwrap();
 
         let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client()).with_next_yield(1);
         let mut stream = Box::pin(new_blocks.into_stream());
@@ -215,7 +269,7 @@ mod tests {
         }
 
         // We will also use provider to manipulate anvil instance via RPC.
-        provider.anvil_mine(Some(U256::from(1)), None).await.unwrap();
+        provider.anvil_mine(Some(1), None).await.unwrap();
 
         let block = timeout(stream.next()).await.expect("Block wasn't fetched");
         assert_eq!(block.header.number, 1);
@@ -226,7 +280,7 @@ mod tests {
         yield_many_blocks(false).await;
     }
     #[tokio::test]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     async fn yield_many_blocks_ws() {
         yield_many_blocks(true).await;
     }
@@ -237,7 +291,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
 
         let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
-        let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
+        let provider = ProviderBuilder::new().connect(&url).await.unwrap();
 
         let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client()).with_next_yield(1);
         let mut stream = Box::pin(new_blocks.into_stream());
@@ -246,7 +300,7 @@ mod tests {
         }
 
         // We will also use provider to manipulate anvil instance via RPC.
-        provider.anvil_mine(Some(U256::from(BLOCKS_TO_MINE)), None).await.unwrap();
+        provider.anvil_mine(Some(BLOCKS_TO_MINE as u64), None).await.unwrap();
 
         let blocks = timeout(stream.take(BLOCKS_TO_MINE).collect::<Vec<_>>()).await;
         assert_eq!(blocks.len(), BLOCKS_TO_MINE);

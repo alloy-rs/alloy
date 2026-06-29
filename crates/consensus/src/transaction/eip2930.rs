@@ -1,16 +1,17 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
+use crate::{SignableTransaction, Transaction, TxType};
+use alloy_eips::{
+    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+};
+use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::mem;
-
-use super::{RlpEcdsaTx, Typed2718};
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip2930Transaction", alias = "TransactionEip2930", alias = "Eip2930Tx")]
 pub struct TxEip2930 {
     /// Added as EIP-pub 155: Simple replay attack protection
@@ -47,14 +48,16 @@ pub struct TxEip2930 {
     /// in the case of contract creation, as an endowment
     /// to the newly created account; formally Tv.
     pub value: U256,
-    /// The accessList specifies a list of addresses and storage keys;
-    /// these addresses and storage keys are added into the `accessed_addresses`
+    /// The access list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930).
+    ///
+    /// The `access_list` specifies a list of addresses and storage keys that the transaction
+    /// plans to access. These addresses and storage keys are added into the `accessed_addresses`
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
     pub access_list: AccessList,
-    /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
-    /// Some). pub init: An unlimited size byte array specifying the
+    /// Input has two uses depending if `to` field is Create or Call.
+    /// pub init: An unlimited size byte array specifying the
     /// EVM-code for the account initialisation procedure CREATE,
     /// data: An unlimited size byte array specifying the
     /// input data of the message call, formally Td.
@@ -71,20 +74,11 @@ impl TxEip2930 {
     /// Calculates a heuristic for the in-memory size of the [TxEip2930] transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u128>() + // gas_price
-        mem::size_of::<u64>() + // gas_limit
-        self.to.size() + // to
-        mem::size_of::<U256>() + // value
-        self.access_list.size() + // access_list
-        self.input.len() // input
+        size_of::<Self>() + self.access_list.size() + self.input.len()
     }
 }
 
-impl RlpEcdsaTx for TxEip2930 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
+impl RlpEcdsaEncodableTx for TxEip2930 {
     /// Outputs the length of the transaction's fields, without a RLP header.
     fn rlp_encoded_fields_length(&self) -> usize {
         self.chain_id.length()
@@ -107,6 +101,10 @@ impl RlpEcdsaTx for TxEip2930 {
         self.input.0.encode(out);
         self.access_list.encode(out);
     }
+}
+
+impl RlpEcdsaDecodableTx for TxEip2930 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
@@ -214,6 +212,12 @@ impl Typed2718 for TxEip2930 {
     }
 }
 
+impl IsTyped2718 for TxEip2930 {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x01)
+    }
+}
+
 impl SignableTransaction<Signature> for TxEip2930 {
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = chain_id;
@@ -226,11 +230,6 @@ impl SignableTransaction<Signature> for TxEip2930 {
 
     fn payload_len_for_signature(&self) -> usize {
         self.length() + 1
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let tx_hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, tx_hash)
     }
 }
 
@@ -252,9 +251,9 @@ impl Decodable for TxEip2930 {
 
 #[cfg(test)]
 mod tests {
-    use super::TxEip2930;
-    use crate::{transaction::RlpEcdsaTx, SignableTransaction, TxEnvelope};
-    use alloy_primitives::{Address, PrimitiveSignature as Signature, TxKind, U256};
+    use super::*;
+    use crate::{SignableTransaction, TxEnvelope};
+    use alloy_primitives::{Address, Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
@@ -400,6 +399,7 @@ pub(super) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -422,8 +422,9 @@ pub(super) mod serde_bincode_compat {
                     .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }

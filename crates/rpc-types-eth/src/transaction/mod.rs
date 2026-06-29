@@ -1,20 +1,23 @@
 //! RPC types for transactions
 
 use alloy_consensus::{
-    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
-    Typed2718,
+    EthereumTxEnvelope, EthereumTypedTransaction, Signed, TxEip1559, TxEip2930, TxEip4844,
+    TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718,
 };
-use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
+use alloy_eips::eip2718::Encodable2718;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
 
-pub use alloy_consensus::BlobTransactionSidecar;
+use alloy_consensus::transaction::Recovered;
+pub use alloy_consensus::{
+    transaction::TransactionInfo, BlobTransactionSidecar, BlobTransactionSidecarEip7594, Receipt,
+    ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
+};
+pub use alloy_consensus_any::AnyReceiptEnvelope;
 pub use alloy_eips::{
     eip2930::{AccessList, AccessListItem, AccessListResult},
-    eip7702::Authorization,
+    eip7702::{Authorization, SignedAuthorization},
 };
-
-pub use alloy_consensus::transaction::TransactionInfo;
 
 mod error;
 pub use error::ConversionError;
@@ -23,15 +26,19 @@ mod receipt;
 pub use receipt::TransactionReceipt;
 
 pub mod request;
-pub use request::{TransactionInput, TransactionRequest};
+pub use request::{FillTransaction, TransactionInput, TransactionInputKind, TransactionRequest};
 
-pub use alloy_consensus::{
-    Receipt, ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
-};
-pub use alloy_consensus_any::AnyReceiptEnvelope;
+/// Serde-bincode-compat
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    pub use super::request::serde_bincode_compat::*;
+}
 
-/// Transaction object used in RPC
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Transaction object used in RPC.
+///
+/// This represents a transaction in RPC format (`eth_getTransactionByHash`) and contains the full
+/// transaction object and additional block metadata if the transaction has been mined.
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(
@@ -45,7 +52,7 @@ pub use alloy_consensus_any::AnyReceiptEnvelope;
 #[doc(alias = "Tx")]
 pub struct Transaction<T = TxEnvelope> {
     /// The inner transaction object
-    pub inner: T,
+    pub inner: Recovered<T>,
 
     /// Hash of block where transaction was included, `None` if pending
     pub block_hash: Option<BlockHash>,
@@ -59,8 +66,102 @@ pub struct Transaction<T = TxEnvelope> {
     /// Deprecated effective gas price value.
     pub effective_gas_price: Option<u128>,
 
-    /// Sender
-    pub from: Address,
+    /// The Unix block_timestamp (in seconds) when the block containing this transaction was mined.
+    ///
+    /// `None` if the transaction is pending.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub block_timestamp: Option<u64>,
+}
+
+impl<T> Default for Transaction<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self {
+            inner: Recovered::new_unchecked(Default::default(), Default::default()),
+            block_hash: Default::default(),
+            block_number: Default::default(),
+            transaction_index: Default::default(),
+            effective_gas_price: Default::default(),
+            block_timestamp: Default::default(),
+        }
+    }
+}
+
+impl<T> Transaction<T> {
+    /// Consumes the type and returns the wrapped transaction.
+    pub fn into_inner(self) -> T {
+        self.inner.into_inner()
+    }
+
+    /// Consumes the type and returns a [`Recovered`] transaction with the sender
+    pub fn into_recovered(self) -> Recovered<T> {
+        self.inner
+    }
+
+    /// Returns a `Recovered<&T>` with the transaction and the sender.
+    pub const fn as_recovered(&self) -> Recovered<&T> {
+        self.inner.as_recovered_ref()
+    }
+
+    /// Converts the transaction type to the given alternative that is `From<T>`
+    pub fn convert<U>(self) -> Transaction<U>
+    where
+        U: From<T>,
+    {
+        self.map(U::from)
+    }
+
+    /// Converts the transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the transaction with the new transaction type if all conversions were successful.
+    pub fn try_convert<U>(self) -> Result<Transaction<U>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map(U::try_from)
+    }
+
+    /// Applies the given closure to the inner transaction type.
+    pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
+        let Self {
+            inner,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            block_timestamp,
+        } = self;
+        Transaction {
+            inner: inner.map(f),
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            block_timestamp,
+        }
+    }
+
+    /// Applies the given fallible closure to the inner transactions.
+    pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Transaction<Tx>, E> {
+        let Self {
+            inner,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            block_timestamp,
+        } = self;
+        Ok(Transaction {
+            inner: inner.try_map(f)?,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            block_timestamp,
+        })
+    }
 }
 
 impl<T> AsRef<T> for Transaction<T> {
@@ -76,6 +177,32 @@ where
     /// Returns true if the transaction is a legacy or 2930 transaction.
     pub fn is_legacy_gas(&self) -> bool {
         self.inner.gas_price().is_some()
+    }
+
+    /// Converts a consensus `tx` with an additional context `tx_info` into an RPC [`Transaction`].
+    pub fn from_transaction(tx: Recovered<T>, tx_info: TransactionInfo) -> Self {
+        let TransactionInfo {
+            block_hash,
+            block_number,
+            index: transaction_index,
+            base_fee,
+            block_timestamp,
+            ..
+        } = tx_info;
+        let effective_gas_price = base_fee
+            .map(|base_fee| {
+                tx.effective_tip_per_gas(base_fee).unwrap_or_default() + base_fee as u128
+            })
+            .unwrap_or_else(|| tx.max_fee_per_gas());
+
+        Self {
+            inner: tx,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price: Some(effective_gas_price),
+            block_timestamp,
+        }
     }
 }
 
@@ -95,6 +222,7 @@ where
             // We don't know the base fee of the block when we're constructing this from
             // `Transaction`
             base_fee: None,
+            block_timestamp: self.block_timestamp,
         }
     }
 }
@@ -108,7 +236,26 @@ where
     /// During this conversion data for [TransactionRequest::sidecar] is not
     /// populated as it is not part of [Transaction].
     pub fn into_request(self) -> TransactionRequest {
-        self.inner.into()
+        self.inner.into_inner().into()
+    }
+}
+
+impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
+    /// Consumes the transaction and returns it as [`Signed`] with [`EthereumTypedTransaction`] as
+    /// the transaction type.
+    pub fn into_signed(self) -> Signed<EthereumTypedTransaction<Eip4844>>
+    where
+        EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+    {
+        self.inner.into_inner().into_signed()
+    }
+
+    /// Consumes the transaction and returns it a [`Recovered`] signed [`EthereumTypedTransaction`].
+    pub fn into_signed_recovered(self) -> Recovered<Signed<EthereumTypedTransaction<Eip4844>>>
+    where
+        EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+    {
+        self.inner.map(|tx| tx.into_signed())
     }
 }
 
@@ -121,43 +268,41 @@ where
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxLegacy> {
+impl<T> From<Transaction<T>> for Recovered<T> {
+    fn from(tx: Transaction<T>) -> Self {
+        tx.into_recovered()
+    }
+}
+
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxLegacy> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
-            TxEnvelope::Legacy(tx) => Ok(tx),
-            _ => {
-                Err(ConversionError::Custom(format!("expected Legacy, got {}", tx.inner.tx_type())))
-            }
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
+        match tx.inner.into_inner() {
+            EthereumTxEnvelope::Legacy(tx) => Ok(tx),
+            tx => Err(ConversionError::Custom(format!("expected Legacy, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip1559> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip1559> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
-            TxEnvelope::Eip1559(tx) => Ok(tx),
-            _ => Err(ConversionError::Custom(format!(
-                "expected Eip1559, got {}",
-                tx.inner.tx_type()
-            ))),
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
+        match tx.inner.into_inner() {
+            EthereumTxEnvelope::Eip1559(tx) => Ok(tx),
+            tx => Err(ConversionError::Custom(format!("expected Eip1559, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip2930> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip2930> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
-            TxEnvelope::Eip2930(tx) => Ok(tx),
-            _ => Err(ConversionError::Custom(format!(
-                "expected Eip2930, got {}",
-                tx.inner.tx_type()
-            ))),
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
+        match tx.inner.into_inner() {
+            EthereumTxEnvelope::Eip2930(tx) => Ok(tx),
+            tx => Err(ConversionError::Custom(format!("expected Eip2930, got {}", tx.tx_type()))),
         }
     }
 }
@@ -178,33 +323,53 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
+        match tx.inner.into_inner() {
             TxEnvelope::Eip4844(tx) => Ok(tx),
-            _ => Err(ConversionError::Custom(format!(
+            tx => Err(ConversionError::Custom(format!(
                 "expected TxEip4844Variant, got {}",
-                tx.inner.tx_type()
+                tx.tx_type()
             ))),
         }
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip7702> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip7702> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
-            TxEnvelope::Eip7702(tx) => Ok(tx),
-            _ => Err(ConversionError::Custom(format!(
-                "expected Eip7702, got {}",
-                tx.inner.tx_type()
-            ))),
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
+        match tx.inner.into_inner() {
+            EthereumTxEnvelope::Eip7702(tx) => Ok(tx),
+            tx => Err(ConversionError::Custom(format!("expected Eip7702, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl From<Transaction> for TxEnvelope {
-    fn from(tx: Transaction) -> Self {
-        tx.inner
+impl<Eip4844, Other> From<Transaction<EthereumTxEnvelope<Eip4844>>> for EthereumTxEnvelope<Other>
+where
+    Self: From<EthereumTxEnvelope<Eip4844>>,
+{
+    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
+        tx.inner.into_inner().into()
+    }
+}
+
+impl<Eip4844, Other> From<Transaction<EthereumTypedTransaction<Eip4844>>>
+    for EthereumTypedTransaction<Other>
+where
+    Self: From<EthereumTypedTransaction<Eip4844>>,
+{
+    fn from(tx: Transaction<EthereumTypedTransaction<Eip4844>>) -> Self {
+        tx.inner.into_inner().into()
+    }
+}
+
+impl<Eip4844> From<Transaction<EthereumTxEnvelope<Eip4844>>>
+    for Signed<EthereumTypedTransaction<Eip4844>>
+where
+    EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+{
+    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
+        tx.into_signed()
     }
 }
 
@@ -296,7 +461,7 @@ impl<T: TransactionTrait + Encodable2718> TransactionResponse for Transaction<T>
     }
 
     fn from(&self) -> Address {
-        self.from
+        self.inner.signer()
     }
 }
 
@@ -312,20 +477,23 @@ mod tx_serde {
     //!
     //! This is needed because we might need to deserialize the `gasPrice` field into both
     //! [`crate::Transaction::effective_gas_price`] and [`alloy_consensus::TxLegacy::gas_price`].
+    //!
+    //! Additionally, during deserialization this module handles the case where the `gasPrice` field
+    //! is larger than `u128::MAX` by saturating it to `u128::MAX`. This is known to happen on
+    //! some networks.
+    //!
+    //! See <https://github.com/alloy-rs/alloy/issues/2842> for example.
+
     use super::*;
+    use alloy_primitives::U256;
     use serde::{Deserialize, Serialize};
 
     /// Helper struct which will be flattened into the transaction and will only contain `gasPrice`
     /// field if inner [`TxEnvelope`] did not consume it.
     #[derive(Serialize, Deserialize)]
     struct MaybeGasPrice {
-        #[serde(
-            default,
-            rename = "gasPrice",
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )]
-        pub effective_gas_price: Option<u128>,
+        #[serde(default, rename = "gasPrice", skip_serializing_if = "Option::is_none")]
+        pub effective_gas_price: Option<U256>,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -344,6 +512,12 @@ mod tx_serde {
 
         #[serde(flatten)]
         gas_price: MaybeGasPrice,
+        #[serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )]
+        block_timestamp: Option<u64>,
     }
 
     impl<T: TransactionTrait> From<Transaction<T>> for TransactionSerdeHelper<T> {
@@ -354,11 +528,17 @@ mod tx_serde {
                 block_number,
                 transaction_index,
                 effective_gas_price,
-                from,
+                block_timestamp,
             } = value;
 
-            // if inner transaction has its own `gasPrice` don't serialize it in this struct.
-            let effective_gas_price = effective_gas_price.filter(|_| inner.gas_price().is_none());
+            let (inner, from) = inner.into_parts();
+
+            let effective_gas_price = if inner.gas_price().is_none() {
+                effective_gas_price.map(U256::from)
+            } else {
+                // If inner transaction has its own `gasPrice` don't serialize it in this struct.
+                None
+            };
 
             Self {
                 inner,
@@ -367,6 +547,7 @@ mod tx_serde {
                 transaction_index,
                 from,
                 gas_price: MaybeGasPrice { effective_gas_price },
+                block_timestamp,
             }
         }
     }
@@ -382,19 +563,22 @@ mod tx_serde {
                 transaction_index,
                 from,
                 gas_price,
+                block_timestamp,
             } = value;
 
-            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice`, otherwise
-            // return error
-            let effective_gas_price = inner.gas_price().or(gas_price.effective_gas_price);
+            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice` (making
+            // sure to saturate when converting to u128), otherwise return error.
+            let effective_gas_price = inner
+                .gas_price()
+                .or_else(|| gas_price.effective_gas_price.map(|g| g.saturating_to()));
 
             Ok(Self {
-                inner,
+                inner: Recovered::new_unchecked(inner, from),
                 block_hash,
                 block_number,
                 transaction_index,
-                from,
                 effective_gas_price,
+                block_timestamp,
             })
         }
     }
@@ -403,6 +587,22 @@ mod tx_serde {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[allow(unused)]
+    fn assert_convert_into_envelope(tx: Transaction) -> TxEnvelope {
+        tx.into()
+    }
+    #[allow(unused)]
+    fn assert_convert_into_consensus(tx: Transaction) -> EthereumTxEnvelope<TxEip4844> {
+        tx.into()
+    }
+
+    #[allow(unused)]
+    fn assert_convert_into_typed(
+        tx: Transaction<EthereumTypedTransaction<TxEip4844>>,
+    ) -> EthereumTypedTransaction<TxEip4844> {
+        tx.into()
+    }
 
     #[test]
     #[cfg(feature = "serde")]
@@ -431,6 +631,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_tx_from_contract_mod() {
         let rpc_tx = r#"{"hash":"0x018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f","nonce":"0x1","blockHash":"0x6e4e53d1de650d5a5ebed19b38321db369ef1dc357904284ecf4d89b8834969c","blockNumber":"0x2","transactionIndex":"0x0","from":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266","to":"0x5fbdb2315678afecb367f032d93f642f64180aa3","value":"0x0","gasPrice":"0x3a29f0f8","gas":"0x1c9c380","maxFeePerGas":"0xba43b7400","maxPriorityFeePerGas":"0x5f5e100","input":"0xd09de08a","r":"0xd309309a59a49021281cb6bb41d164c96eab4e50f0c1bd24c03ca336e7bc2bb7","s":"0x28a7f089143d0a1355ebeb2a1b9f0e5ad9eca4303021c1400d61bc23c9ac5319","v":"0x0","yParity":"0x0","chainId":"0x7a69","accessList":[],"type":"0x2"}"#;
 
@@ -439,6 +640,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_gas_price_present() {
         let blob_rpc_tx = r#"{"blockHash":"0x1732a5fe86d54098c431fa4fea34387b650e41dbff65ca554370028172fcdb6a","blockNumber":"0x3","from":"0x7435ed30a8b4aeb0877cef0c6e8cffe834eb865f","gas":"0x186a0","gasPrice":"0x281d620e","maxFeePerGas":"0x281d620e","maxPriorityFeePerGas":"0x1","maxFeePerBlobGas":"0x20000","hash":"0xb0ebf0d8fca6724d5111d0be9ac61f0e7bf174208e0fafcb653f337c72465b83","input":"0xdc4c8669df128318656d6974","nonce":"0x8","to":"0x7dcd17433742f4c0ca53122ab541d0ba67fc27df","transactionIndex":"0x0","value":"0x3","type":"0x3","accessList":[{"address":"0x7dcd17433742f4c0ca53122ab541d0ba67fc27df","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000000","0x462708a3c1cd03b21605715d090136df64e227f7e7792f74bb1bd7a8288f8801"]}],"chainId":"0xc72dd9d5e883e","blobVersionedHashes":["0x015a4cab4911426699ed34483de6640cf55a568afc5c5edffdcbd8bcd4452f68"],"v":"0x0","r":"0x478385a47075dd6ba56300b623038052a6e4bb03f8cfc53f367712f1c1d3e7de","s":"0x2f79ed9b154b0af2c97ddfc1f4f76e6c17725713b6d44ea922ca4c6bbc20775c","yParity":"0x0"}"#;
         let legacy_rpc_tx = r#"{"blockHash":"0x7e5d03caac4eb2b613ae9c919ef3afcc8ed0e384f31ee746381d3c8739475d2a","blockNumber":"0x4","from":"0x7435ed30a8b4aeb0877cef0c6e8cffe834eb865f","gas":"0x5208","gasPrice":"0x23237dee","hash":"0x3f38cdc805c02e152bfed34471a3a13a786fed436b3aec0c3eca35d23e2cdd2c","input":"0x","nonce":"0xc","to":"0x4dde844b71bcdf95512fb4dc94e84fb67b512ed8","transactionIndex":"0x0","value":"0x1","type":"0x0","chainId":"0xc72dd9d5e883e","v":"0x18e5bb3abd10a0","r":"0x3d61f5d7e93eecd0669a31eb640ab3349e9e5868a44c2be1337c90a893b51990","s":"0xc55f44ba123af37d0e73ed75e578647c3f473805349936f64ea902ea9e03bc7"}"#;
@@ -454,6 +656,7 @@ mod tests {
 
     // <https://github.com/alloy-rs/alloy/issues/1643>
     #[test]
+    #[cfg(feature = "serde")]
     fn deserialize_7702_v() {
         let raw = r#"{"blockHash":"0xb14eac260f0cb7c3bbf4c9ff56034defa4f566780ed3e44b7a79b6365d02887c","blockNumber":"0xb022","from":"0x6d2d4e1c2326a069f36f5d6337470dc26adb7156","gas":"0xf8ac","gasPrice":"0xe07899f","maxFeePerGas":"0xe0789a0","maxPriorityFeePerGas":"0xe078998","hash":"0xadc3f24d05f05f1065debccb1c4b033eaa35917b69b343d88d9062cdf8ecad83","input":"0x","nonce":"0x1a","to":"0x6d2d4e1c2326a069f36f5d6337470dc26adb7156","transactionIndex":"0x0","value":"0x0","type":"0x4","accessList":[],"chainId":"0x1a5ee289c","authorizationList":[{"chainId":"0x1a5ee289c","address":"0x529f773125642b12a44bd543005650989eceaa2a","nonce":"0x1a","v":"0x0","r":"0x9b3de20cf8bd07f3c5c55c38c920c146f081bc5ab4580d0c87786b256cdab3c2","s":"0x74841956f4832bace3c02aed34b8f0a2812450da3728752edbb5b5e1da04497"}],"v":"0x1","r":"0xb3bf7d6877864913bba04d6f93d98009a5af16ee9c12295cd634962a2346b67c","s":"0x31ca4a874afa964ec7643e58c6b56b35b1bcc7698eb1b5e15e61e78b353bd42d","yParity":"0x1"}"#;
         let tx = serde_json::from_str::<Transaction>(raw).unwrap();

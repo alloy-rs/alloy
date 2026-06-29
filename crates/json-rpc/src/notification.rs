@@ -113,7 +113,7 @@ impl<'de> Deserialize<'de> for PubSubItem {
                         }
                         // Discard unknown fields.
                         _ => {
-                            let _ = map.next_value::<serde_json::Value>()?;
+                            let _: serde::de::IgnoredAny = map.next_value()?;
                         }
                     }
                 }

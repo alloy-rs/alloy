@@ -1,9 +1,10 @@
 use crate::{BlockNumberOrTag, Log as RpcLog, Transaction};
-use alloc::{string::String, vec::Vec};
+use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloy_eips::BlockNumHash;
 use alloy_primitives::{
     keccak256,
     map::{hash_set, HashSet},
-    Address, BlockHash, Bloom, BloomInput, B256, U256, U64,
+    Address, BlockHash, Bloom, BloomInput, Log, LogData, B256, U256, U64,
 };
 use core::{
     hash::Hash,
@@ -14,47 +15,51 @@ use itertools::{
     Itertools,
 };
 
-/// Helper type to represent a bloom filter used for matching logs.
-#[derive(Debug, Default)]
-pub struct BloomFilter(Vec<Bloom>);
-
-impl From<Vec<Bloom>> for BloomFilter {
-    fn from(src: Vec<Bloom>) -> Self {
-        Self(src)
-    }
-}
-
-impl BloomFilter {
-    /// Returns whether the given bloom matches the list of Blooms in the current filter.
-    /// If the filter is empty (the list is empty), then any bloom matches
-    /// Otherwise, there must be at least one match for the BloomFilter to match.
-    pub fn matches(&self, bloom: Bloom) -> bool {
-        self.0.is_empty() || self.0.iter().any(|a| bloom.contains(a))
-    }
-}
-
 /// FilterSet is a set of values that will be used to filter logs.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
-pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
+#[cfg_attr(feature = "serde", serde(from = "HashSet<T>"))]
+pub struct FilterSet<T: Eq + Hash> {
+    set: HashSet<T>,
+
+    #[cfg(feature = "std")]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
+    bloom_filter: std::sync::OnceLock<BloomFilter>,
+}
+
+impl<T: Eq + Hash> Default for FilterSet<T> {
+    fn default() -> Self {
+        Self {
+            set: Default::default(),
+            #[cfg(feature = "std")]
+            bloom_filter: Default::default(),
+        }
+    }
+}
 
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
-        Self(core::iter::once(src).collect())
+        Self { set: core::iter::once(src).collect(), ..Default::default() }
     }
 }
 
 impl<T: Eq + Hash> Hash for FilterSet<T> {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        for value in &self.0 {
+        for value in &self.set {
             value.hash(state);
         }
     }
 }
 
+impl<T: Eq + Hash> From<HashSet<T>> for FilterSet<T> {
+    fn from(src: HashSet<T>) -> Self {
+        Self { set: src, ..Default::default() }
+    }
+}
+
 impl<T: Eq + Hash> From<Vec<T>> for FilterSet<T> {
     fn from(src: Vec<T>) -> Self {
-        Self(src.into_iter().collect())
+        src.into_iter().collect::<HashSet<_>>().into()
     }
 }
 
@@ -70,14 +75,14 @@ impl<T: Eq + Hash> From<ValueOrArray<T>> for FilterSet<T> {
 impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
     fn from(src: ValueOrArray<Option<T>>) -> Self {
         match src {
-            ValueOrArray::Value(None) => Self(Default::default()),
+            ValueOrArray::Value(None) => Default::default(),
             ValueOrArray::Value(Some(val)) => val.into(),
             ValueOrArray::Array(arr) => {
                 // If the array contains at least one `null` (ie. None), as it's considered
                 // a "wildcard" value, the whole filter should be treated as matching everything,
                 // thus is empty.
                 if arr.iter().contains(&None) {
-                    Self(Default::default())
+                    Default::default()
                 } else {
                     // Otherwise, we flatten the array, knowing there are no `None` values
                     arr.into_iter().flatten().collect::<Vec<T>>().into()
@@ -92,39 +97,91 @@ impl<T: Eq + Hash> IntoIterator for FilterSet<T> {
     type IntoIter = hash_set::IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.set.into_iter()
     }
 }
 
 impl<T: Eq + Hash> FromIterator<T> for FilterSet<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self(HashSet::from_iter(iter))
+        HashSet::from_iter(iter).into()
     }
 }
 
 impl<T: Eq + Hash> FilterSet<T> {
     /// Returns whether the filter is empty
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.set.is_empty()
     }
 
-    /// Returns whether the given value matches the filter. It the filter is empty
+    /// Returns the number of values in the filter
+    pub fn len(&self) -> usize {
+        self.set.len()
+    }
+
+    /// Returns whether the given value matches the filter. If the filter is empty
     /// any value matches. Otherwise, the filter must include the value
     pub fn matches(&self, value: &T) -> bool {
-        self.is_empty() || self.0.contains(value)
+        self.is_empty() || self.set.contains(value)
     }
 
     /// Returns an iterator over the underlying HashSet. Values are visited
     /// in an arbitrary order.
     pub fn iter(&self) -> hash_set::Iter<'_, T> {
-        self.0.iter()
+        self.set.iter()
+    }
+
+    /// Check if the filter contains the given value
+    pub fn contains(&self, value: &T) -> bool {
+        self.set.contains(value)
+    }
+
+    /// Drop the bloom filter if it exists. This should be invoked by any
+    /// method taking `&mut self`.
+    fn unseal(&mut self) {
+        #[cfg(feature = "std")]
+        self.bloom_filter.take();
+    }
+
+    /// Insert a value into the filter
+    pub fn insert(&mut self, value: T) -> bool {
+        self.unseal();
+        self.set.insert(value)
+    }
+
+    /// Remove a value from the filter (if present)
+    pub fn remove(&mut self, value: &T) -> bool {
+        if self.contains(value) {
+            self.unseal();
+            self.set.remove(value)
+        } else {
+            false
+        }
     }
 }
 
 impl<T: AsRef<[u8]> + Eq + Hash> FilterSet<T> {
+    /// Get a reference to the BloomFilter.
+    #[cfg(feature = "std")]
+    pub fn bloom_filter_ref(&self) -> &BloomFilter {
+        self.bloom_filter.get_or_init(|| self.make_bloom_filter())
+    }
+
     /// Returns a list of Bloom (BloomFilter) corresponding to the filter's values
-    pub fn to_bloom_filter(&self) -> BloomFilter {
-        self.0.iter().map(|a| BloomInput::Raw(a.as_ref()).into()).collect::<Vec<Bloom>>().into()
+    pub fn bloom_filter(&self) -> Cow<'_, BloomFilter> {
+        #[cfg(feature = "std")]
+        {
+            Cow::Borrowed(self.bloom_filter_ref())
+        }
+
+        #[cfg(not(feature = "std"))]
+        {
+            Cow::Owned(self.make_bloom_filter())
+        }
+    }
+
+    /// Returns a list of Bloom (BloomFilter) corresponding to the filter's values
+    fn make_bloom_filter(&self) -> BloomFilter {
+        self.set.iter().map(|a| BloomInput::Raw(a.as_ref()).into()).collect::<Vec<Bloom>>().into()
     }
 }
 
@@ -134,11 +191,10 @@ impl<T: Clone + Eq + Hash> FilterSet<T> {
     /// - If the filter has only 1 value, it returns the single value
     /// - Otherwise it returns an array of values
     pub fn to_value_or_array(&self) -> Option<ValueOrArray<T>> {
-        let mut values = self.0.iter().cloned().collect::<Vec<T>>();
-        match values.len() {
+        match self.set.len() {
             0 => None,
-            1 => Some(ValueOrArray::Value(values.pop().expect("values length is one"))),
-            _ => Some(ValueOrArray::Array(values)),
+            1 => self.set.iter().next().cloned().map(ValueOrArray::Value),
+            _ => Some(ValueOrArray::Array(self.set.iter().cloned().collect())),
         }
     }
 }
@@ -146,9 +202,40 @@ impl<T: Clone + Eq + Hash> FilterSet<T> {
 /// A single topic
 pub type Topic = FilterSet<B256>;
 
+impl Topic {
+    /// Extends the topic with a value that can be converted into a Topic
+    pub fn extend<T: Into<Self>>(mut self, value: T) -> Self {
+        self.unseal();
+        self.set.extend(value.into());
+        self
+    }
+}
+
 impl From<U256> for Topic {
     fn from(src: U256) -> Self {
         Into::<B256>::into(src).into()
+    }
+}
+
+impl From<Address> for Topic {
+    fn from(address: Address) -> Self {
+        let mut bytes = [0u8; 32];
+        bytes[12..].copy_from_slice(address.as_slice());
+        B256::from(bytes).into()
+    }
+}
+
+impl From<bool> for Topic {
+    fn from(value: bool) -> Self {
+        let mut bytes = [0u8; 32];
+        bytes[31] = if value { 1 } else { 0 };
+        B256::from(bytes).into()
+    }
+}
+
+impl From<[u8; 32]> for Topic {
+    fn from(bytes: [u8; 32]) -> Self {
+        B256::from(bytes).into()
     }
 }
 
@@ -182,7 +269,7 @@ pub enum FilterBlockOption {
 }
 
 impl FilterBlockOption {
-    /// Returns the `from_block` value, if any
+    /// Returns the `to_block` value, if any
     pub const fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             Self::Range { to_block, .. } => to_block.as_ref(),
@@ -190,7 +277,7 @@ impl FilterBlockOption {
         }
     }
 
-    /// Returns the `to_block` value, if any
+    /// Returns the `from_block` value, if any
     pub const fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             Self::Range { from_block, .. } => from_block.as_ref(),
@@ -240,13 +327,13 @@ impl FilterBlockOption {
 
     /// Sets the block number this range filter should start at.
     #[must_use]
-    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() }
     }
 
     /// Sets the block number this range filter should end at.
     #[must_use]
-    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) }
     }
 
@@ -317,7 +404,16 @@ pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
     pub block_option: FilterBlockOption,
-    /// Address
+    /// A filter set for matching contract addresses in log queries.
+    ///
+    /// This field determines which contract addresses the filter applies to. It supports:
+    /// - A single address to match logs from that address only.
+    /// - Multiple addresses to match logs from any of them.
+    ///
+    /// ## Notes:
+    /// - An empty array (`[]`) may result in no logs being returned.
+    /// - Some RPC providers handle empty arrays differently than `None`.
+    /// - Large address lists may affect performance or hit provider limits.
     pub address: FilterSet<Address>,
     /// Topics (maximum of 4)
     pub topics: [Topic; 4],
@@ -419,6 +515,25 @@ impl Filter {
             && self.block_option.get_to_block().is_some_and(BlockNumberOrTag::is_pending)
     }
 
+    /// Extracts the block number range from the filter, if applicable.
+    ///
+    /// Returns a tuple of `(from_block, to_block)` where each element is `Some(block_number)`
+    /// if the corresponding block in the filter is a specific number, or `None` otherwise.
+    ///
+    /// This method only works with `FilterBlockOption::Range` variants. For
+    /// `FilterBlockOption::AtBlockHash` variants, it returns `(None, None)`.
+    ///
+    /// Block numbers are extracted only from `BlockNumberOrTag::Number(_)` variants.
+    /// Other variants like `BlockNumberOrTag::Latest`, `BlockNumberOrTag::Pending`, etc.
+    /// are treated as `None`.
+    pub fn extract_block_range(&self) -> (Option<u64>, Option<u64>) {
+        let FilterBlockOption::Range { from_block, to_block } = &self.block_option else {
+            return (None, None);
+        };
+
+        (from_block.and_then(|b| b.as_number()), to_block.and_then(|b| b.as_number()))
+    }
+
     /// Pins the block hash for the filter
     #[must_use]
     pub fn at_block_hash<T: Into<B256>>(mut self, hash: T) -> Self {
@@ -482,14 +597,6 @@ impl Filter {
         self
     }
 
-    /// Sets topic0 (the event name for non-anonymous events)
-    #[must_use]
-    #[deprecated(note = "use `event_signature` instead")]
-    pub fn topic0<T: Into<Topic>>(mut self, topic: T) -> Self {
-        self.topics[0] = topic.into();
-        self
-    }
-
     /// Sets the 1st indexed topic
     #[must_use]
     pub fn topic1<T: Into<Topic>>(mut self, topic: T) -> Self {
@@ -526,7 +633,7 @@ impl Filter {
         self.block_option.get_from_block().and_then(|b| b.as_number())
     }
 
-    /// Returns the numeric value of the `fromBlock` field
+    /// Returns the value of the `blockHash` field
     pub const fn get_block_hash(&self) -> Option<B256> {
         match self.block_option {
             FilterBlockOption::AtBlockHash(hash) => Some(hash),
@@ -534,9 +641,291 @@ impl Filter {
         }
     }
 
-    /// Returns true if at least one topic is set
+    /// Returns `true` if at least one topic is set
     pub fn has_topics(&self) -> bool {
         self.topics.iter().any(|t| !t.is_empty())
+    }
+
+    /// Create the [`BloomFilter`] for the addresses.
+    pub fn address_bloom_filter(&self) -> Cow<'_, BloomFilter> {
+        self.address.bloom_filter()
+    }
+
+    /// Create a [`BloomFilter`] for each topic filter.
+    pub fn topics_bloom_filter(&self) -> [Cow<'_, BloomFilter>; 4] {
+        self.topics.each_ref().map(|t| t.bloom_filter())
+    }
+
+    /// Check whether the provided bloom contains all topics and the address we
+    /// wish to filter on.
+    pub fn matches_bloom(&self, bloom: Bloom) -> bool {
+        self.address_bloom_filter().matches(bloom)
+            && self.topics_bloom_filter().iter().all(|topic_bloom| topic_bloom.matches(bloom))
+    }
+
+    /// Returns `true` if the filter matches the given topics.
+    pub fn matches_topics(&self, topics: &[B256]) -> bool {
+        self.topics.iter().zip_longest(topics.iter()).all(|topic| match topic {
+            Both(filter, log) => filter.matches(log),
+            Left(filter) => filter.is_empty(),
+            Right(_) => false,
+        })
+    }
+
+    /// Returns `true` if the filter matches the given address.
+    pub fn matches_address(&self, address: Address) -> bool {
+        self.address.matches(&address)
+    }
+
+    /// Returns `true` if the block matches the filter.
+    pub const fn matches_block_range(&self, block_number: u64) -> bool {
+        let mut res = true;
+
+        if let Some(BlockNumberOrTag::Number(num)) = self.block_option.get_from_block() {
+            if *num > block_number {
+                res = false;
+            }
+        }
+
+        if let Some(to) = self.block_option.get_to_block() {
+            match to {
+                BlockNumberOrTag::Number(num) if *num < block_number => {
+                    res = false;
+                }
+                BlockNumberOrTag::Earliest => {
+                    res = false;
+                }
+                _ => {}
+            }
+        }
+        res
+    }
+
+    /// Returns `true` if the filter matches the given block hash.
+    pub fn matches_block_hash(&self, block_hash: B256) -> bool {
+        match self.block_option {
+            FilterBlockOption::AtBlockHash(hash) => hash == block_hash,
+            FilterBlockOption::Range { .. } => false,
+        }
+    }
+
+    /// Returns `true` if the filter matches the given block.
+    ///
+    /// For [`FilterBlockOption::AtBlockHash`] filters, only the block hash is checked.
+    /// For [`FilterBlockOption::Range`] filters, only the block number range is checked.
+    pub fn matches_block(&self, block: &BlockNumHash) -> bool {
+        match self.block_option {
+            FilterBlockOption::AtBlockHash(_) => self.matches_block_hash(block.hash),
+            FilterBlockOption::Range { .. } => self.matches_block_range(block.number),
+        }
+    }
+
+    /// Returns `true` if either of the following is true:
+    /// - the filter and log are both pending
+    /// - the filter matches the block in the log. I.e. [`Self::matches_block`] returns true when
+    ///   called with the block number and hash from the log.
+    pub fn matches_log_block<T>(&self, log: &crate::Log<T>) -> bool {
+        if self.is_pending_block_filter() {
+            // We skip checking block_hash, as a mismatch here would indicate
+            // invalid log data
+            return log.block_number.is_none();
+        }
+
+        // If the data is invalid, we'll shortcut return false
+        let Some(number) = log.block_number else { return false };
+        let Some(hash) = log.block_hash else { return false };
+        let num_hash = BlockNumHash { number, hash };
+
+        self.matches_block(&num_hash)
+    }
+
+    /// Check if a [`Log`] matches the filter. This will check topics and
+    /// address.
+    ///
+    /// This checks [`Log<LogData>`], the raw, primitive type carrying un-parsed
+    /// [`LogData`].
+    ///
+    /// - For un-parsed RPC logs [`crate::Log<LogData>`], see [`Self::rpc_matches`] and
+    ///   [`Self::rpc_matches_parsed`].
+    /// - For parsed [`Log`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    pub fn matches(&self, log: &Log) -> bool {
+        if !self.matches_address(log.address) {
+            return false;
+        }
+
+        self.matches_topics(log.topics())
+    }
+
+    /// Check if a [`crate::Log`] matches the filter. This will check topics,
+    /// address, and block option.
+    ///
+    /// This function checks [`crate::Log<LogData>`], the RPC type carrying
+    /// un-parsed [`LogData`].
+    ///
+    /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    /// - For parsed [`crate::Log<T>`]s (e.g. those returned by a contract), see
+    ///   [`Self::rpc_matches`].
+    pub fn rpc_matches(&self, log: &crate::Log) -> bool {
+        self.matches_log_block(log) && self.matches(&log.inner)
+    }
+
+    /// Check if a parsed [`Log<T>`] matches the filter. This will check
+    /// topics and address.
+    ///
+    /// This function checks [`Log<T>`], the primitive `Log` type carrying
+    /// some parsed `T`, usually implementing [`SolEvent`].
+    ///
+    /// - For un-parsed [`Log<LogData>`] see [`Self::matches`].
+    /// - For un-parsed RPC logs [`crate::Log<LogData>`] see [`Self::rpc_matches`].
+    /// - For parsed RPC [`crate::Log<T>`]s (e.g. those returned by a contract), see
+    ///   [`Self::rpc_matches_parsed`].
+    ///
+    /// [`SolEvent`]: alloy_sol_types::SolEvent
+    pub fn matches_parsed<T, U>(&self, log: &T) -> bool
+    where
+        T: AsRef<Log<U>>,
+        for<'a> &'a U: Into<LogData>,
+    {
+        let log = log.as_ref().reserialize();
+        self.matches(&log)
+    }
+
+    /// Check if a parsed rpc log [`crate::Log<T>`] matches the filter. This
+    /// will check topics, address, and block option.
+    ///
+    /// If the RPC log block hash or number is `None` (indicating an uncled
+    /// block), this function will return `false`.
+    ///
+    /// This function checks [`crate::Log<T>`], the RPC type carrying some
+    /// parsed `T`, usually implementing [`SolEvent`].
+    ///
+    /// - For un-parsed [`Log<LogData>`] see [`Self::matches`].
+    /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    /// - For un-parsed RPC logs [`crate::Log<LogData>`] see [`Self::rpc_matches`].
+    ///
+    /// [`SolEvent`]: alloy_sol_types::SolEvent
+    pub fn rpc_matches_parsed<U>(&self, log: &crate::Log<U>) -> bool
+    where
+        for<'a> &'a U: Into<LogData>,
+    {
+        self.matches_log_block(log) && self.matches_parsed(log)
+    }
+
+    /// Appends logs matching the filter from a block's receipts.
+    ///
+    /// Iterates through receipts, filters logs, and appends them with
+    /// block metadata. Includes block number/hash matching.
+    ///
+    /// # Arguments
+    ///
+    /// * `all_logs` - Vector to append matching logs to
+    /// * `block_num_hash` - Block number and hash of the block
+    /// * `block_timestamp` - Block timestamp
+    /// * `tx_hashes_and_receipts` - Iterator of (transaction_hash, receipt) pairs
+    /// * `removed` - Whether logs are from a removed block (reorg)
+    pub fn append_matching_block_logs<'a, I, R>(
+        &self,
+        all_logs: &mut Vec<crate::Log>,
+        block_num_hash: BlockNumHash,
+        block_timestamp: u64,
+        tx_hashes_and_receipts: I,
+        removed: bool,
+    ) where
+        I: IntoIterator<Item = (B256, &'a R)>,
+        R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log> + 'a,
+    {
+        // Early return if block doesn't match filter
+        if !self.matches_block(&block_num_hash) {
+            return;
+        }
+
+        // Tracks the index of a log in the entire block
+        let mut log_index: u64 = 0;
+
+        // Iterate over receipts and append matching logs
+        for (receipt_idx, (tx_hash, receipt)) in tx_hashes_and_receipts.into_iter().enumerate() {
+            for log in receipt.logs() {
+                if self.matches(log) {
+                    let log = crate::Log {
+                        inner: log.clone(),
+                        block_hash: Some(block_num_hash.hash),
+                        block_number: Some(block_num_hash.number),
+                        transaction_hash: Some(tx_hash),
+                        // The transaction and receipt index is always the same
+                        transaction_index: Some(receipt_idx as u64),
+                        log_index: Some(log_index),
+                        removed,
+                        block_timestamp: Some(block_timestamp),
+                    };
+                    all_logs.push(log);
+                }
+
+                log_index += 1;
+            }
+        }
+    }
+
+    /// Returns matching logs from a block's receipts grouped by transaction hashes.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_num_hash` - Block number and hash of the block
+    /// * `block_timestamp` - Block timestamp
+    /// * `tx_hashes_and_receipts` - Iterator of (transaction_hash, receipt) pairs
+    /// * `removed` - Whether logs are from a removed block (reorg)
+    pub fn matching_block_logs<'a, I, R>(
+        &self,
+        block_num_hash: BlockNumHash,
+        block_timestamp: u64,
+        tx_hashes_and_receipts: I,
+        removed: bool,
+    ) -> Vec<crate::Log>
+    where
+        I: IntoIterator<Item = (B256, &'a R)>,
+        R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log> + 'a,
+    {
+        let mut logs = Vec::new();
+        self.append_matching_block_logs(
+            &mut logs,
+            block_num_hash,
+            block_timestamp,
+            tx_hashes_and_receipts,
+            removed,
+        );
+        logs
+    }
+
+    /// Creates an iterator that filters receipts for matching logs.
+    ///
+    /// This method takes an iterator of blocks (where each block is an iterator of receipts)
+    /// and returns an iterator that yields all logs matching this filter.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use alloy_consensus::Receipt;
+    /// # use alloy_primitives::{Address, Log, B256};
+    /// # fn example(receipts: Vec<Vec<Receipt>>) {
+    /// let filter = Filter::new()
+    ///     .address("0x1234...".parse::<Address>().unwrap())
+    ///     .event_signature(B256::from([0x01; 32]));
+    ///
+    /// let logs: Vec<Log> = filter.filter_receipts(receipts).collect();
+    /// # }
+    /// ```
+    pub fn filter_receipts<I, R>(&self, receipts: I) -> FilterReceiptsIter<'_, I::IntoIter, R>
+    where
+        I: IntoIterator,
+        I::Item: IntoIterator<Item = R>,
+        R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+    {
+        FilterReceiptsIter {
+            filter: self,
+            blocks_iter: receipts.into_iter(),
+            current_block: None,
+            current_logs: None,
+        }
     }
 }
 
@@ -567,7 +956,7 @@ impl serde::Serialize for Filter {
             s.serialize_field("address", &address)?;
         }
 
-        let mut filtered_topics = Vec::new();
+        let mut filtered_topics = Vec::with_capacity(self.topics.len());
         let mut filtered_topics_len = 0;
         for (i, topic) in self.topics.iter().enumerate() {
             if !topic.is_empty() {
@@ -696,7 +1085,8 @@ impl<'de> serde::Deserialize<'de> for Filter {
     }
 }
 
-/// Union type for representing a single value or a vector of values inside a filter
+/// Union type for representing a single value or a vector of values inside a
+/// filter.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ValueOrArray<T> {
     /// A single value
@@ -797,135 +1187,6 @@ where
             Variadic::Value(val) => Ok(Self::Value(val)),
             Variadic::Array(arr) => Ok(Self::Array(arr)),
         }
-    }
-}
-
-/// Support for matching [Filter]s
-#[derive(Debug, Default)]
-pub struct FilteredParams {
-    /// The original filter, if any
-    pub filter: Option<Filter>,
-}
-
-impl FilteredParams {
-    /// Creates a new wrapper type for a [Filter], if any with flattened topics, that can be used
-    /// for matching
-    pub fn new(filter: Option<Filter>) -> Self {
-        filter.map_or_else(Default::default, |filter| Self { filter: Some(filter) })
-    }
-
-    /// Returns the [BloomFilter] for the given address
-    pub fn address_filter(address: &FilterSet<Address>) -> BloomFilter {
-        address.to_bloom_filter()
-    }
-
-    /// Returns the [BloomFilter] for the given topics
-    pub fn topics_filter(topics: &[FilterSet<B256>]) -> Vec<BloomFilter> {
-        topics.iter().map(|t| t.to_bloom_filter()).collect()
-    }
-
-    /// Returns `true` if the bloom matches the topics
-    pub fn matches_topics(bloom: Bloom, topic_filters: &[BloomFilter]) -> bool {
-        if topic_filters.is_empty() {
-            return true;
-        }
-
-        // for each filter, iterate through the list of filter blooms. for each set of filter
-        // (each BloomFilter), the given `bloom` must match at least one of them, unless the list is
-        // empty (no filters).
-        for filter in topic_filters {
-            if !filter.matches(bloom) {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// Returns `true` if the bloom contains one of the address blooms, or the address blooms
-    /// list is empty (thus, no filters)
-    pub fn matches_address(bloom: Bloom, address_filter: &BloomFilter) -> bool {
-        address_filter.matches(bloom)
-    }
-
-    /// Returns true if the filter matches the given block number
-    pub fn filter_block_range(&self, block_number: u64) -> bool {
-        if self.filter.is_none() {
-            return true;
-        }
-        let filter = self.filter.as_ref().unwrap();
-        let mut res = true;
-
-        if let Some(BlockNumberOrTag::Number(num)) = filter.block_option.get_from_block() {
-            if *num > block_number {
-                res = false;
-            }
-        }
-
-        if let Some(to) = filter.block_option.get_to_block() {
-            match to {
-                BlockNumberOrTag::Number(num) => {
-                    if *num < block_number {
-                        res = false;
-                    }
-                }
-                BlockNumberOrTag::Earliest => {
-                    res = false;
-                }
-                _ => {}
-            }
-        }
-        res
-    }
-
-    /// Returns `true` if the filter matches the given block hash.
-    pub fn filter_block_hash(&self, block_hash: B256) -> bool {
-        if let Some(h) = self.filter.as_ref().and_then(|f| f.get_block_hash()) {
-            if h != block_hash {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// Return `true` if the filter configured to match pending block.
-    /// This means that both from_block and to_block are set to the pending tag.
-    /// It calls [`Filter::is_pending_block_filter`] undercover.
-    pub fn is_pending_block_filter(&self) -> bool {
-        self.filter.as_ref().is_some_and(|f| f.is_pending_block_filter())
-    }
-
-    /// Returns `true` if the filter matches the given address.
-    pub fn filter_address(&self, address: &Address) -> bool {
-        self.filter.as_ref().map(|f| f.address.matches(address)).unwrap_or(true)
-    }
-
-    /// Returns `true` if the log matches the given topics
-    pub fn filter_topics(&self, log_topics: &[B256]) -> bool {
-        let topics = match self.filter.as_ref() {
-            None => return true,
-            Some(f) => &f.topics,
-        };
-        for topic_tuple in topics.iter().zip_longest(log_topics.iter()) {
-            match topic_tuple {
-                // We exhausted the `log.topics`, so if there's a filter set for
-                // this topic index, there is no match. Otherwise (empty filter), continue.
-                Left(filter_topic) => {
-                    if !filter_topic.is_empty() {
-                        return false;
-                    }
-                }
-                // We exhausted the filter topics, therefore any subsequent log topic
-                // will match.
-                Right(_) => return true,
-                // Check that `log_topic` is included in `filter_topic`
-                Both(filter_topic, log_topic) => {
-                    if !filter_topic.matches(log_topic) {
-                        return false;
-                    }
-                }
-            }
-        }
-        true
     }
 }
 
@@ -1073,7 +1334,6 @@ where
 /// Owned equivalent of a `SubscriptionId`
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum FilterId {
     /// Numeric id
@@ -1094,25 +1354,6 @@ impl From<String> for FilterId {
     }
 }
 
-#[cfg(feature = "jsonrpsee-types")]
-impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
-    fn from(value: FilterId) -> Self {
-        match value {
-            FilterId::Num(n) => jsonrpsee_types::SubscriptionId::Num(n),
-            FilterId::Str(s) => jsonrpsee_types::SubscriptionId::Str(s.into()),
-        }
-    }
-}
-
-#[cfg(feature = "jsonrpsee-types")]
-impl From<jsonrpsee_types::SubscriptionId<'_>> for FilterId {
-    fn from(value: jsonrpsee_types::SubscriptionId<'_>) -> Self {
-        match value {
-            jsonrpsee_types::SubscriptionId::Num(n) => n.into(),
-            jsonrpsee_types::SubscriptionId::Str(s) => s.into_owned().into(),
-        }
-    }
-}
 /// Specifies the kind of information you wish to receive from the `eth_newPendingTransactionFilter`
 /// RPC endpoint.
 ///
@@ -1161,15 +1402,260 @@ impl<'a> serde::Deserialize<'a> for PendingTransactionFilterKind {
     }
 }
 
+/// Helper type to represent a bloom filter used for matching logs.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct BloomFilter(Vec<Bloom>);
+
+impl From<Vec<Bloom>> for BloomFilter {
+    fn from(src: Vec<Bloom>) -> Self {
+        Self(src)
+    }
+}
+
+impl BloomFilter {
+    /// Returns whether the given bloom matches the list of Blooms in the current filter.
+    /// If the filter is empty (the list is empty), then any bloom matches
+    /// Otherwise, there must be at least one match for the BloomFilter to match.
+    pub fn matches(&self, bloom: Bloom) -> bool {
+        self.0.is_empty() || self.0.iter().any(|a| bloom.contains(a))
+    }
+}
+
+/// Support for matching [Filter]s
+#[derive(Debug, Default)]
+pub struct FilteredParams {
+    /// The original filter, if any
+    pub filter: Option<Filter>,
+}
+
+impl FilteredParams {
+    /// Creates a new wrapper type for a [Filter], if any with flattened topics, that can be used
+    /// for matching
+    pub fn new(filter: Option<Filter>) -> Self {
+        filter.map_or_else(Default::default, |filter| Self { filter: Some(filter) })
+    }
+
+    /// Returns the [BloomFilter] for the given address
+    pub fn address_filter(address: &FilterSet<Address>) -> BloomFilter {
+        address.make_bloom_filter()
+    }
+
+    /// Returns the [BloomFilter] for the given topics
+    pub fn topics_filter(topics: &[FilterSet<B256>]) -> Vec<BloomFilter> {
+        topics.iter().map(|t| t.make_bloom_filter()).collect()
+    }
+
+    /// Returns `true` if the bloom matches the topics
+    pub fn matches_topics(bloom: Bloom, topic_filters: &[BloomFilter]) -> bool {
+        if topic_filters.is_empty() {
+            return true;
+        }
+
+        // for each filter, iterate through the list of filter blooms. for each set of filter
+        // (each BloomFilter), the given `bloom` must match at least one of them, unless the list is
+        // empty (no filters).
+        for filter in topic_filters {
+            if !filter.matches(bloom) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Returns `true` if the bloom contains one of the address blooms, or the address blooms
+    /// list is empty (thus, no filters)
+    pub fn matches_address(bloom: Bloom, address_filter: &BloomFilter) -> bool {
+        address_filter.matches(bloom)
+    }
+
+    /// Returns true if the filter matches the given block number
+    pub const fn filter_block_range(&self, block_number: u64) -> bool {
+        match &self.filter {
+            Some(filter) => filter.matches_block_range(block_number),
+            None => true,
+        }
+    }
+
+    /// Returns `true` if the filter matches the given block hash.
+    pub fn filter_block_hash(&self, block_hash: B256) -> bool {
+        if let Some(h) = self.filter.as_ref().and_then(|f| f.get_block_hash()) {
+            if h != block_hash {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Return `true` if the filter configured to match pending block.
+    /// This means that both from_block and to_block are set to the pending tag.
+    /// It calls [`Filter::is_pending_block_filter`] undercover.
+    pub fn is_pending_block_filter(&self) -> bool {
+        self.filter.as_ref().is_some_and(|f| f.is_pending_block_filter())
+    }
+
+    /// Returns `true` if the filter matches the given address.
+    pub fn filter_address(&self, address: &Address) -> bool {
+        self.filter.as_ref().map(|f| f.address.matches(address)).unwrap_or(true)
+    }
+
+    /// Returns `true` if the log matches the given topics
+    pub fn filter_topics(&self, log_topics: &[B256]) -> bool {
+        let topics = match self.filter.as_ref() {
+            None => return true,
+            Some(f) => &f.topics,
+        };
+        for topic_tuple in topics.iter().zip_longest(log_topics.iter()) {
+            match topic_tuple {
+                // We exhausted the `log.topics`, so if there's a filter set for
+                // this topic index, there is no match. Otherwise (empty filter), continue.
+                Left(filter_topic) => {
+                    if !filter_topic.is_empty() {
+                        return false;
+                    }
+                }
+                // We exhausted the filter topics, therefore any subsequent log topic
+                // will match.
+                Right(_) => return true,
+                // Check that `log_topic` is included in `filter_topic`
+                Both(filter_topic, log_topic) => {
+                    if !filter_topic.matches(log_topic) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+}
+
+/// Iterator that yields logs from receipts that match a filter.
+///
+/// This iterator processes blocks of receipts, yielding all logs that match
+/// the provided filter criteria.
+pub struct FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    filter: &'a Filter,
+    blocks_iter: I,
+    current_block: Option<<I::Item as IntoIterator>::IntoIter>,
+    current_logs: Option<alloc::vec::IntoIter<alloy_primitives::Log>>,
+}
+
+impl<'a, I, R> core::fmt::Debug for FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FilterReceiptsIter")
+            .field("filter", &self.filter)
+            .field("has_current_block", &self.current_block.is_some())
+            .field("has_current_logs", &self.current_logs.is_some())
+            .finish()
+    }
+}
+
+impl<'a, I, R> Iterator for FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    type Item = alloy_primitives::Log;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            // First, try to return a log from current logs iterator
+            if let Some(ref mut logs) = self.current_logs {
+                if let Some(log) = logs.next() {
+                    if self.filter.matches(&log) {
+                        return Some(log);
+                    }
+                    continue;
+                }
+            }
+
+            // No more logs, try to get the next receipt
+            if let Some(ref mut receipts) = self.current_block {
+                if let Some(receipt) = receipts.next() {
+                    // Create iterator from logs of this receipt
+                    self.current_logs = Some(receipt.into_logs().into_iter());
+                    continue;
+                }
+            }
+
+            // Current block exhausted or none set, try next block
+            match self.blocks_iter.next() {
+                Some(block) => {
+                    self.current_block = Some(block.into_iter());
+                    self.current_logs = None;
+                }
+                None => return None,
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::{bloom, LogData};
+    #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
 
     #[cfg(feature = "serde")]
     fn serialize<T: serde::Serialize>(t: &T) -> serde_json::Value {
         serde_json::to_value(t).expect("Failed to serialize value")
+    }
+
+    #[test]
+    fn test_filterset_to_value_or_array_semantics() {
+        let empty = FilterSet::<u8>::default();
+        assert_eq!(empty.to_value_or_array(), None);
+
+        let mut single = FilterSet::<u8>::default();
+        assert!(single.insert(7));
+        assert_eq!(single.to_value_or_array(), Some(ValueOrArray::Value(7)));
+
+        let mut multi = FilterSet::<u8>::default();
+        assert!(multi.insert(1));
+        assert!(multi.insert(2));
+        match multi.to_value_or_array() {
+            Some(ValueOrArray::Array(values)) => {
+                assert_eq!(values.len(), 2);
+                assert!(values.contains(&1));
+                assert!(values.contains(&2));
+            }
+            other => panic!("expected Some(ValueOrArray::Array(_)), got {other:?}"),
+        }
+    }
+
+    // <https://hoodi.etherscan.io/block/400001>
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_any_addresses() {
+        let s = r#"{
+            "fromBlock": "0x61A80",
+            "toBlock": "0x61B48",
+            "address": [
+                "0x8CBabC07717038DA6fAf1bC477a39F1627988a3a",
+                "0x927F9c03d1Ac6e2630d31E614F226b5Ed028d443"
+            ]
+        }"#;
+        let filter = serde_json::from_str::<Filter>(s).unwrap();
+
+        // <https://hoodi.etherscan.io/block/400001>
+        let bloom = bloom!("0x10000000000010000000000000000200000002000000000000400000000000000000000400100000000900000000000000000000000000000000000000000000000000000000000000000008400000000000000080000000000080000000000000000000000000000000000000000000000000000002000000000010000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000002000000000000000000000000000000000000002000000000000000000000000000000000000000000000000100000000000000000000000000000004000000000000000000000000000000000000000");
+        assert!(filter.matches_bloom(bloom));
+
+        // <https://hoodi.etherscan.io/block/400002>
+        let bloom = bloom!("0x10000000000010000000000000000200000002000000000000400000000000000000000400100000000900000000000000000000000000000000000000000000000000000000000000000008400000000000000080000000000080000000000000000000000000000000000000000000000000000002000000000010000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000002000000000000000000000000000000000000002000000000000000000000000000000000000000000000000100000000000000000000000000000004000000000000000000000000000000000000000");
+        assert!(filter.matches_bloom(bloom));
     }
 
     #[test]
@@ -1263,12 +1749,12 @@ mod tests {
         }
 
         let item = Item { value: ValueOrArray::Value(U256::from(1u64)) };
-        let json = serde_json::to_value(item.clone()).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
 
         let item = Item { value: ValueOrArray::Array(vec![U256::from(1u64), U256::ZERO]) };
-        let json = serde_json::to_value(item.clone()).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
     }
@@ -1337,14 +1823,6 @@ mod tests {
         assert_eq!(ser, json!({ "address" : addr, "topics": [t0, t1_padded, t2, t3_padded]}));
     }
 
-    fn build_bloom(address: Address, topic1: B256, topic2: B256) -> Bloom {
-        let mut block_bloom = Bloom::default();
-        block_bloom.accrue(BloomInput::Raw(&address[..]));
-        block_bloom.accrue(BloomInput::Raw(&topic1[..]));
-        block_bloom.accrue(BloomInput::Raw(&topic2[..]));
-        block_bloom
-    }
-
     fn topic_filter(topic1: B256, topic2: B256, topic3: B256) -> Filter {
         Filter {
             block_option: Default::default(),
@@ -1360,32 +1838,13 @@ mod tests {
 
     #[test]
     fn can_detect_different_topics() {
-        let topic1 = B256::random();
-        let topic2 = B256::random();
-        let topic3 = B256::random();
+        let topic1 = B256::with_last_byte(1);
+        let topic2 = B256::with_last_byte(2);
+        let topic3 = B256::with_last_byte(3);
 
-        let topics = topic_filter(topic1, topic2, topic3).topics;
-        let topics_bloom = FilteredParams::topics_filter(&topics);
-        assert!(!FilteredParams::matches_topics(
-            build_bloom(Address::random(), B256::random(), B256::random()),
-            &topics_bloom
-        ));
-    }
+        let filter = topic_filter(topic1, topic2, topic3);
 
-    #[test]
-    fn can_match_topic() {
-        let topic1 = B256::random();
-        let topic2 = B256::random();
-        let topic3 = B256::random();
-
-        let topics = topic_filter(topic1, topic2, topic3).topics;
-        let _topics_bloom = FilteredParams::topics_filter(&topics);
-
-        let topics_bloom = FilteredParams::topics_filter(&topics);
-        assert!(FilteredParams::matches_topics(
-            build_bloom(Address::random(), topic1, topic2),
-            &topics_bloom
-        ));
+        assert!(filter.matches_topics(&[topic1, topic2, topic3]));
     }
 
     #[test]
@@ -1395,25 +1854,25 @@ mod tests {
             address: Default::default(),
             topics: Default::default(),
         };
-        let topics = filter.topics;
 
-        let topics_bloom = FilteredParams::topics_filter(&topics);
-        assert!(FilteredParams::matches_topics(
-            build_bloom(Address::random(), B256::random(), B256::random()),
-            &topics_bloom
-        ));
+        assert!(filter.matches_topics(&[
+            B256::with_last_byte(1),
+            B256::with_last_byte(2),
+            B256::with_last_byte(3),
+            B256::with_last_byte(4),
+        ]));
     }
 
     #[test]
     fn can_match_address_and_topics() {
-        let rng_address = Address::random();
-        let topic1 = B256::random();
-        let topic2 = B256::random();
-        let topic3 = B256::random();
+        let address = Address::with_last_byte(1);
+        let topic1 = B256::with_last_byte(2);
+        let topic2 = B256::with_last_byte(3);
+        let topic3 = B256::with_last_byte(4);
 
         let filter = Filter {
             block_option: Default::default(),
-            address: rng_address.into(),
+            address: address.into(),
             topics: [
                 topic1.into(),
                 vec![topic2, topic3].into(),
@@ -1421,26 +1880,19 @@ mod tests {
                 Default::default(),
             ],
         };
-        let topics = filter.topics;
 
-        let address_filter = FilteredParams::address_filter(&filter.address);
-        let topics_filter = FilteredParams::topics_filter(&topics);
-        assert!(
-            FilteredParams::matches_address(
-                build_bloom(rng_address, topic1, topic2),
-                &address_filter
-            ) && FilteredParams::matches_topics(
-                build_bloom(rng_address, topic1, topic2),
-                &topics_filter
-            )
-        );
+        let log =
+            Log { address, data: LogData::new_unchecked(vec![topic1, topic2], Default::default()) };
+
+        assert!(filter.matches(&log));
     }
 
     #[test]
     fn can_match_topics_wildcard() {
-        let topic1 = B256::random();
-        let topic2 = B256::random();
-        let topic3 = B256::random();
+        let address = Address::with_last_byte(1);
+        let topic1 = B256::with_last_byte(2);
+        let topic2 = B256::with_last_byte(3);
+        let topic3 = B256::with_last_byte(4);
 
         let filter = Filter {
             block_option: Default::default(),
@@ -1452,65 +1904,62 @@ mod tests {
                 Default::default(),
             ],
         };
-        let topics = filter.topics;
 
-        let topics_bloom = FilteredParams::topics_filter(&topics);
-        assert!(FilteredParams::matches_topics(
-            build_bloom(Address::random(), topic1, topic2),
-            &topics_bloom
-        ));
+        let log =
+            Log { address, data: LogData::new_unchecked(vec![topic1, topic2], Default::default()) };
+
+        assert!(filter.matches(&log));
     }
 
     #[test]
     fn can_match_topics_wildcard_mismatch() {
+        let address = Address::with_last_byte(1);
+        let topic1 = B256::with_last_byte(2);
+        let topic2 = B256::with_last_byte(3);
+        let bad_topic = B256::with_last_byte(4);
+
         let filter = Filter {
             block_option: Default::default(),
             address: Default::default(),
             topics: [
                 Default::default(),
-                vec![B256::random(), B256::random()].into(),
+                vec![topic1, topic2].into(),
                 Default::default(),
                 Default::default(),
             ],
         };
-        let topics_input = filter.topics;
 
-        let topics_bloom = FilteredParams::topics_filter(&topics_input);
-        assert!(!FilteredParams::matches_topics(
-            build_bloom(Address::random(), B256::random(), B256::random()),
-            &topics_bloom
-        ));
+        let log = Log {
+            address,
+            data: LogData::new_unchecked(vec![bad_topic, bad_topic], Default::default()),
+        };
+
+        assert!(!filter.matches(&log));
     }
 
     #[test]
     fn can_match_address_filter() {
-        let rng_address = Address::random();
+        let address = Address::with_last_byte(1);
         let filter = Filter {
             block_option: Default::default(),
-            address: rng_address.into(),
+            address: address.into(),
             topics: Default::default(),
         };
-        let address_bloom = FilteredParams::address_filter(&filter.address);
-        assert!(FilteredParams::matches_address(
-            build_bloom(rng_address, B256::random(), B256::random(),),
-            &address_bloom
-        ));
+
+        assert!(filter.matches_address(address));
     }
 
     #[test]
     fn can_detect_different_address() {
-        let bloom_address = Address::random();
-        let rng_address = Address::random();
+        let address = Address::with_last_byte(1);
+        let bad_address = Address::with_last_byte(2);
         let filter = Filter {
             block_option: Default::default(),
-            address: rng_address.into(),
+            address: address.into(),
             topics: Default::default(),
         };
-        let address_bloom = FilteredParams::address_filter(&filter.address);
-        assert!(!FilteredParams::matches_address(
-            build_bloom(bloom_address, B256::random(), B256::random(),),
-            &address_bloom
-        ));
+
+        assert!(!filter.matches_address(bad_address));
     }
 
     #[test]
@@ -1698,8 +2147,6 @@ mod tests {
             ],
         };
         assert!(filter.is_pending_block_filter());
-        let filter_params = FilteredParams::new(Some(filter));
-        assert!(filter_params.is_pending_block_filter());
 
         let filter = Filter {
             block_option: FilterBlockOption::Range {
@@ -1727,7 +2174,318 @@ mod tests {
             ],
         };
         assert!(!filter.is_pending_block_filter());
-        let filter_params = FilteredParams::new(Some(filter));
-        assert!(!filter_params.is_pending_block_filter());
+    }
+
+    #[test]
+    fn test_filter_set_topic_extend() {
+        let mut topic = Topic::default();
+
+        // extending with different types that can be converted into Topic
+        topic =
+            topic.extend(U256::from(123)).extend(Address::random()).extend(true).extend([0u8; 32]);
+
+        assert_eq!(topic.set.len(), 4);
+
+        topic = topic.extend(U256::from(123));
+        assert_eq!(topic.set.len(), 4);
+
+        topic = topic.extend(U256::from(456));
+        assert_eq!(topic.set.len(), 5);
+    }
+
+    #[test]
+    fn test_append_matching_block_logs() {
+        use alloy_consensus::Receipt;
+        use alloy_primitives::Bytes;
+
+        // Create test addresses and topics
+        let addr1 = Address::from([0x11; 20]);
+        let addr2 = Address::from([0x22; 20]);
+        let topic1 = B256::from([0x01; 32]);
+        let topic2 = B256::from([0x02; 32]);
+
+        // Create test receipts with logs
+        let receipt1 = Receipt {
+            status: alloy_consensus::Eip658Value::Eip658(true),
+            cumulative_gas_used: 100000,
+            logs: vec![
+                alloy_primitives::Log {
+                    address: addr1,
+                    data: LogData::new(vec![topic1], Bytes::from(vec![0x01, 0x02])).unwrap(),
+                },
+                alloy_primitives::Log {
+                    address: addr2,
+                    data: LogData::new(vec![topic2], Bytes::from(vec![0x03, 0x04])).unwrap(),
+                },
+            ],
+        };
+
+        let receipt2 = Receipt {
+            status: alloy_consensus::Eip658Value::Eip658(true),
+            cumulative_gas_used: 200000,
+            logs: vec![alloy_primitives::Log {
+                address: addr1,
+                data: LogData::new(vec![topic2], Bytes::from(vec![0x05])).unwrap(),
+            }],
+        };
+
+        let receipts = [receipt1, receipt2];
+        let tx_hashes = [B256::from([0xaa; 32]), B256::from([0xbb; 32])];
+
+        let block_num_hash = BlockNumHash::new(1000, B256::from([0xff; 32]));
+        let block_timestamp = 1234567890;
+
+        // Test 1: Filter by address
+        let filter = Filter::new().address(addr1);
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            false,
+        );
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].inner.address, addr1);
+        assert_eq!(result[0].transaction_hash, Some(tx_hashes[0]));
+        assert_eq!(result[0].log_index, Some(0));
+        assert_eq!(result[0].transaction_index, Some(0));
+        assert_eq!(result[1].inner.address, addr1);
+        assert_eq!(result[1].transaction_hash, Some(tx_hashes[1]));
+        assert_eq!(result[1].log_index, Some(2));
+        assert_eq!(result[1].transaction_index, Some(1));
+
+        // Test 2: Filter by topic
+        let filter = Filter::new().event_signature(topic2);
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            false,
+        );
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].inner.data.topics()[0], topic2);
+        assert_eq!(result[0].transaction_hash, Some(tx_hashes[0]));
+        assert_eq!(result[0].log_index, Some(1));
+        assert_eq!(result[1].inner.data.topics()[0], topic2);
+        assert_eq!(result[1].transaction_hash, Some(tx_hashes[1]));
+        assert_eq!(result[1].log_index, Some(2));
+
+        // Test 3: No matches
+        let filter = Filter::new().address(Address::from([0x99; 20]));
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            false,
+        );
+
+        assert_eq!(result.len(), 0);
+
+        // Test 4: Check all metadata is properly set
+        let filter = Filter::new();
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            true, // removed = true
+        );
+
+        assert_eq!(result.len(), 3);
+        for log in &result {
+            assert_eq!(log.block_hash, Some(block_num_hash.hash));
+            assert_eq!(log.block_number, Some(block_num_hash.number));
+            assert_eq!(log.block_timestamp, Some(block_timestamp));
+            assert!(log.removed);
+        }
+
+        // Test 5: Test matching_block_logs with block filter
+        let filter = Filter::new().from_block(1000u64).to_block(1000u64).address(addr1);
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        let result =
+            filter.matching_block_logs(block_num_hash, block_timestamp, tx_receipt_pairs, false);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].inner.address, addr1);
+        assert_eq!(result[1].inner.address, addr1);
+
+        // Test 6: Test matching_block_logs with non-matching block
+        let filter = Filter::new().from_block(2000u64).to_block(2000u64);
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        let result =
+            filter.matching_block_logs(block_num_hash, block_timestamp, tx_receipt_pairs, false);
+
+        assert_eq!(result.len(), 0); // Should not append any logs due to block mismatch
+
+        // Test 7: Test append_matching_block_logs with non-matching block
+        let filter = Filter::new().from_block(2000u64).to_block(2000u64);
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            false,
+        );
+
+        assert_eq!(result.len(), 0); // Should not append any logs due to block mismatch
+    }
+
+    #[test]
+    fn test_filter_receipts_iterator() {
+        use alloy_consensus::Receipt;
+        use alloy_primitives::Bytes;
+
+        // Create test addresses and topics
+        let addr1 = Address::from([0x11; 20]);
+        let addr2 = Address::from([0x22; 20]);
+        let topic1 = B256::from([0x01; 32]);
+        let topic2 = B256::from([0x02; 32]);
+
+        // Create test receipts for block 1
+        let block1_receipts = vec![
+            Receipt {
+                status: alloy_consensus::Eip658Value::Eip658(true),
+                cumulative_gas_used: 100000,
+                logs: vec![
+                    alloy_primitives::Log {
+                        address: addr1,
+                        data: LogData::new(vec![topic1], Bytes::from(vec![0x01, 0x02])).unwrap(),
+                    },
+                    alloy_primitives::Log {
+                        address: addr2,
+                        data: LogData::new(vec![topic2], Bytes::from(vec![0x03, 0x04])).unwrap(),
+                    },
+                ],
+            },
+            Receipt {
+                status: alloy_consensus::Eip658Value::Eip658(true),
+                cumulative_gas_used: 200000,
+                logs: vec![alloy_primitives::Log {
+                    address: addr1,
+                    data: LogData::new(vec![topic2], Bytes::from(vec![0x05])).unwrap(),
+                }],
+            },
+        ];
+
+        // Create test receipts for block 2
+        let block2_receipts = vec![Receipt {
+            status: alloy_consensus::Eip658Value::Eip658(true),
+            cumulative_gas_used: 300000,
+            logs: vec![
+                alloy_primitives::Log {
+                    address: addr1,
+                    data: LogData::new(vec![topic1], Bytes::from(vec![0x06])).unwrap(),
+                },
+                alloy_primitives::Log {
+                    address: addr2,
+                    data: LogData::new(vec![topic1], Bytes::from(vec![0x07])).unwrap(),
+                },
+            ],
+        }];
+
+        let all_receipts = vec![block1_receipts, block2_receipts];
+
+        // Test 1: Filter by address
+        let filter = Filter::new().address(addr1);
+        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        assert_eq!(logs.len(), 3); // Should match 3 logs with addr1
+        assert!(logs.iter().all(|log| log.address == addr1));
+
+        // Test 2: Filter by topic
+        let filter = Filter::new().event_signature(topic1);
+        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+
+        // Block 1, Receipt 1: topic1 (addr1), topic2 (addr2)
+        // Block 1, Receipt 2: topic2 (addr1)
+        // Block 2, Receipt 1: topic1 (addr1), topic1 (addr2)
+        // Total: 3 logs with topic1
+        assert_eq!(logs.len(), 3); // Should match 3 logs with topic1
+        assert!(logs.iter().all(|log| log.topics()[0] == topic1));
+
+        // Test 3: Filter by address and topic
+        let filter = Filter::new().address(addr1).event_signature(topic2);
+        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        assert_eq!(logs.len(), 1); // Should match 1 log with addr1 and topic2
+        assert_eq!(logs[0].address, addr1);
+        assert_eq!(logs[0].topics()[0], topic2);
+
+        // Test 4: No matches
+        let filter = Filter::new().address(Address::from([0x99; 20]));
+        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        assert_eq!(logs.len(), 0);
+
+        // Test 5: Empty filter matches all
+        let filter = Filter::new();
+        let logs: Vec<_> = filter.filter_receipts(all_receipts).collect();
+        assert_eq!(logs.len(), 5); // Should match all 5 logs
+    }
+
+    #[test]
+    fn test_extract_block_range() {
+        // Test Range with numeric block numbers
+        let filter = Filter::new().from_block(10u64).to_block(20u64);
+        assert_eq!(filter.extract_block_range(), (Some(10), Some(20)));
+
+        // Test Range with only from_block
+        let filter = Filter::new().from_block(10u64);
+        assert_eq!(filter.extract_block_range(), (Some(10), None));
+
+        // Test Range with only to_block
+        let filter = Filter::new().to_block(20u64);
+        assert_eq!(filter.extract_block_range(), (None, Some(20)));
+
+        // Test Range with latest/pending tags (should return None)
+        let filter =
+            Filter::new().from_block(BlockNumberOrTag::Latest).to_block(BlockNumberOrTag::Pending);
+        assert_eq!(filter.extract_block_range(), (None, None));
+
+        // Test AtBlockHash (should return None, None)
+        let filter = Filter::new().at_block_hash(B256::ZERO);
+        assert_eq!(filter.extract_block_range(), (None, None));
+
+        // Test empty filter (default Range with None values)
+        let filter = Filter::new();
+        assert_eq!(filter.extract_block_range(), (None, None));
+    }
+
+    #[test]
+    fn test_matches_block_at_block_hash() {
+        let target_hash = B256::with_last_byte(0xab);
+        let filter = Filter::new().at_block_hash(target_hash);
+
+        // Matching hash should return true regardless of block number
+        assert!(filter.matches_block(&BlockNumHash { number: 0, hash: target_hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 999, hash: target_hash }));
+
+        // Non-matching hash must return false
+        let wrong_hash = B256::with_last_byte(0xcd);
+        assert!(!filter.matches_block(&BlockNumHash { number: 0, hash: wrong_hash }));
+        assert!(!filter.matches_block(&BlockNumHash { number: 999, hash: wrong_hash }));
+    }
+
+    #[test]
+    fn test_matches_block_range_filter() {
+        let filter = Filter::new().from_block(10).to_block(20);
+
+        let hash = B256::ZERO;
+        assert!(!filter.matches_block(&BlockNumHash { number: 9, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 10, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 15, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 20, hash }));
+        assert!(!filter.matches_block(&BlockNumHash { number: 21, hash }));
     }
 }

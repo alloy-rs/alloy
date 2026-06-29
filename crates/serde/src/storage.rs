@@ -1,5 +1,8 @@
 use alloc::collections::BTreeMap;
-use alloy_primitives::{ruint::ParseError, Bytes, B256, U256};
+use alloy_primitives::{
+    ruint::{BaseConvertError, ParseError},
+    Bytes, B256, U256,
+};
 use core::{fmt, str::FromStr};
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -70,6 +73,10 @@ impl FromStr for JsonStorageKey {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() > 65 && !(s.len() == 66 && s.starts_with("0x")) {
+            return Err(ParseError::BaseConvertError(BaseConvertError::Overflow));
+        }
+
         if let Ok(hash) = B256::from_str(s) {
             return Ok(Self::Hash(hash));
         }
@@ -81,7 +88,7 @@ impl fmt::Display for JsonStorageKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Hash(hash) => hash.fmt(f),
-            Self::Number(num) => alloc::format!("{num:#x}").fmt(f),
+            Self::Number(num) => write!(f, "{num:#x}"),
         }
     }
 }
@@ -118,18 +125,22 @@ pub fn deserialize_storage_map<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    let map = Option::<BTreeMap<Bytes, Bytes>>::deserialize(deserializer)?;
-    match map {
-        Some(map) => {
-            let mut res_map = BTreeMap::new();
-            for (k, v) in map {
-                let k_deserialized = from_bytes_to_b256::<'de, D>(k)?;
-                let v_deserialized = from_bytes_to_b256::<'de, D>(v)?;
-                res_map.insert(k_deserialized, v_deserialized);
+    if deserializer.is_human_readable() {
+        let map = Option::<BTreeMap<Bytes, Bytes>>::deserialize(deserializer)?;
+        match map {
+            Some(map) => {
+                let mut res_map = BTreeMap::new();
+                for (k, v) in map {
+                    let k_deserialized = from_bytes_to_b256::<'de, D>(k)?;
+                    let v_deserialized = from_bytes_to_b256::<'de, D>(v)?;
+                    res_map.insert(k_deserialized, v_deserialized);
+                }
+                Ok(Some(res_map))
             }
-            Ok(Some(res_map))
+            None => Ok(None),
         }
-        None => Ok(None),
+    } else {
+        Option::<BTreeMap<B256, B256>>::deserialize(deserializer)
     }
 }
 
@@ -175,6 +186,10 @@ mod tests {
             "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",   // Number
             "0xabc",                                                              // Number
             "0xabcd",                                                             // Number
+            // 0x + 63 hex chars (U256 value, total len = 65)
+            "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Number
+            // 0x + 64 hex chars (max U256, total len = 66)
+            "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Hash
         ];
 
         for input in test_cases {
@@ -183,8 +198,7 @@ mod tests {
 
             assert_eq!(
                 input, output,
-                "Storage key roundtrip failed to preserve the exact hex representation for {}",
-                input
+                "Storage key roundtrip failed to preserve the exact hex representation for {input}"
             );
         }
     }
@@ -236,10 +250,50 @@ mod tests {
         let hex_str = "0x0101010101010101010101010101010101010101010101010101010101010101";
         let key = JsonStorageKey::from_str(hex_str).unwrap();
         assert_eq!(key, JsonStorageKey::Hash(B256::from_str(hex_str).unwrap()));
+    }
 
-        let num_str = "42";
-        let key = JsonStorageKey::from_str(num_str).unwrap();
-        assert_eq!(key, JsonStorageKey::Number(U256::from(42)));
+    #[test]
+    fn test_from_str_with_too_long_hex_string() {
+        let long_hex_str = "0x".to_string() + &"1".repeat(65);
+        let result = JsonStorageKey::from_str(&long_hex_str);
+
+        assert!(matches!(result, Err(ParseError::BaseConvertError(BaseConvertError::Overflow))));
+    }
+
+    #[test]
+    fn test_deserialize_too_long_storage_key() {
+        let key = "0x".to_string() + &"f".repeat(68);
+        let result: Result<JsonStorageKey, _> = serde_json::from_str(&json!(key).to_string());
+        assert!(result.is_err(), "storage key with 68 hex chars should fail deserialization");
+    }
+
+    #[test]
+    fn test_from_str_length_boundaries() {
+        // 0x + 63 hex chars = 65 total — valid U256
+        let key_63 = "0x".to_string() + &"f".repeat(63);
+        let result = JsonStorageKey::from_str(&key_63);
+        assert!(result.is_ok(), "0x + 63 hex chars should be a valid U256 storage key");
+        assert!(matches!(result.unwrap(), JsonStorageKey::Number(_)));
+
+        // 0x + 64 hex chars = 66 total — valid B256
+        let key_64 = "0x".to_string() + &"f".repeat(64);
+        let result = JsonStorageKey::from_str(&key_64);
+        assert!(result.is_ok(), "0x + 64 hex chars should be a valid B256 storage key");
+        assert!(matches!(result.unwrap(), JsonStorageKey::Hash(_)));
+
+        // 0x + 65 hex chars = 67 total — overflow
+        let key_65 = "0x".to_string() + &"f".repeat(65);
+        assert!(JsonStorageKey::from_str(&key_65).is_err());
+
+        // 64 bare hex chars — valid B256
+        let bare_64 = "f".repeat(64);
+        let result = JsonStorageKey::from_str(&bare_64);
+        assert!(result.is_ok(), "64 bare hex chars should be a valid B256 storage key");
+        assert!(matches!(result.unwrap(), JsonStorageKey::Hash(_)));
+
+        // 65 bare hex chars — overflow
+        let bare_65 = "f".repeat(65);
+        assert!(JsonStorageKey::from_str(&bare_65).is_err());
     }
 
     #[test]

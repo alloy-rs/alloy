@@ -1,7 +1,7 @@
-use crate::{AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, Network, NetworkWallet, TxSigner};
-use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
-use alloy_primitives::{map::AddressHashMap, Address, PrimitiveSignature as Signature};
-use std::sync::Arc;
+use crate::{Network, NetworkWallet, TxSigner};
+use alloy_consensus::{SignableTransaction, Signed};
+use alloy_primitives::{map::AddressHashMap, Address, Signature};
+use std::{fmt::Debug, sync::Arc};
 
 use super::Ethereum;
 
@@ -42,10 +42,11 @@ impl EthereumWallet {
     }
 
     /// Register a new signer on this object. This signer will be used to sign
-    /// [`TransactionRequest`] and [`TypedTransaction`] object that specify the
+    /// [`TransactionRequest`] and [`TypedTransaction`] objects that specify the
     /// signer's address in the `from` field.
     ///
     /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
+    /// [`TypedTransaction`]: alloy_consensus::TypedTransaction
     pub fn register_signer<S>(&mut self, signer: S)
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
@@ -59,12 +60,36 @@ impl EthereumWallet {
     /// `from` field.
     ///
     /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
+    /// [`TypedTransaction`]: alloy_consensus::TypedTransaction
     pub fn register_default_signer<S>(&mut self, signer: S)
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
     {
         self.default = signer.address();
         self.register_signer(signer);
+    }
+
+    /// Sets the default signer to the given address.
+    ///
+    /// The default signer is used to sign [`TransactionRequest`] and [`TypedTransaction`] objects
+    /// that do not specify a signer address in the `from` field.
+    ///
+    /// The provided address must be a registered signer otherwise an error is returned.
+    ///
+    /// If you're looking to add a new signer and set it as default, use
+    /// [`EthereumWallet::register_default_signer`].
+    ///
+    /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
+    /// [`TypedTransaction`]: alloy_consensus::TypedTransaction
+    pub fn set_default_signer(&mut self, address: Address) -> alloy_signer::Result<()> {
+        if self.signers.contains_key(&address) {
+            self.default = address;
+            Ok(())
+        } else {
+            Err(alloy_signer::Error::message(format!(
+                "{address} is not a registered signer. Use `register_default_signer`"
+            )))
+        }
     }
 
     /// Get the default signer.
@@ -88,16 +113,17 @@ impl EthereumWallet {
     ) -> alloy_signer::Result<Signature> {
         self.signer_by_address(sender)
             .ok_or_else(|| {
-                alloy_signer::Error::other(format!("Missing signing credential for {}", sender))
+                alloy_signer::Error::other(format!("Missing signing credential for {sender}"))
             })?
             .sign_transaction(tx)
             .await
     }
 }
 
-impl<N> NetworkWallet<N> for EthereumWallet
+impl<N: Network> NetworkWallet<N> for EthereumWallet
 where
-    N: Network<UnsignedTx = TypedTransaction, TxEnvelope = TxEnvelope>,
+    N::TxEnvelope: From<Signed<N::UnsignedTx>>,
+    N::UnsignedTx: SignableTransaction<Signature>,
 {
     fn default_signer_address(&self) -> Address {
         self.default
@@ -111,61 +137,28 @@ where
         self.signers.keys().copied()
     }
 
-    #[doc(alias = "sign_tx_from")]
     async fn sign_transaction_from(
         &self,
         sender: Address,
-        tx: TypedTransaction,
-    ) -> alloy_signer::Result<TxEnvelope> {
-        match tx {
-            TypedTransaction::Legacy(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-            TypedTransaction::Eip2930(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-            TypedTransaction::Eip1559(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-            TypedTransaction::Eip4844(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-            TypedTransaction::Eip7702(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-        }
+        mut tx: N::UnsignedTx,
+    ) -> alloy_signer::Result<N::TxEnvelope> {
+        let sig = self.sign_transaction_inner(sender, &mut tx).await?;
+        Ok(tx.into_signed(sig).into())
     }
 }
 
-impl NetworkWallet<AnyNetwork> for EthereumWallet {
-    fn default_signer_address(&self) -> Address {
-        self.default
-    }
+/// A trait for converting a signer into a [`NetworkWallet`].
+pub trait IntoWallet<N: Network = Ethereum>: Send + Sync + Debug {
+    /// The wallet type for the network.
+    type NetworkWallet: NetworkWallet<N>;
+    /// Convert the signer into a wallet.
+    fn into_wallet(self) -> Self::NetworkWallet;
+}
 
-    fn has_signer_for(&self, address: &Address) -> bool {
-        self.signers.contains_key(address)
-    }
+impl<W: NetworkWallet<N>, N: Network> IntoWallet<N> for W {
+    type NetworkWallet = W;
 
-    fn signer_addresses(&self) -> impl Iterator<Item = Address> {
-        self.signers.keys().copied()
-    }
-
-    #[doc(alias = "sign_tx_from")]
-    async fn sign_transaction_from(
-        &self,
-        sender: Address,
-        tx: AnyTypedTransaction,
-    ) -> alloy_signer::Result<AnyTxEnvelope> {
-        match tx {
-            AnyTypedTransaction::Ethereum(t) => Ok(AnyTxEnvelope::Ethereum(
-                NetworkWallet::<Ethereum>::sign_transaction_from(self, sender, t).await?,
-            )),
-            _ => Err(alloy_signer::Error::other("cannot sign UnknownTypedTransaction")),
-        }
+    fn into_wallet(self) -> Self::NetworkWallet {
+        self
     }
 }

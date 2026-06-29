@@ -1,7 +1,10 @@
 use alloy_primitives::U256;
 
-/// The default Ethereum block gas limit.
-pub const ETHEREUM_BLOCK_GAS_LIMIT: u64 = 30_000_000;
+/// The default Ethereum block gas limit: 30M
+pub const ETHEREUM_BLOCK_GAS_LIMIT_30M: u64 = 30_000_000;
+
+/// The default Ethereum block gas limit: 36M
+pub const ETHEREUM_BLOCK_GAS_LIMIT_36M: u64 = 36_000_000;
 
 /// The bound divisor of the gas limit, used in update calculations.
 pub const GAS_LIMIT_BOUND_DIVISOR: u64 = 1024;
@@ -30,29 +33,29 @@ pub const DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR: u64 = 8;
 pub const DEFAULT_ELASTICITY_MULTIPLIER: u64 = 2;
 
 /// Base fee max change denominator for Optimism Sepolia as defined in the Optimism
-/// [transaction costs](https://community.optimism.io/docs/developers/build/differences/#transaction-costs) doc.
+/// [transaction costs](https://docs.optimism.io/stack/differences#transactions) doc.
 pub(crate) const OP_SEPOLIA_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR: u128 = 50;
 
 /// Base fee max change denominator for Optimism Sepolia as defined in the Optimism Canyon hardfork.
 pub(crate) const OP_SEPOLIA_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON: u128 = 250;
 
 /// Base fee max change denominator for Optimism Sepolia as defined in the Optimism
-/// [transaction costs](https://community.optimism.io/docs/developers/build/differences/#transaction-costs) doc.
+/// [transaction costs](https://docs.optimism.io/stack/differences#transactions) doc.
 pub(crate) const OP_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER: u128 = 6;
 
 /// Base fee max change denominator for Optimism Mainnet as defined in the Optimism
-/// [transaction costs](https://community.optimism.io/docs/developers/build/differences/#transaction-costs) doc.
+/// [transaction costs](https://docs.optimism.io/stack/differences#transactions) doc.
 pub(crate) const OP_MAINNET_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR: u128 = 50;
 
 /// Base fee max change denominator for Optimism Mainnet as defined in the Optimism Canyon hardfork.
 pub(crate) const OP_MAINNET_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON: u128 = 250;
 
 /// Base fee max change denominator for Optimism Mainnet as defined in the Optimism
-/// [transaction costs](https://community.optimism.io/docs/developers/build/differences/#transaction-costs) doc.
+/// [transaction costs](https://docs.optimism.io/stack/differences#transactions) doc.
 pub(crate) const OP_MAINNET_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER: u128 = 6;
 
 /// Base fee max change denominator for Base Sepolia as defined in the Optimism
-/// [transaction costs](https://community.optimism.io/docs/developers/build/differences/#transaction-costs) doc.
+/// [transaction costs](https://docs.optimism.io/stack/differences#transactions) doc.
 pub(crate) const BASE_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER: u128 = 10;
 
 #[cfg(test)]

@@ -21,7 +21,45 @@ pub const EMPTY_REQUESTS_HASH: B256 =
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Requests(Vec<Bytes>);
 
+#[cfg(feature = "ssz")]
+impl ssz::Encode for Requests {
+    fn is_ssz_fixed_len() -> bool {
+        <Vec<Bytes> as ssz::Encode>::is_ssz_fixed_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        <Vec<Bytes> as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        self.0.ssz_bytes_len()
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        self.0.ssz_append(buf);
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for Requests {
+    fn is_ssz_fixed_len() -> bool {
+        <Vec<Bytes> as ssz::Decode>::is_ssz_fixed_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        <Vec<Bytes> as ssz::Decode>::ssz_fixed_len()
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        <Vec<Bytes> as ssz::Decode>::from_ssz_bytes(bytes).map(Self)
+    }
+}
+
 impl Requests {
+    /// Create a new [`Requests`] container from an iterator of items convertible to [`Bytes`].
+    pub fn from_requests<T: Into<Bytes>>(requests: impl IntoIterator<Item = T>) -> Self {
+        Self(requests.into_iter().map(Into::into).collect())
+    }
     /// Construct a new [`Requests`] container with the given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self(Vec::with_capacity(capacity))
@@ -92,7 +130,17 @@ impl Requests {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
 
-        let mut requests: Vec<_> = self.0.iter().filter(|req| !req.is_empty()).collect();
+        let mut requests: Vec<_> = self
+            .0
+            .iter()
+            .filter(|req| {
+                // filter out all requests that are empty or only have the type byte
+                // <type-id> <data>
+                req.len() > 1
+            })
+            .collect();
+
+        // requests should only contain unique types: `id [r1,r2,..]`
         requests.sort_unstable_by_key(|req| {
             // SAFETY: only includes non-empty requests
             req[0]
@@ -119,6 +167,8 @@ impl Requests {
 /// needed to simulate the presence of requests without holding actual data.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum RequestsOrHash {
     /// Stores a list of requests, allowing for dynamic requests hash calculation.
     Requests(Requests),
@@ -153,11 +203,27 @@ impl RequestsOrHash {
             Self::Hash(_) => None,
         }
     }
+
+    /// Returns `true` if the variant is a list of requests.
+    pub const fn is_requests(&self) -> bool {
+        matches!(self, Self::Requests(_))
+    }
+
+    /// Returns `true` if the variant is a precomputed hash.
+    pub const fn is_hash(&self) -> bool {
+        matches!(self, Self::Hash(_))
+    }
 }
 
 impl Default for RequestsOrHash {
     fn default() -> Self {
         Self::Requests(Requests::default())
+    }
+}
+
+impl From<Vec<Bytes>> for RequestsOrHash {
+    fn from(requests: Vec<Bytes>) -> Self {
+        Self::Requests(requests.into())
     }
 }
 

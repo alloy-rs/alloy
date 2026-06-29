@@ -1,8 +1,7 @@
-use alloy_chains::NamedChain;
-use alloy_network::Ethereum;
-use std::time::Duration;
-
 use crate::{Provider, ProviderLayer};
+use alloy_chains::NamedChain;
+use alloy_network::Network;
+use std::time::Duration;
 
 /// A layer that wraps a [`NamedChain`]. The layer will be used to set
 /// the client's poll interval based on the average block time for this chain.
@@ -12,6 +11,11 @@ use crate::{Provider, ProviderLayer};
 pub struct ChainLayer(NamedChain);
 
 impl ChainLayer {
+    /// Create a new `ChainLayer` from the given chain.
+    pub const fn new(chain: NamedChain) -> Self {
+        Self(chain)
+    }
+
     /// Get the chain's average blocktime, if applicable.
     pub const fn average_blocktime_hint(&self) -> Option<Duration> {
         self.0.average_blocktime_hint()
@@ -24,9 +28,10 @@ impl From<NamedChain> for ChainLayer {
     }
 }
 
-impl<P> ProviderLayer<P, Ethereum> for ChainLayer
+impl<P, N> ProviderLayer<P, N> for ChainLayer
 where
-    P: Provider,
+    P: Provider<N>,
+    N: Network,
 {
     type Provider = P;
 

@@ -1,20 +1,20 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
-use alloy_consensus::{
-    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
-    TxLegacy, TxType, Typed2718, TypedTransaction,
-};
-use alloy_eips::eip7702::SignedAuthorization;
-use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
-use core::hash::Hash;
-
+use crate::{transaction::AccessList, Transaction, TransactionTrait};
 use alloc::{
     string::{String, ToString},
     vec,
     vec::Vec,
 };
+use alloy_consensus::{
+    error::ValueError, transaction::Recovered, BlobTransactionSidecarVariant, SignableTransaction,
+    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
+    TxLegacy, TxType, Typed2718, TypedTransaction,
+};
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use core::{hash::Hash, str::FromStr};
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -128,8 +128,8 @@ pub struct TransactionRequest {
         feature = "serde",
         serde(default, flatten, skip_serializing_if = "Option::is_none")
     )]
-    pub sidecar: Option<BlobTransactionSidecar>,
-    /// Authorization list for for EIP-7702 transactions.
+    pub sidecar: Option<BlobTransactionSidecarVariant>,
+    /// Authorization list for EIP-7702 transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
@@ -187,6 +187,12 @@ impl TransactionRequest {
     }
 
     /// Initializes the [`TransactionRequest`] with the provided transaction and sender.
+    pub fn from_recovered_transaction<T: TransactionTrait>(tx: Recovered<T>) -> Self {
+        let (tx, from) = tx.into_parts();
+        Self::from_transaction(tx).from(from)
+    }
+
+    /// Initializes the [`TransactionRequest`] with the provided transaction and sender.
     pub fn from_transaction_with_sender<T: TransactionTrait>(tx: T, from: Address) -> Self {
         Self::from_transaction(tx).from(from)
     }
@@ -210,6 +216,12 @@ impl TransactionRequest {
         self
     }
 
+    /// Sets the gas price for the transaction.
+    pub const fn gas_price(mut self, gas_price: u128) -> Self {
+        self.gas_price = Some(gas_price);
+        self
+    }
+
     /// Sets the maximum fee per gas for the transaction.
     pub const fn max_fee_per_gas(mut self, max_fee_per_gas: u128) -> Self {
         self.max_fee_per_gas = Some(max_fee_per_gas);
@@ -222,10 +234,23 @@ impl TransactionRequest {
         self
     }
 
+    /// Sets the maximum fee per blob gas for the transaction.
+    pub const fn max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self {
+        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas);
+        self
+    }
+
     /// Sets the recipient address for the transaction.
     #[inline]
     pub const fn to(mut self, to: Address) -> Self {
         self.to = Some(TxKind::Call(to));
+        self
+    }
+
+    /// Marks this transaction as a contract creation (deploy) with no recipient.
+    #[inline]
+    pub const fn create(mut self) -> Self {
+        self.to = Some(TxKind::Create);
         self
     }
 
@@ -242,8 +267,55 @@ impl TransactionRequest {
     }
 
     /// Sets the input data for the transaction.
+    ///
+    /// This can be used to set both `input` and the `data` field, because some chains or services
+    /// still expect of the deprecated `data` field
+    ///
+    /// ```
+    /// use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
+    /// let req = TransactionRequest::default().input(TransactionInput::both(b"00".into()));
+    /// ```
     pub fn input(mut self, input: TransactionInput) -> Self {
         self.input = input;
+        self
+    }
+
+    /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
+    ///
+    /// This removes `data` the data field.
+    pub fn normalize_input(&mut self) {
+        self.input.normalize_input()
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_input`] applied
+    pub fn normalized_input(mut self) -> Self {
+        self.normalize_input();
+        self
+    }
+
+    /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
+    ///
+    /// This removes `input` the data field.
+    pub fn normalize_data(&mut self) {
+        self.input.normalize_data();
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_data`] applied
+    pub fn normalized_data(mut self) -> Self {
+        self.normalize_data();
+        self
+    }
+
+    /// If only one field is set, this also sets the other field by with that value.
+    ///
+    /// This is a noop if both fields are already set.
+    pub fn set_input_and_data(&mut self) {
+        self.input.set_both();
+    }
+
+    /// Consumes the type and returns it with [`Self::set_input_and_data`] applied.
+    pub fn with_input_and_data(mut self) -> Self {
+        self.set_input_and_data();
         self
     }
 
@@ -253,6 +325,37 @@ impl TransactionRequest {
     #[inline]
     pub fn fee_cap(&self) -> Option<u128> {
         self.gas_price.or(self.max_fee_per_gas)
+    }
+
+    /// Returns true if _any_ of the EIP-4844 fields are set:
+    /// - blob sidecar
+    /// - blob versioned hashes
+    /// - max fee per blob gas
+    pub const fn has_eip4844_fields(&self) -> bool {
+        self.sidecar.is_some()
+            || self.blob_versioned_hashes.is_some()
+            || self.max_fee_per_blob_gas.is_some()
+    }
+
+    /// Returns true if the EIP-4844 blob data fields are set (sidecar or versioned hashes).
+    ///
+    /// This differs from [`Self::has_eip4844_fields`] in that it does not consider
+    /// `max_fee_per_blob_gas` alone as sufficient to indicate a blob transaction.
+    /// This matches go-ethereum behavior where only the presence of `blob_versioned_hashes`
+    /// determines if a transaction is a blob transaction.
+    ///
+    /// Use this method when determining the transaction type for building/simulation,
+    /// as just having a blob fee cap without actual blob data should not force the
+    /// transaction to be EIP-4844.
+    pub const fn has_eip4844_blob_data(&self) -> bool {
+        self.sidecar.is_some() || self.blob_versioned_hashes.is_some()
+    }
+
+    /// Returns true if _any_ of the EIP-1559 fee fields are set:
+    /// - max fee per gas
+    /// - max priority fee per gas
+    pub const fn has_eip1559_fields(&self) -> bool {
+        self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
     }
 
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
@@ -297,15 +400,27 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing.
     /// Use `complete_legacy` to check if the request can be built.
-    fn build_legacy(self) -> Result<TxLegacy, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for legacy transaction.")?;
+    pub fn build_legacy(self) -> Result<TxLegacy, ValueError<Self>> {
+        // Check all required fields first
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for legacy transaction."));
+        };
+        let Some(nonce) = self.nonce else {
+            return Err(ValueError::new(self, "Missing 'nonce' field for legacy transaction."));
+        };
+        let Some(gas_price) = self.gas_price else {
+            return Err(ValueError::new(self, "Missing 'gas_price' for legacy transaction."));
+        };
+        let Some(gas_limit) = self.gas else {
+            return Err(ValueError::new(self, "Missing 'gas_limit' for legacy transaction."));
+        };
 
         Ok(TxLegacy {
             chain_id: self.chain_id,
-            nonce: self.nonce.ok_or("Missing 'nonce' field for legacy transaction.")?,
-            gas_price: self.gas_price.ok_or("Missing 'gas_price' for legacy transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' for legacy transaction.")?,
-            to: checked_to,
+            nonce,
+            gas_price,
+            gas_limit,
+            to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
         })
@@ -313,22 +428,41 @@ impl TransactionRequest {
 
     /// Build an EIP-1559 transaction.
     ///
-    /// Returns ane error if required fields are missing. Use `complete_1559` to check if the
+    /// Returns an error if required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
-    fn build_1559(self) -> Result<TxEip1559, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for Eip1559 transaction.")?;
+    pub fn build_1559(self) -> Result<TxEip1559, ValueError<Self>> {
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip1559 transaction."));
+        };
+        let Some(nonce) = self.nonce else {
+            return Err(ValueError::new(self, "Missing 'nonce' field for Eip1559 transaction."));
+        };
+        let Some(max_priority_fee_per_gas) = self.max_priority_fee_per_gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_priority_fee_per_gas' field for Eip1559 transaction.",
+            ));
+        };
+        let Some(max_fee_per_gas) = self.max_fee_per_gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_fee_per_gas' field for Eip1559 transaction.",
+            ));
+        };
+        let Some(gas_limit) = self.gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_limit' field for Eip1559 transaction.",
+            ));
+        };
 
         Ok(TxEip1559 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip1559 transaction.")?,
-            max_priority_fee_per_gas: self
-                .max_priority_fee_per_gas
-                .ok_or("Missing 'max_priority_fee_per_gas' field for Eip1559 transaction.")?,
-            max_fee_per_gas: self
-                .max_fee_per_gas
-                .ok_or("Missing 'max_fee_per_gas' field for Eip1559 transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip1559 transaction.")?,
-            to: checked_to,
+            nonce,
+            max_priority_fee_per_gas,
+            max_fee_per_gas,
+            gas_limit,
+            to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
@@ -339,17 +473,32 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_2930` to check if the
     /// request can be built.
-    fn build_2930(self) -> Result<TxEip2930, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for Eip2930 transaction.")?;
+    pub fn build_2930(self) -> Result<TxEip2930, ValueError<Self>> {
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip2930 transaction."));
+        };
+        let Some(nonce) = self.nonce else {
+            return Err(ValueError::new(self, "Missing 'nonce' field for Eip2930 transaction."));
+        };
+        let Some(gas_price) = self.gas_price else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_price' field for Eip2930 transaction.",
+            ));
+        };
+        let Some(gas_limit) = self.gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_limit' field for Eip2930 transaction.",
+            ));
+        };
 
         Ok(TxEip2930 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip2930 transaction.")?,
-            gas_price: self
-                .gas_price
-                .ok_or("Missing 'gas_price' field for Eip2930 transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip2930 transaction.")?,
-            to: checked_to,
+            nonce,
+            gas_price,
+            gas_limit,
+            to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
@@ -360,7 +509,7 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    fn build_4844_variant(self) -> Result<TxEip4844Variant, &'static str> {
+    pub fn build_4844_variant(self) -> Result<TxEip4844Variant, ValueError<Self>> {
         if self.sidecar.is_none() {
             self.build_4844_without_sidecar().map(Into::into)
         } else {
@@ -372,33 +521,72 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    fn build_4844_without_sidecar(self) -> Result<TxEip4844, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for Eip4844 transaction.")?;
-
-        let to_address = match checked_to {
-            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
-            TxKind::Call(to) => to,
+    pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, ValueError<Self>> {
+        // First check 'to' field and type
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip4844 transaction."));
         };
+        let TxKind::Call(to_address) = to else {
+            return Err(ValueError::new(
+                Self { to: Some(to), ..self },
+                "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.",
+            ));
+        };
+
+        // Check all required fields exist before extracting
+        if self.nonce.is_none() {
+            return Err(ValueError::new(self, "Missing 'nonce' field for Eip4844 transaction."));
+        }
+        if self.gas.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_limit' field for Eip4844 transaction.",
+            ));
+        }
+        if self.max_fee_per_gas.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_fee_per_gas' field for Eip4844 transaction.",
+            ));
+        }
+        if self.max_priority_fee_per_gas.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_priority_fee_per_gas' field for Eip4844 transaction.",
+            ));
+        }
+        if self.blob_versioned_hashes.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'blob_versioned_hashes' field for Eip4844 transaction.",
+            ));
+        }
+        if self.max_fee_per_blob_gas.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_fee_per_blob_gas' field for Eip4844 transaction.",
+            ));
+        }
+
+        // Now extract all fields - safe to unwrap since we checked above
+        let nonce = self.nonce.unwrap();
+        let gas_limit = self.gas.unwrap();
+        let max_fee_per_gas = self.max_fee_per_gas.unwrap();
+        let max_priority_fee_per_gas = self.max_priority_fee_per_gas.unwrap();
+        let blob_versioned_hashes = self.blob_versioned_hashes.unwrap();
+        let max_fee_per_blob_gas = self.max_fee_per_blob_gas.unwrap();
 
         Ok(TxEip4844 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip4844 transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip4844 transaction.")?,
-            max_fee_per_gas: self
-                .max_fee_per_gas
-                .ok_or("Missing 'max_fee_per_gas' field for Eip4844 transaction.")?,
-            max_priority_fee_per_gas: self
-                .max_priority_fee_per_gas
-                .ok_or("Missing 'max_priority_fee_per_gas' field for Eip4844 transaction.")?,
+            nonce,
+            gas_limit,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
             to: to_address,
             value: self.value.unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
-            blob_versioned_hashes: self
-                .blob_versioned_hashes
-                .ok_or("Missing 'blob_versioned_hashes' field for Eip4844 transaction.")?,
-            max_fee_per_blob_gas: self
-                .max_fee_per_blob_gas
-                .ok_or("Missing 'max_fee_per_blob_gas' field for Eip4844 transaction.")?,
+            blob_versioned_hashes,
+            max_fee_per_blob_gas,
             input: self.input.into_input().unwrap_or_default(),
         })
     }
@@ -407,40 +595,72 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, &'static str> {
+    pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, ValueError<Self>> {
         self.populate_blob_hashes();
 
-        let sidecar =
-            self.sidecar.clone().ok_or("Missing 'sidecar' field for Eip4844 transaction.")?;
+        let Some(sidecar) = self.sidecar.take() else {
+            return Err(ValueError::new(self, "Missing 'sidecar' field for Eip4844 transaction."));
+        };
 
         Ok(TxEip4844WithSidecar { sidecar, tx: self.build_4844_without_sidecar()? })
     }
 
     /// Build an EIP-7702 transaction.
     ///
-    /// # Panics
-    ///
-    /// If required fields are missing. Use `complete_7702` to check if the
-    /// request can be built.
-    fn build_7702(self) -> Result<TxEip7702, &'static str> {
-        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")?;
+    /// Returns an error if required fields are missing. Use `complete_7702` to
+    /// check if the request can be built.
+    pub fn build_7702(self) -> Result<TxEip7702, ValueError<Self>> {
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip7702 transaction."));
+        };
+        let Some(to_address) = to.to().copied() else {
+            return Err(ValueError::new(self, "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."));
+        };
+        let Some(nonce) = self.nonce else {
+            return Err(ValueError::new(self, "Missing 'nonce' field for Eip7702 transaction."));
+        };
+        let Some(gas_limit) = self.gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_limit' field for Eip7702 transaction.",
+            ));
+        };
+        let Some(max_fee_per_gas) = self.max_fee_per_gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_fee_per_gas' field for Eip7702 transaction.",
+            ));
+        };
+        let Some(max_priority_fee_per_gas) = self.max_priority_fee_per_gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_priority_fee_per_gas' field for Eip7702 transaction.",
+            ));
+        };
 
         Ok(TxEip7702 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip7702 transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip7702 transaction.")?,
-            max_fee_per_gas: self
-                .max_fee_per_gas
-                .ok_or("Missing 'max_fee_per_gas' field for Eip7702 transaction.")?,
-            max_priority_fee_per_gas: self
-                .max_priority_fee_per_gas
-                .ok_or("Missing 'max_priority_fee_per_gas' field for Eip7702 transaction.")?,
+            nonce,
+            gas_limit,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
             to: to_address,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
             authorization_list: self.authorization_list.unwrap_or_default(),
         })
+    }
+
+    /// Ensures `to` field is set to an address which is required by:
+    /// - EIP 7702
+    /// - EIP 4844
+    const fn ensure_mandatory_to(&self) -> Result<(), ()> {
+        if !matches!(self.to, Some(TxKind::Call(_))) {
+            Err(())
+        } else {
+            Ok(())
+        }
     }
 
     fn check_reqd_fields(&self) -> Vec<&'static str> {
@@ -516,18 +736,169 @@ impl TransactionRequest {
         }
     }
 
+    /// Returns the minimal transaction type this request can be converted into based on the fields
+    /// that are set.
+    ///
+    /// Compared to [`Self::preferred_type`] which is intended for building and eventually signing
+    /// transactions and which prefers [`TxType::Eip1559`] if no conflicting fields are set, this
+    /// function is intended for deriving the minimal transaction type (legacy).
+    ///
+    /// [`Self::minimal_tx_type`] is mostly relevant for the server-side, for example executing
+    /// `eth_calls` against historic state (pre [`TxType::Eip1559`]) and is used to configure the
+    /// EVM's transaction environment with the minimal settings.
+    /// Whereas [`Self::preferred_type`] is recommend for using client-side (filling a
+    /// [`TransactionRequest`] and signing the transaction [`TransactionRequest::build_typed_tx`]).
+    ///
+    /// The type is determined in the following order:
+    /// - EIP-7702 if authorization_list is set
+    /// - EIP-4844 if blob data fields are set (sidecar or blob hashes)
+    /// - EIP-1559 if any EIP-1559 fee fields are set (max fee per gas, max priority fee)
+    /// - EIP-2930 if access_list is set
+    /// - Legacy otherwise
+    ///
+    /// Note: `max_fee_per_blob_gas` alone does NOT indicate EIP-4844. This matches go-ethereum
+    /// behavior where only the presence of `blob_versioned_hashes` or sidecar determines if a
+    /// transaction is a blob transaction.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use alloy_consensus::TxType;
+    /// use alloy_eips::eip2930::AccessList;
+    /// use alloy_rpc_types_eth::TransactionRequest;
+    ///
+    /// // EIP-7702 (highest priority)
+    /// let mut request = TransactionRequest::default();
+    /// request.authorization_list = Some(vec![]);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip7702);
+    ///
+    /// // max_fee_per_blob_gas alone does NOT make it EIP-4844
+    /// let request = TransactionRequest::default().max_fee_per_blob_gas(1000000000);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy); // NOT Eip4844!
+    ///
+    /// // EIP-4844 with blob_versioned_hashes
+    /// let request = TransactionRequest { blob_versioned_hashes: Some(vec![]), ..Default::default() };
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip4844);
+    ///
+    /// // EIP-1559 with max_fee_per_gas
+    /// let request = TransactionRequest::default().max_fee_per_gas(2000000000);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip1559);
+    ///
+    /// // EIP-1559 with max_priority_fee_per_gas
+    /// let request = TransactionRequest::default().max_priority_fee_per_gas(1000000000);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip1559);
+    ///
+    /// // EIP-2930 with access_list
+    /// let request = TransactionRequest::default().access_list(AccessList::default());
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip2930);
+    ///
+    /// // Legacy (default fallback)
+    /// let request = TransactionRequest::default();
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy);
+    ///
+    /// // Priority example: EIP-4844 (with blob hashes) overrides EIP-1559
+    /// let request = TransactionRequest {
+    ///     max_fee_per_gas: Some(2000000000),
+    ///     blob_versioned_hashes: Some(vec![]),
+    ///     ..Default::default()
+    /// };
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip4844);
+    /// ```
+    pub const fn minimal_tx_type(&self) -> TxType {
+        if self.authorization_list.is_some() {
+            TxType::Eip7702
+        } else if self.has_eip4844_blob_data() {
+            TxType::Eip4844
+        } else if self.has_eip1559_fields() {
+            TxType::Eip1559
+        } else if self.access_list.is_some() {
+            TxType::Eip2930
+        } else {
+            TxType::Legacy
+        }
+    }
+
     /// Check this builder's preferred type, based on the fields that are set.
+    ///
+    /// This function is intended for building and eventually signing transactions client-side.
+    /// Unlike [`Self::minimal_tx_type`] which returns the minimal required type, this function
+    /// prefers [`TxType::Eip1559`] when no conflicting fields are set.
     ///
     /// Types are preferred as follows:
     /// - EIP-7702 if authorization_list is set
-    /// - EIP-4844 if sidecar or max_blob_fee_per_gas is set
+    /// - EIP-4844 if sidecar or blob_versioned_hashes is set
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases
+    ///
+    /// Note: `max_fee_per_blob_gas` alone does NOT indicate EIP-4844. This matches go-ethereum
+    /// behavior where only the presence of `blob_versioned_hashes` or sidecar determines if a
+    /// transaction is a blob transaction.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use alloy_consensus::TxType;
+    /// use alloy_eips::eip2930::AccessList;
+    /// use alloy_rpc_types_eth::TransactionRequest;
+    ///
+    /// // EIP-7702 (highest priority)
+    /// let mut request = TransactionRequest::default();
+    /// request.authorization_list = Some(vec![]);
+    /// assert_eq!(request.preferred_type(), TxType::Eip7702);
+    ///
+    /// // EIP-4844 requires blob_versioned_hashes or sidecar, not just max_fee_per_blob_gas
+    /// let request = TransactionRequest::default().max_fee_per_blob_gas(1000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559); // NOT Eip4844!
+    ///
+    /// // EIP-4844 with blob_versioned_hashes
+    /// let request = TransactionRequest { blob_versioned_hashes: Some(vec![]), ..Default::default() };
+    /// assert_eq!(request.preferred_type(), TxType::Eip4844);
+    ///
+    /// // EIP-2930 with both access_list and gas_price
+    /// let request =
+    ///     TransactionRequest::default().access_list(AccessList::default()).gas_price(20000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Eip2930);
+    ///
+    /// // Legacy with only gas_price (no access_list)
+    /// let request = TransactionRequest::default().gas_price(20000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Legacy);
+    ///
+    /// // EIP-1559 as default for modern transactions
+    /// let request = TransactionRequest::default();
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559);
+    ///
+    /// // EIP-1559 even with access_list but no gas_price
+    /// let request = TransactionRequest::default().access_list(AccessList::default());
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559);
+    /// ```
+    ///
+    /// # Key Differences from [`Self::minimal_tx_type`]
+    ///
+    /// ```rust
+    /// use alloy_consensus::TxType;
+    /// use alloy_eips::eip2930::AccessList;
+    /// use alloy_rpc_types_eth::TransactionRequest;
+    ///
+    /// // Empty request - preferred_type prefers EIP-1559, minimal_tx_type falls back to Legacy
+    /// let request = TransactionRequest::default();
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559); // Preferred for new txs
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy); // Minimal requirement
+    ///
+    /// // Access list only - different behavior
+    /// let request = TransactionRequest::default().access_list(AccessList::default());
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559); // Still prefers EIP-1559
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip2930); // Minimal is EIP-2930
+    ///
+    /// // Gas price only - both agree on Legacy
+    /// let request = TransactionRequest::default().gas_price(20000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Legacy);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy);
+    /// ```
     pub const fn preferred_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
-        } else if self.sidecar.is_some() || self.max_fee_per_blob_gas.is_some() {
+        } else if self.has_eip4844_blob_data() {
             TxType::Eip4844
         } else if self.access_list.is_some() && self.gas_price.is_some() {
             TxType::Eip2930
@@ -567,7 +938,7 @@ impl TransactionRequest {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
 
-        if self.to.is_none() {
+        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
             missing.push("to");
         }
 
@@ -621,6 +992,10 @@ impl TransactionRequest {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
 
+        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
+            missing.push("to");
+        }
+
         if self.authorization_list.is_none() {
             missing.push("authorization_list");
         }
@@ -662,7 +1037,7 @@ impl TransactionRequest {
     /// Build a [`TypedTransaction`]
     ///
     /// When `Ok(...)` is returned, the `TypedTransaction` is guaranteed to be _complete_. Which
-    /// is to say, that it is signable, and the signed versino can be sent to the network.
+    /// is to say, that it is signable, and the signed version can be sent to the network.
     pub fn build_typed_tx(self) -> Result<TypedTransaction, Self> {
         let Some(tx_type) = self.buildable_type() else {
             return Err(self);
@@ -691,18 +1066,31 @@ impl TransactionRequest {
     /// In case the requirement is to build a _complete_ transaction, use `build_typed_tx` instead.
     pub fn build_consensus_tx(self) -> Result<TypedTransaction, BuildTransactionErr> {
         match self.preferred_type() {
-            TxType::Legacy => self.clone().build_legacy().map(Into::into),
-            TxType::Eip2930 => self.clone().build_2930().map(Into::into),
-            TxType::Eip1559 => self.clone().build_1559().map(Into::into),
-            TxType::Eip4844 => self.clone().build_4844_variant().map(Into::into),
-            TxType::Eip7702 => self.clone().build_7702().map(Into::into),
+            TxType::Legacy => self.build_legacy().map(Into::into),
+            TxType::Eip2930 => self.build_2930().map(Into::into),
+            TxType::Eip1559 => self.build_1559().map(Into::into),
+            TxType::Eip4844 => self.build_4844_variant().map(Into::into),
+            TxType::Eip7702 => self.build_7702().map(Into::into),
         }
-        .map_err(|msg| self.into_tx_err(msg))
+        .map_err(|e| {
+            let error = e.to_string();
+            BuildTransactionErr { tx: e.into_value(), error }
+        })
     }
 
-    /// Converts the transaction request into a `BuildTransactionErr` with the given message.
-    fn into_tx_err(self, message: &'static str) -> BuildTransactionErr {
-        BuildTransactionErr { tx: self, error: message.to_string() }
+    /// Builds a signed typed transaction envelope for the `eth_simulateV1` endpoint with a dummy
+    /// signature. See also <https://github.com/ethereum/execution-apis/pull/484>
+    ///
+    /// Returns an error if the transaction is not buildable, i.e. if the required fields are
+    /// missing. See [`Self::buildable_type`] for more information.
+    pub fn build_typed_simulate_transaction(
+        self,
+    ) -> Result<alloy_consensus::EthereumTxEnvelope<TxEip4844>, ValueError<Self>> {
+        let tx = self
+            .build_consensus_tx()
+            .map_err(|err| ValueError::new(err.tx, "Transaction is not buildable"))?;
+        let signature = Signature::new(Default::default(), Default::default(), false);
+        Ok(tx.into_signed(signature).into())
     }
 }
 
@@ -715,11 +1103,15 @@ impl TransactionBuilder4844 for TransactionRequest {
         self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
     }
 
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant> {
         self.sidecar.as_ref()
     }
 
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+    fn has_blob_sidecar(&self) -> bool {
+        self.sidecar.is_some()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant) {
         self.sidecar = Some(sidecar);
         self.populate_blob_hashes();
     }
@@ -735,9 +1127,28 @@ impl TransactionBuilder7702 for TransactionRequest {
     }
 }
 
+#[cfg(feature = "serde")]
+impl From<TransactionRequest> for alloy_serde::WithOtherFields<TransactionRequest> {
+    fn from(tx: TransactionRequest) -> Self {
+        Self::new(tx)
+    }
+}
+
+impl AsRef<Self> for TransactionRequest {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl AsMut<Self> for TransactionRequest {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> Self {
-        tx.into_request()
+        tx.into_recovered().into()
     }
 }
 
@@ -855,7 +1266,11 @@ impl From<TxEip4844Variant> for TransactionRequest {
     fn from(tx: TxEip4844Variant) -> Self {
         match tx {
             TxEip4844Variant::TxEip4844(tx) => tx.into(),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.into(),
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => {
+                let mut req: Self = tx.tx.into();
+                req.sidecar = Some(tx.sidecar);
+                req
+            }
         }
     }
 }
@@ -901,6 +1316,12 @@ impl From<TypedTransaction> for TransactionRequest {
             TypedTransaction::Eip4844(tx) => tx.into(),
             TypedTransaction::Eip7702(tx) => tx.into(),
         }
+    }
+}
+
+impl<T: TransactionTrait> From<Recovered<T>> for TransactionRequest {
+    fn from(tx: Recovered<T>) -> Self {
+        Self::from_recovered_transaction(tx)
     }
 }
 
@@ -996,6 +1417,226 @@ impl From<TxEnvelope> for TransactionRequest {
     }
 }
 
+/// Bincode-compatible [TransactionRequest] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(super) mod serde_bincode_compat {
+    use crate::TransactionInput;
+    use alloc::{borrow::Cow, vec::Vec};
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [super::TransactionRequest] serde implementation.
+    ///
+    /// Intended to use with the [serde_with::serde_as] macro in the following way:
+    /// ```rust
+    /// use alloy_rpc_types_eth::{serde_bincode_compat, transaction, TransactionRequest};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::TransactionRequest")]
+    ///     transaction: TransactionRequest,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct TransactionRequest<'a> {
+        /// The address of the transaction author.
+        pub from: Option<Address>,
+        /// The destination address of the transaction.
+        pub to: Option<TxKind>,
+        /// The legacy gas price.
+        pub gas_price: Option<u128>,
+        /// The max base fee per gas the sender is willing to pay.
+        pub max_fee_per_gas: Option<u128>,
+        /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
+        pub max_priority_fee_per_gas: Option<u128>,
+        /// The max fee per blob gas for EIP-4844 blob transactions.
+        pub max_fee_per_blob_gas: Option<u128>,
+        /// The gas limit for the transaction.
+        pub gas: Option<u64>,
+        /// The value transferred in the transaction, in wei.
+        pub value: Option<U256>,
+        /// Transaction input.
+        pub input: Option<Cow<'a, Bytes>>,
+        /// Transaction data.
+        pub data: Option<Cow<'a, Bytes>>,
+        /// The nonce of the transaction.
+        pub nonce: Option<u64>,
+        /// The chain ID for the transaction.
+        pub chain_id: Option<ChainId>,
+        /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
+        pub access_list: Option<Cow<'a, AccessList>>,
+        /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
+        pub transaction_type: Option<u8>,
+        /// Blob versioned hashes for EIP-4844 transactions.
+        pub blob_versioned_hashes: Option<Cow<'a, Vec<B256>>>,
+        /// Blob sidecar for EIP-4844 transactions.
+        pub sidecar:
+            Option<alloy_eips::eip7594::serde_bincode_compat::BlobTransactionSidecarVariant<'a>>,
+        /// Authorization list for EIP-7702 transactions.
+        pub authorization_list:
+            Option<Vec<alloy_eips::eip7702::serde_bincode_compat::SignedAuthorization<'a>>>,
+    }
+
+    impl<'a> From<&'a super::TransactionRequest> for TransactionRequest<'a> {
+        fn from(value: &'a super::TransactionRequest) -> Self {
+            Self {
+                from: value.from,
+                to: value.to,
+                gas_price: value.gas_price,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                max_fee_per_blob_gas: value.max_fee_per_blob_gas,
+                gas: value.gas,
+                value: value.value,
+                input: value.input.input.as_ref().map(Cow::Borrowed),
+                data: value.input.data.as_ref().map(Cow::Borrowed),
+                nonce: value.nonce,
+                chain_id: value.chain_id,
+                access_list: value.access_list.as_ref().map(Cow::Borrowed),
+                transaction_type: value.transaction_type,
+                blob_versioned_hashes: value.blob_versioned_hashes.as_ref().map(Cow::Borrowed),
+                sidecar: value.sidecar.as_ref().map(Into::into),
+                authorization_list: value
+                    .authorization_list
+                    .as_ref()
+                    .map(|auths| auths.iter().map(Into::into).collect()),
+            }
+        }
+    }
+
+    impl<'a> From<TransactionRequest<'a>> for super::TransactionRequest {
+        fn from(value: TransactionRequest<'a>) -> Self {
+            Self {
+                from: value.from,
+                to: value.to,
+                gas_price: value.gas_price,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                max_fee_per_blob_gas: value.max_fee_per_blob_gas,
+                gas: value.gas,
+                value: value.value,
+                input: TransactionInput {
+                    input: value.input.map(Cow::into_owned),
+                    data: value.data.map(Cow::into_owned),
+                },
+                nonce: value.nonce,
+                chain_id: value.chain_id,
+                access_list: value.access_list.map(|list| list.into_owned()),
+                transaction_type: value.transaction_type,
+                blob_versioned_hashes: value
+                    .blob_versioned_hashes
+                    .map(|hashes| hashes.into_owned()),
+                sidecar: value.sidecar.map(Into::into),
+                authorization_list: value
+                    .authorization_list
+                    .map(|list| list.into_iter().map(Into::into).collect()),
+            }
+        }
+    }
+
+    impl SerializeAs<super::TransactionRequest> for TransactionRequest<'_> {
+        fn serialize_as<S>(
+            source: &super::TransactionRequest,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            TransactionRequest::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::TransactionRequest> for TransactionRequest<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::TransactionRequest, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            TransactionRequest::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use crate::TransactionRequest;
+        use arbitrary::Arbitrary;
+        use bincode::config;
+        use rand::{rngs::StdRng, Rng, SeedableRng};
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        use super::super::serde_bincode_compat;
+
+        #[test]
+        fn test_tx_request_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::TransactionRequest")]
+                transaction: TransactionRequest,
+            }
+
+            let mut bytes = vec![0u8; 1024];
+            StdRng::seed_from_u64(0x3600_4844_7594_7702).fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: TransactionRequest::arbitrary(&mut arbitrary::Unstructured::new(
+                    &bytes,
+                ))
+                .unwrap(),
+            };
+
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, data);
+        }
+    }
+}
+
+/// Represents how a [`TransactionRequest`] handles input/data fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TransactionInputKind {
+    /// Only supports 'input' field
+    #[default]
+    Input,
+    /// Only supports 'data' field
+    Data,
+    /// Supports both 'input' and 'data' fields
+    Both,
+}
+
+impl TransactionInputKind {
+    /// Constructor for [`TransactionInputKind::Both`] variant.
+    pub const fn both() -> Self {
+        Self::Both
+    }
+}
+
+/// Error type for parsing `TransactionInputKind`
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid TransactionInputKind: '{input}', expected 'input', 'data', or 'both'")]
+pub struct ParseTransactionInputKindError {
+    /// The invalid input string
+    input: String,
+}
+
+impl FromStr for TransactionInputKind {
+    type Err = ParseTransactionInputKindError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "input" => Ok(Self::Input),
+            "data" => Ok(Self::Data),
+            "both" => Ok(Self::Both),
+            _ => Err(ParseTransactionInputKindError { input: s.to_string() }),
+        }
+    }
+}
+
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.
 ///
 /// This is done for compatibility reasons where older implementations used `data` instead of the
@@ -1045,6 +1686,57 @@ impl TransactionInput {
     #[inline]
     pub fn into_input(self) -> Option<Bytes> {
         self.input.or(self.data)
+    }
+
+    /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
+    ///
+    /// This removes `data` the data field.
+    pub fn normalize_input(&mut self) {
+        let data = self.data.take();
+        // If input is None but data has a value, copy data to input
+        if self.input.is_none() {
+            self.input = data;
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_input`] applied
+    pub fn normalized_input(mut self) -> Self {
+        self.normalize_input();
+        self
+    }
+
+    /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
+    ///
+    /// This removes `input` the data field.
+    pub fn normalize_data(&mut self) {
+        let input = self.input.take();
+        if self.data.is_none() {
+            self.data = input;
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_data`] applied
+    pub fn normalized_data(mut self) -> Self {
+        self.normalize_data();
+        self
+    }
+
+    /// If only one field is set, this also sets the other field by with that value.
+    ///
+    /// This is a noop if both fields are already set.
+    pub fn set_both(&mut self) {
+        if self.input.is_none() {
+            self.input = self.data.clone();
+        }
+        if self.data.is_none() {
+            self.data = self.input.clone();
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::set_both`] applied.
+    pub fn with_both(mut self) -> Self {
+        self.set_both();
+        self
     }
 
     /// Consumes the type and returns the optional input data.
@@ -1097,13 +1789,6 @@ impl From<Option<Bytes>> for TransactionInput {
     }
 }
 
-/// Error thrown when both `data` and `input` fields are set and not equal.
-#[derive(Debug, Default, thiserror::Error)]
-#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
-#[doc(alias = "TxInputError")]
-#[non_exhaustive]
-pub struct TransactionInputError;
-
 /// Error thrown when a transaction request cannot be built into a transaction.
 #[derive(Debug)]
 pub struct BuildTransactionErr<T = TransactionRequest> {
@@ -1113,10 +1798,30 @@ pub struct BuildTransactionErr<T = TransactionRequest> {
     pub error: String,
 }
 
+/// Error thrown when both `data` and `input` fields are set and not equal.
+#[derive(Debug, Default, thiserror::Error)]
+#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[doc(alias = "TxInputError")]
+#[non_exhaustive]
+pub struct TransactionInputError;
+
+/// Response type for `eth_fillTransaction`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FillTransaction<T = TypedTransaction> {
+    /// RLP-encoded signed transaction bytes.
+    pub raw: Bytes,
+    /// Filled transaction request with populated default values.
+    pub tx: T,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Authorization;
+    use alloy_consensus::BlobTransactionSidecarEip7594;
     use alloy_primitives::b256;
+    #[cfg(feature = "serde")]
     use alloy_serde::WithOtherFields;
     use assert_matches::assert_matches;
     use similar_asserts::assert_eq;
@@ -1173,11 +1878,11 @@ mod tests {
     fn serde_tx_chain_id_field() {
         let chain_id: ChainId = 12345678;
 
-        let chain_id_as_num = format!(r#"{{"chainId": {} }}"#, chain_id);
+        let chain_id_as_num = format!(r#"{{"chainId": {chain_id} }}"#);
         let req1 = serde_json::from_str::<TransactionRequest>(&chain_id_as_num).unwrap();
         assert_eq!(req1.chain_id.unwrap(), chain_id);
 
-        let chain_id_as_hex = format!(r#"{{"chainId": "0x{:x}" }}"#, chain_id);
+        let chain_id_as_hex = format!(r#"{{"chainId": "0x{chain_id:x}" }}"#);
         let req2 = serde_json::from_str::<TransactionRequest>(&chain_id_as_hex).unwrap();
         assert_eq!(req2.chain_id.unwrap(), chain_id);
     }
@@ -1389,7 +2094,7 @@ mod tests {
                 gas: Some(123456),
                 max_fee_per_blob_gas: Some(13579),
                 blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
-                sidecar: Some(sidecar.clone()),
+                sidecar: Some(sidecar.into()),
                 ..Default::default()
             };
 
@@ -1398,6 +2103,25 @@ mod tests {
             assert_matches!(maybe_eip4844_tx,
             Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
             sidecar, .. }))) if sidecar == sidecar);
+
+            // with create to
+            let sidecar =
+                BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Create),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
+                sidecar: Some(sidecar.clone().into()),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Err(..));
 
             // Negative case
             let eip4844_request_incorrect_to = TransactionRequest {
@@ -1408,7 +2132,7 @@ mod tests {
                 gas: Some(123456),
                 max_fee_per_blob_gas: Some(13579),
                 blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
-                sidecar: Some(sidecar),
+                sidecar: Some(sidecar.into()),
                 ..Default::default()
             };
 
@@ -1416,5 +2140,211 @@ mod tests {
                 eip4844_request_incorrect_to.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
+
+        // EIP-4844 with EIP-7594 sidecar
+        {
+            use alloy_eips::eip4844::Blob;
+
+            // Positive case
+            let sidecar = BlobTransactionSidecarEip7594::new(
+                vec![Blob::repeat_byte(0xFA)],
+                Vec::new(),
+                Vec::new(),
+            );
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
+                sidecar: Some(sidecar.into()),
+                ..Default::default()
+            };
+
+            // this panics because EIP-7594 sidecar is ignored
+            eip4844_request.build_consensus_tx().unwrap();
+        }
+
+        // EIP-7702
+        {
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                authorization_list: Some(vec![SignedAuthorization::new_unchecked(
+                    Authorization {
+                        chain_id: Default::default(),
+                        address: Default::default(),
+                        nonce: 0,
+                    },
+                    0,
+                    U256::ZERO,
+                    U256::ZERO,
+                )]),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip7702(_)));
+
+            // as create tx
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Create),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                authorization_list: Some(vec![SignedAuthorization::new_unchecked(
+                    Authorization {
+                        chain_id: Default::default(),
+                        address: Default::default(),
+                        nonce: 0,
+                    },
+                    0,
+                    U256::ZERO,
+                    U256::ZERO,
+                )]),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Err(..));
+        }
+    }
+
+    #[test]
+    fn build_typed_simulate_transaction_builds_eip1559() {
+        let request = TransactionRequest {
+            to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+            max_fee_per_gas: Some(1234),
+            max_priority_fee_per_gas: Some(678),
+            nonce: Some(57),
+            gas: Some(123456),
+            ..Default::default()
+        };
+
+        let envelope = request.build_typed_simulate_transaction().unwrap();
+
+        assert_matches!(envelope, alloy_consensus::EthereumTxEnvelope::Eip1559(_));
+    }
+
+    #[test]
+    fn build_typed_simulate_transaction_allows_4844_without_sidecar() {
+        let blob_hash = B256::repeat_byte(0xAB);
+        let request = TransactionRequest {
+            to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+            max_fee_per_gas: Some(1234),
+            max_priority_fee_per_gas: Some(678),
+            nonce: Some(57),
+            gas: Some(123456),
+            max_fee_per_blob_gas: Some(13579),
+            blob_versioned_hashes: Some(vec![blob_hash]),
+            ..Default::default()
+        };
+
+        let envelope = request.build_typed_simulate_transaction().unwrap();
+
+        assert_matches!(
+            envelope,
+            alloy_consensus::EthereumTxEnvelope::Eip4844(signed)
+                if signed.tx().blob_versioned_hashes == vec![blob_hash]
+        );
+    }
+
+    #[test]
+    fn build_typed_simulate_transaction_builds_4844_with_sidecar() {
+        let request = TransactionRequest {
+            to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+            max_fee_per_gas: Some(1234),
+            max_priority_fee_per_gas: Some(678),
+            nonce: Some(57),
+            gas: Some(123456),
+            max_fee_per_blob_gas: Some(13579),
+            sidecar: Some(alloy_consensus::BlobTransactionSidecar::default().into()),
+            ..Default::default()
+        };
+
+        let envelope = request.build_typed_simulate_transaction().unwrap();
+
+        assert_matches!(
+            envelope,
+            alloy_consensus::EthereumTxEnvelope::Eip4844(signed)
+                if signed.tx().blob_versioned_hashes.is_empty()
+        );
+    }
+
+    #[test]
+    fn build_typed_simulate_transaction_errors_if_not_buildable() {
+        let request = TransactionRequest {
+            to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+            max_fee_per_gas: Some(1234),
+            nonce: Some(57),
+            gas: Some(123456),
+            ..Default::default()
+        };
+
+        assert!(request.build_typed_simulate_transaction().is_err());
+    }
+
+    #[test]
+    fn deserde_auth_request() {
+        let s = r#"        {
+            "to": "0xE854C84cD68fC434cB3B0042c29235D452cAD977",
+            "value": "0x2386f26fc10000",
+            "data": "0x97b2dcb9000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000b187803a4ac9c5a498e470aab82de203f5870ab872cfa6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000249f000000000000000000000000000014c0800000000000000000000000000000000000000000000000000000000000154b4000000000000000000000000002cf2770000000000000000000000000000003200000000000000000000000000000000000000000000000000000000000002600000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e4e9ae5c53000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000078833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000000a9059cbb0000000000000000000000009c2a029612a98264e34ecf3ad8811c4e4a48316f0000000000000000000000000000000000000000000000000000000000001b9b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000074e854c84cd68fc434cb3b0042c29235d452cad97700000000000000000000000000004e2000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000043238000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000164177eee00b973503b11a308c1588a727a359c4709fec51aa9177502497da881f7c2b1a4b90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006825c11f00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000001cff5e8e759c0aebbd4480700377fa5b3fc836d646b6882e2b20df2eb9dfed80e0000000000000000000000000000000000000000000000000000000000000041bb5fa08fdd3834010b589ee27c0918fb37271ee0825c81ab7559b5b97632bc1e14d81ce5cb28e53a6c602bc76c707794a43e5beeba5eb32903f81deb06cbbac61b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "from": "0x4b19129EA58431A06D01054f69AcAe5de50633b6",
+            "authorizationList": [
+                {
+                    "chainId": "0x2105",
+                    "address": "0x000000004F43C49e93C970E84001853a70923B03",
+                    "nonce": "0x0",
+                    "r": "0xb3fdb76993ec6787313ab8b54129200032dfb9ce683fa9f7693129421e6a3185",
+                    "s": "0x210b3350107a5687b532a346a90e7cc9a799b995743e2b79698bedba7bd779ae",
+                    "v": "0x1b",
+                    "yParity": "0x0"
+                }
+            ]
+        }"#;
+
+        let req: TransactionRequest = serde_json::from_str(s).unwrap();
+        let auths = req.authorization_list.unwrap();
+        assert_eq!(auths.len(), 1);
+        assert_eq!(auths[0].y_parity(), 0);
+    }
+
+    #[test]
+    fn set_blob_sidecar_7594_populates_versioned_hashes() {
+        use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, Bytes48};
+
+        // Create a sidecar with a known commitment
+        let commitment = Bytes48::repeat_byte(0x42);
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0xFA)],
+            vec![commitment],
+            vec![Bytes48::repeat_byte(0x11)], // cell proof
+        );
+
+        // Calculate expected versioned hash from the commitment
+        let expected_hash = kzg_to_versioned_hash(commitment.as_slice());
+
+        // Create a transaction request and set the sidecar
+        let mut tx_request = TransactionRequest::default();
+        assert!(tx_request.blob_versioned_hashes.is_none());
+
+        tx_request.set_blob_sidecar_7594(sidecar);
+
+        // Verify that blob_versioned_hashes was populated
+        assert!(tx_request.blob_versioned_hashes.is_some());
+        let hashes = tx_request.blob_versioned_hashes.unwrap();
+        assert_eq!(hashes.len(), 1);
+        assert_eq!(hashes[0], expected_hash);
     }
 }

@@ -1,5 +1,5 @@
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{hex, Address, ChainId, PrimitiveSignature as Signature, B256};
+use alloy_primitives::{hex, Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use gcloud_sdk::{
@@ -15,7 +15,7 @@ use gcloud_sdk::{
 };
 use k256::ecdsa::{self, VerifyingKey};
 use spki::DecodePublicKey;
-use std::{fmt, fmt::Debug};
+use std::fmt;
 use thiserror::Error;
 
 type Client = GoogleApi<KeyManagementServiceClient<GoogleAuthMiddleware>>;
@@ -143,10 +143,14 @@ pub enum GcpSignerError {
     /// [`ecdsa`] error.
     #[error(transparent)]
     K256(#[from] ecdsa::Error),
+
+    /// Failed to recover signature parity for the given digest and public key.
+    #[error("failed to recover signature parity from KMS signature")]
+    SignatureRecoveryFailed,
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl alloy_network::TxSigner<Signature> for GcpSigner {
     fn address(&self) -> Address {
         self.address
@@ -162,8 +166,8 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for GcpSigner {
     #[instrument(err)]
     #[allow(clippy::blocks_in_conditions)]
@@ -187,6 +191,8 @@ impl Signer for GcpSigner {
     }
 }
 
+alloy_network::impl_into_wallet!(GcpSigner);
+
 impl GcpSigner {
     /// Instantiate a new signer from an existing `Client`, keyring reference, key ID, and version.
     ///
@@ -207,7 +213,7 @@ impl GcpSigner {
 
     /// Fetch the pubkey associated with this signer's key.
     pub async fn get_pubkey(&self) -> Result<VerifyingKey, GcpSignerError> {
-        request_get_pubkey(&self.client, &self.key_name).await.and_then(decode_pubkey)
+        Ok(self.pubkey)
     }
 
     /// Sign a digest with this signer's key
@@ -215,12 +221,16 @@ impl GcpSigner {
         request_sign_digest(&self.client, &self.key_name, digest).await.and_then(decode_signature)
     }
 
-    /// Sign a digest with this signer's key and add the eip155 `v` value
-    /// corresponding to the input chain_id
+    /// Sign a digest with this signer's key and recover a `Signature` with the
+    /// correct y-parity for the given public key.
+    ///
+    /// The digest is expected to already include any EIP-155 chain ID encoding
+    /// via the transaction's signature hash.
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, GcpSignerError> {
         let sig = self.sign_digest(digest).await?;
-        Ok(sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey))
+        let recovered = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey)?;
+        Ok(recovered)
     }
 }
 
@@ -229,7 +239,11 @@ async fn request_get_pubkey(
     client: &Client,
     kms_key_name: &str,
 ) -> Result<PublicKey, GcpSignerError> {
-    let mut request = tonic::Request::new(GetPublicKeyRequest { name: kms_key_name.to_string() });
+    let mut request = tonic::Request::new(GetPublicKeyRequest {
+        name: kms_key_name.to_string(),
+        // When not specified, the default will be used.
+        public_key_format: Default::default(),
+    });
     request
         .metadata_mut()
         .insert("x-goog-request-params", format!("name={}", &kms_key_name).parse().unwrap());
@@ -253,7 +267,7 @@ async fn request_sign_digest(
     // Add metadata for request routing: https://cloud.google.com/kms/docs/grpc
     request
         .metadata_mut()
-        .insert("x-goog-request-params", format!("name={}", kms_key_name).parse().unwrap());
+        .insert("x-goog-request-params", format!("name={kms_key_name}").parse().unwrap());
 
     let response = client.get().asymmetric_sign(request).await?;
     let signature = response.into_inner().signature;
@@ -276,18 +290,18 @@ fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
     hash: &B256,
     pubkey: &VerifyingKey,
-) -> Signature {
+) -> Result<Signature, GcpSignerError> {
     let signature = Signature::from_signature_and_parity(sig, false);
     if check_candidate(&signature, hash, pubkey) {
-        return signature;
+        return Ok(signature);
     }
 
     let signature = signature.with_parity(true);
     if check_candidate(&signature, hash, pubkey) {
-        return signature;
+        return Ok(signature);
     }
 
-    panic!("bad sig");
+    Err(GcpSignerError::SignatureRecoveryFailed)
 }
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.

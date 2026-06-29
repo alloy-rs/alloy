@@ -19,7 +19,7 @@ let client: ReqwestClient = ClientBuilder::default().http(url);
 let request = client.request_noparams("eth_blockNumber");
 
 // Poll the request to completion.
-let block_number = request.await.unwrap();
+let block_number: U64 = request.await.unwrap();
 ```
 
 Batch requests are also supported:
@@ -29,11 +29,11 @@ Batch requests are also supported:
 let client: ReqwestClient = ClientBuilder::default().http(url);
 
 // Prepare a batch request to the server.
-let batch = client.new_batch();
+let mut batch = client.new_batch();
 
 // Batches serialize params immediately. So we need to handle the result when
 // adding calls.
-let block_number_fut = batch.add_call("eth_blockNumber", ()).unwrap();
+let block_number_fut = batch.add_call("eth_blockNumber", &()).unwrap();
 let balance_fut = batch.add_call("eth_getBalance", address).unwrap();
 
 // Make sure to send the batch!
@@ -41,6 +41,6 @@ batch.send().await.unwrap();
 
 // After the batch is complete, we can get the results.
 // Note that requests may error separately!
-let block_number = block_number_fut.await.unwrap();
-let balance = balance_fut.await.unwrap();
+let block_number: U64 = block_number_fut.await.unwrap();
+let balance: U256 = balance_fut.await.unwrap();
 ```

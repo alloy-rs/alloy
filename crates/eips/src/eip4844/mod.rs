@@ -2,6 +2,10 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
+/// Re-export the `c_kzg` crate for downstream consumers.
+#[cfg(feature = "kzg")]
+pub use c_kzg;
+
 /// Module houses the KZG settings, enabling Custom and Default
 #[cfg(feature = "kzg")]
 pub mod env_settings;
@@ -22,7 +26,7 @@ mod sidecar;
 #[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
 
-use alloy_primitives::{b256, FixedBytes, B256, U256};
+use alloy_primitives::{b256, Bytes, FixedBytes, B256, U256, U512};
 
 use crate::eip7840;
 
@@ -61,16 +65,17 @@ pub const DATA_GAS_PER_BLOB: u64 = 131_072u64; // 32*4096 = 131072 == 2^17 == 0x
 pub const BYTES_PER_BLOB: usize = 131_072;
 
 /// Maximum data gas for data blobs in a single block.
-pub const MAX_DATA_GAS_PER_BLOCK: u64 = 786_432u64; // 0xC0000 = 6 * 0x20000
+pub const MAX_DATA_GAS_PER_BLOCK_DENCUN: u64 = 786_432u64; // 0xC0000 = 6 * 0x20000
 
 /// Target data gas for data blobs in a single block.
-pub const TARGET_DATA_GAS_PER_BLOCK: u64 = 393_216u64; // 0x60000 = 3 * 0x20000
+pub const TARGET_DATA_GAS_PER_BLOCK_DENCUN: u64 = 393_216u64; // 0x60000 = 3 * 0x20000
 
 /// Maximum number of data blobs in a single block.
-pub const MAX_BLOBS_PER_BLOCK: usize = (MAX_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) as usize; // 786432 / 131072  = 6
+pub const MAX_BLOBS_PER_BLOCK_DENCUN: usize =
+    (MAX_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) as usize; // 786432 / 131072  = 6
 
 /// Target number of data blobs in a single block.
-pub const TARGET_BLOBS_PER_BLOCK: u64 = TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB; // 393216 / 131072 = 3
+pub const TARGET_BLOBS_PER_BLOCK_DENCUN: u64 = TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB; // 393216 / 131072 = 3
 
 /// Determines the maximum rate of change for blob fee
 pub const BLOB_GASPRICE_UPDATE_FRACTION: u128 = 3_338_477u128; // 3338477
@@ -104,8 +109,336 @@ where
     Ok(blob)
 }
 
+/// Helper function to deserialize boxed blobs from a serde deserializer.
+#[cfg(all(debug_assertions, feature = "serde"))]
+pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<alloc::vec::Vec<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use alloc::vec::Vec;
+    use serde::Deserialize;
+
+    let raw_blobs = Vec::<alloy_primitives::Bytes>::deserialize(deserializer)?;
+    let mut blobs = Vec::with_capacity(raw_blobs.len());
+    for blob in raw_blobs {
+        blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
+    }
+    Ok(blobs)
+}
+
+#[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
+/// Helper function to deserialize boxed blobs from a serde deserializer.
+pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<alloc::vec::Vec<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    serde::Deserialize::deserialize(deserializer)
+}
+
+/// A heap allocated blob that serializes as 0x-prefixed hex string
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, alloy_rlp::RlpEncodableWrapper)]
+pub struct HeapBlob(Bytes);
+
+impl HeapBlob {
+    /// Create a new heap blob from a byte slice.
+    pub fn new(blob: &[u8]) -> Result<Self, InvalidBlobLength> {
+        if blob.len() != BYTES_PER_BLOB {
+            return Err(InvalidBlobLength(blob.len()));
+        }
+
+        Ok(Self(Bytes::copy_from_slice(blob)))
+    }
+
+    /// Create a new heap blob from an array.
+    pub fn from_array(blob: [u8; BYTES_PER_BLOB]) -> Self {
+        Self(Bytes::from(blob))
+    }
+
+    /// Create a new heap blob from [`Bytes`].
+    pub fn from_bytes(bytes: Bytes) -> Result<Self, InvalidBlobLength> {
+        if bytes.len() != BYTES_PER_BLOB {
+            return Err(InvalidBlobLength(bytes.len()));
+        }
+
+        Ok(Self(bytes))
+    }
+
+    /// Generate a new heap blob with all bytes set to `byte`.
+    pub fn repeat_byte(byte: u8) -> Self {
+        Self(Bytes::from(vec![byte; BYTES_PER_BLOB]))
+    }
+
+    /// Get the inner
+    pub const fn inner(&self) -> &Bytes {
+        &self.0
+    }
+}
+
+impl Default for HeapBlob {
+    fn default() -> Self {
+        Self::repeat_byte(0)
+    }
+}
+
+/// Error indicating that the blob length is invalid.
+#[derive(Debug, Clone)]
+pub struct InvalidBlobLength(usize);
+impl core::fmt::Display for InvalidBlobLength {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Invalid blob length: {}, expected: {BYTES_PER_BLOB}", self.0)
+    }
+}
+impl core::error::Error for InvalidBlobLength {}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for HeapBlob {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.inner().serialize(serializer)
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for HeapBlob {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut blob = vec![0u8; BYTES_PER_BLOB];
+        u.fill_buffer(&mut blob)?;
+        Ok(Self(Bytes::from(blob)))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for HeapBlob {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let inner = <Bytes>::deserialize(deserializer)?;
+
+        Self::from_bytes(inner).map_err(serde::de::Error::custom)
+    }
+}
+
+impl alloy_rlp::Decodable for HeapBlob {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let bytes = <Bytes>::decode(buf)?;
+
+        Self::from_bytes(bytes).map_err(|_| alloy_rlp::Error::Custom("invalid blob length"))
+    }
+}
+
 /// A commitment/proof serialized as 0x-prefixed hex string
 pub type Bytes48 = FixedBytes<48>;
+
+/// Conversion helpers for c-kzg byte wrappers.
+#[cfg(feature = "kzg")]
+pub trait AsCkzg: Sized {
+    /// The equivalent c-kzg byte wrapper type.
+    type Ckzg;
+
+    /// Returns this value as its c-kzg equivalent.
+    fn as_ckzg(&self) -> &Self::Ckzg;
+
+    /// Returns this value as its mutable c-kzg equivalent.
+    fn as_ckzg_mut(&mut self) -> &mut Self::Ckzg;
+
+    /// Converts a c-kzg value into this type.
+    fn from_ckzg(value: Self::Ckzg) -> Self;
+
+    /// Returns this slice as its c-kzg equivalent.
+    fn slice_as_ckzg(slice: &[Self]) -> &[Self::Ckzg];
+
+    /// Returns this slice as its mutable c-kzg equivalent.
+    fn slice_as_ckzg_mut(slice: &mut [Self]) -> &mut [Self::Ckzg];
+
+    /// Converts this vector into its c-kzg equivalent.
+    fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg>;
+
+    /// Converts a c-kzg vector into this type's equivalent vector.
+    fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self>;
+}
+
+/// Conversion helpers for c-kzg byte wrappers back to Alloy byte wrappers.
+#[cfg(feature = "kzg")]
+pub trait AsAlloy: Sized {
+    /// The equivalent Alloy byte wrapper type.
+    type Alloy;
+
+    /// Returns this value as its Alloy equivalent.
+    fn as_alloy(&self) -> &Self::Alloy;
+
+    /// Returns this value as its mutable Alloy equivalent.
+    fn as_alloy_mut(&mut self) -> &mut Self::Alloy;
+
+    /// Converts this value into its Alloy equivalent.
+    fn into_alloy(self) -> Self::Alloy;
+
+    /// Returns this slice as its Alloy equivalent.
+    fn slice_as_alloy(slice: &[Self]) -> &[Self::Alloy];
+
+    /// Returns this slice as its mutable Alloy equivalent.
+    fn slice_as_alloy_mut(slice: &mut [Self]) -> &mut [Self::Alloy];
+
+    /// Converts this vector into its Alloy equivalent.
+    fn vec_as_alloy(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Alloy>;
+
+    /// Converts this boxed slice into its Alloy equivalent.
+    fn boxed_slice_as_alloy(boxed: alloc::boxed::Box<[Self]>) -> alloc::boxed::Box<[Self::Alloy]>;
+
+    /// Converts an Alloy vector into this type's equivalent vector.
+    fn vec_from_alloy(vec: alloc::vec::Vec<Self::Alloy>) -> alloc::vec::Vec<Self>;
+}
+
+#[cfg(feature = "kzg")]
+macro_rules! impl_ckzg_conversions {
+    ($alloy:ty, $ckzg:ty) => {
+        impl AsCkzg for $alloy {
+            type Ckzg = $ckzg;
+
+            #[inline]
+            fn as_ckzg(&self) -> &Self::Ckzg {
+                // SAFETY: This macro is only invoked for transparent byte wrappers with the same
+                // layout and alignment as their c-kzg equivalents.
+                unsafe { core::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn as_ckzg_mut(&mut self) -> &mut Self::Ckzg {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn from_ckzg(value: Self::Ckzg) -> Self {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(value) }
+            }
+
+            #[inline]
+            fn slice_as_ckzg(slice: &[Self]) -> &[Self::Ckzg] {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(slice) }
+            }
+
+            #[inline]
+            fn slice_as_ckzg_mut(slice: &mut [Self]) -> &mut [Self::Ckzg] {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(slice) }
+            }
+
+            #[inline]
+            fn vec_as_ckzg(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Ckzg> {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(vec) }
+            }
+
+            #[inline]
+            fn vec_from_ckzg(vec: alloc::vec::Vec<Self::Ckzg>) -> alloc::vec::Vec<Self> {
+                // SAFETY: See `AsCkzg::as_ckzg`.
+                unsafe { core::mem::transmute(vec) }
+            }
+        }
+
+        impl_ckzg_conversions!(reverse $alloy, $ckzg);
+    };
+    (reverse $alloy:ty, $ckzg:ty) => {
+        impl AsAlloy for $ckzg {
+            type Alloy = $alloy;
+
+            #[inline]
+            fn as_alloy(&self) -> &Self::Alloy {
+                // SAFETY: This macro is only invoked for c-kzg byte wrappers with the same layout
+                // and alignment as their Alloy equivalents.
+                unsafe { core::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn as_alloy_mut(&mut self) -> &mut Self::Alloy {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn into_alloy(self) -> Self::Alloy {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn slice_as_alloy(slice: &[Self]) -> &[Self::Alloy] {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(slice) }
+            }
+
+            #[inline]
+            fn slice_as_alloy_mut(slice: &mut [Self]) -> &mut [Self::Alloy] {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(slice) }
+            }
+
+            #[inline]
+            fn vec_as_alloy(vec: alloc::vec::Vec<Self>) -> alloc::vec::Vec<Self::Alloy> {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(vec) }
+            }
+
+            #[inline]
+            fn boxed_slice_as_alloy(
+                boxed: alloc::boxed::Box<[Self]>,
+            ) -> alloc::boxed::Box<[Self::Alloy]> {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe {
+                    core::mem::transmute::<
+                        alloc::boxed::Box<[Self]>,
+                        alloc::boxed::Box<[Self::Alloy]>,
+                    >(boxed)
+                }
+            }
+
+            #[inline]
+            fn vec_from_alloy(vec: alloc::vec::Vec<Self::Alloy>) -> alloc::vec::Vec<Self> {
+                // SAFETY: See `AsAlloy::as_alloy`.
+                unsafe { core::mem::transmute(vec) }
+            }
+        }
+    };
+}
+
+#[cfg(feature = "kzg")]
+impl_ckzg_conversions!(Blob, c_kzg::Blob);
+#[cfg(feature = "kzg")]
+impl_ckzg_conversions!(Bytes48, c_kzg::Bytes48);
+#[cfg(feature = "kzg")]
+impl_ckzg_conversions!(reverse Bytes48, c_kzg::KzgProof);
+#[cfg(feature = "kzg")]
+impl_ckzg_conversions!(reverse crate::eip7594::Cell, c_kzg::Cell);
+
+/// Returns blobs as c-kzg blobs.
+#[cfg(feature = "kzg")]
+#[deprecated(note = "use `Blob::slice_as_ckzg` via the `AsCkzg` trait instead")]
+#[inline]
+pub fn blobs_as_ckzg(blobs: &[Blob]) -> &[c_kzg::Blob] {
+    Blob::slice_as_ckzg(blobs)
+}
+
+/// Returns commitment/proof bytes as c-kzg bytes.
+#[cfg(feature = "kzg")]
+#[deprecated(note = "use `Bytes48::slice_as_ckzg` via the `AsCkzg` trait instead")]
+#[inline]
+pub fn bytes48_as_ckzg(bytes: &[Bytes48]) -> &[c_kzg::Bytes48] {
+    Bytes48::slice_as_ckzg(bytes)
+}
+
+/// Converts c-kzg bytes into the Alloy 48-byte wrapper.
+#[cfg(feature = "kzg")]
+#[deprecated(note = "use `Bytes48::from_ckzg` via the `AsCkzg` trait instead")]
+#[inline]
+pub fn bytes48_from_ckzg(bytes: c_kzg::Bytes48) -> Bytes48 {
+    Bytes48::from_ckzg(bytes)
+}
 
 /// Calculates the versioned hash for a KzgCommitment of 48 bytes.
 ///
@@ -130,8 +463,8 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// (`calc_excess_blob_gas`).
 #[inline]
 pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
-    eip7840::BlobParams::cancun()
-        .next_block_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used)
+    let next_excess_blob_gas = parent_excess_blob_gas + parent_blob_gas_used;
+    next_excess_blob_gas.saturating_sub(TARGET_DATA_GAS_PER_BLOCK_DENCUN)
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -139,7 +472,7 @@ pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_u
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`get_blob_gasprice`).
 #[inline]
-pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
+pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
     eip7840::BlobParams::cancun().calc_blob_fee(excess_blob_gas)
 }
 
@@ -154,20 +487,31 @@ pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 ///
 /// This function panics if `denominator` is zero.
 #[inline]
-pub const fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
+pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert!(denominator != 0, "attempt to divide by zero");
 
-    let mut i = 1;
-    let mut output = 0;
-    let mut numerator_accum = factor * denominator;
-    while numerator_accum > 0 {
-        output += numerator_accum;
+    let mut i = U512::from(1);
+    let denominator = U512::from(denominator);
+    let numerator = U512::from(numerator);
+    let mut output = U512::ZERO;
+    let mut numerator_accum = U512::from(factor) * denominator;
 
-        // Denominator is asserted as not zero at the start of the function.
-        numerator_accum = (numerator_accum * numerator) / (denominator * i);
-        i += 1;
+    while numerator_accum > U512::ZERO {
+        let Some(next_output) = output.checked_add(numerator_accum) else {
+            return u128::MAX;
+        };
+        output = next_output;
+
+        // accum = (accum * numerator) / (denominator * i)
+        let Some(next_accum) = numerator_accum.checked_mul(numerator) else {
+            return u128::MAX;
+        };
+        numerator_accum = next_accum / (denominator * i);
+
+        i += U512::from(1);
     }
-    output / denominator
+
+    (output / denominator).try_into().unwrap_or(u128::MAX)
 }
 
 #[cfg(test)]
@@ -177,38 +521,54 @@ mod tests {
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L27
     #[test]
     fn test_calc_excess_blob_gas() {
+        const ZERO_EXCESS: u64 = calc_excess_blob_gas(0, 0);
+        assert_eq!(ZERO_EXCESS, 0);
+
         for t @ &(excess, blobs, expected) in &[
             // The excess blob gas should not increase from zero if the used blob
             // slots are below - or equal - to the target.
             (0, 0, 0),
             (0, 1, 0),
-            (0, TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB, 0),
+            (0, TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB, 0),
             // If the target blob gas is exceeded, the excessBlobGas should increase
             // by however much it was overshot
-            (0, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB),
-            (1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB + 1),
-            (1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) + 2, 2 * DATA_GAS_PER_BLOB + 1),
+            (0, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB),
+            (1, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB + 1),
+            (
+                1,
+                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 2,
+                2 * DATA_GAS_PER_BLOB + 1,
+            ),
             // The excess blob gas should decrease by however much the target was
             // under-shot, capped at zero.
             (
-                TARGET_DATA_GAS_PER_BLOCK,
-                TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB,
-                TARGET_DATA_GAS_PER_BLOCK,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
             ),
             (
-                TARGET_DATA_GAS_PER_BLOCK,
-                (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 1,
-                TARGET_DATA_GAS_PER_BLOCK - DATA_GAS_PER_BLOB,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 1,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN - DATA_GAS_PER_BLOB,
             ),
             (
-                TARGET_DATA_GAS_PER_BLOCK,
-                (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 2,
-                TARGET_DATA_GAS_PER_BLOCK - (2 * DATA_GAS_PER_BLOB),
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 2,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN - (2 * DATA_GAS_PER_BLOB),
             ),
-            (DATA_GAS_PER_BLOB - 1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 1, 0),
+            (DATA_GAS_PER_BLOB - 1, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 1, 0),
         ] {
             let actual = calc_excess_blob_gas(excess, blobs * DATA_GAS_PER_BLOB);
             assert_eq!(actual, expected, "test: {t:?}");
+
+            // the inlined implementation must stay consistent with the osaka variant it
+            // previously delegated to
+            let osaka = eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
+                excess,
+                blobs * DATA_GAS_PER_BLOB,
+                0,
+            );
+            assert_eq!(actual, osaka, "osaka consistency: {t:?}");
         }
     }
 
@@ -237,6 +597,12 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_calc_blob_fee_pectra_large_input() {
+        let actual = crate::eip7691::calc_blob_gasprice(299453931);
+        assert_eq!(actual, 93359993185840258978230108);
+    }
+
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L78
     #[test]
     fn fake_exp() {
@@ -257,9 +623,48 @@ mod tests {
             (2, 5, 2, 23),   // approximate 24.36
             (1, 50000000, 2225652, 5709098764),
             (1, 380928, BLOB_GASPRICE_UPDATE_FRACTION.try_into().unwrap(), 1),
+            (0, 89, 1, 0),
+            (1, 299453931, 5007716, 93359993185840258978230108),
+            (1, 88, 1, 165162653699637111792770913913821835905),
         ] {
             let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
             assert_eq!(actual, expected, "test: {t:?}");
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_heap_blob() {
+        let blob = HeapBlob::repeat_byte(0x42);
+        let serialized = serde_json::to_string(&blob).unwrap();
+
+        let deserialized: HeapBlob = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(blob, deserialized);
+    }
+
+    #[test]
+    fn fake_exp_saturates_when_result_overflows_u128() {
+        assert_eq!(fake_exponential(100, 88, 1), u128::MAX);
+        assert_eq!(fake_exponential(1, u64::MAX as u128, 5007716), u128::MAX);
+    }
+
+    #[test]
+    fn fake_exp_no_spurious_saturation_for_large_factor() {
+        // `factor * denominator` exceeds u128 here, but the result is exactly `factor` since
+        // e^0 == 1; the widened intermediate math must not saturate
+        assert_eq!(
+            fake_exponential(u128::MAX - 1, 0, BLOB_GASPRICE_UPDATE_FRACTION),
+            u128::MAX - 1
+        );
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_handles_large_blob_fee_comparison() {
+        let params = crate::eip7840::BlobParams::osaka();
+        let excess_blob_gas = crate::eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA as u64 * 88;
+
+        let actual = params.next_block_excess_blob_gas_osaka(excess_blob_gas, 0, 1);
+
+        assert_eq!(actual, excess_blob_gas - params.target_blob_gas_per_block());
     }
 }

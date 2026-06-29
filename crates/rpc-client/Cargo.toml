@@ -25,7 +25,7 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["map"] }
 alloy-json-rpc.workspace = true
-alloy-transport-http.workspace = true
+alloy-transport-http = { workspace = true, optional = true }
 alloy-transport.workspace = true
 
 futures.workspace = true
@@ -40,21 +40,22 @@ tracing.workspace = true
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 
+url = { workspace = true, optional = true, features = ["serde"] }
+
+[target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
 reqwest = { workspace = true, optional = true }
 
-url = { workspace = true, optional = true }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 alloy-transport-ipc = { workspace = true, optional = true }
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasmtimer.workspace = true
 
 [dev-dependencies]
 alloy-primitives.workspace = true
 alloy-node-bindings.workspace = true
 alloy-transport-ipc = { workspace = true, features = ["mock"] }
-alloy-transport-ws.workspace = true
+alloy-transport-ws = { workspace = true, features = ["aws-lc-rs"] }
 
 ci_info.workspace = true
 tempfile = "3"
@@ -66,5 +67,8 @@ default = ["reqwest"]
 reqwest = ["dep:url", "dep:reqwest", "alloy-transport-http/reqwest"]
 hyper = ["dep:url", "alloy-transport-http/hyper"]
 pubsub = ["dep:alloy-pubsub"]
-ws = ["pubsub", "dep:alloy-transport-ws", "dep:url"]
+ws-base = ["pubsub", "dep:url", "dep:alloy-transport-ws"]
+ws = ["ws-base", "alloy-transport-ws/aws-lc-rs"]
+ws-ring = ["ws-base", "alloy-transport-ws/ring"]
+ws-native-tls = ["ws-base", "alloy-transport-ws/native-tls"]
 ipc = ["pubsub", "dep:alloy-transport-ipc"]

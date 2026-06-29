@@ -2,8 +2,8 @@
 
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
-use alloy_consensus::{BlockHeader, Sealed, TxEnvelope};
-use alloy_eips::eip4895::Withdrawals;
+use alloy_consensus::{error::ValueError, BlockBody, BlockHeader, Sealed, TxEnvelope};
+use alloy_eips::{eip4895::Withdrawals, eip7840::BlobParams, Encodable2718};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
@@ -11,7 +11,6 @@ use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U2
 use alloy_rlp::Encodable;
 use core::ops::{Deref, DerefMut};
 
-use alloy_eips::eip7840::BlobParams;
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
@@ -79,6 +78,22 @@ impl<T, H> Block<T, H> {
         Self { header, uncles: vec![], transactions, withdrawals: None }
     }
 
+    /// Returns the block's number.
+    pub fn number(&self) -> u64
+    where
+        H: BlockHeader,
+    {
+        self.header.number()
+    }
+
+    /// Apply a function to the block, returning the modified block.
+    pub fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
     /// Sets the transactions for the block.
     pub fn with_transactions(mut self, transactions: BlockTransactions<T>) -> Self {
         self.transactions = transactions;
@@ -97,6 +112,76 @@ impl<T, H> Block<T, H> {
         self
     }
 
+    /// Tries to convert inner transactions into a vector of full transactions
+    ///
+    /// Returns an error if the block contains only transaction hashes or if it is an uncle block.
+    pub fn try_into_transactions(self) -> Result<Vec<T>, ValueError<BlockTransactions<T>>> {
+        self.transactions.try_into_transactions()
+    }
+
+    /// Consumes the type and returns the transactions as a vector.
+    ///
+    /// Note: if this is an uncle or hashes, this will return an empty vector.
+    pub fn into_transactions_vec(self) -> Vec<T> {
+        self.transactions.into_transactions_vec()
+    }
+
+    /// Consumes the type and returns the transaction hashes as a vector.
+    ///
+    /// Note: if this is an uncle, this will return an empty vector.
+    pub fn into_hashes_vec(self) -> Vec<B256>
+    where
+        T: TransactionResponse,
+    {
+        self.transactions.into_hashes_vec()
+    }
+
+    /// Converts this block into a [`BlockBody`].
+    ///
+    /// Returns an error if the transactions are not full or if the block has uncles.
+    pub fn try_into_block_body(self) -> Result<BlockBody<T, H>, ValueError<Self>> {
+        if !self.uncles.is_empty() {
+            return Err(ValueError::new_static(self, "uncles not empty"));
+        }
+        if !self.transactions.is_full() {
+            return Err(ValueError::new_static(self, "transactions not full"));
+        }
+
+        Ok(self.into_block_body_unchecked())
+    }
+
+    /// Converts this block into a [`BlockBody`]
+    ///
+    /// Caution: The body will have empty transactions unless the block's transactions are
+    /// [`BlockTransactions::Full`]. This will disregard ommers/uncles and always return an empty
+    /// ommers vec.
+    pub fn into_block_body_unchecked(self) -> BlockBody<T, H> {
+        BlockBody {
+            transactions: self.transactions.into_transactions_vec(),
+            ommers: Default::default(),
+            withdrawals: self.withdrawals,
+        }
+    }
+
+    /// Consumes the block and returns the [`alloy_consensus::Block`] with the current transaction
+    /// and header type.
+    ///
+    /// Note: Unlike [`Self::into_consensus`], this method returns the Header type `H` as-is without
+    /// converting it to [`alloy_consensus::Header`], See [`Header::into_consensus`].
+    ///
+    /// This has two caveats:
+    ///  - The returned block will always have empty uncles.
+    ///  - If the block's transaction is not [`BlockTransactions::Full`], the returned block will
+    ///    have an empty transaction vec.
+    pub fn into_consensus_block(self) -> alloy_consensus::Block<T, H> {
+        alloy_consensus::BlockBody {
+            transactions: self.transactions.into_transactions_vec(),
+            ommers: vec![],
+            withdrawals: self.withdrawals,
+        }
+        .into_block(self.header)
+    }
+
     /// Converts the block's header type by applying a function to it.
     pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
         Block {
@@ -107,6 +192,21 @@ impl<T, H> Block<T, H> {
         }
     }
 
+    /// Consumes the block and returns its header.
+    ///
+    /// To obtain the underlying [`alloy_consensus::Header`] use [`Block::into_consensus_header`].
+    pub fn into_header(self) -> H {
+        self.header
+    }
+
+    /// Converts the block's header type to the given alternative that is `TryFrom<H>`
+    pub fn try_convert_header<U>(self) -> Result<Block<T, U>, U::Error>
+    where
+        U: TryFrom<H>,
+    {
+        self.try_map_header(U::try_from)
+    }
+
     /// Converts the block's header type by applying a fallible function to it.
     pub fn try_map_header<U, E>(self, f: impl FnOnce(H) -> Result<U, E>) -> Result<Block<T, U>, E> {
         Ok(Block {
@@ -115,6 +215,24 @@ impl<T, H> Block<T, H> {
             transactions: self.transactions,
             withdrawals: self.withdrawals,
         })
+    }
+
+    /// Converts the block's transaction type to the given alternative that is `From<T>`
+    pub fn convert_transactions<U>(self) -> Block<U, H>
+    where
+        U: From<T>,
+    {
+        self.map_transactions(U::from)
+    }
+
+    /// Converts the block's transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the block with the new transaction type if all conversions were successful.
+    pub fn try_convert_transactions<U>(self) -> Result<Block<U, H>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map_transactions(U::try_from)
     }
 
     /// Converts the block's transaction type by applying a function to each transaction.
@@ -131,7 +249,8 @@ impl<T, H> Block<T, H> {
 
     /// Converts the block's transaction type by applying a fallible function to each transaction.
     ///
-    /// Returns the block with the new transaction type if all transactions were successfully.
+    /// Returns the block with the new transaction type if all transactions were mapped
+    /// successfully.
     pub fn try_map_transactions<U, E>(
         self,
         f: impl FnMut(T) -> Result<U, E>,
@@ -142,6 +261,16 @@ impl<T, H> Block<T, H> {
             transactions: self.transactions.try_map(f)?,
             withdrawals: self.withdrawals,
         })
+    }
+
+    /// Calculate the transaction root for the full transactions in this block type.
+    ///
+    /// Returns `None` if the `transactions` is not the [`BlockTransactions::Full`] variant.
+    pub fn calculate_transactions_root(&self) -> Option<B256>
+    where
+        T: Encodable2718,
+    {
+        self.transactions.calculate_transactions_root()
     }
 }
 
@@ -156,7 +285,7 @@ impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
     /// Constructs an "uncle block" from the provided header.
     ///
     /// This function creates a new [`Block`] structure for uncle blocks (ommer blocks),
-    /// using the provided [`alloy_consensus::Header`].
+    /// using the provided header.
     pub fn uncle_from_header(header: H) -> Self {
         let block = alloy_consensus::Block::<TxEnvelope, H>::uncle(header);
         let size = U256::from(block.length());
@@ -170,6 +299,27 @@ impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
 }
 
 impl<T> Block<T> {
+    /// Returns the block's hash as received from rpc.
+    pub const fn hash(&self) -> B256 {
+        self.header.hash
+    }
+
+    /// Returns a sealed reference of the header: `Sealed<&alloy_consensus::Header>`
+    pub const fn sealed_header(&self) -> Sealed<&alloy_consensus::Header> {
+        Sealed::new_unchecked(&self.header.inner, self.header.hash)
+    }
+
+    /// Consumes the type and returns the sealed [`alloy_consensus::Header`].
+    pub fn into_sealed_header(self) -> Sealed<alloy_consensus::Header> {
+        self.header.into_sealed()
+    }
+
+    /// Consumes the type, strips away the rpc context from the rpc [`Header`] type and just returns
+    /// the [`alloy_consensus::Header`].
+    pub fn into_consensus_header(self) -> alloy_consensus::Header {
+        self.header.into_consensus()
+    }
+
     /// Constructs block from a consensus block and `total_difficulty`.
     pub fn from_consensus(block: alloy_consensus::Block<T>, total_difficulty: Option<U256>) -> Self
     where
@@ -189,7 +339,8 @@ impl<T> Block<T> {
         }
     }
 
-    /// Consumes the block and returns the [`alloy_consensus::Block`].
+    /// Consumes the block and returns the ethereum [`alloy_consensus::Block`] with the ethereum
+    /// header type.
     ///
     /// This has two caveats:
     ///  - The returned block will always have empty uncles.
@@ -203,6 +354,21 @@ impl<T> Block<T> {
             withdrawals,
         }
         .into_block(header.into_consensus())
+    }
+
+    /// Same as [`Self::into_consensus`] but returns the block as [`Sealed`] with the block's hash.
+    pub fn into_consensus_sealed(self) -> Sealed<alloy_consensus::Block<T>> {
+        let hash = self.header.hash;
+        Sealed::new_unchecked(self.into_consensus(), hash)
+    }
+}
+
+impl<T, S> From<Block<T>> for alloy_consensus::Block<S>
+where
+    S: From<T>,
+{
+    fn from(block: Block<T>) -> Self {
+        block.into_consensus().convert_transactions()
     }
 }
 
@@ -248,6 +414,11 @@ impl<H> Header<H> {
         Self { hash, inner, total_difficulty: None, size: None }
     }
 
+    /// Consumes the type and returns the [`Sealed`] header.
+    pub fn into_sealed(self) -> Sealed<H> {
+        Sealed::new_unchecked(self.inner, self.hash)
+    }
+
     /// Consumes the type and returns the wrapped consensus header.
     pub fn into_consensus(self) -> H {
         self.inner
@@ -273,6 +444,22 @@ impl<H> Header<H> {
     pub const fn with_size(mut self, size: Option<U256>) -> Self {
         self.size = size;
         self
+    }
+
+    /// Applies the given closure to the inner header.
+    #[expect(clippy::use_self)]
+    pub fn map<H1>(self, f: impl FnOnce(H) -> H1) -> Header<H1> {
+        let Header { hash, inner, total_difficulty, size } = self;
+
+        Header { hash, inner: f(inner), total_difficulty, size }
+    }
+
+    /// Applies the given fallible closure to the inner header.
+    #[expect(clippy::use_self)]
+    pub fn try_map<H1, E>(self, f: impl FnOnce(H) -> Result<H1, E>) -> Result<Header<H1>, E> {
+        let Header { hash, inner, total_difficulty, size } = self;
+
+        Ok(Header { hash, inner: f(inner)?, total_difficulty, size })
     }
 }
 
@@ -403,6 +590,14 @@ impl<H: BlockHeader> BlockHeader for Header<H> {
         self.inner.requests_hash()
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.inner.block_access_list_hash()
+    }
+
+    fn slot_number(&self) -> Option<u64> {
+        self.inner.slot_number()
+    }
+
     fn extra_data(&self) -> &Bytes {
         self.inner.extra_data()
     }
@@ -420,6 +615,12 @@ impl From<Header> for alloy_consensus::Header {
     }
 }
 
+impl<H> From<Header<H>> for Sealed<H> {
+    fn from(value: Header<H>) -> Self {
+        value.into_sealed()
+    }
+}
+
 /// Error that can occur when converting other types to blocks
 #[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
@@ -432,8 +633,8 @@ pub enum BlockError {
 }
 
 #[cfg(feature = "serde")]
-impl From<Block> for alloy_serde::WithOtherFields<Block> {
-    fn from(inner: Block) -> Self {
+impl<T, H> From<Block<T, H>> for alloy_serde::WithOtherFields<Block<T, H>> {
+    fn from(inner: Block<T, H>) -> Self {
         Self { inner, other: Default::default() }
     }
 }
@@ -448,7 +649,7 @@ impl From<Header> for alloy_serde::WithOtherFields<Header> {
 /// BlockOverrides is a set of header fields to override.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase"))]
 pub struct BlockOverrides {
     /// Overrides the block number.
     ///
@@ -503,10 +704,108 @@ pub struct BlockOverrides {
         serde(default, skip_serializing_if = "Option::is_none", alias = "baseFeePerGas")
     )]
     pub base_fee: Option<U256>,
+    /// Overrides the blob base fee of the block.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub blob_base_fee: Option<U256>,
+    /// Overrides the parent beacon block root of the block.
+    ///
+    /// Only used by `eth_simulateV1` — not applicable to `eth_call` or `eth_estimateGas`.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none", alias = "parentBeaconBlockRoot")
+    )]
+    pub beacon_root: Option<B256>,
     /// A dictionary that maps blockNumber to a user-defined hash. It can be queried from the
     /// EVM opcode BLOCKHASH.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_hash: Option<BTreeMap<u64, B256>>,
+}
+
+impl BlockOverrides {
+    /// Returns true if all fields are None, false if any field is not None
+    pub const fn is_empty(&self) -> bool {
+        self.number.is_none()
+            && self.difficulty.is_none()
+            && self.time.is_none()
+            && self.gas_limit.is_none()
+            && self.coinbase.is_none()
+            && self.random.is_none()
+            && self.base_fee.is_none()
+            && self.blob_base_fee.is_none()
+            && self.beacon_root.is_none()
+            && self.block_hash.is_none()
+    }
+
+    /// Sets the block number override
+    pub const fn with_number(mut self, number: U256) -> Self {
+        self.number = Some(number);
+        self
+    }
+
+    /// Sets the difficulty override
+    pub const fn with_difficulty(mut self, difficulty: U256) -> Self {
+        self.difficulty = Some(difficulty);
+        self
+    }
+
+    /// Sets the timestamp override
+    pub const fn with_time(mut self, time: u64) -> Self {
+        self.time = Some(time);
+        self
+    }
+
+    /// Sets the gas limit override
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+        self.gas_limit = Some(gas_limit);
+        self
+    }
+
+    /// Sets the coinbase (fee recipient) override
+    pub const fn with_coinbase(mut self, coinbase: Address) -> Self {
+        self.coinbase = Some(coinbase);
+        self
+    }
+
+    /// Sets the randomness (prevRandao) override
+    pub const fn with_random(mut self, random: B256) -> Self {
+        self.random = Some(random);
+        self
+    }
+
+    /// Sets the base fee override
+    pub const fn with_base_fee(mut self, base_fee: U256) -> Self {
+        self.base_fee = Some(base_fee);
+        self
+    }
+
+    /// Sets the blob base fee override
+    pub const fn with_blob_base_fee(mut self, blob_base_fee: U256) -> Self {
+        self.blob_base_fee = Some(blob_base_fee);
+        self
+    }
+
+    /// Sets the parent beacon block root override
+    pub const fn with_beacon_root(mut self, beacon_root: B256) -> Self {
+        self.beacon_root = Some(beacon_root);
+        self
+    }
+
+    /// Adds a block hash override for a specific block number
+    pub fn append_block_hash(mut self, block_number: u64, hash: B256) -> Self {
+        let hash_map = self.block_hash.get_or_insert_with(Default::default);
+        hash_map.insert(block_number, hash);
+        self
+    }
+
+    /// Adds multiple block hash overrides from an iterator
+    pub fn with_block_hash_overrides<I>(mut self, hashes: I) -> Self
+    where
+        I: IntoIterator<Item = (u64, B256)>,
+    {
+        let map = self.block_hash.get_or_insert_with(Default::default);
+        map.extend(hashes);
+        self
+    }
 }
 
 impl<T: TransactionResponse, H> BlockResponse for Block<T, H> {
@@ -530,23 +829,22 @@ impl<T: TransactionResponse, H> BlockResponse for Block<T, H> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct BadBlock {
+pub struct BadBlock<B = Block> {
     /// Underlying block object.
-    block: Block,
+    pub block: B,
     /// Hash of the block.
-    hash: BlockHash,
+    pub hash: BlockHash,
     /// RLP encoded block header.
-    rlp: Bytes,
+    pub rlp: Bytes,
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use alloy_primitives::{hex, keccak256, Bloom, B64};
     use arbitrary::Arbitrary;
     use rand::Rng;
     use similar_asserts::assert_eq;
-
-    use super::*;
 
     #[test]
     fn arbitrary_header() {
@@ -556,14 +854,37 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "jsonrpsee-types", feature = "serde"))]
+    fn header_response_num_hash() {
+        let number = 42;
+        let hash = B256::with_last_byte(1);
+        let header = Header {
+            hash,
+            inner: alloy_consensus::Header { number, ..Default::default() },
+            ..Default::default()
+        };
+
+        assert_eq!(header.num_hash(), BlockNumHash::new(number, hash));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
     fn serde_json_header() {
-        use jsonrpsee_types::SubscriptionResponse;
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct SubParams<T> {
+            result: T,
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct SubNotification<T> {
+            params: SubParams<T>,
+        }
+
         let resp = r#"{"jsonrpc":"2.0","method":"eth_subscribe","params":{"subscription":"0x7eef37ff35d471f8825b1c8f67a5d3c0","result":{"hash":"0x7a7ada12e140961a32395059597764416499f4178daf1917193fad7bd2cc6386","parentHash":"0xdedbd831f496e705e7f2ec3c8dcb79051040a360bf1455dbd7eb8ea6ad03b751","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","miner":"0x0000000000000000000000000000000000000000","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","number":"0x8","gasUsed":"0x0","gasLimit":"0x1c9c380","extraData":"0x","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x642aa48f","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000"}}}"#;
-        let _header: SubscriptionResponse<'_, Header> = serde_json::from_str(resp).unwrap();
+        let _header: SubNotification<Header> = serde_json::from_str(resp).unwrap();
 
         let resp = r#"{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0x1a14b6bdcf4542fabf71c4abee244e47","result":{"author":"0x000000568b9b5a365eaa767d42e74ed88915c204","difficulty":"0x1","extraData":"0x4e65746865726d696e6420312e392e32322d302d6463373666616366612d32308639ad8ff3d850a261f3b26bc2a55e0f3a718de0dd040a19a4ce37e7b473f2d7481448a1e1fd8fb69260825377c0478393e6055f471a5cf839467ce919a6ad2700","gasLimit":"0x7a1200","gasUsed":"0x0","hash":"0xa4856602944fdfd18c528ef93cc52a681b38d766a7e39c27a47488c8461adcb0","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0x0000000000000000000000000000000000000000","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","number":"0x434822","parentHash":"0x1a9bdc31fc785f8a95efeeb7ae58f40f6366b8e805f47447a52335c95f4ceb49","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","size":"0x261","stateRoot":"0xf38c4bf2958e541ec6df148e54ce073dc6b610f8613147ede568cb7b5c2d81ee","totalDifficulty":"0x633ebd","timestamp":"0x604726b0","transactions":[],"transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","uncles":[]}}}"#;
-        let _header: SubscriptionResponse<'_, Header> = serde_json::from_str(resp).unwrap();
+        let _header: SubNotification<Header> = serde_json::from_str(resp).unwrap();
     }
 
     #[test]
@@ -596,6 +917,8 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
+                    slot_number: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -605,12 +928,12 @@ mod tests {
             withdrawals: Some(Default::default()),
         };
         let serialized = serde_json::to_string(&block).unwrap();
-        assert_eq!(
+        similar_asserts::assert_eq!(
             serialized,
             r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"withdrawals":[]}"#
         );
         let deserialized: Block = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(block, deserialized);
+        similar_asserts::assert_eq!(block, deserialized);
     }
 
     #[test]
@@ -643,6 +966,8 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
+                    slot_number: None,
                 },
                 size: None,
                 total_difficulty: Some(U256::from(100000)),
@@ -688,6 +1013,8 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
+                    slot_number: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -710,6 +1037,44 @@ mod tests {
     fn block_overrides() {
         let s = r#"{"blockNumber": "0xe39dd0"}"#;
         let _overrides = serde_json::from_str::<BlockOverrides>(s).unwrap();
+    }
+
+    #[test]
+    fn block_overrides_is_empty() {
+        // Default should be empty
+        let default_overrides = BlockOverrides::default();
+        assert!(default_overrides.is_empty());
+
+        // With one field set should not be empty
+        let overrides_with_number = BlockOverrides::default().with_number(U256::from(42));
+        assert!(!overrides_with_number.is_empty());
+
+        let overrides_with_difficulty = BlockOverrides::default().with_difficulty(U256::from(100));
+        assert!(!overrides_with_difficulty.is_empty());
+
+        let overrides_with_time = BlockOverrides::default().with_time(12345);
+        assert!(!overrides_with_time.is_empty());
+
+        let overrides_with_gas_limit = BlockOverrides::default().with_gas_limit(21000);
+        assert!(!overrides_with_gas_limit.is_empty());
+
+        let overrides_with_coinbase =
+            BlockOverrides::default().with_coinbase(Address::with_last_byte(1));
+        assert!(!overrides_with_coinbase.is_empty());
+
+        let overrides_with_random = BlockOverrides::default().with_random(B256::with_last_byte(1));
+        assert!(!overrides_with_random.is_empty());
+
+        let overrides_with_base_fee = BlockOverrides::default().with_base_fee(U256::from(20));
+        assert!(!overrides_with_base_fee.is_empty());
+
+        let overrides_with_block_hash =
+            BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
+        assert!(!overrides_with_block_hash.is_empty());
+
+        let overrides_with_beacon_root =
+            BlockOverrides::default().with_beacon_root(B256::with_last_byte(1));
+        assert!(!overrides_with_beacon_root.is_empty());
     }
 
     #[test]
@@ -890,8 +1255,7 @@ mod tests {
     "size": "0xaeb6"
 }"#;
         let block = serde_json::from_str::<Block>(s).unwrap();
-        let header = block.clone().header.inner;
-        let recomputed_hash = keccak256(alloy_rlp::encode(&header));
+        let recomputed_hash = keccak256(alloy_rlp::encode(&block.header.inner));
         assert_eq!(recomputed_hash, block.header.hash);
 
         let s2 = r#"{
@@ -927,8 +1291,7 @@ mod tests {
             "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
          }"#;
         let block2 = serde_json::from_str::<Block>(s2).unwrap();
-        let header = block2.clone().header.inner;
-        let recomputed_hash = keccak256(alloy_rlp::encode(&header));
+        let recomputed_hash = keccak256(alloy_rlp::encode(&block2.header.inner));
         assert_eq!(recomputed_hash, block2.header.hash);
     }
 
@@ -959,13 +1322,15 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                block_access_list_hash: None,
+                slot_number: None,
             },
             size: None,
             total_difficulty: None,
         };
 
         // Convert the RPC header to a primitive header
-        let primitive_header = rpc_header.clone().inner;
+        let primitive_header = rpc_header.inner.clone();
 
         // Seal the primitive header
         let sealed_header: Sealed<alloy_consensus::Header> =
@@ -1005,13 +1370,15 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                block_access_list_hash: None,
+                slot_number: None,
             },
             total_difficulty: None,
             size: Some(U256::from(505)),
         };
 
         // Convert the RPC header to a primitive header
-        let primitive_header = header.clone().inner;
+        let primitive_header = header.inner.clone();
 
         // Convert the primitive header to a RPC uncle block
         let block: Block<Transaction> = Block::uncle_from_header(primitive_header);
@@ -1063,6 +1430,8 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
+                    slot_number: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: Some(U256::from(19)),
@@ -1083,11 +1452,12 @@ mod tests {
         );
 
         let deserialized: BadBlock = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(bad_block, deserialized);
+        similar_asserts::assert_eq!(bad_block, deserialized);
     }
 
     // <https://github.com/succinctlabs/kona/issues/31>
     #[test]
+    #[cfg(feature = "serde")]
     fn deserde_tenderly_block() {
         let s = include_str!("../testdata/tenderly.sepolia.json");
         let _block: Block = serde_json::from_str(s).unwrap();

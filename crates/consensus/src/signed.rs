@@ -1,25 +1,48 @@
-use crate::transaction::{RlpEcdsaTx, SignableTransaction};
-use alloy_eips::eip2718::Eip2718Result;
-use alloy_primitives::{PrimitiveSignature as Signature, B256};
+use crate::{
+    transaction::{
+        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction, TxHashRef, TxHashable,
+    },
+    Transaction,
+};
+use alloy_eips::{
+    eip2718::{Eip2718Error, Eip2718Result},
+    eip2930::AccessList,
+    eip7702::SignedAuthorization,
+    Decodable2718, Encodable2718, Typed2718,
+};
+use alloy_primitives::{Bytes, Sealed, Signature, TxKind, B256, U256};
 use alloy_rlp::BufMut;
+use core::{
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
+#[cfg(not(feature = "std"))]
+use once_cell::race::OnceBox as OnceLock;
+#[cfg(feature = "std")]
+use std::sync::OnceLock;
 
 /// A transaction with a signature and hash seal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone)]
 pub struct Signed<T, Sig = Signature> {
-    #[cfg_attr(feature = "serde", serde(flatten))]
     #[doc(alias = "transaction")]
     tx: T,
-    #[cfg_attr(feature = "serde", serde(flatten))]
     signature: Sig,
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
-    hash: B256,
+    hash: OnceLock<B256>,
 }
 
 impl<T, Sig> Signed<T, Sig> {
     /// Instantiate from a transaction and signature. Does not verify the signature.
-    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
-        Self { tx, signature, hash }
+    pub fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
+        let value = OnceLock::new();
+        #[allow(clippy::useless_conversion)]
+        value.get_or_init(|| hash.into());
+        Self { tx, signature, hash: value }
+    }
+
+    /// Instantiate from a transaction and signature. Does not verify the signature.
+    pub const fn new_unhashed(tx: T, signature: Sig) -> Self {
+        Self { tx, signature, hash: OnceLock::new() }
     }
 
     /// Returns a reference to the transaction.
@@ -29,7 +52,12 @@ impl<T, Sig> Signed<T, Sig> {
     }
 
     /// Returns a mutable reference to the transaction.
-    pub fn tx_mut(&mut self) -> &mut T {
+    ///
+    /// # Warning
+    ///
+    /// Modifying the transaction structurally invalidates the signature and hash.
+    #[doc(hidden)]
+    pub const fn tx_mut(&mut self) -> &mut T {
         &mut self.tx
     }
 
@@ -38,20 +66,51 @@ impl<T, Sig> Signed<T, Sig> {
         &self.signature
     }
 
-    /// Returns a reference to the transaction hash.
-    #[doc(alias = "tx_hash", alias = "transaction_hash")]
-    pub const fn hash(&self) -> &B256 {
-        &self.hash
-    }
-
-    /// Splits the transaction into parts.
-    pub fn into_parts(self) -> (T, Sig, B256) {
-        (self.tx, self.signature, self.hash)
-    }
-
     /// Returns the transaction without signature.
     pub fn strip_signature(self) -> T {
         self.tx
+    }
+
+    /// Converts the transaction type to the given alternative that is `From<T>`
+    ///
+    /// Caution: This is only intended for converting transaction types that are structurally
+    /// equivalent (produce the same hash).
+    pub fn convert<U>(self) -> Signed<U, Sig>
+    where
+        U: From<T>,
+    {
+        self.map(U::from)
+    }
+
+    /// Converts the transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the transaction with the new transaction type if all conversions were successful.
+    ///
+    /// Caution: This is only intended for converting transaction types that are structurally
+    /// equivalent (produce the same hash).
+    pub fn try_convert<U>(self) -> Result<Signed<U, Sig>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map(U::try_from)
+    }
+
+    /// Applies the given closure to the inner transaction type.
+    ///
+    /// Caution: This is only intended for converting transaction types that are structurally
+    /// equivalent (produce the same hash).
+    pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Signed<Tx, Sig> {
+        let Self { tx, signature, hash } = self;
+        Signed { tx: f(tx), signature, hash }
+    }
+
+    /// Applies the given fallible closure to the inner transactions.
+    ///
+    /// Caution: This is only intended for converting transaction types that are structurally
+    /// equivalent (produce the same hash).
+    pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Signed<Tx, Sig>, E> {
+        let Self { tx, signature, hash } = self;
+        Ok(Signed { tx: f(tx)?, signature, hash })
     }
 }
 
@@ -62,10 +121,28 @@ impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
     }
 }
 
+impl<T, Sig> Signed<T, Sig>
+where
+    T: TxHashable<Sig>,
+{
+    /// Returns a reference to the transaction hash.
+    #[doc(alias = "tx_hash", alias = "transaction_hash")]
+    pub fn hash(&self) -> &B256 {
+        #[allow(clippy::useless_conversion)]
+        self.hash.get_or_init(|| self.tx.tx_hash(&self.signature).into())
+    }
+}
+
 impl<T> Signed<T>
 where
-    T: RlpEcdsaTx,
+    T: RlpEcdsaEncodableTx,
 {
+    /// Splits the transaction into parts.
+    pub fn into_parts(self) -> (T, Signature, B256) {
+        let hash = *self.hash();
+        (self.tx, self.signature, hash)
+    }
+
     /// Get the length of the transaction when RLP encoded.
     pub fn rlp_encoded_length(&self) -> usize {
         self.tx.rlp_encoded_length_with_signature(&self.signature)
@@ -105,7 +182,21 @@ where
     pub fn network_encode(&self, out: &mut dyn BufMut) {
         self.tx.network_encode(&self.signature, out);
     }
+}
 
+impl<T, Sig> TxHashRef for Signed<T, Sig>
+where
+    T: TxHashable<Sig>,
+{
+    fn tx_hash(&self) -> &B256 {
+        self.hash()
+    }
+}
+
+impl<T> Signed<T>
+where
+    T: RlpEcdsaDecodableTx,
+{
     /// RLP decode the signed transaction.
     pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         T::rlp_decode_signed(buf)
@@ -132,6 +223,26 @@ where
     }
 }
 
+impl<T, Sig> Hash for Signed<T, Sig>
+where
+    T: TxHashable<Sig> + Hash,
+    Sig: Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash().hash(state);
+        self.tx.hash(state);
+        self.signature.hash(state);
+    }
+}
+
+impl<T: TxHashable<Sig> + PartialEq, Sig: PartialEq> PartialEq for Signed<T, Sig> {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash() == other.hash() && self.tx == other.tx && self.signature == other.signature
+    }
+}
+
+impl<T: TxHashable<Sig> + PartialEq, Sig: PartialEq> Eq for Signed<T, Sig> {}
+
 #[cfg(feature = "k256")]
 impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
     /// Recover the signer of the transaction
@@ -140,6 +251,23 @@ impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
     ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         let sighash = self.tx.signature_hash();
         self.signature.recover_address_from_prehash(&sighash)
+    }
+
+    /// Attempts to recover signer and constructs a [`crate::transaction::Recovered`] object.
+    pub fn try_into_recovered(
+        self,
+    ) -> Result<crate::transaction::Recovered<T>, alloy_primitives::SignatureError> {
+        let signer = self.recover_signer()?;
+        Ok(crate::transaction::Recovered::new_unchecked(self.tx, signer))
+    }
+
+    /// Attempts to recover signer and constructs a [`crate::transaction::Recovered`] with a
+    /// reference to the transaction `Recovered<&T>`
+    pub fn try_to_recovered_ref(
+        &self,
+    ) -> Result<crate::transaction::Recovered<&T>, alloy_primitives::SignatureError> {
+        let signer = self.recover_signer()?;
+        Ok(crate::transaction::Recovered::new_unchecked(&self.tx, signer))
     }
 }
 
@@ -165,5 +293,314 @@ impl<'a, T: SignableTransaction<Signature> + arbitrary::Arbitrary<'a>> arbitrary
         let signature: Signature = (recoverable_sig, recovery_id).into();
 
         Ok(tx.into_signed(signature))
+    }
+}
+
+impl<T, Sig> Typed2718 for Signed<T, Sig>
+where
+    T: Typed2718,
+{
+    fn ty(&self) -> u8 {
+        self.tx().ty()
+    }
+}
+
+impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<T, Sig> {
+    #[inline]
+    fn chain_id(&self) -> Option<u64> {
+        self.tx.chain_id()
+    }
+
+    #[inline]
+    fn nonce(&self) -> u64 {
+        self.tx.nonce()
+    }
+
+    #[inline]
+    fn gas_limit(&self) -> u64 {
+        self.tx.gas_limit()
+    }
+
+    #[inline]
+    fn gas_price(&self) -> Option<u128> {
+        self.tx.gas_price()
+    }
+
+    #[inline]
+    fn max_fee_per_gas(&self) -> u128 {
+        self.tx.max_fee_per_gas()
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.tx.max_priority_fee_per_gas()
+    }
+
+    #[inline]
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.tx.max_fee_per_blob_gas()
+    }
+
+    #[inline]
+    fn priority_fee_or_price(&self) -> u128 {
+        self.tx.priority_fee_or_price()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.tx.effective_gas_price(base_fee)
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        self.tx.is_dynamic_fee()
+    }
+
+    #[inline]
+    fn kind(&self) -> TxKind {
+        self.tx.kind()
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.tx.is_create()
+    }
+
+    #[inline]
+    fn value(&self) -> U256 {
+        self.tx.value()
+    }
+
+    #[inline]
+    fn input(&self) -> &Bytes {
+        self.tx.input()
+    }
+
+    #[inline]
+    fn access_list(&self) -> Option<&AccessList> {
+        self.tx.access_list()
+    }
+
+    #[inline]
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.tx.blob_versioned_hashes()
+    }
+
+    #[inline]
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.tx.authorization_list()
+    }
+}
+
+impl<T: Transaction> Transaction for Sealed<T> {
+    #[inline]
+    fn chain_id(&self) -> Option<u64> {
+        self.inner().chain_id()
+    }
+
+    #[inline]
+    fn nonce(&self) -> u64 {
+        self.inner().nonce()
+    }
+
+    #[inline]
+    fn gas_limit(&self) -> u64 {
+        self.inner().gas_limit()
+    }
+
+    #[inline]
+    fn gas_price(&self) -> Option<u128> {
+        self.inner().gas_price()
+    }
+
+    #[inline]
+    fn max_fee_per_gas(&self) -> u128 {
+        self.inner().max_fee_per_gas()
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.inner().max_priority_fee_per_gas()
+    }
+
+    #[inline]
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.inner().max_fee_per_blob_gas()
+    }
+
+    #[inline]
+    fn priority_fee_or_price(&self) -> u128 {
+        self.inner().priority_fee_or_price()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.inner().effective_gas_price(base_fee)
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        self.inner().is_dynamic_fee()
+    }
+
+    #[inline]
+    fn kind(&self) -> TxKind {
+        self.inner().kind()
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.inner().is_create()
+    }
+
+    #[inline]
+    fn value(&self) -> U256 {
+        self.inner().value()
+    }
+
+    #[inline]
+    fn input(&self) -> &Bytes {
+        self.inner().input()
+    }
+
+    #[inline]
+    fn access_list(&self) -> Option<&AccessList> {
+        self.inner().access_list()
+    }
+
+    #[inline]
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.inner().blob_versioned_hashes()
+    }
+
+    #[inline]
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.inner().authorization_list()
+    }
+}
+
+#[cfg(any(feature = "secp256k1", feature = "k256"))]
+impl<T> crate::transaction::SignerRecoverable for Signed<T>
+where
+    T: SignableTransaction<Signature>,
+{
+    fn recover_signer(&self) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
+    }
+
+    fn recover_signer_unchecked(
+        &self,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+    }
+
+    fn recover_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        buf.clear();
+        self.tx.encode_for_signing(buf);
+        let signature_hash = alloy_primitives::keccak256(buf);
+        crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
+    }
+
+    fn recover_unchecked_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        buf.clear();
+        self.tx.encode_for_signing(buf);
+        let signature_hash = alloy_primitives::keccak256(buf);
+        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+    }
+}
+
+impl<T> Encodable2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+{
+    fn encode_2718_len(&self) -> usize {
+        self.eip2718_encoded_length()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.eip2718_encode(out)
+    }
+
+    fn trie_hash(&self) -> B256 {
+        *self.hash()
+    }
+}
+
+impl<T> Decodable2718 for Signed<T>
+where
+    T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
+{
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        let decoded = T::rlp_decode_signed(buf)?;
+
+        if decoded.ty() != ty {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+
+        Ok(decoded)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::rlp_decode_signed(buf).map_err(Into::into)
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use crate::transaction::TxHashable;
+    use alloc::borrow::Cow;
+    use alloy_primitives::B256;
+    use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+
+    #[derive(Serialize, Deserialize)]
+    struct Signed<'a, T: Clone, Sig: Clone> {
+        #[serde(flatten)]
+        tx: Cow<'a, T>,
+        #[serde(flatten)]
+        signature: Cow<'a, Sig>,
+        hash: Cow<'a, B256>,
+    }
+
+    impl<T, Sig> Serialize for super::Signed<T, Sig>
+    where
+        T: Clone + TxHashable<Sig> + Serialize,
+        Sig: Clone + Serialize,
+    {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Signed {
+                tx: Cow::Borrowed(&self.tx),
+                signature: Cow::Borrowed(&self.signature),
+                hash: Cow::Borrowed(self.hash()),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de, T, Sig> Deserialize<'de> for super::Signed<T, Sig>
+    where
+        T: Clone + DeserializeOwned,
+        Sig: Clone + DeserializeOwned,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Signed::<T, Sig>::deserialize(deserializer).map(|value| {
+                Self::new_unchecked(
+                    value.tx.into_owned(),
+                    value.signature.into_owned(),
+                    value.hash.into_owned(),
+                )
+            })
+        }
     }
 }

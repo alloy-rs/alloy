@@ -33,15 +33,27 @@ thiserror = { workspace = true, features = ["std"] }
 tower.workspace = true
 url.workspace = true
 tracing.workspace = true
+governor = { version = "0.10", default-features = false, features = [
+    "std",
+    "quanta",
+], optional = true }
+futures.workspace = true
+parking_lot.workspace = true
+derive_more.workspace = true
+auto_impl.workspace = true
 
-# non-WASM only
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { workspace = true, features = ["rt", "time"] }
+# Test-only dependencies
+[dev-dependencies]
+alloy-primitives.workspace = true
 
-# WASM only
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
+tokio = { workspace = true, features = ["rt", "time", "sync", "macros"] }
+
+# wasm32-unknown-unknown (Browser)
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
 wasmtimer.workspace = true
 
 [features]
 wasm-bindgen = ["dep:wasm-bindgen-futures"]
+throttle = ["dep:governor"]

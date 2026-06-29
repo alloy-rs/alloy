@@ -1,13 +1,11 @@
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Request, ResponsePacket, RpcParam, RpcReturn,
+    transform_response, try_deserialize_ok, Request, RequestMeta, RequestPacket, ResponsePacket,
+    RpcRecv, RpcSend,
 };
-use alloy_transport::{BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportResult};
-use core::panic;
-use std::{
-    fmt,
-    future::{Future, IntoFuture},
-    marker::PhantomData,
+use alloy_transport::{
+    BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportErrorKind, TransportResult,
 };
+use std::{fmt, future::IntoFuture, marker::PhantomData};
 use tower::Service;
 
 /// A prepared, but unsent, RPC call.
@@ -39,7 +37,7 @@ pub struct RpcCall<Params, Resp, Output = Resp, Map = fn(Resp) -> Output> {
 
 impl<Params, Resp, Output, Map> fmt::Debug for RpcCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
+    Params: RpcSend,
     Map: FnOnce(Resp) -> Output,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -49,7 +47,7 @@ where
 
 impl<Params, Resp> RpcCall<Params, Resp>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     #[doc(hidden)]
     pub fn new(request: Request<Params>, connection: impl IntoBoxTransport) -> Self {
@@ -64,7 +62,7 @@ where
 
 impl<Params, Resp, Output, Map> RpcCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
+    Params: RpcSend,
     Map: FnOnce(Resp) -> Output,
 {
     /// Map the response to a different type. This is usable for converting
@@ -117,13 +115,18 @@ where
         &self.request
     }
 
+    /// Returns the RPC method
+    pub fn method(&self) -> &str {
+        &self.request().meta.method
+    }
+
     /// Returns a mutable reference to the request.
     pub fn request_mut(&mut self) -> &mut Request<Params> {
         &mut self.request
     }
 
     /// Map the params of the request into a new type.
-    pub fn map_params<NewParams: RpcParam>(
+    pub fn map_params<NewParams: RpcSend>(
         self,
         map: impl FnOnce(Params) -> NewParams,
     ) -> RpcCall<NewParams, Resp, Output, Map> {
@@ -134,12 +137,22 @@ where
             _pd: PhantomData,
         }
     }
+
+    /// Maps the metadata of the request using the provided function.
+    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Self {
+        Self {
+            request: self.request.map_meta(f),
+            connection: self.connection,
+            map: self.map,
+            _pd: PhantomData,
+        }
+    }
 }
 
 impl<Params, Resp, Output, Map> RpcCall<&Params, Resp, Output, Map>
 where
-    Params: RpcParam + ToOwned,
-    Params::Owned: RpcParam,
+    Params: RpcSend + ToOwned,
+    Params::Owned: RpcSend,
     Map: FnOnce(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
@@ -159,8 +172,8 @@ where
 
 impl<'a, Params, Resp, Output, Map> RpcCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam + 'a,
-    Resp: RpcReturn,
+    Params: RpcSend + 'a,
+    Resp: RpcRecv,
     Output: 'a,
     Map: FnOnce(Resp) -> Output + Send + 'a,
 {
@@ -171,11 +184,20 @@ where
 
     async fn do_call(self) -> TransportResult<Output> {
         let Self { request, mut connection, map, _pd: PhantomData } = self;
-        std::future::poll_fn(|cx| connection.poll_ready(cx)).await?;
+        std::future::poll_fn(|cx| Service::<RequestPacket>::poll_ready(&mut connection, cx))
+            .await?;
+        if tracing::enabled!(tracing::Level::TRACE) {
+            trace!(?request, "sending request");
+        } else {
+            debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
+        }
         let serialized_request = request.serialize().map_err(TransportError::ser_err)?;
+        trace!(request=%serialized_request.serialized(), "serialized request");
         let response_packet = connection.call(serialized_request.into()).await?;
         let ResponsePacket::Single(response) = response_packet else {
-            panic!("received batch response from single request")
+            return Err(TransportErrorKind::custom_str(
+                "received batch response from single request",
+            ));
         };
         try_deserialize_ok(transform_response(response)).map(map)
     }
@@ -183,13 +205,13 @@ where
 
 impl<'a, Params, Resp, Output, Map> IntoFuture for RpcCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam + 'a,
-    Resp: RpcReturn,
+    Params: RpcSend + 'a,
+    Resp: RpcRecv,
     Output: 'a,
     Map: FnOnce(Resp) -> Output + Send + 'a,
 {
     type IntoFuture = RpcFut<'a, Output>;
-    type Output = <Self::IntoFuture as Future>::Output;
+    type Output = TransportResult<Output>;
 
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.do_call())

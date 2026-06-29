@@ -3,7 +3,7 @@ use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use std::{any::TypeId, fmt};
 use tower::Service;
 
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 mod private {
     pub trait Sealed {}
     impl<T: super::Transport + Clone> Sealed for T {}
@@ -55,7 +55,7 @@ impl BoxTransport {
     /// Returns a reference to the inner transport.
     #[inline]
     pub fn as_any(&self) -> &dyn std::any::Any {
-        self.inner.as_any()
+        &*self.inner
     }
 }
 
@@ -74,7 +74,6 @@ impl Clone for BoxTransport {
 /// Helper trait for constructing [`BoxTransport`].
 trait CloneTransport: Transport + std::any::Any {
     fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync>;
-    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl<T> CloneTransport for T
@@ -85,18 +84,11 @@ where
     fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync> {
         Box::new(self.clone())
     }
-
-    #[inline]
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }
 
 impl Service<RequestPacket> for BoxTransport {
     type Response = ResponsePacket;
-
     type Error = TransportError;
-
     type Future = TransportFut<'static>;
 
     #[inline]

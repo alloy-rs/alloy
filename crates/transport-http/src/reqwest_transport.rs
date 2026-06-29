@@ -4,9 +4,10 @@ use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
     TransportFut, TransportResult,
 };
+use itertools::Itertools;
 use std::task;
 use tower::Service;
-use tracing::{debug, debug_span, trace, Instrument};
+use tracing::{debug, debug_span, instrument, trace, Instrument};
 use url::Url;
 
 /// Rexported from [`reqwest`].
@@ -34,11 +35,13 @@ impl Http<Client> {
         Self { client: Default::default(), url }
     }
 
+    #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
     async fn do_reqwest(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         let resp = self
             .client
             .post(self.url)
             .json(&req)
+            .headers(req.headers())
             .send()
             .await
             .map_err(TransportErrorKind::custom)?;
@@ -51,10 +54,17 @@ impl Http<Client> {
         // if there is one.
         let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
 
-        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-        trace!(body = %String::from_utf8_lossy(&body), "response body");
+        if tracing::enabled!(tracing::Level::TRACE) {
+            trace!(body = %String::from_utf8_lossy(&body), "response body");
+        } else {
+            debug!(bytes = body.len(), "retrieved response body");
+        }
 
-        if status != reqwest::StatusCode::OK {
+        if !status.is_success() {
+            if let Some(response) = crate::json_rpc_error_response(&body) {
+                return Ok(response);
+            }
+
             return Err(TransportErrorKind::http_error(
                 status.as_u16(),
                 String::from_utf8_lossy(&body).into_owned(),
@@ -75,30 +85,15 @@ impl Service<RequestPacket> for Http<reqwest::Client> {
     type Future = TransportFut<'static>;
 
     #[inline]
-    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        (&*self).poll_ready(cx)
-    }
-
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        (&*self).call(req)
-    }
-}
-
-impl Service<RequestPacket> for &Http<reqwest::Client> {
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
-
-    #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         // `reqwest` always returns `Ok(())`.
         task::Poll::Ready(Ok(()))
     }
 
+    #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
         let span = debug_span!("ReqwestTransport", url = %this.url);
-        Box::pin(this.do_reqwest(req).instrument(span))
+        Box::pin(this.do_reqwest(req).instrument(span.or_current()))
     }
 }

@@ -1,6 +1,6 @@
 //! Block heartbeat and pending transaction watcher.
 
-use crate::{Provider, RootProvider};
+use crate::{blocks::Paused, Provider, RootProvider};
 use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, Network};
@@ -9,23 +9,30 @@ use alloy_primitives::{
     TxHash, B256,
 };
 use alloy_transport::{utils::Spawnable, TransportError};
-use futures::{stream::StreamExt, FutureExt, Stream};
+use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
     future::Future,
+    sync::Arc,
     time::Duration,
 };
 use tokio::{
     select,
-    sync::{mpsc, oneshot, watch},
+    sync::{mpsc, oneshot},
 };
 
-#[cfg(target_arch = "wasm32")]
-use wasmtimer::{std::Instant, tokio::sleep_until};
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use wasmtimer::{
+    std::Instant,
+    tokio::{interval, sleep_until},
+};
 
-#[cfg(not(target_arch = "wasm32"))]
-use {std::time::Instant, tokio::time::sleep_until};
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+use {
+    std::time::Instant,
+    tokio::time::{interval, sleep_until},
+};
 
 /// Errors which may occur when watching a pending transaction.
 #[derive(Debug, thiserror::Error)]
@@ -38,7 +45,7 @@ pub enum PendingTransactionError {
     #[error(transparent)]
     TransportError(#[from] TransportError),
 
-    /// Error occured while getting response from the heartbeat.
+    /// Error occurred while getting response from the heartbeat.
     #[error(transparent)]
     Recv(#[from] oneshot::error::RecvError),
 
@@ -119,6 +126,12 @@ impl<N: Network> PendingTransactionBuilder<N> {
         (self.provider, self.config)
     }
 
+    /// Calls a function with a reference to the value.
+    pub fn inspect<F: FnOnce(&Self)>(self, f: F) -> Self {
+        f(&self);
+        self
+    }
+
     /// Returns the transaction hash.
     #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> &TxHash {
@@ -127,7 +140,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
 
     /// Sets the transaction hash.
     #[doc(alias = "set_transaction_hash")]
-    pub fn set_tx_hash(&mut self, tx_hash: TxHash) {
+    pub const fn set_tx_hash(&mut self, tx_hash: TxHash) {
         self.config.set_tx_hash(tx_hash);
     }
 
@@ -146,7 +159,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
 
     /// Sets the number of confirmations to wait for.
     #[doc(alias = "set_confirmations")]
-    pub fn set_required_confirmations(&mut self, confirmations: u64) {
+    pub const fn set_required_confirmations(&mut self, confirmations: u64) {
         self.config.set_required_confirmations(confirmations);
     }
 
@@ -163,7 +176,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
     }
 
     /// Sets the timeout.
-    pub fn set_timeout(&mut self, timeout: Option<Duration>) {
+    pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.config.set_timeout(timeout);
     }
 
@@ -211,17 +224,32 @@ impl<N: Network> PendingTransactionBuilder<N> {
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> Result<N::ReceiptResponse, PendingTransactionError> {
         let hash = self.config.tx_hash;
+        let required_confirmations = self.config.required_confirmations;
         let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
 
         // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
-        // block the tx was mined in
-        let mut interval = tokio::time::interval(self.provider.client().poll_interval());
+        // block the tx was mined in. Only apply this for single confirmation to respect the
+        // confirmation setting.
+        let mut interval = if required_confirmations > 1 {
+            None
+        } else {
+            Some(interval(self.provider.client().poll_interval()))
+        };
 
         loop {
             let mut confirmed = false;
 
+            // If more than 1 block confirmations is specified then we can rely on the regular
+            // watch_pending_transaction and dont need this workaround for the above mentioned race
+            // condition
+            let tick_fut = if let Some(interval) = interval.as_mut() {
+                interval.tick().map(|_| ()).left_future()
+            } else {
+                pending::<()>().right_future()
+            };
+
             select! {
-                _ = interval.tick() => {},
+                _ = tick_fut => {},
                 res = &mut pending_tx => {
                     let _ = res?;
                     confirmed = true;
@@ -274,7 +302,7 @@ impl PendingTransactionConfig {
 
     /// Sets the transaction hash.
     #[doc(alias = "set_transaction_hash")]
-    pub fn set_tx_hash(&mut self, tx_hash: TxHash) {
+    pub const fn set_tx_hash(&mut self, tx_hash: TxHash) {
         self.tx_hash = tx_hash;
     }
 
@@ -293,7 +321,7 @@ impl PendingTransactionConfig {
 
     /// Sets the number of confirmations to wait for.
     #[doc(alias = "set_confirmations")]
-    pub fn set_required_confirmations(&mut self, confirmations: u64) {
+    pub const fn set_required_confirmations(&mut self, confirmations: u64) {
         self.required_confirmations = confirmations;
     }
 
@@ -310,7 +338,7 @@ impl PendingTransactionConfig {
     }
 
     /// Sets the timeout.
-    pub fn set_timeout(&mut self, timeout: Option<Duration>) {
+    pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.timeout = timeout;
     }
 
@@ -329,6 +357,12 @@ impl PendingTransactionConfig {
     }
 }
 
+impl From<TxHash> for PendingTransactionConfig {
+    fn from(tx_hash: TxHash) -> Self {
+        Self::new(tx_hash)
+    }
+}
+
 /// Errors which may occur in heartbeat when watching a transaction.
 #[derive(Debug, thiserror::Error)]
 pub enum WatchTxError {
@@ -337,6 +371,7 @@ pub enum WatchTxError {
     Timeout,
 }
 
+/// The type sent by the [`HeartbeatHandle`] to the [`Heartbeat`] background task.
 #[doc(alias = "TransactionWatcher")]
 struct TxWatcher {
     config: PendingTransactionConfig,
@@ -406,12 +441,11 @@ impl Future for PendingTransaction {
 
 /// A handle to the heartbeat task.
 #[derive(Clone, Debug)]
-pub(crate) struct HeartbeatHandle<N: Network> {
+pub(crate) struct HeartbeatHandle {
     tx: mpsc::Sender<TxWatcher>,
-    latest: watch::Receiver<Option<N::BlockResponse>>,
 }
 
-impl<N: Network> HeartbeatHandle<N> {
+impl HeartbeatHandle {
     /// Watch for a transaction to be confirmed with the given config.
     #[doc(alias = "watch_transaction")]
     pub(crate) async fn watch_tx(
@@ -426,15 +460,8 @@ impl<N: Network> HeartbeatHandle<N> {
             Err(e) => Err(e.0.config),
         }
     }
-
-    /// Returns a watcher that always sees the latest block.
-    #[allow(dead_code)]
-    pub(crate) const fn latest(&self) -> &watch::Receiver<Option<N::BlockResponse>> {
-        &self.latest
-    }
 }
 
-// TODO: Parameterize with `Network`
 /// A heartbeat task that receives blocks and watches for transactions.
 pub(crate) struct Heartbeat<N, S> {
     /// The stream of incoming blocks to watch.
@@ -452,18 +479,22 @@ pub(crate) struct Heartbeat<N, S> {
     /// Ordered map of transactions to reap at a certain time.
     reap_at: BTreeMap<Instant, B256>,
 
+    /// Whether the heartbeat is currently paused.
+    paused: Arc<Paused>,
+
     _network: std::marker::PhantomData<N>,
 }
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Create a new heartbeat task.
-    pub(crate) fn new(stream: S) -> Self {
+    pub(crate) fn new(stream: S, is_paused: Arc<Paused>) -> Self {
         Self {
             stream: stream.fuse(),
             past_blocks: Default::default(),
             unconfirmed: Default::default(),
             waiting_confs: Default::default(),
             reap_at: Default::default(),
+            paused: is_paused,
             _network: Default::default(),
         }
     }
@@ -500,7 +531,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         }
     }
 
-    /// Reap transactions overridden by the reorg.
+    /// Reap transactions overridden by a chain gap (true reorg or resync after a pause).
     /// Accepts new chain height as an argument, and drops any subscriptions
     /// that were received in blocks affected by the reorg (e.g. >= new_height).
     fn move_reorg_to_unconfirmed(&mut self, new_height: u64) {
@@ -510,13 +541,27 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                     // All blocks after and _including_ the new height are reaped.
                     if received_at_block >= new_height {
                         let hash = watcher.config.tx_hash;
-                        debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed due to reorg");
+                        debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed after chain gap");
                         self.unconfirmed.insert(hash, watcher);
                         return None;
                     }
                 }
                 Some(watcher)
             }).collect();
+        }
+    }
+
+    /// Check if we have any pending transactions.
+    fn has_pending_transactions(&self) -> bool {
+        !self.unconfirmed.is_empty() || !self.waiting_confs.is_empty()
+    }
+
+    /// Update the pause state based on whether we have pending transactions.
+    fn update_pause_state(&mut self) {
+        let should_pause = !self.has_pending_transactions();
+        if self.paused.is_paused() != should_pause {
+            debug!(paused = should_pause, "updating heartbeat pause state");
+            self.paused.set_paused(should_pause);
         }
     }
 
@@ -529,9 +574,16 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         if let Some(received_at_block) = to_watch.received_at_block {
             // Transaction is already confirmed, we just need to wait for the required
             // confirmations.
-            let current_block =
+            let confirmations = to_watch.config.required_confirmations;
+            let confirmed_at = received_at_block + confirmations - 1;
+            let current_height =
                 self.past_blocks.back().map(|(h, _)| *h).unwrap_or(received_at_block);
-            self.add_to_waiting_list(to_watch, current_block);
+
+            if confirmed_at <= current_height {
+                to_watch.notify(Ok(()));
+            } else {
+                self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
+            }
             return;
         }
 
@@ -550,6 +602,11 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                     to_watch.notify(Ok(()));
                 } else {
                     debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
+                    // Ensure reorg handling can move this watcher back if needed.
+                    let mut to_watch = to_watch;
+                    if to_watch.received_at_block.is_none() {
+                        to_watch.received_at_block = Some(*block_height);
+                    }
                     self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
                 }
                 return;
@@ -568,13 +625,9 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// Handle a new block by checking if any of the transactions we're
     /// watching are in it, and if so, notifying the watcher. Also updates
     /// the latest block.
-    fn handle_new_block(
-        &mut self,
-        block: N::BlockResponse,
-        latest: &watch::Sender<Option<N::BlockResponse>>,
-    ) {
-        // Blocks without numbers are ignored, as they're not part of the chain.
+    fn handle_new_block(&mut self, block: N::BlockResponse) {
         let block_height = block.header().as_ref().number();
+        debug!(%block_height, "handling block");
 
         // Add the block the lookbehind.
         // The value is chosen arbitrarily to not have a huge memory footprint but still
@@ -590,7 +643,8 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Check that the chain is continuous.
             if *last_height + 1 != block_height {
                 // Move all the transactions that were reset by the reorg to the unconfirmed list.
-                warn!(%block_height, last_height, "reorg detected");
+                // This can also happen if we unpaused the heartbeat after some time.
+                debug!(block_height, last_height, "reorg/unpause detected");
                 self.move_reorg_to_unconfirmed(block_height);
                 // Remove past blocks that are now invalid.
                 self.past_blocks.retain(|(h, _)| *h < block_height);
@@ -624,29 +678,23 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         }
 
         self.check_confirmations(block_height);
-
-        // Update the latest block. We use `send_replace` here to ensure the
-        // latest block is always up to date, even if no receivers exist.
-        // C.f. https://docs.rs/tokio/latest/tokio/sync/watch/struct.Sender.html#method.send
-        debug!(%block_height, "updating latest block");
-        let _ = latest.send_replace(Some(block));
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
-    pub(crate) fn spawn(self) -> HeartbeatHandle<N> {
+    pub(crate) fn spawn(self) -> HeartbeatHandle {
         let (task, handle) = self.consume();
         task.spawn_task();
         handle
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
-    pub(crate) fn spawn(self) -> HeartbeatHandle<N> {
+    pub(crate) fn spawn(self) -> HeartbeatHandle {
         let (task, handle) = self.consume();
         task.spawn_task();
         handle
@@ -654,19 +702,16 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> He
 }
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
-    fn consume(self) -> (impl Future<Output = ()>, HeartbeatHandle<N>) {
-        let (latest, latest_rx) = watch::channel(None::<N::BlockResponse>);
-        let (ix_tx, ixns) = mpsc::channel(16);
-        (self.into_future(latest, ixns), HeartbeatHandle { tx: ix_tx, latest: latest_rx })
+    fn consume(self) -> (impl Future<Output = ()>, HeartbeatHandle) {
+        let (ix_tx, ixns) = mpsc::channel(64);
+        (self.into_future(ixns), HeartbeatHandle { tx: ix_tx })
     }
 
-    async fn into_future(
-        mut self,
-        latest: watch::Sender<Option<N::BlockResponse>>,
-        mut ixns: mpsc::Receiver<TxWatcher>,
-    ) {
+    async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
         'shutdown: loop {
             {
+                self.update_pause_state();
+
                 let next_reap = self.next_reap();
                 let sleep = std::pin::pin!(sleep_until(next_reap.into()));
 
@@ -683,7 +728,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
                     // Wake up to handle new blocks.
                     Some(block) = self.stream.next() => {
-                        self.handle_new_block(block, &latest);
+                        self.handle_new_block(block);
                     },
 
                     // This arm ensures we always wake up to reap timeouts,

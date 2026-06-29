@@ -12,8 +12,8 @@ use futures::lock::Mutex;
 use std::sync::Arc;
 
 /// A trait that determines the behavior of filling nonces.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
     /// Get the next nonce for the given account.
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
@@ -32,8 +32,8 @@ pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
 #[non_exhaustive]
 pub struct SimpleNonceManager;
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl NonceManager for SimpleNonceManager {
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where
@@ -57,8 +57,8 @@ pub struct CachedNonceManager {
     nonces: Arc<DashMap<Address, Arc<Mutex<u64>>>>,
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl NonceManager for CachedNonceManager {
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where
@@ -78,8 +78,10 @@ impl NonceManager for CachedNonceManager {
         let mut nonce = nonce.lock().await;
         let new_nonce = if *nonce == NONE {
             // Initialize the nonce if we haven't seen this account before.
-            provider.get_transaction_count(address).await?
+            trace!(%address, "fetching nonce");
+            provider.get_transaction_count(address).pending().await?
         } else {
+            trace!(%address, current_nonce = *nonce, "incrementing nonce");
             *nonce + 1
         };
         *nonce = new_nonce;
@@ -100,28 +102,61 @@ impl NonceManager for CachedNonceManager {
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
+/// # use alloy_network::{Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
-/// let provider = ProviderBuilder::new()
+/// # use alloy_signer_local::PrivateKeySigner;
+/// # async fn test(url: url::Url) -> Result<(), Box<dyn std::error::Error>> {
+/// let pk: PrivateKeySigner = "0x...".parse()?;
+/// let provider = ProviderBuilder::<_, _, Ethereum>::default()
 ///     .with_simple_nonce_management()
-///     .wallet(wallet)
-///     .on_http(url);
+///     .wallet(pk)
+///     .connect_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())
 /// # }
 /// ```
 #[derive(Clone, Debug, Default)]
-pub struct NonceFiller<M: NonceManager = SimpleNonceManager> {
+pub struct NonceFiller<M: NonceManager = CachedNonceManager> {
     nonce_manager: M,
 }
 
 impl<M: NonceManager> NonceFiller<M> {
     /// Creates a new [`NonceFiller`] with the specified [`NonceManager`].
+    ///
+    /// To instantiate with the [`SimpleNonceManager`], use [`NonceFiller::simple()`].
+    ///
+    /// To instantiate with the [`CachedNonceManager`], use [`NonceFiller::cached()`].
     pub const fn new(nonce_manager: M) -> Self {
         Self { nonce_manager }
+    }
+
+    /// Creates a new [`NonceFiller`] with the [`SimpleNonceManager`].
+    ///
+    /// [`SimpleNonceManager`] will fetch the transaction count for any new account it sees,
+    /// resulting in frequent RPC calls.
+    pub const fn simple() -> NonceFiller<SimpleNonceManager> {
+        NonceFiller { nonce_manager: SimpleNonceManager }
+    }
+
+    /// Creates a new [`NonceFiller`] with the [`CachedNonceManager`].
+    ///
+    /// [`CachedNonceManager`] will fetch the transaction count for any new account it sees,
+    /// store it locally and increment the locally stored nonce as transactions are sent via
+    /// [`Provider::send_transaction`], reducing the number of RPC calls.
+    pub fn cached() -> NonceFiller<CachedNonceManager> {
+        NonceFiller { nonce_manager: CachedNonceManager::default() }
+    }
+
+    /// Get a reference to the nonce manager.
+    pub const fn nonce_manager(&self) -> &M {
+        &self.nonce_manager
+    }
+
+    /// Get a mutable reference to the nonce manager.
+    pub const fn nonce_manager_mut(&mut self) -> &mut M {
+        &mut self.nonce_manager
     }
 }
 
@@ -191,7 +226,7 @@ mod tests {
     #[tokio::test]
     async fn smoke_test() {
         let filler = NonceFiller::<CachedNonceManager>::default();
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let address = Address::ZERO;
         check_nonces(&filler, &provider, address, 0).await;
 
@@ -199,7 +234,7 @@ mod tests {
         {
             use crate::ext::AnvilApi;
             filler.nonce_manager.nonces.clear();
-            provider.anvil_set_nonce(address, U256::from(69)).await.unwrap();
+            provider.anvil_set_nonce(address, 69).await.unwrap();
             check_nonces(&filler, &provider, address, 69).await;
         }
     }
@@ -207,7 +242,7 @@ mod tests {
     #[tokio::test]
     async fn concurrency() {
         let filler = Arc::new(NonceFiller::<CachedNonceManager>::default());
-        let provider = Arc::new(ProviderBuilder::new().on_anvil());
+        let provider = Arc::new(ProviderBuilder::new().connect_anvil());
         let address = Address::ZERO;
         let tasks = (0..5)
             .map(|_| {
@@ -232,7 +267,10 @@ mod tests {
 
     #[tokio::test]
     async fn no_nonce_if_sender_unset() {
-        let provider = ProviderBuilder::new().with_cached_nonce_management().on_anvil();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .connect_anvil();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
@@ -248,7 +286,10 @@ mod tests {
 
     #[tokio::test]
     async fn increments_nonce() {
-        let provider = ProviderBuilder::new().with_cached_nonce_management().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .connect_anvil_with_wallet();
 
         let from = provider.default_signer_address();
         let tx = TransactionRequest {
@@ -277,5 +318,19 @@ mod tests {
             .expect("fail to fetch tx")
             .expect("tx didn't finalize");
         assert_eq!(mined_tx.nonce(), 1);
+    }
+
+    #[tokio::test]
+    async fn cloned_managers() {
+        let cnm1 = CachedNonceManager::default();
+        let cnm2 = cnm1.clone();
+
+        let provider = ProviderBuilder::new().connect_anvil();
+        let address = Address::ZERO;
+
+        assert_eq!(cnm1.get_next_nonce(&provider, address).await.unwrap(), 0);
+        assert_eq!(cnm2.get_next_nonce(&provider, address).await.unwrap(), 1);
+        assert_eq!(cnm1.get_next_nonce(&provider, address).await.unwrap(), 2);
+        assert_eq!(cnm2.get_next_nonce(&provider, address).await.unwrap(), 3);
     }
 }

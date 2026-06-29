@@ -1,7 +1,7 @@
 //! Geth call tracer types.
 
-use crate::parity::LocalizedTransactionTrace;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use crate::parity::{ActionType, CallType, CreationMethod, LocalizedTransactionTrace};
+use alloy_primitives::{Address, Bytes, Selector, B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// The response object for `debug_traceTransaction` with `"tracer": "callTracer"`.
@@ -33,7 +33,7 @@ pub struct CallFrame {
     pub revert_reason: Option<String>,
     /// Recorded child calls.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub calls: Vec<CallFrame>,
+    pub calls: Vec<Self>,
     /// Logs emitted by this call.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub logs: Vec<CallLogFrame>,
@@ -43,6 +43,75 @@ pub struct CallFrame {
     /// The type of the call.
     #[serde(rename = "type")]
     pub typ: String,
+}
+
+impl CallFrame {
+    /// Returns an iterator over this frame and all nested child frames in depth-first pre-order.
+    ///
+    /// Use [`CallFrameIter::skip_children`] to avoid descending into the children of the most
+    /// recently yielded frame.
+    ///
+    /// # Examples
+    ///
+    /// Iterate over all frames:
+    /// ```
+    /// # use alloy_rpc_types_trace::geth::CallFrame;
+    /// # let frame = CallFrame::default();
+    /// for call in frame.iter() {
+    ///     println!("{} -> {:?}", call.from, call.to);
+    /// }
+    /// ```
+    ///
+    /// Skip child calls selectively:
+    /// ```
+    /// # use alloy_rpc_types_trace::geth::CallFrame;
+    /// # let frame = CallFrame::default();
+    /// let mut iter = frame.iter();
+    /// while let Some(call) = iter.next() {
+    ///     if call.is_static_call() {
+    ///         iter.skip_children(); // don't descend into static calls
+    ///     }
+    /// }
+    /// ```
+    pub fn iter(&self) -> CallFrameIter<'_> {
+        CallFrameIter::new(self)
+    }
+
+    /// Error selector is the first 4 bytes of calldata
+    pub fn selector(&self) -> Option<Selector> {
+        if self.input.len() < 4 {
+            return None;
+        }
+        Some(Selector::from_slice(&self.input[..4]))
+    }
+
+    /// Returns true if this call reverted.
+    pub fn is_revert(&self) -> bool {
+        if self.revert_reason.is_some() {
+            return true;
+        }
+        matches!(self.error.as_deref(), Some("execution reverted"))
+    }
+
+    /// Returns true if this is a regular call
+    pub fn is_call(&self) -> bool {
+        self.typ == CallKind::Call
+    }
+
+    /// Returns true if this is a delegate call
+    pub fn is_delegate_call(&self) -> bool {
+        self.typ == CallKind::DelegateCall
+    }
+
+    /// Returns true if this is a static call
+    pub fn is_static_call(&self) -> bool {
+        self.typ == CallKind::StaticCall
+    }
+
+    /// Returns true if this is a auth call
+    pub fn is_auth_call(&self) -> bool {
+        self.typ == CallKind::AuthCall
+    }
 }
 
 /// Represents a recorded log that is emitted during a trace call.
@@ -60,6 +129,26 @@ pub struct CallLogFrame {
     /// The position of the log relative to subcalls within the same trace.
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub position: Option<u64>,
+    /// The index of the log in the trace.
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub index: Option<u64>,
+}
+
+impl CallLogFrame {
+    /// Converts this log frame into a primitives log object
+    pub fn into_log(self) -> alloy_primitives::Log {
+        alloy_primitives::Log::new_unchecked(
+            self.address.unwrap_or_default(),
+            self.topics.unwrap_or_default(),
+            self.data.unwrap_or_default(),
+        )
+    }
+}
+
+impl From<CallLogFrame> for alloy_primitives::Log {
+    fn from(value: CallLogFrame) -> Self {
+        value.into_log()
+    }
 }
 
 /// The configuration for the call tracer.
@@ -121,6 +210,176 @@ impl FlatCallConfig {
     }
 }
 
+/// A unified representation of a call.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum CallKind {
+    /// Represents a regular call.
+    #[default]
+    Call,
+    /// Represents a static call.
+    StaticCall,
+    /// Represents a call code operation.
+    CallCode,
+    /// Represents a delegate call.
+    DelegateCall,
+    /// Represents an authorized call.
+    AuthCall,
+    /// Represents a contract creation operation.
+    Create,
+    /// Represents a contract creation operation using the CREATE2 opcode.
+    Create2,
+}
+
+impl CallKind {
+    /// Returns the string representation of the call kind.
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Self::Call => "CALL",
+            Self::StaticCall => "STATICCALL",
+            Self::CallCode => "CALLCODE",
+            Self::DelegateCall => "DELEGATECALL",
+            Self::AuthCall => "AUTHCALL",
+            Self::Create => "CREATE",
+            Self::Create2 => "CREATE2",
+        }
+    }
+
+    /// Returns true if the call is a create
+    #[inline]
+    pub const fn is_any_create(&self) -> bool {
+        matches!(self, Self::Create | Self::Create2)
+    }
+
+    /// Returns true if the call is a delegate of some sorts
+    #[inline]
+    pub const fn is_delegate(&self) -> bool {
+        matches!(self, Self::DelegateCall | Self::CallCode)
+    }
+
+    /// Returns true if the call is [CallKind::StaticCall].
+    #[inline]
+    pub const fn is_static_call(&self) -> bool {
+        matches!(self, Self::StaticCall)
+    }
+
+    /// Returns true if the call is [CallKind::AuthCall].
+    #[inline]
+    pub const fn is_auth_call(&self) -> bool {
+        matches!(self, Self::AuthCall)
+    }
+}
+
+impl core::fmt::Display for CallKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+impl PartialEq<String> for CallKind {
+    fn eq(&self, other: &String) -> bool {
+        self.to_str() == other.as_str()
+    }
+}
+
+impl PartialEq<CallKind> for String {
+    fn eq(&self, other: &CallKind) -> bool {
+        self.as_str() == other.to_str()
+    }
+}
+
+impl PartialEq<&str> for CallKind {
+    fn eq(&self, other: &&str) -> bool {
+        self.to_str() == *other
+    }
+}
+
+impl PartialEq<CallKind> for &str {
+    fn eq(&self, other: &CallKind) -> bool {
+        *self == other.to_str()
+    }
+}
+
+impl From<CallKind> for CreationMethod {
+    fn from(kind: CallKind) -> Self {
+        match kind {
+            CallKind::Create => Self::Create,
+            CallKind::Create2 => Self::Create2,
+            _ => Self::None,
+        }
+    }
+}
+
+impl From<CallKind> for ActionType {
+    fn from(kind: CallKind) -> Self {
+        match kind {
+            CallKind::Call
+            | CallKind::StaticCall
+            | CallKind::DelegateCall
+            | CallKind::CallCode
+            | CallKind::AuthCall => Self::Call,
+            CallKind::Create | CallKind::Create2 => Self::Create,
+        }
+    }
+}
+
+impl From<CallKind> for CallType {
+    fn from(ty: CallKind) -> Self {
+        match ty {
+            CallKind::Call => Self::Call,
+            CallKind::StaticCall => Self::StaticCall,
+            CallKind::CallCode => Self::CallCode,
+            CallKind::DelegateCall => Self::DelegateCall,
+            CallKind::Create | CallKind::Create2 => Self::None,
+            CallKind::AuthCall => Self::AuthCall,
+        }
+    }
+}
+
+/// An iterator over [`CallFrame`]s in depth-first pre-order.
+///
+/// Created by [`CallFrame::iter`]. Use [`skip_children`](Self::skip_children) to avoid descending
+/// into the children of the most recently yielded frame.
+#[derive(Debug, Clone)]
+pub struct CallFrameIter<'a> {
+    /// Stack of frames yet to be yielded.
+    stack: Vec<&'a CallFrame>,
+    /// Number of children pushed onto the stack by the last call to `next`.
+    last_children_count: usize,
+}
+
+impl<'a> CallFrameIter<'a> {
+    fn new(frame: &'a CallFrame) -> Self {
+        Self { stack: vec![frame], last_children_count: 0 }
+    }
+
+    /// Skips the children of the most recently yielded [`CallFrame`].
+    ///
+    /// Any children that were pushed onto the internal stack by the last call to
+    /// [`next`](Iterator::next) are removed, so iteration continues with the next sibling or
+    /// ancestor instead.
+    ///
+    /// Has no effect if called more than once without an intervening `next`, or if the last frame
+    /// had no children.
+    pub fn skip_children(&mut self) {
+        let len = self.stack.len();
+        self.stack.truncate(len.saturating_sub(self.last_children_count));
+        self.last_children_count = 0;
+    }
+}
+
+impl<'a> Iterator for CallFrameIter<'a> {
+    type Item = &'a CallFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let frame = self.stack.pop()?;
+        // Push children in reverse order so the first child is popped first.
+        self.stack.extend(frame.calls.iter().rev());
+        self.last_children_count = frame.calls.len();
+        Some(frame)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,5 +415,100 @@ mod tests {
         let _trace: CallFrame = serde_json::from_str(LEGACY).unwrap();
         let _trace: CallFrame = serde_json::from_str(ONLY_TOP_CALL).unwrap();
         let _trace: CallFrame = serde_json::from_str(WITH_LOG).unwrap();
+    }
+
+    #[test]
+    fn test_call_log_frame_serde_with_regular_json_number() {
+        // Test that CallLogFrame can deserialize index as a regular JSON number
+        let json = r#"{
+            "address": "0x0000000000000000000000000000000000000000",
+            "topics": ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"],
+            "data": "0x1234",
+            "position": 5,
+            "index": 10
+        }"#;
+
+        let log_frame: CallLogFrame = serde_json::from_str(json).unwrap();
+        assert_eq!(log_frame.position, Some(5));
+        assert_eq!(log_frame.index, Some(10));
+
+        // Test serialization back to JSON with quantity format
+        let serialized = serde_json::to_string(&log_frame).unwrap();
+        let deserialized: CallLogFrame = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(log_frame, deserialized);
+
+        // Test with hex values as well
+        let json_hex = r#"{
+            "address": "0x0000000000000000000000000000000000000000",
+            "topics": ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"],
+            "data": "0x1234",
+            "position": "0x5",
+            "index": "0xa"
+        }"#;
+
+        let log_frame_hex: CallLogFrame = serde_json::from_str(json_hex).unwrap();
+        assert_eq!(log_frame_hex.position, Some(5));
+        assert_eq!(log_frame_hex.index, Some(10));
+        assert_eq!(log_frame, log_frame_hex);
+    }
+
+    /// Helper to build a call frame tree for testing.
+    fn make_frame(label: &str, children: Vec<CallFrame>) -> CallFrame {
+        CallFrame { typ: label.to_string(), calls: children, ..Default::default() }
+    }
+
+    #[test]
+    fn test_callframe_iter_all() {
+        // Build tree:  A -> [B -> [D, E], C]
+        let root = make_frame(
+            "A",
+            vec![
+                make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
+                make_frame("C", vec![]),
+            ],
+        );
+
+        let labels: Vec<&str> = root.iter().map(|f| f.typ.as_str()).collect();
+        assert_eq!(labels, vec!["A", "B", "D", "E", "C"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_skip_children() {
+        // Build tree:  A -> [B -> [D, E], C]
+        let root = make_frame(
+            "A",
+            vec![
+                make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
+                make_frame("C", vec![]),
+            ],
+        );
+
+        let mut labels = Vec::new();
+        let mut iter = root.iter();
+        while let Some(frame) = iter.next() {
+            labels.push(frame.typ.as_str());
+            if frame.typ == "B" {
+                iter.skip_children(); // skip D and E
+            }
+        }
+        assert_eq!(labels, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_single() {
+        let root = make_frame("root", vec![]);
+        let labels: Vec<&str> = root.iter().map(|f| f.typ.as_str()).collect();
+        assert_eq!(labels, vec!["root"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_skip_root_children() {
+        let root = make_frame("A", vec![make_frame("B", vec![]), make_frame("C", vec![])]);
+
+        let mut iter = root.iter();
+        let first = iter.next().unwrap();
+        assert_eq!(first.typ, "A");
+        iter.skip_children();
+        assert!(iter.next().is_none());
     }
 }
