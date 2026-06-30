@@ -7,6 +7,7 @@ use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
 use alloy_transport::{TransportError, TransportResult};
 use futures::try_join;
+use std::time::Duration;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -194,6 +195,14 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     async fn eth_send_raw_transaction_sync(
         &self,
         request: Bytes,
+    ) -> TransportResult<N::ReceiptResponse>;
+
+    /// Sends a raw transaction and waits for it to be mined, returning the receipt or timing out
+    /// after the requested server-side timeout.
+    async fn eth_send_raw_transaction_sync_with_timeout(
+        &self,
+        request: Bytes,
+        timeout: Duration,
     ) -> TransportResult<N::ReceiptResponse>;
 
     /// Sets impersonated transaction
@@ -422,6 +431,16 @@ where
         self.client().request("eth_sendRawTransactionSync", (request,)).await
     }
 
+    async fn eth_send_raw_transaction_sync_with_timeout(
+        &self,
+        request: Bytes,
+        timeout: Duration,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.client()
+            .request("eth_sendRawTransactionSync", (request, duration_millis(timeout)))
+            .await
+    }
+
     async fn anvil_send_impersonated_transaction(
         &self,
         request: N::TransactionRequest,
@@ -480,6 +499,10 @@ where
         let pending = PendingTransactionBuilder::new(self.root().clone(), tx_hash?);
         Ok(pending)
     }
+}
+
+fn duration_millis(timeout: Duration) -> u64 {
+    u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX)
 }
 
 /// Configuration for impersonated transactions, including optional funding and whether to stop
