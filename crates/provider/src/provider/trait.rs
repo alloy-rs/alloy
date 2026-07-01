@@ -975,6 +975,67 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// Use a custom [`CanonicalStore`](crate::provider::CanonicalStore) to retain more canonical
+    /// log history than the default in-memory store.
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_consensus::BlockHeader;
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_network::{BlockResponse, Ethereum};
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{
+    /// #     BlockLogs, CanonicalEvent, CanonicalStore, Provider, ProviderBuilder,
+    /// # };
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    /// # use std::{collections::BTreeMap, convert::Infallible, future};
+    /// #[derive(Debug, Default)]
+    /// struct LogHistoryStore {
+    ///     logs_by_number: BTreeMap<u64, BlockLogs<Ethereum>>,
+    /// }
+    ///
+    /// impl CanonicalStore<BlockLogs<Ethereum>> for LogHistoryStore {
+    ///     type Error = Infallible;
+    ///     type PushFuture = future::Ready<Result<(), Self::Error>>;
+    ///     type GetFuture = future::Ready<Result<Option<BlockLogs<Ethereum>>, Self::Error>>;
+    ///     type PopFuture = future::Ready<Result<Option<BlockLogs<Ethereum>>, Self::Error>>;
+    ///
+    ///     fn push(&mut self, block_logs: BlockLogs<Ethereum>) -> Self::PushFuture {
+    ///         self.logs_by_number.insert(block_logs.header().number(), block_logs);
+    ///         future::ready(Ok(()))
+    ///     }
+    ///
+    ///     fn get(&mut self, block_number: u64) -> Self::GetFuture {
+    ///         future::ready(Ok(self.logs_by_number.get(&block_number).cloned()))
+    ///     }
+    ///
+    ///     fn pop(&mut self) -> Self::PopFuture {
+    ///         let block_number = self.logs_by_number.keys().next_back().copied();
+    ///         future::ready(Ok(block_number.and_then(|n| self.logs_by_number.remove(&n))))
+    ///     }
+    /// }
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_canonical_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .block_store(LogHistoryStore::default())
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event? {
+    ///         CanonicalEvent::Added(block_logs) | CanonicalEvent::Removed(block_logs) => {
+    ///             let _ = block_logs;
+    ///         }
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     fn watch_canonical_logs_from(
         &self,
         start_block: u64,
