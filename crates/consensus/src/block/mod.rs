@@ -230,7 +230,7 @@ where
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
-#[rlp(trailing)]
+#[rlp(trailing(no_gaps))]
 pub struct BlockBody<T, H = Header> {
     /// Transactions in this block.
     pub transactions: Vec<T>,
@@ -336,7 +336,7 @@ mod block_rlp {
     use super::*;
 
     #[derive(RlpDecodable)]
-    #[rlp(trailing)]
+    #[rlp(trailing(no_gaps))]
     struct Helper<T, H> {
         header: H,
         transactions: Vec<T>,
@@ -345,7 +345,7 @@ mod block_rlp {
     }
 
     #[derive(RlpEncodable)]
-    #[rlp(trailing)]
+    #[rlp(trailing(no_gaps))]
     pub(crate) struct HelperRef<'a, T, H> {
         pub(crate) header: &'a H,
         pub(crate) transactions: &'a Vec<T>,
