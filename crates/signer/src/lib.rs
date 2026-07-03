@@ -15,6 +15,9 @@ pub use signer::{Either, Signer, SignerSync};
 pub mod utils;
 
 pub use alloy_primitives::Signature;
+// Avoid nightly rustdoc ICEs when inlining external crate docs:
+// https://github.com/paradigmxyz/solar/pull/912
+#[doc(no_inline)]
 pub use k256;
 
 /// Utility to get and set the chain ID on a transaction and the resulting signature within a

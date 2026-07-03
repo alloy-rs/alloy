@@ -6,7 +6,10 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+// Avoid nightly rustdoc ICEs when inlining external crate docs:
+// https://github.com/paradigmxyz/solar/pull/912
 #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
+#[doc(no_inline)]
 pub use reqwest;
 #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
 mod reqwest_transport;
@@ -16,8 +19,10 @@ mod reqwest_transport;
 pub use reqwest_transport::*;
 
 #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
+#[doc(no_inline)]
 pub use hyper;
 #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
+#[doc(no_inline)]
 pub use hyper_util;
 
 mod layers;
