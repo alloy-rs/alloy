@@ -113,6 +113,7 @@ jobs:
           cargo hack build --workspace --ignore-unknown-features --features ws --target wasm32-unknown-unknown \
             --exclude alloy \
             --exclude alloy-contract \
+            --exclude alloy-eip1271 \
             --exclude alloy-network \
             --exclude alloy-node-bindings \
             --exclude alloy-provider \

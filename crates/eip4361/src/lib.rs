@@ -47,6 +47,7 @@ pub struct VerificationOpts {
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{Message, VerificationError, VerificationOpts};
+    use alloc::{boxed::Box, string::ToString};
     use alloy_eip1271::ProviderEip1271Ext;
     use alloy_primitives::{eip191_hash_message, Address, Signature};
     use alloy_provider::{Network, Provider};

@@ -166,7 +166,7 @@ impl Message {
         self.verify_eip191(signature)
     }
 
-    /// Creates a new [`MessageBuilder`] for constructing a SIWE message.
+    /// Creates a new [`MessageBuilder`](crate::MessageBuilder) for constructing a SIWE message.
     ///
     /// The builder uses a typestate pattern to ensure all required fields are set
     /// at compile time. The builder defaults to [`Version::V1`].

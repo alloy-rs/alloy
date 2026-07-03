@@ -1,5 +1,6 @@
 //! Nonce generation utilities.
 
+use alloc::string::String;
 use rand::{distributions::Alphanumeric, Rng};
 
 /// Generates a secure random nonce for SIWE messages.

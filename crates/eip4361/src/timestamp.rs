@@ -78,6 +78,7 @@ impl PartialOrd<OffsetDateTime> for TimeStamp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::ToString;
 
     #[test]
     fn test_parse_timestamp() {

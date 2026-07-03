@@ -61,6 +61,12 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 default = ["std"]
 std = []
 rand = ["dep:rand"]
-serde = ["dep:serde", "alloy-primitives/serde", "time/serde"]
+serde = [
+	"dep:serde",
+	"alloy-primitives/serde",
+	"time/serde",
+	"iri-string/serde",
+	"rand?/serde",
+]
 eip1271 = ["dep:alloy-eip1271"]
 provider = ["eip1271", "dep:alloy-provider", "dep:async-trait"]
