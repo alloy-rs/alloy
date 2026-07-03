@@ -542,10 +542,8 @@ mod tests {
             let mut header = Vec::new();
             Header::default().encode(&mut header);
 
-            let block_header = alloy_rlp::Header {
-                list: true,
-                payload_length: header.len() + body_fields.len(),
-            };
+            let block_header =
+                alloy_rlp::Header { list: true, payload_length: header.len() + body_fields.len() };
             let mut out = Vec::with_capacity(block_header.length_with_payload());
             block_header.encode(&mut out);
             out.extend_from_slice(&header);
