@@ -80,7 +80,7 @@ alloy-json-abi = { version = "1.6.0", default-features = false }
 alloy-primitives = { version = "1.6.0", default-features = false }
 alloy-sol-types = { version = "1.6.0", default-features = false }
 
-alloy-rlp = { version = "0.3.9", default-features = false }
+alloy-rlp = { version = "0.3.14", default-features = false }
 alloy-trie = { version = "0.9.2", default-features = false }
 
 alloy-chains = { version = "0.2", default-features = false }
