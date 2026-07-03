@@ -444,7 +444,7 @@ where
 mod tests {
     use super::*;
     use crate::{Signed, TxEnvelope, TxLegacy};
-    use alloy_rlp::Encodable;
+    use alloy_rlp::{Decodable, Encodable};
 
     #[test]
     fn can_convert_block() {
@@ -518,6 +518,52 @@ mod tests {
         assert_eq!(sealed.header.number, 42);
         assert_eq!(sealed.body.transactions.len(), 1);
         assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn block_body_rejects_present_string_withdrawals() {
+        let mut omitted: &[u8] = &[0xc2, 0xc0, 0xc0];
+        let body = BlockBody::<TxEnvelope>::decode(&mut omitted).unwrap();
+        assert!(body.withdrawals.is_none());
+        assert!(omitted.is_empty());
+
+        let mut present_empty: &[u8] = &[0xc3, 0xc0, 0xc0, 0xc0];
+        let body = BlockBody::<TxEnvelope>::decode(&mut present_empty).unwrap();
+        assert!(body.withdrawals.as_ref().is_some_and(|w| w.is_empty()));
+        assert!(present_empty.is_empty());
+
+        let mut present_string: &[u8] = &[0xc3, 0xc0, 0xc0, 0x80];
+        assert!(BlockBody::<TxEnvelope>::decode(&mut present_string).is_err());
+    }
+
+    #[test]
+    fn block_decoders_reject_present_string_withdrawals() {
+        fn block_rlp_with_body_fields(body_fields: &[u8]) -> Vec<u8> {
+            let mut header = Vec::new();
+            Header::default().encode(&mut header);
+
+            let block_header = alloy_rlp::Header {
+                list: true,
+                payload_length: header.len() + body_fields.len(),
+            };
+            let mut out = Vec::with_capacity(block_header.length_with_payload());
+            block_header.encode(&mut out);
+            out.extend_from_slice(&header);
+            out.extend_from_slice(body_fields);
+            out
+        }
+
+        let omitted = block_rlp_with_body_fields(&[0xc0, 0xc0]);
+        assert!(Block::<TxEnvelope>::decode(&mut omitted.as_slice()).is_ok());
+        assert!(Block::<TxEnvelope>::decode_sealed(&mut omitted.as_slice()).is_ok());
+
+        let present_empty = block_rlp_with_body_fields(&[0xc0, 0xc0, 0xc0]);
+        assert!(Block::<TxEnvelope>::decode(&mut present_empty.as_slice()).is_ok());
+        assert!(Block::<TxEnvelope>::decode_sealed(&mut present_empty.as_slice()).is_ok());
+
+        let present_string = block_rlp_with_body_fields(&[0xc0, 0xc0, 0x80]);
+        assert!(Block::<TxEnvelope>::decode(&mut present_string.as_slice()).is_err());
+        assert!(Block::<TxEnvelope>::decode_sealed(&mut present_string.as_slice()).is_err());
     }
 }
 
