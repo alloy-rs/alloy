@@ -1462,6 +1462,17 @@ mod tests {
         assert_eq!(tx.encode_2718_len(), hex_data.len());
     }
 
+    #[test]
+    fn decode_2718_exact_rejects_fallback_suffix_reproducer() {
+        let raw = hex!("c23b2d0c818686d22d04457979803200c0018686c2790500ff05");
+
+        assert!(TxEnvelope::decode_2718_exact(&raw).is_err());
+
+        let mut buf = raw.as_slice();
+        assert!(TxEnvelope::decode_2718(&mut buf).is_err());
+        assert_eq!(buf, raw.as_slice());
+    }
+
     #[cfg(feature = "serde")]
     fn test_serde_roundtrip<T: SignableTransaction<Signature>>(tx: T)
     where
