@@ -30,10 +30,14 @@ mod secp256k1;
 #[cfg(feature = "yubihsm")]
 mod yubi;
 
+// Avoid nightly rustdoc ICEs when inlining external crate docs:
+// https://github.com/paradigmxyz/solar/pull/912
 #[cfg(feature = "yubihsm")]
+#[doc(no_inline)]
 pub use yubihsm;
 
 #[cfg(feature = "mnemonic")]
+#[doc(no_inline)]
 pub use coins_bip39;
 
 #[cfg(feature = "secp256k1")]
