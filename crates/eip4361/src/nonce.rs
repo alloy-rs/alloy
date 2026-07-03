@@ -17,11 +17,7 @@ use rand::{distributions::Alphanumeric, Rng};
 /// ```
 #[must_use]
 pub fn generate_nonce() -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(17)
-        .map(char::from)
-        .collect()
+    rand::thread_rng().sample_iter(&Alphanumeric).take(17).map(char::from).collect()
 }
 
 #[cfg(test)]

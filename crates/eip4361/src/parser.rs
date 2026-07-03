@@ -3,7 +3,11 @@
 //! This parser follows the ABNF grammar defined in EIP-4361:
 //! <https://eips.ethereum.org/EIPS/eip-4361>
 
-use alloc::{format, string::String, string::ToString, vec::Vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 use winnow::{
     ascii::{digit1, line_ending},
     combinator::{opt, preceded, terminated},
@@ -69,12 +73,9 @@ fn message(input: &mut &str) -> PResult<Message> {
 /// Parse: `[ scheme "://" ] domain " wants you to sign in with your Ethereum account:" LF`
 fn scheme_and_domain_line(input: &mut &str) -> PResult<(Option<String>, Authority)> {
     // Try to parse optional scheme (e.g., "https://")
-    let scheme = opt(terminated(
-        take_till(1.., |c| c == ':'),
-        "://",
-    ))
-    .parse_next(input)?
-    .map(|s: &str| s.to_string());
+    let scheme = opt(terminated(take_till(1.., |c| c == ':'), "://"))
+        .parse_next(input)?
+        .map(|s: &str| s.to_string());
 
     // Parse domain until the preamble
     let domain_str = terminated(take_till(1.., |c| c == ' '), PREAMBLE)
@@ -99,9 +100,8 @@ fn address_line(input: &mut &str) -> PResult<Address> {
     line_ending.parse_next(input)?;
 
     // Validate EIP-55 checksum
-    let addr: Address = addr_str
-        .parse()
-        .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))?;
+    let addr: Address =
+        addr_str.parse().map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))?;
 
     if addr.to_checksum(None) != addr_str {
         return Err(winnow::error::ErrMode::Cut(ContextError::new()));
@@ -137,40 +137,30 @@ fn uri_field(input: &mut &str) -> PResult<UriString> {
         .parse_next(input)?;
     line_ending.parse_next(input)?;
 
-    uri_str
-        .parse::<UriString>()
-        .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
+    uri_str.parse::<UriString>().map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
 }
 
 /// Parse: `"Version: " version LF`
 fn version_field(input: &mut &str) -> PResult<Version> {
-    preceded("Version: ", "1")
-        .context(StrContext::Label("version"))
-        .parse_next(input)?;
+    preceded("Version: ", "1").context(StrContext::Label("version")).parse_next(input)?;
     line_ending.parse_next(input)?;
     Ok(Version::V1)
 }
 
 /// Parse: `"Chain ID: " 1*DIGIT LF`
 fn chain_id_field(input: &mut &str) -> PResult<u64> {
-    let chain_str = preceded("Chain ID: ", digit1)
-        .context(StrContext::Label("chain ID"))
-        .parse_next(input)?;
+    let chain_str =
+        preceded("Chain ID: ", digit1).context(StrContext::Label("chain ID")).parse_next(input)?;
     line_ending.parse_next(input)?;
 
-    chain_str
-        .parse::<u64>()
-        .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
+    chain_str.parse::<u64>().map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
 }
 
 /// Parse: `"Nonce: " 8*(ALPHA / DIGIT) LF`
 fn nonce_field(input: &mut &str) -> PResult<String> {
-    let nonce_str = preceded(
-        "Nonce: ",
-        take_while(8.., |c: char| c.is_ascii_alphanumeric()),
-    )
-    .context(StrContext::Label("nonce"))
-    .parse_next(input)?;
+    let nonce_str = preceded("Nonce: ", take_while(8.., |c: char| c.is_ascii_alphanumeric()))
+        .context(StrContext::Label("nonce"))
+        .parse_next(input)?;
     line_ending.parse_next(input)?;
 
     Ok(nonce_str.to_string())
@@ -182,24 +172,17 @@ fn issued_at_field(input: &mut &str) -> PResult<TimeStamp> {
         .context(StrContext::Label("issued at"))
         .parse_next(input)?;
 
-    ts_str
-        .parse::<TimeStamp>()
-        .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
+    ts_str.parse::<TimeStamp>().map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
 }
 
 /// Parse: `LF "Expiration Time: " date-time`
 fn expiration_time_field(input: &mut &str) -> PResult<TimeStamp> {
     line_ending.parse_next(input)?;
-    let ts_str = preceded(
-        "Expiration Time: ",
-        take_till(1.., |c| c == '\n' || c == '\r'),
-    )
-    .context(StrContext::Label("expiration time"))
-    .parse_next(input)?;
+    let ts_str = preceded("Expiration Time: ", take_till(1.., |c| c == '\n' || c == '\r'))
+        .context(StrContext::Label("expiration time"))
+        .parse_next(input)?;
 
-    ts_str
-        .parse::<TimeStamp>()
-        .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
+    ts_str.parse::<TimeStamp>().map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
 }
 
 /// Parse: `LF "Not Before: " date-time`
@@ -209,9 +192,7 @@ fn not_before_field(input: &mut &str) -> PResult<TimeStamp> {
         .context(StrContext::Label("not before"))
         .parse_next(input)?;
 
-    ts_str
-        .parse::<TimeStamp>()
-        .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
+    ts_str.parse::<TimeStamp>().map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
 }
 
 /// Parse: `LF "Request ID: " *pchar`
@@ -278,12 +259,7 @@ mod tests {
     fn test_parse_address_line() {
         let mut input = "0x6Da01670d8fc844e736095918bbE11fE8D564163\n";
         let addr = address_line(&mut input).unwrap();
-        assert_eq!(
-            addr,
-            "0x6Da01670d8fc844e736095918bbE11fE8D564163"
-                .parse::<Address>()
-                .unwrap()
-        );
+        assert_eq!(addr, "0x6Da01670d8fc844e736095918bbE11fE8D564163".parse::<Address>().unwrap());
     }
 
     #[test]

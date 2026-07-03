@@ -165,19 +165,15 @@ Issued At: 2021-12-07T18:28:18.807Z"#;
         let sig_bytes = hex!("6228b3ecd7bf2df018183aeab6b6f1db1e9f4e3cbe24560404112e25363540eb679934908143224d746bbb5e1aa65ab435684081f4dbb74a0fec57f98f40f5051c");
 
         // Test with matching nonce
-        let opts = VerificationOpts {
-            nonce: Some("kEWepMt9knR6lWJ6A".to_string()),
-            ..Default::default()
-        };
+        let opts =
+            VerificationOpts { nonce: Some("kEWepMt9knR6lWJ6A".to_string()), ..Default::default() };
         let result: Result<_, VerificationError> =
             provider.verify_siwe(&message, &sig_bytes, &opts).await;
         assert!(result.is_ok());
 
         // Test with mismatched nonce
-        let opts = VerificationOpts {
-            nonce: Some("wrong_nonce_value".to_string()),
-            ..Default::default()
-        };
+        let opts =
+            VerificationOpts { nonce: Some("wrong_nonce_value".to_string()), ..Default::default() };
         let result: Result<_, VerificationError> =
             provider.verify_siwe(&message, &sig_bytes, &opts).await;
         assert!(matches!(result, Err(VerificationError::NonceMismatch)));

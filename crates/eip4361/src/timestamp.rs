@@ -37,10 +37,7 @@ impl TimeStamp {
 
 impl From<OffsetDateTime> for TimeStamp {
     fn from(dt: OffsetDateTime) -> Self {
-        Self {
-            raw: dt.format(&Rfc3339).expect("Rfc3339 formatting works"),
-            parsed: dt,
-        }
+        Self { raw: dt.format(&Rfc3339).expect("Rfc3339 formatting works"), parsed: dt }
     }
 }
 
@@ -54,10 +51,7 @@ impl TryFrom<String> for TimeStamp {
     type Error = time::error::Parse;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        Ok(Self {
-            parsed: OffsetDateTime::parse(&s, &Rfc3339)?,
-            raw: s,
-        })
+        Ok(Self { parsed: OffsetDateTime::parse(&s, &Rfc3339)?, raw: s })
     }
 }
 
@@ -65,10 +59,7 @@ impl FromStr for TimeStamp {
     type Err = time::error::Parse;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self {
-            raw: s.into(),
-            parsed: OffsetDateTime::parse(s, &Rfc3339)?,
-        })
+        Ok(Self { raw: s.into(), parsed: OffsetDateTime::parse(s, &Rfc3339)? })
     }
 }
 

@@ -130,8 +130,7 @@ mod tests {
         let hash = B256::ZERO;
         let signature = Bytes::from(vec![0u8; 65]);
 
-        let is_valid =
-            provider.verify_eip1271(*contract.address(), hash, signature).await.unwrap();
+        let is_valid = provider.verify_eip1271(*contract.address(), hash, signature).await.unwrap();
         assert!(is_valid, "Expected valid signature");
     }
 
@@ -148,8 +147,7 @@ mod tests {
         let hash = B256::ZERO;
         let signature = Bytes::from(vec![0u8; 65]);
 
-        let is_valid =
-            provider.verify_eip1271(*contract.address(), hash, signature).await.unwrap();
+        let is_valid = provider.verify_eip1271(*contract.address(), hash, signature).await.unwrap();
         assert!(!is_valid, "Expected invalid signature");
     }
 

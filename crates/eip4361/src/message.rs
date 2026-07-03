@@ -3,7 +3,10 @@
 //! [EIP-4361]: https://eips.ethereum.org/EIPS/eip-4361
 
 use crate::{TimeStamp, VerificationOpts};
-use alloc::{string::String, string::ToString, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use alloy_primitives::{Address, Signature};
 use core::{
     fmt::{self, Display, Formatter},
