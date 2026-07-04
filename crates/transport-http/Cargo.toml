@@ -59,7 +59,6 @@ reqwest = [
     "dep:serde_json",
     "dep:tower",
     "dep:tracing",
-    "opentelemetry-http?/reqwest",
 ]
 hyper = [
     "dep:hyper",
@@ -70,7 +69,6 @@ hyper = [
     "dep:tower",
     "dep:tracing",
     "hyper-tls",
-    "opentelemetry-http?/hyper",
 ]
 hyper-tls = ["hyper", "dep:hyper-tls"]
 jwt-auth = [
