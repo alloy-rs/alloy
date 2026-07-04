@@ -111,8 +111,14 @@ reqwest = [
     "dep:url",
     "dep:alloy-transport-http",
     "alloy-rpc-client/reqwest",
+    "alloy-transport-http?/reqwest",
 ]
-hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
+hyper = [
+    "dep:alloy-transport-http",
+    "dep:url",
+    "alloy-rpc-client/hyper",
+    "alloy-transport-http?/hyper",
+]
 hyper-tls = ["hyper", "alloy-transport-http/hyper-tls"]
 ws-base = ["pubsub", "dep:alloy-transport-ws", "alloy-rpc-client/ws-base"]
 ws = ["ws-base", "alloy-rpc-client/ws", "alloy-transport-ws/aws-lc-rs"]
@@ -136,4 +142,4 @@ rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
 throttle = ["alloy-transport/throttle"]
 mev-api = ["dep:alloy-rpc-types-mev", "dep:http"]
-more-tuple-impls = []
+more-tuple-impls = ["alloy-sol-types/more-tuple-impls"]
