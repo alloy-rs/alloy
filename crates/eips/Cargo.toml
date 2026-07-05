@@ -108,7 +108,10 @@ serde = [
 serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
 kzg = ["kzg-sidecar", "sha2", "dep:c-kzg"]
 kzg-sidecar = ["sha2"]
-k256 = ["alloy-eip7702/k256"]
+k256 = [
+	"alloy-eip7702/k256",
+	"alloy-primitives/k256"
+]
 sha2 = ["dep:sha2"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive"]
 arbitrary = [
@@ -129,4 +132,5 @@ borsh = [
 	"alloy-primitives/borsh",
 	"alloy-eip2930/borsh",
 	"alloy-eip7702/borsh",
+	"alloy-eip7928/borsh"
 ]

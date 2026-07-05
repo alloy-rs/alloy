@@ -16,19 +16,21 @@
 pub use alloy_core as core;
 
 /// Low-level primitives for Ethereum.
-#[doc(inline)]
+// Avoid nightly rustdoc ICEs when inlining external crate docs:
+// https://github.com/paradigmxyz/solar/pull/912
+#[doc(no_inline)]
 pub use self::core::primitives;
 #[doc(no_inline)]
 pub use primitives::{hex, uint};
 
 /// Dynamic Solidity type encoder.
 #[cfg(feature = "dyn-abi")]
-#[doc(inline)]
+#[doc(no_inline)]
 pub use self::core::dyn_abi;
 
 /// Full Ethereum [JSON-ABI](https://docs.soliditylang.org/en/latest/abi-spec.html) implementation.
 #[cfg(feature = "json-abi")]
-#[doc(inline)]
+#[doc(no_inline)]
 pub use self::core::json_abi;
 
 /// Solidity type modeling and [ABI] and [EIP-712] codec implementation.
@@ -36,7 +38,7 @@ pub use self::core::json_abi;
 /// [ABI]: https://docs.soliditylang.org/en/latest/abi-spec.html
 /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
 #[cfg(feature = "sol-types")]
-#[doc(inline)]
+#[doc(no_inline)]
 pub use self::core::sol_types;
 
 // Show this re-export in docs instead of the wrapper below.
@@ -48,7 +50,7 @@ pub use sol_types::sol;
 ///
 /// [rlp]: https://ethereum.org/en/developers/docs/data-structures-and-encoding/rlp
 #[cfg(feature = "rlp")]
-#[doc(inline)]
+#[doc(no_inline)]
 pub use self::core::rlp;
 
 /// [`sol!`](sol_types::sol!) `macro_rules!` wrapper to set import attributes.
