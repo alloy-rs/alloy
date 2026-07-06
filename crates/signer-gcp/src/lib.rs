@@ -12,7 +12,4 @@ extern crate tracing;
 mod signer;
 pub use signer::{GcpKeyRingRef, GcpSigner, GcpSignerError, KeySpecifier};
 
-// Avoid nightly rustdoc ICEs when inlining external crate docs:
-// https://github.com/paradigmxyz/solar/pull/912
-#[doc(no_inline)]
 pub use gcloud_sdk;
