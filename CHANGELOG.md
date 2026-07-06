@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.1.1
 - Expand zepter feature checks ([#4063](https://github.com/alloy-rs/alloy/issues/4063))
 
 ### Performance
