@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 2.1.0
+- Release 2.1.0
 
 ## [2.0.5](https://github.com/alloy-rs/alloy/releases/tag/v2.0.5) - 2026-05-18
 
