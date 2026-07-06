@@ -9,9 +9,6 @@
 mod signer;
 pub use signer::{TurnkeySigner, TurnkeySignerError};
 
-// Avoid nightly rustdoc ICEs when inlining external crate docs:
-// https://github.com/paradigmxyz/solar/pull/912
-#[doc(no_inline)]
 pub use turnkey_client::{self, TurnkeyClientError, TurnkeyP256ApiKey};
 
 /// Alias for the Turnkey SDK client using the P256 API key stamper.

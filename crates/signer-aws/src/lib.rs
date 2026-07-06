@@ -12,9 +12,5 @@ extern crate tracing;
 mod signer;
 pub use signer::{AwsSigner, AwsSignerError};
 
-// Avoid nightly rustdoc ICEs when inlining external crate docs:
-// https://github.com/paradigmxyz/solar/pull/912
-#[doc(no_inline)]
 pub use aws_config;
-#[doc(no_inline)]
 pub use aws_sdk_kms;
