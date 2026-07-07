@@ -41,10 +41,16 @@ impl TxType {
         matches!(self, Self::Eip7702)
     }
 
+    /// Returns true if the transaction type is EIP-8141.
+    #[inline]
+    pub const fn is_eip8141(&self) -> bool {
+        matches!(self, Self::Eip8141)
+    }
+
     /// Returns true if the transaction type has dynamic fee.
     #[inline]
     pub const fn is_dynamic_fee(&self) -> bool {
-        matches!(self, Self::Eip1559 | Self::Eip4844 | Self::Eip7702)
+        matches!(self, Self::Eip1559 | Self::Eip4844 | Self::Eip7702 | Self::Eip8141)
     }
 }
 
@@ -56,6 +62,7 @@ impl fmt::Display for TxType {
             Self::Eip1559 => write!(f, "EIP-1559"),
             Self::Eip4844 => write!(f, "EIP-4844"),
             Self::Eip7702 => write!(f, "EIP-7702"),
+            Self::Eip8141 => write!(f, "EIP-8141"),
         }
     }
 }
@@ -71,5 +78,6 @@ mod tests {
         assert_eq!(TxType::Eip1559, TxType::Eip1559 as u8);
         assert_eq!(TxType::Eip7702, TxType::Eip7702 as u8);
         assert_eq!(TxType::Eip4844, TxType::Eip4844 as u8);
+        assert_eq!(TxType::Eip8141, TxType::Eip8141 as u8);
     }
 }

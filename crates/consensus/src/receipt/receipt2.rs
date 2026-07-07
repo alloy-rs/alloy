@@ -299,6 +299,9 @@ where
             TxType::Eip1559 => Self::Eip1559(receipt),
             TxType::Eip4844 => Self::Eip4844(receipt),
             TxType::Eip7702 => Self::Eip7702(receipt),
+            TxType::Eip8141 => {
+                panic!("EIP-8141 receipts require FrameReceiptPayload and cannot be built from EthereumReceipt")
+            }
         }
     }
 }
