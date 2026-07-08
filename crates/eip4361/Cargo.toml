@@ -59,7 +59,14 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
 default = ["std"]
-std = []
+std = [
+	"alloy-primitives/std",
+	"derive_more/std",
+	"serde?/std",
+	"strum/std",
+	"thiserror/std",
+	"winnow/std",
+]
 rand = ["dep:rand"]
 serde = [
 	"dep:serde",
