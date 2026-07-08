@@ -481,7 +481,7 @@ pub(crate) mod serde_bincode_compat {
         /// EIP-7702 transaction
         Eip7702(crate::serde_bincode_compat::transaction::TxEip7702<'a>),
         /// EIP-8141 transaction
-        Eip8141(Cow<'a, crate::TxEip8141>),
+        Eip8141(crate::serde_bincode_compat::transaction::TxEip8141<'a>),
     }
 
     impl<'a, T: Clone> From<&'a super::EthereumTypedTransaction<T>>
@@ -494,7 +494,7 @@ pub(crate) mod serde_bincode_compat {
                 super::EthereumTypedTransaction::Eip1559(tx) => Self::Eip1559(tx.into()),
                 super::EthereumTypedTransaction::Eip4844(tx) => Self::Eip4844(Cow::Borrowed(tx)),
                 super::EthereumTypedTransaction::Eip7702(tx) => Self::Eip7702(tx.into()),
-                super::EthereumTypedTransaction::Eip8141(tx) => Self::Eip8141(Cow::Borrowed(tx)),
+                super::EthereumTypedTransaction::Eip8141(tx) => Self::Eip8141(tx.into()),
             }
         }
     }
@@ -507,7 +507,7 @@ pub(crate) mod serde_bincode_compat {
                 EthereumTypedTransaction::Eip1559(tx) => Self::Eip1559(tx.into()),
                 EthereumTypedTransaction::Eip4844(tx) => Self::Eip4844(tx.into_owned()),
                 EthereumTypedTransaction::Eip7702(tx) => Self::Eip7702(tx.into()),
-                EthereumTypedTransaction::Eip8141(tx) => Self::Eip8141(tx.into_owned()),
+                EthereumTypedTransaction::Eip8141(tx) => Self::Eip8141(tx.into()),
             }
         }
     }

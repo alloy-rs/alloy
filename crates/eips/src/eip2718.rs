@@ -27,6 +27,9 @@ pub const EIP4844_TX_TYPE_ID: u8 = 3;
 /// Identifier for an EIP7702 transaction.
 pub const EIP7702_TX_TYPE_ID: u8 = 4;
 
+/// Identifier for an EIP8141 transaction.
+pub const EIP8141_TX_TYPE_ID: u8 = 6;
+
 /// [EIP-2718] decoding errors.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
@@ -387,6 +390,11 @@ pub trait Typed2718 {
     /// Returns true if the type is an EIP-7702 transaction.
     fn is_eip7702(&self) -> bool {
         self.ty() == EIP7702_TX_TYPE_ID
+    }
+
+    /// Returns true if the type is a EIP-8141 transaction.
+    fn is_eip8141(&self) -> bool {
+        self.ty() == EIP8141_TX_TYPE_ID
     }
 }
 
