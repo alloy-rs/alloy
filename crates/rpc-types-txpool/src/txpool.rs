@@ -4,7 +4,8 @@ use alloy_primitives::{Address, U256};
 use alloy_rpc_types_eth::{Transaction, TransactionTrait};
 use serde::{
     de::{self, Deserializer, Visitor},
-    Deserialize, Serialize,
+    ser::SerializeMap,
+    Deserialize, Serialize, Serializer,
 };
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
@@ -55,31 +56,27 @@ impl Visitor<'_> for TxpoolInspectSummaryVisitor {
     where
         E: de::Error,
     {
-        let addr_split: Vec<&str> = value.split(": ").collect();
-        if addr_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: to"));
-        }
-        let value_split: Vec<&str> = addr_split[1].split(" wei + ").collect();
-        if value_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gasLimit"));
-        }
-        let gas_split: Vec<&str> = value_split[1].split(" gas × ").collect();
-        if gas_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas"));
-        }
-        let gas_price_split: Vec<&str> = gas_split[1].split(" wei").collect();
-        if gas_price_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"));
-        }
-        let to = match addr_split[0] {
+        let (addr, rest) = value
+            .split_once(": ")
+            .ok_or_else(|| de::Error::custom("invalid format for TxpoolInspectSummary: to"))?;
+        let (value_str, rest) = rest.split_once(" wei + ").ok_or_else(|| {
+            de::Error::custom("invalid format for TxpoolInspectSummary: gasLimit")
+        })?;
+        let (gas_str, rest) = rest
+            .split_once(" gas × ")
+            .ok_or_else(|| de::Error::custom("invalid format for TxpoolInspectSummary: gas"))?;
+        let (gas_price_str, _) = rest.split_once(" wei").ok_or_else(|| {
+            de::Error::custom("invalid format for TxpoolInspectSummary: gas_price")
+        })?;
+        let to = match addr {
             "" | "0x" | "contract creation" => None,
             addr => {
                 Some(Address::from_str(addr.trim_start_matches("0x")).map_err(de::Error::custom)?)
             }
         };
-        let value = U256::from_str(value_split[0]).map_err(de::Error::custom)?;
-        let gas = u64::from_str(gas_split[0]).map_err(de::Error::custom)?;
-        let gas_price = u128::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
+        let value = U256::from_str(value_str).map_err(de::Error::custom)?;
+        let gas = u64::from_str(gas_str).map_err(de::Error::custom)?;
+        let gas_price = u128::from_str(gas_price_str).map_err(de::Error::custom)?;
 
         Ok(TxpoolInspectSummary { to, value, gas, gas_price })
     }
@@ -127,10 +124,13 @@ impl Serialize for TxpoolInspectSummary {
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(bound(serialize = "T: Serialize"))]
 pub struct TxpoolContent<T = Transaction> {
     /// pending tx
+    #[serde(serialize_with = "serialize_checksum_address_map")]
     pub pending: BTreeMap<Address, BTreeMap<String, T>>,
     /// queued tx
+    #[serde(serialize_with = "serialize_checksum_address_map")]
     pub queued: BTreeMap<Address, BTreeMap<String, T>>,
 }
 
@@ -223,8 +223,10 @@ impl<T> Default for TxpoolContentFrom<T> {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolInspect {
     /// pending tx
+    #[serde(serialize_with = "serialize_checksum_address_map")]
     pub pending: BTreeMap<Address, BTreeMap<String, TxpoolInspectSummary>>,
     /// queued tx
+    #[serde(serialize_with = "serialize_checksum_address_map")]
     pub queued: BTreeMap<Address, BTreeMap<String, TxpoolInspectSummary>>,
 }
 
@@ -245,9 +247,29 @@ pub struct TxpoolStatus {
     pub queued: u64,
 }
 
+/// Serializes address map keys as EIP-55 checksum addresses, matching geth's use of
+/// [`account.Hex()`](https://github.com/ethereum/go-ethereum/blob/e2164cc78c690367e2ca0b24cae982c3ab44bb4e/internal/ethapi/api.go#L221)
+/// and its [`Address.Hex()`](https://github.com/ethereum/go-ethereum/blob/e2164cc78c690367e2ca0b24cae982c3ab44bb4e/common/types.go#L260)
+/// implementation.
+fn serialize_checksum_address_map<S, V>(
+    map: &BTreeMap<Address, V>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    V: Serialize,
+{
+    let mut serialized = serializer.serialize_map(Some(map.len()))?;
+    for (address, value) in map {
+        serialized.serialize_entry(address.to_checksum_buffer(None).as_str(), value)?;
+    }
+    serialized.end()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::address;
     use similar_asserts::assert_eq;
 
     #[test]
@@ -418,13 +440,61 @@ mod tests {
     }
   }
 }"#;
-        let deserialized: TxpoolContent = serde_json::from_str(txpool_content_json).unwrap();
+        let deserialized: TxpoolContent<serde_json::Value> =
+            serde_json::from_str(txpool_content_json).unwrap();
         let serialized: String = serde_json::to_string_pretty(&deserialized).unwrap();
 
-        let origin: serde_json::Value = serde_json::from_str(txpool_content_json).unwrap();
-        let serialized_value = serde_json::to_value(deserialized.clone()).unwrap();
-        assert_eq!(origin, serialized_value);
-        assert_eq!(deserialized, serde_json::from_str::<TxpoolContent>(&serialized).unwrap());
+        assert_eq!(
+            deserialized,
+            serde_json::from_str::<TxpoolContent<serde_json::Value>>(&serialized).unwrap()
+        );
+    }
+
+    #[test]
+    fn txpool_content_fixes_reported_checksum_key_mismatches() {
+        let lowercase = [
+            "0x0c2c51a0990aee1d73c1228de158688341557508",
+            "0x14e46043e63d0e3cdcf2530519f4cfaf35058cb2",
+        ];
+        let checksummed = [
+            "0x0c2c51a0990AeE1d73C1228de158688341557508",
+            "0x14e46043e63D0E3cdcf2530519f4cFAf35058Cb2",
+        ];
+        let json = format!(
+            r#"{{"pending":{{"{}":{{}},"{}":{{}}}},"queued":{{}}}}"#,
+            lowercase[0], lowercase[1]
+        );
+
+        let content: TxpoolContent<serde_json::Value> = serde_json::from_str(&json).unwrap();
+        let serialized = serde_json::to_value(content).unwrap();
+
+        for address in checksummed {
+            assert!(serialized["pending"].get(address).is_some(), "missing key: {address}");
+        }
+        for address in lowercase {
+            assert!(
+                serialized["pending"].get(address).is_none(),
+                "unexpected lowercase key: {address}"
+            );
+        }
+    }
+
+    #[test]
+    fn txpool_inspect_serializes_checksum_address_keys() {
+        let sender = address!("0x0c2c51a0990aee1d73c1228de158688341557508");
+        let json = r#"{
+            "pending": {"0x0c2c51a0990aee1d73c1228de158688341557508": {}},
+            "queued": {"0x0c2c51a0990aee1d73c1228de158688341557508": {}}
+        }"#;
+
+        let inspect: TxpoolInspect = serde_json::from_str(json).unwrap();
+        assert!(inspect.pending.contains_key(&sender));
+        assert!(inspect.queued.contains_key(&sender));
+
+        let serialized = serde_json::to_value(inspect).unwrap();
+        let checksum = "0x0c2c51a0990AeE1d73C1228de158688341557508";
+        assert!(serialized["pending"].get(checksum).is_some());
+        assert!(serialized["queued"].get(checksum).is_some());
     }
 
     #[test]

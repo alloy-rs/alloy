@@ -158,7 +158,11 @@ struct BeaconPayloadAttributes {
     #[serde(skip_serializing_if = "Option::is_none")]
     parent_beacon_block_root: Option<B256>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<DisplayFromStr>")]
     pub slot_number: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub target_gas_limit: Option<u64>,
 }
 
 /// A helper module for serializing and deserializing the payload attributes for the beacon API.
@@ -186,6 +190,7 @@ pub mod beacon_api_payload_attributes {
             withdrawals: payload_attributes.withdrawals.clone(),
             parent_beacon_block_root: payload_attributes.parent_beacon_block_root,
             slot_number: payload_attributes.slot_number,
+            target_gas_limit: payload_attributes.target_gas_limit,
         };
         beacon_api_payload_attributes.serialize(serializer)
     }
@@ -203,6 +208,7 @@ pub mod beacon_api_payload_attributes {
             withdrawals: beacon_api_payload_attributes.withdrawals,
             parent_beacon_block_root: beacon_api_payload_attributes.parent_beacon_block_root,
             slot_number: beacon_api_payload_attributes.slot_number,
+            target_gas_limit: beacon_api_payload_attributes.target_gas_limit,
         })
     }
 }
@@ -855,6 +861,7 @@ mod tests {
         let attrs: BeaconPayloadAttributes = serde_json::from_str(json).unwrap();
         assert_eq!(attrs.timestamp, 1234);
         assert!(attrs.slot_number.is_none());
+        assert!(attrs.target_gas_limit.is_none());
 
         let engine_attrs = PayloadAttributes {
             timestamp: attrs.timestamp,
@@ -863,7 +870,24 @@ mod tests {
             withdrawals: attrs.withdrawals,
             parent_beacon_block_root: attrs.parent_beacon_block_root,
             slot_number: attrs.slot_number,
+            target_gas_limit: attrs.target_gas_limit,
         };
         assert!(engine_attrs.slot_number.is_none());
+        assert!(engine_attrs.target_gas_limit.is_none());
+    }
+
+    #[test]
+    fn serde_beacon_payload_attributes_with_amsterdam_fields() {
+        let json = r#"{
+            "timestamp": "1234",
+            "prev_randao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "suggested_fee_recipient": "0x0000000000000000000000000000000000000000",
+            "slot_number": "7",
+            "target_gas_limit": "30000000"
+        }"#;
+
+        let attrs: BeaconPayloadAttributes = serde_json::from_str(json).unwrap();
+        assert_eq!(attrs.slot_number, Some(7));
+        assert_eq!(attrs.target_gas_limit, Some(30_000_000));
     }
 }

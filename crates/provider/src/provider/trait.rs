@@ -4,7 +4,10 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchHeaders};
+use super::{
+    DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom,
+    WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchHeaders, WatchLogsFrom,
+};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -752,6 +755,232 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
+    ///
+    /// This stream continues polling after catching up and continues yielding new blocks
+    /// indefinitely.
+    ///
+    /// This stream _does not_ handle reorgs. Instead, each item yielded from the stream
+    /// is strictly ordered in terms of block number, regardless of the blocks parent.
+    ///
+    /// For example (height, hash, parent):
+    ///
+    /// You should expect blocks in order by number with no gaps and with disjoint parents:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(3,3B,2B)]
+    ///
+    /// And you should not expect receiving two blocks with the same number:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(2,2B,1A)]
+    ///
+    /// Each yielded future contains one block request.
+    ///
+    /// If a block request returns `NullResp`, the yielded future retries the same block until it
+    /// succeeds.
+    ///
+    /// Other errors are surfaced to the caller. Configure retries on the underlying client
+    /// transport (for example with `RetryBackoffLayer`) for transport-level retry behavior.
+    ///
+    /// This can be buffered by the caller, for example with
+    /// [`StreamExt::buffered`](futures::StreamExt::buffered).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::RetryBackoffLayer,
+    /// #     mock::{Asserter, MockTransport},
+    /// # };
+    /// # use futures::StreamExt;
+    ///
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// provider
+    ///     .watch_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .into_stream()
+    ///     // Keep many RPC request futures in flight at the same time.
+    ///     .buffered(4)
+    ///     // Process many resolved blocks concurrently.
+    ///     .for_each_concurrent(Some(4), |block| async move {
+    ///         match block {
+    ///             Ok(block) => {
+    ///                 let _ = block;
+    ///             }
+    ///             Err(err) => eprintln!("block request failed: {err}"),
+    ///         }
+    ///     })
+    ///     .await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
+        WatchBlocksFrom::new(self.weak_client(), start_block)
+    }
+
+    /// Stream canonical block events from a historical block.
+    ///
+    /// This wraps [`watch_blocks_from`](Self::watch_blocks_from) and performs canonical chain
+    /// reconciliation, yielding [`CanonicalEvent`](crate::provider::CanonicalEvent) values.
+    ///
+    /// On a reorg the stream emits
+    /// [`CanonicalEvent::Removed`](crate::provider::CanonicalEvent::Removed)
+    /// for each rolled-back block (newest first), then
+    /// [`CanonicalEvent::Added`](crate::provider::CanonicalEvent::Added) for the new chain segment.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_provider::CanonicalEvent;
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::RetryBackoffLayer,
+    /// #     mock::{Asserter, MockTransport},
+    /// # };
+    /// # use futures::StreamExt;
+    ///
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// let mut stream = provider
+    ///     .watch_canonical_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .rpc_concurrency(4)
+    ///     .max_reorg_depth(64)
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event {
+    ///         Ok(CanonicalEvent::Added(block)) => {
+    ///             let _ = block;
+    ///         }
+    ///         Ok(CanonicalEvent::Removed(block)) => {
+    ///             let _ = block;
+    ///         }
+    ///         Err(err) => eprintln!("canonical stream failed: {err}"),
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
+        self.watch_blocks_from(start_block).canonical()
+    }
+
+    /// Stream block log batches from a historical block.
+    ///
+    /// This follows block numbers from `start_block` and yields one future per block height. Each
+    /// future fetches the block and a one-block log range concurrently, using the range logs when
+    /// they match the fetched block hash and falling back to a block-hash log query when the range
+    /// result is empty or ambiguous.
+    ///
+    /// This stream does not perform canonical reconciliation after a batch has been emitted. Use
+    /// [`watch_canonical_logs_from`](Self::watch_canonical_logs_from) if the caller needs removed
+    /// events when already-emitted blocks are rolled back by a later reorg.
+    ///
+    /// The filter's block option is replaced internally for each exact block; use `start_block` and
+    /// [`block_tag`](crate::provider::WatchLogsFrom::block_tag) to configure range progress.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .into_stream()
+    ///     .buffered(4);
+    ///
+    /// while let Some(batch) = stream.next().await {
+    ///     let block_logs = batch?;
+    ///     for log in block_logs.logs {
+    ///         let _ = log;
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom<N> {
+        WatchLogsFrom::new(self.weak_client(), start_block, filter.clone())
+    }
+
+    /// Stream canonical block log events from a historical block.
+    ///
+    /// This follows canonical blocks from `start_block` and emits block-scoped log batches.
+    /// Removed events use retained logs when a block is rolled back by a reorg. The filter's block
+    /// option is replaced internally for each exact block; use `start_block` and
+    /// [`block_tag`](crate::provider::WatchCanonicalLogsFrom::block_tag) to configure range
+    /// progress.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{CanonicalEvent, Provider, ProviderBuilder};
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_canonical_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .rpc_concurrency(4)
+    ///     .max_reorg_depth(64)
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event {
+    ///         Ok(CanonicalEvent::Added(block_logs)) => {
+    ///             for log in block_logs.logs {
+    ///                 let _ = log;
+    ///             }
+    ///         }
+    ///         Ok(CanonicalEvent::Removed(block_logs)) => {
+    ///             for log in block_logs.logs {
+    ///                 let _ = log;
+    ///             }
+    ///         }
+    ///         Err(err) => eprintln!("canonical log stream failed: {err}"),
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_canonical_logs_from(
+        &self,
+        start_block: u64,
+        filter: &Filter,
+    ) -> WatchCanonicalLogsFrom<N> {
+        self.watch_logs_from(start_block, filter).canonical()
     }
 
     /// Watch for new pending transaction bodies by polling the provider with

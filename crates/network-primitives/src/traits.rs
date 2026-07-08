@@ -164,6 +164,11 @@ pub trait TransactionResponse: Transaction {
 pub trait HeaderResponse: BlockHeader {
     /// Block hash
     fn hash(&self) -> BlockHash;
+
+    /// Returns the [`BlockNumHash`] of this header.
+    fn num_hash(&self) -> BlockNumHash {
+        BlockNumHash::new(self.number(), self.hash())
+    }
 }
 
 /// Block JSON-RPC response.

@@ -5,7 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1](https://github.com/alloy-rs/alloy/releases/tag/v2.0.1) - 2026-04-22
+## [2.1.1](https://github.com/alloy-rs/alloy/releases/tag/v2.1.1) - 2026-07-06
+
+### Bug Fixes
+
+- Skip exp claim serialization in JWT if none ([#4032](https://github.com/alloy-rs/alloy/issues/4032))
+- [rpc-types-engine] Support positional testing build block requests ([#4014](https://github.com/alloy-rs/alloy/issues/4014))
+
+### Documentation
+
+- [rpc-types-engine] Document ExecutionPayloadV4 fields ([#4012](https://github.com/alloy-rs/alloy/issues/4012))
+- [rpc-types-engine] Include ExecutionPayloadV4 in docs ([#4008](https://github.com/alloy-rs/alloy/issues/4008))
+
+### Features
+
+- [engine] Add testing build block params helper ([#4047](https://github.com/alloy-rs/alloy/issues/4047))
+- [engine] Add SSZ for payload bodies ([#4026](https://github.com/alloy-rs/alloy/issues/4026))
+- Add ssz encoding and decoding to Payload Envelopes ([#4024](https://github.com/alloy-rs/alloy/issues/4024))
+- [rpc-types-engine] Add payload attributes builders ([#3985](https://github.com/alloy-rs/alloy/issues/3985))
+- [rpc-types-engine] Add SSZ codecs for engine types ([#3970](https://github.com/alloy-rs/alloy/issues/3970))
+- [rpc-types-engine] Add sealed block execution data conversions ([#3955](https://github.com/alloy-rs/alloy/issues/3955))
+
+### Miscellaneous Tasks
+
+- Release 2.1.0
+- Added target_gas_limit to payload attributes v4 ([#3980](https://github.com/alloy-rs/alloy/issues/3980))
+- Release 2.0.5
+
+### Performance
+
+- [eips] Optimize c-kzg byte conversions ([#3954](https://github.com/alloy-rs/alloy/issues/3954))
+
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Bug Fixes
+
+- [rpc-types-engine] Remove non_exhaustive from testing build request ([#3940](https://github.com/alloy-rs/alloy/issues/3940))
+
+### Miscellaneous Tasks
+
+- Release 2.0.4
+
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
 
 ### Dependencies
 
@@ -13,16 +54,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- [rpc-types-engine] Derive Default for testing build request ([#3939](https://github.com/alloy-rs/alloy/issues/3939))
+- [eips] Add blob cells response type ([#3932](https://github.com/alloy-rs/alloy/issues/3932))
 - [rpc-types-engine] Add ExecutionPayload bal_hash getter ([#3904](https://github.com/alloy-rs/alloy/issues/3904))
 - [rpc-types-engine] Add hidden setters to ExecutionPayload ([#3875](https://github.com/alloy-rs/alloy/issues/3875))
 - Add amsterdam fields ([#3871](https://github.com/alloy-rs/alloy/issues/3871))
 
 ### Miscellaneous Tasks
 
+- Release 2.0.3
+- Release 2.0.2
+- [rpc-types-engine] Mark TestingBuildBlockRequestV1 non_exhaustive ([#3913](https://github.com/alloy-rs/alloy/issues/3913))
+- Release 2.0.1
 - [BAL] Added from_block_slow_optional_bal ([#3898](https://github.com/alloy-rs/alloy/issues/3898))
 - Release 2.0.0
 - Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
 - Release 1.8.2
+
+### Refactor
+
+- [rpc-types-engine] Move v4 payload deserialize impl ([#3922](https://github.com/alloy-rs/alloy/issues/3922))
 
 ## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
 

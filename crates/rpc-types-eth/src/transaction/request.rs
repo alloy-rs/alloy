@@ -1087,8 +1087,8 @@ impl TransactionRequest {
         self,
     ) -> Result<alloy_consensus::EthereumTxEnvelope<TxEip4844>, ValueError<Self>> {
         let tx = self
-            .build_typed_tx()
-            .map_err(|req| ValueError::new(req, "Transaction is not buildable"))?;
+            .build_consensus_tx()
+            .map_err(|err| ValueError::new(err.tx, "Transaction is not buildable"))?;
         let signature = Signature::new(Default::default(), Default::default(), false);
         Ok(tx.into_signed(signature).into())
     }
@@ -2218,6 +2218,80 @@ mod tests {
                 eip4844_request.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
+    }
+
+    #[test]
+    fn build_typed_simulate_transaction_builds_eip1559() {
+        let request = TransactionRequest {
+            to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+            max_fee_per_gas: Some(1234),
+            max_priority_fee_per_gas: Some(678),
+            nonce: Some(57),
+            gas: Some(123456),
+            ..Default::default()
+        };
+
+        let envelope = request.build_typed_simulate_transaction().unwrap();
+
+        assert_matches!(envelope, alloy_consensus::EthereumTxEnvelope::Eip1559(_));
+    }
+
+    #[test]
+    fn build_typed_simulate_transaction_allows_4844_without_sidecar() {
+        let blob_hash = B256::repeat_byte(0xAB);
+        let request = TransactionRequest {
+            to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+            max_fee_per_gas: Some(1234),
+            max_priority_fee_per_gas: Some(678),
+            nonce: Some(57),
+            gas: Some(123456),
+            max_fee_per_blob_gas: Some(13579),
+            blob_versioned_hashes: Some(vec![blob_hash]),
+            ..Default::default()
+        };
+
+        let envelope = request.build_typed_simulate_transaction().unwrap();
+
+        assert_matches!(
+            envelope,
+            alloy_consensus::EthereumTxEnvelope::Eip4844(signed)
+                if signed.tx().blob_versioned_hashes == vec![blob_hash]
+        );
+    }
+
+    #[test]
+    fn build_typed_simulate_transaction_builds_4844_with_sidecar() {
+        let request = TransactionRequest {
+            to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+            max_fee_per_gas: Some(1234),
+            max_priority_fee_per_gas: Some(678),
+            nonce: Some(57),
+            gas: Some(123456),
+            max_fee_per_blob_gas: Some(13579),
+            sidecar: Some(alloy_consensus::BlobTransactionSidecar::default().into()),
+            ..Default::default()
+        };
+
+        let envelope = request.build_typed_simulate_transaction().unwrap();
+
+        assert_matches!(
+            envelope,
+            alloy_consensus::EthereumTxEnvelope::Eip4844(signed)
+                if signed.tx().blob_versioned_hashes.is_empty()
+        );
+    }
+
+    #[test]
+    fn build_typed_simulate_transaction_errors_if_not_buildable() {
+        let request = TransactionRequest {
+            to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+            max_fee_per_gas: Some(1234),
+            nonce: Some(57),
+            gas: Some(123456),
+            ..Default::default()
+        };
+
+        assert!(request.build_typed_simulate_transaction().is_err());
     }
 
     #[test]

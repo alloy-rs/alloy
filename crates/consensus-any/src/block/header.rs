@@ -57,13 +57,23 @@ pub struct AnyHeader {
     /// Nonce
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub nonce: Option<B64>,
-    /// Base fee per unit of gas (if past London)
+    /// Base fee per unit of gas (if past London).
+    ///
+    /// The Ethereum execution spec defines `base_fee_per_gas` as an arbitrary-precision integer
+    /// (`Uint`), but alloy types it as `u64` for compatibility with Ethereum mainnet, which has
+    /// never observed a value above `u64::MAX`. Some EVM-compatible chains (e.g. Stable,
+    /// chain id 988) do return values above `u64::MAX` for historical blocks. To keep RPC
+    /// deserialization from failing on those chains, oversized inputs saturate to `u64::MAX`
+    /// rather than erroring. Consumers that need the full-precision value should construct a
+    /// custom header type with a wider field.
+    ///
+    /// See <https://github.com/alloy-rs/alloy/issues/3741>.
     #[cfg_attr(
         feature = "serde",
         serde(
             default,
             skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
+            with = "saturating_base_fee_per_gas"
         )
     )]
     pub base_fee_per_gas: Option<u64>,
@@ -404,6 +414,36 @@ impl TryFrom<AnyHeader> for Header {
     }
 }
 
+/// Saturating serde adapter for `base_fee_per_gas`.
+///
+/// Serializes identically to [`alloy_serde::quantity::opt`]. On deserialize, accepts any input
+/// that fits in `U256`; values above `u64::MAX` are clamped to `u64::MAX` instead of erroring.
+/// See [the field-level comment](AnyHeader::base_fee_per_gas) and issue #3741 for context.
+#[cfg(feature = "serde")]
+mod saturating_base_fee_per_gas {
+    use alloy_primitives::U256;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub(super) fn serialize<S>(value: &Option<u64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        alloy_serde::quantity::opt::serialize(value, serializer)
+    }
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let opt: Option<U256> = Option::deserialize(deserializer)?;
+            Ok(opt.map(|v| v.try_into().unwrap_or(u64::MAX)))
+        } else {
+            alloy_serde::quantity::opt::deserialize(deserializer)
+        }
+    }
+}
+
 /// Custom deserializer for `state_root` that treats `"0x"` or empty as `B256::ZERO`
 ///
 /// This exists because some networks (like Tron) may serialize the state root as `"0x"`
@@ -460,5 +500,135 @@ mod tests {
 
         let header: AnyHeader = serde_json::from_str(s).unwrap();
         assert_eq!(header.state_root, B256::ZERO);
+    }
+
+    // <https://github.com/alloy-rs/alloy/issues/3741>
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializes_base_fee_within_u64() {
+        use super::*;
+
+        // Normal in-range hex baseFeePerGas — common case.
+        let s = r#"{
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "sha3Uncles": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "miner": "0x0000000000000000000000000000000000000000",
+  "stateRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "transactionsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "difficulty": "0x0",
+  "number": "0x1",
+  "gasLimit": "0x1c9c380",
+  "gasUsed": "0x5208",
+  "timestamp": "0x65",
+  "extraData": "0x",
+  "baseFeePerGas": "0x3b9aca00"
+}"#;
+        let header: AnyHeader = serde_json::from_str(s).unwrap();
+        assert_eq!(header.base_fee_per_gas, Some(1_000_000_000));
+    }
+
+    // Stable chain (chainId 988) returns baseFeePerGas = 10^21 for a range of
+    // historical blocks. With the prior `Option<u64>` deserializer this errored
+    // with "invalid type: integer 1000000000000000000000, expected u64".
+    // Saturate to u64::MAX instead.
+    // <https://github.com/alloy-rs/alloy/issues/3741>
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializes_base_fee_saturates_above_u64() {
+        use super::*;
+
+        // baseFeePerGas = 0x3635c9adc5dea00000 = 10^21, well above u64::MAX.
+        let s = r#"{
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "sha3Uncles": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "miner": "0x0000000000000000000000000000000000000000",
+  "stateRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "transactionsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "difficulty": "0x0",
+  "number": "0x1",
+  "gasLimit": "0x1c9c380",
+  "gasUsed": "0x5208",
+  "timestamp": "0x65",
+  "extraData": "0x",
+  "baseFeePerGas": "0x3635c9adc5dea00000"
+}"#;
+        let header: AnyHeader = serde_json::from_str(s).unwrap();
+        assert_eq!(header.base_fee_per_gas, Some(u64::MAX));
+    }
+
+    // Exactly u64::MAX should round-trip without saturation.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializes_base_fee_exact_u64_max() {
+        use super::*;
+
+        // u64::MAX = 0xffffffffffffffff
+        let s = r#"{
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "sha3Uncles": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "miner": "0x0000000000000000000000000000000000000000",
+  "stateRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "transactionsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "difficulty": "0x0",
+  "number": "0x1",
+  "gasLimit": "0x1c9c380",
+  "gasUsed": "0x5208",
+  "timestamp": "0x65",
+  "extraData": "0x",
+  "baseFeePerGas": "0xffffffffffffffff"
+}"#;
+        let header: AnyHeader = serde_json::from_str(s).unwrap();
+        assert_eq!(header.base_fee_per_gas, Some(u64::MAX));
+    }
+
+    // The saturating JSON path must not change the binary serde shape inherited
+    // from `alloy_serde::quantity::opt`.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn binary_roundtrip_preserves_base_fee() {
+        #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        struct BaseFee {
+            #[serde(with = "super::saturating_base_fee_per_gas")]
+            base_fee_per_gas: Option<u64>,
+        }
+
+        let header = BaseFee { base_fee_per_gas: Some(1_000_000_000) };
+        let encoded = bincode::serde::encode_to_vec(&header, bincode::config::legacy()).unwrap();
+        let (decoded, _) =
+            bincode::serde::decode_from_slice::<BaseFee, _>(&encoded, bincode::config::legacy())
+                .unwrap();
+
+        assert_eq!(decoded, header);
+    }
+
+    // Absent baseFeePerGas (pre-London) must still deserialize as None.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializes_base_fee_absent() {
+        use super::*;
+
+        let s = r#"{
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "sha3Uncles": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "miner": "0x0000000000000000000000000000000000000000",
+  "stateRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "transactionsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "difficulty": "0x0",
+  "number": "0x1",
+  "gasLimit": "0x1c9c380",
+  "gasUsed": "0x5208",
+  "timestamp": "0x65",
+  "extraData": "0x"
+}"#;
+        let header: AnyHeader = serde_json::from_str(s).unwrap();
+        assert_eq!(header.base_fee_per_gas, None);
     }
 }

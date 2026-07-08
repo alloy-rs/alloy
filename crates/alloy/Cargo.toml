@@ -150,6 +150,7 @@ contract = [
     "json-abi",
     "json",
     "sol-types",
+    "alloy-ens?/contract",
 ]
 eips = ["dep:alloy-eips", "rlp"]
 ens = ["dep:alloy-ens"]
@@ -290,7 +291,8 @@ signer-mnemonic-all-languages = [
 signer-yubihsm = ["signer-local", "alloy-signer-local?/yubihsm"]
 secp256k1 = [
 	"alloy-consensus?/secp256k1",
-	"alloy-signer-local?/secp256k1"
+	"alloy-signer-local?/secp256k1",
+	"alloy-core/secp256k1"
 ]
 # transports
 transports = ["dep:alloy-transport"]
@@ -333,7 +335,11 @@ serde = [
     "dep:alloy-serde",
     "alloy-trie?/serde",
 ]
-serde-bincode-compat = ["alloy-consensus/serde-bincode-compat"]
+serde-bincode-compat = [
+    "alloy-consensus/serde-bincode-compat",
+    "alloy-eips?/serde-bincode-compat",
+    "alloy-genesis?/serde-bincode-compat",
+]
 ssz = ["alloy-rpc-types?/ssz", "alloy-eips?/ssz"]
 k256 = [
     "alloy-core/k256",
@@ -342,7 +348,11 @@ k256 = [
     "alloy-rpc-types?/k256",
     "alloy-eips?/k256",
 ]
-kzg = ["alloy-consensus?/kzg", "alloy-rpc-types?/kzg"]
+kzg = [
+    "alloy-consensus?/kzg",
+    "alloy-rpc-types?/kzg",
+    "alloy-eips?/kzg",
+]
 eip712 = [
     "alloy-core/eip712",
     "alloy-signer?/eip712",

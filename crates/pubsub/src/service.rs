@@ -4,7 +4,7 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
-use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
+use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -193,7 +193,12 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
-    /// Attempt to reconnect with retries
+    /// Attempt to reconnect with retries.
+    ///
+    /// Aborts immediately when a reconnect attempt returns a
+    /// [`TransportErrorKind::NonRetryable`] error so deterministic backend
+    /// failures (auth/protocol violations, malformed handshake, etc.) do not
+    /// burn the full retry budget.
     async fn reconnect_with_retries(&mut self) -> TransportResult<()> {
         let mut retry_count = 0;
         let max_retries = self.handle.max_retries;
@@ -202,6 +207,10 @@ impl<T: PubSubConnect> PubSubService<T> {
             match self.reconnect().await {
                 Ok(()) => break Ok(()),
                 Err(e) => {
+                    if matches!(&e, RpcError::Transport(k) if k.is_non_retryable()) {
+                        error!("Reconnect aborted (non-retryable), shutting down: {e}");
+                        break Err(e);
+                    }
                     retry_count += 1;
                     if retry_count >= max_retries {
                         error!("Reconnect failed after {max_retries} attempts, shutting down: {e}");
@@ -233,13 +242,35 @@ impl<T: PubSubConnect> PubSubService<T> {
                             if let Err(e) = self.handle_item(item) {
                                 break Err(e)
                             }
-                        } else if let Err(e) = self.reconnect_with_retries().await {
-                            break Err(e)
+                        } else {
+                            // The backend dropped its `to_frontend` sender.
+                            // It may have also signaled a typed error via the
+                            // `error` oneshot; drain it before reconnecting
+                            // so a non-retryable error short-circuits the loop.
+                            if let Ok(err) = self.handle.error.try_recv() {
+                                if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
+                                    error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
+                                    break Err(err)
+                                }
+                                error!(%err, "Pubsub service backend error.");
+                            }
+                            if let Err(e) = self.reconnect_with_retries().await {
+                                break Err(e)
+                            }
                         }
                     }
 
-                    _ = &mut self.handle.error => {
-                        error!("Pubsub service backend error.");
+                    res = &mut self.handle.error => {
+                        // The backend signaled a terminal error. The carried
+                        // `TransportError` indicates whether it is recoverable.
+                        // If the sender was dropped without a value, fall back
+                        // to a generic backend-gone error.
+                        let err = res.unwrap_or_else(|_| TransportErrorKind::backend_gone());
+                        if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
+                            error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
+                            break Err(err)
+                        }
+                        error!(%err, "Pubsub service backend error.");
                         if let Err(e) = self.reconnect_with_retries().await {
                             break Err(e)
                         }
@@ -294,7 +325,10 @@ mod tests {
     use crate::ConnectionInterface;
     use alloy_json_rpc::Request;
     use std::{
-        sync::{Arc, Mutex},
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Mutex,
+        },
         time::Duration,
     };
     use tokio::time::timeout;
@@ -317,6 +351,61 @@ mod tests {
                 .expect("poisoned mutex")
                 .take()
                 .ok_or_else(|| TransportErrorKind::custom_str("missing mock connection handle"))
+        }
+    }
+
+    /// Mock connector that counts every `try_reconnect` invocation and
+    /// optionally returns a queued [`ConnectionHandle`].
+    #[derive(Clone, Debug, Default)]
+    struct CountingConnect {
+        handle: Arc<Mutex<Option<ConnectionHandle>>>,
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl CountingConnect {
+        fn with_handle(handle: ConnectionHandle) -> Self {
+            Self {
+                handle: Arc::new(Mutex::new(Some(handle))),
+                calls: Arc::new(AtomicUsize::new(0)),
+            }
+        }
+    }
+
+    impl PubSubConnect for CountingConnect {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            Err(TransportErrorKind::custom_str("connect is not used in this test"))
+        }
+
+        async fn try_reconnect(&self) -> TransportResult<ConnectionHandle> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.handle
+                .lock()
+                .expect("poisoned mutex")
+                .take()
+                .ok_or_else(|| TransportErrorKind::custom_str("no more handles"))
+        }
+    }
+
+    /// Returns a non-retryable error and counts `try_reconnect` calls.
+    #[derive(Clone, Debug, Default)]
+    struct NonRetryableConnect(Arc<AtomicUsize>);
+
+    impl PubSubConnect for NonRetryableConnect {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            Err(TransportErrorKind::non_retryable_str("non-retryable test failure"))
+        }
+
+        async fn try_reconnect(&self) -> TransportResult<ConnectionHandle> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(TransportErrorKind::non_retryable_str("non-retryable test failure"))
         }
     }
 
@@ -385,5 +474,120 @@ mod tests {
                 .expect("request should be dispatched after reconnect")
                 .expect("new backend should receive the request");
         assert_eq!(dispatched.get(), expected);
+    }
+
+    #[tokio::test]
+    async fn non_retryable_reconnect_error_short_circuits_retry_loop() {
+        let (dead_handle, dead_interface) = ConnectionHandle::new();
+        let ConnectionInterface { from_frontend, to_frontend, error, shutdown } = dead_interface;
+        drop(from_frontend);
+        let _keep_dead_backend_alive = (to_frontend, error, shutdown);
+
+        let connector = NonRetryableConnect::default();
+        let counter = connector.0.clone();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle: dead_handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+
+        let req = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let (in_flight, rx) = InFlight::new(req, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
+
+        timeout(Duration::from_secs(1), rx)
+            .await
+            .expect("non-retryable reconnect should resolve promptly")
+            .expect_err("request should fail when backend is gone and reconnect aborts");
+
+        // Exactly one attempt, not `max_retries`.
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn non_retryable_close_skips_reconnect_loop() {
+        // Backend is alive but emits a non-retryable error via the typed
+        // `close_with_transport_error` channel. The service must NOT call
+        // `try_reconnect` at all.
+        let (live_handle, live_interface) = ConnectionHandle::new();
+
+        // Provide a fresh handle that the connector *could* return, so that
+        // accidentally triggering `try_reconnect` would succeed and complete
+        // the reconnect path. We assert the call count to prove it didn't.
+        let (spare_handle, _spare_interface) = ConnectionHandle::new();
+        let connector = CountingConnect::with_handle(spare_handle);
+        let calls = connector.calls.clone();
+
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle: live_handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+
+        // Backend signals a deterministic, non-retryable failure.
+        live_interface.close_with_transport_error(TransportErrorKind::non_retryable_str(
+            "deterministic protocol failure",
+        ));
+
+        // Give the service a chance to act on the error.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "non-retryable backend error must not trigger reconnect attempts"
+        );
+    }
+
+    #[tokio::test]
+    async fn default_close_with_error_still_reconnects() {
+        // Sanity check: the legacy `close_with_error()` path (which sends
+        // `BackendGone`) continues to trigger the reconnect loop.
+        let (live_handle, live_interface) = ConnectionHandle::new();
+
+        let (reconnected_handle, mut reconnected_interface) = ConnectionHandle::new();
+        let connector = CountingConnect::with_handle(reconnected_handle);
+        let calls = connector.calls.clone();
+
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle: live_handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+
+        // Trigger the legacy close path.
+        live_interface.close_with_error();
+
+        // After reconnect, a freshly dispatched request must reach the new
+        // backend.
+        let req = Request::new("eth_chainId", Id::Number(1), ()).serialize().unwrap();
+        let expected = req.serialized().get().to_owned();
+        let (in_flight, _rx) = InFlight::new(req, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
+
+        let dispatched =
+            timeout(Duration::from_secs(1), reconnected_interface.recv_from_frontend())
+                .await
+                .expect("request should be dispatched after reconnect")
+                .expect("new backend should receive the request");
+        assert_eq!(dispatched.get(), expected);
+
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "default close_with_error should trigger exactly one reconnect"
+        );
     }
 }

@@ -1,8 +1,10 @@
 //! Misc types related to the 4844
 
+#[cfg(feature = "ssz")]
+use crate::eip7594::CELLS_PER_EXT_BLOB;
 use crate::{
     eip4844::{Blob, Bytes48},
-    eip7594::{Cell, CELLS_PER_EXT_BLOB},
+    eip7594::Cell,
 };
 use alloc::{boxed::Box, vec::Vec};
 
@@ -117,7 +119,7 @@ impl ssz::Decode for BlobAndProofV2 {
 
 /// Blob cells type returned in responses to `engine_getBlobsV4`:
 /// <https://github.com/ethereum/execution-apis/pull/774>
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobCellsAndProofsV1 {
     /// The requested blob cells.
