@@ -5,10 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0](https://github.com/alloy-rs/alloy/releases/tag/v2.1.0) - 2026-06-16
+## [2.1.1](https://github.com/alloy-rs/alloy/releases/tag/v2.1.1) - 2026-07-06
 
 ### Bug Fixes
 
+- [consensus] Reject string withdrawals in block RLP ([#4058](https://github.com/alloy-rs/alloy/issues/4058))
+- [tx-macros] Preserve fallback decode cursor ([#4059](https://github.com/alloy-rs/alloy/issues/4059))
 - [ci] Satisfy zepter secp256k1 propagation ([#3993](https://github.com/alloy-rs/alloy/issues/3993))
 - [consensus] Correct recovered transaction docs ([#3984](https://github.com/alloy-rs/alloy/issues/3984))
 
@@ -18,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.1.0
 - Release 2.0.5
 
 ## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
