@@ -29,6 +29,7 @@ alloy-core.workspace = true
 # alloy
 alloy-consensus = { workspace = true, optional = true }
 alloy-contract = { workspace = true, optional = true }
+alloy-eip4361 = { workspace = true, optional = true, features = ["provider"] }
 alloy-eips = { workspace = true, optional = true }
 alloy-ens = { workspace = true, optional = true, features = ["contract", "provider"] }
 alloy-genesis = { workspace = true, optional = true }
@@ -81,6 +82,7 @@ default = [
 # std
 std = [
     "alloy-core/std",
+    "alloy-eip4361?/std",
     "alloy-eips?/std",
     "alloy-genesis?/std",
     "alloy-serde?/std",
@@ -151,6 +153,7 @@ contract = [
     "json",
     "sol-types",
 ]
+eip4361 = ["dep:alloy-eip4361"]
 eips = ["dep:alloy-eips", "rlp"]
 ens = ["dep:alloy-ens"]
 genesis = ["dep:alloy-genesis"]
@@ -329,6 +332,7 @@ rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
 serde = [
     "alloy-core/serde",
+    "alloy-eip4361?/serde",
     "alloy-eips?/serde",
     "alloy-consensus?/serde",
     "dep:alloy-serde",
