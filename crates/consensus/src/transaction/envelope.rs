@@ -1034,7 +1034,7 @@ pub mod serde_bincode_compat {
                     signature: Signature::new(U256::ZERO, U256::ZERO, false),
                     transaction:
                         crate::serde_bincode_compat::transaction::EthereumTypedTransaction::Eip8141(
-                            Cow::Borrowed(tx.inner()),
+                            tx.inner().into(),
                         ),
                 },
             }

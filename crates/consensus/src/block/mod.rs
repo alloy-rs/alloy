@@ -14,7 +14,10 @@ pub(crate) use header::serde_bincode_compat;
 
 use crate::Transaction;
 use alloc::vec::Vec;
-use alloy_eips::{eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718, Typed2718};
+use alloy_eips::{
+    eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718,
+    Typed2718,
+};
 use alloy_primitives::{keccak256, Sealable, Sealed, B256};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
@@ -321,6 +324,12 @@ impl<T: Typed2718, H> BlockBody<T, H> {
     #[inline]
     pub fn has_eip7702_transactions(&self) -> bool {
         self.transactions.iter().any(|tx| tx.is_eip7702())
+    }
+
+    /// Returns whether or not the block body contains any EIP-8141 transactions.
+    #[inline]
+    pub fn has_eip8141_transactions(&self) -> bool {
+        self.transactions.iter().any(|tx| tx.is_eip8141())
     }
 
     /// Returns an iterator over all blob transactions of the block.
