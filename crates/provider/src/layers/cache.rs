@@ -108,9 +108,9 @@ macro_rules! rpc_call_with_block {
             });
 
             let res = result.await?;
-            // Insert into cache only for deterministic block identifiers (exclude tag-based ids
-            // like latest/pending/earliest). Caching tag-based results can lead to stale data.
-            if !$req.has_block_tag() {
+            // Insert into cache only for deterministic block identifiers. Caching tag-based or
+            // requireCanonical queries can lead to stale data.
+            if $req.should_cache() {
                 let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
                 let hash = $req.params_hash()?;
                 let _ = cache.put(hash, json_str);
@@ -128,7 +128,7 @@ macro_rules! rpc_call_with_block {
 /// This helps overriding [`Provider`] methods that return `RpcWithBlock`.
 macro_rules! cache_rpc_call_with_block {
     ($cache:expr, $client:expr, $req:expr) => {{
-        if $req.has_block_tag() {
+        if !$req.should_cache() {
             return rpc_call_with_block!($cache, $client, $req);
         }
 
@@ -162,9 +162,9 @@ where
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         let req = RequestType::new("eth_getBlockReceipts", (block,)).with_block_id(block);
 
-        let redirect = req.has_block_tag();
+        let should_cache = req.should_cache();
 
-        if !redirect {
+        if should_cache {
             let params_hash = req.params_hash().ok();
 
             if let Some(hash) = params_hash {
@@ -184,7 +184,7 @@ where
 
             let result = client.request(req.method(), req.params()).await?;
 
-            if !redirect {
+            if should_cache {
                 if let Some(ref receipts) = result {
                     let json_str =
                         serde_json::to_string(receipts).map_err(TransportErrorKind::custom)?;
@@ -400,9 +400,9 @@ where
         RpcWithBlock::new_provider(move |block_id| {
             let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
 
-            let redirect = req.has_block_tag();
+            let should_cache = req.should_cache();
 
-            if !redirect {
+            if should_cache {
                 let params_hash = req.params_hash().ok();
 
                 if let Some(hash) = params_hash {
@@ -427,7 +427,7 @@ where
                     .map_params(|params| ParamsWithBlock::new(params, block_id))
                     .await?;
 
-                if !redirect {
+                if should_cache {
                     let json_str =
                         serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
                     let hash = req.params_hash()?;
@@ -489,18 +489,19 @@ impl<Params: RpcSend> RequestType<Params> {
         self.params.clone()
     }
 
-    /// Returns true if the BlockId has been set to a tag value such as "latest", "earliest", or
-    /// "pending".
-    const fn has_block_tag(&self) -> bool {
+    /// Returns true if the request can be safely served from cache.
+    const fn should_cache(&self) -> bool {
         if let Some(block_id) = self.block_id {
-            return !matches!(
-                block_id,
-                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_))
-            );
+            return match block_id {
+                BlockId::Hash(hash) => !matches!(hash.require_canonical, Some(true)),
+                BlockId::Number(BlockNumberOrTag::Number(_)) => true,
+                _ => false,
+            };
         }
+
         // Treat absence of BlockId as tag-based (e.g., 'latest'), which is non-deterministic
         // and should not be cached.
-        true
+        false
     }
 }
 
@@ -709,6 +710,33 @@ mod tests {
         let second = provider.get_transaction_by_hash(tx_hash).await.unwrap();
         assert_eq!(second, Some(tx));
         assert!(shared_cache.get(&cache_key).is_some());
+    }
+
+    #[tokio::test]
+    async fn test_hash_canonical_block_ids_do_not_use_cache() {
+        let cache_layer = CacheLayer::new(100);
+        let shared_cache = cache_layer.cache();
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .layer(cache_layer)
+            .connect_mocked_client(asserter.clone());
+
+        let address = Address::repeat_byte(5);
+        let block_hash = B256::repeat_byte(0x11);
+        let block_id = BlockId::hash_canonical(block_hash);
+        let req = RequestType::new("eth_getBalance", address).with_block_id(block_id);
+        let cache_key = req.params_hash().unwrap();
+
+        asserter.push_success(&U256::from(456));
+        asserter.push_failure_msg("block is not canonical");
+
+        let first = provider.get_balance(address).block_id(block_id).await.unwrap();
+        assert_eq!(first, U256::from(456));
+        assert!(shared_cache.get(&cache_key).is_none());
+
+        let second = provider.get_balance(address).block_id(block_id).await;
+        assert!(second.is_err());
     }
 
     #[tokio::test]
