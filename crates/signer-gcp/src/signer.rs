@@ -246,7 +246,7 @@ async fn request_get_pubkey(
     });
     request
         .metadata_mut()
-        .insert("x-goog-request-params", format!("name={}", &kms_key_name).parse().unwrap());
+        .insert("x-goog-request-params", format!("name={}", kms_key_name).parse().unwrap());
     client.get().get_public_key(request).await.map(|r| r.into_inner()).map_err(Into::into)
 }
 
