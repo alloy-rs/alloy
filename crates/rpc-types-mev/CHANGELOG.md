@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1](https://github.com/alloy-rs/alloy/releases/tag/v2.1.1) - 2026-07-06
+
+### Miscellaneous Tasks
+
+- Expand zepter feature checks ([#4063](https://github.com/alloy-rs/alloy/issues/4063))
+- Release 2.1.0
+- Release 2.0.5
+
 ## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
 
 ### Miscellaneous Tasks

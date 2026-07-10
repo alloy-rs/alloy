@@ -854,6 +854,19 @@ mod tests {
     }
 
     #[test]
+    fn header_response_num_hash() {
+        let number = 42;
+        let hash = B256::with_last_byte(1);
+        let header = Header {
+            hash,
+            inner: alloy_consensus::Header { number, ..Default::default() },
+            ..Default::default()
+        };
+
+        assert_eq!(header.num_hash(), BlockNumHash::new(number, hash));
+    }
+
+    #[test]
     #[cfg(feature = "serde")]
     fn serde_json_header() {
         #[derive(serde::Deserialize)]

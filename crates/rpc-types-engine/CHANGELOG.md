@@ -5,13 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.5](https://github.com/alloy-rs/alloy/releases/tag/v2.0.5) - 2026-05-18
+## [2.1.1](https://github.com/alloy-rs/alloy/releases/tag/v2.1.1) - 2026-07-06
+
+### Bug Fixes
+
+- Skip exp claim serialization in JWT if none ([#4032](https://github.com/alloy-rs/alloy/issues/4032))
+- [rpc-types-engine] Support positional testing build block requests ([#4014](https://github.com/alloy-rs/alloy/issues/4014))
+
+### Documentation
+
+- [rpc-types-engine] Document ExecutionPayloadV4 fields ([#4012](https://github.com/alloy-rs/alloy/issues/4012))
+- [rpc-types-engine] Include ExecutionPayloadV4 in docs ([#4008](https://github.com/alloy-rs/alloy/issues/4008))
 
 ### Features
 
+- [engine] Add testing build block params helper ([#4047](https://github.com/alloy-rs/alloy/issues/4047))
+- [engine] Add SSZ for payload bodies ([#4026](https://github.com/alloy-rs/alloy/issues/4026))
+- Add ssz encoding and decoding to Payload Envelopes ([#4024](https://github.com/alloy-rs/alloy/issues/4024))
 - [rpc-types-engine] Add payload attributes builders ([#3985](https://github.com/alloy-rs/alloy/issues/3985))
 - [rpc-types-engine] Add SSZ codecs for engine types ([#3970](https://github.com/alloy-rs/alloy/issues/3970))
 - [rpc-types-engine] Add sealed block execution data conversions ([#3955](https://github.com/alloy-rs/alloy/issues/3955))
+
+### Miscellaneous Tasks
+
+- Release 2.1.0
+- Added target_gas_limit to payload attributes v4 ([#3980](https://github.com/alloy-rs/alloy/issues/3980))
+- Release 2.0.5
 
 ### Performance
 

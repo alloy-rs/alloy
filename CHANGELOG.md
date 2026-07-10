@@ -5,6 +5,87 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1](https://github.com/alloy-rs/alloy/releases/tag/v2.1.1) - 2026-07-06
+
+### Bug Fixes
+
+- [consensus] Reject string withdrawals in block RLP ([#4058](https://github.com/alloy-rs/alloy/issues/4058))
+- [tx-macros] Preserve fallback decode cursor ([#4059](https://github.com/alloy-rs/alloy/issues/4059))
+- [docs] Avoid rustdoc ICE on re-exports ([#4060](https://github.com/alloy-rs/alloy/issues/4060))
+- [eips] Serialize hash block ids as bare hashes ([#4052](https://github.com/alloy-rs/alloy/issues/4052))
+- [eips] Avoid fake exponential overflow ([#3961](https://github.com/alloy-rs/alloy/issues/3961))
+
+### Dependencies
+
+- [deps] Bump the ci-weekly group with 3 updates ([#4051](https://github.com/alloy-rs/alloy/issues/4051))
+
+### Documentation
+
+- Fix bug report template link ([#4053](https://github.com/alloy-rs/alloy/issues/4053))
+- Fix contributors guide link in PR template ([#4042](https://github.com/alloy-rs/alloy/issues/4042))
+
+### Features
+
+- [engine] Add testing build block params helper ([#4047](https://github.com/alloy-rs/alloy/issues/4047))
+- [network-primitives] Add header num_hash helper ([#4046](https://github.com/alloy-rs/alloy/issues/4046))
+
+### Miscellaneous Tasks
+
+- Release 2.1.1
+- Release 2.1.1
+- Release 2.1.1
+- Expand zepter feature checks ([#4063](https://github.com/alloy-rs/alloy/issues/4063))
+
+### Performance
+
+- [json-rpc] Skip re-parse when returning owned Box<RawValue> ([#4057](https://github.com/alloy-rs/alloy/issues/4057))
+
+## [2.1.0](https://github.com/alloy-rs/alloy/releases/tag/v2.1.0) - 2026-06-16
+
+### Bug Fixes
+
+- [txpool] Checksum address map keys for tx pool ([#4039](https://github.com/alloy-rs/alloy/issues/4039))
+- Skip exp claim serialization in JWT if none ([#4032](https://github.com/alloy-rs/alloy/issues/4032))
+- [rpc-client] Include IPC path in metadata errors ([#4016](https://github.com/alloy-rs/alloy/issues/4016))
+- [rpc-types-engine] Support positional testing build block requests ([#4014](https://github.com/alloy-rs/alloy/issues/4014))
+- [signer-local] Return missing mnemonic phrase error ([#4009](https://github.com/alloy-rs/alloy/issues/4009))
+- [transport-http] Preserve JSON-RPC errors from non-2xx ([#4006](https://github.com/alloy-rs/alloy/issues/4006))
+
+### Dependencies
+
+- [deps] Bump alloy-eip7928 to 0.4 ([#4011](https://github.com/alloy-rs/alloy/issues/4011))
+
+### Documentation
+
+- [rpc-types-eth] Clarify block header docs ([#3998](https://github.com/alloy-rs/alloy/issues/3998))
+- [rpc-types-engine] Document ExecutionPayloadV4 fields ([#4012](https://github.com/alloy-rs/alloy/issues/4012))
+- [rpc-types-engine] Include ExecutionPayloadV4 in docs ([#4008](https://github.com/alloy-rs/alloy/issues/4008))
+
+### Features
+
+- [rpc-beacon-type] Extend ssz decoding to `SignedBeaconBlock` ([#4029](https://github.com/alloy-rs/alloy/issues/4029))
+- Provider::watch_canonical_logs_from ([#4022](https://github.com/alloy-rs/alloy/issues/4022))
+- [provider] Add anvil_dump_state_with_history to AnvilApi ([#4025](https://github.com/alloy-rs/alloy/issues/4025))
+- [engine] Add SSZ for payload bodies ([#4026](https://github.com/alloy-rs/alloy/issues/4026))
+- Add ssz encoding and decoding to Payload Envelopes ([#4024](https://github.com/alloy-rs/alloy/issues/4024))
+- [consensus] Add generic indexed value helper ([#4005](https://github.com/alloy-rs/alloy/issues/4005))
+- `Provider::watch_blocks_from` and `Provider::watch_canonical_blocks_from` ([#3722](https://github.com/alloy-rs/alloy/issues/3722))
+
+### Miscellaneous Tasks
+
+- Release 2.1.0
+- Release 2.1.0
+- Group weekly dependabot updates ([#4035](https://github.com/alloy-rs/alloy/issues/4035))
+- Fixed amsterdam docs and sequence in chain config ([#4021](https://github.com/alloy-rs/alloy/issues/4021))
+- Replaced typed tx with consensus tx in build_typed_simulate_tx… ([#4015](https://github.com/alloy-rs/alloy/issues/4015))
+- Added target_gas_limit to payload attributes v4 ([#3980](https://github.com/alloy-rs/alloy/issues/3980))
+
+### Other
+
+- Ignore proc-macro-error2 advisory ([#4030](https://github.com/alloy-rs/alloy/issues/4030))
+- Avoid caching pending tx snapshots by hash ([#4001](https://github.com/alloy-rs/alloy/issues/4001))
+- Update CODEOWNERS ([#4004](https://github.com/alloy-rs/alloy/issues/4004))
+
 ## [2.0.5](https://github.com/alloy-rs/alloy/releases/tag/v2.0.5) - 2026-05-18
 
 ### Bug Fixes
@@ -52,6 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.0.5
 - Release 2.0.5
 - Release 2.0.5
 - Release 2.0.5

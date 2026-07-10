@@ -29,6 +29,13 @@ pub struct TestingBuildBlockRequestV1 {
     pub extra_data: Option<Bytes>,
 }
 
+impl TestingBuildBlockRequestV1 {
+    /// Consumes the request and returns the positional JSON-RPC parameters.
+    pub fn into_params(self) -> (B256, PayloadAttributes, Vec<Bytes>, Option<Bytes>) {
+        (self.parent_block_hash, self.payload_attributes, self.transactions, self.extra_data)
+    }
+}
+
 #[cfg(feature = "serde")]
 /// Deserializes from either the camelCase object form produced by [`serde::Serialize`] or the
 /// positional JSON-RPC params form defined by the execution-apis spec.
