@@ -2093,7 +2093,7 @@ mod tests {
     #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
+        for url in ["wss://ethereum.reth.rs/ws"] {
             let _ = ProviderBuilder::<_, _, Ethereum>::default().connect(url).await.unwrap();
         }
     }
