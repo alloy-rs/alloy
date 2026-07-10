@@ -1157,7 +1157,7 @@ impl From<TxLegacy> for TransactionRequest {
         let ty = tx.ty();
         let TxLegacy { chain_id, nonce, gas_price, gas_limit, to, value, input } = tx;
         Self {
-            to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
+            to: Some(to),
             gas_price: Some(gas_price),
             gas: Some(gas_limit),
             value: Some(value),
@@ -1175,7 +1175,7 @@ impl From<TxEip2930> for TransactionRequest {
         let ty = tx.ty();
         let TxEip2930 { chain_id, nonce, gas_price, gas_limit, to, value, access_list, input } = tx;
         Self {
-            to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
+            to: Some(to),
             gas_price: Some(gas_price),
             gas: Some(gas_limit),
             value: Some(value),
@@ -1204,7 +1204,7 @@ impl From<TxEip1559> for TransactionRequest {
             input,
         } = tx;
         Self {
-            to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
+            to: Some(to),
             max_fee_per_gas: Some(max_fee_per_gas),
             max_priority_fee_per_gas: Some(max_priority_fee_per_gas),
             gas: Some(gas_limit),
@@ -2346,5 +2346,50 @@ mod tests {
         let hashes = tx_request.blob_versioned_hashes.unwrap();
         assert_eq!(hashes.len(), 1);
         assert_eq!(hashes[0], expected_hash);
+    }
+
+    #[test]
+    fn transaction_conversions_preserve_contract_creation() {
+        let legacy = TxLegacy {
+            chain_id: Some(1),
+            nonce: 7,
+            gas_price: 2,
+            gas_limit: 53_000,
+            to: TxKind::Create,
+            value: U256::from(3),
+            input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+        };
+        let request: TransactionRequest = legacy.clone().into();
+        assert_eq!(request.to, Some(TxKind::Create));
+        assert_eq!(request.build_legacy().unwrap(), legacy);
+
+        let eip2930 = TxEip2930 {
+            chain_id: 1,
+            nonce: 7,
+            gas_price: 2,
+            gas_limit: 53_000,
+            to: TxKind::Create,
+            value: U256::from(3),
+            access_list: Default::default(),
+            input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+        };
+        let request: TransactionRequest = eip2930.clone().into();
+        assert_eq!(request.to, Some(TxKind::Create));
+        assert_eq!(request.build_2930().unwrap(), eip2930);
+
+        let eip1559 = TxEip1559 {
+            chain_id: 1,
+            nonce: 7,
+            gas_limit: 53_000,
+            max_fee_per_gas: 2,
+            max_priority_fee_per_gas: 1,
+            to: TxKind::Create,
+            value: U256::from(3),
+            access_list: Default::default(),
+            input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+        };
+        let request: TransactionRequest = eip1559.clone().into();
+        assert_eq!(request.to, Some(TxKind::Create));
+        assert_eq!(request.build_1559().unwrap(), eip1559);
     }
 }
