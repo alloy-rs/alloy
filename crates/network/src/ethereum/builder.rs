@@ -1,6 +1,6 @@
 use crate::{
     BuildResult, Ethereum, Network, NetworkTransactionBuilder, NetworkWallet, TransactionBuilder,
-    TransactionBuilder7702, TransactionBuilderError,
+    TransactionBuilderError,
 };
 use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
@@ -125,21 +125,7 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn can_build(&self) -> bool {
-        // value and data may be none. If they are, they will be set to default
-        // values.
-
-        // chain_id and from may be none.
-        let common = self.gas.is_some() && self.nonce.is_some();
-
-        let legacy = self.gas_price.is_some();
-        let eip2930 = legacy && self.access_list().is_some();
-
-        let eip1559 = self.max_fee_per_gas.is_some() && self.max_priority_fee_per_gas.is_some();
-
-        let eip4844 = eip1559 && self.sidecar.is_some() && self.to.is_some();
-
-        let eip7702 = eip1559 && self.authorization_list().is_some();
-        common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)
+        self.complete_preferred().is_ok()
     }
 
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
@@ -191,8 +177,8 @@ mod tests {
         TransactionBuilder7702, TransactionBuilderError,
     };
     use alloy_consensus::{
-        transaction::Recovered, BlobTransactionSidecar, SignableTransaction, TxEip1559, TxEnvelope,
-        TxType, TypedTransaction,
+        transaction::Recovered, BlobTransactionSidecar, SignableTransaction, TxEip1559, TxEip2930,
+        TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
     };
     use alloy_eips::eip7702::Authorization;
     use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U160, U256};
@@ -212,6 +198,128 @@ mod tests {
         };
         let tx_req: TransactionRequest = tx.into();
         tx_req.build_unsigned().unwrap();
+    }
+
+    #[test]
+    fn creation_requests_are_buildable() {
+        let requests: [(TxType, TransactionRequest); 3] = [
+            (
+                TxType::Legacy,
+                TxLegacy {
+                    chain_id: Some(1),
+                    nonce: 7,
+                    gas_price: 2,
+                    gas_limit: 53_000,
+                    to: TxKind::Create,
+                    value: U256::from(3),
+                    input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+                }
+                .into(),
+            ),
+            (
+                TxType::Eip2930,
+                TxEip2930 {
+                    chain_id: 1,
+                    nonce: 7,
+                    gas_price: 2,
+                    gas_limit: 53_000,
+                    to: TxKind::Create,
+                    value: U256::from(3),
+                    access_list: Default::default(),
+                    input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+                }
+                .into(),
+            ),
+            (
+                TxType::Eip1559,
+                TxEip1559 {
+                    chain_id: 1,
+                    nonce: 7,
+                    gas_limit: 53_000,
+                    max_fee_per_gas: 2,
+                    max_priority_fee_per_gas: 1,
+                    to: TxKind::Create,
+                    value: U256::from(3),
+                    access_list: Default::default(),
+                    input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+                }
+                .into(),
+            ),
+        ];
+
+        for (tx_type, request) in requests {
+            assert_eq!(request.to, Some(TxKind::Create));
+            assert_eq!(request.output_tx_type(), tx_type);
+            assert!(request.can_build());
+            assert!(request.complete_preferred().is_ok());
+            assert_eq!(request.build_unsigned().unwrap().ty(), tx_type as u8);
+        }
+    }
+
+    #[test]
+    fn can_build_requires_preferred_type_completeness() {
+        let requests: [(TxType, TransactionRequest); 5] = [
+            (
+                TxType::Legacy,
+                TransactionRequest {
+                    nonce: Some(0),
+                    gas: Some(21_000),
+                    gas_price: Some(1),
+                    ..Default::default()
+                },
+            ),
+            (
+                TxType::Eip2930,
+                TransactionRequest {
+                    nonce: Some(0),
+                    gas: Some(21_000),
+                    gas_price: Some(1),
+                    access_list: Some(Default::default()),
+                    ..Default::default()
+                },
+            ),
+            (
+                TxType::Eip1559,
+                TransactionRequest {
+                    nonce: Some(0),
+                    gas: Some(21_000),
+                    max_fee_per_gas: Some(1),
+                    max_priority_fee_per_gas: Some(1),
+                    ..Default::default()
+                },
+            ),
+            (
+                TxType::Eip4844,
+                TransactionRequest {
+                    to: Some(TxKind::Call(Address::ZERO)),
+                    nonce: Some(0),
+                    gas: Some(21_000),
+                    max_fee_per_gas: Some(1),
+                    max_priority_fee_per_gas: Some(1),
+                    blob_versioned_hashes: Some(vec![]),
+                    ..Default::default()
+                },
+            ),
+            (
+                TxType::Eip7702,
+                TransactionRequest {
+                    to: Some(TxKind::Create),
+                    nonce: Some(0),
+                    gas: Some(21_000),
+                    max_fee_per_gas: Some(1),
+                    max_priority_fee_per_gas: Some(1),
+                    authorization_list: Some(vec![]),
+                    ..Default::default()
+                },
+            ),
+        ];
+
+        for (tx_type, request) in requests {
+            assert_eq!(request.output_tx_type(), tx_type);
+            assert!(request.complete_preferred().is_err());
+            assert!(!request.can_build());
+            assert!(request.build_unsigned().is_err());
+        }
     }
 
     #[test]

@@ -2363,6 +2363,14 @@ mod tests {
         assert_eq!(request.to, Some(TxKind::Create));
         assert_eq!(request.build_legacy().unwrap(), legacy);
 
+        let request: TransactionRequest = TypedTransaction::Legacy(legacy.clone()).into();
+        assert_eq!(request.to, Some(TxKind::Create));
+
+        let envelope =
+            TxEnvelope::Legacy(legacy.into_signed(Signature::new(U256::ZERO, U256::ZERO, false)));
+        let request: TransactionRequest = envelope.into();
+        assert_eq!(request.to, Some(TxKind::Create));
+
         let eip2930 = TxEip2930 {
             chain_id: 1,
             nonce: 7,
@@ -2391,5 +2399,13 @@ mod tests {
         let request: TransactionRequest = eip1559.clone().into();
         assert_eq!(request.to, Some(TxKind::Create));
         assert_eq!(request.build_1559().unwrap(), eip1559);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn creation_request_serializes_explicit_null_to() {
+        let value = serde_json::to_value(TransactionRequest::default().create()).unwrap();
+
+        assert_eq!(value.get("to"), Some(&serde_json::Value::Null));
     }
 }
