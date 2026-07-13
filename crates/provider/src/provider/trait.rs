@@ -1353,7 +1353,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// # Examples
     ///
-    /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
+    /// See [`PendingTransactionBuilder`] for more examples.
     ///
     /// ```no_run
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
