@@ -4,7 +4,6 @@ use alloy_primitives::{address, Address};
 use alloy_signer_tempo::{
     tempo_signer_from_env, TempoSignerError, ENV_ACCESS_KEY, ENV_PRIVATE_KEY, ENV_ROOT_ACCOUNT,
 };
-use serial_test::serial;
 use std::ffi::OsString;
 
 const KEY1_HEX: &str = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
@@ -49,14 +48,12 @@ impl Drop for EnvGuard {
 
 const ALL: &[&str] = &[ENV_PRIVATE_KEY, ENV_ACCESS_KEY, ENV_ROOT_ACCOUNT];
 
-#[serial]
 #[test]
 fn no_env_returns_none() {
     let _g = EnvGuard::new(ALL);
     assert!(tempo_signer_from_env().unwrap().is_none());
 }
 
-#[serial]
 #[test]
 fn private_key_env_returns_direct() {
     let _g = EnvGuard::new(ALL);
@@ -67,7 +64,6 @@ fn private_key_env_returns_direct() {
     assert_eq!(lookup.signer().address(), key1_addr());
 }
 
-#[serial]
 #[test]
 fn access_key_with_root_returns_keychain() {
     let _g = EnvGuard::new(ALL);
@@ -87,7 +83,6 @@ fn access_key_with_root_returns_keychain() {
     assert_eq!(lookup.from_address(), root_addr());
 }
 
-#[serial]
 #[test]
 fn access_key_without_root_returns_direct() {
     let _g = EnvGuard::new(ALL);
@@ -98,7 +93,6 @@ fn access_key_without_root_returns_direct() {
     assert_eq!(lookup.signer().address(), key2_addr());
 }
 
-#[serial]
 #[test]
 fn access_key_with_root_equal_to_signer_returns_direct() {
     let _g = EnvGuard::new(ALL);
@@ -109,7 +103,6 @@ fn access_key_with_root_equal_to_signer_returns_direct() {
     assert!(lookup.is_direct());
 }
 
-#[serial]
 #[test]
 fn access_key_takes_precedence_over_private_key() {
     let _g = EnvGuard::new(ALL);
@@ -121,7 +114,6 @@ fn access_key_takes_precedence_over_private_key() {
     assert_eq!(lookup.signer().address(), key2_addr());
 }
 
-#[serial]
 #[test]
 fn bad_hex_in_private_key_env() {
     let _g = EnvGuard::new(ALL);
@@ -134,7 +126,6 @@ fn bad_hex_in_private_key_env() {
     ));
 }
 
-#[serial]
 #[test]
 fn bad_hex_in_access_key_env() {
     let _g = EnvGuard::new(ALL);
@@ -147,7 +138,6 @@ fn bad_hex_in_access_key_env() {
     ));
 }
 
-#[serial]
 #[test]
 fn bad_address_in_root_account_env() {
     let _g = EnvGuard::new(ALL);
@@ -161,7 +151,6 @@ fn bad_address_in_root_account_env() {
     ));
 }
 
-#[serial]
 #[test]
 fn whitespace_in_env_is_trimmed() {
     let _g = EnvGuard::new(ALL);
