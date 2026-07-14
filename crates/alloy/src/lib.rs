@@ -77,6 +77,11 @@ pub use alloy_contract as contract;
 #[doc(inline)]
 pub use alloy_consensus as consensus;
 
+/// Sign-In with Ethereum (EIP-4361) message construction, parsing, and verification.
+#[cfg(feature = "eip4361")]
+#[doc(inline)]
+pub use alloy_eip4361 as eip4361;
+
 /// Ethereum Improvement Proposal (EIP) implementations.
 #[cfg(feature = "eips")]
 #[doc(inline)]
