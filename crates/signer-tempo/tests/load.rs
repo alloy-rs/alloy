@@ -69,8 +69,8 @@ fn load_completely_invalid_toml_errors() {
     assert!(matches!(err, TempoSignerError::BadToml { .. }));
 }
 
-#[test]
 #[serial]
+#[test]
 fn default_keys_path_uses_tempo_home_when_set() {
     let prev = std::env::var_os("TEMPO_HOME");
     std::env::set_var("TEMPO_HOME", "/custom/tempo/dir");
@@ -79,8 +79,8 @@ fn default_keys_path_uses_tempo_home_when_set() {
     restore_env("TEMPO_HOME", prev);
 }
 
-#[test]
 #[serial]
+#[test]
 fn default_keys_path_falls_back_to_home_dir() {
     let prev = std::env::var_os("TEMPO_HOME");
     std::env::remove_var("TEMPO_HOME");
