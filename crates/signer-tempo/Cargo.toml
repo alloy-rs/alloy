@@ -34,5 +34,4 @@ toml = { version = "0.8", default-features = false, features = ["parse"] }
 dirs = "5"
 
 [dev-dependencies]
-serial_test.workspace = true
 tempfile.workspace = true
