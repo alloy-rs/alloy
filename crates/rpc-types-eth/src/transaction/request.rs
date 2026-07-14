@@ -26,7 +26,10 @@ pub struct TransactionRequest {
     /// The address of the transaction author.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub from: Option<Address>,
-    /// The destination address of the transaction.
+    /// The transaction destination.
+    ///
+    /// A call uses [`TxKind::Call`], contract creation uses [`TxKind::Create`], and `None` means
+    /// the destination is not yet set.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub to: Option<TxKind>,
     /// The legacy gas price.
