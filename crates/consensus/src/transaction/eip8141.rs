@@ -222,6 +222,11 @@ impl TxEip8141 {
         count_frame_data_tokens(&encoded)
     }
 
+    /// Returns the encoded byte length of the signature and frame lists.
+    pub fn frame_calldata_encoded_len(&self) -> u64 {
+        (self.signatures.length() as u64).saturating_add(self.frames.length() as u64)
+    }
+
     /// Calculates the frame transaction gas limit with the provided calldata token gas cost.
     pub fn calculate_gas_limit_with_token_cost(&self, data_token_cost: u64) -> u64 {
         FRAME_TX_INTRINSIC_COST
@@ -238,8 +243,12 @@ impl TxEip8141 {
 
     /// Calculates the calldata floor gas for this frame transaction.
     pub fn calculate_calldata_floor(&self) -> u64 {
+        // EIP-7976 prices every encoded byte as four standard tokens at the floor; unlike the
+        // ordinary intrinsic cost, zero bytes receive no discount here.
         FRAME_TX_INTRINSIC_COST.saturating_add(
-            self.frame_calldata_tokens().saturating_mul(FRAME_TX_DATA_TOKEN_FLOOR_COST),
+            self.frame_calldata_encoded_len()
+                .saturating_mul(FRAME_TX_DATA_TOKEN_STANDARD_COST)
+                .saturating_mul(FRAME_TX_DATA_TOKEN_FLOOR_COST),
         )
     }
 
@@ -648,6 +657,7 @@ mod tests {
         tx.signatures.encode(&mut encoded);
         tx.frames.encode(&mut encoded);
         let calldata_tokens = count_frame_data_tokens(&encoded);
+        let encoded_len = encoded.len() as u64;
         let expected = FRAME_TX_INTRINSIC_COST
             + 2 * FRAME_TX_PER_FRAME_COST
             + calldata_tokens * FRAME_TX_DATA_TOKEN_STANDARD_COST
@@ -657,7 +667,13 @@ mod tests {
         assert_eq!(tx.total_frame_gas_limit(), 30);
         assert_eq!(tx.signature_verification_gas(), 2_800);
         assert_eq!(tx.frame_calldata_tokens(), calldata_tokens);
+        assert_eq!(tx.frame_calldata_encoded_len(), encoded_len);
         assert_eq!(tx.calculate_gas_limit(), expected);
         assert_eq!(tx.gas_limit(), expected);
+        assert_eq!(
+            tx.calculate_calldata_floor(),
+            FRAME_TX_INTRINSIC_COST
+                + encoded_len * FRAME_TX_DATA_TOKEN_STANDARD_COST * FRAME_TX_DATA_TOKEN_FLOOR_COST
+        );
     }
 }
