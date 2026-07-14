@@ -1,7 +1,6 @@
 //! Loading and parsing tests for `TempoKeystore`.
 
 use alloy_signer_tempo::{default_keys_path, TempoKeystore, TempoSignerError};
-use serial_test::serial;
 use std::{fs, path::PathBuf};
 
 const FIXTURE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
@@ -69,7 +68,6 @@ fn load_completely_invalid_toml_errors() {
     assert!(matches!(err, TempoSignerError::BadToml { .. }));
 }
 
-#[serial]
 #[test]
 fn default_keys_path_uses_tempo_home_when_set() {
     let prev = std::env::var_os("TEMPO_HOME");
@@ -79,7 +77,6 @@ fn default_keys_path_uses_tempo_home_when_set() {
     restore_env("TEMPO_HOME", prev);
 }
 
-#[serial]
 #[test]
 fn default_keys_path_falls_back_to_home_dir() {
     let prev = std::env::var_os("TEMPO_HOME");
