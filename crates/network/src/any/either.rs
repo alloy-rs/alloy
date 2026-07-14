@@ -257,13 +257,7 @@ impl From<Signed<AnyTypedTransaction>> for AnyTxEnvelope {
         let sig = *value.signature();
         let tx = value.strip_signature();
         match tx {
-            AnyTypedTransaction::Ethereum(typed_tx) => Self::Ethereum(match typed_tx {
-                TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(tx.into_signed(sig)),
-                TypedTransaction::Eip2930(tx) => TxEnvelope::Eip2930(tx.into_signed(sig)),
-                TypedTransaction::Eip1559(tx) => TxEnvelope::Eip1559(tx.into_signed(sig)),
-                TypedTransaction::Eip4844(tx) => TxEnvelope::Eip4844(tx.into_signed(sig)),
-                TypedTransaction::Eip7702(tx) => TxEnvelope::Eip7702(tx.into_signed(sig)),
-            }),
+            AnyTypedTransaction::Ethereum(typed_tx) => Self::Ethereum(typed_tx.into_envelope(sig)),
             AnyTypedTransaction::Unknown(unknown_tx) => {
                 panic_unknown_transaction_signing(unknown_tx.ty())
             }
@@ -671,6 +665,20 @@ mod tests {
         .unwrap();
 
         let _: AnyTxEnvelope = tx.into_signed(sig).into();
+    }
+
+    #[test]
+    fn signed_eip8141_transaction_converts_to_sealed_envelope() {
+        let tx = AnyTypedTransaction::Ethereum(TypedTransaction::Eip8141(
+            alloy_consensus::TxEip8141::default(),
+        ));
+        let sig = Signature::from_str(
+            "48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b",
+        )
+        .unwrap();
+
+        let envelope: AnyTxEnvelope = tx.into_signed(sig).into();
+        assert!(matches!(envelope, AnyTxEnvelope::Ethereum(TxEnvelope::Eip8141(_))));
     }
 
     #[test]
