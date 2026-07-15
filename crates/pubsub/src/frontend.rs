@@ -1,4 +1,4 @@
-use crate::{ix::PubSubInstruction, managers::InFlight, RawSubscription};
+use crate::{ix::PubSubInstruction, managers::InFlight, RawSubscription, UnsubscribeOutcome};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, SerializedRequest};
 use alloy_primitives::B256;
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut, TransportResult};
@@ -49,11 +49,26 @@ impl PubSubFrontend {
         }
     }
 
-    /// Unsubscribe from a subscription.
+    /// Force-unsubscribe a subscription, closing all local receivers sharing its key.
     pub fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.tx
             .send(PubSubInstruction::Unsubscribe(id))
             .map_err(|_| TransportErrorKind::backend_gone())
+    }
+
+    /// Unsubscribe and wait until the server confirms cleanup or the owning connection closes.
+    pub fn unsubscribe_and_wait(
+        &self,
+        id: B256,
+    ) -> impl Future<Output = TransportResult<UnsubscribeOutcome>> + Send + 'static {
+        let backend_tx = self.tx.clone();
+        async move {
+            let (tx, rx) = oneshot::channel();
+            backend_tx
+                .send(PubSubInstruction::UnsubscribeAndWait(id, tx))
+                .map_err(|_| TransportErrorKind::backend_gone())?;
+            rx.await.map_err(|_| TransportErrorKind::backend_gone())?
+        }
     }
 
     /// Send a request.
@@ -104,9 +119,9 @@ impl PubSubFrontend {
     /// Set the channel size. This is the number of items to buffer in new
     /// subscription channels. Defaults to 16. See
     /// [`tokio::sync::broadcast`] for a description of relevant
-    /// behavior.
+    /// behavior. A zero capacity is rejected as a local usage error when a
+    /// subscription request is sent.
     pub fn set_channel_size(&self, channel_size: usize) {
-        debug_assert_ne!(channel_size, 0, "channel size must be non-zero");
         self.channel_size.store(channel_size, Ordering::Relaxed);
     }
 }

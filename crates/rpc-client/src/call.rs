@@ -216,6 +216,9 @@ where
     /// Set the request to be a non-standard subscription (i.e. not
     /// "eth_subscribe").
     ///
+    /// Call [`Self::set_unsubscribe_method`] as well when the custom protocol exposes a cleanup
+    /// RPC. Otherwise the subscription can only be reclaimed when its connection closes.
+    ///
     /// # Panics
     ///
     /// Panics if called after the request has been sent.
@@ -226,6 +229,30 @@ where
     /// Set the subscription status of the request.
     pub fn set_subscription_status(&mut self, status: bool) {
         self.request_mut().meta.set_subscription_status(status);
+    }
+
+    /// Set the server-side method used to unsubscribe a non-standard subscription.
+    ///
+    /// This configuration is consumed by pubsub transports and is not serialized onto the wire.
+    #[cfg(feature = "pubsub")]
+    pub fn set_unsubscribe_method(&mut self, method: impl Into<std::borrow::Cow<'static, str>>) {
+        self.request_mut()
+            .meta
+            .extensions_mut()
+            .get_or_insert_default::<alloy_pubsub::SubscriptionOptions>()
+            .set_unsubscribe_method(method);
+    }
+
+    /// Set the local broadcast channel capacity for this subscription request.
+    ///
+    /// This configuration is consumed by pubsub transports and is not serialized onto the wire.
+    #[cfg(feature = "pubsub")]
+    pub fn set_subscription_channel_size(&mut self, channel_size: usize) {
+        self.request_mut()
+            .meta
+            .extensions_mut()
+            .get_or_insert_default::<alloy_pubsub::SubscriptionOptions>()
+            .set_channel_size(channel_size);
     }
 
     /// Get a mutable reference to the params of the request.

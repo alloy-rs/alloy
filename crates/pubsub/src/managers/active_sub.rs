@@ -3,17 +3,21 @@ use alloy_json_rpc::SerializedRequest;
 use alloy_primitives::B256;
 use parking_lot::Mutex;
 use serde_json::value::RawValue;
-use std::{fmt, hash::Hash, ops::DerefMut};
+use std::{borrow::Cow, fmt, ops::DerefMut};
 use tokio::sync::broadcast;
 
 /// An active subscription.
 pub(crate) struct ActiveSubscription {
-    /// Cached hash of the request, used for sorting and equality.
+    /// Subscription identity and public alias.
     pub(crate) local_id: B256,
     /// The serialized subscription request.
     pub(crate) request: SerializedRequest,
     /// The channel via which notifications are broadcast.
     pub(crate) tx: broadcast::Sender<Box<RawValue>>,
+    /// The configured channel capacity.
+    pub(crate) channel_size: usize,
+    /// The server-side cleanup method.
+    pub(crate) unsubscribe_method: Option<Cow<'static, str>>,
     /// The initial channel via which notifications are received.
     ///
     /// This is stored so that we don't drop any notifications between initializing
@@ -24,39 +28,13 @@ pub(crate) struct ActiveSubscription {
     pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
 }
 
-// NB: We implement this to prevent any incorrect future implementations.
-// See: https://doc.rust-lang.org/std/hash/trait.Hash.html#hash-and-eq
-impl Hash for ActiveSubscription {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.local_id.hash(state);
-    }
-}
-
-impl PartialEq for ActiveSubscription {
-    fn eq(&self, other: &Self) -> bool {
-        self.local_id == other.local_id
-    }
-}
-
-impl Eq for ActiveSubscription {}
-
-impl PartialOrd for ActiveSubscription {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for ActiveSubscription {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.local_id.cmp(&other.local_id)
-    }
-}
-
 impl fmt::Debug for ActiveSubscription {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ActiveSubscription")
             .field("local_id", &self.local_id)
             .field("request", &self.request)
+            .field("channel_size", &self.channel_size)
+            .field("unsubscribe_method", &self.unsubscribe_method)
             .field("subscribers", &self.tx.receiver_count())
             .finish()
     }
@@ -64,10 +42,14 @@ impl fmt::Debug for ActiveSubscription {
 
 impl ActiveSubscription {
     /// Create a new active subscription.
-    pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
-        let local_id = request.params_hash();
+    pub(crate) fn new(
+        local_id: B256,
+        request: SerializedRequest,
+        channel_size: usize,
+        unsubscribe_method: Option<Cow<'static, str>>,
+    ) -> Self {
         let (tx, rx) = broadcast::channel(channel_size);
-        Self { request, local_id, tx, rx: Mutex::new(Some(rx)) }
+        Self { request, local_id, tx, channel_size, unsubscribe_method, rx: Mutex::new(Some(rx)) }
     }
 
     /// Serialize the request as a boxed [`RawValue`].
