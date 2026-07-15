@@ -1,6 +1,7 @@
+use crate::SubscriptionOptions;
 use alloy_json_rpc::{Response, ResponsePayload, SerializedRequest, SubId};
 use alloy_transport::{TransportError, TransportResult};
-use std::fmt;
+use std::{borrow::Cow, fmt};
 use tokio::sync::oneshot;
 
 /// An in-flight JSON-RPC request.
@@ -14,6 +15,9 @@ pub struct InFlight {
     /// The number of items to buffer in the subscription channel.
     pub channel_size: usize,
 
+    /// The method used to remove the server-side subscription.
+    pub(crate) unsubscribe_method: Option<Cow<'static, str>>,
+
     /// The channel to send the response on.
     pub tx: oneshot::Sender<TransportResult<Response>>,
 }
@@ -23,6 +27,7 @@ impl fmt::Debug for InFlight {
         f.debug_struct("InFlight")
             .field("request", &self.request)
             .field("channel_size", &self.channel_size)
+            .field("unsubscribe_method", &self.unsubscribe_method)
             .field("tx_is_closed", &self.tx.is_closed())
             .finish()
     }
@@ -32,11 +37,15 @@ impl InFlight {
     /// Create a new in-flight request.
     pub fn new(
         request: SerializedRequest,
-        channel_size: usize,
+        default_channel_size: usize,
     ) -> (Self, oneshot::Receiver<TransportResult<Response>>) {
         let (tx, rx) = oneshot::channel();
+        let options = request.meta().extensions().get::<SubscriptionOptions>();
+        let channel_size =
+            options.and_then(SubscriptionOptions::channel_size).unwrap_or(default_channel_size);
+        let unsubscribe_method = options.and_then(SubscriptionOptions::unsubscribe_method_owned);
 
-        (Self { request, channel_size, tx }, rx)
+        (Self { request, channel_size, unsubscribe_method, tx }, rx)
     }
 
     /// Check if the request is a subscription.

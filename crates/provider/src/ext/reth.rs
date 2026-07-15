@@ -70,6 +70,7 @@ where
         &self,
     ) -> GetSubscription<alloy_rpc_client::NoParams, serde_json::Value> {
         self.subscribe_to("reth_subscribeChainNotifications")
+            .unsubscribe_method("reth_unsubscribeChainNotifications")
     }
 
     #[cfg(feature = "pubsub")]
@@ -77,5 +78,6 @@ where
         &self,
     ) -> GetSubscription<alloy_rpc_client::NoParams, serde_json::Value> {
         self.subscribe_to("reth_subscribePersistedBlock")
+            .unsubscribe_method("reth_unsubscribePersistedBlock")
     }
 }

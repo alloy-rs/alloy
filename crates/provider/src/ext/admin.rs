@@ -76,7 +76,7 @@ where
     fn subscribe_peer_events(
         &self,
     ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent> {
-        self.subscribe_to("admin_peerEvents")
+        self.subscribe_to("admin_peerEvents").unsubscribe_method("admin_unsubscribe")
     }
 }
 

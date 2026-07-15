@@ -23,7 +23,7 @@ The PubSub system here consists of 3 logical parts:
 - The **backend** is an actively running connection to the server. Users
   should NEVER instantiate a backend directly. Instead, they should use
   [`PubSubConnect::into_service`] for some connection object. Backends
-  are responsible for managing the connection to the server, accepting user
+  are responsible for managing the connection to the server,accepting user
   requests from the **service** and forwarding server responses to the
   **service**.
 
@@ -53,8 +53,9 @@ This crate provides the following:
   into the expected type, and allows the user to accept or discard unexpected
   responses.
 - [`SubscriptionItem`]: An item in a typed [`Subscription`]. This type is
-  yielded by the subscription via the `recv_any()` API. It contains the
-  deserialized item, or the raw JSON value if deserialization fails.
+  yielded by the subscription via the `recv_any()` API a notification is
+  received and contains the deserialized item. If deserialization fails, it
+  contains the raw JSON value.
 
 ## On Handling Subscriptions
 
@@ -62,44 +63,29 @@ For a normal request, the user sends a request to the **frontend**, and
 later receives a response via a tokio oneshot channel. This is straightforward
 and easy to reason about. Subscriptions, however, are side-effects of other
 requests, and are long-lived. They are managed by the **service** and
-identified locally by a `B256`. This value is a params-derived alias: it is the
-Keccak-256 hash of the serialized parameters and does not include the method.
-Requests with identical parameters therefore share an alias, including custom
-subscription methods with different names. The service uses this ID to manage
-the subscription lifecycle and dispatch notifications to receivers.
+identified by a local `B256` id. The **service** uses this id to manage the
+subscription lifecycle, and to dispatch notifications to the correct
+subscribers.
 
 ### Server & Local IDs
 
 When a user issues a subscription request, the **frontend** sends a
 subscription request to the **service**. The **service** dispatches it to the
 RPC server via the **backend**. The **service** then intercepts the RPC server
-response containing the server ID and assigns a stable `B256` `local_id` to
-the subscription. Server IDs are represented by [`alloy_json_rpc::SubId`] and
-may be numeric or strings. The `local_id` identifies the subscription in the
-**service** and consumer tasks, while the current `server_id` associates
-notifications with the server-side subscription.
+response containing the server id, and assigns a `local_id` to the subscription.
+This `local_id` is used to identify the subscription in the **service** and in
+tasks consuming the subscription, while the `server_id` is used to identify the
+subscription to the RPC server, and to associate notifications with specific
+active subscriptions.
 
-This allows the service to keep the consumer-facing `local_id` stable while the
-server ID changes across reconnections.
+This allows us to use long-lived `local_id` values to manage subscriptions over
+multiple reconnections, without having to notify frontend users of the ID change
+when the server connection is lost. It also prevents race conditions when
+unsubscribing during or immediately after a reconnection.
 
-### Reconnection, replay, and cancellation
-
-After a retryable established-backend failure, the service attempts reconnection under its
-configured retry policy; non-retryable failures terminate it immediately. Following a successful
-reconnect, it re-sends every
-request still awaiting a response and re-creates active subscriptions. If the
-server processed a request but its response was lost, that request may execute
-more than once. Do not rely on at-most-once execution for non-idempotent methods.
-
-Dropping a request future stops waiting locally, but does not cancel a request
-already accepted by the service. Likewise, dropping a [`RawSubscription`] or
-[`Subscription`] only drops that receiver; it does not send
-`eth_unsubscribe`. Call [`PubSubFrontend::unsubscribe`] with the local ID when
-the server-side subscription is no longer needed. `unsubscribe` only queues
-the instruction and does not wait for the server's response. It is best effort:
-an unsubscribe processed while reconnection is re-creating the subscription can
-race with the replacement response, so it is not confirmation of server-side
-teardown.
+The local ID is derived from the complete subscription method and exact serialized params. Calls
+with the same method and params share one server subscription and receive independent local
+broadcast receivers. Calls with different methods never alias merely because their params match.
 
 ### What is a subscription request?
 
@@ -111,9 +97,22 @@ on unknown methods, the `Request`, `SerializedRequest` and `RpcCall` expose
 `set_is_subscription()`, which can be used to mark any given request as a
 subscription.
 
-When marking a request as a subscription, the **service** will intercept the
-RPC response, which must deserialize as an [`alloy_json_rpc::SubId`] (a numeric
-or string ID). Other response types will fail deserialization.
+When marking a request as a subscription, also configure the matching cleanup RPC with
+`RpcCall::set_unsubscribe_method()` when the protocol provides one. Custom subscription protocols
+do not share a universal naming convention, so the service does not guess or fall back to
+`eth_unsubscribe`. A custom subscription without a configured cleanup method can only be reclaimed
+when its connection closes.
+
+The **service** intercepts the RPC response, which must contain a numeric or string subscription
+ID. Other response types will not function as subscriptions.
+
+The service reserves string request IDs beginning with `alloy-pubsub:` for resubscribe and cleanup
+traffic. Manually constructed requests must not use that prefix.
+
+`PubSubFrontend::unsubscribe()` retains its enqueue-only behavior. Use
+`PubSubFrontend::unsubscribe_and_wait()` when the caller needs to observe server confirmation,
+server-reported absence, an RPC error, or connection-level cleanup. Both methods are force
+operations: they close all local receivers sharing the same method and params.
 
 ### Subscription Lifecycle
 
@@ -134,8 +133,8 @@ Subscription Request Lifecycle:
 1. The user issues a subscription request to the **frontend**.
 1. The **frontend** sends the request to the **service**, with a oneshot channel
    to receive the response.
-1. The **service** stores the oneshot channel in its `RequestManager`.
-1. The **service** sends the request to the **backend**.
+1. The **service** joins the request to an existing matching single-flight, or creates one and sends
+   a single request to the **backend**.
 1. The **backend** sends the request to the RPC server.
 1. The RPC server responds with a numeric or string `server_id`.
 1. The **backend** sends the response to the **service**.
@@ -143,13 +142,12 @@ Subscription Request Lifecycle:
    subscription broadcast channel, and stores the relevant information in its
    `SubscriptionManager`.
 1. The **service** overwrites the JSON RPC response with the `local_id`.
-1. The **service** sends the response to the waiting task via the oneshot.
+1. The **service** sends a response with each waiter's original JSON-RPC request ID via its oneshot.
 
 Subscription Notification Lifecycle
 
 1. The RPC server sends a notification to the **backend**.
 1. The **backend** sends the notification to the **service**.
-1. The **service** maps the notification's `server_id` to its stable
-   `local_id`.
+1. The **service** looks up the `local_id` in its `SubscriptionManager`.
 1. If present, the **service** sends the notification to the relevant channel.
    1. Otherwise, the **service** ignores the notification.

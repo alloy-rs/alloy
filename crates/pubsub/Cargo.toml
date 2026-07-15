@@ -28,7 +28,6 @@ alloy-primitives.workspace = true
 alloy-transport.workspace = true
 
 auto_impl.workspace = true
-bimap.workspace = true
 futures.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
