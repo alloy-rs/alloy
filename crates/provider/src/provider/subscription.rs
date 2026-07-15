@@ -3,6 +3,7 @@ use alloy_primitives::B256;
 use alloy_pubsub::Subscription;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_transport::{TransportErrorKind, TransportResult};
+use std::borrow::Cow;
 
 /// A general-purpose subscription request builder
 ///
@@ -34,6 +35,12 @@ where
         self.channel_size = Some(size);
         self
     }
+
+    /// Set the RPC method used to remove the server-side subscription.
+    pub fn unsubscribe_method(mut self, method: impl Into<Cow<'static, str>>) -> Self {
+        self.call.set_unsubscribe_method(method);
+        self
+    }
 }
 
 impl<P, R> core::fmt::Debug for GetSubscription<P, R>
@@ -57,7 +64,7 @@ where
     type Output = TransportResult<alloy_pubsub::Subscription<R>>;
     type IntoFuture = futures_utils_wasm::BoxFuture<'static, Self::Output>;
 
-    fn into_future(self) -> Self::IntoFuture {
+    fn into_future(mut self) -> Self::IntoFuture {
         Box::pin(async move {
             let client = self
                 .client
@@ -65,9 +72,13 @@ where
                 .ok_or_else(|| TransportErrorKind::custom_str("client dropped"))?;
             let pubsub = client.pubsub_frontend().ok_or(TransportErrorKind::PubsubUnavailable)?;
 
-            // Set config channel size if any
             if let Some(size) = self.channel_size {
-                pubsub.set_channel_size(size);
+                if size == 0 {
+                    return Err(alloy_json_rpc::RpcError::local_usage_str(
+                        "subscription channel size must be non-zero",
+                    ));
+                }
+                self.call.set_subscription_channel_size(size);
             }
 
             let id = self.call.await?;
