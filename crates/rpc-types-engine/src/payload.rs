@@ -3900,6 +3900,13 @@ impl From<PayloadStatus> for PayloadStatusV2 {
     }
 }
 
+/// The forkchoice-update variant of [`PayloadStatusV2`].
+///
+/// The Engine API restricts this response to `VALID`, `INVALID`, and `SYNCING`. Alloy keeps the
+/// existing shared [`PayloadStatusEnum`] representation and uses this alias rather than
+/// duplicating the payload status structure.
+pub type RestrictedPayloadStatusV2 = PayloadStatusV2;
+
 #[cfg(feature = "serde")]
 impl serde::Serialize for PayloadStatusV2 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

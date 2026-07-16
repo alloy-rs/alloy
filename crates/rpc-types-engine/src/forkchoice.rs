@@ -1,4 +1,4 @@
-use super::{PayloadStatus, PayloadStatusEnum, PayloadStatusV2};
+use super::{PayloadStatus, PayloadStatusEnum, PayloadStatusV2, RestrictedPayloadStatusV2};
 use crate::PayloadId;
 use alloy_primitives::B256;
 
@@ -125,7 +125,7 @@ pub struct ForkchoiceUpdated {
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ForkchoiceUpdatedResponseV2 {
     /// The EIP-7805 payload validation result.
-    pub payload_status: PayloadStatusV2,
+    pub payload_status: RestrictedPayloadStatusV2,
     /// The identifier of the payload build process that was successfully initiated.
     pub payload_id: Option<PayloadId>,
 }
