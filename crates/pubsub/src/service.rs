@@ -1,8 +1,9 @@
 use crate::{
     handle::ConnectionHandle,
     ix::PubSubInstruction,
-    managers::{InFlight, RequestManager, SubscriptionManager},
-    PubSubConnect, PubSubFrontend, RawSubscription, UnsubscribeOutcome,
+    managers::{ActiveSubscription, InFlight, RequestManager, SubscriptionManager},
+    PubSubConnect, PubSubFrontend, RawSubscription, SubscriptionRetentionPolicy,
+    UnsubscribeOutcome,
 };
 use alloy_json_rpc::{
     Id, PubSubItem, Request, Response, ResponsePayload, RpcError, SerializedRequest, SubId,
@@ -23,6 +24,7 @@ use wasmtimer::tokio::sleep;
 use tokio::time::sleep;
 
 const MAX_RECONNECT_RETRY_INTERVAL: Duration = Duration::from_secs(30);
+const SUBSCRIPTION_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
 
 type CleanupWaiter = oneshot::Sender<TransportResult<UnsubscribeOutcome>>;
 
@@ -184,7 +186,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         let starting_local_ids = self.starting.keys().copied().collect::<Vec<_>>();
         for local_id in starting_local_ids {
             let has_live_waiter = self.starting.get_mut(&local_id).is_some_and(|starting| {
-                starting.waiters.retain(|waiter| !waiter.tx.is_closed());
+                starting.waiters.retain(InFlight::is_live_subscription_waiter);
                 !starting.waiters.is_empty()
             });
             if !has_live_waiter {
@@ -211,6 +213,17 @@ impl<T: PubSubConnect> PubSubService<T> {
         // Drop all server IDs. We'll re-insert them as we get responses.
         self.subs.drop_server_ids();
         self.reconnecting.clear();
+
+        let unowned = self
+            .subs
+            .iter()
+            .filter(|(_, sub)| sub.should_auto_cleanup())
+            .map(|(_, sub)| sub.local_id)
+            .collect::<Vec<_>>();
+        for local_id in unowned {
+            debug!(?local_id, "dropping unowned subscription during reconnect");
+            self.subs.remove_sub(local_id);
+        }
 
         // Dispatch all subscription requests.
         let active = self
@@ -305,7 +318,7 @@ impl<T: PubSubConnect> PubSubService<T> {
             return Ok(());
         }
 
-        if in_flight.tx.is_closed() {
+        if !in_flight.is_live_subscription_waiter() {
             return Ok(());
         }
 
@@ -339,9 +352,26 @@ impl<T: PubSubConnect> PubSubService<T> {
                 in_flight.channel_size,
                 unsubscribe_method.as_deref(),
             );
-            return Self::send_subscription_alias(in_flight, active.local_id);
+            if active.should_auto_cleanup() {
+                let local_id = active.local_id;
+                self.cleanup_unowned_subscription(local_id)?;
+            } else {
+                let active = self.subs.get_mut(&local_id).expect("checked above");
+                let subscription = active.subscribe();
+                Self::deliver_subscription_waiter(active, in_flight, subscription)?;
+                return Ok(());
+            }
         }
 
+        self.start_subscription(local_id, in_flight, unsubscribe_method)
+    }
+
+    fn start_subscription(
+        &mut self,
+        local_id: B256,
+        in_flight: InFlight,
+        unsubscribe_method: Option<Cow<'static, str>>,
+    ) -> TransportResult<()> {
         let wire_request_id = in_flight.request.id().clone();
         let request = in_flight.request.clone();
         let message = request.serialized().to_owned();
@@ -401,20 +431,100 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
     }
 
-    fn send_subscription_alias(in_flight: InFlight, local_id: B256) -> TransportResult<()> {
-        let id = in_flight.request.id().clone();
-        let alias = to_json_raw_value(&local_id)?;
-        let _ = in_flight.tx.send(Ok(Response { id, payload: ResponsePayload::Success(alias) }));
+    fn deliver_subscription_waiter(
+        active: &mut ActiveSubscription,
+        in_flight: InFlight,
+        subscription: RawSubscription,
+    ) -> TransportResult<bool> {
+        if !in_flight.is_live_subscription_waiter() {
+            return Ok(false);
+        }
 
-        Ok(())
+        let id = in_flight.request.id().clone();
+        let retention_policy = in_flight.retention_policy;
+        let alias = to_json_raw_value(&active.local_id)?;
+        let response = Ok(Response { id, payload: ResponsePayload::Success(alias) });
+
+        let delivered = if let Some(ticket) = &in_flight.receiver_ticket {
+            let receiver_delivered = ticket.send(subscription).is_ok();
+            let response_delivered = in_flight.tx.send(response).is_ok();
+            receiver_delivered && response_delivered
+        } else if in_flight.tx.send(response).is_ok() {
+            active.push_manual_claim(subscription);
+            true
+        } else {
+            false
+        };
+
+        if delivered && retention_policy == SubscriptionRetentionPolicy::UntilExplicitUnsubscribe {
+            active.commit_persistent_hold();
+        }
+
+        Ok(delivered)
     }
 
     /// Service a GetSub instruction.
     ///
     /// If the subscription exists, the waiter is sent `Some` broadcast receiver. If
     /// the subscription does not exist, the waiter is sent `None`.
-    fn service_get_sub(&self, local_id: B256, tx: oneshot::Sender<Option<RawSubscription>>) {
-        let _ = tx.send(self.subs.get_subscription(local_id));
+    fn service_get_sub(
+        &mut self,
+        local_id: B256,
+        tx: oneshot::Sender<Option<RawSubscription>>,
+    ) -> TransportResult<()> {
+        let Some(active) = self.subs.get(&local_id) else {
+            let _ = tx.send(None);
+            return Ok(());
+        };
+        if active.should_auto_cleanup() {
+            self.cleanup_unowned_subscription(local_id)?;
+            let _ = tx.send(None);
+            return Ok(());
+        }
+
+        let active = self.subs.get_mut(&local_id).expect("checked above");
+        let (subscription, was_claim) = active
+            .pop_manual_claim()
+            .map_or_else(|| (active.subscribe(), false), |claim| (claim, true));
+        if let Err(Some(subscription)) = tx.send(Some(subscription)) {
+            if was_claim {
+                active.restore_manual_claim(subscription);
+            }
+        }
+        Ok(())
+    }
+
+    fn cleanup_unowned_subscription(&mut self, local_id: B256) -> TransportResult<()> {
+        let Some((subscription, server_id)) = self.subs.remove_sub(local_id) else { return Ok(()) };
+        debug_assert!(subscription.should_auto_cleanup());
+
+        if let Some(server_id) = server_id {
+            if let Some(unsubscribe_method) = subscription.unsubscribe_method {
+                return self.start_cleanup(server_id, unsubscribe_method, Vec::new());
+            }
+            warn!(
+                ?server_id,
+                "unowned subscription has no cleanup method; it will remain until connection close"
+            );
+            return Ok(());
+        }
+
+        self.reconnecting.remove(&subscription.local_id);
+        Ok(())
+    }
+
+    fn sweep_subscriptions(&mut self) -> TransportResult<()> {
+        let unowned = self
+            .subs
+            .iter()
+            .filter(|(_, subscription)| subscription.should_auto_cleanup())
+            .map(|(_, subscription)| subscription.local_id)
+            .collect::<Vec<_>>();
+        for local_id in unowned {
+            debug!(?local_id, "cleaning up subscription without local receivers");
+            self.cleanup_unowned_subscription(local_id)?;
+        }
+        Ok(())
     }
 
     /// Service an unsubscribe instruction.
@@ -466,10 +576,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         trace!(?ix, "servicing instruction");
         match ix {
             PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
-            PubSubInstruction::GetSub(alias, tx) => {
-                self.service_get_sub(alias, tx);
-                Ok(())
-            }
+            PubSubInstruction::GetSub(alias, tx) => self.service_get_sub(alias, tx),
             PubSubInstruction::Unsubscribe(alias) => self.service_unsubscribe(alias, None),
             PubSubInstruction::UnsubscribeAndWait(alias, tx) => {
                 self.service_unsubscribe(alias, Some(tx))
@@ -491,6 +598,13 @@ impl<T: PubSubConnect> PubSubService<T> {
                 }
             }
             PubSubItem::Notification(notification) => {
+                let local_id = self.subs.local_id_for(&notification.subscription);
+                if let Some(local_id) = local_id {
+                    if self.subs.get(&local_id).is_some_and(ActiveSubscription::should_auto_cleanup)
+                    {
+                        return self.cleanup_unowned_subscription(local_id);
+                    }
+                }
                 self.subs.notify(notification);
                 Ok(())
             }
@@ -533,7 +647,7 @@ impl<T: PubSubConnect> PubSubService<T> {
             .is_some_and(|starting| starting.wire_request_id == response_id);
         if is_expected_start {
             let mut starting = self.starting.remove(&local_id).expect("checked above");
-            starting.waiters.retain(|waiter| !waiter.tx.is_closed());
+            starting.waiters.retain(InFlight::is_live_subscription_waiter);
             if starting.waiters.is_empty() || self.subs.get(&local_id).is_some() {
                 return self.compensate_subscription(response_id, server_id, unsubscribe_method);
             }
@@ -547,30 +661,26 @@ impl<T: PubSubConnect> PubSubService<T> {
                 return Ok(());
             }
 
-            self.subs.insert(
+            let (mut active, initial_subscription) = ActiveSubscription::new(
                 local_id,
                 starting.request,
-                server_id.clone(),
                 starting.channel_size,
                 starting.unsubscribe_method,
             );
+            let mut initial_subscription = Some(initial_subscription);
             let mut delivered = false;
             for in_flight in starting.waiters {
-                let id = in_flight.request.id().clone();
-                let alias = to_json_raw_value(&local_id)?;
-                delivered |= in_flight
-                    .tx
-                    .send(Ok(Response { id, payload: ResponsePayload::Success(alias) }))
-                    .is_ok();
+                let subscription =
+                    initial_subscription.take().unwrap_or_else(|| active.subscribe());
+                delivered |=
+                    Self::deliver_subscription_waiter(&mut active, in_flight, subscription)?;
             }
-            if !delivered {
-                if let Some((subscription, _)) = self.subs.remove_sub(local_id) {
-                    if let Some(unsubscribe_method) = subscription.unsubscribe_method {
-                        self.start_cleanup(server_id, unsubscribe_method, Vec::new())?;
-                    } else {
-                        warn!(?server_id, "abandoned subscription has no cleanup method; it will remain until connection close");
-                    }
-                }
+            drop(initial_subscription);
+            if delivered {
+                self.subs.insert(active, server_id);
+            } else {
+                drop(active);
+                self.compensate_subscription(response_id, server_id, unsubscribe_method)?;
             }
             return Ok(());
         }
@@ -579,6 +689,10 @@ impl<T: PubSubConnect> PubSubService<T> {
             self.reconnecting.get(&local_id).is_some_and(|request_id| request_id == &response_id);
         if is_expected_reconnect {
             self.reconnecting.remove(&local_id);
+            if self.subs.get(&local_id).is_some_and(ActiveSubscription::should_auto_cleanup) {
+                self.subs.remove_sub(local_id);
+                return self.compensate_subscription(response_id, server_id, unsubscribe_method);
+            }
             if self.subs.set_server_id(&local_id, server_id.clone()) {
                 return Ok(());
             }
@@ -818,6 +932,8 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Spawn the service.
     pub(crate) fn spawn(mut self) {
         let fut = async move {
+            let sweep_timer = sleep(SUBSCRIPTION_SWEEP_INTERVAL);
+            tokio::pin!(sweep_timer);
             let result: TransportResult<()> = loop {
                 // We bias the loop so that we always handle new messages before
                 // reconnecting, and always reconnect before dispatching new
@@ -883,6 +999,22 @@ impl<T: PubSubConnect> PubSubService<T> {
                            break Ok(())
                         }
                     }
+
+                    _ = &mut sweep_timer => {
+                        sweep_timer.set(sleep(SUBSCRIPTION_SWEEP_INTERVAL));
+                        if let Err(err) = self.sweep_subscriptions() {
+                            if err
+                                .as_transport_err()
+                                .is_some_and(TransportErrorKind::is_backend_gone)
+                            {
+                                if let Err(e) = self.reconnect_with_retries().await {
+                                    break Err(e)
+                                }
+                            } else {
+                                break Err(err)
+                            }
+                        }
+                    }
                 }
             };
 
@@ -912,7 +1044,7 @@ fn reconnect_retry_interval(base_interval: Duration, retry_count: u32) -> Durati
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ConnectionInterface, SubscriptionOptions};
+    use crate::{ConnectionInterface, SubscriptionOptions, SubscriptionReceiverTicket};
     use alloy_json_rpc::{Request, SerializedRequest};
     use std::{
         sync::{
@@ -980,6 +1112,30 @@ mod tests {
         request
     }
 
+    fn with_retention(
+        mut request: SerializedRequest,
+        retention_policy: SubscriptionRetentionPolicy,
+    ) -> SerializedRequest {
+        request
+            .meta_mut()
+            .extensions_mut()
+            .get_or_insert_default::<SubscriptionOptions>()
+            .set_retention_policy(retention_policy);
+        request
+    }
+
+    fn typed_in_flight(
+        mut request: SerializedRequest,
+        retention_policy: SubscriptionRetentionPolicy,
+    ) -> (InFlight, oneshot::Receiver<TransportResult<Response>>, oneshot::Receiver<RawSubscription>)
+    {
+        request = with_retention(request, retention_policy);
+        let (ticket, subscription_rx) = SubscriptionReceiverTicket::channel();
+        request.meta_mut().extensions_mut().insert(ticket);
+        let (in_flight, response_rx) = InFlight::new(request, 16);
+        (in_flight, response_rx, subscription_rx)
+    }
+
     fn subscription_response(id: Id, server_id: &str) -> Response {
         Response {
             id,
@@ -991,6 +1147,14 @@ mod tests {
 
     fn bool_response(id: Id, value: bool) -> Response {
         Response { id, payload: ResponsePayload::Success(to_json_raw_value(&value).unwrap()) }
+    }
+
+    fn notification(server_id: &str, value: serde_json::Value) -> PubSubItem {
+        alloy_json_rpc::EthNotification {
+            subscription: SubId::String(server_id.to_owned()),
+            result: to_json_raw_value(&value).unwrap(),
+        }
+        .into()
     }
 
     fn take_wire(interface: &mut ConnectionInterface) -> serde_json::Value {
@@ -1026,6 +1190,31 @@ mod tests {
         service.handle_item(subscription_response(request_id.clone(), server_id).into()).unwrap();
         let response = rx.try_recv().unwrap().unwrap();
         alias_from_response(response, request_id)
+    }
+
+    fn activate_typed(
+        service: &mut PubSubService<MockConnect>,
+        interface: &mut ConnectionInterface,
+        request: SerializedRequest,
+        server_id: &str,
+        retention_policy: SubscriptionRetentionPolicy,
+    ) -> (B256, RawSubscription) {
+        let request_id = request.id().clone();
+        let (in_flight, mut response_rx, mut subscription_rx) =
+            typed_in_flight(request, retention_policy);
+        service.service_request(in_flight).unwrap();
+        let _ = take_wire(interface);
+        service.handle_item(subscription_response(request_id.clone(), server_id).into()).unwrap();
+        let alias = alias_from_response(response_rx.try_recv().unwrap().unwrap(), request_id);
+        let subscription = subscription_rx.try_recv().unwrap();
+        assert_eq!(&alias, subscription.local_id());
+        (alias, subscription)
+    }
+
+    fn get_subscription(service: &mut PubSubService<MockConnect>, alias: B256) -> RawSubscription {
+        let (tx, mut rx) = oneshot::channel();
+        service.service_get_sub(alias, tx).unwrap();
+        rx.try_recv().unwrap().expect("subscription should exist")
     }
 
     #[test]
@@ -1074,8 +1263,8 @@ mod tests {
         assert_eq!(first_alias, second_alias);
         assert_eq!(service.subs.len(), 1);
 
-        let first_local = service.subs.get_subscription(first_alias).unwrap();
-        let second_local = service.subs.get_subscription(second_alias).unwrap();
+        let first_local = get_subscription(&mut service, first_alias);
+        let second_local = get_subscription(&mut service, second_alias);
         assert_eq!(first_local.local_id, second_local.local_id);
 
         let (third, mut third_rx) = InFlight::new(eth_subscription(3, "newHeads"), 16);
@@ -1085,6 +1274,460 @@ mod tests {
             alias_from_response(third_rx.try_recv().unwrap().unwrap(), Id::Number(3)),
             first_alias
         );
+    }
+
+    #[test]
+    fn typed_ticket_owns_the_initial_receiver_before_the_next_notification() {
+        let (mut service, mut interface) = test_service();
+        let request = eth_subscription(1, "newHeads");
+        let local_id = subscription_local_id(&request);
+        let (in_flight, mut response_rx, mut subscription_rx) =
+            typed_in_flight(request, SubscriptionRetentionPolicy::WhileReceivers);
+        service.service_request(in_flight).unwrap();
+        let _ = take_wire(&mut interface);
+        service.handle_item(subscription_response(Id::Number(1), "typed").into()).unwrap();
+
+        let active = service.subs.get(&local_id).unwrap();
+        assert_eq!(active.receiver_count(), 1);
+        assert_eq!(active.manual_claim_count(), 0);
+        assert!(!active.has_persistent_hold());
+        assert!(active.request.meta().extensions().get::<SubscriptionReceiverTicket>().is_none());
+
+        service.handle_item(notification("typed", serde_json::json!("first"))).unwrap();
+        let alias = alias_from_response(response_rx.try_recv().unwrap().unwrap(), Id::Number(1));
+        let mut subscription = subscription_rx.try_recv().unwrap();
+        assert_eq!(&alias, subscription.local_id());
+        assert_eq!(subscription.try_recv().unwrap().get(), "\"first\"");
+    }
+
+    #[test]
+    fn later_typed_acquire_starts_at_the_current_tail() {
+        let (mut service, mut interface) = test_service();
+        let (_alias, mut first) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "typed",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        service.handle_item(notification("typed", serde_json::json!("old"))).unwrap();
+
+        let (second, mut response_rx, mut subscription_rx) = typed_in_flight(
+            eth_subscription(2, "newHeads"),
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        service.service_request(second).unwrap();
+        assert_no_wire(&mut interface);
+        let _ = alias_from_response(response_rx.try_recv().unwrap().unwrap(), Id::Number(2));
+        let mut second = subscription_rx.try_recv().unwrap();
+
+        assert_eq!(first.try_recv().unwrap().get(), "\"old\"");
+        assert!(matches!(
+            second.try_recv(),
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty)
+        ));
+    }
+
+    #[test]
+    fn typed_ticket_cancellation_after_response_is_cleaned_by_receiver_count() {
+        let (mut service, mut interface) = test_service();
+        let (in_flight, mut response_rx, subscription_rx) = typed_in_flight(
+            eth_subscription(1, "newHeads"),
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        service.service_request(in_flight).unwrap();
+        let _ = take_wire(&mut interface);
+        service.handle_item(subscription_response(Id::Number(1), "typed").into()).unwrap();
+        let _ = response_rx.try_recv().unwrap().unwrap();
+        drop(subscription_rx);
+
+        service.sweep_subscriptions().unwrap();
+        let cleanup = take_wire(&mut interface);
+        assert_eq!(cleanup["method"], "eth_unsubscribe");
+        assert_eq!(cleanup["params"], serde_json::json!(["typed"]));
+        assert_eq!(service.subs.len(), 0);
+    }
+
+    #[test]
+    fn dropping_only_the_last_typed_receiver_triggers_cleanup() {
+        let (mut service, mut interface) = test_service();
+        let (_alias, first) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "typed",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let (second, mut response_rx, mut subscription_rx) = typed_in_flight(
+            eth_subscription(2, "newHeads"),
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        service.service_request(second).unwrap();
+        let _ = response_rx.try_recv().unwrap().unwrap();
+        let second = subscription_rx.try_recv().unwrap();
+
+        drop(first);
+        service.sweep_subscriptions().unwrap();
+        assert_no_wire(&mut interface);
+        assert_eq!(service.subs.len(), 1);
+
+        drop(second);
+        service.handle_item(notification("typed", serde_json::json!("ignored"))).unwrap();
+        assert_eq!(take_wire(&mut interface)["method"], "eth_unsubscribe");
+        assert_eq!(service.subs.len(), 0);
+        service.sweep_subscriptions().unwrap();
+        assert_no_wire(&mut interface);
+    }
+
+    #[test]
+    fn resubscribe_receiver_keeps_upstream_alive_until_it_is_dropped() {
+        let (mut service, mut interface) = test_service();
+        let (_alias, first) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "typed",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let second = first.resubscribe();
+
+        drop(first);
+        service.sweep_subscriptions().unwrap();
+        assert_no_wire(&mut interface);
+
+        drop(second);
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(take_wire(&mut interface)["method"], "eth_unsubscribe");
+    }
+
+    #[test]
+    fn zero_receiver_active_generation_is_not_reopened() {
+        let (mut service, mut interface) = test_service();
+        let (old_alias, old) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "old",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        drop(old);
+
+        let (next, mut response_rx, mut subscription_rx) = typed_in_flight(
+            eth_subscription(2, "newHeads"),
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        service.service_request(next).unwrap();
+        let cleanup = take_wire(&mut interface);
+        let subscribe = take_wire(&mut interface);
+        assert_eq!(cleanup["method"], "eth_unsubscribe");
+        assert_eq!(cleanup["params"], serde_json::json!(["old"]));
+        assert_eq!(subscribe["method"], "eth_subscribe");
+        assert_eq!(subscribe["id"], 2);
+
+        service.handle_item(subscription_response(Id::Number(2), "new").into()).unwrap();
+        let new_alias =
+            alias_from_response(response_rx.try_recv().unwrap().unwrap(), Id::Number(2));
+        let new = subscription_rx.try_recv().unwrap();
+        assert_eq!(new_alias, old_alias);
+        assert_eq!(&new_alias, new.local_id());
+    }
+
+    #[test]
+    fn direct_get_does_not_reopen_an_unowned_typed_generation() {
+        let (mut service, mut interface) = test_service();
+        let (alias, subscription) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "typed",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        drop(subscription);
+
+        let (tx, mut rx) = oneshot::channel();
+        service.service_get_sub(alias, tx).unwrap();
+        assert!(rx.try_recv().unwrap().is_none());
+        assert_eq!(take_wire(&mut interface)["method"], "eth_unsubscribe");
+        assert_eq!(service.subs.len(), 0);
+    }
+
+    #[test]
+    fn legacy_claim_defaults_to_persistent_retention_and_can_be_reacquired() {
+        let (mut service, mut interface) = test_service();
+        let alias =
+            activate(&mut service, &mut interface, eth_subscription(1, "newHeads"), "legacy");
+        let active = service.subs.get(&alias).unwrap();
+        assert!(active.has_persistent_hold());
+        assert_eq!(active.manual_claim_count(), 1);
+
+        let (tx, mut rx) = oneshot::channel();
+        service.service_get_sub(alias, tx).unwrap();
+        let claim = rx.try_recv().unwrap().unwrap();
+        drop(claim);
+        service.sweep_subscriptions().unwrap();
+        assert_no_wire(&mut interface);
+        assert_eq!(service.subs.len(), 1);
+
+        let (tx, mut rx) = oneshot::channel();
+        service.service_get_sub(alias, tx).unwrap();
+        assert!(rx.try_recv().unwrap().is_some());
+        assert_no_wire(&mut interface);
+    }
+
+    #[test]
+    fn mixed_typed_and_legacy_waiters_commit_persistent_hold_regardless_of_order() {
+        for typed_first in [true, false] {
+            let (mut service, mut interface) = test_service();
+            let (typed, mut typed_response, mut typed_subscription) = typed_in_flight(
+                eth_subscription(1, "newHeads"),
+                SubscriptionRetentionPolicy::WhileReceivers,
+            );
+            let (legacy, mut legacy_response) = InFlight::new(eth_subscription(2, "newHeads"), 16);
+            if typed_first {
+                service.service_request(typed).unwrap();
+                service.service_request(legacy).unwrap();
+            } else {
+                service.service_request(legacy).unwrap();
+                service.service_request(typed).unwrap();
+            }
+            let wire = take_wire(&mut interface);
+            let wire_id = if typed_first { Id::Number(1) } else { Id::Number(2) };
+            assert_eq!(wire["id"], serde_json::json!(if typed_first { 1 } else { 2 }));
+            service.handle_item(subscription_response(wire_id, "mixed").into()).unwrap();
+            let typed_alias =
+                alias_from_response(typed_response.try_recv().unwrap().unwrap(), Id::Number(1));
+            let legacy_alias =
+                alias_from_response(legacy_response.try_recv().unwrap().unwrap(), Id::Number(2));
+            assert_eq!(typed_alias, legacy_alias);
+            let typed_subscription = typed_subscription.try_recv().unwrap();
+
+            let (tx, mut claim_rx) = oneshot::channel();
+            service.service_get_sub(legacy_alias, tx).unwrap();
+            let legacy_claim = claim_rx.try_recv().unwrap().unwrap();
+            drop(typed_subscription);
+            drop(legacy_claim);
+            service.sweep_subscriptions().unwrap();
+
+            assert!(service.subs.get(&typed_alias).unwrap().has_persistent_hold());
+            assert_no_wire(&mut interface);
+        }
+    }
+
+    #[test]
+    fn cancelled_legacy_waiter_does_not_upgrade_typed_retention() {
+        let (mut service, mut interface) = test_service();
+        let (typed, mut typed_response, mut typed_subscription) = typed_in_flight(
+            eth_subscription(1, "newHeads"),
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let (legacy, legacy_response) = InFlight::new(eth_subscription(2, "newHeads"), 16);
+        service.service_request(typed).unwrap();
+        let _ = take_wire(&mut interface);
+        service.service_request(legacy).unwrap();
+        drop(legacy_response);
+
+        service.handle_item(subscription_response(Id::Number(1), "typed").into()).unwrap();
+        let alias = alias_from_response(typed_response.try_recv().unwrap().unwrap(), Id::Number(1));
+        let typed_subscription = typed_subscription.try_recv().unwrap();
+        assert!(!service.subs.get(&alias).unwrap().has_persistent_hold());
+
+        drop(typed_subscription);
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(take_wire(&mut interface)["method"], "eth_unsubscribe");
+    }
+
+    #[test]
+    fn explicit_retention_overrides_typed_and_legacy_defaults() {
+        let (mut service, mut interface) = test_service();
+        let (typed_alias, typed) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "typed",
+            SubscriptionRetentionPolicy::UntilExplicitUnsubscribe,
+        );
+        drop(typed);
+        service.sweep_subscriptions().unwrap();
+        assert!(service.subs.get(&typed_alias).unwrap().has_persistent_hold());
+        assert_no_wire(&mut interface);
+
+        let raw_request = with_retention(
+            eth_subscription(2, "logs"),
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let raw_alias = activate(&mut service, &mut interface, raw_request, "raw");
+        assert!(!service.subs.get(&raw_alias).unwrap().has_persistent_hold());
+        let (tx, mut claim_rx) = oneshot::channel();
+        service.service_get_sub(raw_alias, tx).unwrap();
+        drop(claim_rx.try_recv().unwrap().unwrap());
+        service.sweep_subscriptions().unwrap();
+        let cleanup = take_wire(&mut interface);
+        assert_eq!(cleanup["params"], serde_json::json!(["raw"]));
+    }
+
+    #[test]
+    fn direct_get_of_live_typed_entry_does_not_upgrade_retention() {
+        let (mut service, mut interface) = test_service();
+        let (alias, typed) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "typed",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let receiver_count = service.subs.get(&alias).unwrap().receiver_count();
+        let (tx, rx) = oneshot::channel();
+        drop(rx);
+        service.service_get_sub(alias, tx).unwrap();
+        assert_eq!(service.subs.get(&alias).unwrap().receiver_count(), receiver_count);
+
+        let (tx, mut rx) = oneshot::channel();
+        service.service_get_sub(alias, tx).unwrap();
+        let acquired = rx.try_recv().unwrap().unwrap();
+        assert!(!service.subs.get(&alias).unwrap().has_persistent_hold());
+
+        drop(typed);
+        drop(acquired);
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(take_wire(&mut interface)["method"], "eth_unsubscribe");
+    }
+
+    #[test]
+    fn failed_direct_get_restores_an_existing_manual_claim() {
+        let (mut service, mut interface) = test_service();
+        let alias =
+            activate(&mut service, &mut interface, eth_subscription(1, "newHeads"), "legacy");
+        service.handle_item(notification("legacy", serde_json::json!("buffered"))).unwrap();
+
+        let (tx, rx) = oneshot::channel();
+        drop(rx);
+        service.service_get_sub(alias, tx).unwrap();
+        assert_eq!(service.subs.get(&alias).unwrap().manual_claim_count(), 1);
+
+        let (tx, mut rx) = oneshot::channel();
+        service.service_get_sub(alias, tx).unwrap();
+        let mut claim = rx.try_recv().unwrap().unwrap();
+        assert_eq!(claim.try_recv().unwrap().get(), "\"buffered\"");
+    }
+
+    #[test]
+    fn cancelled_active_fast_path_does_not_create_a_receiver_or_hold() {
+        let (mut service, mut interface) = test_service();
+        let (alias, _owner) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "typed",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let receiver_count = service.subs.get(&alias).unwrap().receiver_count();
+        let (in_flight, response_rx, subscription_rx) = typed_in_flight(
+            eth_subscription(2, "newHeads"),
+            SubscriptionRetentionPolicy::UntilExplicitUnsubscribe,
+        );
+        drop(response_rx);
+        drop(subscription_rx);
+
+        service.service_request(in_flight).unwrap();
+        let active = service.subs.get(&alias).unwrap();
+        assert_eq!(active.receiver_count(), receiver_count);
+        assert!(!active.has_persistent_hold());
+        assert_no_wire(&mut interface);
+    }
+
+    #[test]
+    fn subscription_stream_variants_keep_receiver_ownership() {
+        let (mut service, mut interface) = test_service();
+
+        let (_alias, raw) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "stream",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let stream = raw.into_typed::<serde_json::Value>().into_stream();
+        service.sweep_subscriptions().unwrap();
+        assert_no_wire(&mut interface);
+        drop(stream);
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(take_wire(&mut interface)["params"], serde_json::json!(["stream"]));
+
+        let (_alias, raw) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(2, "logs"),
+            "result-stream",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let stream = raw.into_typed::<serde_json::Value>().into_result_stream();
+        service.sweep_subscriptions().unwrap();
+        assert_no_wire(&mut interface);
+        drop(stream);
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(take_wire(&mut interface)["params"], serde_json::json!(["result-stream"]));
+
+        let (_alias, raw) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(3, "newPendingTransactions"),
+            "any-stream",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        let stream = raw.into_typed::<serde_json::Value>().into_any_stream();
+        service.sweep_subscriptions().unwrap();
+        assert_no_wire(&mut interface);
+        drop(stream);
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(take_wire(&mut interface)["params"], serde_json::json!(["any-stream"]));
+    }
+
+    #[test]
+    fn lagged_receiver_is_not_mistaken_for_zero_receivers() {
+        let (mut service, mut interface) = test_service();
+        let request = with_channel_size(eth_subscription(1, "newHeads"), 1);
+        let (_alias, mut subscription) = activate_typed(
+            &mut service,
+            &mut interface,
+            request,
+            "typed",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        service.handle_item(notification("typed", serde_json::json!(1))).unwrap();
+        service.handle_item(notification("typed", serde_json::json!(2))).unwrap();
+        assert!(matches!(
+            subscription.try_recv(),
+            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_))
+        ));
+
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(service.subs.len(), 1);
+        assert_no_wire(&mut interface);
+    }
+
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+    #[tokio::test(start_paused = true)]
+    async fn quiet_subscription_is_cleaned_by_the_periodic_sweep() {
+        let (handle, mut interface) = ConnectionHandle::new();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService::new(handle, MockConnect::default(), reqs);
+        let (_alias, subscription) = activate_typed(
+            &mut service,
+            &mut interface,
+            eth_subscription(1, "newHeads"),
+            "quiet",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        service.spawn();
+        tokio::task::yield_now().await;
+        drop(subscription);
+
+        tokio::time::advance(SUBSCRIPTION_SWEEP_INTERVAL).await;
+        tokio::task::yield_now().await;
+        assert_eq!(take_wire(&mut interface)["method"], "eth_unsubscribe");
+
+        drop(tx);
+        tokio::task::yield_now().await;
     }
 
     #[test]
@@ -1361,8 +2004,8 @@ mod tests {
         let (mut service, mut interface) = test_service();
         let alias =
             activate(&mut service, &mut interface, eth_subscription(1, "newHeads"), "active");
-        let mut first = service.subs.get_subscription(alias).unwrap();
-        let mut second = service.subs.get_subscription(alias).unwrap();
+        let mut first = get_subscription(&mut service, alias);
+        let mut second = get_subscription(&mut service, alias);
 
         service.service_unsubscribe(alias, None).unwrap();
         let _ = take_wire(&mut interface);
@@ -1509,6 +2152,23 @@ mod tests {
         assert_eq!(rx.try_recv().unwrap().unwrap(), UnsubscribeOutcome::TransportClosed);
     }
 
+    #[test]
+    fn dropped_custom_typed_subscription_without_cleanup_method_never_falls_back() {
+        let (mut service, mut interface) = test_service();
+        let (_alias, subscription) = activate_typed(
+            &mut service,
+            &mut interface,
+            custom_subscription(1, "custom_events", None),
+            "custom",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        drop(subscription);
+
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(service.subs.len(), 0);
+        assert_no_wire(&mut interface);
+    }
+
     #[tokio::test]
     async fn reconnect_uses_unique_route_and_preserves_channel_capacity() {
         let (old_handle, mut old_interface) = ConnectionHandle::new();
@@ -1534,6 +2194,79 @@ mod tests {
             service.subs.server_id_for_local_id(&local_id),
             Some(&SubId::String("new-server".into()))
         );
+    }
+
+    #[tokio::test]
+    async fn reconnect_drops_typed_entry_without_receivers() {
+        let (old_handle, mut old_interface) = ConnectionHandle::new();
+        let (new_handle, mut new_interface) = ConnectionHandle::new();
+        let connector = MockConnect(Arc::new(Mutex::new(Some(new_handle))));
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService::new(old_handle, connector, reqs);
+        let (_alias, subscription) = activate_typed(
+            &mut service,
+            &mut old_interface,
+            eth_subscription(1, "newHeads"),
+            "old-server",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+        drop(subscription);
+
+        service.reconnect().await.unwrap();
+        assert_eq!(service.subs.len(), 0);
+        assert_no_wire(&mut new_interface);
+    }
+
+    #[tokio::test]
+    async fn reconnect_restores_persistent_entry_without_receivers() {
+        let (old_handle, mut old_interface) = ConnectionHandle::new();
+        let (new_handle, mut new_interface) = ConnectionHandle::new();
+        let connector = MockConnect(Arc::new(Mutex::new(Some(new_handle))));
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService::new(old_handle, connector, reqs);
+        let alias = activate(
+            &mut service,
+            &mut old_interface,
+            eth_subscription(1, "newHeads"),
+            "old-server",
+        );
+        let (tx, mut claim_rx) = oneshot::channel();
+        service.service_get_sub(alias, tx).unwrap();
+        drop(claim_rx.try_recv().unwrap().unwrap());
+        assert_eq!(service.subs.get(&alias).unwrap().receiver_count(), 0);
+
+        service.reconnect().await.unwrap();
+        assert_eq!(take_wire(&mut new_interface)["method"], "eth_subscribe");
+        assert!(service.subs.get(&alias).unwrap().has_persistent_hold());
+    }
+
+    #[tokio::test]
+    async fn receiver_drop_during_reconnect_compensates_late_server_id() {
+        let (old_handle, mut old_interface) = ConnectionHandle::new();
+        let (new_handle, mut new_interface) = ConnectionHandle::new();
+        let connector = MockConnect(Arc::new(Mutex::new(Some(new_handle))));
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService::new(old_handle, connector, reqs);
+        let (_alias, subscription) = activate_typed(
+            &mut service,
+            &mut old_interface,
+            eth_subscription(1, "newHeads"),
+            "old-server",
+            SubscriptionRetentionPolicy::WhileReceivers,
+        );
+
+        service.reconnect().await.unwrap();
+        let replay = take_wire(&mut new_interface);
+        let replay_id = Id::String(replay["id"].as_str().unwrap().to_owned());
+        drop(subscription);
+        service.sweep_subscriptions().unwrap();
+        assert_eq!(service.subs.len(), 0);
+        assert_no_wire(&mut new_interface);
+
+        service.handle_item(subscription_response(replay_id, "late-server").into()).unwrap();
+        let cleanup = take_wire(&mut new_interface);
+        assert_eq!(cleanup["method"], "eth_unsubscribe");
+        assert_eq!(cleanup["params"], serde_json::json!(["late-server"]));
     }
 
     #[tokio::test]

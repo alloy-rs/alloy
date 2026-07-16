@@ -32,7 +32,10 @@ impl PubSubFrontend {
         Self { tx, channel_size: Arc::new(AtomicUsize::new(16)) }
     }
 
-    /// Get the subscription ID for a local ID.
+    /// Get a legacy/manual receiver claim for a local subscription ID.
+    ///
+    /// This does not add a persistent hold or reopen a receiver-scoped generation that the service
+    /// has already observed at zero receivers.
     pub fn get_subscription(
         &self,
         id: B256,
@@ -49,7 +52,12 @@ impl PubSubFrontend {
         }
     }
 
-    /// Force-unsubscribe a subscription, closing all local receivers sharing its key.
+    /// Queue a force-unsubscribe instruction for a local subscription ID.
+    ///
+    /// The service closes all local receivers sharing the subscription's key.
+    /// A successful return only means the instruction was queued; it does not
+    /// confirm server-side teardown. Use [`Self::unsubscribe_and_wait`] to
+    /// observe the cleanup outcome.
     pub fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.tx
             .send(PubSubInstruction::Unsubscribe(id))

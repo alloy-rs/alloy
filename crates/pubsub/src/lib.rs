@@ -16,7 +16,10 @@ mod frontend;
 pub use frontend::PubSubFrontend;
 
 mod options;
-pub use options::{SubscriptionOptions, UnsubscribeOutcome};
+pub use options::{
+    SubscriptionOptions, SubscriptionReceiverTicket, SubscriptionRetentionPolicy,
+    UnsubscribeOutcome,
+};
 
 mod ix;
 pub use ix::PubSubInstruction;

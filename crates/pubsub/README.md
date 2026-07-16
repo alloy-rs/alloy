@@ -23,7 +23,7 @@ The PubSub system here consists of 3 logical parts:
 - The **backend** is an actively running connection to the server. Users
   should NEVER instantiate a backend directly. Instead, they should use
   [`PubSubConnect::into_service`] for some connection object. Backends
-  are responsible for managing the connection to the server,accepting user
+  are responsible for managing the connection to the server, accepting user
   requests from the **service** and forwarding server responses to the
   **service**.
 
@@ -53,9 +53,8 @@ This crate provides the following:
   into the expected type, and allows the user to accept or discard unexpected
   responses.
 - [`SubscriptionItem`]: An item in a typed [`Subscription`]. This type is
-  yielded by the subscription via the `recv_any()` API a notification is
-  received and contains the deserialized item. If deserialization fails, it
-  contains the raw JSON value.
+  yielded by the subscription via the `recv_any()` API. It contains the
+  deserialized item, or the raw JSON value if deserialization fails.
 
 ## On Handling Subscriptions
 
@@ -72,20 +71,40 @@ subscribers.
 When a user issues a subscription request, the **frontend** sends a
 subscription request to the **service**. The **service** dispatches it to the
 RPC server via the **backend**. The **service** then intercepts the RPC server
-response containing the server id, and assigns a `local_id` to the subscription.
-This `local_id` is used to identify the subscription in the **service** and in
-tasks consuming the subscription, while the `server_id` is used to identify the
-subscription to the RPC server, and to associate notifications with specific
-active subscriptions.
+response containing the server ID and assigns a stable `B256` `local_id` to
+the subscription. Server IDs are represented by [`alloy_json_rpc::SubId`] and
+may be numeric or strings. The `local_id` identifies the subscription in the
+**service** and consumer tasks, while the current `server_id` associates
+notifications with the server-side subscription.
 
-This allows us to use long-lived `local_id` values to manage subscriptions over
-multiple reconnections, without having to notify frontend users of the ID change
-when the server connection is lost. It also prevents race conditions when
-unsubscribing during or immediately after a reconnection.
+This allows the service to keep the consumer-facing `local_id` stable while the
+server ID changes across reconnections.
 
 The local ID is derived from the complete subscription method and exact serialized params. Calls
 with the same method and params share one server subscription and receive independent local
 broadcast receivers. Calls with different methods never alias merely because their params match.
+
+### Reconnection, replay, and cancellation
+
+After a retryable established-backend failure, the service attempts reconnection under its
+configured retry policy; non-retryable failures terminate it immediately. Following a successful
+reconnect, it re-sends every
+request still awaiting a response and re-creates active subscriptions. If the
+server processed a request but its response was lost, that request may execute
+more than once. Do not rely on at-most-once execution for non-idempotent methods.
+
+Dropping a request future stops waiting locally, but does not cancel a request
+already accepted by the service. Dropping a [`RawSubscription`] or [`Subscription`]
+removes that receiver. Under `WhileReceivers`, dropping the final receiver makes the
+subscription eligible for cleanup; a persistent hold requires explicit unsubscribe.
+Call [`PubSubFrontend::unsubscribe`] with the local ID to force cleanup of a shared
+subscription. A successful return only confirms that the instruction was queued;
+use [`PubSubFrontend::unsubscribe_and_wait`] to observe the cleanup outcome.
+
+Typed provider subscriptions receive their first local receiver in the same service turn that
+processes the server response. There is no hidden receiver in the subscription manager, so dropping
+the final typed receiver makes the upstream subscription eligible for cleanup. Local
+`resubscribe()` and all subscription stream adapters count as receivers and keep the upstream alive.
 
 ### What is a subscription request?
 
@@ -103,8 +122,9 @@ do not share a universal naming convention, so the service does not guess or fal
 `eth_unsubscribe`. A custom subscription without a configured cleanup method can only be reclaimed
 when its connection closes.
 
-The **service** intercepts the RPC response, which must contain a numeric or string subscription
-ID. Other response types will not function as subscriptions.
+The **service** intercepts the RPC response, which must deserialize as an
+[`alloy_json_rpc::SubId`] (a numeric or string ID). Other response types will fail
+deserialization.
 
 The service reserves string request IDs beginning with `alloy-pubsub:` for resubscribe and cleanup
 traffic. Manually constructed requests must not use that prefix.
@@ -113,6 +133,26 @@ traffic. Manually constructed requests must not use that prefix.
 `PubSubFrontend::unsubscribe_and_wait()` when the caller needs to observe server confirmation,
 server-reported absence, an RPC error, or connection-level cleanup. Both methods are force
 operations: they close all local receivers sharing the same method and params.
+
+### Retention and legacy claims
+
+[`SubscriptionRetentionPolicy`] controls ownership of the shared upstream subscription:
+
+- Typed `GetSubscription` builders default to `WhileReceivers`. After the last receiver is dropped,
+  cleanup occurs on the next notification, acquire, reconnect, or periodic sweep (at most 30 seconds
+  for a quiet subscription).
+- Low-level two-phase requests (`set_is_subscription()` followed by `get_subscription(local_id)`)
+  default to `UntilExplicitUnsubscribe` for compatibility. A successful response creates a manual
+  receiver claim and a persistent hold, with no claim deadline.
+- Both paths may explicitly select the other policy. If matching typed and legacy subscribe waiters
+  are combined, any successfully delivered `UntilExplicitUnsubscribe` waiter commits a persistent
+  hold. Later `get_subscription(local_id)` calls do not upgrade retention.
+
+A persistent hold is released only by force unsubscribe. For a `WhileReceivers` entry whose receiver
+count has already reached zero, `get_subscription(local_id)` returns not found instead of reopening
+the old generation; issue the original subscription request again to create a new generation.
+
+[`SubscriptionRetentionPolicy`]: crate::SubscriptionRetentionPolicy
 
 ### Subscription Lifecycle
 
@@ -141,6 +181,7 @@ Subscription Request Lifecycle:
 1. The **service** assigns a `local_id` to the subscription, creates a
    subscription broadcast channel, and stores the relevant information in its
    `SubscriptionManager`.
+1. Typed waiters receive a local receiver directly; legacy waiters create named manual claims.
 1. The **service** overwrites the JSON RPC response with the `local_id`.
 1. The **service** sends a response with each waiter's original JSON-RPC request ID via its oneshot.
 
@@ -148,6 +189,9 @@ Subscription Notification Lifecycle
 
 1. The RPC server sends a notification to the **backend**.
 1. The **backend** sends the notification to the **service**.
-1. The **service** looks up the `local_id` in its `SubscriptionManager`.
-1. If present, the **service** sends the notification to the relevant channel.
+1. The **service** maps the notification's `server_id` to its stable
+   `local_id` in its `SubscriptionManager`.
+1. If present and locally owned, the **service** sends the notification to the relevant channel.
+   1. If no receiver or persistent hold remains, the **service** removes the entry and starts
+      upstream cleanup instead.
    1. Otherwise, the **service** ignores the notification.

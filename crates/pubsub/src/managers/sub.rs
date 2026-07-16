@@ -1,7 +1,7 @@
-use crate::{managers::ActiveSubscription, RawSubscription};
-use alloy_json_rpc::{EthNotification, SerializedRequest, SubId};
+use crate::managers::ActiveSubscription;
+use alloy_json_rpc::{EthNotification, SubId};
 use alloy_primitives::B256;
-use std::{borrow::Cow, collections::BTreeMap};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Default)]
 pub(crate) struct SubscriptionManager {
@@ -23,15 +23,8 @@ impl SubscriptionManager {
     }
 
     /// Insert a subscription.
-    pub(crate) fn insert(
-        &mut self,
-        local_id: B256,
-        request: SerializedRequest,
-        server_id: SubId,
-        channel_size: usize,
-        unsubscribe_method: Option<Cow<'static, str>>,
-    ) {
-        let active = ActiveSubscription::new(local_id, request, channel_size, unsubscribe_method);
+    pub(crate) fn insert(&mut self, active: ActiveSubscription, server_id: SubId) {
+        let local_id = active.local_id;
         let previous_server = self.servers.insert(server_id, local_id);
         debug_assert!(previous_server.is_none(), "server subscription id must not be overwritten");
         let previous = self.subscriptions.insert(local_id, active);
@@ -84,13 +77,12 @@ impl SubscriptionManager {
         }
     }
 
-    /// Get a receiver for a subscription.
-    pub(crate) fn get_subscription(&self, local_id: B256) -> Option<RawSubscription> {
-        self.get(&local_id).map(ActiveSubscription::subscribe)
-    }
-
     pub(crate) fn get(&self, local_id: &B256) -> Option<&ActiveSubscription> {
         self.subscriptions.get(local_id)
+    }
+
+    pub(crate) fn get_mut(&mut self, local_id: &B256) -> Option<&mut ActiveSubscription> {
+        self.subscriptions.get_mut(local_id)
     }
 
     pub(crate) fn contains_server_id(&self, server_id: &SubId) -> bool {
