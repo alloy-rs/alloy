@@ -1,4 +1,54 @@
-use std::borrow::Cow;
+use crate::RawSubscription;
+use parking_lot::Mutex;
+use std::{borrow::Cow, fmt, sync::Arc};
+use tokio::sync::oneshot;
+
+/// Controls when a server-side subscription is eligible for automatic cleanup.
+///
+/// This enum defaults to [`Self::WhileReceivers`], matching typed provider builders.
+/// Low-level/manual subscription requests apply [`Self::UntilExplicitUnsubscribe`] as a separate
+/// compatibility default.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SubscriptionRetentionPolicy {
+    /// Keep the server-side subscription until it is explicitly unsubscribed.
+    UntilExplicitUnsubscribe,
+    /// Clean up the server-side subscription after its last local receiver is dropped.
+    #[default]
+    WhileReceivers,
+}
+
+/// A clone-safe, one-shot delivery ticket for a typed subscription receiver.
+///
+/// This is public only so the provider and RPC client crates can carry it through request
+/// metadata. It is not part of the user-facing subscription API.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct SubscriptionReceiverTicket(Arc<Mutex<Option<oneshot::Sender<RawSubscription>>>>);
+
+impl fmt::Debug for SubscriptionReceiverTicket {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SubscriptionReceiverTicket").field("closed", &self.is_closed()).finish()
+    }
+}
+
+impl SubscriptionReceiverTicket {
+    /// Creates a ticket and its receiving half.
+    #[doc(hidden)]
+    pub fn channel() -> (Self, oneshot::Receiver<RawSubscription>) {
+        let (tx, rx) = oneshot::channel();
+        (Self(Arc::new(Mutex::new(Some(tx)))), rx)
+    }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        self.0.lock().as_ref().is_none_or(oneshot::Sender::is_closed)
+    }
+
+    pub(crate) fn send(&self, subscription: RawSubscription) -> Result<(), RawSubscription> {
+        let Some(tx) = self.0.lock().take() else { return Err(subscription) };
+        tx.send(subscription)
+    }
+}
 
 /// Per-request configuration for a pubsub subscription.
 ///
@@ -10,6 +60,8 @@ pub struct SubscriptionOptions {
     channel_size: Option<usize>,
     /// The RPC method used to clean up the server-side subscription.
     unsubscribe_method: Option<Cow<'static, str>>,
+    /// The requested retention behavior.
+    retention_policy: Option<SubscriptionRetentionPolicy>,
 }
 
 impl SubscriptionOptions {
@@ -38,6 +90,16 @@ impl SubscriptionOptions {
         self.unsubscribe_method = Some(method.into());
     }
 
+    /// Returns the configured retention policy.
+    pub const fn retention_policy(&self) -> Option<SubscriptionRetentionPolicy> {
+        self.retention_policy
+    }
+
+    /// Sets the retention policy for this subscription request.
+    pub const fn set_retention_policy(&mut self, policy: SubscriptionRetentionPolicy) {
+        self.retention_policy = Some(policy);
+    }
+
     pub(crate) fn unsubscribe_method_owned(&self) -> Option<Cow<'static, str>> {
         self.unsubscribe_method.clone()
     }
@@ -53,4 +115,17 @@ pub enum UnsubscribeOutcome {
     AlreadyAbsent,
     /// The connection closed, which releases all subscriptions owned by that connection.
     TransportClosed,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retention_policy_default_matches_typed_option_a() {
+        assert_eq!(
+            SubscriptionRetentionPolicy::default(),
+            SubscriptionRetentionPolicy::WhileReceivers
+        );
+    }
 }

@@ -1684,6 +1684,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Subscribe to an RPC event.
+    ///
+    /// The returned typed builder defaults to cleaning up the upstream subscription after its last
+    /// local receiver is dropped. Use [`GetSubscription::retention_policy`] to retain it until an
+    /// explicit force unsubscribe instead.
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     fn subscribe<P, R>(&self, params: P) -> GetSubscription<P, R>

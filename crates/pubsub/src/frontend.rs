@@ -32,7 +32,10 @@ impl PubSubFrontend {
         Self { tx, channel_size: Arc::new(AtomicUsize::new(16)) }
     }
 
-    /// Get the subscription ID for a local ID.
+    /// Get a legacy/manual receiver claim for a local subscription ID.
+    ///
+    /// This does not add a persistent hold or reopen a receiver-scoped generation that the service
+    /// has already observed at zero receivers.
     pub fn get_subscription(
         &self,
         id: B256,

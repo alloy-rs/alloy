@@ -66,7 +66,10 @@ impl<N: Network> RootProvider<N> {
 }
 
 impl<N: Network> RootProvider<N> {
-    /// Gets the subscription corresponding to the given RPC subscription ID.
+    /// Gets a legacy/manual receiver claim corresponding to the given local subscription ID.
+    ///
+    /// This does not upgrade the entry's retention policy. A receiver-only entry that has already
+    /// reached zero receivers is considered ended and returns `subscription not found`.
     #[cfg(feature = "pubsub")]
     pub async fn get_subscription<R: alloy_json_rpc::RpcRecv>(
         &self,

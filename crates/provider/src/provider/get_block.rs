@@ -448,6 +448,12 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
         self
     }
 
+    /// Set when the server-side subscription is eligible for automatic cleanup.
+    pub fn retention_policy(mut self, policy: alloy_pubsub::SubscriptionRetentionPolicy) -> Self {
+        self.sub = self.sub.retention_policy(policy);
+        self
+    }
+
     /// Subscribe to the inner stream of headers and map them to block responses.
     pub async fn into_stream(
         self,
