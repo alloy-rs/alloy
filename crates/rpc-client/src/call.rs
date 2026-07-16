@@ -218,6 +218,8 @@ where
     ///
     /// Call [`Self::set_unsubscribe_method`] as well when the custom protocol exposes a cleanup
     /// RPC. Otherwise the subscription can only be reclaimed when its connection closes.
+    /// Low-level subscription calls retain their upstream subscription until explicit unsubscribe
+    /// unless [`Self::set_subscription_retention_policy`] selects receiver-scoped retention.
     ///
     /// # Panics
     ///
@@ -253,6 +255,33 @@ where
             .extensions_mut()
             .get_or_insert_default::<alloy_pubsub::SubscriptionOptions>()
             .set_channel_size(channel_size);
+    }
+
+    /// Set when the server-side subscription is eligible for automatic cleanup.
+    ///
+    /// Low-level/manual subscription requests default to
+    /// [`alloy_pubsub::SubscriptionRetentionPolicy::UntilExplicitUnsubscribe`]. Typed provider
+    /// builders set receiver-scoped retention by default.
+    #[cfg(feature = "pubsub")]
+    pub fn set_subscription_retention_policy(
+        &mut self,
+        policy: alloy_pubsub::SubscriptionRetentionPolicy,
+    ) {
+        self.request_mut()
+            .meta
+            .extensions_mut()
+            .get_or_insert_default::<alloy_pubsub::SubscriptionOptions>()
+            .set_retention_policy(policy);
+    }
+
+    /// Attach the one-shot receiver ticket used by typed subscription builders.
+    #[doc(hidden)]
+    #[cfg(feature = "pubsub")]
+    pub fn set_subscription_receiver_ticket(
+        &mut self,
+        ticket: alloy_pubsub::SubscriptionReceiverTicket,
+    ) {
+        self.request_mut().meta.extensions_mut().insert(ticket);
     }
 
     /// Get a mutable reference to the params of the request.

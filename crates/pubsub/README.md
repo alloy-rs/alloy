@@ -87,6 +87,11 @@ The local ID is derived from the complete subscription method and exact serializ
 with the same method and params share one server subscription and receive independent local
 broadcast receivers. Calls with different methods never alias merely because their params match.
 
+Typed provider subscriptions receive their first local receiver in the same service turn that
+processes the server response. There is no hidden receiver in the subscription manager, so dropping
+the final typed receiver makes the upstream subscription eligible for cleanup. Local
+`resubscribe()` and all subscription stream adapters count as receivers and keep the upstream alive.
+
 ### What is a subscription request?
 
 The **service** uses the `is_subscription()` method in the request to determine
@@ -113,6 +118,26 @@ traffic. Manually constructed requests must not use that prefix.
 `PubSubFrontend::unsubscribe_and_wait()` when the caller needs to observe server confirmation,
 server-reported absence, an RPC error, or connection-level cleanup. Both methods are force
 operations: they close all local receivers sharing the same method and params.
+
+### Retention and legacy claims
+
+[`SubscriptionRetentionPolicy`] controls ownership of the shared upstream subscription:
+
+- Typed `GetSubscription` builders default to `WhileReceivers`. After the last receiver is dropped,
+  cleanup occurs on the next notification, acquire, reconnect, or periodic sweep (at most 30 seconds
+  for a quiet subscription).
+- Low-level two-phase requests (`set_is_subscription()` followed by `get_subscription(local_id)`)
+  default to `UntilExplicitUnsubscribe` for compatibility. A successful response creates a manual
+  receiver claim and a persistent hold, with no claim deadline.
+- Both paths may explicitly select the other policy. If matching typed and legacy subscribe waiters
+  are combined, any successfully delivered `UntilExplicitUnsubscribe` waiter commits a persistent
+  hold. Later `get_subscription(local_id)` calls do not upgrade retention.
+
+A persistent hold is released only by force unsubscribe. For a `WhileReceivers` entry whose receiver
+count has already reached zero, `get_subscription(local_id)` returns not found instead of reopening
+the old generation; issue the original subscription request again to create a new generation.
+
+[`SubscriptionRetentionPolicy`]: crate::SubscriptionRetentionPolicy
 
 ### Subscription Lifecycle
 
@@ -141,6 +166,7 @@ Subscription Request Lifecycle:
 1. The **service** assigns a `local_id` to the subscription, creates a
    subscription broadcast channel, and stores the relevant information in its
    `SubscriptionManager`.
+1. Typed waiters receive a local receiver directly; legacy waiters create named manual claims.
 1. The **service** overwrites the JSON RPC response with the `local_id`.
 1. The **service** sends a response with each waiter's original JSON-RPC request ID via its oneshot.
 
@@ -149,5 +175,7 @@ Subscription Notification Lifecycle
 1. The RPC server sends a notification to the **backend**.
 1. The **backend** sends the notification to the **service**.
 1. The **service** looks up the `local_id` in its `SubscriptionManager`.
-1. If present, the **service** sends the notification to the relevant channel.
+1. If present and locally owned, the **service** sends the notification to the relevant channel.
+   1. If no receiver or persistent hold remains, the **service** removes the entry and starts
+      upstream cleanup instead.
    1. Otherwise, the **service** ignores the notification.
