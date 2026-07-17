@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
+
+### Bug Fixes
+
+- [ci] Work around nightly test attribute ICE ([#4081](https://github.com/alloy-rs/alloy/issues/4081))
+- Address Rust 1.97 clippy lints ([#4074](https://github.com/alloy-rs/alloy/issues/4074))
+
+### Dependencies
+
+- [deps] Bump trezor-client to 0.1.6 ([#4079](https://github.com/alloy-rs/alloy/issues/4079))
+- [deps] Bump the ci-weekly group with 3 updates ([#4078](https://github.com/alloy-rs/alloy/issues/4078))
+- [signer-turnkey] Bump `turnkey_client` to 0.7 ([#4036](https://github.com/alloy-rs/alloy/issues/4036))
+- Bump MSRV to 1.94.1 ([#4068](https://github.com/alloy-rs/alloy/issues/4068))
+
+### Features
+
+- [consensus] Add block gas limit validation ([#4072](https://github.com/alloy-rs/alloy/issues/4072))
+- [network] Add AnyRpcBlock header conversion ([#4073](https://github.com/alloy-rs/alloy/issues/4073))
+- [rpc-types-engine] Implement FromStr for PayloadId ([#4077](https://github.com/alloy-rs/alloy/issues/4077))
+
+### Miscellaneous Tasks
+
+- [eips] Address nightly clippy lint ([#4080](https://github.com/alloy-rs/alloy/issues/4080))
+
+### Other
+
+- Rustdoc no_inline workaround ([#4064](https://github.com/alloy-rs/alloy/issues/4064))
+
 ## [2.1.1](https://github.com/alloy-rs/alloy/releases/tag/v2.1.1) - 2026-07-06
 
 ### Bug Fixes
@@ -31,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.1.1
 - Release 2.1.1
 - Release 2.1.1
 - Release 2.1.1
