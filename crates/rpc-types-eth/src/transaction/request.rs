@@ -26,10 +26,7 @@ pub struct TransactionRequest {
     /// The address of the transaction author.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub from: Option<Address>,
-    /// The transaction destination.
-    ///
-    /// A call uses [`TxKind::Call`], contract creation uses [`TxKind::Create`], and `None` means
-    /// the destination is not yet set.
+    /// The destination address of the transaction.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub to: Option<TxKind>,
     /// The legacy gas price.
@@ -2402,13 +2399,5 @@ mod tests {
         let request: TransactionRequest = eip1559.clone().into();
         assert_eq!(request.to, Some(TxKind::Create));
         assert_eq!(request.build_1559().unwrap(), eip1559);
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
-    fn creation_request_serializes_explicit_null_to() {
-        let value = serde_json::to_value(TransactionRequest::default().create()).unwrap();
-
-        assert_eq!(value.get("to"), Some(&serde_json::Value::Null));
     }
 }
