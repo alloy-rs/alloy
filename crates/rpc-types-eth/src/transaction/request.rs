@@ -26,7 +26,7 @@ pub struct TransactionRequest {
     /// The address of the transaction author.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub from: Option<Address>,
-    /// The destination address of the transaction.
+    /// The transaction destination.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub to: Option<TxKind>,
     /// The legacy gas price.
@@ -1446,7 +1446,7 @@ pub(super) mod serde_bincode_compat {
     pub struct TransactionRequest<'a> {
         /// The address of the transaction author.
         pub from: Option<Address>,
-        /// The destination address of the transaction.
+        /// The transaction destination.
         pub to: Option<TxKind>,
         /// The legacy gas price.
         pub gas_price: Option<u128>,
