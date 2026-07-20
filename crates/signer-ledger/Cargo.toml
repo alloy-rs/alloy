@@ -46,11 +46,15 @@ alloy-eip7702 = { workspace = true, optional = true }
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-rlp.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-serial_test.workspace = true
 tracing-subscriber.workspace = true
 
 [features]
-eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types", "dep:alloy-dyn-abi"]
+eip712 = [
+    "alloy-signer/eip712",
+    "dep:alloy-sol-types",
+    "dep:alloy-dyn-abi",
+    "alloy-dyn-abi?/eip712",
+]
 eip7702 = ["alloy-eip7702"]
 
 # WASM support

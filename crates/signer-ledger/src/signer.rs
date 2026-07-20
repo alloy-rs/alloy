@@ -405,7 +405,6 @@ mod tests {
     use alloy_network::TxSigner;
     use alloy_primitives::{address, bytes, U256};
     use alloy_rlp::Decodable;
-    use serial_test::serial;
     use std::sync::OnceLock;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
@@ -427,7 +426,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_get_address() {
         let ledger = init_ledger().await;
@@ -436,7 +434,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_version() {
         let ledger = init_ledger().await;
@@ -453,7 +450,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_sign_tx_legacy() {
         // https://github.com/gakonst/ethers-rs/blob/90b87bd85be98caa8bb592b67f3f9acbc8a409cf/ethers-signers/src/ledger/app.rs#L321
@@ -476,7 +472,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_sign_tx_eip2930() {
         // From the Ledger Ethereum app example: https://github.com/LedgerHQ/app-ethereum/blob/2264f677568cbc1e3177f9eccb3c14a229ab3255/examples/signTx.py#L104-L106
@@ -492,7 +487,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_sign_tx_eip1559() {
         // From the Ledger Ethereum app example: https://github.com/LedgerHQ/app-ethereum/blob/2264f677568cbc1e3177f9eccb3c14a229ab3255/examples/signTx.py#L100-L102
@@ -514,7 +508,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_sign_message() {
         let ledger = init_ledger().await;
@@ -526,7 +519,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     #[cfg(feature = "eip7702")]
     async fn test_sign_auth() {
