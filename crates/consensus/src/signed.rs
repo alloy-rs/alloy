@@ -547,7 +547,13 @@ where
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::rlp_decode_signed(buf).map_err(Into::into)
+        let decoded = T::rlp_decode_signed(buf)?;
+
+        if decoded.ty() != 0 {
+            return Err(Eip2718Error::UnexpectedType(0));
+        }
+
+        Ok(decoded)
     }
 }
 
