@@ -211,20 +211,32 @@ impl TxEip8141 {
             .fold(0u64, |acc, signature| acc.saturating_add(signature.verification_gas()))
     }
 
-    /// Returns the EIP-7623/EIP-7976-style token count of encoded frame transaction data.
+    /// Returns the EIP-7623 token count of the frame transaction's charged byte fields.
     ///
-    /// The encoded signature list and frame list are counted. Zero bytes count as one token and
-    /// non-zero bytes count as four tokens.
+    /// Only frame data and signature signer, message, and signature bytes are charged. RLP
+    /// headers and fixed-size frame and signature fields are covered by the intrinsic and
+    /// per-frame costs. Zero bytes count as one token and non-zero bytes count as four tokens.
     pub fn frame_calldata_tokens(&self) -> u64 {
-        let mut encoded = Vec::new();
-        self.signatures.encode(&mut encoded);
-        self.frames.encode(&mut encoded);
-        count_frame_data_tokens(&encoded)
+        let frame_tokens = self
+            .frames
+            .iter()
+            .fold(0u64, |acc, frame| acc.saturating_add(count_frame_data_tokens(&frame.data)));
+        self.signatures.iter().fold(frame_tokens, |acc, signature| {
+            acc.saturating_add(count_frame_data_tokens(&signature.signer))
+                .saturating_add(count_frame_data_tokens(&signature.msg))
+                .saturating_add(count_frame_data_tokens(&signature.signature))
+        })
     }
 
-    /// Returns the encoded byte length of the signature and frame lists.
-    pub fn frame_calldata_encoded_len(&self) -> u64 {
-        (self.signatures.length() as u64).saturating_add(self.frames.length() as u64)
+    /// Returns the byte length of the frame transaction's charged byte fields.
+    pub fn frame_calldata_len(&self) -> u64 {
+        let frame_data_len =
+            self.frames.iter().fold(0u64, |acc, frame| acc.saturating_add(frame.data.len() as u64));
+        self.signatures.iter().fold(frame_data_len, |acc, signature| {
+            acc.saturating_add(signature.signer.len() as u64)
+                .saturating_add(signature.msg.len() as u64)
+                .saturating_add(signature.signature.len() as u64)
+        })
     }
 
     /// Calculates the frame transaction gas limit with the provided calldata token gas cost.
@@ -243,10 +255,11 @@ impl TxEip8141 {
 
     /// Calculates the calldata floor gas for this frame transaction.
     pub fn calculate_calldata_floor(&self) -> u64 {
-        // EIP-7976 prices every encoded byte as four standard tokens at the floor; unlike the
-        // ordinary intrinsic cost, zero bytes receive no discount here.
+        // EIP-7976 prices every charged byte as four standard tokens at the floor; unlike the
+        // ordinary intrinsic cost, zero bytes receive no discount here. RLP headers and fixed-size
+        // fields are not charged data.
         FRAME_TX_INTRINSIC_COST.saturating_add(
-            self.frame_calldata_encoded_len()
+            self.frame_calldata_len()
                 .saturating_mul(FRAME_TX_DATA_TOKEN_STANDARD_COST)
                 .saturating_mul(FRAME_TX_DATA_TOKEN_FLOOR_COST),
         )
@@ -653,11 +666,10 @@ mod tests {
             ..Default::default()
         };
 
-        let mut encoded = Vec::new();
-        tx.signatures.encode(&mut encoded);
-        tx.frames.encode(&mut encoded);
-        let calldata_tokens = count_frame_data_tokens(&encoded);
-        let encoded_len = encoded.len() as u64;
+        let calldata_tokens = count_frame_data_tokens(&[0, 1, 2])
+            + count_frame_data_tokens(&[0x11; 20])
+            + count_frame_data_tokens(&[0x22; 65]);
+        let calldata_len = 3 + 20 + 65;
         let expected = FRAME_TX_INTRINSIC_COST
             + 2 * FRAME_TX_PER_FRAME_COST
             + calldata_tokens * FRAME_TX_DATA_TOKEN_STANDARD_COST
@@ -667,13 +679,33 @@ mod tests {
         assert_eq!(tx.total_frame_gas_limit(), 30);
         assert_eq!(tx.signature_verification_gas(), 2_800);
         assert_eq!(tx.frame_calldata_tokens(), calldata_tokens);
-        assert_eq!(tx.frame_calldata_encoded_len(), encoded_len);
+        assert_eq!(tx.frame_calldata_len(), calldata_len);
         assert_eq!(tx.calculate_gas_limit(), expected);
         assert_eq!(tx.gas_limit(), expected);
         assert_eq!(
             tx.calculate_calldata_floor(),
             FRAME_TX_INTRINSIC_COST
-                + encoded_len * FRAME_TX_DATA_TOKEN_STANDARD_COST * FRAME_TX_DATA_TOKEN_FLOOR_COST
+                + calldata_len * FRAME_TX_DATA_TOKEN_STANDARD_COST * FRAME_TX_DATA_TOKEN_FLOOR_COST
         );
+    }
+
+    #[test]
+    fn fixed_fields_and_rlp_headers_are_not_charged_as_calldata() {
+        let tx = TxEip8141 {
+            frames: vec![Frame {
+                mode: FrameMode::Sender,
+                flags: ApprovalScope::ExecutionAndPayment.into(),
+                target: Bytes::copy_from_slice(Address::repeat_byte(0x44).as_slice()),
+                gas_limit: u64::MAX,
+                value: U256::MAX,
+                data: Bytes::new(),
+            }],
+            signatures: Vec::new(),
+            ..Default::default()
+        };
+
+        assert_eq!(tx.frame_calldata_tokens(), 0);
+        assert_eq!(tx.frame_calldata_len(), 0);
+        assert_eq!(tx.calculate_calldata_floor(), FRAME_TX_INTRINSIC_COST);
     }
 }
