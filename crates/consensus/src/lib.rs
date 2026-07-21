@@ -21,7 +21,9 @@ pub use alloy_trie::TrieAccount;
 pub type Account = TrieAccount;
 
 mod block;
-pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header, HeaderInfo, HeaderRoots};
+pub use block::{
+    Block, BlockBody, BlockHeader, EthBlock, GasLimitMismatch, Header, HeaderInfo, HeaderRoots,
+};
 
 mod indexed;
 pub use indexed::Indexed;

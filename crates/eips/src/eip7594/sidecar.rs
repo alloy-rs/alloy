@@ -1168,8 +1168,8 @@ impl BlobCellMask {
         self,
         cells: &[crate::eip7594::Cell],
     ) -> Option<Vec<crate::eip7594::Cell>> {
-        let chunks = cells.chunks_exact(CELLS_PER_EXT_BLOB);
-        if !chunks.remainder().is_empty() {
+        let (chunks, remainder) = cells.as_chunks::<CELLS_PER_EXT_BLOB>();
+        if !remainder.is_empty() {
             return None;
         }
 
@@ -1424,7 +1424,9 @@ mod tests {
         let matching_cells =
             sidecar.compute_matching_cells_with_settings(cell_mask, settings).unwrap();
         let expected_matching_cells = cells
-            .chunks_exact(CELLS_PER_EXT_BLOB)
+            .as_chunks::<CELLS_PER_EXT_BLOB>()
+            .0
+            .iter()
             .flat_map(|blob_cells| [blob_cells[0], blob_cells[7]])
             .collect::<Vec<_>>();
         assert_eq!(

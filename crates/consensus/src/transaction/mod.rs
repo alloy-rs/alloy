@@ -650,3 +650,58 @@ mod tests {
         );
     }
 }
+
+/// Regression coverage for the `fallback_decode_arms` fix in `alloy-tx-macros`
+/// (`crates/tx-macros/src/expand.rs`): `#[envelope(flatten)]` composes another
+/// `TransactionEnvelope`-derived type into a larger envelope, and that flattened variant may be
+/// the *only* place a legacy transaction is reachable from (as below: `MyEnvelope` declares no
+/// `#[envelope(ty = 0)]` variant of its own). A fix that restricts `fallback_decode` to
+/// `ProcessedVariant::is_legacy()` alone -- dropping `Flattened` variants outright -- would
+/// silently break decoding of untagged legacy transactions for every envelope built this way.
+/// The correct restriction (mirroring `generate_untagged_variants`'s serde untagged path, which
+/// tries flattened variants and the legacy variant, and only those) keeps `Flattened` variants
+/// eligible for fallback decode alongside the legacy variant.
+#[cfg(test)]
+mod fallback_decode_flatten_tests {
+    use crate::{
+        SignableTransaction, Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxLegacy,
+    };
+    use alloy_eips::eip2718::{Decodable2718, Encodable2718};
+    use alloy_primitives::{Address, Signature, U256};
+
+    #[derive(Debug, Clone, TransactionEnvelope)]
+    #[envelope(alloy_consensus = crate, tx_type_name = MyTxType)]
+    enum MyEnvelope {
+        #[envelope(flatten)]
+        Ethereum(TxEnvelope),
+        #[envelope(ty = 10)]
+        MyTx(Signed<TxEip1559>),
+    }
+
+    #[test]
+    fn flattened_variant_still_decodes_untagged_legacy() {
+        let legacy = TxLegacy {
+            chain_id: None,
+            nonce: 2,
+            gas_limit: 1_000_000,
+            gas_price: 10_000_000_000,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            ..Default::default()
+        }
+        .into_signed(Signature::test_signature().with_parity(true));
+
+        let ethereum_envelope: TxEnvelope = legacy.into();
+        let encoded = ethereum_envelope.encoded_2718();
+        // Sanity: legacy transactions have no EIP-2718 type-byte prefix on the wire, so decoding
+        // this necessarily goes through `fallback_decode`, not `typed_decode`.
+        assert!(encoded[0] >= 0xc0);
+
+        let my_envelope = MyEnvelope::decode_2718_exact(&encoded)
+            .expect("untagged legacy tx must still decode through the flattened variant");
+        match my_envelope {
+            MyEnvelope::Ethereum(TxEnvelope::Legacy(_)) => {}
+            other => panic!("expected Ethereum(Legacy(..)), got {other:?}"),
+        }
+    }
+}
