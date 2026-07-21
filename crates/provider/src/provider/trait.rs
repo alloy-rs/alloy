@@ -2165,6 +2165,24 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "ws-base")]
+    async fn subscribe_blocks_ws_publicnode_short_subscription_id() {
+        use futures::stream::StreamExt;
+
+        let url = "wss://ethereum-rpc.publicnode.com";
+        let ws = alloy_rpc_client::WsConnect::new(url);
+        let Ok(client) = alloy_rpc_client::RpcClient::connect_pubsub(ws).await else { return };
+        let provider = RootProvider::<Ethereum>::new(client);
+        let sub = provider.subscribe_blocks().await.unwrap();
+        let mut stream = sub.into_stream();
+        let header = tokio::time::timeout(Duration::from_secs(30), stream.next())
+            .await
+            .expect("timed out waiting for PublicNode header")
+            .expect("subscription stream closed");
+        assert!(header.number > 0);
+    }
+
+    #[tokio::test]
     async fn test_custom_retry_policy() {
         #[derive(Debug, Clone)]
         struct CustomPolicy;
