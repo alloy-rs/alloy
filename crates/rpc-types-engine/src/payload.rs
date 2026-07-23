@@ -3434,6 +3434,11 @@ pub struct PayloadAttributes {
         )
     )]
     pub target_gas_limit: Option<u64>,
+    /// Transactions from the inclusion list enabled with EIP-7805.
+    ///
+    /// See <https://github.com/ethereum/execution-apis/pull/609>
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub inclusion_list_transactions: Option<Vec<Bytes>>,
 }
 
 impl PayloadAttributes {
@@ -3458,6 +3463,12 @@ impl PayloadAttributes {
     /// Sets the slot number for the payload attributes.
     pub const fn with_slot_number(mut self, slot_number: u64) -> Self {
         self.slot_number = Some(slot_number);
+        self
+    }
+
+    /// Sets the inclusion list transactions for the payload attributes.
+    pub fn with_inclusion_list_transactions(mut self, transactions: Vec<Bytes>) -> Self {
+        self.inclusion_list_transactions = Some(transactions);
         self
     }
 }
@@ -3486,8 +3497,14 @@ impl PayloadAttributes {
         Self::ssz_v4_slot_fixed_len() + <u64 as ssz::Encode>::ssz_fixed_len()
     }
 
+    fn ssz_v5_fixed_len() -> usize {
+        Self::ssz_v4_target_fixed_len() + <Vec<Bytes> as ssz::Encode>::ssz_fixed_len()
+    }
+
     fn ssz_fixed_section_len(&self) -> usize {
-        if self.target_gas_limit.is_some() {
+        if self.inclusion_list_transactions.is_some() {
+            Self::ssz_v5_fixed_len()
+        } else if self.target_gas_limit.is_some() {
             Self::ssz_v4_target_fixed_len()
         } else if self.slot_number.is_some() {
             Self::ssz_v4_slot_fixed_len()
@@ -3529,8 +3546,15 @@ impl ssz::Encode for PayloadAttributes {
             encoder.append(&self.slot_number.unwrap_or_default());
         }
 
-        if fixed_section_len == Self::ssz_v4_target_fixed_len() {
+        if fixed_section_len >= Self::ssz_v4_target_fixed_len() {
             encoder.append(&self.target_gas_limit.unwrap_or_default());
+        }
+
+        if fixed_section_len == Self::ssz_v5_fixed_len() {
+            let empty_transactions = Vec::new();
+            let transactions =
+                self.inclusion_list_transactions.as_ref().unwrap_or(&empty_transactions);
+            encoder.append(transactions);
         }
 
         encoder.finalize();
@@ -3544,7 +3568,16 @@ impl ssz::Encode for PayloadAttributes {
             0
         };
 
-        fixed_section_len + withdrawals_len
+        let inclusion_list_transactions_len = if fixed_section_len == Self::ssz_v5_fixed_len() {
+            self.inclusion_list_transactions
+                .as_ref()
+                .map(ssz::Encode::ssz_bytes_len)
+                .unwrap_or_default()
+        } else {
+            0
+        };
+
+        fixed_section_len + withdrawals_len + inclusion_list_transactions_len
     }
 }
 
@@ -3572,6 +3605,7 @@ impl ssz::Decode for PayloadAttributes {
                 parent_beacon_block_root: None,
                 slot_number: None,
                 target_gas_limit: None,
+                inclusion_list_transactions: None,
             });
         }
 
@@ -3608,6 +3642,7 @@ impl ssz::Decode for PayloadAttributes {
                     parent_beacon_block_root: None,
                     slot_number: None,
                     target_gas_limit: None,
+                    inclusion_list_transactions: None,
                 })
             }
             offset if offset == Self::ssz_v3_fixed_len() => {
@@ -3622,6 +3657,7 @@ impl ssz::Decode for PayloadAttributes {
                     parent_beacon_block_root: Some(decoder.decode_next()?),
                     slot_number: None,
                     target_gas_limit: None,
+                    inclusion_list_transactions: None,
                 })
             }
             offset if offset == Self::ssz_v4_slot_fixed_len() => {
@@ -3637,6 +3673,7 @@ impl ssz::Decode for PayloadAttributes {
                     parent_beacon_block_root: Some(decoder.decode_next()?),
                     slot_number: Some(decoder.decode_next()?),
                     target_gas_limit: None,
+                    inclusion_list_transactions: None,
                 })
             }
             offset if offset == Self::ssz_v4_target_fixed_len() => {
@@ -3653,6 +3690,25 @@ impl ssz::Decode for PayloadAttributes {
                     parent_beacon_block_root: Some(decoder.decode_next()?),
                     slot_number: Some(decoder.decode_next()?),
                     target_gas_limit: Some(decoder.decode_next()?),
+                    inclusion_list_transactions: None,
+                })
+            }
+            offset if offset == Self::ssz_v5_fixed_len() => {
+                builder.register_type::<B256>()?;
+                builder.register_type::<u64>()?;
+                builder.register_type::<u64>()?;
+                builder.register_type::<Vec<Bytes>>()?;
+                let mut decoder = builder.build()?;
+
+                Ok(Self {
+                    timestamp: decoder.decode_next()?,
+                    prev_randao: decoder.decode_next()?,
+                    suggested_fee_recipient: decoder.decode_next()?,
+                    withdrawals: Some(decoder.decode_next()?),
+                    parent_beacon_block_root: Some(decoder.decode_next()?),
+                    slot_number: Some(decoder.decode_next()?),
+                    target_gas_limit: Some(decoder.decode_next()?),
+                    inclusion_list_transactions: Some(decoder.decode_next()?),
                 })
             }
             offset => Err(ssz::DecodeError::BytesInvalid(format!(
@@ -3791,6 +3847,79 @@ impl serde::Serialize for PayloadStatus {
         map.serialize_entry("status", self.status.as_str())?;
         map.serialize_entry("latestValidHash", &self.latest_valid_hash)?;
         map.serialize_entry("validationError", &self.status.validation_error())?;
+        map.end()
+    }
+}
+
+/// This structure contains the result of processing a payload or fork choice update in the
+/// EIP-7805 API.
+///
+/// This composes [`PayloadStatus`] instead of duplicating its status, latest-valid-hash, and
+/// validation-error fields.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct PayloadStatusV2 {
+    /// The common payload status fields.
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub payload_inner: PayloadStatus,
+    /// Whether the payload satisfied the inclusion list constraints.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub inclusion_list_satisfied: Option<bool>,
+}
+
+impl PayloadStatusV2 {
+    /// Creates a new EIP-7805 payload status.
+    pub const fn new(
+        payload_status: PayloadStatus,
+        inclusion_list_satisfied: Option<bool>,
+    ) -> Self {
+        Self { payload_inner: payload_status, inclusion_list_satisfied }
+    }
+
+    /// Returns true if the payload status is syncing.
+    pub const fn is_syncing(&self) -> bool {
+        self.payload_inner.is_syncing()
+    }
+
+    /// Returns true if the payload status is valid.
+    pub const fn is_valid(&self) -> bool {
+        self.payload_inner.is_valid()
+    }
+
+    /// Returns true if the payload status is invalid.
+    pub const fn is_invalid(&self) -> bool {
+        self.payload_inner.is_invalid()
+    }
+}
+
+impl From<PayloadStatus> for PayloadStatusV2 {
+    fn from(payload_status: PayloadStatus) -> Self {
+        Self::new(payload_status, None)
+    }
+}
+
+/// The forkchoice-update variant of [`PayloadStatusV2`].
+///
+/// The Engine API restricts this response to `VALID`, `INVALID`, and `SYNCING`. Alloy keeps the
+/// existing shared [`PayloadStatusEnum`] representation and uses this alias rather than
+/// duplicating the payload status structure.
+pub type RestrictedPayloadStatusV2 = PayloadStatusV2;
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for PayloadStatusV2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(4))?;
+        map.serialize_entry("status", self.payload_inner.status.as_str())?;
+        map.serialize_entry("latestValidHash", &self.payload_inner.latest_valid_hash)?;
+        map.serialize_entry("validationError", &self.payload_inner.status.validation_error())?;
+        map.serialize_entry("inclusionListSatisfied", &self.inclusion_list_satisfied)?;
         map.end()
     }
 }
@@ -4422,6 +4551,23 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
+    fn serde_payload_status_v2() {
+        let s = r#"{"status":"VALID","latestValidHash":null,"validationError":null,"inclusionListSatisfied":true}"#;
+        let status: PayloadStatusV2 = serde_json::from_str(s).unwrap();
+        assert_eq!(status.payload_inner.status, PayloadStatusEnum::Valid);
+        assert!(status.payload_inner.latest_valid_hash.is_none());
+        assert_eq!(status.inclusion_list_satisfied, Some(true));
+        assert_eq!(serde_json::to_string(&status).unwrap(), s);
+
+        let s = r#"{"status":"SYNCING","latestValidHash":null,"validationError":null,"inclusionListSatisfied":null}"#;
+        let status: PayloadStatusV2 = serde_json::from_str(s).unwrap();
+        assert_eq!(status.payload_inner.status, PayloadStatusEnum::Syncing);
+        assert_eq!(status.inclusion_list_satisfied, None);
+        assert_eq!(serde_json::to_string(&status).unwrap(), s);
+    }
+
+    #[test]
     fn payload_attributes_builder_setters() {
         let withdrawal = Withdrawal {
             index: 1,
@@ -4435,12 +4581,17 @@ mod tests {
             .with_timestamp(10)
             .with_withdrawals(vec![withdrawal])
             .with_parent_beacon_block_root(parent_beacon_block_root)
-            .with_slot_number(6);
+            .with_slot_number(6)
+            .with_inclusion_list_transactions(vec![Bytes::from_static(&[0x01, 0x02])]);
 
         assert_eq!(attributes.timestamp, 10);
         assert_eq!(attributes.withdrawals, Some(vec![withdrawal]));
         assert_eq!(attributes.parent_beacon_block_root, Some(parent_beacon_block_root));
         assert_eq!(attributes.slot_number, Some(6));
+        assert_eq!(
+            attributes.inclusion_list_transactions,
+            Some(vec![Bytes::from_static(&[0x01, 0x02])])
+        );
     }
 
     #[test]
@@ -4463,6 +4614,7 @@ mod tests {
             parent_beacon_block_root: None,
             slot_number: None,
             target_gas_limit: None,
+            inclusion_list_transactions: None,
         };
         let decoded_v1 = PayloadAttributes::from_ssz_bytes(&v1.as_ssz_bytes()).unwrap();
         assert_eq!(decoded_v1, v1);
@@ -4475,6 +4627,7 @@ mod tests {
             parent_beacon_block_root: None,
             slot_number: None,
             target_gas_limit: None,
+            inclusion_list_transactions: None,
         };
         let decoded_v2 = PayloadAttributes::from_ssz_bytes(&v2.as_ssz_bytes()).unwrap();
         assert_eq!(decoded_v2, v2);
@@ -4487,6 +4640,7 @@ mod tests {
             parent_beacon_block_root: Some(B256::with_last_byte(33)),
             slot_number: None,
             target_gas_limit: None,
+            inclusion_list_transactions: None,
         };
         let decoded_v3 = PayloadAttributes::from_ssz_bytes(&v3.as_ssz_bytes()).unwrap();
         assert_eq!(decoded_v3, v3);
@@ -4499,9 +4653,23 @@ mod tests {
             parent_beacon_block_root: Some(B256::with_last_byte(43)),
             slot_number: Some(44),
             target_gas_limit: Some(45),
+            inclusion_list_transactions: None,
         };
         let decoded_v4 = PayloadAttributes::from_ssz_bytes(&v4.as_ssz_bytes()).unwrap();
         assert_eq!(decoded_v4, v4);
+
+        let v5 = PayloadAttributes {
+            timestamp: 50,
+            prev_randao: B256::with_last_byte(51),
+            suggested_fee_recipient: Address::with_last_byte(52),
+            withdrawals: Some(vec![withdrawal]),
+            parent_beacon_block_root: Some(B256::with_last_byte(53)),
+            slot_number: Some(54),
+            target_gas_limit: Some(55),
+            inclusion_list_transactions: Some(vec![Bytes::from_static(&[0x01, 0x02])]),
+        };
+        let decoded_v5 = PayloadAttributes::from_ssz_bytes(&v5.as_ssz_bytes()).unwrap();
+        assert_eq!(decoded_v5, v5);
     }
 
     #[test]
@@ -4524,6 +4692,7 @@ mod tests {
             parent_beacon_block_root: None,
             slot_number: None,
             target_gas_limit: None,
+            inclusion_list_transactions: None,
         };
         assert_eq!(v1.as_ssz_bytes().len(), 60);
 
@@ -4535,6 +4704,7 @@ mod tests {
             parent_beacon_block_root: None,
             slot_number: None,
             target_gas_limit: None,
+            inclusion_list_transactions: None,
         };
         let bytes = v2.as_ssz_bytes();
         assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 64);
@@ -4547,6 +4717,7 @@ mod tests {
             parent_beacon_block_root: Some(B256::with_last_byte(33)),
             slot_number: None,
             target_gas_limit: None,
+            inclusion_list_transactions: None,
         };
         let bytes = v3.as_ssz_bytes();
         assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 96);
@@ -4559,9 +4730,23 @@ mod tests {
             parent_beacon_block_root: Some(B256::with_last_byte(43)),
             slot_number: Some(44),
             target_gas_limit: Some(45),
+            inclusion_list_transactions: None,
         };
         let bytes = v4.as_ssz_bytes();
         assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 112);
+
+        let v5 = PayloadAttributes {
+            timestamp: 50,
+            prev_randao: B256::with_last_byte(51),
+            suggested_fee_recipient: Address::with_last_byte(52),
+            withdrawals: Some(vec![withdrawal]),
+            parent_beacon_block_root: Some(B256::with_last_byte(53)),
+            slot_number: Some(54),
+            target_gas_limit: Some(55),
+            inclusion_list_transactions: Some(vec![Bytes::from_static(&[0x01, 0x02])]),
+        };
+        let bytes = v5.as_ssz_bytes();
+        assert_eq!(u32::from_le_bytes(bytes[60..64].try_into().unwrap()), 116);
     }
 
     #[test]
@@ -5406,6 +5591,7 @@ mod tests {
         assert_eq!(attrs.timestamp, 0x1234);
         assert!(attrs.slot_number.is_none());
         assert!(attrs.target_gas_limit.is_none());
+        assert!(attrs.inclusion_list_transactions.is_none());
     }
 
     #[test]
@@ -5418,13 +5604,18 @@ mod tests {
             "withdrawals": [],
             "parentBeaconBlockRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "slotNumber": "0x0",
-            "targetGasLimit": "0x1c9c380"
+            "targetGasLimit": "0x1c9c380",
+            "inclusionListTransactions": ["0x0102", "0xabcd"]
         }"#;
 
         let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
         assert_eq!(attrs.timestamp, 0x2);
         assert_eq!(attrs.slot_number, Some(0));
         assert_eq!(attrs.target_gas_limit, Some(30_000_000));
+        assert_eq!(
+            attrs.inclusion_list_transactions,
+            Some(vec![Bytes::from_static(&[0x01, 0x02]), Bytes::from_static(&[0xab, 0xcd])])
+        );
     }
 
     #[test]

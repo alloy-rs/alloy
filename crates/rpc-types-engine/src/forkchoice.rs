@@ -1,4 +1,4 @@
-use super::{PayloadStatus, PayloadStatusEnum};
+use super::{PayloadStatus, PayloadStatusEnum, PayloadStatusV2, RestrictedPayloadStatusV2};
 use crate::PayloadId;
 use alloy_primitives::B256;
 
@@ -113,6 +113,69 @@ pub struct ForkchoiceUpdated {
     pub payload_status: PayloadStatus,
     /// The identifier of the payload build process that was successfully initiated.
     pub payload_id: Option<PayloadId>,
+}
+
+/// Represents a successfully processed fork choice state update for EIP-7805.
+///
+/// The payload status is composed as [`PayloadStatusV2`] so the common fork choice response
+/// fields are not duplicated.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ForkchoiceUpdatedResponseV2 {
+    /// The EIP-7805 payload validation result.
+    pub payload_status: RestrictedPayloadStatusV2,
+    /// The identifier of the payload build process that was successfully initiated.
+    pub payload_id: Option<PayloadId>,
+}
+
+/// Alloy's concise name for [`ForkchoiceUpdatedResponseV2`].
+pub type ForkchoiceUpdatedV2 = ForkchoiceUpdatedResponseV2;
+
+impl ForkchoiceUpdatedResponseV2 {
+    /// Creates a new EIP-7805 fork choice response.
+    pub const fn new(payload_status: PayloadStatusV2) -> Self {
+        Self { payload_status, payload_id: None }
+    }
+
+    /// Creates a new response from a common payload status.
+    pub const fn from_status(status: PayloadStatusEnum) -> Self {
+        Self::new(PayloadStatusV2::new(PayloadStatus::from_status(status), None))
+    }
+
+    /// Sets the latest valid hash of the payload status.
+    pub const fn with_latest_valid_hash(mut self, hash: B256) -> Self {
+        self.payload_status.payload_inner.latest_valid_hash = Some(hash);
+        self
+    }
+
+    /// Sets whether the payload satisfied the inclusion list constraints.
+    pub const fn with_inclusion_list_satisfied(mut self, satisfied: bool) -> Self {
+        self.payload_status.inclusion_list_satisfied = Some(satisfied);
+        self
+    }
+
+    /// Sets the payload id of the created payload job.
+    pub const fn with_payload_id(mut self, id: PayloadId) -> Self {
+        self.payload_id = Some(id);
+        self
+    }
+
+    /// Returns true if the payload status is syncing.
+    pub const fn is_syncing(&self) -> bool {
+        self.payload_status.is_syncing()
+    }
+
+    /// Returns true if the payload status is valid.
+    pub const fn is_valid(&self) -> bool {
+        self.payload_status.is_valid()
+    }
+
+    /// Returns true if the payload status is invalid.
+    pub const fn is_invalid(&self) -> bool {
+        self.payload_status.is_invalid()
+    }
 }
 
 impl ForkchoiceUpdated {
@@ -249,6 +312,19 @@ mod tests {
 
         let encoded = updated.as_ssz_bytes();
         let decoded = ForkchoiceUpdated::from_ssz_bytes(&encoded).unwrap();
+        assert_eq!(decoded, updated);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_forkchoice_updated_v2() {
+        let updated = ForkchoiceUpdatedResponseV2::from_status(PayloadStatusEnum::Valid)
+            .with_inclusion_list_satisfied(true);
+        let value = serde_json::to_value(&updated).unwrap();
+        assert_eq!(value["payloadStatus"]["status"], "VALID");
+        assert_eq!(value["payloadStatus"]["inclusionListSatisfied"], true);
+
+        let decoded: ForkchoiceUpdatedResponseV2 = serde_json::from_value(value).unwrap();
         assert_eq!(decoded, updated);
     }
 }
