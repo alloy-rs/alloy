@@ -4,7 +4,10 @@ use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result, IsTyped2718},
     eip7702::SignedAuthorization,
     eip8141::{
-        constants::{FRAME_TX_INTRINSIC_COST, FRAME_TX_PER_FRAME_COST, FRAME_TX_TYPE},
+        constants::{
+            FRAME_TX_DATA_TOKEN_STANDARD_COST, FRAME_TX_INTRINSIC_COST, FRAME_TX_PER_FRAME_COST,
+            FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE,
+        },
         Frame, FrameMode, FrameSignature,
     },
     Decodable2718, Encodable2718, Typed2718,
@@ -15,16 +18,6 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use crate::Transaction;
 
 static EMPTY_INPUT: Bytes = Bytes::new();
-
-/// Standard gas charged per frame transaction calldata token.
-///
-/// This matches `GasCosts.TX_DATA_TOKEN_STANDARD` in the execution-specs EIP-8141 draft.
-pub const FRAME_TX_DATA_TOKEN_STANDARD_COST: u64 = 4;
-
-/// Floor gas charged per frame transaction calldata token.
-///
-/// This matches `GasCosts.TX_DATA_TOKEN_FLOOR` in the execution-specs EIP-8141 draft.
-pub const FRAME_TX_DATA_TOKEN_FLOOR_COST: u64 = 16;
 
 /// Counts frame transaction calldata tokens.
 ///
@@ -255,14 +248,12 @@ impl TxEip8141 {
 
     /// Calculates the calldata floor gas for this frame transaction.
     pub fn calculate_calldata_floor(&self) -> u64 {
-        // EIP-7976 prices every charged byte as four standard tokens at the floor; unlike the
-        // ordinary intrinsic cost, zero bytes receive no discount here. RLP headers and fixed-size
-        // fields are not charged data.
-        FRAME_TX_INTRINSIC_COST.saturating_add(
-            self.frame_calldata_len()
-                .saturating_mul(FRAME_TX_DATA_TOKEN_STANDARD_COST)
-                .saturating_mul(FRAME_TX_DATA_TOKEN_FLOOR_COST),
-        )
+        FRAME_TX_INTRINSIC_COST
+            .saturating_add((self.frames.len() as u64).saturating_mul(FRAME_TX_PER_FRAME_COST))
+            .saturating_add(self.signature_verification_gas())
+            .saturating_add(
+                self.frame_calldata_tokens().saturating_mul(FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN),
+            )
     }
 
     /// Calculates a heuristic for the in-memory size of the [TxEip8141] transaction.
@@ -685,7 +676,9 @@ mod tests {
         assert_eq!(
             tx.calculate_calldata_floor(),
             FRAME_TX_INTRINSIC_COST
-                + calldata_len * FRAME_TX_DATA_TOKEN_STANDARD_COST * FRAME_TX_DATA_TOKEN_FLOOR_COST
+                + 2 * FRAME_TX_PER_FRAME_COST
+                + 2_800
+                + calldata_tokens * FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN
         );
     }
 
@@ -706,6 +699,9 @@ mod tests {
 
         assert_eq!(tx.frame_calldata_tokens(), 0);
         assert_eq!(tx.frame_calldata_len(), 0);
-        assert_eq!(tx.calculate_calldata_floor(), FRAME_TX_INTRINSIC_COST);
+        assert_eq!(
+            tx.calculate_calldata_floor(),
+            FRAME_TX_INTRINSIC_COST + FRAME_TX_PER_FRAME_COST
+        );
     }
 }
