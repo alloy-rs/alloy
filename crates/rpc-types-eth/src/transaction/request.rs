@@ -16,6 +16,14 @@ use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
 
+#[cfg(feature = "serde")]
+fn deserialize_to<'de, D>(deserializer: D) -> Result<Option<TxKind>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    <TxKind as serde::Deserialize>::deserialize(deserializer).map(Some)
+}
+
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -27,7 +35,14 @@ pub struct TransactionRequest {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub from: Option<Address>,
     /// The destination address of the transaction.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "deserialize_to"
+        )
+    )]
     pub to: Option<TxKind>,
     /// The legacy gas price.
     #[cfg_attr(
@@ -1893,6 +1908,18 @@ mod tests {
         let tx = TransactionRequest::default();
         let serialized = serde_json::to_string(&tx).unwrap();
         assert_eq!(serialized, "{}");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_to_distinguishes_create_from_missing() {
+        let create = TransactionRequest::default().create();
+        let json = serde_json::to_value(create).unwrap();
+        let decoded = serde_json::from_value::<TransactionRequest>(json).unwrap();
+        let missing = serde_json::from_str::<TransactionRequest>("{}").unwrap();
+
+        assert_eq!(decoded.to, Some(TxKind::Create));
+        assert_eq!(missing.to, None);
     }
 
     #[test]
