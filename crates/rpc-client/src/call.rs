@@ -1,6 +1,6 @@
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Request, RequestMeta, RequestPacket, ResponsePacket,
-    RpcRecv, RpcResult, RpcSend,
+    transform_response_payload, try_deserialize_ok, Id, Request, RequestMeta, RequestPacket,
+    ResponsePacket, RpcRecv, RpcResult, RpcSend,
 };
 use alloy_transport::{
     BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportErrorKind, TransportResult,
@@ -28,6 +28,7 @@ where
         connection: BoxTransport,
     },
     AwaitingResponse {
+        expected_id: Id,
         #[pin]
         fut: <BoxTransport as Service<RequestPacket>>::Future,
     },
@@ -84,6 +85,7 @@ where
                     } else {
                         debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
                     }
+                    let expected_id = request.meta.id.clone();
                     let request = request.serialize();
                     let fut = match request {
                         Ok(request) => {
@@ -96,11 +98,20 @@ where
                             return Ready(RpcResult::Err(TransportError::ser_err(err)));
                         }
                     };
-                    self.set(Self::AwaitingResponse { fut });
+                    self.set(Self::AwaitingResponse { expected_id, fut });
                 }
-                CallStateProj::AwaitingResponse { fut } => {
+                CallStateProj::AwaitingResponse { expected_id, fut } => {
                     let res = match task::ready!(fut.poll(cx)) {
-                        Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
+                        Ok(ResponsePacket::Single(res)) => {
+                            if res.id != *expected_id {
+                                Ready(RpcResult::Err(TransportErrorKind::custom_str(&format!(
+                                    "received response with ID {}, expected {}",
+                                    res.id, &*expected_id
+                                ))))
+                            } else {
+                                Ready(transform_response_payload(res.payload))
+                            }
+                        }
                         Err(e) => Ready(RpcResult::Err(e)),
                         Ok(ResponsePacket::Batch(_)) => {
                             Ready(RpcResult::Err(TransportErrorKind::custom_str(
@@ -350,5 +361,44 @@ where
         let this = self.get_mut();
         let resp = try_deserialize_ok(ready!(this.state.poll_unpin(cx)));
         Ready(resp.map(this.map.take().expect("polled after completion")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_json_rpc::{Response, ResponsePayload};
+    use alloy_transport::{TransportError, TransportFut};
+    use serde_json::value::to_raw_value;
+    use std::task::Poll;
+
+    #[derive(Clone)]
+    struct MismatchedIdTransport;
+
+    impl Service<RequestPacket> for MismatchedIdTransport {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: RequestPacket) -> Self::Future {
+            Box::pin(async move {
+                Ok(ResponsePacket::Single(Response {
+                    id: Id::Number(99),
+                    payload: ResponsePayload::Success(to_raw_value(&1u64).unwrap()),
+                }))
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn single_request_rejects_mismatched_response_id() {
+        let request = Request::new("eth_chainId", Id::Number(1), ());
+        let err = RpcCall::<_, u64>::new(request, MismatchedIdTransport).await.unwrap_err();
+
+        assert!(err.to_string().contains("received response with ID 99, expected 1"));
     }
 }
