@@ -38,7 +38,7 @@ use alloy_rpc_types_eth::{
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
-use std::borrow::Cow;
+use std::{borrow::Cow, time::Duration};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -1323,6 +1323,24 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_sendRawTransactionSync", (rlp_hex,)).await
     }
 
+    /// Broadcasts a raw transaction RLP bytes to the network and returns the transaction receipt
+    /// after it has been mined or the server-side timeout elapses.
+    ///
+    /// The timeout is sent as the optional second `eth_sendRawTransactionSync` parameter in
+    /// milliseconds, as defined in [EIP-7966].
+    ///
+    /// [EIP-7966]: https://github.com/ethereum/EIPs/pull/9151
+    async fn send_raw_transaction_sync_with_timeout(
+        &self,
+        encoded_tx: &[u8],
+        timeout: Duration,
+    ) -> TransportResult<N::ReceiptResponse> {
+        let rlp_hex = hex::encode_prefixed(encoded_tx);
+        self.client()
+            .request("eth_sendRawTransactionSync", (rlp_hex, duration_millis(timeout)))
+            .await
+    }
+
     /// Broadcasts a raw transaction RLP bytes with a conditional [`TransactionConditional`] to the
     /// network.
     ///
@@ -1827,6 +1845,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn transaction_request(&self) -> N::TransactionRequest {
         Default::default()
     }
+}
+
+fn duration_millis(timeout: Duration) -> u64 {
+    u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX)
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
