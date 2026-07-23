@@ -1,4 +1,7 @@
-use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
+use crate::{
+    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, InMemorySize, Receipt,
+    ReceiptWithBloom, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt, TxType,
+};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::{
@@ -8,8 +11,8 @@ use alloy_eips::{
     eip8141::{constants::FRAME_TX_TYPE, FrameReceipt, FrameReceiptPayload},
     Typed2718,
 };
-use alloy_primitives::{Bloom, Log};
-use alloy_rlp::{BufMut, Decodable, Encodable};
+use alloy_primitives::{logs_bloom, Bloom, Log};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
@@ -243,7 +246,7 @@ impl<T> ReceiptEnvelope<T> {
 
 impl<T> TxReceipt for ReceiptEnvelope<T>
 where
-    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync + AsRef<Log>,
 {
     type Log = T;
 
@@ -260,7 +263,19 @@ where
 
     /// Return the receipt's bloom.
     fn bloom(&self) -> Bloom {
-        self.as_receipt_with_bloom().map_or_else(Bloom::default, |receipt| receipt.logs_bloom)
+        match self {
+            Self::Legacy(receipt)
+            | Self::Eip2930(receipt)
+            | Self::Eip1559(receipt)
+            | Self::Eip4844(receipt)
+            | Self::Eip7702(receipt) => receipt.logs_bloom,
+            Self::Eip8141(receipt) => logs_bloom(
+                receipt
+                    .frame_receipts
+                    .iter()
+                    .flat_map(|frame| frame.logs.iter().map(AsRef::as_ref)),
+            ),
+        }
     }
 
     fn bloom_cheap(&self) -> Option<Bloom> {
@@ -322,6 +337,99 @@ impl Decodable for ReceiptEnvelope {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::network_decode(buf)
             .map_or_else(|_| Err(alloy_rlp::Error::Custom("Unexpected type")), Ok)
+    }
+}
+
+impl RlpEncodableReceipt for ReceiptEnvelope {
+    fn rlp_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize {
+        let payload_length = self.eip2718_encoded_length_with_bloom(bloom);
+        if self.is_legacy() {
+            payload_length
+        } else {
+            Header { list: false, payload_length }.length() + payload_length
+        }
+    }
+
+    fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
+        if !self.is_legacy() {
+            Header { list: false, payload_length: self.eip2718_encoded_length_with_bloom(bloom) }
+                .encode(out);
+        }
+        self.eip2718_encode_with_bloom(bloom, out);
+    }
+}
+
+impl RlpDecodableReceipt for ReceiptEnvelope {
+    fn rlp_decode_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
+        let receipt = Self::decode(buf)?;
+        let logs_bloom = TxReceipt::bloom(&receipt);
+        Ok(ReceiptWithBloom { receipt, logs_bloom })
+    }
+}
+
+impl Eip2718EncodableReceipt for ReceiptEnvelope {
+    fn eip2718_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize {
+        let type_len = usize::from(!self.is_legacy());
+        type_len
+            + match self {
+                Self::Legacy(receipt)
+                | Self::Eip2930(receipt)
+                | Self::Eip1559(receipt)
+                | Self::Eip4844(receipt)
+                | Self::Eip7702(receipt) => receipt.receipt.rlp_encoded_length_with_bloom(bloom),
+                Self::Eip8141(receipt) => receipt.length(),
+            }
+    }
+
+    fn eip2718_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
+        if !self.is_legacy() {
+            out.put_u8(self.ty());
+        }
+        match self {
+            Self::Legacy(receipt)
+            | Self::Eip2930(receipt)
+            | Self::Eip1559(receipt)
+            | Self::Eip4844(receipt)
+            | Self::Eip7702(receipt) => receipt.receipt.rlp_encode_with_bloom(bloom, out),
+            Self::Eip8141(receipt) => receipt.encode(out),
+        }
+    }
+}
+
+impl Eip2718DecodableReceipt for ReceiptEnvelope {
+    fn typed_decode_with_bloom(ty: u8, buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>> {
+        let receipt = Self::typed_decode(ty, buf)?;
+        let logs_bloom = TxReceipt::bloom(&receipt);
+        Ok(ReceiptWithBloom { receipt, logs_bloom })
+    }
+
+    fn fallback_decode_with_bloom(buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>> {
+        let receipt = Self::fallback_decode(buf)?;
+        let logs_bloom = TxReceipt::bloom(&receipt);
+        Ok(ReceiptWithBloom { receipt, logs_bloom })
+    }
+}
+
+impl InMemorySize for ReceiptEnvelope {
+    fn size(&self) -> usize {
+        core::mem::size_of::<Self>()
+            + match self {
+                Self::Legacy(receipt)
+                | Self::Eip2930(receipt)
+                | Self::Eip1559(receipt)
+                | Self::Eip4844(receipt)
+                | Self::Eip7702(receipt) => {
+                    receipt.receipt.logs.iter().map(InMemorySize::size).sum::<usize>()
+                }
+                Self::Eip8141(receipt) => receipt
+                    .frame_receipts
+                    .iter()
+                    .map(|frame| {
+                        core::mem::size_of_val(frame)
+                            + frame.logs.iter().map(InMemorySize::size).sum::<usize>()
+                    })
+                    .sum::<usize>(),
+            }
     }
 }
 
@@ -570,12 +678,14 @@ pub(crate) mod serde_bincode_compat {
 
 #[cfg(test)]
 mod test {
-    use crate::{Receipt, ReceiptEnvelope, TxType};
+    use crate::{
+        Receipt, ReceiptEnvelope, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt, TxType,
+    };
     use alloy_eips::{
         eip2718::{Decodable2718, Encodable2718},
         eip8141::{constants::FRAME_TX_TYPE, FrameReceipt, FrameReceiptPayload, FrameStatus},
     };
-    use alloy_primitives::{Address, Log};
+    use alloy_primitives::{Address, Bloom, Log};
 
     #[cfg(feature = "serde")]
     #[test]
@@ -635,5 +745,16 @@ mod test {
         assert_eq!(decoded, envelope);
         assert!(decoded.as_receipt_with_bloom().is_none());
         assert_eq!(decoded.as_eip8141().unwrap().frame_receipts.len(), 1);
+
+        let logs_bloom = TxReceipt::bloom(&decoded);
+        assert_ne!(logs_bloom, Bloom::default());
+
+        let mut network_encoded = Vec::new();
+        decoded.rlp_encode_with_bloom(&logs_bloom, &mut network_encoded);
+        assert_eq!(network_encoded.len(), decoded.rlp_encoded_length_with_bloom(&logs_bloom));
+        let decoded_with_bloom =
+            ReceiptEnvelope::rlp_decode_with_bloom(&mut network_encoded.as_slice()).unwrap();
+        assert_eq!(decoded_with_bloom.receipt, decoded);
+        assert_eq!(decoded_with_bloom.logs_bloom, logs_bloom);
     }
 }
