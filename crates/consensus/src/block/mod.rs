@@ -14,10 +14,7 @@ pub(crate) use header::serde_bincode_compat;
 
 use crate::Transaction;
 use alloc::vec::Vec;
-use alloy_eips::{
-    eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718,
-    Typed2718,
-};
+use alloy_eips::{eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718, Typed2718};
 use alloy_primitives::{keccak256, Sealable, Sealed, B256};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 

@@ -8,8 +8,8 @@ use alloc::{
 };
 use alloy_consensus::{
     error::ValueError, transaction::Recovered, BlobTransactionSidecarVariant, SignableTransaction,
-    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702,
-    TxEip8141, TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
+    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEip8141,
+    TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip7702::SignedAuthorization,
