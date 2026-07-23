@@ -23,7 +23,9 @@ use alloy_consensus::{
 };
 use alloy_network_primitives::{BlockResponse, TransactionResponse};
 pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
-use alloy_rpc_types_eth::{AccessList, Block, BlockTransactions, Transaction, TransactionRequest};
+use alloy_rpc_types_eth::{
+    AccessList, Block, BlockTransactions, Log, Transaction, TransactionRequest,
+};
 use alloy_serde::WithOtherFields;
 use derive_more::From;
 use serde::{Deserialize, Serialize};
@@ -81,7 +83,12 @@ impl Network for AnyNetwork {
     type HeaderResponse = AnyRpcHeader;
 
     type BlockResponse = AnyRpcBlock;
+
+    type LogResponse = AnyRpcLog;
 }
+
+/// Catch-all RPC log preserving unknown response fields.
+pub type AnyRpcLog = WithOtherFields<Log>;
 
 /// A wrapper for [`AnyRpcBlock`] that allows for handling unknown block types.
 ///
@@ -603,6 +610,17 @@ mod tests {
 
         assert_eq!(header.hash, B256::ZERO);
         assert_eq!(header.other.get("timestampMillis"), Some(&serde_json::json!(1_234_567)));
+    }
+
+    #[test]
+    fn any_rpc_log_preserves_other_fields() {
+        let mut log = AnyRpcLog::new(Log::default());
+        log.other.insert("blockTimestampMs".to_owned(), serde_json::json!(42_200));
+
+        let value = serde_json::to_value(&log).unwrap();
+        let decoded: AnyRpcLog = serde_json::from_value(value).unwrap();
+
+        assert_eq!(decoded.other.get("blockTimestampMs"), Some(&serde_json::json!(42_200)));
     }
 
     #[test]

@@ -9,7 +9,7 @@ use alloy_primitives::{
     keccak256, Address, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
 use alloy_rpc_types_eth::{
-    BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log, StorageValuesRequest,
+    BlockNumberOrTag, EIP1186AccountProofResponse, Filter, StorageValuesRequest,
     StorageValuesResponse,
 };
 use alloy_transport::{TransportErrorKind, TransportResult};
@@ -215,7 +215,7 @@ where
         })
     }
 
-    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<N::LogResponse>> {
         if filter.block_option.as_block_hash().is_none() {
             // if block options have dynamic range we can't cache them
             let from_is_number = filter

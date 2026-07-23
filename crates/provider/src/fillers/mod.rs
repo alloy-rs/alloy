@@ -61,7 +61,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
-    FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
+    FilterChanges, StorageValuesRequest, StorageValuesResponse,
 };
 use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
@@ -570,7 +570,10 @@ where
         self.inner.watch_pending_transactions().await
     }
 
-    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
+    async fn watch_logs(
+        &self,
+        filter: &Filter,
+    ) -> TransportResult<FilterPollerBuilder<N::LogResponse>> {
         self.inner.watch_logs(filter).await
     }
 
@@ -580,11 +583,14 @@ where
         self.inner.watch_full_pending_transactions().await
     }
 
-    async fn get_filter_changes_dyn(&self, id: U256) -> TransportResult<FilterChanges> {
+    async fn get_filter_changes_dyn(
+        &self,
+        id: U256,
+    ) -> TransportResult<FilterChanges<N::TransactionResponse, N::LogResponse>> {
         self.inner.get_filter_changes_dyn(id).await
     }
 
-    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<Log>> {
+    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<N::LogResponse>> {
         self.inner.get_filter_logs(id).await
     }
 
@@ -599,7 +605,7 @@ where
         self.inner.watch_pending_transaction(config).await
     }
 
-    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<N::LogResponse>> {
         self.inner.get_logs(filter).await
     }
 
@@ -790,7 +796,10 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+    fn subscribe_logs(
+        &self,
+        filter: &Filter,
+    ) -> GetSubscription<(SubscriptionKind, Params), N::LogResponse> {
         self.inner.subscribe_logs(filter)
     }
 
