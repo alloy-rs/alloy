@@ -2,7 +2,7 @@
 
 use crate::{
     transaction::TxEip4844Sidecar, EthereumTxEnvelope, Header, Receipt, TxEip1559, TxEip2930,
-    TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxLegacy, TxType,
+    TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEip8141, TxLegacy, TxType,
 };
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawals;
@@ -51,7 +51,7 @@ macro_rules! impl_in_mem_size {
     };
 }
 
-impl_in_mem_size!(Header, TxLegacy, TxEip2930, TxEip1559, TxEip7702, TxEip4844);
+impl_in_mem_size!(Header, TxLegacy, TxEip2930, TxEip1559, TxEip7702, TxEip8141, TxEip4844);
 
 impl<T: TxEip4844Sidecar> InMemorySize for TxEip4844Variant<T> {
     #[inline]
@@ -96,6 +96,7 @@ impl<T: InMemorySize> InMemorySize for EthereumTxEnvelope<T> {
             Self::Eip1559(tx) => tx.size(),
             Self::Eip4844(tx) => tx.size(),
             Self::Eip7702(tx) => tx.size(),
+            Self::Eip8141(tx) => tx.inner().size(),
         }
     }
 }
@@ -147,6 +148,7 @@ mod tests {
         assert_no_recursion::<TxEip2930>();
         assert_no_recursion::<TxEip1559>();
         assert_no_recursion::<TxEip7702>();
+        assert_no_recursion::<TxEip8141>();
         assert_no_recursion::<TxEip4844>();
     }
 }

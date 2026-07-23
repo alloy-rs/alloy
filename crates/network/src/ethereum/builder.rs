@@ -139,7 +139,8 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
         let eip4844 = eip1559 && self.sidecar.is_some() && self.to.is_some();
 
         let eip7702 = eip1559 && self.authorization_list().is_some();
-        common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)
+        let eip8141 = self.complete_8141().is_ok();
+        (common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)) || eip8141
     }
 
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
@@ -149,6 +150,7 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
             TxType::Eip1559 => self.complete_1559(),
             TxType::Eip4844 => self.complete_4844(),
             TxType::Eip7702 => self.complete_7702(),
+            TxType::Eip8141 => self.complete_8141(),
         }
     }
 
@@ -212,6 +214,25 @@ mod tests {
         };
         let tx_req: TransactionRequest = tx.into();
         tx_req.build_unsigned().unwrap();
+    }
+
+    #[test]
+    fn builds_eip8141_without_explicit_gas_limit() {
+        let request = TransactionRequest {
+            from: Some(Address::ZERO),
+            nonce: Some(0),
+            max_priority_fee_per_gas: Some(1),
+            max_fee_per_gas: Some(2),
+            max_fee_per_blob_gas: Some(0),
+            transaction_type: Some(TxType::Eip8141 as u8),
+            frames: Some(Vec::new()),
+            signatures: Some(Vec::new()),
+            ..Default::default()
+        };
+
+        assert!(request.can_build());
+        assert!(request.complete_type(TxType::Eip8141).is_ok());
+        assert!(matches!(request.build_unsigned().unwrap(), TypedTransaction::Eip8141(_)));
     }
 
     #[test]

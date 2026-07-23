@@ -16,6 +16,10 @@ pub use eip2930::TxEip2930;
 mod eip7702;
 pub use eip7702::TxEip7702;
 
+/// [EIP-8141] frame transaction helpers and types.
+pub mod eip8141;
+pub use eip8141::TxEip8141;
+
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;
@@ -71,15 +75,16 @@ pub use legacy::{signed_legacy_serde, untagged_legacy_serde};
 pub mod serde_bincode_compat {
     pub use super::{
         eip1559::serde_bincode_compat::*, eip2930::serde_bincode_compat::*,
-        eip7702::serde_bincode_compat::*, envelope::serde_bincode_compat::*,
-        legacy::serde_bincode_compat::*, typed::serde_bincode_compat::*,
+        eip7702::serde_bincode_compat::*, eip8141::serde_bincode_compat::*,
+        envelope::serde_bincode_compat::*, legacy::serde_bincode_compat::*,
+        typed::serde_bincode_compat::*,
     };
 }
 
 use alloy_eips::Typed2718;
 
 /// Represents a minimal EVM transaction.
-/// Currently, EIP-1559, EIP-4844, and EIP-7702 support dynamic fees.
+/// Currently, EIP-1559, EIP-4844, EIP-7702, and EIP-8141 support dynamic fees.
 /// We call these transactions "dynamic fee transactions".
 /// We call non dynamic fee transactions(EIP-155, EIP-2930) "legacy fee transactions".
 #[doc(alias = "Tx")]

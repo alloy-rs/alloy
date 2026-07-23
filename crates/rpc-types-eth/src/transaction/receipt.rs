@@ -147,6 +147,7 @@ impl TransactionReceipt {
             | ReceiptEnvelope::Eip4844(receipt)
             | ReceiptEnvelope::Eip7702(receipt)
             | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status.coerce_status(),
+            ReceiptEnvelope::Eip8141(_) => true,
         }
     }
 

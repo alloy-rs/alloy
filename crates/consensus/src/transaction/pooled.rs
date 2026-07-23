@@ -28,6 +28,7 @@ impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844WithSidecar<T>> {
             Self::Eip1559(tx) => tx.into(),
             Self::Eip7702(tx) => tx.into(),
             Self::Eip4844(tx) => tx.into(),
+            Self::Eip8141(tx) => EthereumTxEnvelope::Eip8141(tx),
         }
     }
 }
