@@ -1353,7 +1353,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// # Examples
     ///
-    /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
+    /// See [`PendingTransactionBuilder`] for more examples.
     ///
     /// ```no_run
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
@@ -2093,7 +2093,7 @@ mod tests {
     #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
+        for url in ["wss://ethereum.reth.rs/ws"] {
             let _ = ProviderBuilder::<_, _, Ethereum>::default().connect(url).await.unwrap();
         }
     }

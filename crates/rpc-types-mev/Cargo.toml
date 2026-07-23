@@ -38,4 +38,10 @@ bincode = { workspace = true, features = ["serde"] }
 workspace = true
 
 [features]
-serde-bincode-compat = ["serde_with", "alloy-eips/serde-bincode-compat"]
+serde-bincode-compat = [
+    "serde_with",
+    "alloy-eips/serde-bincode-compat",
+    "alloy-consensus/serde-bincode-compat",
+    "alloy-rpc-types-eth/serde-bincode-compat",
+]
+serde_with = ["dep:serde_with", "alloy-consensus/serde_with"]

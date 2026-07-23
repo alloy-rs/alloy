@@ -359,7 +359,7 @@ where
                     ?tx, ?self.filler,
                     ERROR
                 );
-                panic!("{}, {:?}, {:?}", ERROR, &tx, &self.filler);
+                panic!("{}, {:?}, {:?}", ERROR, tx, self.filler);
             }
         }
         Ok(tx)
