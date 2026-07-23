@@ -71,7 +71,9 @@ impl<T> ReceiptEnvelope<T> {
             TxType::Eip4844 => Self::Eip4844(receipt.into()),
             TxType::Eip7702 => Self::Eip7702(receipt.into()),
             TxType::Eip8141 => {
-                panic!("EIP-8141 receipts use FrameReceiptPayload; construct ReceiptEnvelope::Eip8141")
+                panic!(
+                    "EIP-8141 receipts use FrameReceiptPayload; construct ReceiptEnvelope::Eip8141"
+                )
             }
         }
     }
@@ -168,11 +170,9 @@ impl<T> ReceiptEnvelope<T> {
             | Self::Eip1559(t)
             | Self::Eip4844(t)
             | Self::Eip7702(t) => t.receipt.logs,
-            Self::Eip8141(t) => t
-                .frame_receipts
-                .into_iter()
-                .flat_map(|receipt| receipt.logs)
-                .collect(),
+            Self::Eip8141(t) => {
+                t.frame_receipts.into_iter().flat_map(|receipt| receipt.logs).collect()
+            }
         }
     }
 
@@ -260,8 +260,7 @@ where
 
     /// Return the receipt's bloom.
     fn bloom(&self) -> Bloom {
-        self.as_receipt_with_bloom()
-            .map_or_else(Bloom::default, |receipt| receipt.logs_bloom)
+        self.as_receipt_with_bloom().map_or_else(Bloom::default, |receipt| receipt.logs_bloom)
     }
 
     fn bloom_cheap(&self) -> Option<Bloom> {
@@ -574,9 +573,7 @@ mod test {
     use crate::{Receipt, ReceiptEnvelope, TxType};
     use alloy_eips::{
         eip2718::{Decodable2718, Encodable2718},
-        eip8141::{
-            constants::FRAME_TX_TYPE, FrameReceipt, FrameReceiptPayload, FrameStatus,
-        },
+        eip8141::{constants::FRAME_TX_TYPE, FrameReceipt, FrameReceiptPayload, FrameStatus},
     };
     use alloy_primitives::{Address, Log};
 

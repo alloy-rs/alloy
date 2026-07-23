@@ -895,7 +895,7 @@ where
             Self::Eip1559(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
             Self::Eip4844(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
             Self::Eip7702(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
-            Self::Eip8141(_) => Err(crate::crypto::RecoveryError::new()),
+            Self::Eip8141(tx) => Ok(tx.sender),
         }
     }
 
@@ -916,7 +916,7 @@ where
             Self::Eip7702(tx) => {
                 crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
             }
-            Self::Eip8141(_) => Err(crate::crypto::RecoveryError::new()),
+            Self::Eip8141(tx) => Ok(tx.sender),
         }
     }
 
@@ -930,7 +930,7 @@ where
             Self::Eip1559(tx) => crate::transaction::SignerRecoverable::recover_with_buf(tx, buf),
             Self::Eip4844(tx) => crate::transaction::SignerRecoverable::recover_with_buf(tx, buf),
             Self::Eip7702(tx) => crate::transaction::SignerRecoverable::recover_with_buf(tx, buf),
-            Self::Eip8141(_) => Err(crate::crypto::RecoveryError::new()),
+            Self::Eip8141(tx) => Ok(tx.sender),
         }
     }
 
@@ -954,7 +954,7 @@ where
             Self::Eip7702(tx) => {
                 crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
-            Self::Eip8141(_) => Err(crate::crypto::RecoveryError::new()),
+            Self::Eip8141(tx) => Ok(tx.sender),
         }
     }
 }
@@ -1148,6 +1148,22 @@ mod tests {
         assert_encodable::<EthereumTxEnvelope<TxEip4844>>();
         assert_encodable::<Recovered<EthereumTxEnvelope<TxEip4844>>>();
         assert_encodable::<Recovered<EthereumTxEnvelope<TxEip4844Variant>>>();
+    }
+
+    #[test]
+    #[cfg(any(feature = "secp256k1", feature = "k256"))]
+    fn eip8141_recovers_explicit_sender() {
+        use alloy_primitives::Sealable;
+
+        let sender = Address::repeat_byte(0x14);
+        let tx = TxEnvelope::Eip8141(TxEip8141 { sender, ..Default::default() }.seal_slow());
+        let mut buf = vec![0xaa];
+
+        assert_eq!(tx.recover_signer().unwrap(), sender);
+        assert_eq!(tx.recover_signer_unchecked().unwrap(), sender);
+        assert_eq!(tx.recover_with_buf(&mut buf).unwrap(), sender);
+        assert_eq!(tx.recover_unchecked_with_buf(&mut buf).unwrap(), sender);
+        assert_eq!(buf, [0xaa]);
     }
 
     #[test]
