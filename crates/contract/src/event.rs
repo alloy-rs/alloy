@@ -1,6 +1,7 @@
 use crate::Error;
-use alloy_network::Ethereum;
-use alloy_primitives::{Address, LogData, B256};
+use alloy_json_rpc::RpcObject;
+use alloy_network::{Ethereum, LogResponse};
+use alloy_primitives::{Address, B256};
 use alloy_provider::{FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topic, ValueOrArray};
 use alloy_sol_types::SolEvent;
@@ -51,14 +52,14 @@ impl<P: Provider<N>, E: SolEvent, N: Network> Event<P, E, N> {
     }
 
     /// Queries the blockchain for the selected filter and returns a vector of matching event logs.
-    pub async fn query(&self) -> Result<Vec<(E, Log)>, Error> {
+    pub async fn query(&self) -> Result<Vec<(E, N::LogResponse)>, Error> {
         let logs = self.query_raw().await?;
         logs.into_iter().map(|log| Ok((decode_log(&log)?, log))).collect()
     }
 
     /// Queries the blockchain for the selected filter and returns a vector of matching event logs,
     /// without decoding them.
-    pub async fn query_raw(&self) -> TransportResult<Vec<Log>> {
+    pub async fn query_raw(&self) -> TransportResult<Vec<N::LogResponse>> {
         self.provider.get_logs(&self.filter).await
     }
 
@@ -67,7 +68,7 @@ impl<P: Provider<N>, E: SolEvent, N: Network> Event<P, E, N> {
     /// Returns a stream of decoded events and raw logs.
     #[doc(alias = "stream")]
     #[doc(alias = "stream_with_meta")]
-    pub async fn watch(&self) -> TransportResult<EventPoller<E>> {
+    pub async fn watch(&self) -> TransportResult<EventPoller<E, N::LogResponse>> {
         let poller = self.provider.watch_logs(&self.filter).await?;
         Ok(poller.into())
     }
@@ -76,7 +77,9 @@ impl<P: Provider<N>, E: SolEvent, N: Network> Event<P, E, N> {
     ///
     /// Returns a stream of decoded events and raw logs.
     #[cfg(feature = "pubsub")]
-    pub async fn subscribe(&self) -> TransportResult<subscription::EventSubscription<E>> {
+    pub async fn subscribe(
+        &self,
+    ) -> TransportResult<subscription::EventSubscription<E, N::LogResponse>> {
         let sub = self.provider.subscribe_logs(&self.filter).await?;
         Ok(sub.into())
     }
@@ -251,7 +254,7 @@ impl<P, E, N> ChunkedEvent<P, E, N> {
 impl<P: Provider<N> + Clone + 'static, E: SolEvent + Send + Sync + 'static, N: Network>
     std::future::IntoFuture for ChunkedEvent<P, E, N>
 {
-    type Output = Result<Vec<(E, Log)>, Error>;
+    type Output = Result<Vec<(E, N::LogResponse)>, Error>;
     type IntoFuture = BoxFuture<'static, Self::Output>;
 
     fn into_future(self) -> Self::IntoFuture {
@@ -263,7 +266,7 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     /// Queries the blockchain for matching event logs, decoding them.
     ///
     /// See [`query_raw`](Self::query_raw) for the full description of the chunked strategy.
-    pub async fn query(&self) -> Result<Vec<(E, Log)>, Error> {
+    pub async fn query(&self) -> Result<Vec<(E, N::LogResponse)>, Error> {
         let logs = self.query_raw().await?;
         logs.into_iter().map(|log| Ok((decode_log(&log)?, log))).collect()
     }
@@ -273,7 +276,7 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     /// Attempts the full block range optimistically first. If that fails, splits the range into
     /// `chunk_size`-block windows queried concurrently (up to `max_concurrent` at a time). If an
     /// individual chunk still fails, falls back to querying each block individually.
-    pub async fn query_raw(&self) -> TransportResult<Vec<Log>> {
+    pub async fn query_raw(&self) -> TransportResult<Vec<N::LogResponse>> {
         if let Ok(logs) = self.provider.get_logs(&self.filter).await {
             return Ok(logs);
         }
@@ -282,7 +285,7 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
 
     /// Divides the block range into chunks and queries them concurrently, falling back to
     /// single-block queries for any chunk that fails.
-    async fn get_logs_chunked(&self) -> TransportResult<Vec<Log>> {
+    async fn get_logs_chunked(&self) -> TransportResult<Vec<N::LogResponse>> {
         let FilterBlockOption::Range { from_block, to_block } = self.filter.block_option else {
             return Err(RpcError::local_usage_str(
                 "chunked queries require a block range filter, not a block hash filter",
@@ -299,10 +302,10 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
             return Ok(vec![]);
         }
 
-        let all_results: Vec<TransportResult<(u64, Vec<Log>)>> =
+        let all_results: Vec<TransportResult<(u64, Vec<N::LogResponse>)>> =
             self.chunk_stream(from, to).collect().await;
 
-        let mut resolved: Vec<(u64, Vec<Log>)> =
+        let mut resolved: Vec<(u64, Vec<N::LogResponse>)> =
             all_results.into_iter().collect::<TransportResult<Vec<_>>>()?;
 
         resolved.sort_by_key(|(block_num, _)| *block_num);
@@ -318,7 +321,7 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
         &self,
         from: u64,
         to: u64,
-    ) -> impl Stream<Item = TransportResult<(u64, Vec<Log>)>> {
+    ) -> impl Stream<Item = TransportResult<(u64, Vec<N::LogResponse>)>> {
         let filter = self.filter.clone();
         let provider = self.provider.clone();
         let max_concurrent = self.max_concurrent;
@@ -352,7 +355,7 @@ async fn query_chunk<P: Provider<N>, N: Network>(
     filter: &Filter,
     start_block: u64,
     end_block: u64,
-) -> TransportResult<(u64, Vec<Log>)> {
+) -> TransportResult<(u64, Vec<N::LogResponse>)> {
     match provider.get_logs(filter).await {
         Ok(logs) => Ok((start_block, logs)),
         Err(err) => {
@@ -375,27 +378,30 @@ async fn query_chunk<P: Provider<N>, N: Network>(
 /// An event poller.
 ///
 /// Polling configuration is available through the [`poller`](Self::poller) field.
-pub struct EventPoller<E> {
+pub struct EventPoller<E, L = Log> {
     /// The inner poller.
-    pub poller: FilterPollerBuilder<Log>,
+    pub poller: FilterPollerBuilder<L>,
     _phantom: PhantomData<E>,
 }
 
-impl<E> AsRef<FilterPollerBuilder<Log>> for EventPoller<E> {
+impl<E, L> AsRef<FilterPollerBuilder<L>> for EventPoller<E, L> {
     #[inline]
-    fn as_ref(&self) -> &FilterPollerBuilder<Log> {
+    fn as_ref(&self) -> &FilterPollerBuilder<L> {
         &self.poller
     }
 }
 
-impl<E> AsMut<FilterPollerBuilder<Log>> for EventPoller<E> {
+impl<E, L> AsMut<FilterPollerBuilder<L>> for EventPoller<E, L> {
     #[inline]
-    fn as_mut(&mut self) -> &mut FilterPollerBuilder<Log> {
+    fn as_mut(&mut self) -> &mut FilterPollerBuilder<L> {
         &mut self.poller
     }
 }
 
-impl<E> fmt::Debug for EventPoller<E> {
+impl<E, L> fmt::Debug for EventPoller<E, L>
+where
+    FilterPollerBuilder<L>: fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EventPoller")
             .field("poller", &self.poller)
@@ -404,17 +410,17 @@ impl<E> fmt::Debug for EventPoller<E> {
     }
 }
 
-impl<E> From<FilterPollerBuilder<Log>> for EventPoller<E> {
-    fn from(poller: FilterPollerBuilder<Log>) -> Self {
+impl<E, L> From<FilterPollerBuilder<L>> for EventPoller<E, L> {
+    fn from(poller: FilterPollerBuilder<L>) -> Self {
         Self { poller, _phantom: PhantomData }
     }
 }
 
-impl<E: SolEvent> EventPoller<E> {
+impl<E: SolEvent, L: LogResponse + RpcObject> EventPoller<E, L> {
     /// Starts the poller and returns a stream that yields the decoded event and the raw log.
     ///
     /// Note that this stream will not return `None` until the provider is dropped.
-    pub fn into_stream(self) -> impl Stream<Item = alloy_sol_types::Result<(E, Log)>> + Unpin {
+    pub fn into_stream(self) -> impl Stream<Item = alloy_sol_types::Result<(E, L)>> + Unpin {
         self.poller
             .into_stream()
             .flat_map(futures_util::stream::iter)
@@ -437,8 +443,8 @@ async fn resolve_block_tag<P: Provider<N>, N: Network>(
     }
 }
 
-fn decode_log<E: SolEvent>(log: &Log) -> alloy_sol_types::Result<E> {
-    let log_data: &LogData = log.as_ref();
+fn decode_log<E: SolEvent>(log: &impl LogResponse) -> alloy_sol_types::Result<E> {
+    let log_data = &log.as_ref().data;
 
     E::decode_raw_log(log_data.topics().iter().copied(), &log_data.data)
 }
@@ -451,27 +457,30 @@ pub(crate) mod subscription {
     /// An event subscription.
     ///
     /// Underlying subscription is available through the [`sub`](Self::sub) field.
-    pub struct EventSubscription<E> {
+    pub struct EventSubscription<E, L = Log> {
         /// The inner poller.
-        pub sub: Subscription<Log>,
+        pub sub: Subscription<L>,
         _phantom: PhantomData<E>,
     }
 
-    impl<E> AsRef<Subscription<Log>> for EventSubscription<E> {
+    impl<E, L> AsRef<Subscription<L>> for EventSubscription<E, L> {
         #[inline]
-        fn as_ref(&self) -> &Subscription<Log> {
+        fn as_ref(&self) -> &Subscription<L> {
             &self.sub
         }
     }
 
-    impl<E> AsMut<Subscription<Log>> for EventSubscription<E> {
+    impl<E, L> AsMut<Subscription<L>> for EventSubscription<E, L> {
         #[inline]
-        fn as_mut(&mut self) -> &mut Subscription<Log> {
+        fn as_mut(&mut self) -> &mut Subscription<L> {
             &mut self.sub
         }
     }
 
-    impl<E> fmt::Debug for EventSubscription<E> {
+    impl<E, L> fmt::Debug for EventSubscription<E, L>
+    where
+        Subscription<L>: fmt::Debug,
+    {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             f.debug_struct("EventSubscription")
                 .field("sub", &self.sub)
@@ -480,15 +489,15 @@ pub(crate) mod subscription {
         }
     }
 
-    impl<E> From<Subscription<Log>> for EventSubscription<E> {
-        fn from(sub: Subscription<Log>) -> Self {
+    impl<E, L> From<Subscription<L>> for EventSubscription<E, L> {
+        fn from(sub: Subscription<L>) -> Self {
             Self { sub, _phantom: PhantomData }
         }
     }
 
-    impl<E: SolEvent> EventSubscription<E> {
+    impl<E: SolEvent, L: LogResponse + RpcObject> EventSubscription<E, L> {
         /// Converts the subscription into a stream.
-        pub fn into_stream(self) -> impl Stream<Item = alloy_sol_types::Result<(E, Log)>> + Unpin {
+        pub fn into_stream(self) -> impl Stream<Item = alloy_sol_types::Result<(E, L)>> + Unpin {
             self.sub.into_stream().map(|log| decode_log(&log).map(|e| (e, log)))
         }
     }
@@ -497,10 +506,12 @@ pub(crate) mod subscription {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::EthereumWallet;
-    use alloy_primitives::U256;
+    use alloy_network::{AnyNetwork, AnyRpcLog, EthereumWallet};
+    use alloy_primitives::{Log as PrimitiveLog, LogData, U256};
+    use alloy_provider::ProviderBuilder;
     use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
+    use alloy_transport::mock::Asserter;
 
     sol! {
         // solc v0.8.24; solc a.sol --via-ir --optimize --bin
@@ -521,6 +532,36 @@ mod tests {
                 emit WrongEvent(42, "hello", true, bytes32(uint256(0xdeadbeef)));
             }
         }
+    }
+
+    #[tokio::test]
+    async fn any_network_event_preserves_log_fields() {
+        let expected = MyContract::MyEvent {
+            _0: 42,
+            _1: "hello".to_string(),
+            _2: true,
+            _3: U256::from(0xdeadbeefu64).into(),
+        };
+        let topics = expected.encode_topics().into_iter().map(|topic| topic.0).collect();
+        let mut log = AnyRpcLog::new(Log {
+            inner: PrimitiveLog {
+                address: Address::ZERO,
+                data: LogData::new_unchecked(topics, expected.encode_data().into()),
+            },
+            ..Default::default()
+        });
+        log.other.insert("blockTimestampMs".to_owned(), serde_json::json!("0xa4d8"));
+
+        let asserter = Asserter::new();
+        asserter.push_success(&vec![log]);
+        let provider =
+            ProviderBuilder::new().network::<AnyNetwork>().connect_mocked_client(asserter);
+        let event: Event<_, MyContract::MyEvent, AnyNetwork> = Event::new(&provider, Filter::new());
+
+        let mut logs = event.query().await.unwrap();
+        let (decoded, raw) = logs.pop().unwrap();
+        assert_eq!(decoded, expected);
+        assert_eq!(raw.other.get("blockTimestampMs"), Some(&serde_json::json!("0xa4d8")));
     }
 
     #[tokio::test]

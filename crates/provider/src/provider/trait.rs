@@ -33,7 +33,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index,
     StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
@@ -752,7 +752,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
+    async fn watch_logs(
+        &self,
+        filter: &Filter,
+    ) -> TransportResult<FilterPollerBuilder<N::LogResponse>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -1032,12 +1035,15 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// This returns an enum over all possible return values. You probably want to use
     /// [`get_filter_changes`](Self::get_filter_changes) instead.
-    async fn get_filter_changes_dyn(&self, id: U256) -> TransportResult<FilterChanges> {
+    async fn get_filter_changes_dyn(
+        &self,
+        id: U256,
+    ) -> TransportResult<FilterChanges<N::TransactionResponse, N::LogResponse>> {
         self.client().request("eth_getFilterChanges", (id,)).await
     }
 
-    /// Retrieves a [`Vec<Log>`] for the given filter ID.
-    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<Log>> {
+    /// Retrieves logs for the given filter ID.
+    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<N::LogResponse>> {
         self.client().request("eth_getFilterLogs", (id,)).await
     }
 
@@ -1058,8 +1064,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().watch_pending_transaction(config).await
     }
 
-    /// Retrieves a [`Vec<Log>`] with the given [`Filter`].
-    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+    /// Retrieves logs with the given [`Filter`].
+    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<N::LogResponse>> {
         self.client().request("eth_getLogs", (filter,)).await
     }
 
@@ -1675,7 +1681,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+    fn subscribe_logs(
+        &self,
+        filter: &Filter,
+    ) -> GetSubscription<(SubscriptionKind, Params), N::LogResponse> {
         let rpc_call = self.client().request(
             "eth_subscribe",
             (SubscriptionKind::Logs, Params::Logs(Box::new(filter.clone()))),

@@ -22,7 +22,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index,
     StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
@@ -218,7 +218,10 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.watch_pending_transactions().await
     }
 
-    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
+    async fn watch_logs(
+        &self,
+        filter: &Filter,
+    ) -> TransportResult<FilterPollerBuilder<N::LogResponse>> {
         self.0.watch_logs(filter).await
     }
 
@@ -248,11 +251,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.watch_full_pending_transactions().await
     }
 
-    async fn get_filter_changes_dyn(&self, id: U256) -> TransportResult<FilterChanges> {
+    async fn get_filter_changes_dyn(
+        &self,
+        id: U256,
+    ) -> TransportResult<FilterChanges<N::TransactionResponse, N::LogResponse>> {
         self.0.get_filter_changes_dyn(id).await
     }
 
-    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<Log>> {
+    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<N::LogResponse>> {
         self.0.get_filter_logs(id).await
     }
 
@@ -267,7 +273,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.watch_pending_transaction(config).await
     }
 
-    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<N::LogResponse>> {
         self.0.get_logs(filter).await
     }
 
@@ -458,7 +464,10 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+    fn subscribe_logs(
+        &self,
+        filter: &Filter,
+    ) -> GetSubscription<(SubscriptionKind, Params), N::LogResponse> {
         self.0.subscribe_logs(filter)
     }
 

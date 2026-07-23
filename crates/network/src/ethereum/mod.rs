@@ -31,4 +31,6 @@ impl Network for Ethereum {
     type HeaderResponse = alloy_rpc_types_eth::Header;
 
     type BlockResponse = alloy_rpc_types_eth::Block;
+
+    type LogResponse = alloy_rpc_types_eth::Log;
 }
