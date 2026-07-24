@@ -63,7 +63,7 @@ For a normal request, the user sends a request to the **frontend**, and
 later receives a response via a tokio oneshot channel. This is straightforward
 and easy to reason about. Subscriptions, however, are side-effects of other
 requests, and are long-lived. They are managed by the **service** and
-identified by a `U256` id. The **service** uses this id to manage the
+identified by a local `B256` id. The **service** uses this id to manage the
 subscription lifecycle, and to dispatch notifications to the correct
 subscribers.
 
@@ -72,7 +72,7 @@ subscribers.
 When a user issues a subscription request, the **frontend** sends a
 subscription request to the **service**. The **service** dispatches it to the
 RPC server via the **backend**. The **service** then intercepts the RPC server
-response containing the serve id, and assigns a `local_id` to the subscription.
+response containing the server id, and assigns a `local_id` to the subscription.
 This `local_id` is used to identify the subscription in the **service** and in
 tasks consuming the subscription, while the `server_id` is used to identify the
 subscription to the RPC server, and to associate notifications with specific
@@ -82,6 +82,10 @@ This allows us to use long-lived `local_id` values to manage subscriptions over
 multiple reconnections, without having to notify frontend users of the ID change
 when the server connection is lost. It also prevents race conditions when
 unsubscribing during or immediately after a reconnection.
+
+The local ID is derived from the complete subscription method and exact serialized params. Calls
+with the same method and params share one server subscription and receive independent local
+broadcast receivers. Calls with different methods never alias merely because their params match.
 
 ### What is a subscription request?
 
@@ -93,9 +97,22 @@ on unknown methods, the `Request`, `SerializedRequest` and `RpcCall` expose
 `set_is_subscription()`, which can be used to mark any given request as a
 subscription.
 
-When marking a request as a subscription, the **service** will intercept the
-RPC response, which MUST be a `U256` value. Subscription requests that return
-anything other than a `U256` value will not function.
+When marking a request as a subscription, also configure the matching cleanup RPC with
+`RpcCall::set_unsubscribe_method()` when the protocol provides one. Custom subscription protocols
+do not share a universal naming convention, so the service does not guess or fall back to
+`eth_unsubscribe`. A custom subscription without a configured cleanup method can only be reclaimed
+when its connection closes.
+
+The **service** intercepts the RPC response, which must contain a numeric or string subscription
+ID. Other response types will not function as subscriptions.
+
+The service reserves string request IDs beginning with `alloy-pubsub:` for resubscribe and cleanup
+traffic. Manually constructed requests must not use that prefix.
+
+`PubSubFrontend::unsubscribe()` retains its enqueue-only behavior. Use
+`PubSubFrontend::unsubscribe_and_wait()` when the caller needs to observe server confirmation,
+server-reported absence, an RPC error, or connection-level cleanup. Both methods are force
+operations: they close all local receivers sharing the same method and params.
 
 ### Subscription Lifecycle
 
@@ -116,16 +133,16 @@ Subscription Request Lifecycle:
 1. The user issues a subscription request to the **frontend**.
 1. The **frontend** sends the request to the **service**, with a oneshot channel
    to receive the response.
-1. The **service** stores the oneshot channel in its `RequestManager`.
-1. The **service** sends the request to the **backend**.
+1. The **service** joins the request to an existing matching single-flight, or creates one and sends
+   a single request to the **backend**.
 1. The **backend** sends the request to the RPC server.
-1. The RPC server responds with a `U256` value (the `server_id`).
+1. The RPC server responds with a numeric or string `server_id`.
 1. The **backend** sends the response to the **service**.
 1. The **service** assigns a `local_id` to the subscription, creates a
    subscription broadcast channel, and stores the relevant information in its
    `SubscriptionManager`.
 1. The **service** overwrites the JSON RPC response with the `local_id`.
-1. The **service** sends the response to the waiting task via the oneshot.
+1. The **service** sends a response with each waiter's original JSON-RPC request ID via its oneshot.
 
 Subscription Notification Lifecycle
 
