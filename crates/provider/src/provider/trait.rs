@@ -1684,6 +1684,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Subscribe to an RPC event.
+    ///
+    /// The returned typed builder defaults to cleaning up the upstream subscription after its last
+    /// local receiver is dropped. Use [`GetSubscription::retention_policy`] to retain it until an
+    /// explicit force unsubscribe instead.
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     fn subscribe<P, R>(&self, params: P) -> GetSubscription<P, R>
@@ -1700,7 +1704,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// This is a helper method for creating subscriptions to methods that are not
     /// "eth_subscribe" and don't require parameters. It automatically marks the
-    /// request as a subscription.
+    /// request as a subscription. Because custom protocols do not share a universal cleanup
+    /// naming convention, configure [`GetSubscription::unsubscribe_method`] when the server
+    /// exposes one. Without it, the subscription can only be reclaimed when the connection closes.
     ///
     /// # Examples
     ///
@@ -1728,10 +1734,19 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         GetSubscription::new(self.weak_client(), rpc_call)
     }
 
-    /// Cancels a subscription given the subscription ID.
+    /// Force-cancels a subscription and closes all local receivers sharing its key.
     #[cfg(feature = "pubsub")]
     async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.root().unsubscribe(id)
+    }
+
+    /// Cancels a subscription and waits for server confirmation or connection-level cleanup.
+    #[cfg(feature = "pubsub")]
+    async fn unsubscribe_and_wait(
+        &self,
+        id: B256,
+    ) -> TransportResult<alloy_pubsub::UnsubscribeOutcome> {
+        self.root().unsubscribe_and_wait(id).await
     }
 
     /// Gets syncing info.
