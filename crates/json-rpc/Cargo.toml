@@ -25,7 +25,7 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["std", "serde", "map"] }
 serde.workspace = true
-serde_json = { workspace = true, features = ["std", "raw_value"] }
+serde_json = { workspace = true, features = ["std", "raw_value", "unbounded_depth"] }
 thiserror = { workspace = true, features = ["std"] }
 tracing.workspace = true
 alloy-sol-types.workspace = true

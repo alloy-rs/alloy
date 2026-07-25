@@ -75,7 +75,12 @@ where
     let _guard = debug_span!("deserialize_response", ty=%std::any::type_name::<T>()).entered();
     let json = json.borrow().get();
     trace!(%json, "deserializing");
-    serde_json::from_str(json)
+    // Geth callTracer / similar RPC payloads can nest deeper than serde_json's default
+    // recursion limit (~128). RPC responses are treated as trusted; disable the limit so
+    // deep CallFrame trees deserialize (alloy#1156).
+    let mut de = serde_json::Deserializer::from_str(json);
+    de.disable_recursion_limit();
+    T::deserialize(&mut de)
         .inspect(|response| trace!(?response, "deserialized"))
         .inspect_err(|err| trace!(?err, "failed to deserialize"))
         .map_err(|err| RpcError::deser_err(err, json))
@@ -108,5 +113,36 @@ mod tests {
         let input: RpcResult<Box<RawValue>, (), Box<RawValue>> = Ok(raw);
         let out = try_deserialize_ok::<_, u64, (), Box<RawValue>>(input).unwrap();
         assert_eq!(out, 42);
+    }
+
+    /// Synthetic deep nesting exceeds serde_json's default recursion limit (~128).
+    /// Regression for https://github.com/alloy-rs/alloy/issues/1156 (CallTracer trees).
+    #[test]
+    fn deep_nested_json_does_not_hit_recursion_limit() {
+        #[derive(Debug, serde::Deserialize, PartialEq)]
+        struct Nested {
+            v: u32,
+            #[serde(default)]
+            child: Option<Box<Nested>>,
+        }
+
+        let depth = 200usize;
+        let mut json = String::from("null");
+        for i in (0..depth).rev() {
+            json = format!(r#"{{"v":{i},"child":{json}}}"#);
+        }
+        let raw = RawValue::from_string(json).unwrap();
+        let input: RpcResult<Box<RawValue>, (), Box<RawValue>> = Ok(raw);
+        let out = try_deserialize_ok::<_, Nested, (), Box<RawValue>>(input).unwrap();
+        // Walk to leaf
+        let mut cur = &out;
+        let mut n = 0;
+        while let Some(ch) = cur.child.as_ref() {
+            n += 1;
+            cur = ch;
+        }
+        assert_eq!(n, depth - 1);
+        assert_eq!(out.v, 0);
+        assert_eq!(cur.v, (depth - 1) as u32);
     }
 }
