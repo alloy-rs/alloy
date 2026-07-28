@@ -16,7 +16,7 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable
 use core::fmt::Debug;
 
 /// Helper trait alias with requirements for transaction type generic to be used within
-/// [`EthereumReceipt`].
+/// [`EthereumReceiptData`].
 pub trait TxTy:
     Debug
     + Copy
@@ -51,7 +51,7 @@ impl<T> TxTy for T where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct EthereumReceipt<T = TxType, L = Log> {
+pub struct EthereumReceiptData<T = TxType, L = Log> {
     /// Receipt type.
     #[cfg_attr(feature = "serde", serde(rename = "type"))]
     pub tx_type: T,
@@ -67,13 +67,42 @@ pub struct EthereumReceipt<T = TxType, L = Log> {
     pub logs: Vec<L>,
 }
 
+/// Ethereum receipt with a uniform standard payload and an EIP-8141 frame
+/// payload variant.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub enum EthereumReceipt<T = TxType, L = Log> {
+    /// A legacy or typed standard Ethereum receipt. The transaction type is
+    /// carried by the payload's `tx_type` field.
+    Standard(EthereumReceiptData<T, L>),
+    /// An EIP-8141 frame receipt payload.
+    Frame(alloy_eips::eip8141::FrameReceiptPayload<L>),
+}
+
+impl<T: Default, L: Default> Default for EthereumReceipt<T, L> {
+    fn default() -> Self {
+        Self::Standard(EthereumReceiptData::default())
+    }
+}
+
 impl<T, L> EthereumReceipt<T, L> {
+    /// Maps the receipt log type by applying a function to each log.
+    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> EthereumReceipt<T, U> {
+        match self {
+            Self::Standard(receipt) => EthereumReceipt::Standard(receipt.map_logs(f)),
+            Self::Frame(payload) => EthereumReceipt::Frame(payload.map_logs(f)),
+        }
+    }
+}
+
+impl<T, L> EthereumReceiptData<T, L> {
     /// Converts the receipt's log type by applying a function to each log.
     ///
     /// Returns the receipt with the new log type.
-    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> EthereumReceipt<T, U> {
+    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> EthereumReceiptData<T, U> {
         let Self { tx_type, success, cumulative_gas_used, logs } = self;
-        EthereumReceipt {
+        EthereumReceiptData {
             tx_type,
             success,
             cumulative_gas_used,
@@ -82,7 +111,7 @@ impl<T, L> EthereumReceipt<T, L> {
     }
 }
 
-impl<T: TxTy> EthereumReceipt<T> {
+impl<T: TxTy> EthereumReceiptData<T> {
     /// Returns length of RLP-encoded receipt fields with the given [`Bloom`] without an RLP header.
     pub fn rlp_encoded_fields_length(&self, bloom: &Bloom) -> usize {
         self.success.length()
@@ -141,7 +170,7 @@ impl<T: TxTy> EthereumReceipt<T> {
     }
 }
 
-impl<T: TxTy> Eip2718EncodableReceipt for EthereumReceipt<T> {
+impl<T: TxTy> Eip2718EncodableReceipt for EthereumReceiptData<T> {
     fn eip2718_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize {
         !self.tx_type.is_legacy() as usize + self.rlp_header_inner(bloom).length_with_payload()
     }
@@ -155,7 +184,7 @@ impl<T: TxTy> Eip2718EncodableReceipt for EthereumReceipt<T> {
     }
 }
 
-impl<T: TxTy> Eip2718DecodableReceipt for EthereumReceipt<T> {
+impl<T: TxTy> Eip2718DecodableReceipt for EthereumReceiptData<T> {
     fn typed_decode_with_bloom(ty: u8, buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>> {
         Ok(Self::rlp_decode_inner(buf, T::try_from(ty)?)?)
     }
@@ -165,7 +194,7 @@ impl<T: TxTy> Eip2718DecodableReceipt for EthereumReceipt<T> {
     }
 }
 
-impl<T: TxTy> RlpEncodableReceipt for EthereumReceipt<T> {
+impl<T: TxTy> RlpEncodableReceipt for EthereumReceiptData<T> {
     fn rlp_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize {
         let payload_length = self.eip2718_encoded_length_with_bloom(bloom);
 
@@ -185,7 +214,7 @@ impl<T: TxTy> RlpEncodableReceipt for EthereumReceipt<T> {
     }
 }
 
-impl<T: TxTy> RlpDecodableReceipt for EthereumReceipt<T> {
+impl<T: TxTy> RlpDecodableReceipt for EthereumReceiptData<T> {
     fn rlp_decode_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
         let header_buf = &mut &**buf;
         let header = Header::decode(header_buf)?;
@@ -211,7 +240,7 @@ impl<T: TxTy> RlpDecodableReceipt for EthereumReceipt<T> {
     }
 }
 
-impl<T, L> TxReceipt for EthereumReceipt<T, L>
+impl<T, L> TxReceipt for EthereumReceiptData<T, L>
 where
     T: TxTy,
     L: Send + Sync + Clone + Debug + Eq + AsRef<Log>,
@@ -243,25 +272,25 @@ where
     }
 }
 
-impl<T: TxTy> Typed2718 for EthereumReceipt<T> {
+impl<T: TxTy> Typed2718 for EthereumReceiptData<T> {
     fn ty(&self) -> u8 {
         self.tx_type.ty()
     }
 }
 
-impl<T: TxTy + IsTyped2718> IsTyped2718 for EthereumReceipt<T> {
+impl<T: TxTy + IsTyped2718> IsTyped2718 for EthereumReceiptData<T> {
     fn is_type(type_id: u8) -> bool {
         <T as IsTyped2718>::is_type(type_id)
     }
 }
 
-impl<T: TxTy> InMemorySize for EthereumReceipt<T> {
+impl<T: TxTy> InMemorySize for EthereumReceiptData<T> {
     fn size(&self) -> usize {
         core::mem::size_of::<Self>() + self.logs.iter().map(|log| log.size()).sum::<usize>()
     }
 }
 
-impl<T> From<ReceiptEnvelope<T>> for EthereumReceipt<TxType>
+impl<T> From<ReceiptEnvelope<T>> for EthereumReceiptData<TxType>
 where
     T: Into<Log>,
 {
@@ -276,8 +305,8 @@ where
     }
 }
 
-impl<T, L> From<EthereumReceipt<T, L>> for crate::Receipt<L> {
-    fn from(value: EthereumReceipt<T, L>) -> Self {
+impl<T, L> From<EthereumReceiptData<T, L>> for crate::Receipt<L> {
+    fn from(value: EthereumReceiptData<T, L>) -> Self {
         Self {
             status: value.success.into(),
             cumulative_gas_used: value.cumulative_gas_used,
@@ -286,11 +315,11 @@ impl<T, L> From<EthereumReceipt<T, L>> for crate::Receipt<L> {
     }
 }
 
-impl<L> From<EthereumReceipt<TxType, L>> for ReceiptEnvelope<L>
+impl<L> From<EthereumReceiptData<TxType, L>> for ReceiptEnvelope<L>
 where
     L: Send + Sync + Clone + Debug + Eq + AsRef<Log>,
 {
-    fn from(value: EthereumReceipt<TxType, L>) -> Self {
+    fn from(value: EthereumReceiptData<TxType, L>) -> Self {
         let tx_type = value.tx_type;
         let receipt = value.into_with_bloom().map_receipt(Into::into);
         match tx_type {
@@ -300,7 +329,7 @@ where
             TxType::Eip4844 => Self::Eip4844(receipt),
             TxType::Eip7702 => Self::Eip7702(receipt),
             TxType::Eip8141 => {
-                panic!("EIP-8141 receipts require FrameReceiptPayload and cannot be built from EthereumReceipt")
+                panic!("EIP-8141 receipts require FrameReceiptPayload and cannot be built from EthereumReceiptData")
             }
         }
     }
@@ -315,24 +344,24 @@ pub(crate) mod serde_bincode_compat {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
-    /// Bincode-compatible [`super::EthereumReceipt`] serde implementation.
+    /// Bincode-compatible [`super::EthereumReceiptData`] serde implementation.
     ///
     /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
     /// ```rust
-    /// use alloy_consensus::{serde_bincode_compat, EthereumReceipt, TxType};
+    /// use alloy_consensus::{serde_bincode_compat, EthereumReceiptData, TxType};
     /// use serde::{de::DeserializeOwned, Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///
     /// #[serde_as]
     /// #[derive(Serialize, Deserialize)]
     /// struct Data {
-    ///     #[serde_as(as = "serde_bincode_compat::EthereumReceipt<'_>")]
-    ///     receipt: EthereumReceipt<TxType>,
+    ///     #[serde_as(as = "serde_bincode_compat::EthereumReceiptData<'_>")]
+    ///     receipt: EthereumReceiptData<TxType>,
     /// }
     /// ```
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(bound(deserialize = "T: TryFrom<u8, Error = Eip2718Error>"))]
-    pub struct EthereumReceipt<'a, T = crate::TxType> {
+    pub struct EthereumReceiptData<'a, T = crate::TxType> {
         /// Receipt type.
         #[serde(deserialize_with = "deserde_txtype")]
         pub tx_type: T,
@@ -355,8 +384,8 @@ pub(crate) mod serde_bincode_compat {
         U8::deserialize(deserializer)?.to::<u8>().try_into().map_err(serde::de::Error::custom)
     }
 
-    impl<'a, T: Copy> From<&'a super::EthereumReceipt<T>> for EthereumReceipt<'a, T> {
-        fn from(value: &'a super::EthereumReceipt<T>) -> Self {
+    impl<'a, T: Copy> From<&'a super::EthereumReceiptData<T>> for EthereumReceiptData<'a, T> {
+        fn from(value: &'a super::EthereumReceiptData<T>) -> Self {
             Self {
                 tx_type: value.tx_type,
                 success: value.success,
@@ -366,8 +395,8 @@ pub(crate) mod serde_bincode_compat {
         }
     }
 
-    impl<'a, T> From<EthereumReceipt<'a, T>> for super::EthereumReceipt<T> {
-        fn from(value: EthereumReceipt<'a, T>) -> Self {
+    impl<'a, T> From<EthereumReceiptData<'a, T>> for super::EthereumReceiptData<T> {
+        fn from(value: EthereumReceiptData<'a, T>) -> Self {
             Self {
                 tx_type: value.tx_type,
                 success: value.success,
@@ -377,26 +406,28 @@ pub(crate) mod serde_bincode_compat {
         }
     }
 
-    impl<T: Copy + Serialize> SerializeAs<super::EthereumReceipt<T>> for EthereumReceipt<'_, T> {
+    impl<T: Copy + Serialize> SerializeAs<super::EthereumReceiptData<T>>
+        for EthereumReceiptData<'_, T>
+    {
         fn serialize_as<S>(
-            source: &super::EthereumReceipt<T>,
+            source: &super::EthereumReceiptData<T>,
             serializer: S,
         ) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            EthereumReceipt::<'_>::from(source).serialize(serializer)
+            EthereumReceiptData::<'_>::from(source).serialize(serializer)
         }
     }
 
-    impl<'de, T: TryFrom<u8, Error = Eip2718Error>> DeserializeAs<'de, super::EthereumReceipt<T>>
-        for EthereumReceipt<'de, T>
+    impl<'de, T: TryFrom<u8, Error = Eip2718Error>>
+        DeserializeAs<'de, super::EthereumReceiptData<T>> for EthereumReceiptData<'de, T>
     {
-        fn deserialize_as<D>(deserializer: D) -> Result<super::EthereumReceipt<T>, D::Error>
+        fn deserialize_as<D>(deserializer: D) -> Result<super::EthereumReceiptData<T>, D::Error>
         where
             D: Deserializer<'de>,
         {
-            EthereumReceipt::<'_, T>::deserialize(deserializer).map(Into::into)
+            EthereumReceiptData::<'_, T>::deserialize(deserializer).map(Into::into)
         }
     }
 
@@ -408,7 +439,7 @@ pub(crate) mod serde_bincode_compat {
         use rand::Rng;
         use serde_with::serde_as;
 
-        use super::super::EthereumReceipt;
+        use super::super::EthereumReceiptData;
 
         #[test]
         fn test_ethereum_receipt_bincode_roundtrip() {
@@ -416,14 +447,14 @@ pub(crate) mod serde_bincode_compat {
             #[derive(Debug, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
             struct Data {
-                #[serde_as(as = "super::EthereumReceipt<'_, TxType>")]
-                receipt: EthereumReceipt<TxType>,
+                #[serde_as(as = "super::EthereumReceiptData<'_, TxType>")]
+                receipt: EthereumReceiptData<TxType>,
             }
 
             let mut bytes = [0u8; 1024];
             rand::thread_rng().fill(bytes.as_mut_slice());
             let data = Data {
-                receipt: EthereumReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
+                receipt: EthereumReceiptData::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
                     .unwrap(),
             };
 

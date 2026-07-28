@@ -7,7 +7,7 @@ mod envelope;
 pub use envelope::ReceiptEnvelope;
 
 pub(crate) mod receipt2;
-pub use receipt2::{EthereumReceipt, TxTy};
+pub use receipt2::{EthereumReceipt, EthereumReceiptData, TxTy};
 
 mod receipts;
 pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
