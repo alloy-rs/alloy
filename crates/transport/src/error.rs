@@ -1,7 +1,7 @@
 use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
 use serde::Deserialize;
 use serde_json::value::RawValue;
-use std::{error::Error as StdError, fmt::Debug};
+use std::{error::Error as StdError, fmt::Debug, time::Duration};
 use thiserror::Error;
 
 /// A transport error is an [`RpcError`] containing a [`TransportErrorKind`].
@@ -35,6 +35,16 @@ pub enum TransportErrorKind {
     /// HTTP Error with code and body
     #[error("{0}")]
     HttpError(#[from] HttpError),
+
+    /// HTTP error with a server-provided retry delay.
+    #[error("{error}")]
+    HttpErrorWithRetryAfter {
+        /// The HTTP error.
+        #[source]
+        error: HttpError,
+        /// The delay requested by the server.
+        retry_after: Duration,
+    },
 
     /// Custom error.
     #[error("{0}")]
@@ -101,6 +111,18 @@ impl TransportErrorKind {
         RpcError::Transport(Self::HttpError(HttpError { status, body }))
     }
 
+    /// Instantiate a new HTTP error with a server-provided retry delay.
+    pub const fn http_error_with_retry_after(
+        status: u16,
+        body: String,
+        retry_after: Duration,
+    ) -> TransportError {
+        RpcError::Transport(Self::HttpErrorWithRetryAfter {
+            error: HttpError { status, body },
+            retry_after,
+        })
+    }
+
     /// Returns true if this is [`TransportErrorKind::PubsubUnavailable`].
     pub const fn is_pubsub_unavailable(&self) -> bool {
         matches!(self, Self::PubsubUnavailable)
@@ -111,15 +133,24 @@ impl TransportErrorKind {
         matches!(self, Self::BackendGone)
     }
 
-    /// Returns true if this is [`TransportErrorKind::HttpError`].
+    /// Returns true if this is an HTTP error.
     pub const fn is_http_error(&self) -> bool {
-        matches!(self, Self::HttpError(_))
+        matches!(self, Self::HttpError(_) | Self::HttpErrorWithRetryAfter { .. })
     }
 
-    /// Returns the [`HttpError`] if this is [`TransportErrorKind::HttpError`].
+    /// Returns the [`HttpError`] if this is an HTTP error.
     pub const fn as_http_error(&self) -> Option<&HttpError> {
         match self {
             Self::HttpError(err) => Some(err),
+            Self::HttpErrorWithRetryAfter { error, .. } => Some(error),
+            _ => None,
+        }
+    }
+
+    /// Returns the server-provided retry delay, if present.
+    pub const fn retry_after(&self) -> Option<Duration> {
+        match self {
+            Self::HttpErrorWithRetryAfter { retry_after, .. } => Some(*retry_after),
             _ => None,
         }
     }
@@ -138,7 +169,7 @@ impl TransportErrorKind {
         match self {
             // Missing batch response errors can be retried.
             Self::MissingBatchResponse(_) => true,
-            Self::HttpError(http_err) => {
+            Self::HttpError(http_err) | Self::HttpErrorWithRetryAfter { error: http_err, .. } => {
                 http_err.is_rate_limit_err() || http_err.is_temporarily_unavailable()
             }
             Self::Custom(err) => {
@@ -219,6 +250,13 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
     }
 
     fn backoff_hint(&self) -> Option<std::time::Duration> {
+        if let Self::Transport(TransportErrorKind::HttpErrorWithRetryAfter {
+            retry_after, ..
+        }) = self
+        {
+            return Some(*retry_after);
+        }
+
         if let Self::ErrorResp(resp) = self {
             // try to extract backoff from the error data (infura-style)
             let data = resp.try_data_as::<serde_json::Value>();
@@ -310,5 +348,22 @@ mod tests {
         let err = r#"{"code":429,"event":-33200,"message":"Too Many Requests","details":"You have surpassed your allowed throughput limit. Reduce the amount of requests per second or upgrade for more capacity."}"#;
         let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
         assert!(TransportError::ErrorResp(err).is_retryable());
+    }
+
+    #[test]
+    fn http_retry_after_preserves_http_error() {
+        let err = TransportErrorKind::http_error_with_retry_after(
+            429,
+            "Too Many Requests".to_owned(),
+            Duration::from_secs(52),
+        );
+
+        let TransportError::Transport(kind) = err else { panic!("expected transport error") };
+        assert!(kind.is_http_error());
+        assert!(kind.is_retry_err());
+        assert_eq!(kind.retry_after(), Some(Duration::from_secs(52)));
+        assert_eq!(kind.as_http_error().unwrap().status, 429);
+        assert_eq!(kind.as_http_error().unwrap().body, "Too Many Requests");
+        assert_eq!(kind.to_string(), "HTTP error 429 with body: Too Many Requests");
     }
 }

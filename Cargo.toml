@@ -122,6 +122,7 @@ hyper = { version = "1.2", default-features = false }
 hyper-util = "0.1"
 hyper-tls = "0.6.0"
 http-body-util = "0.1"
+httpdate = "1"
 tokio = "1"
 tokio-util = "0.7"
 tokio-stream = "0.1"

@@ -346,6 +346,19 @@ fn compute_unit_offset_in_secs(
 mod tests {
     use super::*;
 
+    #[test]
+    fn rate_limit_policy_uses_http_retry_after_hint() {
+        let error = TransportErrorKind::http_error_with_retry_after(
+            429,
+            "Too Many Requests".to_owned(),
+            Duration::from_secs(52),
+        );
+        let policy = RateLimitRetryPolicy;
+
+        assert!(policy.should_retry(&error));
+        assert_eq!(policy.backoff_hint(&error), Some(Duration::from_secs(52)));
+    }
+
     #[tokio::test]
     async fn request_queue_count_decrements_when_future_is_dropped() {
         let pending_service =
