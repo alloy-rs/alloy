@@ -94,6 +94,22 @@ impl<T, L> EthereumReceipt<T, L> {
             Self::Frame(payload) => EthereumReceipt::Frame(payload.map_logs(f)),
         }
     }
+
+    /// Returns the standard receipt payload, if this is a standard receipt.
+    pub const fn as_standard(&self) -> Option<&EthereumReceiptData<T, L>> {
+        match self {
+            Self::Standard(receipt) => Some(receipt),
+            Self::Frame(_) => None,
+        }
+    }
+
+    /// Returns the frame receipt payload, if this is an EIP-8141 receipt.
+    pub const fn as_frame(&self) -> Option<&alloy_eips::eip8141::FrameReceiptPayload<L>> {
+        match self {
+            Self::Standard(_) => None,
+            Self::Frame(payload) => Some(payload),
+        }
+    }
 }
 
 impl<T, L> EthereumReceiptData<T, L> {
@@ -301,6 +317,18 @@ where
             success: value.is_success(),
             cumulative_gas_used: value.cumulative_gas_used(),
             logs: value.into_logs(),
+        }
+    }
+}
+
+impl<T> From<ReceiptEnvelope<T>> for EthereumReceipt<TxType>
+where
+    T: Into<Log>,
+{
+    fn from(value: ReceiptEnvelope<T>) -> Self {
+        match value {
+            ReceiptEnvelope::Eip8141(payload) => Self::Frame(payload.map_logs(Into::into)),
+            envelope => Self::Standard(EthereumReceiptData::from(envelope)),
         }
     }
 }
