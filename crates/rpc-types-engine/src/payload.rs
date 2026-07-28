@@ -89,6 +89,14 @@ impl core::fmt::Display for PayloadId {
     }
 }
 
+impl core::str::FromStr for PayloadId {
+    type Err = <B64 as core::str::FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
 impl From<B64> for PayloadId {
     fn from(value: B64) -> Self {
         Self(value)
@@ -4603,6 +4611,20 @@ mod tests {
         let payload_id = PayloadId(B64::with_last_byte(42));
         let decoded = PayloadId::from_ssz_bytes(&payload_id.as_ssz_bytes()).unwrap();
         assert_eq!(decoded, payload_id);
+    }
+
+    #[test]
+    fn payload_id_from_str() {
+        let expected = PayloadId(B64::with_last_byte(42));
+
+        assert_eq!("0x000000000000002a".parse::<PayloadId>().unwrap(), expected);
+        assert_eq!("000000000000002a".parse::<PayloadId>().unwrap(), expected);
+    }
+
+    #[test]
+    fn payload_id_from_str_rejects_invalid_hex() {
+        assert!("0x2a".parse::<PayloadId>().is_err());
+        assert!("0x00000000000000zz".parse::<PayloadId>().is_err());
     }
 
     #[test]

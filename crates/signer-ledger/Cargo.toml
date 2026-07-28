@@ -46,7 +46,6 @@ alloy-eip7702 = { workspace = true, optional = true }
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-rlp.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-serial_test.workspace = true
 tracing-subscriber.workspace = true
 
 [features]

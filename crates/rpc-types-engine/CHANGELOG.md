@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.1](https://github.com/alloy-rs/alloy/releases/tag/v2.1.1) - 2026-07-06
+## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
 
 ### Bug Fixes
 
@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- [rpc-types-engine] Implement FromStr for PayloadId ([#4077](https://github.com/alloy-rs/alloy/issues/4077))
 - [engine] Add testing build block params helper ([#4047](https://github.com/alloy-rs/alloy/issues/4047))
 - [engine] Add SSZ for payload bodies ([#4026](https://github.com/alloy-rs/alloy/issues/4026))
 - Add ssz encoding and decoding to Payload Envelopes ([#4024](https://github.com/alloy-rs/alloy/issues/4024))
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.1.1
 - Release 2.1.0
 - Added target_gas_limit to payload attributes v4 ([#3980](https://github.com/alloy-rs/alloy/issues/3980))
 - Release 2.0.5

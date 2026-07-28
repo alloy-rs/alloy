@@ -1589,13 +1589,9 @@ where
             }
 
             // Current block exhausted or none set, try next block
-            match self.blocks_iter.next() {
-                Some(block) => {
-                    self.current_block = Some(block.into_iter());
-                    self.current_logs = None;
-                }
-                None => return None,
-            }
+            let block = self.blocks_iter.next()?;
+            self.current_block = Some(block.into_iter());
+            self.current_logs = None;
         }
     }
 }
