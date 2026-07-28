@@ -366,7 +366,7 @@ where
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) mod serde_bincode_compat {
     use alloc::{borrow::Cow, vec::Vec};
-    use alloy_eips::eip2718::Eip2718Error;
+    use alloy_eips::{eip2718::Eip2718Error, eip8141::FrameReceiptPayload};
     use alloy_primitives::{Log, U8};
     use core::fmt::Debug;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -459,6 +459,57 @@ pub(crate) mod serde_bincode_compat {
         }
     }
 
+    /// Bincode-compatible [`super::EthereumReceipt`] envelope.
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(bound(deserialize = "T: TryFrom<u8, Error = Eip2718Error>"))]
+    pub enum EthereumReceipt<'a, T = crate::TxType> {
+        /// Standard receipt payload.
+        Standard(EthereumReceiptData<'a, T>),
+        /// EIP-8141 frame receipt payload.
+        Frame(FrameReceiptPayload<Log>),
+    }
+
+    impl<'a, T: Copy> From<&'a super::EthereumReceipt<T>> for EthereumReceipt<'a, T> {
+        fn from(value: &'a super::EthereumReceipt<T>) -> Self {
+            match value {
+                super::EthereumReceipt::Standard(receipt) => Self::Standard(receipt.into()),
+                super::EthereumReceipt::Frame(payload) => Self::Frame(payload.clone()),
+            }
+        }
+    }
+
+    impl<'a, T> From<EthereumReceipt<'a, T>> for super::EthereumReceipt<T> {
+        fn from(value: EthereumReceipt<'a, T>) -> Self {
+            match value {
+                EthereumReceipt::Standard(receipt) => Self::Standard(receipt.into()),
+                EthereumReceipt::Frame(payload) => Self::Frame(payload),
+            }
+        }
+    }
+
+    impl<T: Copy + Serialize> SerializeAs<super::EthereumReceipt<T>> for EthereumReceipt<'_, T> {
+        fn serialize_as<S>(
+            source: &super::EthereumReceipt<T>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            EthereumReceipt::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de, T: TryFrom<u8, Error = Eip2718Error>> DeserializeAs<'de, super::EthereumReceipt<T>>
+        for EthereumReceipt<'de, T>
+    {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::EthereumReceipt<T>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            EthereumReceipt::<'_, T>::deserialize(deserializer).map(Into::into)
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use crate::TxType;
@@ -467,7 +518,7 @@ pub(crate) mod serde_bincode_compat {
         use rand::Rng;
         use serde_with::serde_as;
 
-        use super::super::EthereumReceiptData;
+        use super::super::{EthereumReceipt, EthereumReceiptData};
 
         #[test]
         fn test_ethereum_receipt_bincode_roundtrip() {
@@ -486,6 +537,35 @@ pub(crate) mod serde_bincode_compat {
                     .unwrap(),
             };
 
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _): (Data, _) =
+                bincode::serde::decode_from_slice(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, data);
+        }
+
+        #[test]
+        fn test_frame_receipt_bincode_roundtrip() {
+            use alloy_eips::eip8141::{FrameReceipt, FrameReceiptPayload, FrameStatus};
+            use alloy_primitives::{address, Log};
+
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::EthereumReceipt<'_, TxType>")]
+                receipt: EthereumReceipt<TxType>,
+            }
+
+            let data = Data {
+                receipt: EthereumReceipt::Frame(FrameReceiptPayload {
+                    cumulative_gas_used: 42,
+                    payer: address!("0x0000000000000000000000000000000000000001"),
+                    frame_receipts: vec![FrameReceipt {
+                        status: FrameStatus::Success,
+                        gas_used: 21,
+                        logs: vec![Log::default()],
+                    }],
+                }),
+            };
             let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
             let (decoded, _): (Data, _) =
                 bincode::serde::decode_from_slice(&encoded, config::legacy()).unwrap();
