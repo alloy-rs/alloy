@@ -137,7 +137,7 @@ impl From<Bytes> for PayloadExtras {
 /// See:
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/shanghai.md#response>
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum ExecutionPayloadFieldV2 {
@@ -145,6 +145,31 @@ pub enum ExecutionPayloadFieldV2 {
     V1(ExecutionPayloadV1),
     /// V2 payload
     V2(ExecutionPayloadV2),
+}
+
+// Deserializes untagged ExecutionPayloadFieldV2 as V2 if withdrawals are present, V1 otherwise.
+// A derived untagged impl would try V1 first, which also matches V2 input and drops withdrawals.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for ExecutionPayloadFieldV2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            #[serde(flatten)]
+            payload_inner: ExecutionPayloadV1,
+            withdrawals: Option<Vec<Withdrawal>>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        Ok(match helper.withdrawals {
+            Some(withdrawals) => {
+                Self::V2(ExecutionPayloadV2 { payload_inner: helper.payload_inner, withdrawals })
+            }
+            None => Self::V1(helper.payload_inner),
+        })
+    }
 }
 
 impl ExecutionPayloadFieldV2 {
@@ -4730,6 +4755,44 @@ mod tests {
         // pulled from a geth response getPayloadV3 in hive tests
         let response = r#"{"executionPayload":{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"},"blockValue":"0x0","blobsBundle":{"commitments":[],"proofs":[],"blobs":[]},"shouldOverrideBuilder":false}"#;
         let envelope: ExecutionPayloadEnvelopeV3 = serde_json::from_str(response).unwrap();
+        assert_eq!(serde_json::to_string(&envelope).unwrap(), response);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_roundtrip_execution_payload_field_v2() {
+        // withdrawals must select the V2 variant instead of collapsing into V1
+        let s = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]}"#;
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(s).unwrap();
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(s).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V2(payload_v2));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s);
+
+        // empty withdrawals still mean V2
+        let s_empty = s.replace(
+            r#"[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]"#,
+            "[]",
+        );
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(&s_empty).unwrap();
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(&s_empty).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V2(payload_v2));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s_empty);
+
+        // no withdrawals field means V1
+        let s_v1 = s_empty.replace(r#","withdrawals":[]"#, "");
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(&s_v1).unwrap();
+        let payload_v1: ExecutionPayloadV1 = serde_json::from_str(&s_v1).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V1(payload_v1));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s_v1);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_roundtrip_execution_payload_envelope_v2() {
+        // a getPayloadV2 response with withdrawals in the payload
+        let response = r#"{"executionPayload":{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]},"blockValue":"0x123"}"#;
+        let envelope: ExecutionPayloadEnvelopeV2 = serde_json::from_str(response).unwrap();
+        assert!(matches!(envelope.execution_payload, ExecutionPayloadFieldV2::V2(_)));
         assert_eq!(serde_json::to_string(&envelope).unwrap(), response);
     }
 
