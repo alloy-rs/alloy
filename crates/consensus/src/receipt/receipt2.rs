@@ -11,7 +11,7 @@ use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     Typed2718,
 };
-use alloy_primitives::{Bloom, Log, B256};
+use alloy_primitives::{logs_bloom, Bloom, Log, B256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable};
 use core::fmt::Debug;
 
@@ -77,7 +77,12 @@ pub enum EthereumReceipt<T = TxType, L = Log> {
     /// carried by the payload's `tx_type` field.
     Standard(EthereumReceiptData<T, L>),
     /// An EIP-8141 frame receipt payload.
-    Frame(alloy_eips::eip8141::FrameReceiptPayload<L>),
+    Frame {
+        /// The lossless EIP-8141 receipt payload.
+        payload: alloy_eips::eip8141::FrameReceiptPayload<L>,
+        /// Logs flattened across all frame receipts for the [`TxReceipt`] interface.
+        logs: Vec<L>,
+    },
 }
 
 impl<T: Default, L: Default> Default for EthereumReceipt<T, L> {
@@ -88,10 +93,13 @@ impl<T: Default, L: Default> Default for EthereumReceipt<T, L> {
 
 impl<T, L> EthereumReceipt<T, L> {
     /// Maps the receipt log type by applying a function to each log.
-    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> EthereumReceipt<T, U> {
+    pub fn map_logs<U>(self, mut f: impl FnMut(L) -> U) -> EthereumReceipt<T, U> {
         match self {
             Self::Standard(receipt) => EthereumReceipt::Standard(receipt.map_logs(f)),
-            Self::Frame(payload) => EthereumReceipt::Frame(payload.map_logs(f)),
+            Self::Frame { payload, logs } => {
+                let logs = logs.into_iter().map(&mut f).collect();
+                EthereumReceipt::Frame { payload: payload.map_logs(f), logs }
+            }
         }
     }
 
@@ -99,7 +107,7 @@ impl<T, L> EthereumReceipt<T, L> {
     pub const fn as_standard(&self) -> Option<&EthereumReceiptData<T, L>> {
         match self {
             Self::Standard(receipt) => Some(receipt),
-            Self::Frame(_) => None,
+            Self::Frame { .. } => None,
         }
     }
 
@@ -107,7 +115,51 @@ impl<T, L> EthereumReceipt<T, L> {
     pub const fn as_frame(&self) -> Option<&alloy_eips::eip8141::FrameReceiptPayload<L>> {
         match self {
             Self::Standard(_) => None,
-            Self::Frame(payload) => Some(payload),
+            Self::Frame { payload, .. } => Some(payload),
+        }
+    }
+}
+
+impl<T, L> TxReceipt for EthereumReceipt<T, L>
+where
+    EthereumReceipt<T, L>: Clone + Debug + PartialEq + Eq + Send + Sync,
+    L: AsRef<Log> + Send + Sync,
+{
+    type Log = L;
+
+    fn status_or_post_state(&self) -> Eip658Value {
+        self.status().into()
+    }
+
+    fn status(&self) -> bool {
+        match self {
+            Self::Standard(receipt) => receipt.success,
+            Self::Frame { .. } => true,
+        }
+    }
+
+    fn bloom(&self) -> Bloom {
+        logs_bloom(self.logs().iter().map(AsRef::as_ref))
+    }
+
+    fn cumulative_gas_used(&self) -> u64 {
+        match self {
+            Self::Standard(receipt) => receipt.cumulative_gas_used,
+            Self::Frame { payload, .. } => payload.cumulative_gas_used,
+        }
+    }
+
+    fn logs(&self) -> &[L] {
+        match self {
+            Self::Standard(receipt) => &receipt.logs,
+            Self::Frame { logs, .. } => logs,
+        }
+    }
+
+    fn into_logs(self) -> Vec<L> {
+        match self {
+            Self::Standard(receipt) => receipt.logs,
+            Self::Frame { logs, .. } => logs,
         }
     }
 }
@@ -327,7 +379,15 @@ where
 {
     fn from(value: ReceiptEnvelope<T>) -> Self {
         match value {
-            ReceiptEnvelope::Eip8141(payload) => Self::Frame(payload.map_logs(Into::into)),
+            ReceiptEnvelope::Eip8141(payload) => {
+                let payload = payload.map_logs(Into::into);
+                let logs = payload
+                    .frame_receipts
+                    .iter()
+                    .flat_map(|receipt| receipt.logs.iter().cloned())
+                    .collect();
+                Self::Frame { payload, logs }
+            }
             envelope => Self::Standard(EthereumReceiptData::from(envelope)),
         }
     }
@@ -473,7 +533,7 @@ pub(crate) mod serde_bincode_compat {
         fn from(value: &'a super::EthereumReceipt<T>) -> Self {
             match value {
                 super::EthereumReceipt::Standard(receipt) => Self::Standard(receipt.into()),
-                super::EthereumReceipt::Frame(payload) => Self::Frame(payload.clone()),
+                super::EthereumReceipt::Frame { payload, .. } => Self::Frame(payload.clone()),
             }
         }
     }
@@ -482,7 +542,14 @@ pub(crate) mod serde_bincode_compat {
         fn from(value: EthereumReceipt<'a, T>) -> Self {
             match value {
                 EthereumReceipt::Standard(receipt) => Self::Standard(receipt.into()),
-                EthereumReceipt::Frame(payload) => Self::Frame(payload),
+                EthereumReceipt::Frame(payload) => {
+                    let logs = payload
+                        .frame_receipts
+                        .iter()
+                        .flat_map(|receipt| receipt.logs.iter().cloned())
+                        .collect();
+                    Self::Frame { payload, logs }
+                }
             }
         }
     }
@@ -556,15 +623,18 @@ pub(crate) mod serde_bincode_compat {
             }
 
             let data = Data {
-                receipt: EthereumReceipt::Frame(FrameReceiptPayload {
-                    cumulative_gas_used: 42,
-                    payer: address!("0x0000000000000000000000000000000000000001"),
-                    frame_receipts: vec![FrameReceipt {
-                        status: FrameStatus::Success,
-                        gas_used: 21,
-                        logs: vec![Log::default()],
-                    }],
-                }),
+                receipt: EthereumReceipt::Frame {
+                    payload: FrameReceiptPayload {
+                        cumulative_gas_used: 42,
+                        payer: address!("0x0000000000000000000000000000000000000001"),
+                        frame_receipts: vec![FrameReceipt {
+                            status: FrameStatus::Success,
+                            gas_used: 21,
+                            logs: vec![Log::default()],
+                        }],
+                    },
+                    logs: vec![Log::default()],
+                },
             };
             let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
             let (decoded, _): (Data, _) =
