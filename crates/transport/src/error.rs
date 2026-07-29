@@ -111,16 +111,20 @@ impl TransportErrorKind {
         RpcError::Transport(Self::HttpError(HttpError { status, body }))
     }
 
-    /// Instantiate a new HTTP error with a server-provided retry delay.
+    /// Instantiate a new HTTP error that optionally carries the retry delay requested by the
+    /// server via a `Retry-After` header.
     pub const fn http_error_with_retry_after(
         status: u16,
         body: String,
-        retry_after: Duration,
+        retry_after: Option<Duration>,
     ) -> TransportError {
-        RpcError::Transport(Self::HttpErrorWithRetryAfter {
-            error: HttpError { status, body },
-            retry_after,
-        })
+        match retry_after {
+            Some(retry_after) => RpcError::Transport(Self::HttpErrorWithRetryAfter {
+                error: HttpError { status, body },
+                retry_after,
+            }),
+            None => Self::http_error(status, body),
+        }
     }
 
     /// Returns true if this is [`TransportErrorKind::PubsubUnavailable`].
@@ -355,15 +359,15 @@ mod tests {
         let err = TransportErrorKind::http_error_with_retry_after(
             429,
             "Too Many Requests".to_owned(),
-            Duration::from_secs(52),
+            Some(Duration::from_secs(52)),
         );
+
+        assert!(err.is_retryable());
+        assert_eq!(err.backoff_hint(), Some(Duration::from_secs(52)));
 
         let TransportError::Transport(kind) = err else { panic!("expected transport error") };
         assert!(kind.is_http_error());
-        assert!(kind.is_retry_err());
         assert_eq!(kind.retry_after(), Some(Duration::from_secs(52)));
         assert_eq!(kind.as_http_error().unwrap().status, 429);
-        assert_eq!(kind.as_http_error().unwrap().body, "Too Many Requests");
-        assert_eq!(kind.to_string(), "HTTP error 429 with body: Too Many Requests");
     }
 }

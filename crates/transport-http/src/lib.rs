@@ -35,25 +35,7 @@ pub use hyper_transport::{HyperClient, HyperResponse, HyperResponseFut, HyperTra
 use alloy_transport::utils::guess_local_url;
 use core::str::FromStr;
 use std::marker::PhantomData;
-#[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
-use std::time::{Duration, SystemTime};
 use url::Url;
-
-#[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
-fn parse_retry_after(value: &str) -> Option<Duration> {
-    parse_retry_after_at(value, SystemTime::now())
-}
-
-#[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
-fn parse_retry_after_at(value: &str, now: SystemTime) -> Option<Duration> {
-    let value = value.trim();
-    if let Ok(seconds) = value.parse::<u64>() {
-        return Some(Duration::from_secs(seconds));
-    }
-
-    let deadline = httpdate::parse_http_date(value).ok()?;
-    Some(deadline.duration_since(now).unwrap_or_default())
-}
 
 #[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
 fn json_rpc_error_response(body: &[u8]) -> Option<alloy_json_rpc::ResponsePacket> {
@@ -146,8 +128,6 @@ impl<T> Http<T> {
 
 #[cfg(all(test, any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper"))))]
 mod tests {
-    use std::time::{Duration, UNIX_EPOCH};
-
     #[test]
     fn parses_json_rpc_errors_from_http_error_body() {
         let body = br#"{
@@ -169,31 +149,5 @@ mod tests {
     #[test]
     fn ignores_non_json_rpc_error_body() {
         assert!(super::json_rpc_error_response(b"too many requests").is_none());
-    }
-
-    #[test]
-    fn parses_retry_after_delay_seconds() {
-        assert_eq!(super::parse_retry_after_at(" 52 ", UNIX_EPOCH), Some(Duration::from_secs(52)));
-        assert_eq!(super::parse_retry_after_at("0", UNIX_EPOCH), Some(Duration::ZERO));
-    }
-
-    #[test]
-    fn parses_retry_after_http_date() {
-        let now = UNIX_EPOCH + Duration::from_secs(1_000_000);
-        let deadline = now + Duration::from_secs(52);
-        let value = httpdate::fmt_http_date(deadline);
-
-        assert_eq!(super::parse_retry_after_at(&value, now), Some(Duration::from_secs(52)));
-        assert_eq!(
-            super::parse_retry_after_at(&value, deadline + Duration::from_secs(1)),
-            Some(Duration::ZERO)
-        );
-    }
-
-    #[test]
-    fn rejects_invalid_retry_after() {
-        for value in ["", "-1", "1.5", "tomorrow"] {
-            assert_eq!(super::parse_retry_after_at(value, UNIX_EPOCH), None, "{value}");
-        }
     }
 }

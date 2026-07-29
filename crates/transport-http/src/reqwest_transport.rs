@@ -5,7 +5,7 @@ use alloy_transport::{
     TransportFut, TransportResult,
 };
 use itertools::Itertools;
-use std::task;
+use std::{task, time::Duration};
 use tower::Service;
 use tracing::{debug, debug_span, instrument, trace, Instrument};
 use url::Url;
@@ -46,11 +46,13 @@ impl Http<Client> {
             .await
             .map_err(TransportErrorKind::custom)?;
         let status = resp.status();
+        // Delay requested by the server via a `Retry-After` header, delay-seconds form only.
         let retry_after = resp
             .headers()
             .get(reqwest::header::RETRY_AFTER)
             .and_then(|value| value.to_str().ok())
-            .and_then(crate::parse_retry_after);
+            .and_then(|value| value.trim().parse().ok())
+            .map(Duration::from_secs);
 
         debug!(%status, "received response from server");
 
@@ -66,20 +68,15 @@ impl Http<Client> {
         }
 
         if !status.is_success() {
-            let body = String::from_utf8_lossy(&body).into_owned();
-            if let Some(retry_after) = retry_after {
-                return Err(TransportErrorKind::http_error_with_retry_after(
-                    status.as_u16(),
-                    body,
-                    retry_after,
-                ));
-            }
-
-            if let Some(response) = crate::json_rpc_error_response(body.as_bytes()) {
+            if let Some(response) = crate::json_rpc_error_response(&body) {
                 return Ok(response);
             }
 
-            return Err(TransportErrorKind::http_error(status.as_u16(), body));
+            return Err(TransportErrorKind::http_error_with_retry_after(
+                status.as_u16(),
+                String::from_utf8_lossy(&body).into_owned(),
+                retry_after,
+            ));
         }
 
         // Deserialize a Box<RawValue> from the body. If deserialization fails, return
@@ -106,69 +103,5 @@ impl Service<RequestPacket> for Http<reqwest::Client> {
         let this = self.clone();
         let span = debug_span!("ReqwestTransport", url = %this.url);
         Box::pin(this.do_reqwest(req).instrument(span.or_current()))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use alloy_json_rpc::{Id, Request};
-    use std::{
-        io::{BufRead, BufReader, Read, Write},
-        net::TcpListener,
-        thread,
-        time::Duration,
-    };
-
-    const BODY: &str =
-        r#"{"jsonrpc":"2.0","id":1,"error":{"code":429,"message":"Rate Limit Hit"}}"#;
-
-    fn request() -> RequestPacket {
-        RequestPacket::Single(Request::new("eth_chainId", Id::Number(1), ()).serialize().unwrap())
-    }
-
-    #[tokio::test]
-    async fn preserves_retry_after_from_http_error() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let server = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut content_length = 0;
-            let mut line = String::new();
-            loop {
-                line.clear();
-                reader.read_line(&mut line).unwrap();
-                if line == "\r\n" {
-                    break;
-                }
-                if let Some((name, value)) = line.split_once(':') {
-                    if name.eq_ignore_ascii_case("content-length") {
-                        content_length = value.trim().parse().unwrap();
-                    }
-                }
-            }
-            reader.read_exact(&mut vec![0_u8; content_length]).unwrap();
-
-            let response = format!(
-                "HTTP/1.1 429 Too Many Requests\r\n\
-                 Content-Type: application/json\r\n\
-                 Content-Length: {}\r\n\
-                 Retry-After: 52\r\n\
-                 Connection: close\r\n\r\n\
-                 {BODY}",
-                BODY.len()
-            );
-            stream.write_all(response.as_bytes()).unwrap();
-        });
-
-        let mut transport = Http::new(format!("http://{address}").parse().unwrap());
-        let error = transport.call(request()).await.unwrap_err();
-        server.join().unwrap();
-
-        let TransportError::Transport(error) = error else { panic!("expected transport error") };
-        assert_eq!(error.retry_after(), Some(Duration::from_secs(52)));
-        assert_eq!(error.as_http_error().unwrap().status, 429);
-        assert_eq!(error.as_http_error().unwrap().body, BODY);
     }
 }

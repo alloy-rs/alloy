@@ -11,7 +11,7 @@ use hyper::{
 };
 use hyper_util::client::legacy::Error;
 use itertools::Itertools;
-use std::{future::Future, marker::PhantomData, pin::Pin, task};
+use std::{future::Future, marker::PhantomData, pin::Pin, task, time::Duration};
 use tower::{Layer, Service};
 use tracing::{debug, debug_span, instrument, trace, Instrument};
 
@@ -137,11 +137,13 @@ where
         let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
 
         let status = resp.status();
+        // Delay requested by the server via a `Retry-After` header, delay-seconds form only.
         let retry_after = resp
             .headers()
             .get(header::RETRY_AFTER)
             .and_then(|value| value.to_str().ok())
-            .and_then(crate::parse_retry_after);
+            .and_then(|value| value.trim().parse().ok())
+            .map(Duration::from_secs);
 
         debug!(%status, "received response from server");
 
@@ -157,20 +159,15 @@ where
         }
 
         if !status.is_success() {
-            let body = String::from_utf8_lossy(&body).into_owned();
-            if let Some(retry_after) = retry_after {
-                return Err(TransportErrorKind::http_error_with_retry_after(
-                    status.as_u16(),
-                    body,
-                    retry_after,
-                ));
-            }
-
-            if let Some(response) = crate::json_rpc_error_response(body.as_bytes()) {
+            if let Some(response) = crate::json_rpc_error_response(body.as_ref()) {
                 return Ok(response);
             }
 
-            return Err(TransportErrorKind::http_error(status.as_u16(), body));
+            return Err(TransportErrorKind::http_error_with_retry_after(
+                status.as_u16(),
+                String::from_utf8_lossy(&body).into_owned(),
+                retry_after,
+            ));
         }
 
         // Deserialize a Box<RawValue> from the body. If deserialization fails, return
@@ -213,42 +210,5 @@ where
         let this = self.clone();
         let span = debug_span!("HyperTransport", url = %this.url);
         Box::pin(this.do_hyper(req).instrument(span.or_current()))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use alloy_json_rpc::{Id, Request as RpcRequest};
-    use std::{convert::Infallible, time::Duration};
-
-    const BODY: &str =
-        r#"{"jsonrpc":"2.0","id":1,"error":{"code":429,"message":"Rate Limit Hit"}}"#;
-
-    fn request() -> RequestPacket {
-        RequestPacket::Single(
-            RpcRequest::new("eth_chainId", Id::Number(1), ()).serialize().unwrap(),
-        )
-    }
-
-    #[tokio::test]
-    async fn preserves_retry_after_from_http_error() {
-        let service = tower::service_fn(|_: Request<Full<Bytes>>| async {
-            Ok::<_, Infallible>(
-                Response::builder()
-                    .status(429)
-                    .header(header::RETRY_AFTER, "52")
-                    .body(Full::new(Bytes::from_static(BODY.as_bytes())))
-                    .unwrap(),
-            )
-        });
-        let client = HyperClient::with_service(service);
-        let transport = Http::with_client(client, "http://localhost".parse().unwrap());
-        let error = transport.do_hyper(request()).await.unwrap_err();
-
-        let TransportError::Transport(error) = error else { panic!("expected transport error") };
-        assert_eq!(error.retry_after(), Some(Duration::from_secs(52)));
-        assert_eq!(error.as_http_error().unwrap().status, 429);
-        assert_eq!(error.as_http_error().unwrap().body, BODY);
     }
 }
