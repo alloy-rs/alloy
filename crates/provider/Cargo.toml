@@ -73,7 +73,7 @@ http.workspace = true
 tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
-reqwest = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["json", "stream"], optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
@@ -108,6 +108,7 @@ tokio-tungstenite.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]
+ccip-read = ["reqwest"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",
