@@ -36,4 +36,9 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
 contract = ["dep:alloy-contract", "dep:thiserror", "dep:alloy-sol-types"]
-provider = ["contract", "dep:alloy-provider", "dep:async-trait"]
+provider = [
+    "contract",
+    "dep:alloy-provider",
+    "alloy-provider/ccip-read-http",
+    "dep:async-trait",
+]
