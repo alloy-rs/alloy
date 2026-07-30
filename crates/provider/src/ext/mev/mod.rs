@@ -9,7 +9,7 @@ use alloy_primitives::{hex, TxHash};
 use alloy_rpc_types_mev::{
     EthBundleHash, EthCallBundle, EthCallBundleResponse, EthCancelBundle,
     EthCancelPrivateTransaction, EthSendBlobs, EthSendBundle, EthSendEndOfBlockBundle,
-    EthSendPrivateTransaction, MevSendBundle, PrivateTransactionPreferences,
+    EthSendPrivateTransaction, MevSendBundle, PrivateTransactionPreferences, SimBundleResponse,
 };
 
 /// The HTTP header used for Flashbots signature authentication.
@@ -95,6 +95,24 @@ pub trait MevApi<N>: Send + Sync {
         &self,
         bundle: MevSendBundle,
     ) -> MevBuilder<(MevSendBundle,), Option<EthBundleHash>>;
+
+    /// Simulates a MEV bundle using the `mev_simBundle` RPC method.
+    /// Returns the simulation result on success.
+    ///
+    /// # Matched Bundles Only
+    ///
+    /// Only matched bundles can be simulated. The `bundle` must contain only signed
+    /// transactions ([`BundleItem::Tx`]) or nested bundles ([`BundleItem::Bundle`]) that
+    /// themselves contain only signed transactions. Bundles containing a transaction hash
+    /// ([`BundleItem::Hash`]) are considered "unmatched" and will cause the call to error.
+    ///
+    /// [`BundleItem::Tx`]: alloy_rpc_types_mev::BundleItem::Tx
+    /// [`BundleItem::Bundle`]: alloy_rpc_types_mev::BundleItem::Bundle
+    /// [`BundleItem::Hash`]: alloy_rpc_types_mev::BundleItem::Hash
+    fn sim_mev_bundle(
+        &self,
+        bundle: MevSendBundle,
+    ) -> MevBuilder<(MevSendBundle,), Option<SimBundleResponse>>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -170,5 +188,12 @@ where
         bundle: MevSendBundle,
     ) -> MevBuilder<(MevSendBundle,), Option<EthBundleHash>> {
         MevBuilder::new_rpc(self.client().request("mev_sendBundle", (bundle,)))
+    }
+
+    fn sim_mev_bundle(
+        &self,
+        bundle: MevSendBundle,
+    ) -> MevBuilder<(MevSendBundle,), Option<SimBundleResponse>> {
+        MevBuilder::new_rpc(self.client().request("mev_simBundle", (bundle,)))
     }
 }
