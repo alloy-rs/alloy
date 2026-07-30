@@ -9,7 +9,7 @@
 //! ENS Name resolving utilities.
 
 mod utils;
-pub use utils::{dns_encode, namehash, reverse_address, try_dns_encode, DnsEncodeError};
+pub use utils::{dns_encode, namehash, reverse_address, DnsEncodeError};
 
 use alloy_primitives::{address, Address};
 use std::str::FromStr;
@@ -223,7 +223,7 @@ mod contract {
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{
-        coin_type, namehash, try_dns_encode, EnsError, EnsMulticoinResolver, EnsResolver,
+        coin_type, dns_encode, namehash, EnsError, EnsMulticoinResolver, EnsResolver,
         EnsResolver::EnsResolverInstance, UniversalResolver, UNIVERSAL_RESOLVER_ADDRESS,
     };
     use alloy_primitives::{Address, Bytes, U256};
@@ -274,7 +274,7 @@ mod provider {
         N: Network,
     {
         async fn get_resolver(&self, name: &str) -> Result<EnsResolverInstance<&P, N>, EnsError> {
-            let dns = try_dns_encode(name)?;
+            let dns = dns_encode(name)?;
 
             let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
             let info = ur
@@ -288,7 +288,7 @@ mod provider {
 
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError> {
             let node = namehash(name);
-            let dns = try_dns_encode(name)?;
+            let dns = dns_encode(name)?;
             let calldata = EnsResolver::addrCall { node }.abi_encode();
 
             let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
@@ -307,7 +307,7 @@ mod provider {
             coin_type: u64,
         ) -> Result<Bytes, EnsError> {
             let node = namehash(name);
-            let dns = try_dns_encode(name)?;
+            let dns = dns_encode(name)?;
             let calldata = EnsMulticoinResolver::addrCall {
                 node,
                 coin_type: U256::from(coin_type),
@@ -337,7 +337,7 @@ mod provider {
 
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError> {
             let node = namehash(name);
-            let dns = try_dns_encode(name)?;
+            let dns = dns_encode(name)?;
             let calldata = EnsResolver::textCall { node, key: key.to_string() }.abi_encode();
 
             let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
