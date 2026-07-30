@@ -40,5 +40,6 @@ provider = [
     "contract",
     "dep:alloy-provider",
     "alloy-provider/ccip-read-http",
+    "alloy-provider/reqwest-default-tls",
     "dep:async-trait",
 ]
