@@ -1,7 +1,7 @@
 use alloy_primitives::{Address, Keccak256, B256};
 use std::borrow::Cow;
 
-/// Error returned by [`dns_encode`].
+/// Error returned by [`try_dns_encode`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DnsEncodeError {
     /// A label in the name is empty (e.g., consecutive dots or leading/trailing dot).
@@ -21,13 +21,27 @@ impl std::fmt::Display for DnsEncodeError {
 
 impl std::error::Error for DnsEncodeError {}
 
-/// DNS wire-format encodes an ENS name for use with the Universal Resolver's `resolve()`.
+/// DNS wire-format encodes a name.
 ///
 /// Each label is prefixed with its byte length and the sequence is terminated with `\x00`.
 /// For example, `"foo.eth"` encodes to `[3, 'f', 'o', 'o', 3, 'e', 't', 'h', 0]`.
 ///
+/// This preserves the original infallible API. Use [`try_dns_encode`] when encoding
+/// untrusted input for the Universal Resolver.
+pub fn dns_encode(name: &str) -> Vec<u8> {
+    let mut out = Vec::with_capacity(name.len() + 2);
+    for label in name.split('.') {
+        out.push(label.len() as u8);
+        out.extend_from_slice(label.as_bytes());
+    }
+    out.push(0);
+    out
+}
+
+/// DNS wire-format encodes an ENS name for use with the Universal Resolver's `resolve()`.
+///
 /// Returns an error if any label is empty or exceeds 63 bytes.
-pub fn dns_encode(name: &str) -> Result<Vec<u8>, DnsEncodeError> {
+pub fn try_dns_encode(name: &str) -> Result<Vec<u8>, DnsEncodeError> {
     if name.is_empty() {
         return Ok(vec![0]);
     }
@@ -134,25 +148,32 @@ mod tests {
 
     #[test]
     fn test_dns_encode() {
-        assert_eq!(dns_encode("").unwrap(), vec![0]);
+        assert_eq!(dns_encode(""), vec![0, 0]);
         assert_eq!(
-            dns_encode("foo.eth").unwrap(),
+            dns_encode("foo.eth"),
             vec![3, b'f', b'o', b'o', 3, b'e', b't', b'h', 0]
         );
         assert_eq!(
-            dns_encode("alice.eth").unwrap(),
+            dns_encode("alice.eth"),
             vec![5, b'a', b'l', b'i', b'c', b'e', 3, b'e', b't', b'h', 0]
         );
         // Known vector: "integration-tests.eth"
         assert_eq!(
-            dns_encode("integration-tests.eth").unwrap(),
+            dns_encode("integration-tests.eth"),
             hex::decode("11696e746567726174696f6e2d74657374730365746800").unwrap()
         );
+        assert_eq!(dns_encode(".eth"), vec![0, 3, b'e', b't', b'h', 0]);
+    }
+
+    #[test]
+    fn test_try_dns_encode() {
+        assert_eq!(try_dns_encode(""), Ok(vec![0]));
+        assert_eq!(try_dns_encode("foo.eth"), Ok(dns_encode("foo.eth")));
         // Empty label errors
-        assert_eq!(dns_encode(".eth").unwrap_err(), DnsEncodeError::EmptyLabel);
-        assert_eq!(dns_encode("foo..eth").unwrap_err(), DnsEncodeError::EmptyLabel);
+        assert_eq!(try_dns_encode(".eth").unwrap_err(), DnsEncodeError::EmptyLabel);
+        assert_eq!(try_dns_encode("foo..eth").unwrap_err(), DnsEncodeError::EmptyLabel);
         // Label too long
         let long_label = "a".repeat(64) + ".eth";
-        assert_eq!(dns_encode(&long_label).unwrap_err(), DnsEncodeError::LabelTooLong);
+        assert_eq!(try_dns_encode(&long_label).unwrap_err(), DnsEncodeError::LabelTooLong);
     }
 }
