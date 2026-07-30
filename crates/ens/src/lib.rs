@@ -9,7 +9,7 @@
 //! ENS Name resolving utilities.
 
 mod utils;
-pub use utils::{dns_encode, namehash, reverse_address, DnsEncodeError};
+pub use utils::{dns_encode, namehash, reverse_address, try_dns_encode, DnsEncodeError};
 
 use alloy_primitives::{address, Address};
 use std::str::FromStr;
@@ -18,7 +18,7 @@ use std::str::FromStr;
 ///
 /// The primary entry-point for ENS name resolution. Supports wildcard resolvers
 /// and CCIP Read (ERC-3668).
-pub const ENS_UNIVERSAL_RESOLVER_ADDRESS: Address =
+pub const UNIVERSAL_RESOLVER_ADDRESS: Address =
     address!("0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe");
 
 /// Helpers for ENS multichain coin types.
@@ -223,8 +223,8 @@ mod contract {
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{
-        coin_type, dns_encode, namehash, EnsError, EnsMulticoinResolver, EnsResolver,
-        EnsResolver::EnsResolverInstance, UniversalResolver, ENS_UNIVERSAL_RESOLVER_ADDRESS,
+        coin_type, namehash, try_dns_encode, EnsError, EnsMulticoinResolver, EnsResolver,
+        EnsResolver::EnsResolverInstance, UniversalResolver, UNIVERSAL_RESOLVER_ADDRESS,
     };
     use alloy_primitives::{Address, Bytes, U256};
     use alloy_provider::{Network, Provider};
@@ -274,9 +274,9 @@ mod provider {
         N: Network,
     {
         async fn get_resolver(&self, name: &str) -> Result<EnsResolverInstance<&P, N>, EnsError> {
-            let dns = dns_encode(name)?;
+            let dns = try_dns_encode(name)?;
 
-            let ur = UniversalResolver::new(ENS_UNIVERSAL_RESOLVER_ADDRESS, self);
+            let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
             let info = ur
                 .requireResolver(dns.into())
                 .call()
@@ -288,10 +288,10 @@ mod provider {
 
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError> {
             let node = namehash(name);
-            let dns = dns_encode(name)?;
+            let dns = try_dns_encode(name)?;
             let calldata = EnsResolver::addrCall { node }.abi_encode();
 
-            let ur = UniversalResolver::new(ENS_UNIVERSAL_RESOLVER_ADDRESS, self);
+            let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
             let ret = ur
                 .resolve(dns.into(), calldata.into())
                 .call()
@@ -307,14 +307,14 @@ mod provider {
             coin_type: u64,
         ) -> Result<Bytes, EnsError> {
             let node = namehash(name);
-            let dns = dns_encode(name)?;
+            let dns = try_dns_encode(name)?;
             let calldata = EnsMulticoinResolver::addrCall {
                 node,
                 coin_type: U256::from(coin_type),
             }
             .abi_encode();
 
-            let ur = UniversalResolver::new(ENS_UNIVERSAL_RESOLVER_ADDRESS, self);
+            let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
             let ret = ur
                 .resolve(dns.into(), calldata.into())
                 .call()
@@ -325,7 +325,7 @@ mod provider {
         }
 
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError> {
-            let ur = UniversalResolver::new(ENS_UNIVERSAL_RESOLVER_ADDRESS, self);
+            let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
             let ret = ur
                 .reverse(Bytes::copy_from_slice(address.as_slice()), U256::from(coin_type::ETH))
                 .call()
@@ -337,10 +337,10 @@ mod provider {
 
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError> {
             let node = namehash(name);
-            let dns = dns_encode(name)?;
+            let dns = try_dns_encode(name)?;
             let calldata = EnsResolver::textCall { node, key: key.to_string() }.abi_encode();
 
-            let ur = UniversalResolver::new(ENS_UNIVERSAL_RESOLVER_ADDRESS, self);
+            let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
             let ret = ur
                 .resolve(dns.into(), calldata.into())
                 .call()
