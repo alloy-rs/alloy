@@ -68,15 +68,7 @@ impl Http<Client> {
         }
 
         if !status.is_success() {
-            if let Some(response) = crate::json_rpc_error_response(&body) {
-                return Ok(response);
-            }
-
-            return Err(TransportErrorKind::http_error_with_retry_after(
-                status.as_u16(),
-                String::from_utf8_lossy(&body).into_owned(),
-                retry_after,
-            ));
+            return crate::http_error_response(status.as_u16(), &body, retry_after);
         }
 
         // Deserialize a Box<RawValue> from the body. If deserialization fails, return
