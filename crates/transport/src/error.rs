@@ -37,6 +37,8 @@ pub enum TransportErrorKind {
     HttpError(#[from] HttpError),
 
     /// HTTP error with a server-provided retry delay.
+    ///
+    /// Always considered retryable since the server explicitly requested a retry.
     #[error("{error}")]
     HttpErrorWithRetryAfter {
         /// The HTTP error.
@@ -173,9 +175,11 @@ impl TransportErrorKind {
         match self {
             // Missing batch response errors can be retried.
             Self::MissingBatchResponse(_) => true,
-            Self::HttpError(http_err) | Self::HttpErrorWithRetryAfter { error: http_err, .. } => {
+            Self::HttpError(http_err) => {
                 http_err.is_rate_limit_err() || http_err.is_temporarily_unavailable()
             }
+            // The server explicitly requested a retry with a delay.
+            Self::HttpErrorWithRetryAfter { .. } => true,
             Self::Custom(err) => {
                 let msg = err.to_string();
                 msg.contains("429 Too Many Requests")
@@ -352,6 +356,20 @@ mod tests {
         let err = r#"{"code":429,"event":-33200,"message":"Too Many Requests","details":"You have surpassed your allowed throughput limit. Reduce the amount of requests per second or upgrade for more capacity."}"#;
         let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
         assert!(TransportError::ErrorResp(err).is_retryable());
+    }
+
+    #[test]
+    fn http_retry_after_always_retryable() {
+        let err = TransportErrorKind::http_error_with_retry_after(
+            500,
+            String::new(),
+            Some(Duration::from_secs(1)),
+        );
+        assert!(err.is_retryable());
+        assert_eq!(err.backoff_hint(), Some(Duration::from_secs(1)));
+
+        // without the header a plain 500 stays non-retryable
+        assert!(!TransportErrorKind::http_error(500, String::new()).is_retryable());
     }
 
     #[test]
