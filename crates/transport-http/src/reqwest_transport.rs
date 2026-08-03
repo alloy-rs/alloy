@@ -59,7 +59,18 @@ impl Http<Client> {
         // Unpack data from the response body. We do this regardless of
         // the status code, as we want to return the error in the body
         // if there is one.
-        let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
+        let body = match resp.bytes().await {
+            Ok(body) => body,
+            // A failed body read on an error response still carries retryable metadata.
+            Err(err) if !status.is_success() => {
+                return Err(TransportErrorKind::http_error_with_retry_after(
+                    status.as_u16(),
+                    format!("<failed to read response body: {err}>"),
+                    retry_after,
+                ));
+            }
+            Err(err) => return Err(TransportErrorKind::custom(err)),
+        };
 
         if tracing::enabled!(tracing::Level::TRACE) {
             trace!(body = %String::from_utf8_lossy(&body), "response body");
