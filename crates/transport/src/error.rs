@@ -38,7 +38,9 @@ pub enum TransportErrorKind {
 
     /// HTTP error with a server-provided retry delay.
     ///
-    /// Always considered retryable since the server explicitly requested a retry.
+    /// Error statuses (4xx/5xx) are always considered retryable since the server explicitly
+    /// requested a retry. Redirects are not: `Retry-After` on a 3xx delays the redirected
+    /// request, not a replay of the original one.
     #[error("{error}")]
     HttpErrorWithRetryAfter {
         /// The HTTP error.
@@ -178,8 +180,9 @@ impl TransportErrorKind {
             Self::HttpError(http_err) => {
                 http_err.is_rate_limit_err() || http_err.is_temporarily_unavailable()
             }
-            // The server explicitly requested a retry with a delay.
-            Self::HttpErrorWithRetryAfter { .. } => true,
+            // The server explicitly requested a retry with a delay. Redirects are excluded
+            // because their `Retry-After` delays the redirected request, not a replay.
+            Self::HttpErrorWithRetryAfter { error, .. } => error.status >= 400,
             Self::Custom(err) => {
                 let msg = err.to_string();
                 msg.contains("429 Too Many Requests")
@@ -359,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn http_retry_after_always_retryable() {
+    fn http_retry_after_retryable_for_error_statuses() {
         let err = TransportErrorKind::http_error_with_retry_after(
             500,
             String::new(),
@@ -370,6 +373,14 @@ mod tests {
 
         // without the header a plain 500 stays non-retryable
         assert!(!TransportErrorKind::http_error(500, String::new()).is_retryable());
+
+        // redirects are not replayed even with a Retry-After
+        let err = TransportErrorKind::http_error_with_retry_after(
+            301,
+            String::new(),
+            Some(Duration::from_secs(1)),
+        );
+        assert!(!err.is_retryable());
     }
 
     #[test]
