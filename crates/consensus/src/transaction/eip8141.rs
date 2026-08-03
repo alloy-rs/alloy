@@ -243,7 +243,8 @@ impl TxEip8141 {
 
     /// Calculates the derived total gas limit of this frame transaction.
     pub fn calculate_gas_limit(&self) -> u64 {
-        self.calculate_gas_limit_with_token_cost(FRAME_TX_DATA_TOKEN_STANDARD_COST)
+        let standard = self.calculate_gas_limit_with_token_cost(FRAME_TX_DATA_TOKEN_STANDARD_COST);
+        standard.max(self.calculate_calldata_floor())
     }
 
     /// Calculates the calldata floor gas for this frame transaction.
