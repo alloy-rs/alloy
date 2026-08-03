@@ -598,7 +598,17 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
                 }
             }
 
-            Ok(abi::queryCall::abi_encode_returns(&abi::queryReturn { failures, responses }).into())
+            let encoded: Bytes =
+                abi::queryCall::abi_encode_returns(&abi::queryReturn { failures, responses })
+                    .into();
+            if encoded.len() > context.config.max_response_size {
+                return Err(CcipReadError::ResourceLimit(format!(
+                    "batch gateway response is {} bytes; limit is {}",
+                    encoded.len(),
+                    context.config.max_response_size
+                )));
+            }
+            Ok(encoded)
         })
     }
 }
@@ -1077,6 +1087,43 @@ mod tests {
         let http_error = abi::HttpError::abi_decode(&decoded.responses[1]).unwrap();
         assert_eq!(http_error.status, 404);
         assert_eq!(http_error.message, "not found");
+    }
+
+    #[tokio::test]
+    async fn enforces_response_limit_for_local_batch() {
+        let sender = address!("1111111111111111111111111111111111111111");
+        let batch = abi::queryCall {
+            requests: vec![abi::BatchGatewayRequest {
+                sender,
+                urls: vec!["https://one.test".into()],
+                data: bytes!("01"),
+            }],
+        }
+        .abi_encode()
+        .into();
+        // Encoded (failures=[false], responses=[["aaaa"]]) is larger than 8 bytes.
+        let config = CcipReadConfig { max_response_size: 8, ..Default::default() };
+        let client = CcipReadClient::new(BatchMockGateway).with_config(config);
+        let context = BatchContext {
+            total_requests: Arc::new(AtomicUsize::new(0)),
+            concurrency: Arc::new(tokio::sync::Semaphore::new(
+                client.config().max_concurrent_requests,
+            )),
+            config: client.config(),
+        };
+
+        let error = client
+            .fetch(
+                CcipReadRequest { sender, urls: vec![BATCH_GATEWAY_SENTINEL.into()], data: batch },
+                &context,
+            )
+            .await
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            CcipReadError::ResourceLimit(message) if message.contains("batch gateway response")
+        ));
     }
 
     #[tokio::test]
