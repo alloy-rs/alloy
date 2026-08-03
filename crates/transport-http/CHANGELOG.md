@@ -5,16 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Bug Fixes
 
+- [transport-http] Honor Retry-After ([#4103](https://github.com/alloy-rs/alloy/issues/4103))
 - [docs] Avoid rustdoc ICE on re-exports ([#4060](https://github.com/alloy-rs/alloy/issues/4060))
 - [transport-http] Preserve JSON-RPC errors from non-2xx ([#4006](https://github.com/alloy-rs/alloy/issues/4006))
 - [ci] Stabilize main red tests ([#3942](https://github.com/alloy-rs/alloy/issues/3942))
 
 ### Miscellaneous Tasks
 
+- Release 2.2.0
 - Release 2.1.1
 - Release 2.1.0
 - Release 2.0.5
