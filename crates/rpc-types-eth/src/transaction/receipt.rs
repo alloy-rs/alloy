@@ -441,4 +441,16 @@ mod test {
         let proper_receipt: TransactionReceipt = serde_json::from_str(proper_receipt).unwrap();
         assert_eq!(proper_receipt.effective_gas_price, 12500000000);
     }
+
+    #[test]
+    fn no_type_deser() {
+        // Receipt from a Geth-derived chain whose `marshalReceipt` never sets the `type` field.
+        let json = r#"{"blockHash":"0x18cf669d61484fafd3fd01ca88c0b6706332f444f90de28d04fe84c6a922c5d2","blockNumber":"0x6abbdf1","contractAddress":"0xd937e6195ddf60b91de26a27c59492bbb48690fa","cumulativeGasUsed":"0xc3b68","from":"0xeff507ead35c808439741f5d1b228918c00a4329","gasUsed":"0xc3b68","logs":[],"logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","status":"0x1","to":null,"transactionHash":"0x13c2e2de4e886256727ac69efd52d066fae21c37d4e458f009e47a033d09e252","transactionIndex":"0x0"}"#;
+
+        let receipt: TransactionReceipt = serde_json::from_str(json).unwrap();
+
+        assert_eq!(receipt.transaction_type(), TxType::Legacy);
+        assert_eq!(receipt.gas_used, 0xc3b68);
+        assert!(receipt.status());
+    }
 }
