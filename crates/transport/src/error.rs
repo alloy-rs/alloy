@@ -261,36 +261,47 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
     }
 
     fn backoff_hint(&self) -> Option<std::time::Duration> {
-        if let Self::Transport(TransportErrorKind::HttpErrorWithRetryAfter {
-            retry_after, ..
-        }) = self
-        {
-            return Some(*retry_after);
-        }
-
-        if let Self::ErrorResp(resp) = self {
-            // try to extract backoff from the error data (infura-style)
-            let data = resp.try_data_as::<serde_json::Value>();
-            if let Some(Ok(data)) = data {
-                // if daily rate limit exceeded, infura returns the requested backoff in the error
-                // response
-                let backoff_seconds = &data["rate"]["backoff_seconds"];
-                // infura rate limit error
-                if let Some(seconds) = backoff_seconds.as_u64() {
-                    return Some(std::time::Duration::from_secs(seconds));
-                }
-                if let Some(seconds) = backoff_seconds.as_f64() {
-                    return Some(std::time::Duration::from_secs(seconds as u64 + 1));
-                }
-            }
-
-            // try to extract backoff from the error message, e.g. "try again in 4ms"
-            if let Some(duration) = parse_retry_after(&resp.message) {
-                return Some(duration);
-            }
-        }
-        None
+        // Server-provided hints are clamped so that a misbehaving server cannot stall retries
+        // with an absurd delay.
+        raw_backoff_hint(self).map(|hint| hint.min(MAX_BACKOFF_HINT))
     }
+}
+
+/// Maximum server-provided backoff honored, whether from a `Retry-After` header or an error
+/// payload.
+const MAX_BACKOFF_HINT: Duration = Duration::from_secs(5 * 60);
+
+/// Extracts the backoff hint from the error, unbounded.
+fn raw_backoff_hint(err: &RpcError<TransportErrorKind>) -> Option<Duration> {
+    if let RpcError::Transport(TransportErrorKind::HttpErrorWithRetryAfter {
+        retry_after, ..
+    }) = err
+    {
+        return Some(*retry_after);
+    }
+
+    if let RpcError::ErrorResp(resp) = err {
+        // try to extract backoff from the error data (infura-style)
+        let data = resp.try_data_as::<serde_json::Value>();
+        if let Some(Ok(data)) = data {
+            // if daily rate limit exceeded, infura returns the requested backoff in the error
+            // response
+            let backoff_seconds = &data["rate"]["backoff_seconds"];
+            // infura rate limit error
+            if let Some(seconds) = backoff_seconds.as_u64() {
+                return Some(Duration::from_secs(seconds));
+            }
+            if let Some(seconds) = backoff_seconds.as_f64() {
+                return Some(Duration::from_secs((seconds as u64).saturating_add(1)));
+            }
+        }
+
+        // try to extract backoff from the error message, e.g. "try again in 4ms"
+        if let Some(duration) = parse_retry_after(&resp.message) {
+            return Some(duration);
+        }
+    }
+    None
 }
 
 /// Parses a duration from messages like "try again in 4ms", "try again in 1s".
@@ -381,6 +392,16 @@ mod tests {
             Some(Duration::from_secs(1)),
         );
         assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn backoff_hint_clamped() {
+        let err = TransportErrorKind::http_error_with_retry_after(
+            429,
+            String::new(),
+            Some(Duration::from_secs(u64::MAX)),
+        );
+        assert_eq!(err.backoff_hint(), Some(MAX_BACKOFF_HINT));
     }
 
     #[test]
