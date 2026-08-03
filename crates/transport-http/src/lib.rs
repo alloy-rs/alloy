@@ -49,21 +49,14 @@ fn http_error_response(
     body: &[u8],
     retry_after: Option<std::time::Duration>,
 ) -> alloy_transport::TransportResult<alloy_json_rpc::ResponsePacket> {
-    if let Some(retry_after) = retry_after {
-        return Err(alloy_transport::TransportErrorKind::http_error_with_retry_after(
-            status,
-            String::from_utf8_lossy(body).into_owned(),
-            Some(retry_after),
-        ));
-    }
-
     if let Some(response) = json_rpc_error_response(body) {
         return Ok(response);
     }
 
-    Err(alloy_transport::TransportErrorKind::http_error(
+    Err(alloy_transport::TransportErrorKind::http_error_with_retry_after(
         status,
         String::from_utf8_lossy(body).into_owned(),
+        retry_after,
     ))
 }
 
@@ -180,9 +173,20 @@ mod tests {
     }
 
     #[test]
-    fn retry_after_takes_precedence_over_json_rpc_error_body() {
-        let error = super::http_error_response(429, JSON_RPC_ERROR, Some(Duration::from_secs(52)))
-            .unwrap_err();
+    fn json_rpc_error_body_takes_precedence_over_retry_after() {
+        let response =
+            super::http_error_response(429, JSON_RPC_ERROR, Some(Duration::from_secs(52)))
+                .expect("valid JSON-RPC error response");
+
+        assert!(response.is_error());
+        assert_eq!(response.first_error_code(), Some(-32000));
+    }
+
+    #[test]
+    fn non_json_rpc_body_carries_retry_after() {
+        let error =
+            super::http_error_response(429, b"too many requests", Some(Duration::from_secs(52)))
+                .unwrap_err();
 
         let TransportError::Transport(error) = error else { panic!("expected transport error") };
         assert_eq!(error.retry_after(), Some(Duration::from_secs(52)));
