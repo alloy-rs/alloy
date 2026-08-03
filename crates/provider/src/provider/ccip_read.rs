@@ -4,6 +4,7 @@ use crate::Provider;
 use alloy_eips::BlockId;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes};
+use alloy_rpc_types_eth::TransactionInputKind;
 use alloy_sol_types::{sol, SolCall, SolError, SolValue};
 use alloy_transport::TransportError;
 #[cfg(not(target_family = "wasm"))]
@@ -488,7 +489,9 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
                     let mut callback = Vec::with_capacity(4 + args.len());
                     callback.extend_from_slice(lookup.callbackFunction.as_slice());
                     callback.extend_from_slice(&args);
-                    transaction.set_input(callback);
+                    // Keep `input` and `data` in sync. Some eth_call clients reject
+                    // requests where both fields are set and disagree (e.g. Geth).
+                    transaction.set_input_kind(callback, TransactionInputKind::Both);
                 }
             }
         }
@@ -719,7 +722,7 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_json_rpc::ErrorPayload;
     use alloy_primitives::{address, bytes, fixed_bytes};
-    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
     use alloy_transport::mock::Asserter;
     use std::{
         collections::VecDeque,
@@ -826,6 +829,41 @@ mod tests {
                 data: call_data,
             }]
         );
+    }
+
+    #[tokio::test]
+    async fn callback_keeps_input_and_data_in_sync() {
+        let target = address!("1111111111111111111111111111111111111111");
+        let revert: Bytes = abi::OffchainLookup {
+            sender: target,
+            urls: vec!["https://example.test/{data}".into()],
+            callData: bytes!("abcdef"),
+            callbackFunction: fixed_bytes!("12345678"),
+            extraData: bytes!("010203"),
+        }
+        .abi_encode()
+        .into();
+
+        let asserter = Asserter::new();
+        asserter.push_failure(revert_error(revert));
+        asserter.push_success(&bytes!("feed"));
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+        let gateway = MockGateway::with_responses([Ok(bytes!("deadbeef"))]);
+        let client = CcipReadClient::new(gateway);
+
+        // Requests with both `input` and `data` previously broke after the callback
+        // replaced only `input`, leaving a stale `data` field.
+        let result = client
+            .call(
+                &provider,
+                TransactionRequest::default()
+                    .to(target)
+                    .input(TransactionInput::both(bytes!("00"))),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result, bytes!("feed"));
     }
 
     #[tokio::test]
