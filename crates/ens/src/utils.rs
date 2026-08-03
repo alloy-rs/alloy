@@ -6,7 +6,7 @@ use std::borrow::Cow;
 pub enum DnsEncodeError {
     /// A label in the name is empty (e.g., consecutive dots or leading/trailing dot).
     EmptyLabel,
-    /// A label exceeds the 63-byte maximum DNS length.
+    /// A label exceeds the 255-byte maximum used by ENS DNS wire encoding.
     LabelTooLong,
 }
 
@@ -14,7 +14,7 @@ impl std::fmt::Display for DnsEncodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyLabel => f.write_str("ENS name contains an empty label"),
-            Self::LabelTooLong => f.write_str("ENS name label exceeds 63 bytes"),
+            Self::LabelTooLong => f.write_str("ENS name label exceeds 255 bytes"),
         }
     }
 }
@@ -26,7 +26,9 @@ impl std::error::Error for DnsEncodeError {}
 /// Each label is prefixed with its byte length and the sequence is terminated with `\x00`.
 /// For example, `"foo.eth"` encodes to `[3, 'f', 'o', 'o', 3, 'e', 't', 'h', 0]`.
 ///
-/// Returns an error if any label is empty or exceeds 63 bytes.
+/// Returns an error if any label is empty or exceeds 255 bytes. This matches ENS
+/// [`NameCoder`](https://github.com/ensdomains/ens-contracts/blob/staging/contracts/utils/NameCoder.sol),
+/// which uses a full length byte (not the RFC 1035 63-octet DNS message limit).
 pub fn dns_encode(name: &str) -> Result<Vec<u8>, DnsEncodeError> {
     if name.is_empty() {
         return Ok(vec![0]);
@@ -46,7 +48,7 @@ pub fn dns_encode(name: &str) -> Result<Vec<u8>, DnsEncodeError> {
         if bytes.is_empty() {
             return Err(DnsEncodeError::EmptyLabel);
         }
-        if bytes.len() > 63 {
+        if bytes.len() > 255 {
             return Err(DnsEncodeError::LabelTooLong);
         }
         out.push(bytes.len() as u8);
@@ -148,8 +150,10 @@ mod tests {
         // Empty label errors
         assert_eq!(dns_encode(".eth").unwrap_err(), DnsEncodeError::EmptyLabel);
         assert_eq!(dns_encode("foo..eth").unwrap_err(), DnsEncodeError::EmptyLabel);
-        // Label too long
-        let long_label = "a".repeat(64) + ".eth";
-        assert_eq!(dns_encode(&long_label).unwrap_err(), DnsEncodeError::LabelTooLong);
+        // Labels up to 255 bytes are valid for ENS DNS wire encoding / NameCoder.
+        let max_label = "a".repeat(255) + ".eth";
+        assert!(dns_encode(&max_label).is_ok());
+        let too_long = "a".repeat(256) + ".eth";
+        assert_eq!(dns_encode(&too_long).unwrap_err(), DnsEncodeError::LabelTooLong);
     }
 }

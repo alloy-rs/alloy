@@ -233,8 +233,9 @@ mod contract {
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{
-        coin_type, dns_encode, namehash, EnsError, EnsMulticoinResolver, EnsResolver,
-        EnsResolver::EnsResolverInstance, UniversalResolver, UNIVERSAL_RESOLVER_ADDRESS,
+        coin_type, dns_encode, namehash, reverse_address, EnsError, EnsMulticoinResolver,
+        EnsResolver, EnsResolver::EnsResolverInstance, UniversalResolver,
+        UNIVERSAL_RESOLVER_ADDRESS,
     };
     use alloy_primitives::{Address, Bytes, U256};
     use alloy_provider::{Network, Provider};
@@ -297,7 +298,7 @@ mod provider {
                 .requireResolver(dns.into())
                 .call()
                 .await
-                .map_err(EnsError::Resolver)?;
+                .map_err(|error| map_ur_error(error, name, EnsError::Resolver))?;
 
             // Extended and parent/wildcard resolvers must be queried through the
             // Universal Resolver. Returning a raw instance invites incorrect direct
@@ -319,7 +320,7 @@ mod provider {
                 .resolve(dns.into(), calldata.into())
                 .call()
                 .await
-                .map_err(EnsError::Resolve)?;
+                .map_err(|error| map_ur_error(error, name, EnsError::Resolve))?;
 
             Address::abi_decode(ret.result.as_ref()).map_err(|_| EnsError::InvalidResponse)
         }
@@ -342,18 +343,19 @@ mod provider {
                 .resolve(dns.into(), calldata.into())
                 .call()
                 .await
-                .map_err(EnsError::Resolve)?;
+                .map_err(|error| map_ur_error(error, name, EnsError::Resolve))?;
 
             Bytes::abi_decode(ret.result.as_ref()).map_err(|_| EnsError::InvalidResponse)
         }
 
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError> {
+            let reverse_name = reverse_address(address);
             let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
             let ret = ur
                 .reverse(Bytes::copy_from_slice(address.as_slice()), U256::from(coin_type::ETH))
                 .call()
                 .await
-                .map_err(EnsError::Lookup)?;
+                .map_err(|error| map_ur_error(error, &reverse_name, EnsError::Lookup))?;
 
             Ok(ret.name)
         }
@@ -368,9 +370,22 @@ mod provider {
                 .resolve(dns.into(), calldata.into())
                 .call()
                 .await
-                .map_err(EnsError::ResolveTxtRecord)?;
+                .map_err(|error| map_ur_error(error, name, EnsError::ResolveTxtRecord))?;
 
             String::abi_decode(ret.result.as_ref()).map_err(|_| EnsError::InvalidResponse)
+        }
+    }
+
+    /// Maps Universal Resolver contract errors, preserving [`EnsError::ResolverNotFound`].
+    fn map_ur_error(
+        error: alloy_contract::Error,
+        name: &str,
+        fallback: impl FnOnce(alloy_contract::Error) -> EnsError,
+    ) -> EnsError {
+        if error.as_decoded_error::<UniversalResolver::ResolverNotFound>().is_some() {
+            EnsError::ResolverNotFound(name.to_string())
+        } else {
+            fallback(error)
         }
     }
 }
