@@ -202,6 +202,16 @@ mod contract {
         /// No resolver found for the given name.
         #[error("ENS resolver not found for name {0:?}")]
         ResolverNotFound(String),
+        /// Direct resolver calls are unsafe for this name; use Universal Resolver helpers.
+        ///
+        /// Returned when the name resolves through an ENSIP-10 extended resolver or a
+        /// parent/wildcard resolver. Calling `addr`/`text`/`name` on the raw resolver
+        /// instance can return incorrect data — use `resolve_name`, `lookup_txt`, or
+        /// related helpers instead.
+        #[error(
+            "ENS name {0:?} requires Universal Resolver resolution (extended or wildcard resolver)"
+        )]
+        RequiresUniversalResolver(String),
         /// Failed to perform a reverse lookup.
         #[error("Failed to lookup ENS name from an address: {0}")]
         Lookup(alloy_contract::Error),
@@ -237,6 +247,12 @@ mod provider {
         /// Returns the resolver contract instance for the given ENS name.
         ///
         /// Determines the resolver address via the Universal Resolver.
+        ///
+        /// Returns [`EnsError::RequiresUniversalResolver`] when the name uses an
+        /// ENSIP-10 extended resolver or a parent/wildcard resolver. In those cases
+        /// direct `addr`/`text`/`name` calls on the resolver are not equivalent to
+        /// Universal Resolver resolution — use [`Self::resolve_name`],
+        /// [`Self::lookup_txt`], or the other helpers instead.
         async fn get_resolver(&self, name: &str) -> Result<EnsResolverInstance<&P, N>, EnsError>;
 
         /// Performs a forward lookup of an ENS name to an Ethereum address.
@@ -282,6 +298,13 @@ mod provider {
                 .call()
                 .await
                 .map_err(EnsError::Resolver)?;
+
+            // Extended and parent/wildcard resolvers must be queried through the
+            // Universal Resolver. Returning a raw instance invites incorrect direct
+            // `addr`/`text` calls (e.g. ur.integration-tests.eth).
+            if info.extended || !info.offset.is_zero() {
+                return Err(EnsError::RequiresUniversalResolver(name.to_string()));
+            }
 
             Ok(EnsResolverInstance::new(info.resolver, self))
         }
@@ -433,6 +456,15 @@ mod provider_tests {
 
         let res = provider.resolve_name("ur.integration-tests.eth").await.unwrap();
         assert_eq!(res, address!("0x2222222222222222222222222222222222222222"));
+    }
+
+    #[tokio::test]
+    async fn test_get_resolver_rejects_extended_resolver() {
+        let provider = ProviderBuilder::new()
+            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+
+        let err = provider.get_resolver("ur.integration-tests.eth").await.unwrap_err();
+        assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
     }
 
     #[tokio::test]
