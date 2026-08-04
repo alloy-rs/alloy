@@ -50,6 +50,8 @@ pub struct BlockTraceResult {
 }
 
 /// Result for one block emitted by a `debug_traceChain` subscription.
+///
+/// <https://github.com/ethereum/go-ethereum/blob/e25efd2c62175e82b364c0344d77c882aa951f68/eth/tracers/api.go#L190-L196>
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainBlockTraceResult {
     /// Block number corresponding to the trace task.
