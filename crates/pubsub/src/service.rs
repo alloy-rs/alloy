@@ -133,9 +133,9 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
-        if let Some(server_id) = self.subs.server_id_for(&local_id) {
+        if let Some((server_id, method)) = self.subs.unsubscribe_data(&local_id) {
             // TODO: ideally we can send this with an unused id
-            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
+            let req = Request::new(method, Id::Number(1), [server_id]);
             let brv = req.serialize().expect("no ser error").take_request();
 
             self.dispatch_request(brv)?;
@@ -433,6 +433,33 @@ mod tests {
 
         assert_eq!(reconnect_retry_interval(base, 1), Duration::from_secs(60));
         assert_eq!(reconnect_retry_interval(base, 2), Duration::from_secs(60));
+    }
+
+    #[tokio::test]
+    async fn uses_configured_unsubscribe_method() {
+        let (handle, mut interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect::default(),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+
+        let mut request = Request::new("debug_subscribe", Id::Number(1), ("traceChain",));
+        crate::set_unsubscribe_method(&mut request.meta, "debug_unsubscribe");
+        let request = request.serialize().unwrap();
+        let local_id = request.params_hash();
+        service.subs.upsert(request, alloy_json_rpc::SubId::String("0x1".into()), 16);
+
+        service.service_unsubscribe(local_id).unwrap();
+
+        let request = interface.recv_from_frontend().await.unwrap();
+        let request: serde_json::Value = serde_json::from_str(request.get()).unwrap();
+        assert_eq!(request["method"], "debug_unsubscribe");
+        assert_eq!(request["params"], serde_json::json!(["0x1"]));
+        assert!(service.subs.get_subscription(local_id).is_none());
     }
 
     #[tokio::test]

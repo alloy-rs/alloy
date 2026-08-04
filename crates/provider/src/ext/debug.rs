@@ -1,10 +1,14 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::Provider;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
 use alloy_rpc_types_eth::{BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext};
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_trace::geth::ChainBlockTraceResult;
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, CallFrame, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
     PreStateFrame, TraceResult,
@@ -32,11 +36,26 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
 
     /// Returns the structured logs created during the execution of EVM between two blocks
     /// (excluding start) as a JSON object.
+    #[deprecated(
+        note = "trace chain is exposed as a subscription; use debug_subscribe_trace_chain"
+    )]
     async fn debug_trace_chain(
         &self,
         start_exclusive: BlockNumberOrTag,
         end_inclusive: BlockNumberOrTag,
     ) -> TransportResult<Vec<BlockTraceResult>>;
+
+    /// Subscribes to traces for blocks in `(start, end]`.
+    #[cfg(feature = "pubsub")]
+    fn debug_subscribe_trace_chain(
+        &self,
+        start_exclusive: BlockNumberOrTag,
+        end_inclusive: BlockNumberOrTag,
+        trace_options: Option<GethDebugTracingOptions>,
+    ) -> GetSubscription<
+        (&'static str, BlockNumberOrTag, BlockNumberOrTag, Option<GethDebugTracingOptions>),
+        ChainBlockTraceResult,
+    >;
 
     /// The debug_traceBlock method will return a full stack trace of all invoked opcodes of all
     /// transaction that were included in this block.
@@ -398,6 +417,24 @@ where
         end_inclusive: BlockNumberOrTag,
     ) -> TransportResult<Vec<BlockTraceResult>> {
         self.client().request("debug_traceChain", (start_exclusive, end_inclusive)).await
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn debug_subscribe_trace_chain(
+        &self,
+        start_exclusive: BlockNumberOrTag,
+        end_inclusive: BlockNumberOrTag,
+        trace_options: Option<GethDebugTracingOptions>,
+    ) -> GetSubscription<
+        (&'static str, BlockNumberOrTag, BlockNumberOrTag, Option<GethDebugTracingOptions>),
+        ChainBlockTraceResult,
+    > {
+        let mut call = self.client().request(
+            "debug_subscribe",
+            ("traceChain", start_exclusive, end_inclusive, trace_options),
+        );
+        call.set_is_subscription();
+        GetSubscription::new(self.weak_client(), call).unsubscribe_method("debug_unsubscribe")
     }
 
     async fn debug_trace_block(

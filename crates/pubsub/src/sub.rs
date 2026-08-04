@@ -1,8 +1,9 @@
+use alloy_json_rpc::RequestMeta;
 use alloy_primitives::B256;
 use futures::{ready, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
-use std::{pin::Pin, task};
+use std::{borrow::Cow, pin::Pin, task};
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
 
@@ -439,4 +440,17 @@ impl<T: DeserializeOwned> Stream for SubResultStream<T> {
             }
         }
     }
+}
+
+#[derive(Clone, Debug)]
+struct UnsubscribeMethod(Cow<'static, str>);
+
+/// Sets the method used to unsubscribe from a subscription request.
+#[doc(hidden)]
+pub fn set_unsubscribe_method(meta: &mut RequestMeta, method: impl Into<Cow<'static, str>>) {
+    meta.extensions_mut().insert(UnsubscribeMethod(method.into()));
+}
+
+pub(crate) fn unsubscribe_method(meta: &RequestMeta) -> Option<Cow<'static, str>> {
+    meta.extensions().get::<UnsubscribeMethod>().map(|method| method.0.clone())
 }

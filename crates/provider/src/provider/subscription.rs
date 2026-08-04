@@ -1,8 +1,9 @@
 use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_primitives::B256;
-use alloy_pubsub::Subscription;
+use alloy_pubsub::{set_unsubscribe_method, Subscription};
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_transport::{TransportErrorKind, TransportResult};
+use std::borrow::Cow;
 
 /// A general-purpose subscription request builder
 ///
@@ -32,6 +33,12 @@ where
     /// Set the channel_size for the subscription stream.
     pub const fn channel_size(mut self, size: usize) -> Self {
         self.channel_size = Some(size);
+        self
+    }
+
+    /// Sets the RPC method used to unsubscribe from the subscription.
+    pub fn unsubscribe_method(mut self, method: impl Into<Cow<'static, str>>) -> Self {
+        set_unsubscribe_method(&mut self.call.request_mut().meta, method);
         self
     }
 }
