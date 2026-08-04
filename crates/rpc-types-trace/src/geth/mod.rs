@@ -49,6 +49,21 @@ pub struct BlockTraceResult {
     pub traces: Vec<TraceResult>,
 }
 
+/// Result for one block emitted by a `debug_traceChain` subscription.
+///
+/// <https://github.com/ethereum/go-ethereum/blob/e25efd2c62175e82b364c0344d77c882aa951f68/eth/tracers/api.go#L190-L196>
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChainBlockTraceResult {
+    /// Block number corresponding to the trace task.
+    pub block: U256,
+    /// Block hash corresponding to the trace task.
+    pub hash: B256,
+    /// Trace results produced by the trace task.
+    ///
+    /// Geth leaves entries after the first transaction-level tracing failure as `null`.
+    pub traces: Vec<Option<TraceResult>>,
+}
+
 /// Geth Default struct log trace frame
 ///
 /// <https://github.com/ethereum/go-ethereum/blob/a9ef135e2dd53682d106c6a2aede9187026cc1de/eth/tracers/logger/logger.go#L406-L411>
@@ -837,6 +852,35 @@ fn serialize_string_storage_map_opt<S: Serializer>(
 mod tests {
     use super::*;
     use similar_asserts::assert_eq;
+
+    #[test]
+    fn serde_chain_block_trace_result() {
+        let block_hash = B256::repeat_byte(0x11);
+        let tx_hash = B256::repeat_byte(0x22);
+        let result = ChainBlockTraceResult {
+            block: U256::from(2),
+            hash: block_hash,
+            traces: vec![
+                Some(TraceResult::Error {
+                    error: "trace failed".to_string(),
+                    tx_hash: Some(tx_hash),
+                }),
+                None,
+            ],
+        };
+
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            serde_json::json!({
+                "block": "0x2",
+                "hash": block_hash,
+                "traces": [
+                    {"error": "trace failed", "txHash": tx_hash},
+                    null
+                ]
+            })
+        );
+    }
 
     #[test]
     fn test_return_data_prefix() {
