@@ -852,7 +852,7 @@ mod tests {
     use similar_asserts::assert_eq;
 
     #[test]
-    fn chain_block_trace_result_matches_geth_wire_shape() {
+    fn serde_chain_block_trace_result() {
         let block_hash = B256::repeat_byte(0x11);
         let tx_hash = B256::repeat_byte(0x22);
         let result = ChainBlockTraceResult {
