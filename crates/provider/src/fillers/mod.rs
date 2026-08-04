@@ -61,7 +61,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
-    FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
+    FilterChanges, Log, SignTransaction, StorageValuesRequest, StorageValuesResponse,
 };
 use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
@@ -766,7 +766,10 @@ where
         self.inner.send_transaction_sync_internal(tx).await
     }
 
-    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+    async fn sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<SignTransaction<N::TransactionResponse>> {
         let tx = self.fill(tx).await?;
         let tx = tx.try_into_request().map_err(TransportError::local_usage)?;
         self.inner.sign_transaction(tx).await

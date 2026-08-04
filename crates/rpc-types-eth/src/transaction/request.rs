@@ -1809,9 +1809,17 @@ pub struct TransactionInputError;
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FillTransaction<T = TypedTransaction> {
-    /// RLP-encoded signed transaction bytes.
+    /// Filled unsigned transaction with populated default values.
+    pub tx: T,
+}
+
+/// Response type for `eth_signTransaction`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SignTransaction<T = Transaction> {
+    /// EIP-2718 encoded signed transaction bytes.
     pub raw: Bytes,
-    /// Filled transaction request with populated default values.
+    /// Signed RPC transaction object.
     pub tx: T,
 }
 
@@ -1825,6 +1833,19 @@ mod tests {
     use alloy_serde::WithOtherFields;
     use assert_matches::assert_matches;
     use similar_asserts::assert_eq;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn transaction_response_serde() {
+        let filled = FillTransaction { tx: 1u64 };
+        assert_eq!(serde_json::to_value(filled).unwrap(), serde_json::json!({ "tx": 1 }));
+
+        let signed = SignTransaction { raw: Bytes::from_static(&[1]), tx: 1u64 };
+        assert_eq!(
+            serde_json::to_value(signed).unwrap(),
+            serde_json::json!({ "raw": "0x01", "tx": 1 })
+        );
+    }
 
     // <https://github.com/paradigmxyz/reth/issues/6670>
     #[test]
