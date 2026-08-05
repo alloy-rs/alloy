@@ -32,9 +32,6 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
 
     /// Returns the structured logs created during the execution of EVM between two blocks
     /// (excluding start) as a JSON object.
-    #[deprecated(
-        note = "trace chain is exposed as a subscription; use debug_subscribe_trace_chain"
-    )]
     async fn debug_trace_chain(
         &self,
         start_exclusive: BlockNumberOrTag,
