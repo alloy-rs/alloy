@@ -1,14 +1,10 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
-#[cfg(feature = "pubsub")]
-use crate::GetSubscription;
 use crate::Provider;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
 use alloy_rpc_types_eth::{BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext};
-#[cfg(feature = "pubsub")]
-use alloy_rpc_types_trace::geth::ChainBlockTraceResult;
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, CallFrame, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
     PreStateFrame, TraceResult,
@@ -52,9 +48,9 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
         start_exclusive: BlockNumberOrTag,
         end_inclusive: BlockNumberOrTag,
         trace_options: Option<GethDebugTracingOptions>,
-    ) -> GetSubscription<
+    ) -> crate::GetSubscription<
         (&'static str, BlockNumberOrTag, BlockNumberOrTag, Option<GethDebugTracingOptions>),
-        ChainBlockTraceResult,
+        alloy_rpc_types_trace::geth::ChainBlockTraceResult,
     >;
 
     /// The debug_traceBlock method will return a full stack trace of all invoked opcodes of all
@@ -425,16 +421,17 @@ where
         start_exclusive: BlockNumberOrTag,
         end_inclusive: BlockNumberOrTag,
         trace_options: Option<GethDebugTracingOptions>,
-    ) -> GetSubscription<
+    ) -> crate::GetSubscription<
         (&'static str, BlockNumberOrTag, BlockNumberOrTag, Option<GethDebugTracingOptions>),
-        ChainBlockTraceResult,
+        alloy_rpc_types_trace::geth::ChainBlockTraceResult,
     > {
         let mut call = self.client().request(
             "debug_subscribe",
             ("traceChain", start_exclusive, end_inclusive, trace_options),
         );
         call.set_is_subscription();
-        GetSubscription::new(self.weak_client(), call).unsubscribe_method("debug_unsubscribe")
+        crate::GetSubscription::new(self.weak_client(), call)
+            .unsubscribe_method("debug_unsubscribe")
     }
 
     async fn debug_trace_block(
