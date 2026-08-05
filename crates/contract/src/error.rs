@@ -1,6 +1,6 @@
 use alloy_dyn_abi::Error as AbiError;
 use alloy_primitives::{Bytes, Selector};
-use alloy_provider::PendingTransactionError;
+use alloy_provider::{MulticallError, PendingTransactionError};
 use alloy_sol_types::{SolError, SolInterface};
 use alloy_transport::{RpcError, TransportError, TransportErrorKind};
 use serde_json::value::RawValue;
@@ -43,6 +43,16 @@ impl From<alloy_sol_types::Error> for Error {
     #[inline]
     fn from(e: alloy_sol_types::Error) -> Self {
         Self::AbiError(e.into())
+    }
+}
+
+impl From<MulticallError> for Error {
+    fn from(error: MulticallError) -> Self {
+        match error {
+            MulticallError::TransportError(error) => Self::TransportError(error),
+            MulticallError::DecodeError(error) => error.into(),
+            error => Self::TransportError(TransportErrorKind::custom_str(&error.to_string())),
+        }
     }
 }
 
@@ -212,5 +222,32 @@ impl TransportErrorExt for TransportError {
             return TryParseTransportErrorResult::UnknownSelector(decoded);
         }
         TryParseTransportErrorResult::Original(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn converts_multicall_transport_error() {
+        let error = MulticallError::TransportError(TransportErrorKind::backend_gone());
+
+        assert!(matches!(Error::from(error), Error::TransportError(_)));
+    }
+
+    #[test]
+    fn converts_multicall_decode_error() {
+        let error = MulticallError::DecodeError(alloy_sol_types::Error::Overrun);
+
+        assert!(matches!(Error::from(error), Error::AbiError(_)));
+    }
+
+    #[test]
+    fn converts_other_multicall_errors_to_transport_errors() {
+        let error = Error::from(MulticallError::NoReturnData);
+
+        assert!(matches!(error, Error::TransportError(_)));
+        assert_eq!(error.to_string(), "no return data");
     }
 }
