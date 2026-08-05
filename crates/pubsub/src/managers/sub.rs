@@ -1,8 +1,7 @@
-use crate::{managers::ActiveSubscription, unsubscribe_method, RawSubscription};
+use crate::{managers::ActiveSubscription, RawSubscription};
 use alloy_json_rpc::{EthNotification, SerializedRequest, SubId};
 use alloy_primitives::B256;
 use bimap::BiBTreeMap;
-use std::borrow::Cow;
 
 #[derive(Debug, Default)]
 pub(crate) struct SubscriptionManager {
@@ -67,14 +66,6 @@ impl SubscriptionManager {
     /// De-alias an alias, getting the original ID.
     pub(crate) fn server_id_for(&self, local_id: &B256) -> Option<&SubId> {
         self.local_to_server.get_by_left(local_id)
-    }
-
-    /// Returns the server ID and unsubscribe method for a subscription.
-    pub(crate) fn unsubscribe_data(&self, local_id: &B256) -> Option<(SubId, Cow<'static, str>)> {
-        let server_id = self.server_id_for(local_id)?.clone();
-        let request = self.local_to_sub.get_by_left(local_id)?.request();
-        let method = unsubscribe_method(request.meta()).unwrap_or(Cow::Borrowed("eth_unsubscribe"));
-        Some((server_id, method))
     }
 
     /// Drop all server_ids.

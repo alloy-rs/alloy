@@ -431,7 +431,6 @@ where
         );
         call.set_is_subscription();
         crate::GetSubscription::new(self.weak_client(), call)
-            .unsubscribe_method("debug_unsubscribe")
     }
 
     async fn debug_trace_block(

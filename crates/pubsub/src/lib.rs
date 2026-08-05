@@ -27,9 +27,6 @@ pub use managers::InFlight;
 mod service;
 
 mod sub;
-#[doc(hidden)]
-pub use sub::set_unsubscribe_method;
-pub(crate) use sub::unsubscribe_method;
 pub use sub::{
     RawSubscription, SubAnyStream, SubResultStream, Subscription, SubscriptionItem,
     SubscriptionStream,
