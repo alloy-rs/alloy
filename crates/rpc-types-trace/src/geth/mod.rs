@@ -113,7 +113,7 @@ pub struct StructLog {
     /// Net state-dimension gas change caused by this opcode. This can be negative
     /// for source-based state-gas refunds under EIP-8037.
     #[serde(default, rename = "stateGasCost", skip_serializing_if = "Option::is_none")]
-    pub state_gas_cost: Option<alloy_primitives::I256>,
+    pub state_gas_cost: Option<i64>,
     /// State-gas reservoir remaining before this opcode.
     #[serde(default, rename = "stateGasReservoir", skip_serializing_if = "Option::is_none")]
     pub state_gas_reservoir: Option<u64>,
