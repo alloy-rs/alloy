@@ -27,7 +27,6 @@ pub struct StateGasTrace {
 mod tests {
     use super::*;
     use crate::geth::{GethDebugTracingOptions, GethTrace, StructLog};
-    use alloy_primitives::I256;
 
     #[test]
     fn test_state_gas_trace_serde() {
@@ -89,7 +88,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(log.state_gas_cost, Some(I256::try_from(-5).unwrap()));
+        assert_eq!(log.state_gas_cost, Some(-5));
         assert_eq!(log.state_gas_reservoir, Some(90));
+        assert_eq!(serde_json::to_value(&log).unwrap()["stateGasCost"], -5);
     }
 }
