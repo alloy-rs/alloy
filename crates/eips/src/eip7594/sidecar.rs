@@ -94,6 +94,18 @@ impl BlobTransactionSidecarVariant {
         }
     }
 
+    /// Clears EIP-7594 blob payloads while retaining commitments and cell proofs.
+    ///
+    /// This prepares the sidecar for inclusion in an eth/72 `PooledTransactions` response as
+    /// specified by [EIP-8070]. This has no effect on EIP-4844 sidecars.
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    pub fn clear_eip7594_blobs(&mut self) {
+        if let Self::Eip7594(sidecar) = self {
+            sidecar.clear_eip7594_blobs();
+        }
+    }
+
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarVariant].
     #[inline]
     pub const fn size(&self) -> usize {
@@ -546,6 +558,16 @@ impl BlobTransactionSidecarEip7594 {
         cell_proofs: Vec<Bytes48>,
     ) -> Self {
         Self { blobs, commitments, cell_proofs }
+    }
+
+    /// Clears blob payloads while retaining commitments and cell proofs.
+    ///
+    /// This prepares the sidecar for inclusion in an eth/72 `PooledTransactions` response as
+    /// specified by [EIP-8070].
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    pub fn clear_eip7594_blobs(&mut self) {
+        self.blobs.clear();
     }
 
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarEip7594].
@@ -1305,6 +1327,39 @@ mod tests {
         builder::{SidecarBuilder, SimpleCoder},
         env_settings::EnvKzgSettings,
     };
+
+    #[test]
+    fn clear_eip7594_blobs_preserves_metadata() {
+        let commitments = vec![Bytes48::repeat_byte(0x01)];
+        let cell_proofs = vec![Bytes48::repeat_byte(0x02); CELLS_PER_EXT_BLOB];
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0x03)],
+            commitments.clone(),
+            cell_proofs.clone(),
+        );
+        let mut variant = BlobTransactionSidecarVariant::Eip7594(sidecar);
+
+        variant.clear_eip7594_blobs();
+
+        let sidecar = variant.as_eip7594().unwrap();
+        assert!(sidecar.blobs.is_empty());
+        assert_eq!(sidecar.commitments, commitments);
+        assert_eq!(sidecar.cell_proofs, cell_proofs);
+    }
+
+    #[test]
+    fn clear_eip7594_blobs_ignores_eip4844_variant() {
+        let sidecar = BlobTransactionSidecar::new(
+            vec![Blob::repeat_byte(0x01)],
+            vec![Bytes48::repeat_byte(0x02)],
+            vec![Bytes48::repeat_byte(0x03)],
+        );
+        let mut variant = BlobTransactionSidecarVariant::Eip4844(sidecar.clone());
+
+        variant.clear_eip7594_blobs();
+
+        assert_eq!(variant, BlobTransactionSidecarVariant::Eip4844(sidecar));
+    }
 
     #[test]
     fn sidecar_variant_rlp_roundtrip() {
