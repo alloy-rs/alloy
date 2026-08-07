@@ -75,7 +75,7 @@ where
         EthCall { inner: self.inner, decoder }
     }
 
-    /// Wraps this call in a timeout.
+    /// Wraps this call in a client-side timeout that only stops waiting for the response.
     ///
     /// Awaiting the returned future produces a timeout result around the existing contract result,
     /// so the two error cases can be handled separately.
@@ -105,7 +105,8 @@ where
     ///
     /// # Panics
     ///
-    /// On Tokio-backed targets, including WASI, this panics if there is no current Tokio timer.
+    /// On Tokio-backed targets, including WASI, the returned future panics when polled if there
+    /// is no current Tokio timer, for example when polled outside of a Tokio runtime.
     pub fn timeout(self, duration: Duration) -> Timeout<<Self as IntoFuture>::IntoFuture> {
         timeout_future(duration, self.into_future())
     }

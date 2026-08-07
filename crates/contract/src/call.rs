@@ -54,12 +54,17 @@ impl<'a, N: Network> SendSyncFut<'a, N> {
         Self { inner }
     }
 
-    /// Wraps this future in a timeout.
+    /// Wraps this future in a client-side timeout.
     ///
     /// The timeout only stops waiting for the response. The transaction may still have been
     /// submitted to the network, so it may be unsafe to retry it without checking its status.
     /// Awaiting the returned future produces a timeout result around the existing contract result,
     /// so the two error cases can be handled separately.
+    ///
+    /// This is unrelated to the server-side `timeout` parameter of `eth_sendRawTransactionSync`
+    /// defined by [EIP-7966], which will be exposed separately as a request option.
+    ///
+    /// [EIP-7966]: https://eips.ethereum.org/EIPS/eip-7966
     ///
     /// # Examples
     ///
@@ -77,7 +82,8 @@ impl<'a, N: Network> SendSyncFut<'a, N> {
     ///
     /// # Panics
     ///
-    /// On Tokio-backed targets, including WASI, this panics if there is no current Tokio timer.
+    /// On Tokio-backed targets, including WASI, the returned future panics when polled if there
+    /// is no current Tokio timer, for example when polled outside of a Tokio runtime.
     pub fn timeout(self, duration: Duration) -> Timeout<Self> {
         timeout_future(duration, self)
     }
