@@ -11,6 +11,8 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
 use super::{Decodable7594, Encodable7594};
 use crate::eip4844::VersionedHashIter;
+#[cfg(feature = "kzg")]
+use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
@@ -321,7 +323,7 @@ impl BlobTransactionSidecarVariant {
         &self,
         blob_versioned_hashes: &[B256],
         proof_settings: &c_kzg::KzgSettings,
-    ) -> Result<(), crate::eip4844::BlobTransactionValidationError> {
+    ) -> Result<(), BlobTransactionValidationError> {
         match self {
             Self::Eip4844(sidecar) => sidecar.validate(blob_versioned_hashes, proof_settings),
             Self::Eip7594(sidecar) => sidecar.validate(blob_versioned_hashes, proof_settings),
@@ -746,9 +748,8 @@ impl BlobTransactionSidecarEip7594 {
                 settings.recover_cells_and_kzg_proofs(cell_indices, &ckzg_cells)?;
             let blob = reconstruct_blob(recovered_cells.as_ref())?;
 
-            let commitment =
-                settings.blob_to_kzg_commitment(crate::eip4844::AsCkzg::as_ckzg(&blob))?;
-            let commitment = <Bytes48 as crate::eip4844::AsCkzg>::from_ckzg(commitment.to_bytes());
+            let commitment = settings.blob_to_kzg_commitment(AsCkzg::as_ckzg(&blob))?;
+            let commitment = <Bytes48 as AsCkzg>::from_ckzg(commitment.to_bytes());
             if commitment != commitments[blob_index] {
                 return Err(c_kzg::Error::InvalidKzgCommitment(format!(
                     "reconstructed blob {blob_index} does not match its commitment"
@@ -761,7 +762,7 @@ impl BlobTransactionSidecarEip7594 {
             let recovered_proofs_bytes =
                 recovered_proofs.iter().map(|proof| proof.to_bytes()).collect::<Vec<_>>();
             let valid = settings.verify_cell_kzg_proof_batch(
-                <Bytes48 as crate::eip4844::AsCkzg>::slice_as_ckzg(&commitments),
+                <Bytes48 as AsCkzg>::slice_as_ckzg(&commitments),
                 &cell_indices,
                 recovered_cells.as_ref(),
                 &recovered_proofs_bytes,
@@ -773,11 +774,9 @@ impl BlobTransactionSidecarEip7594 {
             }
 
             blobs.push(blob);
-            cell_proofs.extend_from_slice(
-                <c_kzg::KzgProof as crate::eip4844::AsAlloy>::slice_as_alloy(
-                    recovered_proofs.as_ref(),
-                ),
-            );
+            cell_proofs.extend_from_slice(<c_kzg::KzgProof as AsAlloy>::slice_as_alloy(
+                recovered_proofs.as_ref(),
+            ));
         }
 
         Ok(Self::new(blobs, commitments, cell_proofs))
@@ -840,26 +839,23 @@ impl BlobTransactionSidecarEip7594 {
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
         if let [blob] = blobs.as_slice() {
-            let blob = crate::eip4844::AsCkzg::as_ckzg(blob);
+            let blob = AsCkzg::as_ckzg(blob);
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
-            let commitments =
-                vec![<Bytes48 as crate::eip4844::AsCkzg>::from_ckzg(commitment.to_bytes())];
-            let proofs =
-                <c_kzg::KzgProof as crate::eip4844::AsAlloy>::boxed_slice_as_alloy(kzg_proofs)
-                    .into();
+            let commitments = vec![<Bytes48 as AsCkzg>::from_ckzg(commitment.to_bytes())];
+            let proofs = <c_kzg::KzgProof as AsAlloy>::boxed_slice_as_alloy(kzg_proofs).into();
             return Ok(Self::new(blobs, commitments, proofs));
         }
 
         let mut commitments = Vec::with_capacity(blobs.len());
         let mut proofs = Vec::with_capacity(blobs.len() * CELLS_PER_EXT_BLOB);
         for blob in &blobs {
-            let blob = crate::eip4844::AsCkzg::as_ckzg(blob);
+            let blob = AsCkzg::as_ckzg(blob);
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
 
-            commitments.push(<Bytes48 as crate::eip4844::AsCkzg>::from_ckzg(commitment.to_bytes()));
-            proofs.extend_from_slice(<c_kzg::KzgProof as crate::eip4844::AsAlloy>::slice_as_alloy(
+            commitments.push(<Bytes48 as AsCkzg>::from_ckzg(commitment.to_bytes()));
+            proofs.extend_from_slice(<c_kzg::KzgProof as AsAlloy>::slice_as_alloy(
                 kzg_proofs.as_ref(),
             ));
         }
@@ -906,18 +902,14 @@ impl BlobTransactionSidecarEip7594 {
         settings: &c_kzg::KzgSettings,
     ) -> Result<Vec<crate::eip7594::Cell>, c_kzg::Error> {
         if let [blob] = self.blobs.as_slice() {
-            let blob_cells = settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(blob))?;
-            return Ok(
-                <c_kzg::Cell as crate::eip4844::AsAlloy>::boxed_slice_as_alloy(blob_cells).into()
-            );
+            let blob_cells = settings.compute_cells(AsCkzg::as_ckzg(blob))?;
+            return Ok(<c_kzg::Cell as AsAlloy>::boxed_slice_as_alloy(blob_cells).into());
         }
 
         let mut cells = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
         for blob in &self.blobs {
-            let blob_cells = settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(blob))?;
-            cells.extend_from_slice(<c_kzg::Cell as crate::eip4844::AsAlloy>::slice_as_alloy(
-                blob_cells.as_ref(),
-            ));
+            let blob_cells = settings.compute_cells(AsCkzg::as_ckzg(blob))?;
+            cells.extend_from_slice(<c_kzg::Cell as AsAlloy>::slice_as_alloy(blob_cells.as_ref()));
         }
         Ok(cells)
     }
@@ -966,8 +958,7 @@ impl BlobTransactionSidecarEip7594 {
     /// elements, commitments, and proofs. The cells are constructed from each blob and verified
     /// against the commitments and proofs.
     ///
-    /// Returns [crate::eip4844::BlobTransactionValidationError::InvalidProof] if any blob KZG proof
-    /// in the response
+    /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
     /// commitment versioned hashes.
     #[cfg(feature = "kzg")]
@@ -975,7 +966,7 @@ impl BlobTransactionSidecarEip7594 {
         &self,
         blob_versioned_hashes: &[B256],
         proof_settings: &c_kzg::KzgSettings,
-    ) -> Result<(), crate::eip4844::BlobTransactionValidationError> {
+    ) -> Result<(), BlobTransactionValidationError> {
         // Ensure the versioned hashes and commitments have the same length.
         if blob_versioned_hashes.len() != self.commitments.len() {
             return Err(c_kzg::Error::MismatchLength(format!(
@@ -1006,7 +997,7 @@ impl BlobTransactionSidecarEip7594 {
             let calculated_versioned_hash =
                 crate::eip4844::kzg_to_versioned_hash(commitment.as_slice());
             if *versioned_hash != calculated_versioned_hash {
-                return Err(crate::eip4844::BlobTransactionValidationError::WrongVersionedHash {
+                return Err(BlobTransactionValidationError::WrongVersionedHash {
                     have: *versioned_hash,
                     expected: calculated_versioned_hash,
                 });
@@ -1024,27 +1015,25 @@ impl BlobTransactionSidecarEip7594 {
         }
 
         let cells = if let [blob] = self.blobs.as_slice() {
-            let cells: Box<[c_kzg::Cell]> =
-                proof_settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(blob))?;
+            let cells: Box<[c_kzg::Cell]> = proof_settings.compute_cells(AsCkzg::as_ckzg(blob))?;
             cells.into()
         } else {
             let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
             for blob in &self.blobs {
-                let blob_cells =
-                    proof_settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(blob))?;
+                let blob_cells = proof_settings.compute_cells(AsCkzg::as_ckzg(blob))?;
                 cells.extend_from_slice(blob_cells.as_ref());
             }
             cells
         };
 
         let res = proof_settings.verify_cell_kzg_proof_batch(
-            <Bytes48 as crate::eip4844::AsCkzg>::slice_as_ckzg(&commitments),
+            <Bytes48 as AsCkzg>::slice_as_ckzg(&commitments),
             &cell_indices,
             &cells,
-            <Bytes48 as crate::eip4844::AsCkzg>::slice_as_ckzg(self.cell_proofs.as_slice()),
+            <Bytes48 as AsCkzg>::slice_as_ckzg(self.cell_proofs.as_slice()),
         )?;
 
-        res.then_some(()).ok_or(crate::eip4844::BlobTransactionValidationError::InvalidProof)
+        res.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.
@@ -1102,7 +1091,7 @@ impl BlobTransactionSidecarEip7594 {
             return Ok(Some(crate::eip4844::BlobCellsAndProofsV1::default()));
         }
 
-        let cells = settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(blob))?;
+        let cells = settings.compute_cells(AsCkzg::as_ckzg(blob))?;
 
         Ok(Some(Self::blob_cells_and_proofs_from_computed_cells(cell_mask, cells.as_ref(), proofs)))
     }
@@ -1221,7 +1210,7 @@ impl BlobTransactionSidecarEip7594 {
                 {
                     cells_and_proofs.clone()
                 } else {
-                    let cells = settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(blob))?;
+                    let cells = settings.compute_cells(AsCkzg::as_ckzg(blob))?;
                     let cells_and_proofs = Self::blob_cells_and_proofs_from_computed_cells(
                         cell_mask,
                         cells.as_ref(),
@@ -1719,6 +1708,22 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "kzg")]
+    fn sparse_cells_for_indices(
+        sidecar: &BlobTransactionSidecarEip7594,
+        cell_indices: &[u64],
+        settings: &c_kzg::KzgSettings,
+    ) -> Vec<Vec<crate::eip7594::Cell>> {
+        sidecar
+            .compute_cells_with_settings(settings)
+            .unwrap()
+            .chunks_exact(CELLS_PER_EXT_BLOB)
+            .map(|blob_cells| {
+                cell_indices.iter().map(|&index| blob_cells[index as usize]).collect()
+            })
+            .collect()
+    }
+
     #[test]
     #[cfg(feature = "kzg")]
     fn reconstruct_sidecar_from_cells() {
@@ -1765,6 +1770,138 @@ mod tests {
         )
         .unwrap();
         assert_eq!(reconstructed.blobs(), sidecar.blobs.as_slice());
+    }
+
+    /// Mirrors Geth's `RecoverBlobs` coverage: multiple blobs are recovered from a shared,
+    /// non-contiguous set of exactly `DataPerBlob` cells.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_from_minimum_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02), Blob::repeat_byte(0x03)],
+            settings,
+        )
+        .unwrap();
+
+        let cell_indices =
+            (0..CELLS_PER_EXT_BLOB as u64).filter(|index| index % 2 == 0).collect::<Vec<_>>();
+        assert_eq!(cell_indices.len(), CELLS_PER_EXT_BLOB / 2);
+        let sparse_cells = sparse_cells_for_indices(&sidecar, &cell_indices, settings);
+
+        let recovered = BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+            sidecar.commitments.clone(),
+            &cell_indices,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap();
+
+        assert_eq!(recovered.blobs, sidecar.blobs);
+        assert_eq!(recovered.commitments, sidecar.commitments);
+        assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
+    }
+
+    /// Geth varies the sampled count above the minimum. Check that a sparse set with an extra
+    /// cell follows the same recovery path.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_with_more_than_minimum_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
+            settings,
+        )
+        .unwrap();
+
+        let cell_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2)
+            .chain(core::iter::once(CELLS_PER_EXT_BLOB as u64 - 1))
+            .collect::<Vec<_>>();
+        assert_eq!(cell_indices.len(), CELLS_PER_EXT_BLOB / 2 + 1);
+        let sparse_cells = sparse_cells_for_indices(&sidecar, &cell_indices, settings);
+
+        let recovered = BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+            sidecar.commitments.clone(),
+            &cell_indices,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap();
+
+        assert_eq!(recovered.blobs, sidecar.blobs);
+        assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_insufficient_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let cell_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2 - 1).collect::<Vec<_>>();
+        let cells = vec![(0..cell_indices.len())
+            .map(|_| crate::eip7594::Cell::repeat_byte(0))
+            .collect::<Vec<_>>()];
+
+        assert!(BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+            vec![Bytes48::ZERO],
+            &cell_indices,
+            &cells,
+            settings,
+        )
+        .is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_invalid_indices() {
+        let settings = EnvKzgSettings::Default.get();
+        let cells = vec![(0..CELLS_PER_EXT_BLOB / 2)
+            .map(|_| crate::eip7594::Cell::repeat_byte(0))
+            .collect::<Vec<_>>()];
+
+        let mut duplicate_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2).collect::<Vec<_>>();
+        duplicate_indices[CELLS_PER_EXT_BLOB / 2 - 1] =
+            duplicate_indices[CELLS_PER_EXT_BLOB / 2 - 2];
+        assert!(BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+            vec![Bytes48::ZERO],
+            &duplicate_indices,
+            &cells,
+            settings,
+        )
+        .is_err());
+
+        let mut out_of_range_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2).collect::<Vec<_>>();
+        out_of_range_indices[CELLS_PER_EXT_BLOB / 2 - 1] = CELLS_PER_EXT_BLOB as u64;
+        assert!(BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+            vec![Bytes48::ZERO],
+            &out_of_range_indices,
+            &cells,
+            settings,
+        )
+        .is_err());
+    }
+
+    /// Mirrors Geth's corrupted-cell recovery coverage. A cell that no longer matches the
+    /// commitment must not produce a sidecar.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_corrupted_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02), Blob::repeat_byte(0x03)],
+            settings,
+        )
+        .unwrap();
+        let cell_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2).collect::<Vec<_>>();
+        let mut sparse_cells = sparse_cells_for_indices(&sidecar, &cell_indices, settings);
+        sparse_cells[0][0][0] ^= 0xff;
+
+        assert!(BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+            sidecar.commitments,
+            &cell_indices,
+            &sparse_cells,
+            settings,
+        )
+        .is_err());
     }
 
     #[test]
