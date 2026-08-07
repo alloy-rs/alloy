@@ -594,7 +594,7 @@ impl BlobTransactionSidecarEip7594 {
     ) -> Self {
         Self { blobs, commitments, cell_proofs }
     }
-  
+
     /// Tries to create a new sidecar by reconstructing blobs from complete EIP-7594 cell sets.
     ///
     /// The cells must be laid out in blob-major order, with exactly
@@ -628,7 +628,7 @@ impl BlobTransactionSidecarEip7594 {
         cell_proofs: Vec<Bytes48>,
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
-        if cells.len() % CELLS_PER_EXT_BLOB != 0 {
+        if !cells.len().is_multiple_of(CELLS_PER_EXT_BLOB) {
             return Err(c_kzg::Error::MismatchLength(format!(
                 "invalid cell count {}; expected a multiple of {CELLS_PER_EXT_BLOB}",
                 cells.len()
