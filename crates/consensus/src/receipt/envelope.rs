@@ -22,7 +22,7 @@ use core::fmt;
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
@@ -50,6 +50,32 @@ pub enum ReceiptEnvelope<T = Log> {
     /// [EIP-7702]: https://eips.ethereum.org/EIPS/eip-7702
     #[cfg_attr(feature = "serde", serde(rename = "0x4", alias = "0x04"))]
     Eip7702(ReceiptWithBloom<Receipt<T>>),
+}
+
+/// Deserializes a receipt, treating a missing `type` field as [`TxType::Legacy`].
+///
+/// The `type` field is required by the JSON-RPC specification, but some
+/// Ethereum-compatible nodes omit it entirely. A receipt without a type flag is a
+/// pre-[EIP-2718] receipt, which is unambiguously legacy, so it is accepted rather
+/// than rejected.
+///
+/// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+#[cfg(feature = "serde")]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for ReceiptEnvelope<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct ReceiptEnvelopeHelper<T> {
+            #[serde(default, rename = "type", with = "alloy_serde::quantity::opt")]
+            ty: Option<u8>,
+            #[serde(flatten)]
+            receipt: ReceiptWithBloom<Receipt<T>>,
+        }
+
+        let helper = ReceiptEnvelopeHelper::<T>::deserialize(deserializer)?;
+        let ty = TxType::try_from(helper.ty.unwrap_or(LEGACY_TX_TYPE_ID))
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self::from_typed(ty, helper.receipt))
+    }
 }
 
 impl<T> ReceiptEnvelope<T> {
@@ -494,6 +520,33 @@ mod test {
                 "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
             ))
         );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deser_receipt_envelope_without_type() {
+        let inner = super::ReceiptWithBloom::<Receipt<()>> {
+            receipt: Receipt {
+                status: super::Eip658Value::Eip658(true),
+                cumulative_gas_used: 0xc3b68,
+                logs: Default::default(),
+            },
+            logs_bloom: Default::default(),
+        };
+        let mut json = serde_json::to_value(&inner).unwrap();
+        assert!(json.get("type").is_none());
+
+        let envelope: ReceiptEnvelope<()> = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(envelope, ReceiptEnvelope::Legacy(inner.clone()));
+
+        // An explicit type flag is still honored.
+        json["type"] = "0x2".into();
+        let envelope: ReceiptEnvelope<()> = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(envelope, ReceiptEnvelope::Eip1559(inner));
+
+        // An unknown type flag is still rejected.
+        json["type"] = "0x7f".into();
+        serde_json::from_value::<ReceiptEnvelope<()>>(json).unwrap_err();
     }
 
     #[test]

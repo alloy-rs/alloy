@@ -5,7 +5,7 @@ use alloy_transport::{
     TransportFut, TransportResult,
 };
 use itertools::Itertools;
-use std::task;
+use std::{task, time::Duration};
 use tower::Service;
 use tracing::{debug, debug_span, instrument, trace, Instrument};
 use url::Url;
@@ -46,13 +46,31 @@ impl Http<Client> {
             .await
             .map_err(TransportErrorKind::custom)?;
         let status = resp.status();
+        // Delay requested by the server via a `Retry-After` header, delay-seconds form only.
+        let retry_after = resp
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse().ok())
+            .map(Duration::from_secs);
 
         debug!(%status, "received response from server");
 
         // Unpack data from the response body. We do this regardless of
         // the status code, as we want to return the error in the body
         // if there is one.
-        let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
+        let body = match resp.bytes().await {
+            Ok(body) => body,
+            // A failed body read on an error response still carries retryable metadata.
+            Err(err) if !status.is_success() => {
+                return Err(TransportErrorKind::http_error_with_retry_after(
+                    status.as_u16(),
+                    format!("<failed to read response body: {err}>"),
+                    retry_after,
+                ));
+            }
+            Err(err) => return Err(TransportErrorKind::custom(err)),
+        };
 
         if tracing::enabled!(tracing::Level::TRACE) {
             trace!(body = %String::from_utf8_lossy(&body), "response body");
@@ -61,14 +79,7 @@ impl Http<Client> {
         }
 
         if !status.is_success() {
-            if let Some(response) = crate::json_rpc_error_response(&body) {
-                return Ok(response);
-            }
-
-            return Err(TransportErrorKind::http_error(
-                status.as_u16(),
-                String::from_utf8_lossy(&body).into_owned(),
-            ));
+            return crate::http_error_response(status.as_u16(), &body, retry_after);
         }
 
         // Deserialize a Box<RawValue> from the body. If deserialization fails, return

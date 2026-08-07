@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Bug Fixes
+
+- [transport-http] Honor Retry-After ([#4103](https://github.com/alloy-rs/alloy/issues/4103))
+- [rpc-types-engine] Preserve withdrawals when deserializing ExecutionPayloadFieldV2 ([#4104](https://github.com/alloy-rs/alloy/issues/4104))
+- [consensus] Default missing receipt type to legacy
+- [rpc-types-anvil] Accept MineOptions object without timestamp key ([#4099](https://github.com/alloy-rs/alloy/issues/4099))
+- [provider] Preserve pending block miner ([#4094](https://github.com/alloy-rs/alloy/issues/4094))
+- Fail in `Signed<T>` `fallback_decode` ([#4090](https://github.com/alloy-rs/alloy/issues/4090))
+
+### Dependencies
+
+- [deps] Bump the ci-weekly group with 3 updates ([#4109](https://github.com/alloy-rs/alloy/issues/4109))
+- [deps] Bump `tokio-tungstenite` to 0.29 ([#4101](https://github.com/alloy-rs/alloy/issues/4101))
+- [deps] Bump the ci-weekly group with 3 updates ([#4100](https://github.com/alloy-rs/alloy/issues/4100))
+- [deps] Bump the ci-weekly group with 2 updates ([#4088](https://github.com/alloy-rs/alloy/issues/4088))
+
+### Documentation
+
+- Clarify block ID check comment in should_batch_call ([#4037](https://github.com/alloy-rs/alloy/issues/4037))
+
+### Features
+
+- [provider-ext-mev] Add sim_mev_bundle call ([#4108](https://github.com/alloy-rs/alloy/issues/4108))
+- [rpc-types-eth] Generalize filter change logs ([#4102](https://github.com/alloy-rs/alloy/issues/4102))
+- [rpc-types-engine] Too deep reorg error ([#3935](https://github.com/alloy-rs/alloy/issues/3935))
+
+### Miscellaneous Tasks
+
+- Add bogota hardfork for support ([#4087](https://github.com/alloy-rs/alloy/issues/4087))
+
+### Testing
+
+- [consensus] Add fallback decode regression coverage ([#4091](https://github.com/alloy-rs/alloy/issues/4091))
+
 ## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
 
 ### Bug Fixes
@@ -27,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.2.0
 - Release 2.2.0
 - [eips] Address nightly clippy lint ([#4080](https://github.com/alloy-rs/alloy/issues/4080))
 
