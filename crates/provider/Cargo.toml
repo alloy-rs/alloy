@@ -69,6 +69,9 @@ url = { workspace = true, optional = true }
 either.workspace = true
 http = { workspace = true, optional = true }
 
+[target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
+tokio = { workspace = true, features = ["time"] }
+
 [target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
 reqwest = { workspace = true, optional = true }
 

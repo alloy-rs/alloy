@@ -15,7 +15,20 @@ use alloy_rpc_types_eth::{
     BlockId, SignedAuthorization,
 };
 use alloy_sol_types::SolCall;
-use std::marker::PhantomData;
+use alloy_transport::{BoxFuture, TransportResult};
+use std::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+use tokio::time::{timeout as timeout_future, Timeout};
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use wasmtimer::tokio::{timeout as timeout_future, Timeout};
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -29,6 +42,66 @@ pub type DynCallBuilder<P, N = Ethereum> = CallBuilder<P, Function, N>;
 
 /// [`CallBuilder`] that does not have a call decoder.
 pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
+
+/// Future returned by [`CallBuilder::send_sync`].
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct SendSyncFut<'a, N: Network> {
+    inner: BoxFuture<'a, TransportResult<N::ReceiptResponse>>,
+}
+
+impl<'a, N: Network> SendSyncFut<'a, N> {
+    fn new(inner: BoxFuture<'a, TransportResult<N::ReceiptResponse>>) -> Self {
+        Self { inner }
+    }
+
+    /// Wraps this future in a client-side timeout.
+    ///
+    /// The timeout only stops waiting for the response. The transaction may still have been
+    /// submitted to the network, so it may be unsafe to retry it without checking its status.
+    /// Awaiting the returned future produces a timeout result around the existing contract result,
+    /// so the two error cases can be handled separately.
+    ///
+    /// This is unrelated to the server-side `timeout` parameter of `eth_sendRawTransactionSync`
+    /// defined by [EIP-7966], which will be exposed separately as a request option.
+    ///
+    /// [EIP-7966]: https://eips.ethereum.org/EIPS/eip-7966
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example<P: alloy_provider::Provider>(
+    /// #     call: &alloy_contract::RawCallBuilder<P>,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// use std::time::Duration;
+    ///
+    /// let receipt = call.send_sync().timeout(Duration::from_secs(30)).await??;
+    /// # let _ = receipt;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// On Tokio-backed targets, including WASI, the returned future panics when polled if there
+    /// is no current Tokio timer, for example when polled outside of a Tokio runtime.
+    pub fn timeout(self, duration: Duration) -> Timeout<Self> {
+        timeout_future(duration, self)
+    }
+}
+
+impl<N: Network> std::fmt::Debug for SendSyncFut<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SendSyncFut").finish_non_exhaustive()
+    }
+}
+
+impl<N: Network> Future for SendSyncFut<'_, N> {
+    type Output = Result<N::ReceiptResponse>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.inner.as_mut().poll(cx).map(|result| result.map_err(Into::into))
+    }
+}
 
 /// A builder for sending a transaction via `eth_sendTransaction`, or calling a contract via
 /// `eth_call`.
@@ -626,12 +699,13 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     /// Returns the transaction receipt if the transaction was confirmed.
     ///
     /// See [`Provider::send_transaction_sync`] for more information.
+    /// Use [`SendSyncFut::timeout`] to limit how long to wait for the response.
     ///
     /// # Note
     ///
     /// Not all providers and clients support `eth_sendRawTransactionSync` yet.
-    pub async fn send_sync(&self) -> Result<N::ReceiptResponse> {
-        Ok(self.provider.send_transaction_sync(self.request.clone()).await?)
+    pub fn send_sync(&self) -> SendSyncFut<'_, N> {
+        SendSyncFut::new(self.provider.send_transaction_sync(self.request.clone()))
     }
 
     /// Calculates the address that will be created by the transaction, if any.
@@ -693,6 +767,15 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil();
         let call_builder = EmptyConstructor::deploy_builder(&provider);
         assert_eq!(*call_builder.calldata(), bytes!("6942"));
+    }
+
+    #[tokio::test]
+    async fn send_sync_with_timeout() {
+        let inner: BoxFuture<'_, TransportResult<<Ethereum as Network>::ReceiptResponse>> =
+            Box::pin(std::future::pending());
+        let future = SendSyncFut::<Ethereum>::new(inner);
+
+        assert!(future.timeout(Duration::ZERO).await.is_err());
     }
 
     sol! {
@@ -858,7 +941,12 @@ mod tests {
 
         let my_state_builder = my_contract.myState();
         assert_eq!(my_state_builder.calldata()[..], MyContract::myStateCall {}.abi_encode(),);
-        let my_state = my_state_builder.call().await.unwrap();
+        let my_state = my_state_builder
+            .call()
+            .timeout(Duration::from_secs(30))
+            .await
+            .expect("eth_call timed out")
+            .unwrap();
         assert!(my_state);
 
         let do_stuff_builder = my_contract.doStuff(U256::from(0x69), true);
@@ -923,7 +1011,9 @@ mod tests {
             .max_fee_per_gas(max_fee_per_gas.to())
             .max_priority_fee_per_gas(max_priority_fee_per_gas.to())
             .send_sync()
+            .timeout(Duration::from_secs(30))
             .await
+            .expect("synchronous transaction timed out")
             .expect("Could not send transaction");
         let transaction_hash = receipt.transaction_hash;
         let transaction = provider

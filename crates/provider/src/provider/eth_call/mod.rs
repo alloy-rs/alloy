@@ -10,7 +10,19 @@ use alloy_rpc_types_eth::{
 use alloy_sol_types::SolCall;
 use alloy_transport::TransportResult;
 use futures::FutureExt;
-use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
+use std::{
+    future::{Future, IntoFuture},
+    marker::PhantomData,
+    sync::Arc,
+    task::Poll,
+    time::Duration,
+};
+
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+use tokio::time::{timeout as timeout_future, Timeout};
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use wasmtimer::tokio::{timeout as timeout_future, Timeout};
 
 mod params;
 pub use params::{EthCallManyParams, EthCallParams};
@@ -234,6 +246,36 @@ where
         }
     }
 
+    /// Wraps this call in a client-side timeout that only stops waiting for the response.
+    ///
+    /// Awaiting the returned future produces a timeout result around the existing transport result,
+    /// so the two error cases can be handled separately.
+    ///
+    /// ```no_run
+    /// # async fn example<P: alloy_provider::Provider>(
+    /// #     provider: P,
+    /// #     tx: alloy_rpc_types_eth::TransactionRequest,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_provider::Provider as _;
+    /// use std::time::Duration;
+    ///
+    /// let output = provider.call(tx).timeout(Duration::from_secs(10)).await??;
+    /// # let _: alloy_primitives::Bytes = output;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// On Tokio-backed targets, including WASI, the returned future panics when polled if there
+    /// is no current Tokio timer, for example when polled outside of a Tokio runtime.
+    pub fn timeout(self, duration: Duration) -> Timeout<<Self as IntoFuture>::IntoFuture>
+    where
+        Output: 'static,
+    {
+        timeout_future(duration, self.into_future())
+    }
+
     /// Set the state overrides for this call.
     pub fn overrides(mut self, overrides: impl Into<StateOverride>) -> Self {
         self.params.overrides = Some(overrides.into());
@@ -384,6 +426,39 @@ mod test {
     use alloy_network::{Ethereum, TransactionBuilder};
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::{state::StateOverride, TransactionRequest};
+
+    #[derive(Clone, Copy, Debug)]
+    struct PendingCaller;
+
+    impl Caller<Ethereum, U256> for PendingCaller {
+        fn call(
+            &self,
+            _params: EthCallParams<Ethereum>,
+        ) -> TransportResult<ProviderCall<EthCallParams<Ethereum>, U256>> {
+            Ok(ProviderCall::BoxedFuture(Box::pin(std::future::pending())))
+        }
+
+        fn estimate_gas(
+            &self,
+            _params: EthCallParams<Ethereum>,
+        ) -> TransportResult<ProviderCall<EthCallParams<Ethereum>, U256>> {
+            Ok(ProviderCall::BoxedFuture(Box::pin(std::future::pending())))
+        }
+
+        fn call_many(
+            &self,
+            _params: EthCallManyParams<'_>,
+        ) -> TransportResult<ProviderCall<EthCallManyParams<'static>, U256>> {
+            Ok(ProviderCall::BoxedFuture(Box::pin(std::future::pending())))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eth_call_with_timeout() {
+        let call = EthCall::call(PendingCaller, TransactionRequest::default());
+
+        assert!(call.timeout(Duration::ZERO).await.is_err());
+    }
 
     #[test]
     fn test_serialize_eth_call_params() {
