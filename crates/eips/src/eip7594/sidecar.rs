@@ -607,7 +607,6 @@ impl BlobTransactionSidecarEip7594 {
         cell_proofs: Vec<Bytes48>,
     ) -> Result<Self, c_kzg::Error> {
         use crate::eip4844::env_settings::EnvKzgSettings;
-
         Self::try_from_cells_with_settings(
             cells,
             commitments,
