@@ -3,16 +3,22 @@ use crate::{
         Blob, BlobAndProofV2, BlobTransactionSidecar, Bytes48, BYTES_PER_BLOB,
         BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
     },
-    eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
+    eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION, FIELD_ELEMENTS_PER_EXT_BLOB},
 };
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, format, vec::Vec};
 use alloy_primitives::{B128, B256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
 use super::{Decodable7594, Encodable7594};
 use crate::eip4844::VersionedHashIter;
 #[cfg(feature = "kzg")]
-use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
+use crate::eip4844::{
+    AsAlloy, AsCkzg, BlobTransactionValidationError, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB,
+};
+#[cfg(feature = "kzg")]
+use crate::eip7594::{Cell, BYTES_PER_CELL};
+#[cfg(feature = "kzg")]
+use alloy_primitives::U256;
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
@@ -282,6 +288,41 @@ impl BlobTransactionSidecarVariant {
         }
     }
 
+    /// Reconstructs an EIP-7594 sidecar from a common sparse cell set for every blob.
+    ///
+    /// `cell_indices` contains the strictly ascending cell indices represented by each inner
+    /// vector in `cells`. The inner vectors are blob-major: `cells[blob_index]` contains the cells
+    /// for `commitments[blob_index]`. At least 64 of the 128 cells must be supplied for each blob.
+    /// The recovered sidecar contains all 128 cells' proofs and the reconstructed blob bytes.
+    ///
+    /// This uses the default KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_sparse_cells(
+        commitments: Vec<Bytes48>,
+        cell_indices: &[u64],
+        cells: &[Vec<Cell>],
+    ) -> Result<Self, c_kzg::Error> {
+        BlobTransactionSidecarEip7594::try_from_sparse_cells(commitments, cell_indices, cells)
+            .map(Self::Eip7594)
+    }
+
+    /// Reconstructs an EIP-7594 sidecar from sparse cells using custom KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_sparse_cells_with_settings(
+        commitments: Vec<Bytes48>,
+        cell_indices: &[u64],
+        cells: &[Vec<Cell>],
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+            commitments,
+            cell_indices,
+            cells,
+            settings,
+        )
+        .map(Self::Eip7594)
+    }
+
     /// Verifies that the sidecar is valid. See relevant methods for each variant for more info.
     #[cfg(feature = "kzg")]
     pub fn validate(
@@ -546,6 +587,204 @@ impl BlobTransactionSidecarEip7594 {
         cell_proofs: Vec<Bytes48>,
     ) -> Self {
         Self { blobs, commitments, cell_proofs }
+    }
+
+    /// Tries to create a new sidecar by reconstructing blobs from complete EIP-7594 cell sets.
+    ///
+    /// The cells must be laid out in blob-major order, with exactly
+    /// [`CELLS_PER_EXT_BLOB`] cells for each blob. The supplied proofs must match the recovered
+    /// proofs. This uses the default KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_cells(
+        cells: Vec<Cell>,
+        commitments: Vec<Bytes48>,
+        cell_proofs: Vec<Bytes48>,
+    ) -> Result<Self, c_kzg::Error> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        Self::try_from_cells_with_settings(
+            cells,
+            commitments,
+            cell_proofs,
+            EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Tries to create a new sidecar by reconstructing blobs from complete EIP-7594 cell sets
+    /// with custom KZG settings.
+    ///
+    /// The cells must be laid out in blob-major order, with exactly
+    /// [`CELLS_PER_EXT_BLOB`] cells for each blob. The supplied proofs must match the recovered
+    /// proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_cells_with_settings(
+        cells: Vec<Cell>,
+        commitments: Vec<Bytes48>,
+        cell_proofs: Vec<Bytes48>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        if cells.len() % CELLS_PER_EXT_BLOB != 0 {
+            return Err(c_kzg::Error::MismatchLength(format!(
+                "invalid cell count {}; expected a multiple of {CELLS_PER_EXT_BLOB}",
+                cells.len()
+            )));
+        }
+
+        if cell_proofs.len() != cells.len() {
+            return Err(c_kzg::Error::MismatchLength(format!(
+                "expected {} cell proofs, got {}",
+                cells.len(),
+                cell_proofs.len()
+            )));
+        }
+
+        let blob_count = cells.len() / CELLS_PER_EXT_BLOB;
+        if commitments.len() != blob_count {
+            return Err(c_kzg::Error::MismatchLength(format!(
+                "expected {blob_count} commitments, got {}",
+                commitments.len()
+            )));
+        }
+
+        let indices: Vec<u64> = (0..CELLS_PER_EXT_BLOB as u64).collect();
+        let per_blob_cells =
+            cells.chunks_exact(CELLS_PER_EXT_BLOB).map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
+        let reconstructed = Self::try_from_sparse_cells_with_settings(
+            commitments,
+            &indices,
+            &per_blob_cells,
+            settings,
+        )?;
+
+        if reconstructed.cell_proofs != cell_proofs {
+            return Err(c_kzg::Error::InvalidKzgProof(
+                "supplied cell proofs do not match the recovered proofs".into(),
+            ));
+        }
+
+        Ok(reconstructed)
+    }
+
+    /// Tries to create a new sidecar by reconstructing blobs from sparse EIP-7594 cell sets.
+    ///
+    /// `cell_indices` must be strictly ascending and describe the cells in every inner vector of
+    /// `cells`. The vectors are blob-major and must have the same length as `commitments`. At
+    /// least 64 cells are required for each blob. The recovered sidecar contains the complete blob
+    /// data and all 128 cell proofs. This uses the default KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_sparse_cells(
+        commitments: Vec<Bytes48>,
+        cell_indices: &[u64],
+        cells: &[Vec<Cell>],
+    ) -> Result<Self, c_kzg::Error> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        Self::try_from_sparse_cells_with_settings(
+            commitments,
+            cell_indices,
+            cells,
+            EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Tries to create a new sidecar by reconstructing blobs from sparse EIP-7594 cell sets with
+    /// custom KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_sparse_cells_with_settings(
+        commitments: Vec<Bytes48>,
+        cell_indices: &[u64],
+        cells: &[Vec<Cell>],
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        if commitments.len() != cells.len() {
+            return Err(c_kzg::Error::MismatchLength(format!(
+                "expected one cell vector per commitment, got {} commitments and {} cell vectors",
+                commitments.len(),
+                cells.len()
+            )));
+        }
+
+        // An empty sidecar has no blob to recover and is valid without cell indices.
+        if commitments.is_empty() {
+            return Ok(Self::new(Vec::new(), commitments, Vec::new()));
+        }
+
+        if cell_indices.len() < CELLS_PER_EXT_BLOB / 2 {
+            return Err(c_kzg::Error::MismatchLength(format!(
+                "need at least {} cells for recovery, got {}",
+                CELLS_PER_EXT_BLOB / 2,
+                cell_indices.len()
+            )));
+        }
+        if cell_indices.len() > CELLS_PER_EXT_BLOB {
+            return Err(c_kzg::Error::MismatchLength(format!(
+                "got {} cells, maximum is {}",
+                cell_indices.len(),
+                CELLS_PER_EXT_BLOB
+            )));
+        }
+        if cell_indices.iter().any(|&index| index >= CELLS_PER_EXT_BLOB as u64)
+            || cell_indices.windows(2).any(|window| window[0] >= window[1])
+        {
+            return Err(c_kzg::Error::CError(c_kzg::CkzgError::C_KZG_BADARGS));
+        }
+
+        let mut blobs = Vec::with_capacity(commitments.len());
+        let mut cell_proofs = Vec::with_capacity(commitments.len() * CELLS_PER_EXT_BLOB);
+        for (blob_index, blob_cells) in cells.iter().enumerate() {
+            if blob_cells.len() != cell_indices.len() {
+                return Err(c_kzg::Error::MismatchLength(format!(
+                    "blob {blob_index} has {} cells, expected {}",
+                    blob_cells.len(),
+                    cell_indices.len()
+                )));
+            }
+
+            let ckzg_cells = blob_cells
+                .iter()
+                .map(|cell| {
+                    c_kzg::Cell::new(
+                        cell.as_slice()
+                            .try_into()
+                            .expect("EIP-7594 cells have a fixed byte length"),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let (recovered_cells, recovered_proofs) =
+                settings.recover_cells_and_kzg_proofs(cell_indices, &ckzg_cells)?;
+            let blob = reconstruct_blob(recovered_cells.as_ref())?;
+
+            let commitment = settings.blob_to_kzg_commitment(blob.as_ckzg())?;
+            let commitment = Bytes48::from_ckzg(commitment.to_bytes());
+            if commitment != commitments[blob_index] {
+                return Err(c_kzg::Error::InvalidKzgCommitment(format!(
+                    "reconstructed blob {blob_index} does not match its commitment"
+                )));
+            }
+
+            let cell_indices = (0..CELLS_PER_EXT_BLOB as u64).collect::<Vec<_>>();
+            let commitments =
+                core::iter::repeat_n(commitment, CELLS_PER_EXT_BLOB).collect::<Vec<_>>();
+            let recovered_proofs_bytes =
+                recovered_proofs.iter().map(|proof| proof.to_bytes()).collect::<Vec<_>>();
+            let valid = settings.verify_cell_kzg_proof_batch(
+                Bytes48::slice_as_ckzg(&commitments),
+                &cell_indices,
+                recovered_cells.as_ref(),
+                &recovered_proofs_bytes,
+            )?;
+            if !valid {
+                return Err(c_kzg::Error::InvalidKzgProof(format!(
+                    "recovered proofs for blob {blob_index} are invalid"
+                )));
+            }
+
+            blobs.push(blob);
+            cell_proofs
+                .extend_from_slice(c_kzg::KzgProof::slice_as_alloy(recovered_proofs.as_ref()));
+        }
+
+        Ok(Self::new(blobs, commitments, cell_proofs))
     }
 
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarEip7594].
@@ -1064,6 +1303,98 @@ impl BlobTransactionSidecarEip7594 {
     }
 }
 
+#[cfg(feature = "kzg")]
+const EIP7594_ROOT_OF_UNITY: U256 = U256::from_be_bytes([
+    0x71, 0xdb, 0x41, 0xab, 0xda, 0x03, 0xe0, 0x55, 0x06, 0x5d, 0x22, 0x7f, 0xea, 0xd1, 0x13, 0x9b,
+    0x41, 0xfa, 0xc7, 0x9f, 0x59, 0xe9, 0x19, 0x72, 0xa3, 0x3d, 0x27, 0x9f, 0xf0, 0xcc, 0xff, 0xc9,
+]);
+
+#[cfg(feature = "kzg")]
+fn reconstruct_blob(recovered_cells: &[c_kzg::Cell]) -> Result<Blob, c_kzg::Error> {
+    let mut evaluations = Vec::with_capacity(CELLS_PER_EXT_BLOB * BYTES_PER_CELL / 32);
+    for cell in recovered_cells {
+        for field_element in cell.to_bytes().chunks_exact(32) {
+            let value = U256::from_be_slice(field_element);
+            if value >= BLS_MODULUS {
+                return Err(c_kzg::Error::CError(c_kzg::CkzgError::C_KZG_BADARGS));
+            }
+            evaluations.push(value);
+        }
+    }
+
+    // c-kzg returns cell evaluations after bit-reversing the extended FFT output. Restore the
+    // natural evaluation order, then invert the 8192-point transform. The extended polynomial is
+    // the original 4096 blob field elements followed by 4096 zero coefficients.
+    bit_reverse_permutation(&mut evaluations);
+    fft(&mut evaluations, true);
+
+    evaluations.truncate(FIELD_ELEMENTS_PER_BLOB as usize);
+
+    let mut blob = [0u8; BYTES_PER_BLOB];
+    for (output, field_element) in blob.chunks_exact_mut(32).zip(evaluations) {
+        output.copy_from_slice(&field_element.to_be_bytes::<32>());
+    }
+    Ok(Blob::new(blob))
+}
+
+#[cfg(feature = "kzg")]
+fn fft(values: &mut [U256], inverse: bool) {
+    bit_reverse_permutation(values);
+
+    let root = if inverse {
+        EIP7594_ROOT_OF_UNITY.pow_mod(U256::from(8191u64), BLS_MODULUS)
+    } else {
+        EIP7594_ROOT_OF_UNITY
+    };
+    let n = values.len();
+    let mut width = 2;
+    while width <= n {
+        let exponent = FIELD_ELEMENTS_PER_EXT_BLOB / width;
+        let width_root = root.pow_mod(U256::from(exponent), BLS_MODULUS);
+        for chunk in values.chunks_exact_mut(width) {
+            let (left, right) = chunk.split_at_mut(width / 2);
+            let mut factor = U256::from(1u64);
+            for (left, right) in left.iter_mut().zip(right) {
+                let product = right.mul_mod(factor, BLS_MODULUS);
+                let sum = left.add_mod(product, BLS_MODULUS);
+                let difference = if *left >= product {
+                    *left - product
+                } else {
+                    BLS_MODULUS - (product - *left)
+                };
+                *left = sum;
+                *right = difference;
+                factor = factor.mul_mod(width_root, BLS_MODULUS);
+            }
+        }
+        width *= 2;
+    }
+
+    if inverse {
+        let inverse_n = U256::from(n).inv_mod(BLS_MODULUS).unwrap();
+        for value in values {
+            *value = value.mul_mod(inverse_n, BLS_MODULUS);
+        }
+    }
+}
+
+#[cfg(feature = "kzg")]
+fn bit_reverse_permutation(values: &mut [U256]) {
+    let mut reversed = 0usize;
+    for index in 1..values.len() {
+        let highest_bit = values.len() >> 1;
+        let mut bit = highest_bit;
+        while reversed & bit != 0 {
+            reversed &= !bit;
+            bit >>= 1;
+        }
+        reversed |= bit;
+        if index < reversed {
+            values.swap(index, reversed);
+        }
+    }
+}
+
 impl Encodable for BlobTransactionSidecarEip7594 {
     /// Encodes the inner [BlobTransactionSidecarEip7594] fields as RLP bytes, without a RLP header.
     fn encode(&self, out: &mut dyn BufMut) {
@@ -1446,6 +1777,54 @@ mod tests {
                 assert_eq!(*cell, crate::eip7594::Cell::new(expected_cell.to_bytes()));
             }
         }
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn reconstruct_sidecar_from_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
+            settings,
+        )
+        .unwrap();
+        let cells = sidecar.compute_cells_with_settings(settings).unwrap();
+
+        let reconstructed = BlobTransactionSidecarEip7594::try_from_cells_with_settings(
+            cells.clone(),
+            sidecar.commitments.clone(),
+            sidecar.cell_proofs.clone(),
+            settings,
+        )
+        .unwrap();
+        assert_eq!(reconstructed.blobs, sidecar.blobs);
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_from_cells(
+                cells,
+                reconstructed.commitments.clone(),
+                reconstructed.cell_proofs.clone(),
+            )
+            .unwrap(),
+            reconstructed
+        );
+
+        let cell_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2).collect::<Vec<_>>();
+        let sparse_cells = sidecar
+            .compute_cells_with_settings(settings)
+            .unwrap()
+            .chunks_exact(CELLS_PER_EXT_BLOB)
+            .map(|blob_cells| {
+                cell_indices.iter().map(|&index| blob_cells[index as usize]).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let reconstructed = BlobTransactionSidecarVariant::try_from_sparse_cells_with_settings(
+            sidecar.commitments.clone(),
+            &cell_indices,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap();
+        assert_eq!(reconstructed.blobs(), sidecar.blobs.as_slice());
     }
 
     #[test]
