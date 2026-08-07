@@ -146,9 +146,29 @@ pub fn calc_next_block_base_fee(
 /// Calculate the gas limit for the next block based on parent and desired gas limits.
 /// Ref: <https://github.com/ethereum/go-ethereum/blob/88cbfab332c96edfbe99d161d9df6a40721bd786/core/block_validator.go#L166>
 pub fn calculate_block_gas_limit(parent_gas_limit: u64, desired_gas_limit: u64) -> u64 {
-    let delta = (parent_gas_limit / GAS_LIMIT_BOUND_DIVISOR).saturating_sub(1);
-    let min_gas_limit = parent_gas_limit - delta;
-    let max_gas_limit = parent_gas_limit + delta;
+    calculate_block_gas_limit_with_bound_divisor(
+        parent_gas_limit,
+        desired_gas_limit,
+        GAS_LIMIT_BOUND_DIVISOR,
+    )
+}
+
+/// Calculate the gas limit for the next block based on parent and desired gas limits and a custom
+/// gas limit bound divisor.
+///
+/// # Panics
+///
+/// Panics if `gas_limit_bound_divisor` is zero.
+pub fn calculate_block_gas_limit_with_bound_divisor(
+    parent_gas_limit: u64,
+    desired_gas_limit: u64,
+    gas_limit_bound_divisor: u64,
+) -> u64 {
+    assert!(gas_limit_bound_divisor != 0, "gas limit bound divisor must be non-zero");
+
+    let delta = (parent_gas_limit / gas_limit_bound_divisor).saturating_sub(1);
+    let min_gas_limit = parent_gas_limit.saturating_sub(delta);
+    let max_gas_limit = parent_gas_limit.saturating_add(delta);
     desired_gas_limit.clamp(min_gas_limit, max_gas_limit)
 }
 
@@ -160,6 +180,28 @@ mod tests {
     #[test]
     fn min_protocol_sanity() {
         assert_eq!(MIN_PROTOCOL_BASE_FEE_U256.to::<u64>(), MIN_PROTOCOL_BASE_FEE);
+    }
+
+    #[test]
+    fn calculate_block_gas_limit_bounds_desired_limit() {
+        let parent_gas_limit = 30_000_000;
+        let min_gas_limit = 29_970_705;
+        let max_gas_limit = 30_029_295;
+
+        assert_eq!(calculate_block_gas_limit(parent_gas_limit, 20_000_000), min_gas_limit);
+        assert_eq!(calculate_block_gas_limit(parent_gas_limit, 30_000_000), 30_000_000);
+        assert_eq!(calculate_block_gas_limit(parent_gas_limit, 40_000_000), max_gas_limit);
+    }
+
+    #[test]
+    fn calculate_block_gas_limit_uses_custom_bound_divisor() {
+        assert_eq!(calculate_block_gas_limit_with_bound_divisor(1_000, 2_000, 10), 1_099);
+    }
+
+    #[test]
+    #[should_panic(expected = "gas limit bound divisor must be non-zero")]
+    fn calculate_block_gas_limit_rejects_zero_bound_divisor() {
+        calculate_block_gas_limit_with_bound_divisor(1_000, 2_000, 0);
     }
 
     #[test]

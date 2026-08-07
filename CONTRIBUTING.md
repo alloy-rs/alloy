@@ -61,10 +61,10 @@ PR that helps others avoid the problems that you encountered.
 ### Submitting a Bug Report
 
 When opening a new issue in the Alloy issue tracker, users will be presented
-with a [basic template][template] that should be filled in. If you believe that
-you have uncovered a bug, please fill out this form, following the template to
-the best of your ability. Do not worry if you cannot answer every detail, just
-fill in what you can.
+with a [bug report form][bug-template] that should be filled in. If you believe
+that you have uncovered a bug, please fill out this form, following the template
+to the best of your ability. Do not worry if you cannot answer every detail,
+just fill in what you can.
 
 The two most important pieces of information we need in order to properly
 evaluate the report is a description of the behavior you are seeing and a simple
@@ -77,7 +77,7 @@ cases should be limited, as much as possible, to using only Alloy APIs.
 See [How to create a Minimal, Complete, and Verifiable example][mcve].
 
 [mcve]: https://stackoverflow.com/help/mcve
-[template]: .github/PULL_REQUEST_TEMPLATE.md
+[bug-template]: .github/ISSUE_TEMPLATE/BUG-FORM.yml
 
 ### Triaging a Bug Report
 

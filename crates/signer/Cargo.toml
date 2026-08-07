@@ -45,4 +45,8 @@ serde.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
-eip712 = ["dep:alloy-sol-types", "dep:alloy-dyn-abi"]
+eip712 = [
+    "dep:alloy-sol-types",
+    "dep:alloy-dyn-abi",
+    "alloy-dyn-abi?/eip712",
+]

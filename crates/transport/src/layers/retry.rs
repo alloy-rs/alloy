@@ -297,8 +297,9 @@ where
                         current_queued_reqs,
                         ahead_in_queue,
                     );
-                    let total_backoff = next_backoff
-                        + std::time::Duration::from_secs(seconds_to_wait_for_compute_budget);
+                    let total_backoff = next_backoff.saturating_add(
+                        std::time::Duration::from_secs(seconds_to_wait_for_compute_budget),
+                    );
 
                     trace!(
                         total_backoff_millis = total_backoff.as_millis(),

@@ -1191,16 +1191,18 @@ where
 }
 
 /// Response of the `eth_getFilterChanges` RPC.
+///
+/// `T` is the transaction response type and `L` is the log response type.
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
-pub enum FilterChanges<T = Transaction> {
+pub enum FilterChanges<T = Transaction, L = RpcLog> {
     /// Empty result.
     #[cfg_attr(feature = "serde", serde(with = "empty_array"))]
     #[default]
     Empty,
     /// New logs.
-    Logs(Vec<RpcLog>),
+    Logs(Vec<L>),
     /// New hashes (block or transactions).
     Hashes(Vec<B256>),
     /// New transactions.
@@ -1225,7 +1227,7 @@ impl From<Vec<Transaction>> for FilterChanges {
     }
 }
 
-impl<T> FilterChanges<T> {
+impl<T, L> FilterChanges<T, L> {
     /// Get the hashes if present.
     pub fn as_hashes(&self) -> Option<&[B256]> {
         if let Self::Hashes(hashes) = self {
@@ -1236,7 +1238,7 @@ impl<T> FilterChanges<T> {
     }
 
     /// Get the logs if present.
-    pub fn as_logs(&self) -> Option<&[RpcLog]> {
+    pub fn as_logs(&self) -> Option<&[L]> {
         if let Self::Logs(logs) = self {
             Some(logs)
         } else {
@@ -1287,9 +1289,10 @@ mod empty_array {
 }
 
 #[cfg(feature = "serde")]
-impl<'de, T> serde::Deserialize<'de> for FilterChanges<T>
+impl<'de, T, L> serde::Deserialize<'de> for FilterChanges<T, L>
 where
     T: serde::Deserialize<'de>,
+    L: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -1297,13 +1300,13 @@ where
     {
         #[derive(serde::Deserialize)]
         #[serde(untagged)]
-        enum Changes<T = Transaction> {
+        enum Changes<T, L> {
             Hashes(Vec<B256>),
-            Logs(Vec<RpcLog>),
+            Logs(Vec<L>),
             Transactions(Vec<T>),
         }
 
-        let changes = Changes::deserialize(deserializer)?;
+        let changes = Changes::<T, L>::deserialize(deserializer)?;
         let changes = match changes {
             Changes::Logs(vals) => {
                 if vals.is_empty() {
@@ -1589,13 +1592,9 @@ where
             }
 
             // Current block exhausted or none set, try next block
-            match self.blocks_iter.next() {
-                Some(block) => {
-                    self.current_block = Some(block.into_iter());
-                    self.current_logs = None;
-                }
-                None => return None,
-            }
+            let block = self.blocks_iter.next()?;
+            self.current_block = Some(block.into_iter());
+            self.current_logs = None;
         }
     }
 }
@@ -1611,6 +1610,39 @@ mod tests {
     #[cfg(feature = "serde")]
     fn serialize<T: serde::Serialize>(t: &T) -> serde_json::Value {
         serde_json::to_value(t).expect("Failed to serialize value")
+    }
+
+    #[test]
+    fn filter_changes_defaults_to_rpc_log() {
+        fn assert_default_log_type(_: FilterChanges<u64, RpcLog>) {}
+        fn transaction_changes<T>(transactions: Vec<T>) -> FilterChanges<T> {
+            FilterChanges::Transactions(transactions)
+        }
+
+        let logs: FilterChanges<u64> = FilterChanges::Logs(Vec::new());
+        assert_default_log_type(logs);
+
+        let transactions = transaction_changes(vec![1]);
+        assert_eq!(transactions.as_transactions(), Some([1].as_slice()));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn filter_changes_supports_custom_logs() {
+        #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        struct CustomLog {
+            value: u64,
+        }
+
+        let changes = FilterChanges::<Transaction, CustomLog>::Logs(vec![CustomLog { value: 42 }]);
+        assert_eq!(changes.as_logs(), Some([CustomLog { value: 42 }].as_slice()));
+
+        let value = serde_json::to_value(&changes).unwrap();
+        assert_eq!(value, json!([{ "value": 42 }]));
+        assert_eq!(
+            serde_json::from_value::<FilterChanges<Transaction, CustomLog>>(value).unwrap(),
+            changes
+        );
     }
 
     #[test]
