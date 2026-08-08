@@ -14,7 +14,10 @@ pub struct TempoAccessKey {
     pub key_address: Address,
     /// RLP-encoded `SignedKeyAuthorization`.
     pub key_authorization: Option<Bytes>,
-    /// Chain ID the access key was authorized on.
+    /// Chain ID recorded for the access key.
+    ///
+    /// This is metadata and is not applied to the signer. Environment-derived Keychain lookups use
+    /// `0` when the chain ID is unknown.
     pub chain_id: u64,
     /// Expiry as a unix timestamp, if any.
     pub expiry: Option<u64>,
@@ -36,7 +39,8 @@ impl fmt::Debug for TempoAccessKey {
 ///
 /// In [`Self::Direct`] the signer is the wallet itself; in [`Self::Keychain`]
 /// the signer is an access key and the transaction `from` lives in the
-/// accompanying [`TempoAccessKey`].
+/// accompanying [`TempoAccessKey`]. Lookup does not enforce the metadata, and the underlying
+/// signer's chain ID is not configured.
 #[non_exhaustive]
 pub enum TempoLookup {
     /// EOA mode: the signer is the wallet.
@@ -54,6 +58,10 @@ impl TempoLookup {
     }
 
     /// Consume the lookup and return the underlying signer.
+    ///
+    /// For [`Self::Keychain`], this returns the access-key signer and discards the wallet address,
+    /// authorization, chain ID, and expiry metadata. Retain the lookup when that metadata is needed
+    /// to construct a transaction.
     pub fn into_signer(self) -> PrivateKeySigner {
         match self {
             Self::Direct(s) | Self::Keychain(s, _) => s,

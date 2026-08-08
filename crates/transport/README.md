@@ -9,6 +9,8 @@ use alloy_transport::mock::{Asserter, MockTransport};
 use alloy_json_rpc as j;
 use tower::Service;
 
+# async fn example() {
+
 // Prepare a mock response and a serialized request
 let asserter = Asserter::new();
 asserter.push_success(&12345u64);
@@ -20,10 +22,7 @@ let packet = j::RequestPacket::from(req);
 
 // Drive the service and assert the response
 let mut transport = MockTransport::new(asserter.clone());
-let resp = tokio::runtime::Runtime::new()
-    .unwrap()
-    .block_on(async move { transport.call(packet).await })
-    .unwrap();
+let resp = transport.call(packet).await.unwrap();
 
 if let j::ResponsePacket::Single(r) = resp {
     let n: u64 = match r.payload {
@@ -32,6 +31,7 @@ if let j::ResponsePacket::Single(r) = resp {
     };
     assert_eq!(n, 12345);
 }
+# }
 ```
 
 Low-level Ethereum JSON-RPC transport abstraction.

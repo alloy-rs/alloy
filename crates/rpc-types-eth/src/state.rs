@@ -123,7 +123,7 @@ impl FromIterator<(Address, AccountOverride)> for StateOverridesBuilder {
     }
 }
 
-/// A set of account overrides
+/// Account overrides keyed by the address whose state should be changed for the call.
 pub type StateOverride = AddressHashMap<AccountOverride>;
 
 /// Allows converting `StateOverridesBuilder` directly into `StateOverride`.
@@ -132,12 +132,17 @@ impl From<StateOverridesBuilder> for StateOverride {
         builder.overrides
     }
 }
-/// Custom account override used in call
+/// Overrides one account while executing a call.
+///
+/// `state` and `state_diff` are alternative request fields; callers should set at most one, though
+/// this type does not enforce that constraint. `state` replaces the complete storage map, so
+/// unspecified slots read as zero, while `state_diff` changes only the listed slots. Storage keys
+/// and values are raw 32-byte EVM slot and value words.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase", deny_unknown_fields))]
 pub struct AccountOverride {
-    /// Fake balance to set for the account before executing the call.
+    /// Fake balance to set for the account before executing the call, in wei.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub balance: Option<U256>,
     /// Fake nonce to set for the account before executing the call.

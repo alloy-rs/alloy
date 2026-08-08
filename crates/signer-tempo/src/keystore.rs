@@ -60,6 +60,10 @@ impl TempoKeystore {
     }
 
     /// Load the keystore from an explicit path.
+    ///
+    /// If the file is valid TOML but individual `[[keys]]` entries are malformed, those entries
+    /// are skipped and a warning is emitted through [`tracing`]. Completely invalid TOML returns
+    /// [`TempoSignerError::BadToml`].
     pub fn load_from(path: impl AsRef<Path>) -> Result<Self, TempoSignerError> {
         let path = path.as_ref().to_path_buf();
         let contents = match std::fs::read_to_string(&path) {
@@ -104,14 +108,20 @@ impl TempoKeystore {
         })
     }
 
-    /// Find a usable key by wallet/EOA address (`from`).
+    /// Find available key material by wallet/EOA address (`from`).
+    ///
+    /// This checks key type, key presence, and expiry at lookup time; it does not enforce chain ID,
+    /// limits, or authorization metadata. The returned signer's chain ID is not configured.
     pub fn find_by_from(&self, from: Address) -> Result<TempoLookup, TempoSignerError> {
         let candidates: Vec<&RawKeyEntry> =
             self.entries.iter().filter(|e| e.wallet_address == from).collect();
         select_one(candidates, from)
     }
 
-    /// Find a usable key by access-key address.
+    /// Find available key material by the recorded access-key address.
+    ///
+    /// This has the same validation scope as [`Self::find_by_from`], and the returned signer's
+    /// chain ID is not configured.
     pub fn find_by_key(&self, key_address: Address) -> Result<TempoLookup, TempoSignerError> {
         let candidates: Vec<&RawKeyEntry> =
             self.entries.iter().filter(|e| e.key_address == Some(key_address)).collect();

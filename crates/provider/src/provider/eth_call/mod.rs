@@ -141,6 +141,11 @@ where
 /// A builder for an `"eth_call"` request. This type is returned by the
 /// [`Provider::call`] method.
 ///
+/// Builders returned by the default [`Provider::call`] and estimation paths retain only a weak
+/// client handle. Keep the provider alive until such a call is awaited, or awaiting it returns a
+/// backend-gone transport error. Provider layers may supply a custom caller that retains additional
+/// state, as the batching layer does.
+///
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Clone)]

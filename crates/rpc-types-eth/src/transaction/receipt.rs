@@ -33,12 +33,15 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Gas used by this transaction alone.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
-    /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
-    /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
-    /// that's actually paid by users can only be determined post-execution
+    /// The price paid post-execution by the transaction, in wei per gas (base fee plus priority
+    /// fee). Both fee fields in EIP-1559 transactions are maximums; the amount actually paid can
+    /// only be determined post-execution.
+    ///
+    /// Deserialization also accepts the legacy `gasPrice` name and defaults to zero if neither
+    /// name is present.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub effective_gas_price: u128,
-    /// Blob gas used by the eip-4844 transaction
+    /// Blob gas used by the EIP-4844 transaction, in blob gas units.
     ///
     /// This is None for non eip-4844 transactions
     #[cfg_attr(
@@ -50,7 +53,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
         )
     )]
     pub blob_gas_used: Option<u64>,
-    /// The price paid by the eip-4844 transaction per blob gas.
+    /// The price paid by the EIP-4844 transaction, in wei per blob gas.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -185,6 +188,8 @@ impl<T> TransactionReceipt<T> {
     }
 
     /// Calculates the address that will be created by the transaction, if any.
+    ///
+    /// `nonce` is the sender nonce used by the contract-creation transaction.
     ///
     /// Returns `None` if the transaction is not a contract creation (the `to` field is set).
     pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {

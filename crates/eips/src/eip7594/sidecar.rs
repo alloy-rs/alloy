@@ -17,7 +17,8 @@ use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, PartialEq, Eq, Hash, Debug, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
@@ -361,7 +362,7 @@ impl BlobTransactionSidecarVariant {
 }
 
 impl Encodable for BlobTransactionSidecarVariant {
-    /// Encodes the [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+    /// Encodes the selected sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         match self {
             Self::Eip4844(sidecar) => sidecar.encode(out),
@@ -378,7 +379,7 @@ impl Encodable for BlobTransactionSidecarVariant {
 }
 
 impl Decodable for BlobTransactionSidecarVariant {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(buf)?;
         if !header.list {
@@ -509,7 +510,13 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
 
 /// This represents a set of blobs, and its corresponding commitments and cell proofs.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// A well-formed sidecar has one commitment per blob and `CELLS_PER_EXT_BLOB` cell proofs per
+/// blob. Public fields and [`Self::new`] do not enforce these cardinalities or validate proofs.
+/// With the `kzg` feature, prefer `try_from_blobs_with_settings` or call `validate` before
+/// use.
+///
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -538,8 +545,7 @@ impl core::fmt::Debug for BlobTransactionSidecarEip7594 {
 }
 
 impl BlobTransactionSidecarEip7594 {
-    /// Constructs a new [BlobTransactionSidecarEip7594] from a set of blobs, commitments, and
-    /// cell proofs.
+    /// Constructs a sidecar without validating cardinalities, commitments, or cell proofs.
     pub const fn new(
         blobs: Vec<Blob>,
         commitments: Vec<Bytes48>,
@@ -1065,7 +1071,7 @@ impl BlobTransactionSidecarEip7594 {
 }
 
 impl Encodable for BlobTransactionSidecarEip7594 {
-    /// Encodes the inner [BlobTransactionSidecarEip7594] fields as RLP bytes, without a RLP header.
+    /// Encodes the sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -1076,8 +1082,7 @@ impl Encodable for BlobTransactionSidecarEip7594 {
 }
 
 impl Decodable for BlobTransactionSidecarEip7594 {
-    /// Decodes the inner [BlobTransactionSidecarEip7594] fields from RLP bytes, without a RLP
-    /// header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }

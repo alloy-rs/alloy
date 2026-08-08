@@ -765,7 +765,10 @@ impl ExecutionPayloadV1 {
         BlockNumHash::new(self.block_number, self.block_hash)
     }
 
-    /// Converts [`ExecutionPayloadV1`] to [`Block`]
+    /// Converts [`ExecutionPayloadV1`] to an unsealed [`Block`].
+    ///
+    /// This does not recompute or compare the payload's advertised [`Self::block_hash`]. Callers
+    /// performing Engine API validation must hash the returned block and compare it separately.
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
         self.try_into_block_with(|tx| {
             T::decode_2718_exact(tx.as_ref())
@@ -872,6 +875,8 @@ impl ExecutionPayloadV1 {
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`] using the given block hash.
+    ///
+    /// The supplied hash is stored verbatim without checking it against the block.
     pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
     where
         T: Encodable2718,
@@ -2288,6 +2293,10 @@ impl TryFrom<BlobsBundleV2> for BlobsBundleV1 {
 
 /// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2],
 /// [ExecutionPayloadV3], or [ExecutionPayloadV4].
+///
+/// Payload-to-block conversions return an unsealed block and do not recompute or compare the
+/// advertised `block_hash`. Callers performing Engine API validation must hash the returned block
+/// and compare it separately.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
@@ -2375,6 +2384,10 @@ impl ExecutionPayload {
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     /// See also [`ExecutionPayloadSidecar::from_block`].
+    ///
+    /// The supplied hash is stored verbatim without checking it against the block. The payload
+    /// version is inferred from the block access-list hash, parent beacon block root, and
+    /// withdrawals.
     pub fn from_block_unchecked<T, H>(
         block_hash: B256,
         block: &Block<T, H>,
@@ -2468,6 +2481,7 @@ impl ExecutionPayload {
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
     ///
     /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    /// The payload's advertised `block_hash` is not recomputed or compared.
     ///
     /// # Note
     ///
@@ -2517,6 +2531,9 @@ impl ExecutionPayload {
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`].
+    ///
+    /// The returned block is unsealed, and the payload's advertised `block_hash` is not recomputed
+    /// or compared.
     ///
     /// Caution: This does not set fields that are not part of the payload and only part of the
     /// [`ExecutionPayloadSidecar`]:
@@ -4020,6 +4037,7 @@ impl ExecutionData {
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
     ///
     /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    /// The payload's advertised `block_hash` is not recomputed or compared.
     ///
     /// # Note
     ///

@@ -31,8 +31,8 @@ impl PreStateFrame {
         matches!(self, Self::Diff(_))
     }
 
-    /// Returns the account states after the transaction is executed if this trace was requested
-    /// without diffmode.
+    /// Returns the pre-state accounts needed to execute the transaction if this trace was
+    /// requested without diff mode.
     pub const fn as_default(&self) -> Option<&PreStateMode> {
         match self {
             Self::Default(mode) => Some(mode),

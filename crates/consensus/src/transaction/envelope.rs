@@ -10,17 +10,7 @@ use crate::{
 use alloy_eips::{eip2718::Encodable2718, eip7594::Encodable7594};
 use alloy_primitives::{Bytes, Signature, B256};
 
-/// The Ethereum [EIP-2718] Transaction Envelope.
-///
-/// # Note:
-///
-/// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
-/// Therefore we must ensure that encoding returns the precise byte-array that
-/// was decoded, preserving the presence or absence of the `TransactionType`
-/// flag.
-///
-/// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+/// The standard Ethereum transaction envelope, using [`TxEip4844Variant`] for blob transactions.
 pub type TxEnvelope = EthereumTxEnvelope<TxEip4844Variant>;
 
 impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844Variant<T>> {
@@ -466,13 +456,8 @@ impl TryFrom<EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransa
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
-/// # Note:
-///
-/// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
-/// Therefore we must ensure that encoding returns the precise byte-array that
-/// was decoded, preserving the presence or absence of the `TransactionType`
-/// flag.
+/// Represents untagged legacy transactions and typed EIP-2718 variants. Type ID 0 is normalized to
+/// the untagged legacy encoding; this type does not preserve a literal `0x00` prefix.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, TransactionEnvelope)]

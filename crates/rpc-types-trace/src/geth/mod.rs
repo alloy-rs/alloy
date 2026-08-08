@@ -535,8 +535,11 @@ pub struct GethDebugTracingOptions {
     /// This could be [CallConfig] or [PreStateConfig] depending on the tracer.
     #[serde(default, skip_serializing_if = "GethDebugTracerConfig::is_null")]
     pub tracer_config: GethDebugTracerConfig,
-    /// A string of decimal integers that overrides the JavaScript-based tracing calls default
-    /// timeout of 5 seconds.
+    /// A Go duration string, such as `5s`, that overrides the default five-second timeout for
+    /// JavaScript-based tracing calls.
+    ///
+    /// [`Self::with_timeout`] represents the supplied duration as integer milliseconds, for
+    /// example `2500ms`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<String>,
 }
