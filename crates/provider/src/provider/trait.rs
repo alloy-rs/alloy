@@ -15,7 +15,7 @@ use crate::{
     utils::{self, Eip1559Estimation, Eip1559Estimator},
     EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
     PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
-    SendableTx,
+    SendRawTransactionSync, SendableTx,
 };
 use alloy_consensus::BlockHeader;
 use alloy_eips::{eip2718::Encodable2718, eip7928::BlockAccessList};
@@ -1281,7 +1281,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Broadcasts a raw transaction RLP bytes to the network and returns the transaction receipt
     /// after it has been mined.
     ///
-    /// Unlike send_raw_transaction which returns immediately with
+    /// Unlike [`send_raw_transaction`](Self::send_raw_transaction), which returns immediately with
     /// a transaction hash, this method waits on the server side until the transaction is included
     /// in a block and returns the receipt directly. This is an optimization that reduces the number
     /// of RPC calls needed to confirm a transaction.
@@ -1289,7 +1289,27 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// This method implements the `eth_sendRawTransactionSync` RPC method as defined in
     /// [EIP-7966].
     ///
-    /// [EIP-7966]: https://github.com/ethereum/EIPs/pull/9151
+    /// [EIP-7966]: https://eips.ethereum.org/EIPS/eip-7966
+    ///
+    /// The returned [`SendRawTransactionSync`] future can configure independent client-side and
+    /// server-side timeouts:
+    ///
+    /// ```no_run
+    /// # async fn example<N: alloy_network::Network>(
+    /// #     provider: impl alloy_provider::Provider<N>,
+    /// #     encoded_tx: &[u8],
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// use std::time::Duration;
+    ///
+    /// let receipt = provider
+    ///     .send_raw_transaction_sync(encoded_tx)
+    ///     .server_timeout(Some(Duration::from_secs(5)))
+    ///     .timeout(Duration::from_secs(10))
+    ///     .await??;
+    /// # let _ = receipt;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Error Handling
     ///
@@ -1315,12 +1335,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// Note: This is only available on certain clients that support the
     /// `eth_sendRawTransactionSync` RPC method, such as Anvil.
-    async fn send_raw_transaction_sync(
-        &self,
-        encoded_tx: &[u8],
-    ) -> TransportResult<N::ReceiptResponse> {
-        let rlp_hex = hex::encode_prefixed(encoded_tx);
-        self.client().request("eth_sendRawTransactionSync", (rlp_hex,)).await
+    fn send_raw_transaction_sync(&self, encoded_tx: &[u8]) -> SendRawTransactionSync<N> {
+        SendRawTransactionSync::new(self.client(), encoded_tx)
     }
 
     /// Broadcasts a raw transaction RLP bytes with a conditional [`TransactionConditional`] to the
@@ -2249,8 +2265,13 @@ mod tests {
         let encoded = tx_envelope.encoded_2718();
 
         // Send using the sync method - this directly returns the receipt
-        let receipt =
-            provider.send_raw_transaction_sync(&encoded).await.expect("failed to send raw tx sync");
+        let receipt = provider
+            .send_raw_transaction_sync(&encoded)
+            .server_timeout(Some(Duration::from_secs(5)))
+            .timeout(Duration::from_secs(10))
+            .await
+            .expect("client timeout elapsed")
+            .expect("failed to send raw tx sync");
 
         // Verify receipt
         assert_eq!(receipt.to(), Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")));
