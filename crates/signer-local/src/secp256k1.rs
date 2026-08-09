@@ -194,7 +194,7 @@ impl LocalSigner<Secp256k1Credential> {
         R: Rng + CryptoRng,
         S: AsRef<[u8]>,
     {
-        let (secret, uuid) = eth_keystore::new(dir, rng, password, name)?;
+        let (secret, uuid) = super::keystore::new(dir, rng, password, name)?;
         Ok((Self::from_slice(&secret)?, uuid))
     }
 
@@ -205,7 +205,7 @@ impl LocalSigner<Secp256k1Credential> {
         P: AsRef<Path>,
         S: AsRef<[u8]>,
     {
-        let secret = eth_keystore::decrypt_key(keypath, password)?;
+        let secret = super::keystore::decrypt_key(keypath, password)?;
         Ok(Self::from_slice(&secret)?)
     }
 
@@ -228,7 +228,7 @@ impl LocalSigner<Secp256k1Credential> {
         S: AsRef<[u8]>,
     {
         let pk = pk.as_ref();
-        let uuid = eth_keystore::encrypt_key(keypath, rng, pk, password, name)?;
+        let uuid = super::keystore::encrypt_key(keypath, rng, pk, password, name)?;
         Ok((Self::from_slice(pk)?, uuid))
     }
 }
