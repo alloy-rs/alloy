@@ -5,14 +5,14 @@ Local signer implementations:
 - [K256 private key](https://docs.rs/alloy-signer-local/latest/alloy_signer_local/type.PrivateKeySigner.html)
 - [Secp256k1 private key](https://docs.rs/alloy-signer-local/latest/alloy_signer_local/type.Secp256k1Signer.html) (feature-gated)
 - [Mnemonic phrase](https://docs.rs/alloy-signer-local/latest/alloy_signer_local/struct.MnemonicBuilder.html)
-- [YubiHSM2](https://docs.rs/alloy-signer-local/latest/alloy_signer_local/type.YubiSigner.html)
+- [YubiHSM2](https://docs.rs/alloy-signer-local/latest/alloy_signer_local/struct.YubiSigner.html)
 
 ## Features
 
 - `keystore`: enables Ethereum keystore functionality on the `PrivateKeySigner` and `Secp256k1Signer` types.
 - `mnemonic`: enables BIP-39 mnemonic functionality for building `PrivateKeySigner`s.
 - `secp256k1`: enables the `Secp256k1Signer` type, an alternative signer implementation using the [`secp256k1`] crate instead of [`k256`].
-- `yubihsm`: enables `LocalSigner`s with [YubiHSM2] support.
+- `yubihsm`: enables the [YubiHSM2]-backed `YubiSigner`.
 
 ## Secp256k1 vs K256
 
