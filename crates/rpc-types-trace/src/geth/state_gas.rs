@@ -12,9 +12,9 @@ pub struct StateGasTrace {
     /// Receipt gas used, after refunds and any calldata floor.
     #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
-    /// Gross regular-dimension gas used by the transaction.
+    /// Gross execution-dimension gas used by the transaction.
     #[serde(with = "alloy_serde::quantity")]
-    pub regular_gas_used: u64,
+    pub execution_gas_used: u64,
     /// Gross state-dimension gas used by the transaction.
     #[serde(with = "alloy_serde::quantity")]
     pub state_gas_used: u64,
@@ -33,7 +33,7 @@ mod tests {
         let trace: StateGasTrace = serde_json::from_str(
             r#"{
                 "gasUsed": "0x5208",
-                "regularGasUsed": "0x5208",
+                "executionGasUsed": "0x5208",
                 "stateGasUsed": "0x0",
                 "gasRefund": "0x0"
             }"#,
@@ -41,14 +41,14 @@ mod tests {
         .unwrap();
 
         assert_eq!(trace.gas_used, 21000);
-        assert_eq!(trace.regular_gas_used, 21000);
+        assert_eq!(trace.execution_gas_used, 21000);
         assert_eq!(trace.state_gas_used, 0);
         assert_eq!(trace.gas_refund, 0);
         assert_eq!(
             serde_json::to_value(&trace).unwrap(),
             serde_json::json!({
                 "gasUsed": "0x5208",
-                "regularGasUsed": "0x5208",
+                "executionGasUsed": "0x5208",
                 "stateGasUsed": "0x0",
                 "gasRefund": "0x0"
             })
@@ -60,7 +60,7 @@ mod tests {
         let trace: GethTrace = serde_json::from_str(
             r#"{
                 "gasUsed": "0x5208",
-                "regularGasUsed": "0x5208",
+                "executionGasUsed": "0x5208",
                 "stateGasUsed": "0x0",
                 "gasRefund": "0x0"
             }"#,

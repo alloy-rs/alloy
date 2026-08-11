@@ -76,7 +76,7 @@ pub struct DefaultFrame {
     pub failed: bool,
     /// How much gas was used.
     pub gas: u64,
-    /// Gross regular-dimension gas used by the transaction.
+    /// Gross execution-dimension gas used by the transaction.
     ///
     /// These fields are optional because pre-Amsterdam responses omit them. The
     /// optional representation preserves decoding of both old and new responses;
@@ -85,10 +85,10 @@ pub struct DefaultFrame {
     #[serde(
         default,
         with = "alloy_serde::quantity::opt",
-        rename = "regularGasUsed",
+        rename = "executionGasUsed",
         skip_serializing_if = "Option::is_none"
     )]
-    pub regular_gas_used: Option<u64>,
+    pub execution_gas_used: Option<u64>,
     /// Gross state-dimension gas used by the transaction.
     #[serde(
         default,
