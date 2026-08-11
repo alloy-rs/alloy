@@ -27,7 +27,18 @@ pub struct TransactionRequest {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub from: Option<Address>,
     /// The destination address of the transaction.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    ///
+    /// A missing `to` field deserializes to `None`, while an explicit `null` deserializes to
+    /// `Some(TxKind::Create)` (contract creation) in human-readable formats. See the
+    /// `deserialize_to` function for details.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "deserialize_to"
+        )
+    )]
     pub to: Option<TxKind>,
     /// The legacy gas price.
     #[cfg_attr(
@@ -132,6 +143,41 @@ pub struct TransactionRequest {
     /// Authorization list for EIP-7702 transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
+}
+
+/// Deserializer for [`TransactionRequest::to`].
+///
+/// This is only invoked when the `to` field is *present* in the input, because the field is also
+/// annotated with `#[serde(default)]`: serde skips `deserialize_with` entirely for a missing field
+/// and uses `Default::default()` (`None`) instead. This is what lets us distinguish the three
+/// cases:
+///
+/// * missing `to`      -> `None` (handled by `#[serde(default)]`, this function is not called)
+/// * explicit `"to": null` -> `Some(TxKind::Create)` (contract creation)
+/// * `"to": "0x..."`   -> `Some(TxKind::Call(address))`
+///
+/// A present value is deserialized directly as [`TxKind`] (whose own `Deserialize` maps `null` to
+/// [`TxKind::Create`] and an address to [`TxKind::Call`]) and wrapped in `Some`. Without this, the
+/// outer `Option<TxKind>` deserializer would swallow `null` as `None`, losing the contract-creation
+/// intent.
+///
+/// For non-human-readable formats (e.g. bincode) the original `Option<TxKind>` behavior is
+/// preserved, since those formats are not self-describing and rely on the field always being
+/// present with its `None`/`Some` encoding intact.
+#[cfg(feature = "serde")]
+fn deserialize_to<'de, D>(deserializer: D) -> Result<Option<TxKind>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+
+    if deserializer.is_human_readable() {
+        // Present value: `null` -> `Some(TxKind::Create)`, address -> `Some(TxKind::Call(..))`.
+        TxKind::deserialize(deserializer).map(Some)
+    } else {
+        // Preserve original binary semantics.
+        Option::<TxKind>::deserialize(deserializer)
+    }
 }
 
 impl TransactionRequest {
@@ -2346,5 +2392,69 @@ mod tests {
         let hashes = tx_request.blob_versioned_hashes.unwrap();
         assert_eq!(hashes.len(), 1);
         assert_eq!(hashes[0], expected_hash);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_tx_request_contract_creation_roundtrip() {
+        let request = TransactionRequest::default().create();
+
+        assert_eq!(request.to, Some(TxKind::Create));
+
+        let json = serde_json::to_value(&request).unwrap();
+
+        assert_eq!(json["to"], serde_json::Value::Null);
+
+        let decoded: TransactionRequest = serde_json::from_value(json).unwrap();
+
+        assert_eq!(decoded.to, Some(TxKind::Create));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_tx_request_to_missing_is_none() {
+        let request: TransactionRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(request.to, None);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_tx_request_to_explicit_null_is_create() {
+        let request: TransactionRequest = serde_json::from_str(r#"{"to":null}"#).unwrap();
+        assert_eq!(request.to, Some(TxKind::Create));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_tx_request_to_address_is_call() {
+        let address = Address::repeat_byte(0xDE);
+        let json = format!(r#"{{"to":"{address}"}}"#);
+        let request: TransactionRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(request.to, Some(TxKind::Call(address)));
+    }
+
+    /// Ensures the custom `to` deserializer does not alter binary (non-human-readable) semantics:
+    /// a bincode roundtrip must preserve every `to` variant exactly.
+    #[test]
+    #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+    fn serde_tx_request_to_bincode_roundtrip() {
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        #[serde_as]
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Data {
+            #[serde_as(as = "serde_bincode_compat::TransactionRequest")]
+            request: TransactionRequest,
+        }
+
+        for to in [None, Some(TxKind::Create), Some(TxKind::Call(Address::repeat_byte(0xDE)))] {
+            let data = Data { request: TransactionRequest { to, ..Default::default() } };
+            let encoded = bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, bincode::config::legacy())
+                    .unwrap();
+            assert_eq!(decoded, data);
+        }
     }
 }
