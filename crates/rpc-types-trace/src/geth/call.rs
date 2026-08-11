@@ -17,6 +17,22 @@ pub struct CallFrame {
     /// How much gas was used by the call.
     #[serde(default, rename = "gasUsed")]
     pub gas_used: U256,
+    /// Gross execution-dimension gas used by the transaction.
+    ///
+    /// This is present on the top-level frame for Amsterdam and later blocks.
+    /// See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) and the
+    /// [execution-apis call tracer proposal](https://github.com/ethereum/execution-apis/pull/852).
+    #[serde(default, rename = "executionGasUsed", skip_serializing_if = "Option::is_none")]
+    pub execution_gas_used: Option<U256>,
+    /// Gross state-dimension gas used by the transaction.
+    #[serde(default, rename = "stateGasUsed", skip_serializing_if = "Option::is_none")]
+    pub state_gas_used: Option<U256>,
+    /// EIP-3529 gas refund applied at the transaction boundary.
+    #[serde(default, rename = "gasRefund", skip_serializing_if = "Option::is_none")]
+    pub gas_refund: Option<U256>,
+    /// State gas refunded within the transaction.
+    #[serde(default, rename = "stateGasRefund", skip_serializing_if = "Option::is_none")]
+    pub state_gas_refund: Option<U256>,
     /// The address of the contract that was called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<Address>,
