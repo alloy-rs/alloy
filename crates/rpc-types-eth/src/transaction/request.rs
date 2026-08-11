@@ -16,6 +16,18 @@ use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
 
+#[cfg(feature = "serde")]
+fn deserialize_to<'de, D>(deserializer: D) -> Result<Option<TxKind>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        <TxKind as serde::Deserialize>::deserialize(deserializer).map(Some)
+    } else {
+        <Option<TxKind> as serde::Deserialize>::deserialize(deserializer)
+    }
+}
+
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -27,7 +39,14 @@ pub struct TransactionRequest {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub from: Option<Address>,
     /// The destination address of the transaction.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "deserialize_to"
+        )
+    )]
     pub to: Option<TxKind>,
     /// The legacy gas price.
     #[cfg_attr(
@@ -1571,6 +1590,12 @@ pub(super) mod serde_bincode_compat {
 
         use super::super::serde_bincode_compat;
 
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Destination {
+            #[serde(default, deserialize_with = "super::super::deserialize_to")]
+            to: Option<alloy_primitives::TxKind>,
+        }
+
         #[test]
         fn test_tx_request_bincode_roundtrip() {
             #[serde_as]
@@ -1593,6 +1618,39 @@ pub(super) mod serde_bincode_compat {
             let (decoded, _) =
                 bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
+
+            for to in [
+                None,
+                Some(alloy_primitives::TxKind::Create),
+                Some(alloy_primitives::TxKind::Call(alloy_primitives::Address::repeat_byte(0x11))),
+            ] {
+                let data = Data { transaction: TransactionRequest { to, ..Default::default() } };
+                let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+                let (decoded, _) =
+                    bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy())
+                        .unwrap();
+                assert_eq!(decoded, data);
+            }
+        }
+
+        #[test]
+        fn test_deserialize_to_preserves_bincode_option_encoding() {
+            for to in [
+                None,
+                Some(alloy_primitives::TxKind::Create),
+                Some(alloy_primitives::TxKind::Call(alloy_primitives::Address::repeat_byte(0x11))),
+            ] {
+                let expected = bincode::serde::encode_to_vec(to, config::legacy()).unwrap();
+                let encoded =
+                    bincode::serde::encode_to_vec(&Destination { to }, config::legacy()).unwrap();
+                assert_eq!(encoded, expected);
+
+                let (decoded, consumed) =
+                    bincode::serde::decode_from_slice::<Destination, _>(&encoded, config::legacy())
+                        .unwrap();
+                assert_eq!(decoded.to, to);
+                assert_eq!(consumed, encoded.len());
+            }
         }
     }
 }
@@ -1893,6 +1951,33 @@ mod tests {
         let tx = TransactionRequest::default();
         let serialized = serde_json::to_string(&tx).unwrap();
         assert_eq!(serialized, "{}");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_to_distinguishes_missing_create_and_call() {
+        let missing = serde_json::from_value::<TransactionRequest>(serde_json::json!({})).unwrap();
+        assert_eq!(missing.to, None);
+
+        let create_json = serde_json::json!({ "to": null });
+        let create = serde_json::from_value::<TransactionRequest>(create_json.clone()).unwrap();
+        assert_eq!(create.to, Some(TxKind::Create));
+        assert_eq!(serde_json::to_value(create).unwrap(), create_json);
+
+        let address = Address::repeat_byte(0x11);
+        let call_json = serde_json::json!({ "to": address });
+        let call = serde_json::from_value::<TransactionRequest>(call_json.clone()).unwrap();
+        assert_eq!(call.to, Some(TxKind::Call(address)));
+        assert_eq!(serde_json::to_value(call).unwrap(), call_json);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_to_rejects_invalid_address() {
+        let result = serde_json::from_value::<TransactionRequest>(
+            serde_json::json!({ "to": "invalid address" }),
+        );
+        assert!(result.is_err());
     }
 
     #[test]
