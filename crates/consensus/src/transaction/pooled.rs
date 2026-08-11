@@ -7,8 +7,8 @@ use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, Encodable7594};
 
 /// Pooled transaction format for Osaka and later.
 ///
-/// This can contain an EIP-7594 blob transaction with its cell-proof sidecar or any non-blob
-/// signed Ethereum transaction. For cross-fork EIP-4844/EIP-7594 handling, use
+/// This can contain an [EIP-7594] blob transaction with its cell-proof sidecar or any non-blob
+/// signed Ethereum transaction. For cross-fork [EIP-4844]/[EIP-7594] handling, use
 /// `EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>>` instead.
 ///
 /// The difference between this and the [`EthereumTxEnvelope<TxEip4844Variant<T>>`] is that this
@@ -18,6 +18,9 @@ use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, Encodable7594};
 /// After the Osaka upgrade (EIP-7594), the blob sidecar uses
 /// [`BlobTransactionSidecarEip7594`] which replaces single KZG proofs with cell proofs
 /// for PeerDAS data availability sampling.
+///
+/// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
+/// [EIP-7594]: https://eips.ethereum.org/EIPS/eip-7594
 pub type PooledTransaction =
     EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>;
 

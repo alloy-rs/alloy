@@ -65,10 +65,8 @@ impl Serialize for InclusionListStatusV1 {
     }
 }
 
-/// An inclusion-list entry from the historical Engine API draft implemented by this crate.
-///
-/// This `{ address, nonce }` shape is not the `{ address, gas_limit }` entry in the currently
-/// published EIP-7547 text.
+/// This is an individual entry in the inclusion list summary, representing a transaction that
+/// should be included in this block or the next block.
 ///
 /// From the spec:
 ///
@@ -98,9 +96,8 @@ impl fmt::Display for InclusionListSummaryEntryV1 {
     }
 }
 
-/// Inclusion-list summary input for the historical `engine_newInclusionListV1` draft RPC.
-///
-/// The `parent_hash` field and entry shape do not match the currently published EIP-7547 text.
+/// This structure contains the inclusion list summary input to the `engine_newInclusionListV1` RPC
+/// call.
 ///
 /// ### InclusionListSummaryV1
 ///

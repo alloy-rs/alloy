@@ -1,10 +1,8 @@
 //! Constants related to EIP-7547.
 
-/// The maximum gas allowed by the historical Engine API draft implemented by this crate.
+/// The maximum gas allowed for the inclusion list.
 ///
-/// This is `2**22`, not the `2**21` value in the currently published EIP-7547 text.
-///
-/// Based on the following part of the historical draft:
+/// Based on the following part of the spec:
 ///
 /// ## Constants
 ///
