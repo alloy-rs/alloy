@@ -406,9 +406,9 @@ impl Default for FilterBlockOption {
 
 /// Filter for logs.
 ///
-/// Addresses are ORed. Values within one topic position are ORed, while populated topic positions
-/// are ANDed. Empty address and topic sets are wildcards. Block ranges are inclusive, and a block
-/// hash is mutually exclusive with `fromBlock` and `toBlock`.
+/// Addresses use OR semantics. Values within one topic position use OR semantics, while populated
+/// topic positions use AND semantics. Empty address and topic sets are wildcards. Block ranges are
+/// inclusive, and a block hash is mutually exclusive with `fromBlock` and `toBlock`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
@@ -421,8 +421,8 @@ pub struct Filter {
     pub address: FilterSet<Address>,
     /// Topic filters, with at most four positions.
     ///
-    /// Values within a position are ORed; populated positions are ANDed. An empty position is a
-    /// wildcard and serializes as `null` when followed by a populated position.
+    /// Values within a position use OR semantics; populated positions use AND semantics. An empty
+    /// position is a wildcard and serializes as `null` when followed by a populated position.
     pub topics: [Topic; 4],
 }
 
