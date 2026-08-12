@@ -294,41 +294,6 @@ impl BlobTransactionSidecarVariant {
         }
     }
 
-    /// Reconstructs an EIP-7594 sidecar from a common sparse cell set for every blob.
-    ///
-    /// `cell_indices` contains the strictly ascending cell indices represented by each inner
-    /// vector in `cells`. The inner vectors are blob-major: `cells[blob_index]` contains the cells
-    /// for `commitments[blob_index]`. At least 64 of the 128 cells must be supplied for each blob.
-    /// The recovered sidecar contains all 128 cells' proofs and the reconstructed blob bytes.
-    ///
-    /// This uses the default KZG settings.
-    #[cfg(feature = "kzg")]
-    pub fn try_from_sparse_cells(
-        commitments: Vec<Bytes48>,
-        cell_indices: &[u64],
-        cells: &[Vec<crate::eip7594::Cell>],
-    ) -> Result<Self, c_kzg::Error> {
-        BlobTransactionSidecarEip7594::try_from_sparse_cells(commitments, cell_indices, cells)
-            .map(Self::Eip7594)
-    }
-
-    /// Reconstructs an EIP-7594 sidecar from sparse cells using custom KZG settings.
-    #[cfg(feature = "kzg")]
-    pub fn try_from_sparse_cells_with_settings(
-        commitments: Vec<Bytes48>,
-        cell_indices: &[u64],
-        cells: &[Vec<crate::eip7594::Cell>],
-        settings: &c_kzg::KzgSettings,
-    ) -> Result<Self, c_kzg::Error> {
-        BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
-            commitments,
-            cell_indices,
-            cells,
-            settings,
-        )
-        .map(Self::Eip7594)
-    }
-
     /// Verifies that the sidecar is valid. See relevant methods for each variant for more info.
     #[cfg(feature = "kzg")]
     pub fn validate(
@@ -554,6 +519,64 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
     }
 }
 
+/// An error that can occur while recovering blobs from EIP-7594 cells.
+#[cfg(feature = "kzg")]
+#[derive(Debug)]
+pub enum BlobCellRecoveryError {
+    /// Fewer than half of the extended blob cells were selected.
+    InsufficientCells {
+        /// The number of cells supplied for each blob.
+        provided: usize,
+        /// The minimum number of cells required for recovery.
+        required: usize,
+    },
+    /// The flattened cell slice does not match the commitments and cell mask.
+    CellCountMismatch {
+        /// The number of cells supplied.
+        provided: usize,
+        /// The number of cells implied by the commitments and cell mask.
+        expected: usize,
+    },
+    /// The expected cell count cannot be represented as a `usize`.
+    CellCountOverflow,
+    /// A reconstructed blob does not match its supplied commitment.
+    CommitmentMismatch {
+        /// The index of the blob whose commitment did not match.
+        blob_index: usize,
+    },
+    /// An error returned by [`c_kzg`].
+    Kzg(c_kzg::Error),
+}
+
+#[cfg(feature = "kzg")]
+impl core::fmt::Display for BlobCellRecoveryError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InsufficientCells { provided, required } => {
+                write!(f, "need at least {required} cells per blob for recovery, got {provided}")
+            }
+            Self::CellCountMismatch { provided, expected } => {
+                write!(f, "expected {expected} cells, got {provided}")
+            }
+            Self::CellCountOverflow => f.write_str("the expected cell count overflows usize"),
+            Self::CommitmentMismatch { blob_index } => {
+                write!(f, "reconstructed blob {blob_index} does not match its commitment")
+            }
+            Self::Kzg(err) => write!(f, "KZG error: {err:?}"),
+        }
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl core::error::Error for BlobCellRecoveryError {}
+
+#[cfg(feature = "kzg")]
+impl From<c_kzg::Error> for BlobCellRecoveryError {
+    fn from(source: c_kzg::Error) -> Self {
+        Self::Kzg(source)
+    }
+}
+
 /// This represents a set of blobs, and its corresponding commitments and cell proofs.
 ///
 /// This type encodes and decodes the fields without an rlp header.
@@ -595,193 +618,88 @@ impl BlobTransactionSidecarEip7594 {
         Self { blobs, commitments, cell_proofs }
     }
 
-    /// Tries to create a new sidecar by reconstructing blobs from complete EIP-7594 cell sets.
+    /// Recovers a sidecar from a common set of EIP-7594 cells for every blob.
     ///
-    /// The cells must be laid out in blob-major order, with exactly
-    /// [`CELLS_PER_EXT_BLOB`] cells for each blob. The supplied proofs must match the recovered
-    /// proofs. This uses the default KZG settings.
-    #[cfg(feature = "kzg")]
-    pub fn try_from_cells(
-        cells: Vec<crate::eip7594::Cell>,
-        commitments: Vec<Bytes48>,
-        cell_proofs: Vec<Bytes48>,
-    ) -> Result<Self, c_kzg::Error> {
-        use crate::eip4844::env_settings::EnvKzgSettings;
-        Self::try_from_cells_with_settings(
-            cells,
-            commitments,
-            cell_proofs,
-            EnvKzgSettings::Default.get(),
-        )
-    }
-
-    /// Tries to create a new sidecar by reconstructing blobs from complete EIP-7594 cell sets
-    /// with custom KZG settings.
+    /// `cell_mask` identifies the cells supplied for each commitment. `cells` must be flattened in
+    /// blob-major order: all selected cells for `commitments[0]`, followed by all selected cells
+    /// for `commitments[1]`, and so on. At least half of the 128 extended blob cells must be
+    /// selected. The recovered sidecar contains the complete blob data and all 128 cell proofs.
     ///
-    /// The cells must be laid out in blob-major order, with exactly
-    /// [`CELLS_PER_EXT_BLOB`] cells for each blob. The supplied proofs must match the recovered
-    /// proofs.
-    #[cfg(feature = "kzg")]
-    pub fn try_from_cells_with_settings(
-        cells: Vec<crate::eip7594::Cell>,
-        commitments: Vec<Bytes48>,
-        cell_proofs: Vec<Bytes48>,
-        settings: &c_kzg::KzgSettings,
-    ) -> Result<Self, c_kzg::Error> {
-        if !cells.len().is_multiple_of(CELLS_PER_EXT_BLOB) {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "invalid cell count {}; expected a multiple of {CELLS_PER_EXT_BLOB}",
-                cells.len()
-            )));
-        }
-
-        if cell_proofs.len() != cells.len() {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "expected {} cell proofs, got {}",
-                cells.len(),
-                cell_proofs.len()
-            )));
-        }
-
-        let blob_count = cells.len() / CELLS_PER_EXT_BLOB;
-        if commitments.len() != blob_count {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "expected {blob_count} commitments, got {}",
-                commitments.len()
-            )));
-        }
-
-        let indices: Vec<u64> = (0..CELLS_PER_EXT_BLOB as u64).collect();
-        let per_blob_cells =
-            cells.chunks_exact(CELLS_PER_EXT_BLOB).map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
-        let reconstructed = Self::try_from_sparse_cells_with_settings(
-            commitments,
-            &indices,
-            &per_blob_cells,
-            settings,
-        )?;
-
-        if reconstructed.cell_proofs != cell_proofs {
-            return Err(c_kzg::Error::InvalidKzgProof(
-                "supplied cell proofs do not match the recovered proofs".into(),
-            ));
-        }
-
-        Ok(reconstructed)
-    }
-
-    /// Tries to create a new sidecar by reconstructing blobs from sparse EIP-7594 cell sets.
+    /// Recovery authenticates each reconstructed blob by recomputing and comparing its
+    /// commitment. It does not verify proofs for the input cells; callers accepting untrusted
+    /// cells and proofs should batch-verify them before recovery when early rejection is useful.
     ///
-    /// `cell_indices` must be strictly ascending and describe the cells in every inner vector of
-    /// `cells`. The vectors are blob-major and must have the same length as `commitments`. At
-    /// least 64 cells are required for each blob. The recovered sidecar contains the complete blob
-    /// data and all 128 cell proofs. This uses the default KZG settings.
+    /// This uses the default KZG settings.
     #[cfg(feature = "kzg")]
-    pub fn try_from_sparse_cells(
+    pub fn try_recover_from_cells(
         commitments: Vec<Bytes48>,
-        cell_indices: &[u64],
-        cells: &[Vec<crate::eip7594::Cell>],
-    ) -> Result<Self, c_kzg::Error> {
+        cell_mask: BlobCellMask,
+        cells: &[crate::eip7594::Cell],
+    ) -> Result<Self, BlobCellRecoveryError> {
         use crate::eip4844::env_settings::EnvKzgSettings;
 
-        Self::try_from_sparse_cells_with_settings(
+        Self::try_recover_from_cells_with_settings(
             commitments,
-            cell_indices,
+            cell_mask,
             cells,
             EnvKzgSettings::Default.get(),
         )
     }
 
-    /// Tries to create a new sidecar by reconstructing blobs from sparse EIP-7594 cell sets with
-    /// custom KZG settings.
+    /// Recovers a sidecar from EIP-7594 cells using custom KZG settings.
+    ///
+    /// See [`Self::try_recover_from_cells`] for the expected cell layout and verification
+    /// boundary.
     #[cfg(feature = "kzg")]
-    pub fn try_from_sparse_cells_with_settings(
+    pub fn try_recover_from_cells_with_settings(
         commitments: Vec<Bytes48>,
-        cell_indices: &[u64],
-        cells: &[Vec<crate::eip7594::Cell>],
+        cell_mask: BlobCellMask,
+        cells: &[crate::eip7594::Cell],
         settings: &c_kzg::KzgSettings,
-    ) -> Result<Self, c_kzg::Error> {
-        if commitments.len() != cells.len() {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "expected one cell vector per commitment, got {} commitments and {} cell vectors",
-                commitments.len(),
-                cells.len()
-            )));
+    ) -> Result<Self, BlobCellRecoveryError> {
+        let cells_per_blob = cell_mask.count();
+        if !commitments.is_empty() && cells_per_blob < CELLS_PER_EXT_BLOB / 2 {
+            return Err(BlobCellRecoveryError::InsufficientCells {
+                provided: cells_per_blob,
+                required: CELLS_PER_EXT_BLOB / 2,
+            });
         }
 
-        // An empty sidecar has no blob to recover and is valid without cell indices.
+        let expected_cells = commitments
+            .len()
+            .checked_mul(cells_per_blob)
+            .ok_or(BlobCellRecoveryError::CellCountOverflow)?;
+        if cells.len() != expected_cells {
+            return Err(BlobCellRecoveryError::CellCountMismatch {
+                provided: cells.len(),
+                expected: expected_cells,
+            });
+        }
         if commitments.is_empty() {
             return Ok(Self::new(Vec::new(), commitments, Vec::new()));
         }
 
-        if cell_indices.len() < CELLS_PER_EXT_BLOB / 2 {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "need at least {} cells for recovery, got {}",
-                CELLS_PER_EXT_BLOB / 2,
-                cell_indices.len()
-            )));
-        }
-        if cell_indices.len() > CELLS_PER_EXT_BLOB {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "got {} cells, maximum is {}",
-                cell_indices.len(),
-                CELLS_PER_EXT_BLOB
-            )));
-        }
-        if cell_indices.iter().any(|&index| index >= CELLS_PER_EXT_BLOB as u64)
-            || cell_indices.windows(2).any(|window| window[0] >= window[1])
-        {
-            return Err(c_kzg::Error::CError(c_kzg::CkzgError::C_KZG_BADARGS));
-        }
-
+        let cell_indices =
+            cell_mask.selected_indices().map(|index| index as u64).collect::<Vec<_>>();
         let mut blobs = Vec::with_capacity(commitments.len());
-        let mut cell_proofs = Vec::with_capacity(commitments.len() * CELLS_PER_EXT_BLOB);
-        for (blob_index, blob_cells) in cells.iter().enumerate() {
-            if blob_cells.len() != cell_indices.len() {
-                return Err(c_kzg::Error::MismatchLength(format!(
-                    "blob {blob_index} has {} cells, expected {}",
-                    blob_cells.len(),
-                    cell_indices.len()
-                )));
-            }
+        let cell_proof_capacity = commitments
+            .len()
+            .checked_mul(CELLS_PER_EXT_BLOB)
+            .ok_or(BlobCellRecoveryError::CellCountOverflow)?;
+        let mut cell_proofs = Vec::with_capacity(cell_proof_capacity);
 
-            let ckzg_cells = blob_cells
-                .iter()
-                .map(|cell| {
-                    c_kzg::Cell::new(
-                        cell.as_slice()
-                            .try_into()
-                            .expect("EIP-7594 cells have a fixed byte length"),
-                    )
-                })
-                .collect::<Vec<_>>();
+        for (blob_index, (blob_cells, expected_commitment)) in
+            cells.chunks_exact(cells_per_blob).zip(&commitments).enumerate()
+        {
+            let ckzg_cells = <crate::eip7594::Cell as AsCkzg>::slice_as_ckzg(blob_cells);
             let (recovered_cells, recovered_proofs) =
-                settings.recover_cells_and_kzg_proofs(cell_indices, &ckzg_cells)?;
-            let blob = reconstruct_blob(recovered_cells.as_ref())?;
+                settings.recover_cells_and_kzg_proofs(&cell_indices, ckzg_cells)?;
+            let blob = reconstruct_blob(recovered_cells.as_ref());
 
             let commitment = settings.blob_to_kzg_commitment(AsCkzg::as_ckzg(&blob))?;
             let commitment = <Bytes48 as AsCkzg>::from_ckzg(commitment.to_bytes());
-            if commitment != commitments[blob_index] {
-                return Err(c_kzg::Error::InvalidKzgCommitment(format!(
-                    "reconstructed blob {blob_index} does not match its commitment"
-                )));
-            }
-
-            let cell_indices = (0..CELLS_PER_EXT_BLOB as u64).collect::<Vec<_>>();
-            let commitments =
-                core::iter::repeat_n(commitment, CELLS_PER_EXT_BLOB).collect::<Vec<_>>();
-            let recovered_proofs_bytes =
-                recovered_proofs.iter().map(|proof| proof.to_bytes()).collect::<Vec<_>>();
-            let valid = settings.verify_cell_kzg_proof_batch(
-                <Bytes48 as AsCkzg>::slice_as_ckzg(&commitments),
-                &cell_indices,
-                recovered_cells.as_ref(),
-                &recovered_proofs_bytes,
-            )?;
-            if !valid {
-                return Err(c_kzg::Error::InvalidKzgProof(format!(
-                    "recovered proofs for blob {blob_index} are invalid"
-                )));
+            if commitment != *expected_commitment {
+                return Err(BlobCellRecoveryError::CommitmentMismatch { blob_index });
             }
 
             blobs.push(blob);
@@ -1321,26 +1239,18 @@ impl BlobTransactionSidecarEip7594 {
 }
 
 #[cfg(feature = "kzg")]
-fn reconstruct_blob(recovered_cells: &[c_kzg::Cell]) -> Result<Blob, c_kzg::Error> {
+fn reconstruct_blob(recovered_cells: &[c_kzg::Cell; CELLS_PER_EXT_BLOB]) -> Blob {
     // `RecoverCells` returns cells in the canonical EIP-7594 order. The first half is the
     // original blob data; the remaining cells are the extension used for sampling and proofs.
     // This is the same boundary used by Geth's `kzg4844.RecoverBlobs`: the KZG backend performs
     // the recovery, while the wrapper only materializes the first `DataPerBlob` cells.
-    if recovered_cells.len() < CELLS_PER_EXT_BLOB / 2 {
-        return Err(c_kzg::Error::MismatchLength(format!(
-            "expected at least {} recovered cells, got {}",
-            CELLS_PER_EXT_BLOB / 2,
-            recovered_cells.len()
-        )));
-    }
-
     let mut blob = [0u8; BYTES_PER_BLOB];
     for (cell_index, cell) in recovered_cells.iter().take(CELLS_PER_EXT_BLOB / 2).enumerate() {
         let start = cell_index * crate::eip7594::BYTES_PER_CELL;
         let end = start + crate::eip7594::BYTES_PER_CELL;
         blob[start..end].copy_from_slice(&cell.to_bytes());
     }
-    Ok(Blob::new(blob))
+    Blob::new(blob)
 }
 
 impl Encodable for BlobTransactionSidecarEip7594 {
@@ -1762,67 +1672,56 @@ mod tests {
     }
 
     #[cfg(feature = "kzg")]
-    fn sparse_cells_for_indices(
+    fn sparse_cells_for_mask(
         sidecar: &BlobTransactionSidecarEip7594,
-        cell_indices: &[u64],
+        cell_mask: BlobCellMask,
         settings: &c_kzg::KzgSettings,
-    ) -> Vec<Vec<crate::eip7594::Cell>> {
-        sidecar
-            .compute_cells_with_settings(settings)
-            .unwrap()
-            .chunks_exact(CELLS_PER_EXT_BLOB)
-            .map(|blob_cells| {
-                cell_indices.iter().map(|&index| blob_cells[index as usize]).collect()
-            })
-            .collect()
+    ) -> Vec<crate::eip7594::Cell> {
+        let cells = sidecar.compute_cells_with_settings(settings).unwrap();
+        cell_mask.matching_cells_from_computed_cells(&cells).unwrap()
     }
 
     #[test]
     #[cfg(feature = "kzg")]
-    fn reconstruct_sidecar_from_cells() {
+    fn recover_sidecar_from_complete_cells() {
         let settings = EnvKzgSettings::Default.get();
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+                Vec::new(),
+                BlobCellMask::default(),
+                &[],
+                settings,
+            )
+            .unwrap(),
+            BlobTransactionSidecarEip7594::default()
+        );
+
         let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
             vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
             settings,
         )
         .unwrap();
         let cells = sidecar.compute_cells_with_settings(settings).unwrap();
+        let cell_mask = BlobCellMask::from_bits(u128::MAX);
 
-        let reconstructed = BlobTransactionSidecarEip7594::try_from_cells_with_settings(
-            cells.clone(),
+        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
             sidecar.commitments.clone(),
-            sidecar.cell_proofs.clone(),
+            cell_mask,
+            &cells,
             settings,
         )
         .unwrap();
-        assert_eq!(reconstructed.blobs, sidecar.blobs);
+        assert_eq!(recovered, sidecar);
+
         assert_eq!(
-            BlobTransactionSidecarEip7594::try_from_cells(
-                cells,
-                reconstructed.commitments.clone(),
-                reconstructed.cell_proofs.clone(),
+            BlobTransactionSidecarEip7594::try_recover_from_cells(
+                recovered.commitments.clone(),
+                cell_mask,
+                &cells,
             )
             .unwrap(),
-            reconstructed
+            recovered
         );
-
-        let cell_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2).collect::<Vec<_>>();
-        let sparse_cells = sidecar
-            .compute_cells_with_settings(settings)
-            .unwrap()
-            .chunks_exact(CELLS_PER_EXT_BLOB)
-            .map(|blob_cells| {
-                cell_indices.iter().map(|&index| blob_cells[index as usize]).collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-        let reconstructed = BlobTransactionSidecarVariant::try_from_sparse_cells_with_settings(
-            sidecar.commitments.clone(),
-            &cell_indices,
-            &sparse_cells,
-            settings,
-        )
-        .unwrap();
-        assert_eq!(reconstructed.blobs(), sidecar.blobs.as_slice());
     }
 
     /// Mirrors Geth's `RecoverBlobs` coverage: multiple blobs are recovered from a shared,
@@ -1837,14 +1736,15 @@ mod tests {
         )
         .unwrap();
 
-        let cell_indices =
-            (0..CELLS_PER_EXT_BLOB as u64).filter(|index| index % 2 == 0).collect::<Vec<_>>();
-        assert_eq!(cell_indices.len(), CELLS_PER_EXT_BLOB / 2);
-        let sparse_cells = sparse_cells_for_indices(&sidecar, &cell_indices, settings);
+        let cell_mask = BlobCellMask::from_bits(
+            (0..CELLS_PER_EXT_BLOB).step_by(2).fold(0, |mask, index| mask | (1u128 << index)),
+        );
+        assert_eq!(cell_mask.count(), CELLS_PER_EXT_BLOB / 2);
+        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
 
-        let recovered = BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
             sidecar.commitments.clone(),
-            &cell_indices,
+            cell_mask,
             &sparse_cells,
             settings,
         )
@@ -1867,15 +1767,15 @@ mod tests {
         )
         .unwrap();
 
-        let cell_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2)
-            .chain(core::iter::once(CELLS_PER_EXT_BLOB as u64 - 1))
-            .collect::<Vec<_>>();
-        assert_eq!(cell_indices.len(), CELLS_PER_EXT_BLOB / 2 + 1);
-        let sparse_cells = sparse_cells_for_indices(&sidecar, &cell_indices, settings);
+        let cell_mask = BlobCellMask::from_bits(
+            ((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1) | (1u128 << (CELLS_PER_EXT_BLOB - 1)),
+        );
+        assert_eq!(cell_mask.count(), CELLS_PER_EXT_BLOB / 2 + 1);
+        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
 
-        let recovered = BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
             sidecar.commitments.clone(),
-            &cell_indices,
+            cell_mask,
             &sparse_cells,
             settings,
         )
@@ -1889,48 +1789,69 @@ mod tests {
     #[cfg(feature = "kzg")]
     fn recover_sparse_blobs_rejects_insufficient_cells() {
         let settings = EnvKzgSettings::Default.get();
-        let cell_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2 - 1).collect::<Vec<_>>();
-        let cells = vec![(0..cell_indices.len())
-            .map(|_| crate::eip7594::Cell::repeat_byte(0))
-            .collect::<Vec<_>>()];
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2 - 1)) - 1);
+        let cells = vec![crate::eip7594::Cell::repeat_byte(0); cell_mask.count()];
 
-        assert!(BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
             vec![Bytes48::ZERO],
-            &cell_indices,
+            cell_mask,
             &cells,
             settings,
         )
-        .is_err());
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            BlobCellRecoveryError::InsufficientCells {
+                provided,
+                required,
+            } if provided == CELLS_PER_EXT_BLOB / 2 - 1
+                && required == CELLS_PER_EXT_BLOB / 2
+        ));
     }
 
     #[test]
     #[cfg(feature = "kzg")]
-    fn recover_sparse_blobs_rejects_invalid_indices() {
+    fn recover_sparse_blobs_rejects_mismatched_cell_count() {
         let settings = EnvKzgSettings::Default.get();
-        let cells = vec![(0..CELLS_PER_EXT_BLOB / 2)
-            .map(|_| crate::eip7594::Cell::repeat_byte(0))
-            .collect::<Vec<_>>()];
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let cells = vec![crate::eip7594::Cell::repeat_byte(0); cell_mask.count() - 1];
 
-        let mut duplicate_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2).collect::<Vec<_>>();
-        duplicate_indices[CELLS_PER_EXT_BLOB / 2 - 1] =
-            duplicate_indices[CELLS_PER_EXT_BLOB / 2 - 2];
-        assert!(BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
-            vec![Bytes48::ZERO],
-            &duplicate_indices,
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            vec![Bytes48::ZERO, Bytes48::ZERO],
+            cell_mask,
             &cells,
             settings,
         )
-        .is_err());
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            BlobCellRecoveryError::CellCountMismatch {
+                provided,
+                expected,
+            } if provided == CELLS_PER_EXT_BLOB / 2 - 1 && expected == CELLS_PER_EXT_BLOB
+        ));
+    }
 
-        let mut out_of_range_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2).collect::<Vec<_>>();
-        out_of_range_indices[CELLS_PER_EXT_BLOB / 2 - 1] = CELLS_PER_EXT_BLOB as u64;
-        assert!(BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
-            vec![Bytes48::ZERO],
-            &out_of_range_indices,
-            &cells,
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_commitment_mismatch() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01)],
             settings,
         )
-        .is_err());
+        .unwrap();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            vec![Bytes48::ZERO],
+            cell_mask,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap_err();
+        assert!(matches!(err, BlobCellRecoveryError::CommitmentMismatch { blob_index: 0 }));
     }
 
     /// Mirrors Geth's corrupted-cell recovery coverage. A cell that no longer matches the
@@ -1944,13 +1865,13 @@ mod tests {
             settings,
         )
         .unwrap();
-        let cell_indices = (0..CELLS_PER_EXT_BLOB as u64 / 2).collect::<Vec<_>>();
-        let mut sparse_cells = sparse_cells_for_indices(&sidecar, &cell_indices, settings);
-        sparse_cells[0][0][0] ^= 0xff;
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let mut sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+        sparse_cells[0][0] ^= 0xff;
 
-        assert!(BlobTransactionSidecarEip7594::try_from_sparse_cells_with_settings(
+        assert!(BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
             sidecar.commitments,
-            &cell_indices,
+            cell_mask,
             &sparse_cells,
             settings,
         )
