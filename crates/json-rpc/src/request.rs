@@ -337,6 +337,13 @@ where
 /// This struct is used to represent a request that has been serialized, but
 /// not yet sent. It is used by RPC clients to build batch requests and manage
 /// in-flight requests.
+///
+/// The metadata is stored separately from the serialized JSON. Mutating the
+/// metadata's ID or method after serialization does not rewrite the JSON that
+/// will be sent, and can make routing metadata disagree with the wire request.
+/// To change a wire field, modify the original [`Request`] and serialize it
+/// again. Extensions, headers, and subscription status are intentionally
+/// metadata-only.
 #[derive(Clone, Debug)]
 pub struct SerializedRequest {
     meta: RequestMeta,
@@ -360,7 +367,9 @@ impl SerializedRequest {
         &self.meta
     }
 
-    /// Returns a mutable reference to the request metadata (ID and Method).
+    /// Returns a mutable reference to the request metadata (ID and method).
+    ///
+    /// Changing the ID or method does not rewrite [`Self::serialized`].
     pub const fn meta_mut(&mut self) -> &mut RequestMeta {
         &mut self.meta
     }

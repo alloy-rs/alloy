@@ -16,7 +16,7 @@ pub struct Log<T = LogData> {
     /// Number of the block the transaction that emitted this log was mined in
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
-    /// The timestamp of the block as proposed in:
+    /// The block timestamp in Unix seconds, as proposed in:
     /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
     /// <https://github.com/ethereum/execution-apis/issues/295>
     #[cfg_attr(
@@ -38,7 +38,9 @@ pub struct Log<T = LogData> {
     /// Log Index in Block
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
     pub log_index: Option<u64>,
-    /// Geth Compatibility Field: whether this log was removed
+    /// Whether a previously emitted log was removed from the canonical chain by a reorganization.
+    ///
+    /// Subscription consumers should reverse any effects previously attributed to a removed log.
     #[cfg_attr(feature = "serde", serde(default))]
     pub removed: bool,
 }

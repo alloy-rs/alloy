@@ -7,7 +7,12 @@ materialized signer plus optional Keychain-mode metadata. No network I/O.
 ## On-disk path
 
 `$TEMPO_HOME/wallet/keys.toml`, falling back to `~/.tempo/wallet/keys.toml`
-(Unix mode `0600`). Matches the Tempo CLI exactly.
+(matches the Tempo CLI). The CLI normally creates this file with Unix mode
+`0600`; this crate reads the file without inspecting or enforcing its permissions.
+
+If the file is valid TOML but individual `[[keys]]` entries do not match the
+expected schema, those entries are skipped and a warning is emitted through
+`tracing`.
 
 ## Example
 
@@ -38,3 +43,9 @@ metadata, foundry-compatible env vars (`TEMPO_PRIVATE_KEY`,
 
 Out: writing/rotating keys, decoding `key_authorization` to a typed value
 (the RLP bytes are exposed opaquely), any network I/O.
+
+Lookup is metadata extraction, not authorization enforcement. It filters for
+available secp256k1 key material and checks expiry at lookup time, but it does
+not enforce the recorded chain ID, spending limits, authorization, or expiry
+when the signer is later used. Returned signers have no chain ID configured;
+configure transaction chain IDs separately.

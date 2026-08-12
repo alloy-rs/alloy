@@ -137,6 +137,17 @@ where
 /// [`crate::BatchRequest`], which serializes greedily. This is because the
 /// batch request must immediately erase the `Param` type to allow batching of
 /// requests with different `Param` types, while the `RpcCall` may do so lazily.
+///
+/// ### Cloning and cancellation
+///
+/// A call can be cloned only while it is still prepared, normally before its
+/// first poll. Each clone keeps the same JSON-RPC ID, and polling multiple
+/// clones sends the request multiple times with that ID. Cloning after
+/// dispatch panics.
+///
+/// Dropping an unpolled call leaves it unsent. Dropping a dispatched call stops
+/// waiting locally, but does not guarantee that the remote operation is
+/// cancelled.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
 #[derive(Clone)]

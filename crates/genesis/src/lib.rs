@@ -317,6 +317,9 @@ impl From<GenesisAccount> for TrieAccount {
 ///
 /// Encapsulates parameters shaping network evolution and behavior.
 ///
+/// `Default` is a minimally populated configuration with chain ID 1 and every fork activation
+/// unset. It is not Ethereum mainnet's historical chain configuration.
+///
 /// See [geth's `ChainConfig`
 /// struct](https://github.com/ethereum/go-ethereum/blob/v1.14.0/params/config.go#L326)
 /// for the source of each field.
@@ -1072,15 +1075,17 @@ impl ChainConfig {
         self.is_active_at_block(self.gray_glacier_block, block)
     }
 
-    /// Checks if the blockchain is active at or after the Shanghai fork block and the specified
-    /// timestamp.
+    /// Returns whether London is active at `block` and Shanghai is active at `timestamp`.
+    ///
+    /// Returns `false` if either activation is unset.
     pub fn is_shanghai_active_at_block_and_timestamp(&self, block: u64, timestamp: u64) -> bool {
         self.is_london_active_at_block(block)
             && self.is_active_at_timestamp(self.shanghai_time, timestamp)
     }
 
-    /// Checks if the blockchain is active at or after the Cancun fork block and the specified
-    /// timestamp.
+    /// Returns whether London is active at `block` and Cancun is active at `timestamp`.
+    ///
+    /// Returns `false` if either activation is unset.
     pub fn is_cancun_active_at_block_and_timestamp(&self, block: u64, timestamp: u64) -> bool {
         self.is_london_active_at_block(block)
             && self.is_active_at_timestamp(self.cancun_time, timestamp)

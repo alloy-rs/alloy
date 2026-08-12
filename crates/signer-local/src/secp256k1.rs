@@ -32,12 +32,16 @@ impl Secp256k1Credential {
     }
 
     /// Returns a reference to the inner [`SecretKey`].
+    ///
+    /// This exposes private-key material. Do not log or disclose it.
     #[inline]
     pub const fn inner(&self) -> &SecretKey {
         &self.0
     }
 
     /// Consumes this credential and returns the inner [`SecretKey`].
+    ///
+    /// This exposes private-key material. Do not log or disclose it.
     #[inline]
     pub const fn into_inner(self) -> SecretKey {
         self.0
@@ -139,7 +143,12 @@ impl LocalSigner<Secp256k1Credential> {
         Self::from_secp256k1(secret_key)
     }
 
-    /// Serialize this [`LocalSigner`]'s [`SecretKey`] as a [`B256`] byte array.
+    /// Serializes this [`LocalSigner`]'s [`SecretKey`] as a [`B256`] byte array.
+    ///
+    /// # Security
+    ///
+    /// The returned bytes are unencrypted private-key material. Do not log or disclose them, and
+    /// clear copies as soon as practical.
     #[inline]
     pub fn to_bytes(&self) -> B256 {
         B256::from_slice(&self.credential.0.secret_bytes())

@@ -17,6 +17,11 @@ use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
 
 /// Represents _all_ transaction requests to/from RPC.
+///
+/// Transaction type selection is field-driven. The [`Self::transaction_type`] field is retained
+/// for RPC serialization, but is not consulted by [`Self::minimal_tx_type`],
+/// [`Self::preferred_type`], or the transaction build methods. Typed transaction builders use
+/// mainnet chain ID `1` when [`Self::chain_id`] is absent.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -108,7 +113,10 @@ pub struct TransactionRequest {
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub access_list: Option<AccessList>,
-    /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
+    /// The EIP-2718 transaction type reported to or received from RPC.
+    ///
+    /// This is wire metadata and does not select the type used by the transaction build methods.
+    /// See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -429,7 +437,7 @@ impl TransactionRequest {
     /// Build an EIP-1559 transaction.
     ///
     /// Returns an error if required fields are missing. Use `complete_1559` to check if the
-    /// request can be built.
+    /// request can be built. If `chain_id` is absent, this uses mainnet chain ID `1`.
     pub fn build_1559(self) -> Result<TxEip1559, ValueError<Self>> {
         let Some(to) = self.to else {
             return Err(ValueError::new(self, "Missing 'to' field for Eip1559 transaction."));
@@ -472,7 +480,7 @@ impl TransactionRequest {
     /// Build an EIP-2930 transaction.
     ///
     /// Returns an error if required fields are missing. Use `complete_2930` to check if the
-    /// request can be built.
+    /// request can be built. If `chain_id` is absent, this uses mainnet chain ID `1`.
     pub fn build_2930(self) -> Result<TxEip2930, ValueError<Self>> {
         let Some(to) = self.to else {
             return Err(ValueError::new(self, "Missing 'to' field for Eip2930 transaction."));
@@ -519,8 +527,9 @@ impl TransactionRequest {
 
     /// Build an EIP-4844 transaction without sidecar.
     ///
-    /// Returns an error if required fields are missing. Use `complete_4844` to check if the
-    /// request can be built.
+    /// Returns an error if required consensus fields are missing. Unlike [`Self::complete_4844`],
+    /// this does not require the sidecar needed for a network-submittable transaction. If
+    /// `chain_id` is absent, this uses mainnet chain ID `1`.
     pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, ValueError<Self>> {
         // First check 'to' field and type
         let Some(to) = self.to else {
@@ -608,7 +617,7 @@ impl TransactionRequest {
     /// Build an EIP-7702 transaction.
     ///
     /// Returns an error if required fields are missing. Use `complete_7702` to
-    /// check if the request can be built.
+    /// check if the request can be built. If `chain_id` is absent, this uses mainnet chain ID `1`.
     pub fn build_7702(self) -> Result<TxEip7702, ValueError<Self>> {
         let Some(to) = self.to else {
             return Err(ValueError::new(self, "Missing 'to' field for Eip7702 transaction."));
@@ -1642,8 +1651,9 @@ impl FromStr for TransactionInputKind {
 /// This is done for compatibility reasons where older implementations used `data` instead of the
 /// newer, recommended `input` field.
 ///
-/// If both fields are set, it is expected that they contain the same value, otherwise an error is
-/// returned.
+/// Serde accepts either spelling or both and does not validate that both values are equal.
+/// [`Self::input`] and [`Self::into_input`] prefer `input` when both fields are present. Use
+/// [`Self::unique_input`] or [`Self::try_into_unique_input`] to reject conflicting values.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -1683,6 +1693,8 @@ impl TransactionInput {
     }
 
     /// Consumes the type and returns the optional input data.
+    ///
+    /// If both fields are present, this returns `input` without checking whether `data` differs.
     #[inline]
     pub fn into_input(self) -> Option<Bytes> {
         self.input.or(self.data)
@@ -1690,7 +1702,8 @@ impl TransactionInput {
 
     /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
     ///
-    /// This removes `data` the data field.
+    /// This removes `data`. If both fields are present, the existing `input` value is retained
+    /// without checking whether `data` differs.
     pub fn normalize_input(&mut self) {
         let data = self.data.take();
         // If input is None but data has a value, copy data to input
@@ -1707,7 +1720,8 @@ impl TransactionInput {
 
     /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
     ///
-    /// This removes `input` the data field.
+    /// This removes `input`. If both fields are present, the existing `data` value is retained
+    /// without checking whether `input` differs.
     pub fn normalize_data(&mut self) {
         let input = self.input.take();
         if self.data.is_none() {
@@ -1748,6 +1762,8 @@ impl TransactionInput {
     }
 
     /// Returns the optional input data.
+    ///
+    /// If both fields are present, this returns `input` without checking whether `data` differs.
     #[inline]
     pub fn input(&self) -> Option<&Bytes> {
         self.input.as_ref().or(self.data.as_ref())

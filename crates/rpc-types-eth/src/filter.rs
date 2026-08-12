@@ -15,7 +15,13 @@ use itertools::{
     Itertools,
 };
 
-/// FilterSet is a set of values that will be used to filter logs.
+/// A set of values used to filter logs.
+///
+/// Values in the set are ORed. An empty set is a wildcard and matches every value. When used in a
+/// [`Filter`], an empty address set is omitted. An empty topic position before a later populated
+/// position is serialized as `null`; trailing empty positions are omitted. The [`Filter`]
+/// deserializer normalizes `null`, an empty array, or a topic array containing `null` to this
+/// wildcard representation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(from = "HashSet<T>"))]
@@ -399,23 +405,24 @@ impl Default for FilterBlockOption {
 }
 
 /// Filter for logs.
+///
+/// Addresses use OR semantics. Values within one topic position use OR semantics, while populated
+/// topic positions use AND semantics. Empty address and topic sets are wildcards. Block ranges are
+/// inclusive, and a block hash is mutually exclusive with `fromBlock` and `toBlock`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
     pub block_option: FilterBlockOption,
-    /// A filter set for matching contract addresses in log queries.
+    /// Contract addresses to match.
     ///
-    /// This field determines which contract addresses the filter applies to. It supports:
-    /// - A single address to match logs from that address only.
-    /// - Multiple addresses to match logs from any of them.
-    ///
-    /// ## Notes:
-    /// - An empty array (`[]`) may result in no logs being returned.
-    /// - Some RPC providers handle empty arrays differently than `None`.
-    /// - Large address lists may affect performance or hit provider limits.
+    /// Multiple addresses are ORed. An empty set is a wildcard and is omitted during
+    /// serialization.
     pub address: FilterSet<Address>,
-    /// Topics (maximum of 4)
+    /// Topic filters, with at most four positions.
+    ///
+    /// Values within a position use OR semantics; populated positions use AND semantics. An empty
+    /// position is a wildcard and serializes as `null` when followed by a populated position.
     pub topics: [Topic; 4],
 }
 
@@ -576,14 +583,19 @@ impl Filter {
         self
     }
 
-    /// Given the event signature in string form, it hashes it and adds it to the topics to monitor
+    /// Hashes a canonical event signature and sets it as topic 0.
+    ///
+    /// Pass the complete signature, for example `Transfer(address,address,uint256)`, rather than
+    /// only the event name. The exact UTF-8 bytes are hashed with Keccak-256.
     #[must_use]
     pub fn event(self, event_name: &str) -> Self {
         let hash = keccak256(event_name.as_bytes());
         self.event_signature(hash)
     }
 
-    /// Hashes all event signatures and sets them as array to event_signature(topic0)
+    /// Hashes canonical event signatures and sets them as alternatives for topic 0.
+    ///
+    /// Each item must include the event name and canonical parameter types.
     #[must_use]
     pub fn events(self, events: impl IntoIterator<Item = impl AsRef<[u8]>>) -> Self {
         let events = events.into_iter().map(|e| keccak256(e.as_ref())).collect::<Vec<_>>();
@@ -677,7 +689,10 @@ impl Filter {
         self.address.matches(&address)
     }
 
-    /// Returns `true` if the block matches the filter.
+    /// Returns `true` if the block number matches the locally evaluable range.
+    ///
+    /// Numeric bounds are inclusive. Dynamic tags such as `latest`, `safe`, and `pending` are not
+    /// resolved here and therefore do not impose a numeric bound.
     pub const fn matches_block_range(&self, block_number: u64) -> bool {
         let mut res = true;
 

@@ -10,10 +10,11 @@ use std::{any::TypeId, borrow::Borrow};
 ///
 /// The common cases are:
 /// - `Ok(T)` - The server returned a successful response.
-/// - `Err(RpcError::ErrorResponse(ErrResp))` - The server returned an error response.
-/// - `Err(RpcError::SerError(E))` - A serialization error occurred.
-/// - `Err(RpcError::DeserError { err: E, text: String })` - A deserialization error occurred.
-/// - `Err(RpcError::TransportError(E))` - Some client-side or communication error occurred.
+/// - `Err(RpcError::ErrorResp(ErrorPayload<ErrResp>))` - The server returned an error response.
+/// - `Err(RpcError::SerError(serde_json::Error))` - A serialization error occurred.
+/// - `Err(RpcError::DeserError { err: serde_json::Error, text: String })` - A deserialization error
+///   occurred.
+/// - `Err(RpcError::Transport(E))` - Some client-side or communication error occurred.
 pub type RpcResult<T, E, ErrResp = Box<RawValue>> = Result<T, RpcError<E, ErrResp>>;
 
 /// A partially deserialized [`RpcResult`], borrowing from the deserializer.

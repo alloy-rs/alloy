@@ -6,26 +6,16 @@ use alloy_primitives::{
 use core::{fmt, str::FromStr};
 use serde::{Deserialize, Deserializer, Serialize};
 
-/// A storage key type that can be serialized to and from a hex string up to 32 bytes. Used for
-/// `eth_getStorageAt` and `eth_getProof` RPCs.
+/// A storage key that accepts hex strings up to 32 bytes for `eth_getStorageAt` and `eth_getProof`.
 ///
-/// This is a wrapper type meant to mirror geth's serialization and deserialization behavior for
-/// storage keys.
+/// A full-width, 32-byte input is stored as [`Hash`](Self::Hash) and serializes at full width.
+/// Shorter inputs are stored as [`Number`](Self::Number) and serialize as canonical quantities, so
+/// their original prefix, letter case, and leading zeroes are not preserved. [`Self::as_b256`]
+/// returns either representation left-padded to 32 bytes.
 ///
-/// In `eth_getStorageAt`, this is used for deserialization of the `index` field. Internally, the
-/// index is a [B256], but in `eth_getStorageAt` requests, its serialization can be _up to_ 32
-/// bytes. To support this, the storage key is deserialized first as a U256, and converted to a
-/// B256 for use internally.
-///
-/// `eth_getProof` also takes storage keys up to 32 bytes as input, so the `keys` field is
-/// similarly deserialized. However, geth populates the storage proof `key` fields in the response
-/// by mirroring the `key` field used in the input.
-///
-/// See how `storageKey`s (the input) are populated in the `StorageResult` (the output):
+/// This distinction mirrors geth's treatment of `eth_getProof` storage keys. See how input
+/// `storageKey`s populate the returned `StorageResult`:
 /// <https://github.com/ethereum/go-ethereum/blob/00a73fbcce3250b87fc4160f3deddc44390848f4/internal/ethapi/api.go#L658-L690>
-///
-/// The contained [B256] and From implementation for String are used to preserve the input and
-/// implement this behavior from geth.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum JsonStorageKey {
@@ -93,8 +83,7 @@ impl fmt::Display for JsonStorageKey {
     }
 }
 
-/// Converts a Bytes value into a B256, accepting inputs that are less than 32 bytes long. These
-/// inputs will be left padded with zeros.
+/// Converts a [`Bytes`] value of at most 32 bytes into a [`B256`], left-padding it with zeroes.
 pub fn from_bytes_to_b256<'de, D>(bytes: Bytes) -> Result<B256, D::Error>
 where
     D: Deserializer<'de>,
@@ -111,8 +100,8 @@ where
     Ok(B256::from_slice(&padded))
 }
 
-/// Deserializes the input into a storage map, using [from_bytes_to_b256] which allows cropped
-/// values:
+/// Deserializes an optional storage map, accepting keys and values shorter than 32 bytes and
+/// left-padding them with zeroes:
 ///
 /// ```json
 /// {

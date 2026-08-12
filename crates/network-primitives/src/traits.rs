@@ -32,6 +32,8 @@ pub trait ReceiptResponse {
     /// receipts, as it may not accurately reflect the status of the
     /// transaction. The transaction status is not knowable from the receipt
     /// for transactions before [EIP-658].
+    ///
+    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     fn status(&self) -> bool;
 
     /// Hash of the block this transaction was included within.
@@ -42,7 +44,8 @@ pub trait ReceiptResponse {
 
     /// Returns the [`BlockNumHash`] of the block this transaction was mined in.
     ///
-    /// Returns `None` if this transaction is still pending.
+    /// Returns `None` if either component is absent, as is normally the case for a pending
+    /// transaction.
     fn block_hash_num(&self) -> Option<BlockNumHash> {
         Some(BlockNumHash::new(self.block_number()?, self.block_hash()?))
     }
@@ -59,7 +62,11 @@ pub trait ReceiptResponse {
     /// Effective gas price.
     fn effective_gas_price(&self) -> u128;
 
-    /// Total cost of this transaction = gas_used * effective_gas_price.
+    /// Returns the execution-gas cost in wei: `gas_used * effective_gas_price`.
+    ///
+    /// This excludes blob-gas charges, transferred value, and network-specific fee components;
+    /// it is not the sender's total balance change. The ordinary `u128` multiplication can
+    /// overflow, panicking when overflow checks are enabled or wrapping otherwise.
     fn cost(&self) -> u128 {
         self.gas_used() as u128 * self.effective_gas_price()
     }
@@ -73,18 +80,24 @@ pub trait ReceiptResponse {
     /// Address of the sender.
     fn from(&self) -> Address;
 
-    /// Address of the receiver.
+    /// Address of the receiver, or `None` for contract creation.
     fn to(&self) -> Option<Address>;
 
-    /// Returns the cumulative gas used at this receipt.
+    /// Returns the gas used in the block up to and including this transaction.
     fn cumulative_gas_used(&self) -> u64;
 
-    /// The post-transaction state root (pre Byzantium)
+    /// Returns the post-transaction state root carried by pre-[EIP-658] receipts.
     ///
-    /// EIP98 makes this field optional.
+    /// [EIP-658] replaced this value with a status code, so post-Byzantium receipts normally
+    /// return `None`.
+    ///
+    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     fn state_root(&self) -> Option<B256>;
 
-    /// Ensures the transaction was successful, returning an error if it failed.
+    /// Ensures the transaction was successful, returning its hash in the error if it failed.
+    ///
+    /// This does not recover revert data and has the same pre-EIP-658 limitation as
+    /// [`Self::status`].
     fn ensure_success(&self) -> Result<(), TransactionFailedError> {
         if self.status() {
             Ok(())
@@ -95,6 +108,10 @@ pub trait ReceiptResponse {
 }
 
 /// Transaction JSON-RPC response. Aggregates transaction data with its block and signer context.
+///
+/// The optional fee accessors split fixed-price and dynamic-fee consensus caps by transaction type
+/// and share names with differently typed methods on [`Transaction`]. Use trait-qualified calls
+/// such as `TransactionResponse::max_fee_per_gas(tx)` when the distinction matters.
 pub trait TransactionResponse: Transaction {
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
@@ -102,17 +119,18 @@ pub trait TransactionResponse: Transaction {
 
     /// Returns the hash of the block this transaction was mined in.
     ///
-    /// Returns `None` if this transaction is still pending.
+    /// Returns `None` when absent from the response, normally for a pending transaction.
     fn block_hash(&self) -> Option<BlockHash>;
 
     /// Returns the number of the block this transaction was mined in.
     ///
-    /// Returns `None` if this transaction is still pending.
+    /// Returns `None` when absent from the response, normally for a pending transaction.
     fn block_number(&self) -> Option<u64>;
 
     /// Returns the [`BlockNumHash`] of the block this transaction was mined in.
     ///
-    /// Returns `None` if this transaction is still pending.
+    /// Returns `None` if either component is absent, as is normally the case for a pending
+    /// transaction.
     fn block_hash_num(&self) -> Option<BlockNumHash> {
         Some(BlockNumHash::new(self.block_number()?, self.block_hash()?))
     }
@@ -123,7 +141,11 @@ pub trait TransactionResponse: Transaction {
     /// Sender of the transaction
     fn from(&self) -> Address;
 
-    /// Gas Price, this is the RPC format for `max_fee_per_gas`, pre-eip-1559.
+    /// Returns the fixed gas price for standard Ethereum transaction type IDs 0 and 1.
+    ///
+    /// The default returns the consensus fee cap for those type IDs and `None` for IDs 2 and
+    /// above. Networks with different type numbering or RPC `gasPrice` semantics must override
+    /// this method.
     fn gas_price(&self) -> Option<u128> {
         if self.ty() < 2 {
             return Some(Transaction::max_fee_per_gas(self));
@@ -131,8 +153,10 @@ pub trait TransactionResponse: Transaction {
         None
     }
 
-    /// Max BaseFeePerGas the user is willing to pay. For pre-eip-1559 transactions, the field
-    /// label `gas_price` is used instead.
+    /// Returns the maximum fee per gas for standard Ethereum transaction type IDs 2 and above.
+    ///
+    /// The default returns `None` for type IDs 0 and 1 and the consensus fee cap for later IDs.
+    /// Networks with different type numbering must override this method.
     fn max_fee_per_gas(&self) -> Option<u128> {
         if self.ty() < 2 {
             return None;
@@ -173,9 +197,9 @@ pub trait HeaderResponse: BlockHeader {
 
 /// Block JSON-RPC response.
 pub trait BlockResponse {
-    /// Header type
+    /// Concrete RPC header representation.
     type Header;
-    /// Transaction type
+    /// Full-transaction representation used by [`BlockTransactions::Full`].
     type Transaction: TransactionResponse;
 
     /// Block header
@@ -184,10 +208,16 @@ pub trait BlockResponse {
     /// Block transactions
     fn transactions(&self) -> &BlockTransactions<Self::Transaction>;
 
-    /// Mutable reference to block transactions
+    /// Returns a mutable reference to the block transactions.
+    ///
+    /// Mutating transactions does not recompute or validate header fields such as the transaction
+    /// root.
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction>;
 
-    /// Returns the `other` field from `WithOtherFields` type.
+    /// Returns flattened chain- or client-specific RPC fields when they were retained.
+    ///
+    /// The default is `None`. A [`WithOtherFields`] response returns `Some` even when its map is
+    /// empty.
     fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
         None
     }

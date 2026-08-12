@@ -93,7 +93,7 @@ impl CallFrame {
         CallFrameIter::new(self)
     }
 
-    /// Error selector is the first 4 bytes of calldata
+    /// Returns the first four bytes of calldata, or `None` if the input is shorter.
     pub fn selector(&self) -> Option<Selector> {
         if self.input.len() < 4 {
             return None;
