@@ -394,6 +394,31 @@ impl SerializedRequest {
         }
     }
 
+    /// Clone this request with a different JSON-RPC request ID.
+    ///
+    /// The serialized params are preserved verbatim, including the distinction between omitted
+    /// params, `null`, and an empty collection.
+    pub fn with_id(&self, id: Id) -> serde_json::Result<Self> {
+        #[derive(Serialize)]
+        struct RequestWithId<'a> {
+            method: &'a str,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            params: Option<&'a RawValue>,
+            id: &'a Id,
+            jsonrpc: &'static str,
+        }
+
+        let request = serde_json::value::to_raw_value(&RequestWithId {
+            method: self.method(),
+            params: self.params_with_presence(),
+            id: &id,
+            jsonrpc: "2.0",
+        })?;
+        let mut meta = self.meta.clone();
+        meta.id = id;
+        Ok(Self { meta, request })
+    }
+
     /// Mark the request as a non-standard subscription (i.e. not
     /// `eth_subscribe`)
     pub const fn set_is_subscription(&mut self) {
@@ -441,6 +466,40 @@ impl SerializedRequest {
         req.params
     }
 
+    /// Get the exact serialized params when the `params` field is present.
+    ///
+    /// Unlike [`Self::params`], this distinguishes an omitted `params` field from an explicitly
+    /// serialized `null` value.
+    pub fn params_with_presence(&self) -> Option<&RawValue> {
+        #[derive(Default)]
+        enum ParamsField<'a> {
+            #[default]
+            Missing,
+            Present(&'a RawValue),
+        }
+
+        impl<'de: 'a, 'a> Deserialize<'de> for ParamsField<'a> {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                <&'de RawValue>::deserialize(deserializer).map(Self::Present)
+            }
+        }
+
+        #[derive(Deserialize)]
+        struct Req<'a> {
+            #[serde(borrow, default)]
+            params: ParamsField<'a>,
+        }
+
+        let req: Req<'_> = serde_json::from_str(self.request.get()).unwrap();
+        match req.params {
+            ParamsField::Missing => None,
+            ParamsField::Present(params) => Some(params),
+        }
+    }
+
     /// Get the hash of the serialized request's params.
     ///
     /// This partially deserializes the request, and should be avoided if
@@ -478,5 +537,21 @@ mod test {
         test_inner(Request::<u64>::new("test", "hello".to_string().into(), 1));
         test_inner(Request::<String>::new("test", Id::None, "test".to_string()));
         test_inner(Request::<Vec<u64>>::new("test", u64::MAX.into(), vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn with_id_preserves_exact_params_presence_and_value() {
+        let omitted = Request::new("test", Id::Number(1), ()).serialize().unwrap();
+        let null =
+            Request::new("test", Id::Number(1), serde_json::Value::Null).serialize().unwrap();
+        let empty = Request::new("test", Id::Number(1), Vec::<u8>::new()).serialize().unwrap();
+
+        let omitted = omitted.with_id(Id::String("next".into())).unwrap();
+        let null = null.with_id(Id::String("next".into())).unwrap();
+        let empty = empty.with_id(Id::String("next".into())).unwrap();
+
+        assert!(omitted.params_with_presence().is_none());
+        assert_eq!(null.params_with_presence().unwrap().get(), "null");
+        assert_eq!(empty.params_with_presence().unwrap().get(), "[]");
     }
 }

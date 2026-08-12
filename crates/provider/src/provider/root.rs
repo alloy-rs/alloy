@@ -66,7 +66,10 @@ impl<N: Network> RootProvider<N> {
 }
 
 impl<N: Network> RootProvider<N> {
-    /// Gets the subscription corresponding to the given RPC subscription ID.
+    /// Gets a legacy/manual receiver claim corresponding to the given local subscription ID.
+    ///
+    /// This does not upgrade the entry's retention policy. A receiver-only entry that has already
+    /// reached zero receivers is considered ended and returns `subscription not found`.
     #[cfg(feature = "pubsub")]
     pub async fn get_subscription<R: alloy_json_rpc::RpcRecv>(
         &self,
@@ -75,10 +78,19 @@ impl<N: Network> RootProvider<N> {
         self.pubsub_frontend()?.get_subscription(id).await.map(Subscription::from)
     }
 
-    /// Unsubscribes from the subscription corresponding to the given RPC subscription ID.
+    /// Force-unsubscribes the subscription and closes all local receivers sharing its key.
     #[cfg(feature = "pubsub")]
     pub fn unsubscribe(&self, id: alloy_primitives::B256) -> alloy_transport::TransportResult<()> {
         self.pubsub_frontend()?.unsubscribe(id)
+    }
+
+    /// Unsubscribes and waits for the server-side cleanup to reach a terminal state.
+    #[cfg(feature = "pubsub")]
+    pub async fn unsubscribe_and_wait(
+        &self,
+        id: alloy_primitives::B256,
+    ) -> alloy_transport::TransportResult<alloy_pubsub::UnsubscribeOutcome> {
+        self.pubsub_frontend()?.unsubscribe_and_wait(id).await
     }
 
     #[cfg(feature = "pubsub")]

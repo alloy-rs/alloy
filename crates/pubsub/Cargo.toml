@@ -28,7 +28,6 @@ alloy-primitives.workspace = true
 alloy-transport.workspace = true
 
 auto_impl.workspace = true
-bimap.workspace = true
 futures.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
@@ -40,3 +39,6 @@ tracing.workspace = true
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasmtimer.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "time"] }

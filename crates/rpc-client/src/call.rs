@@ -216,6 +216,11 @@ where
     /// Set the request to be a non-standard subscription (i.e. not
     /// "eth_subscribe").
     ///
+    /// Call [`Self::set_unsubscribe_method`] as well when the custom protocol exposes a cleanup
+    /// RPC. Otherwise the subscription can only be reclaimed when its connection closes.
+    /// Low-level subscription calls retain their upstream subscription until explicit unsubscribe
+    /// unless [`Self::set_subscription_retention_policy`] selects receiver-scoped retention.
+    ///
     /// # Panics
     ///
     /// Panics if called after the request has been sent.
@@ -226,6 +231,57 @@ where
     /// Set the subscription status of the request.
     pub fn set_subscription_status(&mut self, status: bool) {
         self.request_mut().meta.set_subscription_status(status);
+    }
+
+    /// Set the server-side method used to unsubscribe a non-standard subscription.
+    ///
+    /// This configuration is consumed by pubsub transports and is not serialized onto the wire.
+    #[cfg(feature = "pubsub")]
+    pub fn set_unsubscribe_method(&mut self, method: impl Into<std::borrow::Cow<'static, str>>) {
+        self.request_mut()
+            .meta
+            .extensions_mut()
+            .get_or_insert_default::<alloy_pubsub::SubscriptionOptions>()
+            .set_unsubscribe_method(method);
+    }
+
+    /// Set the local broadcast channel capacity for this subscription request.
+    ///
+    /// This configuration is consumed by pubsub transports and is not serialized onto the wire.
+    #[cfg(feature = "pubsub")]
+    pub fn set_subscription_channel_size(&mut self, channel_size: usize) {
+        self.request_mut()
+            .meta
+            .extensions_mut()
+            .get_or_insert_default::<alloy_pubsub::SubscriptionOptions>()
+            .set_channel_size(channel_size);
+    }
+
+    /// Set when the server-side subscription is eligible for automatic cleanup.
+    ///
+    /// Low-level/manual subscription requests default to
+    /// [`alloy_pubsub::SubscriptionRetentionPolicy::UntilExplicitUnsubscribe`]. Typed provider
+    /// builders set receiver-scoped retention by default.
+    #[cfg(feature = "pubsub")]
+    pub fn set_subscription_retention_policy(
+        &mut self,
+        policy: alloy_pubsub::SubscriptionRetentionPolicy,
+    ) {
+        self.request_mut()
+            .meta
+            .extensions_mut()
+            .get_or_insert_default::<alloy_pubsub::SubscriptionOptions>()
+            .set_retention_policy(policy);
+    }
+
+    /// Attach the one-shot receiver ticket used by typed subscription builders.
+    #[doc(hidden)]
+    #[cfg(feature = "pubsub")]
+    pub fn set_subscription_receiver_ticket(
+        &mut self,
+        ticket: alloy_pubsub::SubscriptionReceiverTicket,
+    ) {
+        self.request_mut().meta.extensions_mut().insert(ticket);
     }
 
     /// Get a mutable reference to the params of the request.
