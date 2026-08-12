@@ -1,7 +1,7 @@
 use crate::{BlockTransactions, InclusionInfo};
 use alloy_consensus::{BlockHeader, Transaction};
 use alloy_eips::BlockNumHash;
-use alloy_primitives::{Address, BlockHash, TxHash, B256};
+use alloy_primitives::{Address, BlockHash, Log, TxHash, B256};
 use alloy_serde::WithOtherFields;
 
 /// Error returned when a transaction failed.
@@ -193,6 +193,35 @@ pub trait BlockResponse {
     }
 }
 
+/// Log JSON-RPC response.
+pub trait LogResponse: AsRef<Log> {
+    /// Hash of the block containing the log.
+    fn block_hash(&self) -> Option<BlockHash>;
+
+    /// Number of the block containing the log.
+    fn block_number(&self) -> Option<u64>;
+
+    /// Timestamp of the block containing the log.
+    fn block_timestamp(&self) -> Option<u64>;
+
+    /// Hash of the transaction that emitted the log.
+    fn transaction_hash(&self) -> Option<TxHash>;
+
+    /// Index of the transaction that emitted the log.
+    fn transaction_index(&self) -> Option<u64>;
+
+    /// Index of the log in the block.
+    fn log_index(&self) -> Option<u64>;
+
+    /// Whether the log was removed due to a chain reorganization.
+    fn removed(&self) -> bool;
+
+    /// Returns additional flattened response fields, if available.
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        None
+    }
+}
+
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
     fn tx_hash(&self) -> TxHash {
         self.inner.tx_hash()
@@ -287,6 +316,40 @@ impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
 
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
         self.inner.transactions_mut()
+    }
+
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        Some(&self.other)
+    }
+}
+
+impl<T: LogResponse> LogResponse for WithOtherFields<T> {
+    fn block_hash(&self) -> Option<BlockHash> {
+        self.inner.block_hash()
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.inner.block_number()
+    }
+
+    fn block_timestamp(&self) -> Option<u64> {
+        self.inner.block_timestamp()
+    }
+
+    fn transaction_hash(&self) -> Option<TxHash> {
+        self.inner.transaction_hash()
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.inner.transaction_index()
+    }
+
+    fn log_index(&self) -> Option<u64> {
+        self.inner.log_index()
+    }
+
+    fn removed(&self) -> bool {
+        self.inner.removed()
     }
 
     fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {

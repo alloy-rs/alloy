@@ -25,15 +25,15 @@ pub use ethereum::{Ethereum, EthereumWallet, IntoWallet};
 /// Types for handling unknown network types.
 pub mod any;
 pub use any::{
-    AnyHeader, AnyNetwork, AnyReceiptEnvelope, AnyRpcBlock, AnyRpcHeader, AnyRpcTransaction,
-    AnyTransactionReceipt, AnyTxEnvelope, AnyTxType, AnyTypedTransaction, UnknownTxEnvelope,
-    UnknownTypedTransaction,
+    AnyHeader, AnyNetwork, AnyReceiptEnvelope, AnyRpcBlock, AnyRpcHeader, AnyRpcLog,
+    AnyRpcTransaction, AnyTransactionReceipt, AnyTxEnvelope, AnyTxType, AnyTypedTransaction,
+    UnknownTxEnvelope, UnknownTypedTransaction,
 };
 
 pub use alloy_eips::eip2718;
 use alloy_eips::Typed2718;
 pub use alloy_network_primitives::{
-    self as primitives, BlockResponse, ReceiptResponse, TransactionResponse,
+    self as primitives, BlockResponse, LogResponse, ReceiptResponse, TransactionResponse,
 };
 
 /// Captures type info for network-specific RPC requests/responses.
@@ -100,6 +100,9 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     /// The JSON body of a block response.
     type BlockResponse: RpcObject
         + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
+
+    /// The JSON body of a log response.
+    type LogResponse: RpcObject + LogResponse;
 }
 
 /// Utility to implement IntoWallet for signer over the specified network.

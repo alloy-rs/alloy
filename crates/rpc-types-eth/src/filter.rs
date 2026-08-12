@@ -1612,6 +1612,26 @@ mod tests {
         serde_json::to_value(t).expect("Failed to serialize value")
     }
 
+    #[cfg(feature = "serde")]
+    #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CustomLog {
+        custom_field: u64,
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn filter_changes_supports_custom_logs() {
+        let value = json!([{ "customField": 42 }]);
+        let changes: FilterChanges<(), CustomLog> = serde_json::from_value(value.clone()).unwrap();
+
+        assert_eq!(changes.as_logs(), Some(&[CustomLog { custom_field: 42 }][..]));
+        assert_eq!(serialize(&changes), value);
+
+        let empty: FilterChanges<(), CustomLog> = serde_json::from_value(json!([])).unwrap();
+        assert!(empty.is_empty());
+    }
+
     #[test]
     fn filter_changes_defaults_to_rpc_log() {
         fn assert_default_log_type(_: FilterChanges<u64, RpcLog>) {}

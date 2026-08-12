@@ -197,6 +197,36 @@ impl<T> AsRef<alloy_primitives::Log<T>> for Log<T> {
     }
 }
 
+impl alloy_network_primitives::LogResponse for Log {
+    fn block_hash(&self) -> Option<BlockHash> {
+        self.block_hash
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.block_number
+    }
+
+    fn block_timestamp(&self) -> Option<u64> {
+        self.block_timestamp
+    }
+
+    fn transaction_hash(&self) -> Option<TxHash> {
+        self.transaction_hash
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.transaction_index
+    }
+
+    fn log_index(&self) -> Option<u64> {
+        self.log_index
+    }
+
+    fn removed(&self) -> bool {
+        self.removed
+    }
+}
+
 impl<T> AsMut<alloy_primitives::Log<T>> for Log<T> {
     fn as_mut(&mut self) -> &mut alloy_primitives::Log<T> {
         &mut self.inner

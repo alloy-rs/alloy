@@ -1,7 +1,10 @@
+use alloy_network::{AnyNetwork, AnyRpcLog, AnyRpcTransaction};
 use alloy_primitives::{bytes, Address, U256};
 use alloy_provider::{Provider, ProviderBuilder};
-use alloy_rpc_types_eth::TransactionRequest;
+use alloy_rpc_types_eth::{Filter, FilterChanges, Log, TransactionRequest};
+use alloy_serde::WithOtherFields;
 use alloy_transport::mock::Asserter;
+use futures::StreamExt;
 
 #[tokio::test]
 async fn mocked_default_provider() {
@@ -41,4 +44,38 @@ async fn mocked_default_provider() {
     asserter.push_success(&assert_bal);
     let response = provider.get_balance(Address::default()).await.unwrap();
     assert_eq!(response, assert_bal);
+}
+
+#[tokio::test]
+async fn mocked_any_network_preserves_log_fields() {
+    let asserter = Asserter::new();
+    let provider =
+        ProviderBuilder::new().network::<AnyNetwork>().connect_mocked_client(asserter.clone());
+    let mut log = WithOtherFields::new(Log::default());
+    log.other.insert("blockTimestampMs".to_owned(), serde_json::json!("0xa4d8"));
+
+    asserter.push_success(&vec![log.clone()]);
+    let logs = provider.get_logs(&Filter::new()).await.unwrap();
+    assert_eq!(logs[0].other.get("blockTimestampMs"), log.other.get("blockTimestampMs"));
+
+    let changes = FilterChanges::<AnyRpcTransaction, AnyRpcLog>::Logs(vec![log.clone()]);
+    asserter.push_success(&changes);
+    let changes = provider.get_filter_changes_dyn(U256::from(1)).await.unwrap();
+    assert_eq!(
+        changes.as_logs().unwrap()[0].other.get("blockTimestampMs"),
+        log.other.get("blockTimestampMs")
+    );
+
+    asserter.push_success(&U256::from(1));
+    asserter.push_success(&vec![log.clone()]);
+    let logs = provider
+        .watch_logs(&Filter::new())
+        .await
+        .unwrap()
+        .with_limit(Some(1))
+        .into_stream()
+        .next()
+        .await
+        .unwrap();
+    assert_eq!(logs[0].other.get("blockTimestampMs"), log.other.get("blockTimestampMs"));
 }
