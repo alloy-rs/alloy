@@ -414,7 +414,7 @@ impl_ckzg_conversions!(Bytes48, c_kzg::Bytes48);
 #[cfg(feature = "kzg")]
 impl_ckzg_conversions!(reverse Bytes48, c_kzg::KzgProof);
 #[cfg(feature = "kzg")]
-impl_ckzg_conversions!(reverse crate::eip7594::Cell, c_kzg::Cell);
+impl_ckzg_conversions!(crate::eip7594::Cell, c_kzg::Cell);
 
 /// Returns blobs as c-kzg blobs.
 #[cfg(feature = "kzg")]
