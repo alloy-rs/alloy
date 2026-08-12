@@ -81,15 +81,79 @@ impl PubSubFrontend {
         .instrument(debug_span!("request", %method_name))
     }
 
-    /// Send a packet of requests, by breaking it up into individual requests.
+    /// Send a packet of JSON-RPC requests.
     ///
-    /// Once all responses are received, we return a single response packet.
+    /// Single requests continue to use the existing request path.
+    ///
+    /// Batch requests are kept grouped when they are sent to the pubsub
+    /// service. Each request still gets its own [`InFlight`] entry and response
+    /// receiver so responses can be routed independently by JSON-RPC ID.
+    ///
+    /// The pubsub service is responsible for serializing the batch into one
+    /// JSON array and dispatching it as one backend message.
     pub fn send_packet(&self, req: RequestPacket) -> TransportFut<'static> {
         match req {
             RequestPacket::Single(req) => self.send(req).map_ok(ResponsePacket::Single).boxed(),
-            RequestPacket::Batch(reqs) => try_join_all(reqs.into_iter().map(|req| self.send(req)))
-                .map_ok(ResponsePacket::Batch)
-                .boxed(),
+
+            RequestPacket::Batch(reqs) => {
+                let tx = self.tx.clone();
+                let channel_size = self.channel_size.load(Ordering::Relaxed);
+
+                async move {
+                    // Preserve the previous behavior for an empty batch:
+                    // there is nothing to send to the backend and there are no
+                    // responses to wait for.
+                    if reqs.is_empty() {
+                        return Ok(ResponsePacket::Batch(Vec::new()));
+                    }
+
+                    debug!(request_count = reqs.len(), "sending request batch to backend");
+
+                    // We need two collections:
+                    //
+                    // 1. `in_flights` These are sent together to the pubsub service so the service
+                    //    can serialize them as one JSON-RPC batch.
+                    //
+                    // 2. `receivers` Each request still has an independent oneshot receiver because
+                    //    JSON-RPC responses are matched by request ID.
+                    let mut in_flights = Vec::with_capacity(reqs.len());
+                    let mut receivers = Vec::with_capacity(reqs.len());
+
+                    for req in reqs {
+                        let (in_flight, rx) = InFlight::new(req, channel_size);
+
+                        in_flights.push(in_flight);
+                        receivers.push(rx);
+                    }
+
+                    // IMPORTANT:
+                    //
+                    // Previously this function called `self.send(req)` for
+                    // every element, producing N `Request` instructions.
+                    //
+                    // Sending one `Batch` instruction preserves the grouping
+                    // until the pubsub service, where the requests can be
+                    // serialized into one JSON array / one WebSocket message.
+                    tx.send(PubSubInstruction::Batch(in_flights))
+                        .map_err(|_| TransportErrorKind::backend_gone())?;
+
+                    // The server is allowed to respond to the requests
+                    // independently and even in a different order.
+                    //
+                    // RequestManager routes each response to the correct
+                    // oneshot sender using its JSON-RPC ID. Here we only wait
+                    // until all those individual responses have arrived.
+                    let responses = try_join_all(receivers.into_iter().map(|rx| async move {
+                        rx.await.map_err(|_| TransportErrorKind::backend_gone())?
+                    }))
+                    .await?;
+
+                    // Keep the Transport API unchanged: callers of
+                    // `send_packet()` still receive one ResponsePacket::Batch.
+                    Ok(ResponsePacket::Batch(responses))
+                }
+                .boxed()
+            }
         }
     }
 
