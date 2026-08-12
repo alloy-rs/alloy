@@ -519,64 +519,6 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
     }
 }
 
-/// An error that can occur while recovering blobs from EIP-7594 cells.
-#[cfg(feature = "kzg")]
-#[derive(Debug)]
-pub enum BlobCellRecoveryError {
-    /// Fewer than half of the extended blob cells were selected.
-    InsufficientCells {
-        /// The number of cells supplied for each blob.
-        provided: usize,
-        /// The minimum number of cells required for recovery.
-        required: usize,
-    },
-    /// The flattened cell slice does not match the commitments and cell mask.
-    CellCountMismatch {
-        /// The number of cells supplied.
-        provided: usize,
-        /// The number of cells implied by the commitments and cell mask.
-        expected: usize,
-    },
-    /// The expected cell count cannot be represented as a `usize`.
-    CellCountOverflow,
-    /// A reconstructed blob does not match its supplied commitment.
-    CommitmentMismatch {
-        /// The index of the blob whose commitment did not match.
-        blob_index: usize,
-    },
-    /// An error returned by [`c_kzg`].
-    Kzg(c_kzg::Error),
-}
-
-#[cfg(feature = "kzg")]
-impl core::fmt::Display for BlobCellRecoveryError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::InsufficientCells { provided, required } => {
-                write!(f, "need at least {required} cells per blob for recovery, got {provided}")
-            }
-            Self::CellCountMismatch { provided, expected } => {
-                write!(f, "expected {expected} cells, got {provided}")
-            }
-            Self::CellCountOverflow => f.write_str("the expected cell count overflows usize"),
-            Self::CommitmentMismatch { blob_index } => {
-                write!(f, "reconstructed blob {blob_index} does not match its commitment")
-            }
-            Self::Kzg(err) => write!(f, "KZG error: {err:?}"),
-        }
-    }
-}
-
-#[cfg(feature = "kzg")]
-impl core::error::Error for BlobCellRecoveryError {}
-
-#[cfg(feature = "kzg")]
-impl From<c_kzg::Error> for BlobCellRecoveryError {
-    fn from(source: c_kzg::Error) -> Self {
-        Self::Kzg(source)
-    }
-}
-
 /// This represents a set of blobs, and its corresponding commitments and cell proofs.
 ///
 /// This type encodes and decodes the fields without an rlp header.
@@ -691,25 +633,25 @@ impl BlobTransactionSidecarEip7594 {
         for (blob_index, (blob_cells, expected_commitment)) in
             cells.chunks_exact(cells_per_blob).zip(&commitments).enumerate()
         {
-            let ckzg_cells = <crate::eip7594::Cell as AsCkzg>::slice_as_ckzg(blob_cells);
+            let ckzg_cells = crate::eip7594::Cell::slice_as_ckzg(blob_cells);
             let (recovered_cells, recovered_proofs) =
                 settings.recover_cells_and_kzg_proofs(&cell_indices, ckzg_cells)?;
             let blob = reconstruct_blob(recovered_cells.as_ref());
 
-            let commitment = settings.blob_to_kzg_commitment(AsCkzg::as_ckzg(&blob))?;
-            let commitment = <Bytes48 as AsCkzg>::from_ckzg(commitment.to_bytes());
+            let commitment = settings.blob_to_kzg_commitment(blob.as_ckzg())?;
+            let commitment = Bytes48::from_ckzg(commitment.to_bytes());
             if commitment != *expected_commitment {
                 return Err(BlobCellRecoveryError::CommitmentMismatch { blob_index });
             }
 
             blobs.push(blob);
-            cell_proofs.extend_from_slice(<c_kzg::KzgProof as AsAlloy>::slice_as_alloy(
-                recovered_proofs.as_ref(),
-            ));
+            cell_proofs
+                .extend_from_slice(c_kzg::KzgProof::slice_as_alloy(recovered_proofs.as_ref()));
         }
 
         Ok(Self::new(blobs, commitments, cell_proofs))
     }
+
     /// Clears blob payloads while retaining commitments and cell proofs.
     ///
     /// This prepares the sidecar for inclusion in an eth/72 `PooledTransactions` response as
@@ -777,25 +719,23 @@ impl BlobTransactionSidecarEip7594 {
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
         if let [blob] = blobs.as_slice() {
-            let blob = AsCkzg::as_ckzg(blob);
+            let blob = blob.as_ckzg();
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
-            let commitments = vec![<Bytes48 as AsCkzg>::from_ckzg(commitment.to_bytes())];
-            let proofs = <c_kzg::KzgProof as AsAlloy>::boxed_slice_as_alloy(kzg_proofs).into();
+            let commitments = vec![Bytes48::from_ckzg(commitment.to_bytes())];
+            let proofs = c_kzg::KzgProof::boxed_slice_as_alloy(kzg_proofs).into();
             return Ok(Self::new(blobs, commitments, proofs));
         }
 
         let mut commitments = Vec::with_capacity(blobs.len());
         let mut proofs = Vec::with_capacity(blobs.len() * CELLS_PER_EXT_BLOB);
         for blob in &blobs {
-            let blob = AsCkzg::as_ckzg(blob);
+            let blob = blob.as_ckzg();
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
 
-            commitments.push(<Bytes48 as AsCkzg>::from_ckzg(commitment.to_bytes()));
-            proofs.extend_from_slice(<c_kzg::KzgProof as AsAlloy>::slice_as_alloy(
-                kzg_proofs.as_ref(),
-            ));
+            commitments.push(Bytes48::from_ckzg(commitment.to_bytes()));
+            proofs.extend_from_slice(c_kzg::KzgProof::slice_as_alloy(kzg_proofs.as_ref()));
         }
 
         Ok(Self::new(blobs, commitments, proofs))
@@ -840,14 +780,14 @@ impl BlobTransactionSidecarEip7594 {
         settings: &c_kzg::KzgSettings,
     ) -> Result<Vec<crate::eip7594::Cell>, c_kzg::Error> {
         if let [blob] = self.blobs.as_slice() {
-            let blob_cells = settings.compute_cells(AsCkzg::as_ckzg(blob))?;
-            return Ok(<c_kzg::Cell as AsAlloy>::boxed_slice_as_alloy(blob_cells).into());
+            let blob_cells = settings.compute_cells(blob.as_ckzg())?;
+            return Ok(c_kzg::Cell::boxed_slice_as_alloy(blob_cells).into());
         }
 
         let mut cells = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
         for blob in &self.blobs {
-            let blob_cells = settings.compute_cells(AsCkzg::as_ckzg(blob))?;
-            cells.extend_from_slice(<c_kzg::Cell as AsAlloy>::slice_as_alloy(blob_cells.as_ref()));
+            let blob_cells = settings.compute_cells(blob.as_ckzg())?;
+            cells.extend_from_slice(c_kzg::Cell::slice_as_alloy(blob_cells.as_ref()));
         }
         Ok(cells)
     }
@@ -953,22 +893,22 @@ impl BlobTransactionSidecarEip7594 {
         }
 
         let cells = if let [blob] = self.blobs.as_slice() {
-            let cells: Box<[c_kzg::Cell]> = proof_settings.compute_cells(AsCkzg::as_ckzg(blob))?;
+            let cells: Box<[c_kzg::Cell]> = proof_settings.compute_cells(blob.as_ckzg())?;
             cells.into()
         } else {
             let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
             for blob in &self.blobs {
-                let blob_cells = proof_settings.compute_cells(AsCkzg::as_ckzg(blob))?;
+                let blob_cells = proof_settings.compute_cells(blob.as_ckzg())?;
                 cells.extend_from_slice(blob_cells.as_ref());
             }
             cells
         };
 
         let res = proof_settings.verify_cell_kzg_proof_batch(
-            <Bytes48 as AsCkzg>::slice_as_ckzg(&commitments),
+            Bytes48::slice_as_ckzg(&commitments),
             &cell_indices,
             &cells,
-            <Bytes48 as AsCkzg>::slice_as_ckzg(self.cell_proofs.as_slice()),
+            Bytes48::slice_as_ckzg(self.cell_proofs.as_slice()),
         )?;
 
         res.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
@@ -1029,7 +969,7 @@ impl BlobTransactionSidecarEip7594 {
             return Ok(Some(crate::eip4844::BlobCellsAndProofsV1::default()));
         }
 
-        let cells = settings.compute_cells(AsCkzg::as_ckzg(blob))?;
+        let cells = settings.compute_cells(blob.as_ckzg())?;
 
         Ok(Some(Self::blob_cells_and_proofs_from_computed_cells(cell_mask, cells.as_ref(), proofs)))
     }
@@ -1148,7 +1088,7 @@ impl BlobTransactionSidecarEip7594 {
                 {
                     cells_and_proofs.clone()
                 } else {
-                    let cells = settings.compute_cells(AsCkzg::as_ckzg(blob))?;
+                    let cells = settings.compute_cells(blob.as_ckzg())?;
                     let cells_and_proofs = Self::blob_cells_and_proofs_from_computed_cells(
                         cell_mask,
                         cells.as_ref(),
@@ -1238,6 +1178,64 @@ impl BlobTransactionSidecarEip7594 {
     }
 }
 
+/// An error that can occur while recovering blobs from EIP-7594 cells.
+#[cfg(feature = "kzg")]
+#[derive(Debug)]
+pub enum BlobCellRecoveryError {
+    /// Fewer than half of the extended blob cells were selected.
+    InsufficientCells {
+        /// The number of cells supplied for each blob.
+        provided: usize,
+        /// The minimum number of cells required for recovery.
+        required: usize,
+    },
+    /// The flattened cell slice does not match the commitments and cell mask.
+    CellCountMismatch {
+        /// The number of cells supplied.
+        provided: usize,
+        /// The number of cells implied by the commitments and cell mask.
+        expected: usize,
+    },
+    /// The expected cell count cannot be represented as a `usize`.
+    CellCountOverflow,
+    /// A reconstructed blob does not match its supplied commitment.
+    CommitmentMismatch {
+        /// The index of the blob whose commitment did not match.
+        blob_index: usize,
+    },
+    /// An error returned by [`c_kzg`].
+    Kzg(c_kzg::Error),
+}
+
+#[cfg(feature = "kzg")]
+impl core::fmt::Display for BlobCellRecoveryError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InsufficientCells { provided, required } => {
+                write!(f, "need at least {required} cells per blob for recovery, got {provided}")
+            }
+            Self::CellCountMismatch { provided, expected } => {
+                write!(f, "expected {expected} cells, got {provided}")
+            }
+            Self::CellCountOverflow => f.write_str("the expected cell count overflows usize"),
+            Self::CommitmentMismatch { blob_index } => {
+                write!(f, "reconstructed blob {blob_index} does not match its commitment")
+            }
+            Self::Kzg(err) => write!(f, "KZG error: {err:?}"),
+        }
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl core::error::Error for BlobCellRecoveryError {}
+
+#[cfg(feature = "kzg")]
+impl From<c_kzg::Error> for BlobCellRecoveryError {
+    fn from(source: c_kzg::Error) -> Self {
+        Self::Kzg(source)
+    }
+}
+
 #[cfg(feature = "kzg")]
 fn reconstruct_blob(recovered_cells: &[c_kzg::Cell; CELLS_PER_EXT_BLOB]) -> Blob {
     // `RecoverCells` returns cells in the canonical EIP-7594 order. The first half is the
@@ -1248,7 +1246,7 @@ fn reconstruct_blob(recovered_cells: &[c_kzg::Cell; CELLS_PER_EXT_BLOB]) -> Blob
     for (cell_index, cell) in recovered_cells.iter().take(CELLS_PER_EXT_BLOB / 2).enumerate() {
         let start = cell_index * crate::eip7594::BYTES_PER_CELL;
         let end = start + crate::eip7594::BYTES_PER_CELL;
-        blob[start..end].copy_from_slice(&cell.to_bytes());
+        blob[start..end].copy_from_slice(cell.as_alloy().as_slice());
     }
     Blob::new(blob)
 }
@@ -1660,8 +1658,7 @@ mod tests {
         assert!(sidecar.compute_matching_cells(BlobCellMask::default()).unwrap().is_empty());
 
         for (blob_index, blob) in sidecar.blobs.iter().enumerate() {
-            let expected_cells =
-                settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(blob)).unwrap();
+            let expected_cells = settings.compute_cells(blob.as_ckzg()).unwrap();
             let start = blob_index * CELLS_PER_EXT_BLOB;
             let end = start + CELLS_PER_EXT_BLOB;
 
@@ -1937,8 +1934,7 @@ mod tests {
             vec![Some(sidecar.cell_proofs[0]), Some(sidecar.cell_proofs[7])]
         );
 
-        let expected_cells =
-            settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(&sidecar.blobs[0])).unwrap();
+        let expected_cells = settings.compute_cells(sidecar.blobs[0].as_ckzg()).unwrap();
         assert_eq!(
             cells_and_proofs.blob_cells,
             vec![
@@ -1976,7 +1972,7 @@ mod tests {
         let cell_mask = BlobCellMask::from_bits(1);
 
         let invalid_blob = Blob::repeat_byte(0xff);
-        assert!(settings.compute_cells(crate::eip4844::AsCkzg::as_ckzg(&invalid_blob)).is_err());
+        assert!(settings.compute_cells(invalid_blob.as_ckzg()).is_err());
 
         sidecar.blobs.push(invalid_blob);
         sidecar.commitments.push(Bytes48::ZERO);
