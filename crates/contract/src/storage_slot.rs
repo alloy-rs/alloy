@@ -132,7 +132,8 @@ where
 
         let tx = base_request.with_to(contract).with_input(calldata);
 
-        // first collect all the slots that are used by the function call
+        // First collect all the slots that are used by the function call in the provider's
+        // default block context.
         let access_list_result = provider.create_access_list(&tx).await?;
         let access_list = access_list_result.access_list;
 
