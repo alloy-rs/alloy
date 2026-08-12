@@ -1242,8 +1242,8 @@ impl BlobTransactionSidecarEip7594 {
 fn reconstruct_blob(recovered_cells: &[c_kzg::Cell; CELLS_PER_EXT_BLOB]) -> Blob {
     // `RecoverCells` returns cells in the canonical EIP-7594 order. The first half is the
     // original blob data; the remaining cells are the extension used for sampling and proofs.
-    // This is the same boundary used by Geth's `kzg4844.RecoverBlobs`: the KZG backend performs
-    // the recovery, while the wrapper only materializes the first `DataPerBlob` cells.
+    // The KZG backend performs the recovery, while this wrapper only materializes the original
+    // blob cells.
     let mut blob = [0u8; BYTES_PER_BLOB];
     for (cell_index, cell) in recovered_cells.iter().take(CELLS_PER_EXT_BLOB / 2).enumerate() {
         let start = cell_index * crate::eip7594::BYTES_PER_CELL;
@@ -1724,8 +1724,8 @@ mod tests {
         );
     }
 
-    /// Mirrors Geth's `RecoverBlobs` coverage: multiple blobs are recovered from a shared,
-    /// non-contiguous set of exactly `DataPerBlob` cells.
+    /// Multiple blobs are recovered from a shared, non-contiguous set containing the minimum
+    /// number of cells required for each blob.
     #[test]
     #[cfg(feature = "kzg")]
     fn recover_sparse_blobs_from_minimum_cells() {
@@ -1755,8 +1755,7 @@ mod tests {
         assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
     }
 
-    /// Geth varies the sampled count above the minimum. Check that a sparse set with an extra
-    /// cell follows the same recovery path.
+    /// A sparse set above the minimum cell count follows the same recovery path.
     #[test]
     #[cfg(feature = "kzg")]
     fn recover_sparse_blobs_with_more_than_minimum_cells() {
@@ -1854,8 +1853,7 @@ mod tests {
         assert!(matches!(err, BlobCellRecoveryError::CommitmentMismatch { blob_index: 0 }));
     }
 
-    /// Mirrors Geth's corrupted-cell recovery coverage. A cell that no longer matches the
-    /// commitment must not produce a sidecar.
+    /// A cell that no longer matches the commitment must not produce a sidecar.
     #[test]
     #[cfg(feature = "kzg")]
     fn recover_sparse_blobs_rejects_corrupted_cells() {
