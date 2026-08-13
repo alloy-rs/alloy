@@ -2,6 +2,7 @@ use alloy_json_rpc::{RequestMeta, RpcRecv, RpcSend};
 use alloy_rpc_client::{RpcCall, Waiter};
 use alloy_transport::TransportResult;
 use futures::FutureExt;
+use http::{HeaderMap, HeaderName, HeaderValue};
 use pin_project::pin_project;
 use serde_json::value::RawValue;
 use std::{
@@ -191,6 +192,28 @@ where
             _ => Err(self),
         }
     }
+
+    /// Adds HTTP headers to the underlying RPC request.
+    ///
+    /// Existing values with the same header names are replaced. This function
+    /// fails if the inner future is not an [`RpcCall`].
+    pub fn with_headers(self, headers: HeaderMap) -> Result<Self, Self> {
+        self.map_meta(|mut meta| {
+            meta.headers_mut().extend(headers);
+            meta
+        })
+    }
+
+    /// Adds an HTTP header to the underlying RPC request.
+    ///
+    /// An existing value with the same header name is replaced. This function
+    /// fails if the inner future is not an [`RpcCall`].
+    pub fn with_header(self, name: HeaderName, value: HeaderValue) -> Result<Self, Self> {
+        self.map_meta(|mut meta| {
+            meta.headers_mut().insert(name, value);
+            meta
+        })
+    }
 }
 
 impl<Params, Resp, Output, Map> ProviderCall<&Params, Resp, Output, Map>
@@ -322,5 +345,35 @@ mod tests {
     fn map_meta_returns_non_rpc_call() {
         let call = ProviderCall::<NoParams, u64>::ready(Ok(1));
         assert!(call.map_meta(std::convert::identity).is_err());
+    }
+
+    #[test]
+    fn with_headers_updates_rpc_call_headers() {
+        let client = ClientBuilder::default().transport(MockTransport::new(Asserter::new()), true);
+        let call: ProviderCall<NoParams, u64> = client.request_noparams("test_method").into();
+        let mut headers = HeaderMap::new();
+        headers.insert("x-api-key", HeaderValue::from_static("secret"));
+
+        let call = call.with_headers(headers).expect("call is an RPC call");
+
+        assert_eq!(
+            call.as_rpc_call().unwrap().request().meta.headers().unwrap().get("x-api-key"),
+            Some(&HeaderValue::from_static("secret"))
+        );
+    }
+
+    #[test]
+    fn with_header_updates_rpc_call_header() {
+        let client = ClientBuilder::default().transport(MockTransport::new(Asserter::new()), true);
+        let call: ProviderCall<NoParams, u64> = client.request_noparams("test_method").into();
+
+        let call = call
+            .with_header(HeaderName::from_static("x-api-key"), HeaderValue::from_static("secret"))
+            .expect("call is an RPC call");
+
+        assert_eq!(
+            call.as_rpc_call().unwrap().request().meta.headers().unwrap().get("x-api-key"),
+            Some(&HeaderValue::from_static("secret"))
+        );
     }
 }
