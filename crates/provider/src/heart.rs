@@ -363,6 +363,10 @@ impl From<TxHash> for PendingTransactionConfig {
     }
 }
 
+const fn confirmation_target_block(block_height: u64, confirmations: u64) -> u64 {
+    block_height.saturating_add(confirmations.saturating_sub(1))
+}
+
 /// Errors which may occur in heartbeat when watching a transaction.
 #[derive(Debug, thiserror::Error)]
 pub enum WatchTxError {
@@ -575,7 +579,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Transaction is already confirmed, we just need to wait for the required
             // confirmations.
             let confirmations = to_watch.config.required_confirmations;
-            let confirmed_at = received_at_block + confirmations - 1;
+            let confirmed_at = confirmation_target_block(received_at_block, confirmations);
             let current_height =
                 self.past_blocks.back().map(|(h, _)| *h).unwrap_or(received_at_block);
 
@@ -595,7 +599,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         for (block_height, txs) in self.past_blocks.iter().rev() {
             if txs.contains(&to_watch.config.tx_hash) {
                 let confirmations = to_watch.config.required_confirmations;
-                let confirmed_at = *block_height + confirmations - 1;
+                let confirmed_at = confirmation_target_block(*block_height, confirmations);
                 let current_height = self.past_blocks.back().map(|(h, _)| *h).unwrap();
 
                 if confirmed_at <= current_height {
@@ -619,7 +623,10 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     fn add_to_waiting_list(&mut self, watcher: TxWatcher, block_height: u64) {
         let confirmations = watcher.config.required_confirmations;
         debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-        self.waiting_confs.entry(block_height + confirmations - 1).or_default().push(watcher);
+        self.waiting_confs
+            .entry(confirmation_target_block(block_height, confirmations))
+            .or_default()
+            .push(watcher);
     }
 
     /// Handle a new block by checking if any of the transactions we're
@@ -740,5 +747,50 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Always reap timeouts
             self.reap_timeouts();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_network::Ethereum;
+    use futures::stream;
+    use std::sync::Arc;
+
+    fn heartbeat() -> Heartbeat<Ethereum, futures::stream::Empty<alloy_rpc_types_eth::Block>> {
+        Heartbeat::new(stream::empty(), Arc::new(Paused::default()))
+    }
+
+    fn watcher(
+        confirmations: u64,
+        received_at_block: Option<u64>,
+    ) -> (TxWatcher, oneshot::Receiver<Result<(), WatchTxError>>) {
+        let (tx, rx) = oneshot::channel();
+        let config = PendingTransactionConfig::new(TxHash::with_last_byte(1))
+            .with_required_confirmations(confirmations);
+        (TxWatcher { config, received_at_block, tx }, rx)
+    }
+
+    #[tokio::test]
+    async fn zero_confirmations_notify_already_confirmed_transaction() {
+        let mut heartbeat = heartbeat();
+        heartbeat.past_blocks.push_back((0, Default::default()));
+
+        let (watcher, rx) = watcher(0, Some(0));
+        heartbeat.handle_watch_ix(watcher);
+
+        assert!(rx.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn zero_confirmations_notify_lookbehind_transaction() {
+        let mut heartbeat = heartbeat();
+        let tx_hash = TxHash::with_last_byte(1);
+        heartbeat.past_blocks.push_back((0, [tx_hash].into_iter().collect()));
+
+        let (watcher, rx) = watcher(0, None);
+        heartbeat.handle_watch_ix(watcher);
+
+        assert!(rx.await.unwrap().is_ok());
     }
 }
