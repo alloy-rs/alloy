@@ -54,6 +54,7 @@ pub struct Genesis {
     // * base_fee_per_gas
     // * excess_blob_gas
     // * blob_gas_used
+    // * slot_number
     // * number
     // should NOT be set in a real genesis file, but are included here for compatibility with
     // consensus tests, which have genesis files with these fields populated.
@@ -66,6 +67,9 @@ pub struct Genesis {
     /// The genesis header blob gas used
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub blob_gas_used: Option<u64>,
+    /// The genesis header slot number (EIP-7843)
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub slot_number: Option<u64>,
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
@@ -186,6 +190,12 @@ impl Genesis {
     /// Set the blob gas used.
     pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
         self.blob_gas_used = blob_gas_used;
+        self
+    }
+
+    /// Set the slot number.
+    pub const fn with_slot_number(mut self, slot_number: Option<u64>) -> Self {
+        self.slot_number = slot_number;
         self
     }
 
@@ -1352,6 +1362,27 @@ mod tests {
     }
 
     #[test]
+    fn parse_slot_number() {
+        let geth_genesis = r#"
+    {
+        "difficulty": "0x20000",
+        "gasLimit": "0x1",
+        "alloc": {},
+        "slotNumber": "0x3e7",
+        "config": {
+          "chainId": 1
+        }
+    }
+    "#;
+
+        let genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
+        assert_eq!(genesis.slot_number, Some(999));
+
+        let ser = serde_json::to_value(&genesis).unwrap();
+        assert_eq!(ser["slotNumber"], "0x3e7");
+    }
+
+    #[test]
     fn parse_hive_clique_smoke_genesis() {
         let geth_genesis = r#"
     {
@@ -2006,6 +2037,7 @@ mod tests {
                 base_fee_per_gas: None,
                 excess_blob_gas: None,
                 blob_gas_used: None,
+                slot_number: None,
                 number: None,
                 parent_hash: Some(B256::ZERO),
                 alloc: BTreeMap::from_iter(vec![
