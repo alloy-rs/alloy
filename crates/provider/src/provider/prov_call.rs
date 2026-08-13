@@ -1,4 +1,4 @@
-use alloy_json_rpc::{RpcRecv, RpcSend};
+use alloy_json_rpc::{RequestMeta, RpcRecv, RpcSend};
 use alloy_rpc_client::{RpcCall, Waiter};
 use alloy_transport::TransportResult;
 use futures::FutureExt;
@@ -157,6 +157,40 @@ where
             _ => Err(self),
         }
     }
+
+    /// Maps the metadata of the underlying RPC request.
+    ///
+    /// This can be used with typed [`Provider`](crate::Provider) methods to
+    /// attach request-scoped metadata such as HTTP headers without falling
+    /// back to a raw RPC call:
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use http::{HeaderMap, HeaderValue};
+    /// # async fn example() -> alloy_transport::TransportResult<()> {
+    /// # let provider = ProviderBuilder::new().connect("http://localhost:8545").await?;
+    /// let mut headers = HeaderMap::new();
+    /// headers.insert("x-api-key", HeaderValue::from_static("secret"));
+    ///
+    /// let call = provider.get_block_number().map_meta(|mut meta| {
+    ///     meta.headers_mut().extend(headers);
+    ///     meta
+    /// });
+    /// let Ok(call) = call else { unreachable!("typed provider method should produce an RPC call") };
+    /// let block_number = call.await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// This function fails if the inner future is not an [`RpcCall`], since
+    /// boxed, batched, or ready calls no longer expose an individual request
+    /// whose metadata can be changed.
+    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Result<Self, Self> {
+        match self {
+            Self::RpcCall(call) => Ok(Self::RpcCall(call.map_meta(f))),
+            _ => Err(self),
+        }
+    }
 }
 
 impl<Params, Resp, Output, Map> ProviderCall<&Params, Resp, Output, Map>
@@ -256,5 +290,37 @@ where
                 Poll::Ready(output.take().expect("output taken twice"))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_rpc_client::{ClientBuilder, NoParams};
+    use alloy_transport::mock::{Asserter, MockTransport};
+    use http::HeaderValue;
+
+    #[test]
+    fn map_meta_updates_rpc_call_metadata() {
+        let client = ClientBuilder::default().transport(MockTransport::new(Asserter::new()), true);
+        let call: ProviderCall<NoParams, u64> = client.request_noparams("test_method").into();
+
+        let call = call
+            .map_meta(|mut meta| {
+                meta.headers_mut().insert("x-api-key", HeaderValue::from_static("secret"));
+                meta
+            })
+            .expect("call is an RPC call");
+
+        assert_eq!(
+            call.as_rpc_call().unwrap().request().meta.headers().unwrap().get("x-api-key"),
+            Some(&HeaderValue::from_static("secret"))
+        );
+    }
+
+    #[test]
+    fn map_meta_returns_non_rpc_call() {
+        let call = ProviderCall::<NoParams, u64>::ready(Ok(1));
+        assert!(call.map_meta(std::convert::identity).is_err());
     }
 }
