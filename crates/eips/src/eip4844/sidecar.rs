@@ -32,7 +32,13 @@ pub struct IndexedBlobHash {
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// For a well-formed sidecar, all three vectors have equal lengths and describe the same blob at
+/// each index. Public fields and [`Self::new`] do not enforce this invariant. With the `kzg`
+/// feature, prefer `try_from_blobs_with_settings` or call `validate` before use. Consuming
+/// iteration uses `zip`, so malformed unequal vectors are truncated to the shortest vector.
+///
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -235,7 +241,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
 }
 
 impl BlobTransactionSidecar {
-    /// Constructs a new [BlobTransactionSidecar] from a set of blobs, commitments, and proofs.
+    /// Constructs a sidecar without validating vector lengths, commitments, or proofs.
     pub const fn new(blobs: Vec<Blob>, commitments: Vec<Bytes48>, proofs: Vec<Bytes48>) -> Self {
         Self { blobs, commitments, proofs }
     }
@@ -481,7 +487,7 @@ impl BlobTransactionSidecar {
 }
 
 impl Encodable for BlobTransactionSidecar {
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+    /// Encodes the sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -492,7 +498,7 @@ impl Encodable for BlobTransactionSidecar {
 }
 
 impl Decodable for BlobTransactionSidecar {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }

@@ -17,7 +17,8 @@ use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, PartialEq, Eq, Hash, Debug, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
@@ -373,7 +374,7 @@ impl BlobTransactionSidecarVariant {
 }
 
 impl Encodable for BlobTransactionSidecarVariant {
-    /// Encodes the [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+    /// Encodes the selected sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         match self {
             Self::Eip4844(sidecar) => sidecar.encode(out),
@@ -390,7 +391,7 @@ impl Encodable for BlobTransactionSidecarVariant {
 }
 
 impl Decodable for BlobTransactionSidecarVariant {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(buf)?;
         if !header.list {
@@ -521,7 +522,13 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
 
 /// This represents a set of blobs, and its corresponding commitments and cell proofs.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// A well-formed sidecar has one commitment per blob and `CELLS_PER_EXT_BLOB` cell proofs per
+/// blob. Public fields and [`Self::new`] do not enforce these cardinalities or validate proofs.
+/// With the `kzg` feature, prefer `try_from_blobs_with_settings` or call `validate` before
+/// use.
+///
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -550,14 +557,105 @@ impl core::fmt::Debug for BlobTransactionSidecarEip7594 {
 }
 
 impl BlobTransactionSidecarEip7594 {
-    /// Constructs a new [BlobTransactionSidecarEip7594] from a set of blobs, commitments, and
-    /// cell proofs.
+    /// Constructs a sidecar without validating cardinalities, commitments, or cell proofs.
     pub const fn new(
         blobs: Vec<Blob>,
         commitments: Vec<Bytes48>,
         cell_proofs: Vec<Bytes48>,
     ) -> Self {
         Self { blobs, commitments, cell_proofs }
+    }
+
+    /// Recovers a sidecar from a common set of EIP-7594 cells for every blob.
+    ///
+    /// `cell_mask` identifies the cells supplied for each commitment. `cells` must be flattened in
+    /// blob-major order: all selected cells for `commitments[0]`, followed by all selected cells
+    /// for `commitments[1]`, and so on. At least half of the 128 extended blob cells must be
+    /// selected. The recovered sidecar contains the complete blob data and all 128 cell proofs.
+    ///
+    /// Recovery authenticates each reconstructed blob by recomputing and comparing its
+    /// commitment. It does not verify proofs for the input cells; callers accepting untrusted
+    /// cells and proofs should batch-verify them before recovery when early rejection is useful.
+    ///
+    /// This uses the default KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_recover_from_cells(
+        commitments: Vec<Bytes48>,
+        cell_mask: BlobCellMask,
+        cells: &[crate::eip7594::Cell],
+    ) -> Result<Self, BlobCellRecoveryError> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        Self::try_recover_from_cells_with_settings(
+            commitments,
+            cell_mask,
+            cells,
+            EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Recovers a sidecar from EIP-7594 cells using custom KZG settings.
+    ///
+    /// See [`Self::try_recover_from_cells`] for the expected cell layout and verification
+    /// boundary.
+    #[cfg(feature = "kzg")]
+    pub fn try_recover_from_cells_with_settings(
+        commitments: Vec<Bytes48>,
+        cell_mask: BlobCellMask,
+        cells: &[crate::eip7594::Cell],
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, BlobCellRecoveryError> {
+        let cells_per_blob = cell_mask.count();
+        if !commitments.is_empty() && cells_per_blob < CELLS_PER_EXT_BLOB / 2 {
+            return Err(BlobCellRecoveryError::InsufficientCells {
+                provided: cells_per_blob,
+                required: CELLS_PER_EXT_BLOB / 2,
+            });
+        }
+
+        let expected_cells = commitments
+            .len()
+            .checked_mul(cells_per_blob)
+            .ok_or(BlobCellRecoveryError::CellCountOverflow)?;
+        if cells.len() != expected_cells {
+            return Err(BlobCellRecoveryError::CellCountMismatch {
+                provided: cells.len(),
+                expected: expected_cells,
+            });
+        }
+        if commitments.is_empty() {
+            return Ok(Self::new(Vec::new(), commitments, Vec::new()));
+        }
+
+        let cell_indices =
+            cell_mask.selected_indices().map(|index| index as u64).collect::<Vec<_>>();
+        let mut blobs = Vec::with_capacity(commitments.len());
+        let cell_proof_capacity = commitments
+            .len()
+            .checked_mul(CELLS_PER_EXT_BLOB)
+            .ok_or(BlobCellRecoveryError::CellCountOverflow)?;
+        let mut cell_proofs = Vec::with_capacity(cell_proof_capacity);
+
+        for (blob_index, (blob_cells, expected_commitment)) in
+            cells.chunks_exact(cells_per_blob).zip(&commitments).enumerate()
+        {
+            let ckzg_cells = crate::eip7594::Cell::slice_as_ckzg(blob_cells);
+            let (recovered_cells, recovered_proofs) =
+                settings.recover_cells_and_kzg_proofs(&cell_indices, ckzg_cells)?;
+            let blob = reconstruct_blob(recovered_cells.as_ref());
+
+            let commitment = settings.blob_to_kzg_commitment(blob.as_ckzg())?;
+            let commitment = Bytes48::from_ckzg(commitment.to_bytes());
+            if commitment != *expected_commitment {
+                return Err(BlobCellRecoveryError::CommitmentMismatch { blob_index });
+            }
+
+            blobs.push(blob);
+            cell_proofs
+                .extend_from_slice(c_kzg::KzgProof::slice_as_alloy(recovered_proofs.as_ref()));
+        }
+
+        Ok(Self::new(blobs, commitments, cell_proofs))
     }
 
     /// Clears blob payloads while retaining commitments and cell proofs.
@@ -1086,8 +1184,81 @@ impl BlobTransactionSidecarEip7594 {
     }
 }
 
+/// An error that can occur while recovering blobs from EIP-7594 cells.
+#[cfg(feature = "kzg")]
+#[derive(Debug)]
+pub enum BlobCellRecoveryError {
+    /// Fewer than half of the extended blob cells were selected.
+    InsufficientCells {
+        /// The number of cells supplied for each blob.
+        provided: usize,
+        /// The minimum number of cells required for recovery.
+        required: usize,
+    },
+    /// The flattened cell slice does not match the commitments and cell mask.
+    CellCountMismatch {
+        /// The number of cells supplied.
+        provided: usize,
+        /// The number of cells implied by the commitments and cell mask.
+        expected: usize,
+    },
+    /// The expected cell count cannot be represented as a `usize`.
+    CellCountOverflow,
+    /// A reconstructed blob does not match its supplied commitment.
+    CommitmentMismatch {
+        /// The index of the blob whose commitment did not match.
+        blob_index: usize,
+    },
+    /// An error returned by [`c_kzg`].
+    Kzg(c_kzg::Error),
+}
+
+#[cfg(feature = "kzg")]
+impl core::fmt::Display for BlobCellRecoveryError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InsufficientCells { provided, required } => {
+                write!(f, "need at least {required} cells per blob for recovery, got {provided}")
+            }
+            Self::CellCountMismatch { provided, expected } => {
+                write!(f, "expected {expected} cells, got {provided}")
+            }
+            Self::CellCountOverflow => f.write_str("the expected cell count overflows usize"),
+            Self::CommitmentMismatch { blob_index } => {
+                write!(f, "reconstructed blob {blob_index} does not match its commitment")
+            }
+            Self::Kzg(err) => write!(f, "KZG error: {err:?}"),
+        }
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl core::error::Error for BlobCellRecoveryError {}
+
+#[cfg(feature = "kzg")]
+impl From<c_kzg::Error> for BlobCellRecoveryError {
+    fn from(source: c_kzg::Error) -> Self {
+        Self::Kzg(source)
+    }
+}
+
+#[cfg(feature = "kzg")]
+fn reconstruct_blob(recovered_cells: &[c_kzg::Cell; CELLS_PER_EXT_BLOB]) -> Blob {
+    // `RecoverCells` returns cells in the canonical EIP-7594 order. The first half is the
+    // original blob data; the remaining cells are the extension used for sampling and proofs.
+    // The KZG backend performs the recovery, while this wrapper only materializes the original
+    // blob cells.
+    let mut blob = [0u8; BYTES_PER_BLOB];
+    for (cell_index, cell) in recovered_cells.iter().take(CELLS_PER_EXT_BLOB / 2).enumerate() {
+        let start = cell_index * crate::eip7594::BYTES_PER_CELL;
+        let end = start + crate::eip7594::BYTES_PER_CELL;
+        blob[start..end].copy_from_slice(cell.as_alloy().as_slice());
+    }
+    Blob::new(blob)
+}
+
 impl Encodable for BlobTransactionSidecarEip7594 {
-    /// Encodes the inner [BlobTransactionSidecarEip7594] fields as RLP bytes, without a RLP header.
+    /// Encodes the sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -1098,8 +1269,7 @@ impl Encodable for BlobTransactionSidecarEip7594 {
 }
 
 impl Decodable for BlobTransactionSidecarEip7594 {
-    /// Decodes the inner [BlobTransactionSidecarEip7594] fields from RLP bytes, without a RLP
-    /// header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }
@@ -1501,6 +1671,211 @@ mod tests {
                 assert_eq!(*cell, crate::eip7594::Cell::new(expected_cell.to_bytes()));
             }
         }
+    }
+
+    #[cfg(feature = "kzg")]
+    fn sparse_cells_for_mask(
+        sidecar: &BlobTransactionSidecarEip7594,
+        cell_mask: BlobCellMask,
+        settings: &c_kzg::KzgSettings,
+    ) -> Vec<crate::eip7594::Cell> {
+        let cells = sidecar.compute_cells_with_settings(settings).unwrap();
+        cell_mask.matching_cells_from_computed_cells(&cells).unwrap()
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sidecar_from_complete_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+                Vec::new(),
+                BlobCellMask::default(),
+                &[],
+                settings,
+            )
+            .unwrap(),
+            BlobTransactionSidecarEip7594::default()
+        );
+
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
+            settings,
+        )
+        .unwrap();
+        let cells = sidecar.compute_cells_with_settings(settings).unwrap();
+        let cell_mask = BlobCellMask::from_bits(u128::MAX);
+
+        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            sidecar.commitments.clone(),
+            cell_mask,
+            &cells,
+            settings,
+        )
+        .unwrap();
+        assert_eq!(recovered, sidecar);
+
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_recover_from_cells(
+                recovered.commitments.clone(),
+                cell_mask,
+                &cells,
+            )
+            .unwrap(),
+            recovered
+        );
+    }
+
+    /// Multiple blobs are recovered from a shared, non-contiguous set containing the minimum
+    /// number of cells required for each blob.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_from_minimum_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02), Blob::repeat_byte(0x03)],
+            settings,
+        )
+        .unwrap();
+
+        let cell_mask = BlobCellMask::from_bits(
+            (0..CELLS_PER_EXT_BLOB).step_by(2).fold(0, |mask, index| mask | (1u128 << index)),
+        );
+        assert_eq!(cell_mask.count(), CELLS_PER_EXT_BLOB / 2);
+        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+
+        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            sidecar.commitments.clone(),
+            cell_mask,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap();
+
+        assert_eq!(recovered.blobs, sidecar.blobs);
+        assert_eq!(recovered.commitments, sidecar.commitments);
+        assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
+    }
+
+    /// A sparse set above the minimum cell count follows the same recovery path.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_with_more_than_minimum_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
+            settings,
+        )
+        .unwrap();
+
+        let cell_mask = BlobCellMask::from_bits(
+            ((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1) | (1u128 << (CELLS_PER_EXT_BLOB - 1)),
+        );
+        assert_eq!(cell_mask.count(), CELLS_PER_EXT_BLOB / 2 + 1);
+        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+
+        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            sidecar.commitments.clone(),
+            cell_mask,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap();
+
+        assert_eq!(recovered.blobs, sidecar.blobs);
+        assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_insufficient_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2 - 1)) - 1);
+        let cells = vec![crate::eip7594::Cell::repeat_byte(0); cell_mask.count()];
+
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            vec![Bytes48::ZERO],
+            cell_mask,
+            &cells,
+            settings,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            BlobCellRecoveryError::InsufficientCells {
+                provided,
+                required,
+            } if provided == CELLS_PER_EXT_BLOB / 2 - 1
+                && required == CELLS_PER_EXT_BLOB / 2
+        ));
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_mismatched_cell_count() {
+        let settings = EnvKzgSettings::Default.get();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let cells = vec![crate::eip7594::Cell::repeat_byte(0); cell_mask.count() - 1];
+
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            vec![Bytes48::ZERO, Bytes48::ZERO],
+            cell_mask,
+            &cells,
+            settings,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            BlobCellRecoveryError::CellCountMismatch {
+                provided,
+                expected,
+            } if provided == CELLS_PER_EXT_BLOB / 2 - 1 && expected == CELLS_PER_EXT_BLOB
+        ));
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_commitment_mismatch() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01)],
+            settings,
+        )
+        .unwrap();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            vec![Bytes48::ZERO],
+            cell_mask,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap_err();
+        assert!(matches!(err, BlobCellRecoveryError::CommitmentMismatch { blob_index: 0 }));
+    }
+
+    /// A cell that no longer matches the commitment must not produce a sidecar.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_corrupted_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02), Blob::repeat_byte(0x03)],
+            settings,
+        )
+        .unwrap();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let mut sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+        sparse_cells[0][0] ^= 0xff;
+
+        assert!(BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            sidecar.commitments,
+            cell_mask,
+            &sparse_cells,
+            settings,
+        )
+        .is_err());
     }
 
     #[test]

@@ -18,6 +18,7 @@ pub const ENS_ADDRESS: Address = address!("0x00000000000C2E074eC69A0dFb2997BA6C7
 /// (`0xeeeeeeee14d718c2b47d9923deab1335e144eeee`)
 ///
 /// The Universal Resolver is the canonical entry point for all ENS resolution.
+/// Resolution may require EIP-3668 CCIP Read, which must be handled outside this crate's helpers.
 pub const UNIVERSAL_RESOLVER_ADDRESS: Address =
     address!("0xeeeeeeee14d718c2b47d9923deab1335e144eeee");
 
@@ -30,17 +31,21 @@ pub use contract::*;
 #[cfg(feature = "provider")]
 pub use provider::*;
 
-/// ENS name or Ethereum Address.
+/// An ENS name or Ethereum address.
+///
+/// [`FromStr`] first attempts to parse an address, then treats a string containing `.` as a name.
+/// This is only a routing heuristic: it rejects dotless names and does not normalize or validate
+/// ENS names. In contrast, converting from [`String`] always creates [`Name`](Self::Name).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NameOrAddress {
-    /// An ENS Name (format does not get checked)
+    /// An ENS name. The value must already be ENSIP-15 normalized; its format is not checked.
     Name(String),
     /// An Ethereum Address
     Address(Address),
 }
 
 impl NameOrAddress {
-    /// Resolves the name to an Ethereum Address.
+    /// Resolves a name to an Ethereum address, or returns an address unchanged without an RPC call.
     #[cfg(feature = "provider")]
     pub async fn resolve<N: alloy_provider::Network, P: alloy_provider::Provider<N>>(
         &self,
@@ -119,15 +124,23 @@ mod contract {
 
         /// ENS Universal Resolver contract.
         ///
-        /// The Universal Resolver is the canonical entry point for ENS resolution.
-        /// It handles CCIP-Read (EIP-3668) for offchain/cross-chain names and
-        /// supports all name types including DNS names.
+        /// The `resolve` item models the canonical Universal Resolver entry point.
+        ///
+        /// It may signal EIP-3668 CCIP Read with an `OffchainLookup` revert. This binding does not
+        /// follow that redirect; the caller must provide CCIP-Read handling separately.
+        ///
+        /// The legacy `reverse(bytes)` item below does **not** match the deployed canonical
+        /// resolver's `reverse(bytes,uint256)` ABI and must not be used with
+        /// [`UNIVERSAL_RESOLVER_ADDRESS`](crate::UNIVERSAL_RESOLVER_ADDRESS).
         #[sol(rpc)]
         contract UniversalResolver {
             /// Resolves an ENS name with the given encoded resolver call data.
             function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory, address);
 
-            /// Performs reverse resolution for an address.
+            /// A legacy reverse-resolution ABI retained for compatibility.
+            ///
+            /// This selector and return shape do not match the deployed canonical Universal
+            /// Resolver. Do not call it at [`UNIVERSAL_RESOLVER_ADDRESS`](crate::UNIVERSAL_RESOLVER_ADDRESS).
             function reverse(bytes calldata reverseName) external view returns (string memory, address, address, address);
         }
 
@@ -175,6 +188,10 @@ mod provider {
     use alloy_sol_types::SolCall;
 
     /// Extension trait for ENS contract calls.
+    ///
+    /// All ENS name strings must already be normalized according to ENSIP-15. These helpers do not
+    /// perform complete normalization or validation before hashing or DNS-encoding them;
+    /// [`namehash`] only removes `U+FE0F`.
     #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
     #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
     pub trait ProviderEnsExt<N: alloy_provider::Network, P: Provider<N>> {
@@ -188,13 +205,23 @@ mod provider {
         /// Returns the reverse registrar for the specified node.
         async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError>;
 
-        /// Performs a forward lookup of an ENS name to an address using the Universal Resolver.
+        /// Performs a forward lookup of an already-normalized ENS name using the Universal
+        /// Resolver.
+        ///
+        /// The name must also satisfy [`dns_encode`]'s non-empty-label and length preconditions.
+        ///
+        /// EIP-3668 CCIP-Read redirects are not followed by this helper and surface as a resolution
+        /// error unless handling is supplied outside it.
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError>;
 
-        /// Performs a reverse lookup of an address to an ENS name.
+        /// Reads the legacy `{address}.addr.reverse` record through the ENS registry and resolver.
+        ///
+        /// This is not Universal Resolver multichain reverse resolution. The returned name is not
+        /// normalized or forward-verified; normalize it, resolve it, and compare the resulting
+        /// address before treating the name as an authenticated identity.
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError>;
 
-        /// Performs a txt lookup of an ENS name.
+        /// Looks up a text record for an already-normalized ENS name.
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError>;
     }
 
@@ -273,7 +300,10 @@ mod provider {
     }
 }
 
-/// Returns the ENS namehash as specified in [EIP-137](https://eips.ethereum.org/EIPS/eip-137)
+/// Returns the ENS namehash as specified in [EIP-137](https://eips.ethereum.org/EIPS/eip-137).
+///
+/// `name` must already be ENSIP-15 normalized. Apart from removing the `U+FE0F` variation selector,
+/// this function hashes labels verbatim and does not normalize or validate them.
 pub fn namehash(name: &str) -> B256 {
     if name.is_empty() {
         return B256::ZERO;
@@ -311,6 +341,12 @@ pub fn namehash(name: &str) -> B256 {
 ///
 /// Each label is prefixed with its length byte, and the name is terminated with a
 /// zero-length label (null byte).
+///
+/// This is an unchecked encoder: `name` must already be ENSIP-15 normalized and non-empty, must
+/// not contain empty labels (including leading, trailing, or repeated dots), and each UTF-8 label
+/// length must fit in a `u8`. The caller is also responsible for the applicable ENSIP-10 and DNS
+/// length limits. Invalid input is encoded without an error; an oversized label's length prefix is
+/// truncated.
 ///
 /// # Examples
 ///

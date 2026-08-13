@@ -26,6 +26,21 @@ const DEFAULT_ACTIVE_TRANSPORT_COUNT: usize = 3;
 ///
 /// The service ranks transports based on latency and stability metrics,
 /// and will attempt to always use the best available transports.
+///
+/// # Parallel execution and side effects
+///
+/// Unless a method is in `sequential_methods`, the request is sent to up to
+/// `active_transport_count` transports concurrently. Dropping the remaining
+/// futures after one completes does not undo remote side effects. Add every
+/// non-idempotent method to the sequential set. Sequential mode avoids
+/// concurrent submission, but can still try another transport after an error,
+/// so it does not guarantee at-most-once execution.
+///
+/// "Successful" means that the transport returned `Ok(ResponsePacket)`; a
+/// packet containing a JSON-RPC error still wins the race. Responses are not
+/// compared for equality or consensus. Sequential mode tries only the top
+/// `active_transport_count` transports, and a batch is sequential when any of
+/// its methods is in the sequential set.
 #[derive(Debug, Clone)]
 pub struct FallbackService<S> {
     /// The list of transports to use
@@ -300,6 +315,8 @@ where
 /// transports in parallel, and return the first successful response.
 ///
 /// If all transports fail, the fallback service will return an error.
+/// Parallel execution can submit the same operation to several remote nodes;
+/// see [`FallbackService`] for replay-safety and JSON-RPC error semantics.
 ///
 /// # Automatic Transport Ranking
 ///

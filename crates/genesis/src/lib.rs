@@ -255,6 +255,16 @@ impl GenesisAccount {
         self
     }
 
+    /// Returns the account bytecode if it is non-empty.
+    pub fn non_empty_code(&self) -> Option<&Bytes> {
+        self.code.as_ref().filter(|code| !code.is_empty())
+    }
+
+    /// Returns the hash of the account bytecode if it is non-empty.
+    pub fn code_hash(&self) -> Option<B256> {
+        self.non_empty_code().map(keccak256)
+    }
+
     /// Set the storage.
     pub fn with_storage(mut self, storage: Option<BTreeMap<B256, B256>>) -> Self {
         self.storage = storage;
@@ -277,6 +287,7 @@ impl GenesisAccount {
 
 impl From<GenesisAccount> for TrieAccount {
     fn from(account: GenesisAccount) -> Self {
+        let code_hash = account.code_hash().unwrap_or(KECCAK_EMPTY);
         let storage_root = account
             .storage
             .map(|storage| {
@@ -293,7 +304,7 @@ impl From<GenesisAccount> for TrieAccount {
             nonce: account.nonce.unwrap_or_default(),
             balance: account.balance,
             storage_root,
-            code_hash: account.code.map_or(KECCAK_EMPTY, keccak256),
+            code_hash,
         }
     }
 }
@@ -305,6 +316,9 @@ impl From<GenesisAccount> for TrieAccount {
 /// Governs crucial blockchain behavior and adaptability.
 ///
 /// Encapsulates parameters shaping network evolution and behavior.
+///
+/// `Default` is a minimally populated configuration with chain ID 1 and every fork activation
+/// unset. It is not Ethereum mainnet's historical chain configuration.
 ///
 /// See [geth's `ChainConfig`
 /// struct](https://github.com/ethereum/go-ethereum/blob/v1.14.0/params/config.go#L326)
@@ -1061,15 +1075,17 @@ impl ChainConfig {
         self.is_active_at_block(self.gray_glacier_block, block)
     }
 
-    /// Checks if the blockchain is active at or after the Shanghai fork block and the specified
-    /// timestamp.
+    /// Returns whether London is active at `block` and Shanghai is active at `timestamp`.
+    ///
+    /// Returns `false` if either activation is unset.
     pub fn is_shanghai_active_at_block_and_timestamp(&self, block: u64, timestamp: u64) -> bool {
         self.is_london_active_at_block(block)
             && self.is_active_at_timestamp(self.shanghai_time, timestamp)
     }
 
-    /// Checks if the blockchain is active at or after the Cancun fork block and the specified
-    /// timestamp.
+    /// Returns whether London is active at `block` and Cancun is active at `timestamp`.
+    ///
+    /// Returns `false` if either activation is unset.
     pub fn is_cancun_active_at_block_and_timestamp(&self, block: u64, timestamp: u64) -> bool {
         self.is_london_active_at_block(block)
             && self.is_active_at_timestamp(self.cancun_time, timestamp)
@@ -2290,6 +2306,22 @@ mod tests {
 
         let result: Result<GenesisAccount, _> = serde_json::from_value(json_data);
         assert!(result.is_err()); // The deserialization should fail due to an empty string
+    }
+
+    #[test]
+    fn genesis_account_code_helpers() {
+        let account = GenesisAccount::default();
+        assert_eq!(account.non_empty_code(), None);
+        assert_eq!(account.code_hash(), None);
+
+        let account = GenesisAccount::default().with_code(Some(Bytes::new()));
+        assert_eq!(account.non_empty_code(), None);
+        assert_eq!(account.code_hash(), None);
+
+        let code = Bytes::from(vec![0x60, 0x61]);
+        let account = GenesisAccount::default().with_code(Some(code.clone()));
+        assert_eq!(account.non_empty_code(), Some(&code));
+        assert_eq!(account.code_hash(), Some(keccak256(&code)));
     }
 
     #[test]

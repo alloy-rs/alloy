@@ -1,11 +1,12 @@
 # alloy-eip5792
 
-Types for the Wallet Call API.
+Legacy sequencer-specific Wallet Call API types.
 
-- `wallet_getCapabilities` based on [EIP-5792][eip-5792], with the only capability being
-  `delegation`.
-- `wallet_sendTransaction` that can perform sequencer-sponsored [EIP-7702][eip-7702] delegations
-  and send other sequencer-sponsored transactions on behalf of EOAs with delegated code.
+These types model an earlier draft and do **not** implement the Final [EIP-5792] `wallet_sendCalls`
+schema. In particular, `SendCallsRequest` requires `from`, stores a chain ID per call, and has no
+top-level `id`, `chainId`, or `atomicRequired`. `WalletCapabilities` models a custom
+sequencer-sponsored [EIP-7702] delegation capability rather than EIP-5792's built-in `atomic`
+capability. Use this crate only with APIs that expect this legacy shape.
 
-[eip-5792]: https://eips.ethereum.org/EIPS/eip-5792
-[eip-7702]: https://eips.ethereum.org/EIPS/eip-7702
+[EIP-5792]: https://eips.ethereum.org/EIPS/eip-5792
+[EIP-7702]: https://eips.ethereum.org/EIPS/eip-7702

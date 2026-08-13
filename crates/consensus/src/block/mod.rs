@@ -187,6 +187,9 @@ impl<T: Encodable2718> Block<T, Header> {
     ///
     /// Computes and sets the `transactions_root` on the header automatically.
     /// `ommers_hash` is set to [`EMPTY_OMMER_ROOT_HASH`](crate::EMPTY_OMMER_ROOT_HASH).
+    ///
+    /// This updates no other header fields, creates a body without withdrawals, and does not
+    /// calculate the receipts root, validate transactions, or seal the header.
     pub fn from_transactions(
         mut header: Header,
         transactions: impl IntoIterator<Item = T>,

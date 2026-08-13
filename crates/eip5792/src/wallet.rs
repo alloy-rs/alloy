@@ -1,7 +1,7 @@
 use alloy_primitives::{map::HashMap, Address, ChainId};
 use serde::{Deserialize, Serialize};
 
-/// The capability to perform [EIP-7702][eip-7702] delegations, sponsored by the sequencer.
+/// A legacy, sequencer-specific capability for sponsored [EIP-7702][eip-7702] delegations.
 ///
 /// The sequencer will only perform delegations, and act on behalf of delegated accounts, if the
 /// account delegates to one of the addresses specified within this capability.
@@ -13,14 +13,16 @@ pub struct DelegationCapability {
     pub addresses: Vec<Address>,
 }
 
-/// Wallet capabilities for a specific chain.
+/// Legacy sequencer-specific wallet capabilities for a chain.
+///
+/// This is not the capability object defined by the Final EIP-5792 schema.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Capabilities {
     /// The capability to delegate.
     pub delegation: DelegationCapability,
 }
 
-/// A map of wallet capabilities per chain ID.
+/// A legacy map of sequencer-specific wallet capabilities per chain ID.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct WalletCapabilities(
     #[serde(with = "alloy_serde::quantity::hashmap")] pub HashMap<ChainId, Capabilities>,

@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Bug Fixes
+
+- [signer-local] Add fallible YubiHSM constructors ([#4128](https://github.com/alloy-rs/alloy/issues/4128))
+- [provider] Skip cache for requireCanonical block hash queries ([#4075](https://github.com/alloy-rs/alloy/issues/4075))
+
+### Dependencies
+
+- [deps] Bump lru to 0.18.2 ([#4131](https://github.com/alloy-rs/alloy/issues/4131))
+- Bump tokio-tungstenite to 0.29 ([#3969](https://github.com/alloy-rs/alloy/issues/3969))
+- [deps] Bump the ci-weekly group with 2 updates ([#4126](https://github.com/alloy-rs/alloy/issues/4126))
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Features
+
+- [eip7594] Reconstruct sidecars from sparse cells ([#4120](https://github.com/alloy-rs/alloy/issues/4120))
+- [genesis] Add account code helpers ([#4132](https://github.com/alloy-rs/alloy/issues/4132))
+- [rpc-types-trace] Add EIP-8037 state-gas fields ([#4113](https://github.com/alloy-rs/alloy/issues/4113))
+- [contract] Add call timeout futures ([#4119](https://github.com/alloy-rs/alloy/issues/4119))
+- [consensus] Add EIP-8070 blob clearing helpers ([#4121](https://github.com/alloy-rs/alloy/issues/4121))
+- [provider] Add trace chain subscription ([#4116](https://github.com/alloy-rs/alloy/issues/4116))
+- [contract] Convert multicall errors ([#4118](https://github.com/alloy-rs/alloy/issues/4118))
+- [rpc-types] Add debug_traceChain result type ([#4115](https://github.com/alloy-rs/alloy/issues/4115))
+
+### Styling
+
+- [eips] Remove redundant format import ([#4134](https://github.com/alloy-rs/alloy/issues/4134))
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Bug Fixes
@@ -35,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.3.0
 - Add bogota hardfork for support ([#4087](https://github.com/alloy-rs/alloy/issues/4087))
 
 ### Testing

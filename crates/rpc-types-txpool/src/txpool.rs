@@ -9,21 +9,28 @@ use serde::{
 };
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
-/// Transaction summary as found in the Txpool Inspection property.
+/// Transaction summary as found in the txpool inspection response.
+///
+/// Its Geth wire representation is a string of the form
+/// `<to>: <value> wei + <gas> gas × <gas_price> wei`; contract creation uses
+/// `contract creation` in place of the recipient.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TxpoolInspectSummary {
     /// Recipient (None when contract creation)
     pub to: Option<Address>,
-    /// Transferred value
+    /// Transferred value, in wei.
     pub value: U256,
     /// Gas amount
     pub gas: u64,
-    /// Gas Price
+    /// Gas price or fee cap, in wei per gas.
     pub gas_price: u128,
 }
 
 impl TxpoolInspectSummary {
     /// Extracts the [`TxpoolInspectSummary`] from a transaction.
+    ///
+    /// For a dynamic-fee transaction, `gas_price` is its maximum fee per gas, not an effective
+    /// price paid in a mined block.
     pub fn from_tx<T: TransactionTrait>(tx: T) -> Self {
         Self {
             to: tx.to(),
@@ -122,14 +129,19 @@ impl Serialize for TxpoolInspectSummary {
 /// the transactions currently pending for inclusion in the next block(s), as well
 /// as the ones that are being scheduled for future execution only.
 ///
+/// The wire shape is sender address to decimal nonce string to transaction. `pending` entries are
+/// executable, while `queued` entries are held for future execution, commonly because of nonce
+/// gaps. Iterators follow [`BTreeMap`] key order: senders are ordered by address, but nonce strings
+/// are lexicographic rather than numeric. Parse nonce keys before relying on numeric order.
+///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: Serialize"))]
 pub struct TxpoolContent<T = Transaction> {
-    /// pending tx
+    /// Transactions currently executable by sender and decimal nonce string.
     #[serde(serialize_with = "serialize_checksum_address_map")]
     pub pending: BTreeMap<Address, BTreeMap<String, T>>,
-    /// queued tx
+    /// Transactions queued for future execution by sender and decimal nonce string.
     #[serde(serialize_with = "serialize_checksum_address_map")]
     pub queued: BTreeMap<Address, BTreeMap<String, T>>,
 }

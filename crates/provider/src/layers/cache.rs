@@ -19,11 +19,15 @@ use serde::{Deserialize, Serialize};
 use std::{io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc};
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
-/// In order to initialize the caching layer, the path to the cache file is provided along with the
-/// max number of items that are stored in the in-memory LRU cache.
+/// The cache is an in-memory LRU with a fixed maximum item count. Block-sensitive methods are
+/// cached only for explicit block numbers or hashes; dynamic tags such as `latest` and `pending`
+/// bypass the cache. Log queries are cached only when pinned to a block hash or a fixed numeric
+/// range. It also caches block receipts, included transactions, raw transactions, and transaction
+/// receipts; other [`Provider`] methods pass through to the inner provider.
 ///
-/// One can load the cache from the file system by calling `load_cache` and save the cache to the
-/// file system by calling `save_cache`.
+/// Persistence is opt-in. Obtain a [`SharedCache`] with [`CacheLayer::cache`] before applying the
+/// layer, retain that handle, and use [`SharedCache::load_cache`] or [`SharedCache::save_cache`].
+/// There is no automatic persistence or invalidation.
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
     /// In-memory LRU cache, mapping requests to responses.
@@ -64,9 +68,8 @@ where
 /// from the [`Provider`] trait. It attempts to fetch from the cache and fallbacks to
 /// the RPC in case of a cache miss.
 ///
-/// Most importantly, the [`CacheProvider`] adds `save_cache` and `load_cache` methods
-/// to the provider interface, allowing users to save the cache to disk and load it
-/// from there on demand.
+/// Access to persistence remains on the shared [`SharedCache`] handle obtained from
+/// [`CacheLayer::cache`].
 #[derive(Debug, Clone)]
 pub struct CacheProvider<P, N> {
     /// Inner provider.
@@ -533,7 +536,7 @@ impl SharedCache {
         self.max_items.get() as u32
     }
 
-    /// Puts a value into the cache, and returns the old value if it existed.
+    /// Puts a value into the cache and returns whether an existing value was replaced.
     pub fn put(&self, key: B256, value: String) -> TransportResult<bool> {
         Ok(self.inner.write().put(key, value).is_some())
     }
@@ -570,8 +573,10 @@ impl SharedCache {
         Ok(())
     }
 
-    /// Loads the cache from a file specified by the path.
-    /// If the file does not exist, it returns without error.
+    /// Loads entries from a file and merges them into the existing cache.
+    ///
+    /// Existing keys may be replaced, and entries beyond the configured capacity are evicted
+    /// according to the LRU policy. If the file does not exist, this returns without error.
     pub fn load_cache(&self, path: PathBuf) -> TransportResult<()> {
         if !path.exists() {
             return Ok(());
