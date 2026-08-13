@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [rpc-types-trace] Add EIP-8037 state-gas fields ([#4113](https://github.com/alloy-rs/alloy/issues/4113))
 - [rpc-types] Add debug_traceChain result type ([#4115](https://github.com/alloy-rs/alloy/issues/4115))
 
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Miscellaneous Tasks

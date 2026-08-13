@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [contract] Add call timeout futures ([#4119](https://github.com/alloy-rs/alloy/issues/4119))
 - [provider] Add trace chain subscription ([#4116](https://github.com/alloy-rs/alloy/issues/4116))
 
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Bug Fixes
