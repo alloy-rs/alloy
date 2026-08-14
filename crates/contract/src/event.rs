@@ -273,6 +273,11 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     /// Attempts the full block range optimistically first. If that fails, splits the range into
     /// `chunk_size`-block windows queried concurrently (up to `max_concurrent` at a time). If an
     /// individual chunk still fails, falls back to querying each block individually.
+    ///
+    /// # Errors
+    ///
+    /// If the initial request fails, this method returns a local usage error for block hash filters
+    /// and for ranges that use [`BlockNumberOrTag::Pending`].
     pub async fn query_raw(&self) -> TransportResult<Vec<Log>> {
         if let Ok(logs) = self.provider.get_logs(&self.filter).await {
             return Ok(logs);
@@ -424,16 +429,22 @@ impl<E: SolEvent> EventPoller<E> {
 
 /// Resolves a [`BlockNumberOrTag`] to a concrete block number.
 ///
-/// Returns `0` for [`BlockNumberOrTag::Earliest`] and fetches the latest block number from the
-/// provider for any other non-numeric tag (e.g. `Latest`, `Pending`, `Safe`, `Finalized`).
+/// Returns `0` for [`BlockNumberOrTag::Earliest`] and uses [`Provider::get_block_number_by_id`]
+/// to resolve `Latest`, `Safe`, and `Finalized`.
+///
+/// Returns a local usage error for [`BlockNumberOrTag::Pending`].
 async fn resolve_block_tag<P: Provider<N>, N: Network>(
     provider: &P,
     tag: BlockNumberOrTag,
 ) -> TransportResult<u64> {
-    match tag.as_number() {
-        Some(n) => Ok(n),
-        None if tag == BlockNumberOrTag::Earliest => Ok(0),
-        None => provider.get_block_number().await,
+    match tag {
+        BlockNumberOrTag::Number(number) => Ok(number),
+        BlockNumberOrTag::Earliest => Ok(0),
+        BlockNumberOrTag::Pending => Err(RpcError::local_usage_str(
+            "chunked queries require a concrete block range, not a pending block tag",
+        )),
+        // Latest, Safe, Finalized
+        _ => provider.get_block_number_by_id(tag.into()).await?.ok_or(RpcError::NullResp),
     }
 }
 
@@ -499,8 +510,10 @@ mod tests {
     use super::*;
     use alloy_network::EthereumWallet;
     use alloy_primitives::U256;
+    use alloy_rpc_types_eth::Header;
     use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
+    use alloy_transport::mock::Asserter;
 
     sol! {
         // solc v0.8.24; solc a.sol --via-ir --optimize --bin
@@ -775,5 +788,103 @@ mod tests {
 
         assert_eq!(chunked.len(), 3, "expected exactly 3 events across all chunks");
         assert_eq!(chunked, reference, "chunked result must match full-range query");
+    }
+
+    /// Verifies that `safe` and `finalized` fail with `NullResp` when the node has no such block
+    #[tokio::test]
+    async fn resolve_block_tag_errors_when_finality_block_is_unavailable() {
+        for tag in [BlockNumberOrTag::Safe, BlockNumberOrTag::Finalized] {
+            let asserter = Asserter::new();
+            let provider =
+                alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+            // The requested finality block is not available
+            asserter.push_success(&Option::<Header>::None);
+
+            let err = resolve_block_tag(&provider, tag).await.unwrap_err();
+
+            assert!(err.is_null_resp(), "{tag}: expected NullResp, got: {err}");
+        }
+    }
+
+    /// Verifies that chunking rejects [`BlockNumberOrTag::Pending`] at either end of a range
+    #[tokio::test]
+    async fn chunked_query_rejects_pending_block_tags() {
+        let filters = [
+            Filter::new().from_block(BlockNumberOrTag::Pending).to_block(BlockNumberOrTag::Pending),
+            Filter::new().from_block(1u64).to_block(BlockNumberOrTag::Pending),
+            Filter::new().from_block(BlockNumberOrTag::Pending).to_block(1u64),
+        ];
+
+        for filter in filters {
+            let asserter = Asserter::new();
+            let provider =
+                alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+            // Force the numeric chunked fallback
+            asserter.push_failure_msg("full-range query failed");
+
+            let block_option = filter.block_option;
+            let event: Event<_, MyContract::MyEvent, Ethereum> = Event::new(provider, filter);
+            let err = event.chunked().chunk_size(10).query_raw().await.unwrap_err();
+
+            assert!(
+                err.is_local_usage_error(),
+                "{block_option:?}: expected a usage error, got: {err}"
+            );
+        }
+    }
+
+    /// Verifies that a chunked query resolves `finalized`, `safe`, and `latest` separately
+    #[tokio::test]
+    async fn chunked_query_resolves_block_tags() {
+        use alloy_provider::ext::AnvilApi;
+
+        let anvil = alloy_node_bindings::Anvil::new().spawn();
+
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+        let provider = alloy_provider::ProviderBuilder::new()
+            .wallet(EthereumWallet::from(pk))
+            .connect_http(anvil.endpoint_url());
+
+        let contract = MyContract::deploy(&provider).await.unwrap();
+
+        // Emit three events far enough apart for finalized, safe, and latest queries
+        let mut emitted = Vec::new();
+        for i in 0..3 {
+            if i > 0 {
+                provider.anvil_mine(Some(40), None).await.unwrap();
+            }
+            let receipt = contract.doEmit().send().await.unwrap().get_receipt().await.unwrap();
+            emitted.push(receipt.block_number.unwrap());
+        }
+
+        for (tag, expected) in [
+            (BlockNumberOrTag::Finalized, &emitted[..1]),
+            (BlockNumberOrTag::Safe, &emitted[..2]),
+            (BlockNumberOrTag::Latest, &emitted[..3]),
+        ] {
+            let tag_block_number =
+                provider.get_block_by_number(tag).await.unwrap().unwrap().header.number;
+
+            // Anvil answers the full range in one call, so call get_logs_chunked() directly
+            // to make sure the tag is resolved by the chunking path
+            let logs = contract
+                .MyEvent_filter()
+                .from_block(0u64)
+                .to_block(tag)
+                .chunked()
+                .chunk_size(10)
+                .get_logs_chunked()
+                .await
+                .unwrap();
+
+            let actual = logs.iter().map(|log| log.block_number.unwrap()).collect::<Vec<_>>();
+            assert_eq!(
+                actual, expected,
+                "{tag} (block {tag_block_number}) cut the range at the wrong block"
+            );
+        }
     }
 }
