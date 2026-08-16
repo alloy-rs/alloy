@@ -7,10 +7,16 @@ use std::fmt;
 use thiserror::Error;
 
 /// A Trezor derivation-path preset.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DerivationType {
     /// Standard path `m/44'/60'/0'/0/<index>`.
     TrezorLive(usize),
+    /// Testnet path `m/44'/1'/0'/0/<index>`.
+    ///
+    /// Formerly used by Trezor Suite for testnets (e.g. Sepolia, Goerli, Holesky).
+    /// Note: Trezor Suite now defaults Sepolia to the standard Ethereum path `m/44'/60'/0'/0/<index>`,
+    /// but accounts previously created with the testnet path use this derivation.
+    TrezorTestnet(usize),
     /// Any other path.
     ///
     /// **Warning**: Trezor by default forbids custom derivation paths;
@@ -22,6 +28,7 @@ impl fmt::Display for DerivationType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             Self::TrezorLive(index) => write!(f, "m/44'/60'/0'/0/{index}"),
+            Self::TrezorTestnet(index) => write!(f, "m/44'/1'/0'/0/{index}"),
             Self::Other(inner) => f.write_str(inner),
         }
     }
