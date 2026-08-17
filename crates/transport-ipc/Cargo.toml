@@ -37,6 +37,7 @@ serde.workspace = true
 
 bytes = "1.5.0"
 interprocess = { version = "2", features = ["tokio"] }
+memchr = "2.7"
 tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
