@@ -527,6 +527,23 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             if let Some(watcher) = self.unconfirmed.remove(tx_hash) {
                 debug!(tx=%tx_hash, "reaped");
                 watcher.notify(Err(WatchTxError::Timeout));
+                continue;
+            }
+
+            // Also check waiting_confs — the tx may have been included in a block
+            // but is still waiting for additional confirmations.
+            let mut found = false;
+            for waiters in self.waiting_confs.values_mut() {
+                if let Some(pos) = waiters.iter().position(|w| w.config.tx_hash == *tx_hash) {
+                    let watcher = waiters.swap_remove(pos);
+                    debug!(tx=%tx_hash, "reaped from waiting confirmations");
+                    watcher.notify(Err(WatchTxError::Timeout));
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                debug!(tx=%tx_hash, "timeout fired but watcher already gone");
             }
         }
     }
