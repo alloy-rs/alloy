@@ -252,8 +252,11 @@ impl TxEip8141 {
         FRAME_TX_INTRINSIC_COST
             .saturating_add((self.frames.len() as u64).saturating_mul(FRAME_TX_PER_FRAME_COST))
             .saturating_add(self.signature_verification_gas())
+            // EIP-7976 charges every calldata byte as four floor tokens.
             .saturating_add(
-                self.frame_calldata_tokens().saturating_mul(FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN),
+                self.frame_calldata_len()
+                    .saturating_mul(4)
+                    .saturating_mul(FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN),
             )
     }
 
@@ -672,14 +675,15 @@ mod tests {
         assert_eq!(tx.signature_verification_gas(), 2_800);
         assert_eq!(tx.frame_calldata_tokens(), calldata_tokens);
         assert_eq!(tx.frame_calldata_len(), calldata_len);
-        assert_eq!(tx.calculate_gas_limit(), expected);
-        assert_eq!(tx.gas_limit(), expected);
+        let floor = FRAME_TX_INTRINSIC_COST
+            + 2 * FRAME_TX_PER_FRAME_COST
+            + 2_800
+            + calldata_len as u64 * 4 * FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN;
+        assert_eq!(tx.calculate_gas_limit(), expected.max(floor));
+        assert_eq!(tx.gas_limit(), expected.max(floor));
         assert_eq!(
             tx.calculate_calldata_floor(),
-            FRAME_TX_INTRINSIC_COST
-                + 2 * FRAME_TX_PER_FRAME_COST
-                + 2_800
-                + calldata_tokens * FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN
+            floor
         );
     }
 
