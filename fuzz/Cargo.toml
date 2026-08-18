@@ -1,0 +1,29 @@
+[package]
+name = "alloy-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+alloy-consensus = { path = "../crates/consensus" }
+alloy-eips = { path = "../crates/eips" }
+alloy-rlp = "0.3.16"
+libfuzzer-sys = "0.4"
+
+[build-dependencies]
+alloy-consensus = { path = "../crates/consensus" }
+alloy-eips = { path = "../crates/eips" }
+alloy-primitives = "1.6.1"
+alloy-rlp = "0.3.16"
+
+[[bin]]
+name = "consensus_rlp"
+path = "fuzz_targets/consensus_rlp.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
