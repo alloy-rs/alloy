@@ -67,17 +67,21 @@ pub use contract::*;
 #[cfg(feature = "provider")]
 pub use provider::*;
 
-/// ENS name or Ethereum Address.
+/// An ENS name or Ethereum address.
+///
+/// [`FromStr`] first attempts to parse an address, then treats a string containing `.` as a name.
+/// This is only a routing heuristic: it rejects dotless names and does not normalize or validate
+/// ENS names. In contrast, converting from [`String`] always creates [`Name`](Self::Name).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NameOrAddress {
-    /// An ENS Name (format does not get checked)
+    /// An ENS name. The value must already be ENSIP-15 normalized; its format is not checked.
     Name(String),
     /// An Ethereum Address
     Address(Address),
 }
 
 impl NameOrAddress {
-    /// Resolves the name to an Ethereum Address.
+    /// Resolves a name to an Ethereum address, or returns an address unchanged without an RPC call.
     #[cfg(feature = "provider")]
     pub async fn resolve<N: alloy_provider::Network, P: alloy_provider::Provider<N>>(
         &self,
