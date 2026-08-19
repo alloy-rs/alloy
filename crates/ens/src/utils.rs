@@ -1,7 +1,7 @@
 use alloy_primitives::{Address, Keccak256, B256};
 use std::borrow::Cow;
 
-/// Error returned by [`dns_encode`].
+/// Error returned by [`try_dns_encode`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DnsEncodeError {
     /// A label in the name is empty (e.g., consecutive dots or leading/trailing dot).
@@ -21,6 +21,35 @@ impl std::fmt::Display for DnsEncodeError {
 
 impl std::error::Error for DnsEncodeError {}
 
+/// Encodes a domain name into DNS wire format as specified in
+/// [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035).
+///
+/// Each label is prefixed with its length byte, and the name is terminated with a
+/// zero-length label (null byte).
+///
+/// This preserves the original infallible API and does not validate the name. Use
+/// [`try_dns_encode`] when encoding untrusted input for the Universal Resolver.
+///
+/// # Examples
+///
+/// ```
+/// use alloy_ens::dns_encode;
+/// assert_eq!(dns_encode("eth"), vec![3, b'e', b't', b'h', 0]);
+/// assert_eq!(
+///     dns_encode("vitalik.eth"),
+///     vec![7, b'v', b'i', b't', b'a', b'l', b'i', b'k', 3, b'e', b't', b'h', 0]
+/// );
+/// ```
+pub fn dns_encode(name: &str) -> Vec<u8> {
+    let mut result = Vec::with_capacity(name.len() + 2);
+    for label in name.split('.') {
+        result.push(label.len() as u8);
+        result.extend_from_slice(label.as_bytes());
+    }
+    result.push(0);
+    result
+}
+
 /// DNS wire-format encodes an ENS name for use with the Universal Resolver's `resolve()`.
 ///
 /// Each label is prefixed with its byte length and the sequence is terminated with `\x00`.
@@ -29,7 +58,7 @@ impl std::error::Error for DnsEncodeError {}
 /// Returns an error if any label is empty or exceeds 255 bytes. This matches ENS
 /// [`NameCoder`](https://github.com/ensdomains/ens-contracts/blob/staging/contracts/utils/NameCoder.sol),
 /// which uses a full length byte (not the RFC 1035 63-octet DNS message limit).
-pub fn dns_encode(name: &str) -> Result<Vec<u8>, DnsEncodeError> {
+pub fn try_dns_encode(name: &str) -> Result<Vec<u8>, DnsEncodeError> {
     if name.is_empty() {
         return Ok(vec![0]);
     }
@@ -136,24 +165,33 @@ mod tests {
 
     #[test]
     fn test_dns_encode() {
-        assert_eq!(dns_encode(""), Ok(vec![0]));
-        assert_eq!(dns_encode("foo.eth"), Ok(vec![3, b'f', b'o', b'o', 3, b'e', b't', b'h', 0]));
+        assert_eq!(dns_encode("eth"), vec![3, b'e', b't', b'h', 0]);
+        assert_eq!(dns_encode("foo.eth"), vec![3, b'f', b'o', b'o', 3, b'e', b't', b'h', 0]);
+    }
+
+    #[test]
+    fn test_try_dns_encode() {
+        assert_eq!(try_dns_encode(""), Ok(vec![0]));
         assert_eq!(
-            dns_encode("alice.eth"),
+            try_dns_encode("foo.eth"),
+            Ok(vec![3, b'f', b'o', b'o', 3, b'e', b't', b'h', 0])
+        );
+        assert_eq!(
+            try_dns_encode("alice.eth"),
             Ok(vec![5, b'a', b'l', b'i', b'c', b'e', 3, b'e', b't', b'h', 0])
         );
         // Known vector: "integration-tests.eth"
         assert_eq!(
-            dns_encode("integration-tests.eth"),
+            try_dns_encode("integration-tests.eth"),
             Ok(hex::decode("11696e746567726174696f6e2d74657374730365746800").unwrap())
         );
         // Empty label errors
-        assert_eq!(dns_encode(".eth").unwrap_err(), DnsEncodeError::EmptyLabel);
-        assert_eq!(dns_encode("foo..eth").unwrap_err(), DnsEncodeError::EmptyLabel);
+        assert_eq!(try_dns_encode(".eth").unwrap_err(), DnsEncodeError::EmptyLabel);
+        assert_eq!(try_dns_encode("foo..eth").unwrap_err(), DnsEncodeError::EmptyLabel);
         // Labels up to 255 bytes are valid for ENS DNS wire encoding / NameCoder.
         let max_label = "a".repeat(255) + ".eth";
-        assert!(dns_encode(&max_label).is_ok());
+        assert!(try_dns_encode(&max_label).is_ok());
         let too_long = "a".repeat(256) + ".eth";
-        assert_eq!(dns_encode(&too_long).unwrap_err(), DnsEncodeError::LabelTooLong);
+        assert_eq!(try_dns_encode(&too_long).unwrap_err(), DnsEncodeError::LabelTooLong);
     }
 }
