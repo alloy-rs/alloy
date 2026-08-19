@@ -194,7 +194,19 @@ impl TxEip8141 {
 
     /// Returns the sum of all frame gas limits.
     pub fn total_frame_gas_limit(&self) -> u64 {
-        self.frames.iter().fold(0u64, |acc, frame| acc.saturating_add(frame.gas_limit))
+        self.frames.iter().fold(0u64, |acc, frame| {
+            acc.saturating_add(frame.limits.execution.saturating_add(frame.limits.state))
+        })
+    }
+
+    /// Returns the sum of all frame execution gas limits.
+    pub fn total_frame_execution_gas_limit(&self) -> u64 {
+        self.frames.iter().fold(0u64, |acc, frame| acc.saturating_add(frame.limits.execution))
+    }
+
+    /// Returns the sum of all frame state gas limits.
+    pub fn total_frame_state_gas_limit(&self) -> u64 {
+        self.frames.iter().fold(0u64, |acc, frame| acc.saturating_add(frame.limits.state))
     }
 
     /// Returns the gas charged for protocol validation of all signature entries.
@@ -244,7 +256,8 @@ impl TxEip8141 {
     /// Calculates the derived total gas limit of this frame transaction.
     pub fn calculate_gas_limit(&self) -> u64 {
         let standard = self.calculate_gas_limit_with_token_cost(FRAME_TX_DATA_TOKEN_STANDARD_COST);
-        standard.max(self.calculate_calldata_floor())
+        standard
+            .max(self.calculate_calldata_floor().saturating_add(self.total_frame_state_gas_limit()))
     }
 
     /// Calculates the calldata floor gas for this frame transaction.
@@ -554,7 +567,7 @@ pub(super) mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_eips::eip8141::{ApprovalScope, FrameMode, SignatureScheme};
+    use alloy_eips::eip8141::{ApprovalScope, FrameLimits, FrameMode, SignatureScheme};
     use alloy_primitives::{Address, Bytes, U256};
 
     #[test]
@@ -567,7 +580,7 @@ mod tests {
                 mode: FrameMode::Verify,
                 flags: ApprovalScope::ExecutionAndPayment.into(),
                 target: Bytes::new(),
-                gas_limit: 21_000,
+                limits: FrameLimits { execution: 21_000, state: 0 },
                 value: U256::ZERO,
                 data: Bytes::new(),
             }],
@@ -646,11 +659,15 @@ mod tests {
         let tx = TxEip8141 {
             frames: vec![
                 Frame {
-                    gas_limit: 10,
+                    limits: FrameLimits { execution: 10, state: 3 },
                     data: Bytes::copy_from_slice(&[0, 1]),
                     ..Default::default()
                 },
-                Frame { gas_limit: 20, data: Bytes::copy_from_slice(&[2]), ..Default::default() },
+                Frame {
+                    limits: FrameLimits { execution: 20, state: 4 },
+                    data: Bytes::copy_from_slice(&[2]),
+                    ..Default::default()
+                },
             ],
             signatures: vec![FrameSignature {
                 scheme: SignatureScheme::Secp256k1,
@@ -669,9 +686,10 @@ mod tests {
             + 2 * FRAME_TX_PER_FRAME_COST
             + calldata_tokens * FRAME_TX_DATA_TOKEN_STANDARD_COST
             + 2_800
-            + 30;
+            + 37;
 
-        assert_eq!(tx.total_frame_gas_limit(), 30);
+        assert_eq!(tx.total_frame_gas_limit(), 37);
+        assert_eq!(tx.total_frame_execution_gas_limit(), 30);
         assert_eq!(tx.signature_verification_gas(), 2_800);
         assert_eq!(tx.frame_calldata_tokens(), calldata_tokens);
         assert_eq!(tx.frame_calldata_len(), calldata_len);
@@ -679,12 +697,10 @@ mod tests {
             + 2 * FRAME_TX_PER_FRAME_COST
             + 2_800
             + calldata_len as u64 * 4 * FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN;
-        assert_eq!(tx.calculate_gas_limit(), expected.max(floor));
-        assert_eq!(tx.gas_limit(), expected.max(floor));
-        assert_eq!(
-            tx.calculate_calldata_floor(),
-            floor
-        );
+        let floor_with_state = floor + tx.total_frame_state_gas_limit();
+        assert_eq!(tx.calculate_gas_limit(), expected.max(floor_with_state));
+        assert_eq!(tx.gas_limit(), expected.max(floor_with_state));
+        assert_eq!(tx.calculate_calldata_floor(), floor);
     }
 
     #[test]
@@ -694,7 +710,7 @@ mod tests {
                 mode: FrameMode::Sender,
                 flags: ApprovalScope::ExecutionAndPayment.into(),
                 target: Bytes::copy_from_slice(Address::repeat_byte(0x44).as_slice()),
-                gas_limit: u64::MAX,
+                limits: FrameLimits { execution: u64::MAX, state: u64::MAX },
                 value: U256::MAX,
                 data: Bytes::new(),
             }],
