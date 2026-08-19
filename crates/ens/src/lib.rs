@@ -381,6 +381,12 @@ mod provider {
         /// Uses the shared default HTTP CCIP Read client. For a custom gateway, URL
         /// policy, or limits, use [`Self::resolve_name_with_ccip_read`].
         ///
+        /// CCIP Read round trips issue an initial `eth_call`, an off-chain gateway
+        /// fetch, and a callback `eth_call`, all against [`BlockId::latest`]. Chain
+        /// state backing that tag can move between those steps. ERC-3668 resolvers
+        /// typically bind signed gateway payloads to the lookup; Alloy does not
+        /// enforce that itself.
+        ///
         /// [Universal Resolver]: https://docs.ens.domains/web/ensv2-readiness
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError>;
 
@@ -388,6 +394,9 @@ mod provider {
         ///
         /// Pass a custom [`CcipReadClient`] to proxy, allowlist/blocklist, or otherwise
         /// constrain contract-controlled gateway URLs as recommended by ERC-3668.
+        ///
+        /// Uses [`BlockId::latest`] for both the initial call and the CCIP callback.
+        /// See [`Self::resolve_name`] for the chain-head drift tradeoff.
         async fn resolve_name_with_ccip_read<G: CcipReadGateway>(
             &self,
             name: &str,
@@ -407,6 +416,9 @@ mod provider {
         ) -> Result<Bytes, EnsError>;
 
         /// Like [`Self::resolve_name_for_coin_type`], but uses the provided CCIP Read client.
+        ///
+        /// Uses [`BlockId::latest`] for both the initial call and the CCIP callback.
+        /// See [`Self::resolve_name`] for the chain-head drift tradeoff.
         async fn resolve_name_for_coin_type_with_ccip_read<G: CcipReadGateway>(
             &self,
             name: &str,
@@ -418,6 +430,9 @@ mod provider {
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError>;
 
         /// Like [`Self::lookup_address`], but uses the provided CCIP Read client.
+        ///
+        /// Uses [`BlockId::latest`] for both the initial call and the CCIP callback.
+        /// See [`Self::resolve_name`] for the chain-head drift tradeoff.
         async fn lookup_address_with_ccip_read<G: CcipReadGateway>(
             &self,
             address: &Address,
@@ -428,6 +443,9 @@ mod provider {
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError>;
 
         /// Like [`Self::lookup_txt`], but uses the provided CCIP Read client.
+        ///
+        /// Uses [`BlockId::latest`] for both the initial call and the CCIP callback.
+        /// See [`Self::resolve_name`] for the chain-head drift tradeoff.
         async fn lookup_txt_with_ccip_read<G: CcipReadGateway>(
             &self,
             name: &str,
@@ -535,11 +553,9 @@ mod provider {
         ) -> Result<Bytes, EnsError> {
             let node = namehash(name);
             let dns = try_dns_encode(name)?;
-            let calldata = EnsMulticoinResolver::addrCall {
-                node,
-                coin_type: U256::from(coin_type),
-            }
-            .abi_encode();
+            let calldata =
+                EnsMulticoinResolver::addrCall { node, coin_type: U256::from(coin_type) }
+                    .abi_encode();
 
             let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
                 .resolve(dns.into(), calldata.into())
@@ -582,8 +598,12 @@ mod provider {
         }
 
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError> {
-            self.lookup_txt_with_ccip_read(name, key, alloy_provider::shared_http_ccip_read_client())
-                .await
+            self.lookup_txt_with_ccip_read(
+                name,
+                key,
+                alloy_provider::shared_http_ccip_read_client(),
+            )
+            .await
         }
 
         async fn lookup_txt_with_ccip_read<G: CcipReadGateway>(
@@ -637,7 +657,13 @@ mod provider {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use alloy_provider::transport::TransportErrorKind;
+        use alloy_json_rpc::ErrorPayload;
+        use alloy_primitives::{bytes, Address};
+        use alloy_provider::{
+            transport::{TransportError, TransportErrorKind},
+            CcipReadGatewayError,
+        };
+        use alloy_sol_types::SolError;
 
         #[test]
         fn preserves_existing_ens_transport_error_category() {
@@ -645,6 +671,47 @@ mod provider {
             assert!(matches!(
                 map_ccip_error(error, "test.eth", EnsError::Resolve),
                 EnsError::Resolve(_)
+            ));
+        }
+
+        #[test]
+        fn maps_non_transport_ccip_errors_to_ccip_read() {
+            let gateway = CcipReadError::Gateway(CcipReadGatewayError::new("gateway down"));
+            assert!(matches!(
+                map_ccip_error(gateway, "test.eth", EnsError::Resolve),
+                EnsError::CcipRead(_)
+            ));
+
+            let redirects = CcipReadError::TooManyRedirects(4);
+            assert!(matches!(
+                map_ccip_error(redirects, "test.eth", EnsError::Resolve),
+                EnsError::CcipRead(_)
+            ));
+
+            let mismatch = CcipReadError::SenderMismatch {
+                sender: Address::ZERO,
+                target: Address::repeat_byte(1),
+            };
+            assert!(matches!(
+                map_ccip_error(mismatch, "test.eth", EnsError::Resolve),
+                EnsError::CcipRead(_)
+            ));
+        }
+
+        #[test]
+        fn maps_resolver_not_found_wrapped_in_ccip_transport() {
+            let revert: alloy_primitives::Bytes =
+                UniversalResolver23::ResolverNotFound { name: bytes!("03666f6f0365746800") }
+                    .abi_encode()
+                    .into();
+            let payload = ErrorPayload::internal_error_with_message_and_obj(
+                "execution reverted".into(),
+                serde_json::value::to_raw_value(&revert).unwrap(),
+            );
+            let error = CcipReadError::Transport(TransportError::ErrorResp(payload));
+            assert!(matches!(
+                map_ccip_error(error, "foo.eth", EnsError::Resolve),
+                EnsError::ResolverNotFound(name) if name == "foo.eth"
             ));
         }
     }
@@ -819,10 +886,7 @@ mod provider_tests {
             )
             .await
             .unwrap();
-        assert_eq!(
-            res.as_ref(),
-            address!("0xa66E90D515F576f49Af2dF40952476D56F72A420").as_slice()
-        );
+        assert_eq!(res.as_ref(), address!("0xa66E90D515F576f49Af2dF40952476D56F72A420").as_slice());
     }
 
     #[tokio::test]
