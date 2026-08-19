@@ -108,7 +108,13 @@ tokio-tungstenite.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]
-ccip-read = ["reqwest"]
+# ERC-3668 / ENSIP-21 protocol client. Does not enable an HTTP gateway or the
+# provider's reqwest JSON-RPC transport — pair with `ccip-read-http` or supply a
+# custom [`CcipReadGateway`].
+ccip-read = []
+# Default HTTPS [`HttpCcipReadGateway`] backed by the `reqwest` crate only.
+# Does not enable `alloy-transport-http` / `alloy-rpc-client` reqwest transport.
+ccip-read-http = ["ccip-read", "dep:reqwest"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",

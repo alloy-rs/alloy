@@ -193,9 +193,10 @@ mod contract {
         /// `reverse(bytes,uint256)`; the historical 1-arg `reverse(bytes reverseName)`
         /// binding did not match the chain and is not preserved.
         ///
-        /// Note: CCIP Read requires client-side handling of the `OffchainLookup` revert
-        /// (ERC-3668). Alloy does not currently implement this; calls to names that require
-        /// CCIP Read will surface as [`EnsError::Resolve`].
+        /// Provider-based ENS helpers in this crate do not yet follow `OffchainLookup`
+        /// redirects. Enable `alloy-provider`'s `ccip-read` / `ccip-read-http` features
+        /// (and the follow-up ENS wiring) for ERC-3668 handling; until then, names that
+        /// require CCIP Read surface as [`EnsError::Resolve`].
         #[sol(rpc)]
         contract UniversalResolver {
             error ResolverNotFound(bytes name);
