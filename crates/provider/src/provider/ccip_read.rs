@@ -1,4 +1,11 @@
 //! CCIP Read (ERC-3668) support for `eth_call`.
+//!
+//! Gateway URLs in [`CcipReadRequest::urls`] come from the contract that emitted
+//! `OffchainLookup` and are therefore untrusted. The default
+//! [`HttpCcipReadGateway`] only requires the `https` scheme: it does **not**
+//! block private, link-local, loopback, or cloud-metadata addresses (for
+//! example `169.254.169.254` or `127.0.0.0/8`). Callers that need an allowlist,
+//! blocklist, or resolved-IP check should supply a custom [`CcipReadGateway`].
 
 use crate::Provider;
 use alloy_eips::BlockId;
@@ -19,6 +26,12 @@ use std::sync::{
     Arc,
 };
 
+/// ENSIP-21 local batch-gateway sentinel (`x-batch-gateway:true`).
+///
+/// If this value appears **anywhere** in [`CcipReadRequest::urls`], the client
+/// handles the request as an ENSIP-21 local batch and does **not** try the other
+/// URLs in that list. That prefers the local batch protocol over ERC-3668
+/// HTTP fallback order when a resolver advertises both.
 const BATCH_GATEWAY_SENTINEL: &str = "x-batch-gateway:true";
 #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 const HTTP_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -92,7 +105,11 @@ impl Default for CcipReadConfig {
 pub struct CcipReadRequest {
     /// The contract that emitted the revert.
     pub sender: Address,
-    /// Gateway URL templates, in fallback order.
+    /// Gateway URL templates, in ERC-3668 fallback order.
+    ///
+    /// If `x-batch-gateway:true` is present anywhere in this list, HTTP URLs in
+    /// the same list are not contacted. That prefers the ENSIP-21 local batch
+    /// protocol over ERC-3668 HTTP fallback order when a resolver advertises both.
     pub urls: Vec<String>,
     /// Data supplied by the reverting contract.
     pub data: Bytes,
@@ -173,6 +190,15 @@ pub trait CcipReadGateway: Send + Sync {
 /// The default HTTPS implementation of [`CcipReadGateway`].
 ///
 /// Available behind the `ccip-read-http` feature.
+///
+/// # URL trust
+///
+/// Templates in [`CcipReadRequest::urls`] are chosen by the callee contract.
+/// This gateway checks only that each URL (and each redirect) uses `https`. It
+/// will follow an `https` URL to a private, link-local, loopback, or cloud
+/// metadata address. To constrain destinations, construct
+/// [`HttpCcipReadGateway::new`] with a custom [`reqwest::Client`] or implement
+/// [`CcipReadGateway`] with your own allowlist, blocklist, or DNS/IP policy.
 #[derive(Clone, Debug)]
 #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 pub struct HttpCcipReadGateway {
@@ -223,6 +249,98 @@ struct GatewayRequestBody<'a> {
 #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 struct GatewayResponse {
     data: Bytes,
+}
+
+/// Outcome of classifying one HTTP gateway response.
+#[derive(Debug)]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+enum GatewayResponseOutcome {
+    Data(Bytes),
+    Fatal(CcipReadGatewayError),
+    Retry(CcipReadGatewayError),
+}
+
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+fn is_http_client_error(status: u16) -> bool {
+    (400..500).contains(&status)
+}
+
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+fn is_http_success(status: u16) -> bool {
+    (200..300).contains(&status)
+}
+
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+fn size_limit_error(status: u16) -> CcipReadGatewayError {
+    CcipReadGatewayError::http(status, "gateway response exceeded configured size limit")
+}
+
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+fn classify_content_length(
+    status: u16,
+    content_length: Option<u64>,
+    max_response_size: usize,
+) -> Option<GatewayResponseOutcome> {
+    let length = content_length?;
+    if length <= max_response_size as u64 {
+        return None;
+    }
+    let error = size_limit_error(status);
+    Some(if is_http_client_error(status) {
+        GatewayResponseOutcome::Fatal(error)
+    } else {
+        GatewayResponseOutcome::Retry(error)
+    })
+}
+
+/// Classifies a fully buffered gateway HTTP body.
+///
+/// Used after the response has been read (or when the advertised Content-Length
+/// is absent and the streamed body itself must be size-checked).
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+fn classify_buffered_gateway_response(
+    status: u16,
+    content_type: &str,
+    body: &[u8],
+    max_response_size: usize,
+) -> GatewayResponseOutcome {
+    if body.len() > max_response_size {
+        let error = size_limit_error(status);
+        return if is_http_client_error(status) {
+            GatewayResponseOutcome::Fatal(error)
+        } else {
+            GatewayResponseOutcome::Retry(error)
+        };
+    }
+    if is_http_client_error(status) {
+        return GatewayResponseOutcome::Fatal(CcipReadGatewayError::http(
+            status,
+            response_message(body),
+        ));
+    }
+    if !is_http_success(status) {
+        return GatewayResponseOutcome::Retry(CcipReadGatewayError::http(
+            status,
+            response_message(body),
+        ));
+    }
+    if !content_type
+        .split(';')
+        .next()
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("application/json"))
+    {
+        return GatewayResponseOutcome::Retry(CcipReadGatewayError::http(
+            status,
+            "gateway response was not application/json",
+        ));
+    }
+    match serde_json::from_slice::<GatewayResponse>(body) {
+        Ok(response) => GatewayResponseOutcome::Data(response.data),
+        Err(err) => GatewayResponseOutcome::Retry(CcipReadGatewayError::http(
+            status,
+            format!("invalid gateway response: {err}"),
+        )),
+    }
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -280,18 +398,17 @@ impl CcipReadGateway for HttpCcipReadGateway {
                 }
             };
 
-            let status = response.status();
-            if let Some(length) = response.content_length() {
-                if length > max_response_size as u64 {
-                    let error = CcipReadGatewayError::http(
-                        status.as_u16(),
-                        "gateway response exceeded configured size limit",
-                    );
-                    if status.is_client_error() {
-                        return Err(error);
+            let status = response.status().as_u16();
+            if let Some(outcome) =
+                classify_content_length(status, response.content_length(), max_response_size)
+            {
+                match outcome {
+                    GatewayResponseOutcome::Fatal(error) => return Err(error),
+                    GatewayResponseOutcome::Retry(error) => {
+                        last_error = Some(error);
+                        continue;
                     }
-                    last_error = Some(error);
-                    continue;
+                    GatewayResponseOutcome::Data(_) => unreachable!(),
                 }
             }
 
@@ -309,10 +426,7 @@ impl CcipReadGateway for HttpCcipReadGateway {
                         body.extend_from_slice(&chunk);
                     }
                     Some(Ok(_)) => {
-                        break Some(CcipReadGatewayError::http(
-                            status.as_u16(),
-                            "gateway response exceeded configured size limit",
-                        ));
+                        break Some(size_limit_error(status));
                     }
                     Some(Err(err)) => {
                         break Some(CcipReadGatewayError::new(format!(
@@ -323,41 +437,22 @@ impl CcipReadGateway for HttpCcipReadGateway {
                 }
             };
             if let Some(error) = read_error {
-                if status.is_client_error() {
+                if is_http_client_error(status) {
                     return Err(error);
                 }
                 last_error = Some(error);
                 continue;
             }
 
-            if status.is_client_error() {
-                return Err(CcipReadGatewayError::http(status.as_u16(), response_message(&body)));
-            }
-            if !status.is_success() {
-                last_error =
-                    Some(CcipReadGatewayError::http(status.as_u16(), response_message(&body)));
-                continue;
-            }
-            if !content_type
-                .split(';')
-                .next()
-                .is_some_and(|value| value.trim().eq_ignore_ascii_case("application/json"))
-            {
-                last_error = Some(CcipReadGatewayError::http(
-                    status.as_u16(),
-                    "gateway response was not application/json",
-                ));
-                continue;
-            }
-
-            match serde_json::from_slice::<GatewayResponse>(&body) {
-                Ok(response) => return Ok(response.data),
-                Err(err) => {
-                    last_error = Some(CcipReadGatewayError::http(
-                        status.as_u16(),
-                        format!("invalid gateway response: {err}"),
-                    ));
-                }
+            match classify_buffered_gateway_response(
+                status,
+                &content_type,
+                &body,
+                max_response_size,
+            ) {
+                GatewayResponseOutcome::Data(data) => return Ok(data),
+                GatewayResponseOutcome::Fatal(error) => return Err(error),
+                GatewayResponseOutcome::Retry(error) => last_error = Some(error),
             }
         }
 
@@ -449,6 +544,11 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
         P: Provider<N>,
         N: Network,
     {
+        if self.config.max_concurrent_requests == 0 {
+            return Err(CcipReadError::InvalidConfig(
+                "max_concurrent_requests must be greater than zero".into(),
+            ));
+        }
         let target = transaction.to().ok_or(CcipReadError::MissingTarget)?;
         let context = BatchContext {
             total_requests: Arc::new(AtomicUsize::new(0)),
@@ -1185,5 +1285,119 @@ mod tests {
             .unwrap()
             .reason
             .contains("budget"));
+    }
+
+    #[tokio::test]
+    async fn rejects_zero_max_concurrent_requests_before_eth_call() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+        let client = CcipReadClient::new(MockGateway::default()).with_config(CcipReadConfig {
+            max_concurrent_requests: 0,
+            ..Default::default()
+        });
+
+        let error = client
+            .call(
+                &provider,
+                TransactionRequest::default()
+                    .to(address!("1111111111111111111111111111111111111111")),
+            )
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, CcipReadError::InvalidConfig(message) if message.contains("max_concurrent_requests")));
+    }
+
+    #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+    fn outcome_message(outcome: &GatewayResponseOutcome) -> &str {
+        match outcome {
+            GatewayResponseOutcome::Data(_) => "",
+            GatewayResponseOutcome::Fatal(error) | GatewayResponseOutcome::Retry(error) => {
+                &error.message
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+    fn buffered_gateway_response_table() {
+        let json_ok = br#"{"data":"0xdead"}"#;
+        match classify_buffered_gateway_response(200, "application/json", json_ok, 1024) {
+            GatewayResponseOutcome::Data(data) => assert_eq!(data, bytes!("dead")),
+            other => panic!("expected data, got {other:?}"),
+        }
+
+        let oversized = vec![b'x'; 16];
+        let outcome = classify_buffered_gateway_response(200, "application/json", &oversized, 8);
+        assert!(
+            matches!(outcome, GatewayResponseOutcome::Retry(_)),
+            "{outcome:?}"
+        );
+        assert!(outcome_message(&outcome).contains("size limit"));
+
+        let outcome =
+            classify_buffered_gateway_response(200, "text/plain", json_ok, 1024);
+        assert!(matches!(outcome, GatewayResponseOutcome::Retry(_)));
+        assert!(outcome_message(&outcome).contains("application/json"));
+
+        let outcome =
+            classify_buffered_gateway_response(200, "application/json", b"{\"data\":", 1024);
+        assert!(matches!(outcome, GatewayResponseOutcome::Retry(_)));
+        assert!(outcome_message(&outcome).contains("invalid gateway response"));
+
+        let outcome =
+            classify_buffered_gateway_response(200, "application/json", b"not json", 1024);
+        assert!(matches!(outcome, GatewayResponseOutcome::Retry(_)));
+        assert!(outcome_message(&outcome).contains("invalid gateway response"));
+    }
+
+    #[test]
+    #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+    fn content_length_precheck_rejects_oversized() {
+        assert!(classify_content_length(200, Some(16), 8).is_some());
+        assert!(classify_content_length(200, Some(8), 8).is_none());
+        assert!(classify_content_length(200, None, 8).is_none());
+    }
+
+    #[tokio::test]
+    #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
+    async fn http_gateway_rejects_empty_http_and_invalid_urls() {
+        let gateway = HttpCcipReadGateway::default();
+        let sender = address!("1111111111111111111111111111111111111111");
+
+        let empty = gateway
+            .request(
+                &CcipReadRequest { sender, urls: vec![], data: bytes!("") },
+                1024,
+            )
+            .await
+            .unwrap_err();
+        assert!(empty.message.contains("no gateway URLs"));
+
+        let http = gateway
+            .request(
+                &CcipReadRequest {
+                    sender,
+                    urls: vec!["http://example.test/{sender}/{data}".into()],
+                    data: bytes!(""),
+                },
+                1024,
+            )
+            .await
+            .unwrap_err();
+        assert!(http.message.contains("HTTPS"));
+
+        let invalid = gateway
+            .request(
+                &CcipReadRequest {
+                    sender,
+                    urls: vec!["not a url".into()],
+                    data: bytes!(""),
+                },
+                1024,
+            )
+            .await
+            .unwrap_err();
+        assert!(invalid.message.contains("invalid CCIP Read gateway URL"));
     }
 }
