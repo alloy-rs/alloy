@@ -118,20 +118,26 @@ reqwest = [
 reqwest-default-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-default-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-default-tls",
+    "alloy-ens?/reqwest-default-tls",
 ]
 reqwest-rustls-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-rustls-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-rustls-tls",
+    "alloy-ens?/reqwest-rustls-tls",
 ]
 reqwest-native-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-native-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-native-tls",
+    "alloy-ens?/reqwest-native-tls",
 ]
 hyper = [
     "alloy-rpc-client?/hyper",

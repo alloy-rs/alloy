@@ -37,11 +37,16 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
 contract = ["dep:alloy-contract", "dep:thiserror", "dep:alloy-sol-types"]
+# Enables Universal Resolver helpers with CCIP Read. Does not select a TLS backend —
+# enable one of the `reqwest-*-tls` features (or rely on the caller's choice via the
+# `alloy` meta-crate) so the default HTTPS gateway can speak TLS.
 provider = [
     "contract",
     "dep:alloy-eips",
     "dep:alloy-provider",
     "alloy-provider/ccip-read-http",
-    "alloy-provider/reqwest-default-tls",
     "dep:async-trait",
 ]
+reqwest-default-tls = ["provider", "alloy-provider/reqwest-default-tls"]
+reqwest-rustls-tls = ["provider", "alloy-provider/reqwest-rustls-tls"]
+reqwest-native-tls = ["provider", "alloy-provider/reqwest-native-tls"]

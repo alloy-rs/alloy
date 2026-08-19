@@ -329,7 +329,7 @@ mod provider {
     };
     use alloy_eips::BlockId;
     use alloy_primitives::{Address, Bytes, B256, U256};
-    use alloy_provider::{CcipReadError, Network, Provider, ProviderCcipReadExt};
+    use alloy_provider::{CcipReadClient, CcipReadError, CcipReadGateway, Network, Provider};
     use alloy_sol_types::{SolCall, SolValue};
 
     /// Extension trait for ENS contract calls.
@@ -378,8 +378,21 @@ mod provider {
         /// Routes through the [Universal Resolver], which handles wildcard resolvers
         /// and CCIP Read (ERC-3668).
         ///
+        /// Uses the shared default HTTP CCIP Read client. For a custom gateway, URL
+        /// policy, or limits, use [`Self::resolve_name_with_ccip_read`].
+        ///
         /// [Universal Resolver]: https://docs.ens.domains/web/ensv2-readiness
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError>;
+
+        /// Like [`Self::resolve_name`], but uses the provided CCIP Read client.
+        ///
+        /// Pass a custom [`CcipReadClient`] to proxy, allowlist/blocklist, or otherwise
+        /// constrain contract-controlled gateway URLs as recommended by ERC-3668.
+        async fn resolve_name_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            client: &CcipReadClient<G>,
+        ) -> Result<Address, EnsError>;
 
         /// Resolves an ENS name to a multichain address for the given coin type (ENSIP-11).
         ///
@@ -393,11 +406,34 @@ mod provider {
             coin_type: u64,
         ) -> Result<Bytes, EnsError>;
 
+        /// Like [`Self::resolve_name_for_coin_type`], but uses the provided CCIP Read client.
+        async fn resolve_name_for_coin_type_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            coin_type: u64,
+            client: &CcipReadClient<G>,
+        ) -> Result<Bytes, EnsError>;
+
         /// Performs a reverse lookup of an address to its primary ENS name.
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError>;
 
+        /// Like [`Self::lookup_address`], but uses the provided CCIP Read client.
+        async fn lookup_address_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            address: &Address,
+            client: &CcipReadClient<G>,
+        ) -> Result<String, EnsError>;
+
         /// Looks up a text record for an ENS name.
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError>;
+
+        /// Like [`Self::lookup_txt`], but uses the provided CCIP Read client.
+        async fn lookup_txt_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            key: &str,
+            client: &CcipReadClient<G>,
+        ) -> Result<String, EnsError>;
     }
 
     #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -452,6 +488,15 @@ mod provider {
         }
 
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError> {
+            self.resolve_name_with_ccip_read(name, alloy_provider::shared_http_ccip_read_client())
+                .await
+        }
+
+        async fn resolve_name_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            client: &CcipReadClient<G>,
+        ) -> Result<Address, EnsError> {
             let node = namehash(name);
             let dns = try_dns_encode(name)?;
             let calldata = EnsResolver::addrCall { node }.abi_encode();
@@ -459,8 +504,8 @@ mod provider {
             let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
                 .resolve(dns.into(), calldata.into())
                 .into_transaction_request();
-            let output = self
-                .call_with_ccip_read_at(transaction, BlockId::latest())
+            let output = client
+                .call_at(self, transaction, BlockId::latest())
                 .await
                 .map_err(|error| map_ccip_error(error, name, EnsError::Resolve))?;
             let ret = UniversalResolver::resolveCall::abi_decode_returns(&output)
@@ -474,6 +519,20 @@ mod provider {
             name: &str,
             coin_type: u64,
         ) -> Result<Bytes, EnsError> {
+            self.resolve_name_for_coin_type_with_ccip_read(
+                name,
+                coin_type,
+                alloy_provider::shared_http_ccip_read_client(),
+            )
+            .await
+        }
+
+        async fn resolve_name_for_coin_type_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            coin_type: u64,
+            client: &CcipReadClient<G>,
+        ) -> Result<Bytes, EnsError> {
             let node = namehash(name);
             let dns = try_dns_encode(name)?;
             let calldata = EnsMulticoinResolver::addrCall {
@@ -485,8 +544,8 @@ mod provider {
             let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
                 .resolve(dns.into(), calldata.into())
                 .into_transaction_request();
-            let output = self
-                .call_with_ccip_read_at(transaction, BlockId::latest())
+            let output = client
+                .call_at(self, transaction, BlockId::latest())
                 .await
                 .map_err(|error| map_ccip_error(error, name, EnsError::Resolve))?;
             let ret = UniversalResolver::resolveCall::abi_decode_returns(&output)
@@ -496,12 +555,24 @@ mod provider {
         }
 
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError> {
+            self.lookup_address_with_ccip_read(
+                address,
+                alloy_provider::shared_http_ccip_read_client(),
+            )
+            .await
+        }
+
+        async fn lookup_address_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            address: &Address,
+            client: &CcipReadClient<G>,
+        ) -> Result<String, EnsError> {
             let reverse_name = reverse_address(address);
             let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
                 .reverse(Bytes::copy_from_slice(address.as_slice()), U256::from(coin_type::ETH))
                 .into_transaction_request();
-            let output = self
-                .call_with_ccip_read_at(transaction, BlockId::latest())
+            let output = client
+                .call_at(self, transaction, BlockId::latest())
                 .await
                 .map_err(|error| map_ccip_error(error, &reverse_name, EnsError::Lookup))?;
             let ret = UniversalResolver::reverseCall::abi_decode_returns(&output)
@@ -511,6 +582,16 @@ mod provider {
         }
 
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError> {
+            self.lookup_txt_with_ccip_read(name, key, alloy_provider::shared_http_ccip_read_client())
+                .await
+        }
+
+        async fn lookup_txt_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            key: &str,
+            client: &CcipReadClient<G>,
+        ) -> Result<String, EnsError> {
             let node = namehash(name);
             let dns = try_dns_encode(name)?;
             let calldata = EnsResolver::textCall { node, key: key.to_string() }.abi_encode();
@@ -518,8 +599,8 @@ mod provider {
             let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
                 .resolve(dns.into(), calldata.into())
                 .into_transaction_request();
-            let output = self
-                .call_with_ccip_read_at(transaction, BlockId::latest())
+            let output = client
+                .call_at(self, transaction, BlockId::latest())
                 .await
                 .map_err(|error| map_ccip_error(error, name, EnsError::ResolveTxtRecord))?;
             let ret = UniversalResolver::resolveCall::abi_decode_returns(&output)
@@ -680,29 +761,33 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_reverse_registrar_fetching_mainnet() {
-        let res = provider().get_reverse_registrar().await;
+        let provider = provider();
+        let res = provider.get_reverse_registrar().await;
         assert_eq!(*res.unwrap().address(), address!("0xa58E81fe9b61B5c3fE2AFD33CF304c454AbFc7Cb"));
     }
 
     #[tokio::test]
     async fn test_pub_resolver_fetching_mainnet() {
+        let provider = provider();
         let name = "vitalik.eth";
         let node = namehash(name);
-        let res = provider().get_resolver(node, name).await;
+        let res = provider.get_resolver(node, name).await;
         assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
     }
 
     #[tokio::test]
     async fn test_get_resolver_for_name_mainnet() {
-        let res = provider().get_resolver_for_name("vitalik.eth").await;
+        let provider = provider();
+        let res = provider.get_resolver_for_name("vitalik.eth").await;
         assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
     }
 
     #[tokio::test]
     async fn test_pub_resolver_text() {
+        let provider = provider();
         let name = "vitalik.eth";
         let node = namehash(name);
-        let res = provider().get_resolver(node, name).await.unwrap();
+        let res = provider.get_resolver(node, name).await.unwrap();
         let text = res.text(node, "avatar".to_string()).call().await.unwrap();
         assert_eq!(text, "https://euc.li/vitalik.eth")
     }
@@ -712,19 +797,22 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_universal_resolver() {
-        let res = provider().resolve_name("ur.integration-tests.eth").await.unwrap();
+        let provider = provider();
+        let res = provider.resolve_name("ur.integration-tests.eth").await.unwrap();
         assert_eq!(res, address!("0x2222222222222222222222222222222222222222"));
     }
 
     #[tokio::test]
     async fn test_get_resolver_for_name_rejects_extended_resolver() {
-        let err = provider().get_resolver_for_name("ur.integration-tests.eth").await.unwrap_err();
+        let provider = provider();
+        let err = provider.get_resolver_for_name("ur.integration-tests.eth").await.unwrap_err();
         assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
     }
 
     #[tokio::test]
     async fn test_forward_base_onchain() {
-        let res = provider()
+        let provider = provider();
+        let res = provider
             .resolve_name_for_coin_type(
                 "coins.integration-tests.eth",
                 coin_type::evm_chain(8453).unwrap(),
@@ -739,19 +827,22 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_forward_wildcard() {
-        let res = provider().resolve_name("moo331.nft-owner.eth").await.unwrap();
+        let provider = provider();
+        let res = provider.resolve_name("moo331.nft-owner.eth").await.unwrap();
         assert_eq!(res, address!("0x51050ec063d393217B436747617aD1C2285Aeeee"));
     }
 
     #[tokio::test]
     async fn test_forward_eth_offchain() {
-        let res = provider().resolve_name("test.offchaindemo.eth").await.unwrap();
+        let provider = provider();
+        let res = provider.resolve_name("test.offchaindemo.eth").await.unwrap();
         assert_eq!(res, address!("0x779981590E7Ccc0CFAe8040Ce7151324747cDb97"));
     }
 
     #[tokio::test]
     async fn test_forward_text_onchain() {
-        let res = provider().lookup_txt("integration-tests.eth", "avatar").await.unwrap();
+        let provider = provider();
+        let res = provider.lookup_txt("integration-tests.eth", "avatar").await.unwrap();
         assert_eq!(
             res,
             "https://raw.githubusercontent.com/ensdomains/resolution-tests/refs/heads/main/assets/avatar.svg"
@@ -760,13 +851,15 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_forward_text_offchain() {
-        let res = provider().lookup_txt("test.offchaindemo.eth", "description").await.unwrap();
+        let provider = provider();
+        let res = provider.lookup_txt("test.offchaindemo.eth", "description").await.unwrap();
         assert_eq!(res, "asdflkjasdflkjasdf");
     }
 
     #[tokio::test]
     async fn test_reverse_eth() {
-        let res = provider()
+        let provider = provider();
+        let res = provider
             .lookup_address(&address!("0xeE9eeaAB0Bb7D9B969D701f6f8212609EDeA252E"))
             .await
             .unwrap();
@@ -775,7 +868,8 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_forward_dns_offchain() {
-        let res = provider().resolve_name("pokersback.com").await.unwrap();
+        let provider = provider();
+        let res = provider.resolve_name("pokersback.com").await.unwrap();
         assert_eq!(res, address!("0x534631Bcf33BDb069fB20A93d2fdb9e4D4dD42CF"));
     }
 }
