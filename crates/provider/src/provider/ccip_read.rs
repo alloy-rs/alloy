@@ -1291,10 +1291,8 @@ mod tests {
     async fn rejects_zero_max_concurrent_requests_before_eth_call() {
         let asserter = Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter);
-        let client = CcipReadClient::new(MockGateway::default()).with_config(CcipReadConfig {
-            max_concurrent_requests: 0,
-            ..Default::default()
-        });
+        let client = CcipReadClient::new(MockGateway::default())
+            .with_config(CcipReadConfig { max_concurrent_requests: 0, ..Default::default() });
 
         let error = client
             .call(
@@ -1305,7 +1303,9 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(matches!(error, CcipReadError::InvalidConfig(message) if message.contains("max_concurrent_requests")));
+        assert!(
+            matches!(error, CcipReadError::InvalidConfig(message) if message.contains("max_concurrent_requests"))
+        );
     }
 
     #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
@@ -1329,14 +1329,10 @@ mod tests {
 
         let oversized = vec![b'x'; 16];
         let outcome = classify_buffered_gateway_response(200, "application/json", &oversized, 8);
-        assert!(
-            matches!(outcome, GatewayResponseOutcome::Retry(_)),
-            "{outcome:?}"
-        );
+        assert!(matches!(outcome, GatewayResponseOutcome::Retry(_)), "{outcome:?}");
         assert!(outcome_message(&outcome).contains("size limit"));
 
-        let outcome =
-            classify_buffered_gateway_response(200, "text/plain", json_ok, 1024);
+        let outcome = classify_buffered_gateway_response(200, "text/plain", json_ok, 1024);
         assert!(matches!(outcome, GatewayResponseOutcome::Retry(_)));
         assert!(outcome_message(&outcome).contains("application/json"));
 
@@ -1366,10 +1362,7 @@ mod tests {
         let sender = address!("1111111111111111111111111111111111111111");
 
         let empty = gateway
-            .request(
-                &CcipReadRequest { sender, urls: vec![], data: bytes!("") },
-                1024,
-            )
+            .request(&CcipReadRequest { sender, urls: vec![], data: bytes!("") }, 1024)
             .await
             .unwrap_err();
         assert!(empty.message.contains("no gateway URLs"));
@@ -1389,11 +1382,7 @@ mod tests {
 
         let invalid = gateway
             .request(
-                &CcipReadRequest {
-                    sender,
-                    urls: vec!["not a url".into()],
-                    data: bytes!(""),
-                },
+                &CcipReadRequest { sender, urls: vec!["not a url".into()], data: bytes!("") },
                 1024,
             )
             .await
