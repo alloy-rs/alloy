@@ -12,7 +12,7 @@ use futures::future::BoxFuture as CcipFuture;
 #[cfg(target_family = "wasm")]
 use futures::future::LocalBoxFuture as CcipFuture;
 use futures::{stream, StreamExt};
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 use serde::{Deserialize, Serialize};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -20,7 +20,7 @@ use std::sync::{
 };
 
 const BATCH_GATEWAY_SENTINEL: &str = "x-batch-gateway:true";
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 const HTTP_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 mod abi {
@@ -171,13 +171,15 @@ pub trait CcipReadGateway: Send + Sync {
 }
 
 /// The default HTTPS implementation of [`CcipReadGateway`].
+///
+/// Available behind the `ccip-read-http` feature.
 #[derive(Clone, Debug)]
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 pub struct HttpCcipReadGateway {
     client: reqwest::Client,
 }
 
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 impl Default for HttpCcipReadGateway {
     fn default() -> Self {
         #[cfg(not(target_family = "wasm"))]
@@ -199,7 +201,7 @@ impl Default for HttpCcipReadGateway {
     }
 }
 
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 impl HttpCcipReadGateway {
     /// Creates a gateway handler using an existing HTTP client.
     ///
@@ -211,21 +213,21 @@ impl HttpCcipReadGateway {
 }
 
 #[derive(Serialize)]
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 struct GatewayRequestBody<'a> {
     sender: &'a str,
     data: &'a str,
 }
 
 #[derive(Deserialize)]
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 struct GatewayResponse {
     data: Bytes,
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 impl CcipReadGateway for HttpCcipReadGateway {
     async fn request(
         &self,
@@ -365,12 +367,12 @@ impl CcipReadGateway for HttpCcipReadGateway {
 
 /// Placeholder gateway for WASI Preview 1, where the `reqwest` transport is unavailable.
 #[derive(Clone, Copy, Debug, Default)]
-#[cfg(all(target_os = "wasi", target_env = "p1"))]
+#[cfg(all(feature = "ccip-read-http", target_os = "wasi", target_env = "p1"))]
 pub struct HttpCcipReadGateway;
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-#[cfg(all(target_os = "wasi", target_env = "p1"))]
+#[cfg(all(feature = "ccip-read-http", target_os = "wasi", target_env = "p1"))]
 impl CcipReadGateway for HttpCcipReadGateway {
     async fn request(
         &self,
@@ -383,7 +385,7 @@ impl CcipReadGateway for HttpCcipReadGateway {
     }
 }
 
-#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+#[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 fn response_message(body: &[u8]) -> String {
     const LIMIT: usize = 1_024;
     let body = &body[..body.len().min(LIMIT)];
@@ -392,11 +394,12 @@ fn response_message(body: &[u8]) -> String {
 
 /// An executor for CCIP Read enabled `eth_call` requests.
 #[derive(Clone, Debug)]
-pub struct CcipReadClient<G = HttpCcipReadGateway> {
+pub struct CcipReadClient<G> {
     gateway: G,
     config: CcipReadConfig,
 }
 
+#[cfg(feature = "ccip-read-http")]
 impl Default for CcipReadClient<HttpCcipReadGateway> {
     fn default() -> Self {
         Self::new(HttpCcipReadGateway::default())
@@ -686,6 +689,9 @@ fn encode_batch_error(error: &CcipReadError) -> Bytes {
 }
 
 /// Extension methods for CCIP Read enabled provider calls.
+///
+/// Requires the `ccip-read-http` feature (uses the default HTTP gateway).
+#[cfg(feature = "ccip-read-http")]
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait ProviderCcipReadExt<N: Network>: Provider<N> {
@@ -703,6 +709,7 @@ pub trait ProviderCcipReadExt<N: Network>: Provider<N> {
     ) -> Result<Bytes, CcipReadError>;
 }
 
+#[cfg(feature = "ccip-read-http")]
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<P, N> ProviderCcipReadExt<N> for P
@@ -714,7 +721,7 @@ where
         &self,
         transaction: N::TransactionRequest,
     ) -> Result<Bytes, CcipReadError> {
-        CcipReadClient::default().call(self, transaction).await
+        CcipReadClient::new(HttpCcipReadGateway::default()).call(self, transaction).await
     }
 
     async fn call_with_ccip_read_at(
@@ -722,7 +729,7 @@ where
         transaction: N::TransactionRequest,
         block: BlockId,
     ) -> Result<Bytes, CcipReadError> {
-        CcipReadClient::default().call_at(self, transaction, block).await
+        CcipReadClient::new(HttpCcipReadGateway::default()).call_at(self, transaction, block).await
     }
 }
 
