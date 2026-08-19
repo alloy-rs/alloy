@@ -21,6 +21,18 @@ use std::str::FromStr;
 pub const UNIVERSAL_RESOLVER_ADDRESS: Address =
     address!("0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe");
 
+/// ENS registry address (`0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e`).
+#[deprecated(
+    note = "resolution now routes through the Universal Resolver; use `UNIVERSAL_RESOLVER_ADDRESS` and the Universal Resolver helpers"
+)]
+pub const ENS_ADDRESS: Address = address!("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e");
+
+/// ENS registry domain for reverse records: `addr.reverse`.
+#[deprecated(
+    note = "reverse resolution now routes through the Universal Resolver; use `reverse_address` or `lookup_address`"
+)]
+pub const ENS_REVERSE_REGISTRAR_DOMAIN: &str = "addr.reverse";
+
 /// Helpers for ENS multichain coin types.
 ///
 /// Non-EVM chains use their static SLIP-0044 coin type according to ENSIP-9.
@@ -111,6 +123,27 @@ mod contract {
     use alloy_sol_types::sol;
 
     sol! {
+        /// ENS Registry contract.
+        ///
+        /// Deprecated: retained for backwards compatibility. Resolution now routes
+        /// through the [`UniversalResolver`], which handles wildcard resolvers and
+        /// CCIP Read.
+        #[sol(rpc)]
+        contract EnsRegistry {
+            /// Returns the resolver for the specified node.
+            function resolver(bytes32 node) view returns (address);
+
+            /// returns the owner of this node
+            function owner(bytes32 node) view returns (address);
+        }
+
+        /// ENS Reverse Registrar contract.
+        ///
+        /// Deprecated: retained for backwards compatibility. Reverse resolution now
+        /// routes through the [`UniversalResolver`].
+        #[sol(rpc)]
+        contract ReverseRegistrar {}
+
         /// ENS Resolver interface (ENSIP-1).
         #[sol(rpc)]
         contract EnsResolver {
@@ -212,6 +245,18 @@ mod contract {
             "ENS name {0:?} requires Universal Resolver resolution (extended or wildcard resolver)"
         )]
         RequiresUniversalResolver(String),
+        /// Failed to get the reverse registrar from the ENS registry.
+        #[deprecated(
+            note = "only produced by the deprecated registry-based `get_reverse_registrar` helper"
+        )]
+        #[error("Failed to get reverse registrar from the ENS registry: {0}")]
+        RevRegistrar(alloy_contract::Error),
+        /// No reverse registrar found for `addr.reverse`.
+        #[deprecated(
+            note = "only produced by the deprecated registry-based `get_reverse_registrar` helper"
+        )]
+        #[error("ENS reverse registrar not found for addr.reverse")]
+        ReverseRegistrarNotFound,
         /// Failed to perform a reverse lookup.
         #[error("Failed to lookup ENS name from an address: {0}")]
         Lookup(alloy_contract::Error),
@@ -232,12 +277,14 @@ mod contract {
 
 #[cfg(feature = "provider")]
 mod provider {
+    #[allow(deprecated)]
     use crate::{
         coin_type, namehash, reverse_address, try_dns_encode, EnsError, EnsMulticoinResolver,
-        EnsResolver, EnsResolver::EnsResolverInstance, UniversalResolver,
-        UNIVERSAL_RESOLVER_ADDRESS,
+        EnsRegistry, EnsResolver, EnsResolver::EnsResolverInstance,
+        ReverseRegistrar::ReverseRegistrarInstance, UniversalResolver, ENS_ADDRESS,
+        ENS_REVERSE_REGISTRAR_DOMAIN, UNIVERSAL_RESOLVER_ADDRESS,
     };
-    use alloy_primitives::{Address, Bytes, U256};
+    use alloy_primitives::{Address, Bytes, B256, U256};
     use alloy_provider::{Network, Provider};
     use alloy_sol_types::{SolCall, SolValue};
 
@@ -254,7 +301,33 @@ mod provider {
         /// direct `addr`/`text`/`name` calls on the resolver are not equivalent to
         /// Universal Resolver resolution — use [`Self::resolve_name`],
         /// [`Self::lookup_txt`], or the other helpers instead.
-        async fn get_resolver(&self, name: &str) -> Result<EnsResolverInstance<&P, N>, EnsError>;
+        async fn get_resolver_for_name(
+            &self,
+            name: &str,
+        ) -> Result<EnsResolverInstance<&P, N>, EnsError>;
+
+        /// Returns the resolver for the specified node.
+        ///
+        /// The `&str` is only used for error messages. Looks up the resolver via the
+        /// ENS registry, matching the historical Alloy API.
+        ///
+        /// Prefer [`Self::get_resolver_for_name`] or the Universal Resolver helpers
+        /// (`resolve_name`, `lookup_txt`, …). Registry-based resolver discovery does
+        /// not handle ENSIP-10 extended or wildcard resolvers correctly.
+        #[deprecated(
+            note = "registry-based resolver discovery; use `get_resolver_for_name` or Universal Resolver helpers"
+        )]
+        async fn get_resolver(
+            &self,
+            node: B256,
+            error_name: &str,
+        ) -> Result<EnsResolverInstance<&P, N>, EnsError>;
+
+        /// Returns the reverse registrar for the specified node.
+        #[deprecated(
+            note = "reverse resolution now routes through the Universal Resolver; use `lookup_address` instead"
+        )]
+        async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError>;
 
         /// Performs a forward lookup of an ENS name to an Ethereum address.
         ///
@@ -285,12 +358,16 @@ mod provider {
 
     #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
     #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
+    #[allow(deprecated)]
     impl<N, P> ProviderEnsExt<N, P> for P
     where
         P: Provider<N>,
         N: Network,
     {
-        async fn get_resolver(&self, name: &str) -> Result<EnsResolverInstance<&P, N>, EnsError> {
+        async fn get_resolver_for_name(
+            &self,
+            name: &str,
+        ) -> Result<EnsResolverInstance<&P, N>, EnsError> {
             let dns = try_dns_encode(name)?;
 
             let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
@@ -308,6 +385,32 @@ mod provider {
             }
 
             Ok(EnsResolverInstance::new(info.resolver, self))
+        }
+
+        async fn get_resolver(
+            &self,
+            node: B256,
+            error_name: &str,
+        ) -> Result<EnsResolverInstance<&P, N>, EnsError> {
+            let registry = EnsRegistry::new(ENS_ADDRESS, self);
+            let address = registry.resolver(node).call().await.map_err(EnsError::Resolver)?;
+            if address == Address::ZERO {
+                return Err(EnsError::ResolverNotFound(error_name.to_string()));
+            }
+            Ok(EnsResolverInstance::new(address, self))
+        }
+
+        async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError> {
+            let registry = EnsRegistry::new(ENS_ADDRESS, self);
+            let address = registry
+                .owner(namehash(ENS_REVERSE_REGISTRAR_DOMAIN))
+                .call()
+                .await
+                .map_err(EnsError::RevRegistrar)?;
+            if address == Address::ZERO {
+                return Err(EnsError::ReverseRegistrarNotFound);
+            }
+            Ok(ReverseRegistrarInstance::new(address, self))
         }
 
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError> {
@@ -430,35 +533,57 @@ mod tests {
 
 #[cfg(all(test, feature = "provider"))]
 mod provider_tests {
+    #![allow(deprecated)]
+
     use super::*;
     use alloy_primitives::address;
     use alloy_provider::ProviderBuilder;
 
     #[tokio::test]
-    async fn test_pub_resolver_fetching_mainnet() {
-        let provider = ProviderBuilder::new()
-            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+    async fn test_reverse_registrar_fetching_mainnet() {
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
-        let res = provider.get_resolver("vitalik.eth").await;
+        let res = provider.get_reverse_registrar().await;
+        assert_eq!(*res.unwrap().address(), address!("0xa58E81fe9b61B5c3fE2AFD33CF304c454AbFc7Cb"));
+    }
+
+    #[tokio::test]
+    async fn test_pub_resolver_fetching_mainnet() {
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+
+        let name = "vitalik.eth";
+        let node = namehash(name);
+        let res = provider.get_resolver(node, name).await;
+        assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
+    }
+
+    #[tokio::test]
+    async fn test_get_resolver_for_name_mainnet() {
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+
+        let res = provider.get_resolver_for_name("vitalik.eth").await;
         assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
     }
 
     #[tokio::test]
     async fn test_pub_resolver_text() {
-        let provider = ProviderBuilder::new()
-            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let name = "vitalik.eth";
         let node = namehash(name);
-        let res = provider.get_resolver(name).await.unwrap();
+        let res = provider.get_resolver(node, name).await.unwrap();
         let text = res.text(node, "avatar".to_string()).call().await.unwrap();
         assert_eq!(text, "https://euc.li/vitalik.eth")
     }
 
     #[tokio::test]
     async fn test_pub_resolver_fetching_text() {
-        let provider = ProviderBuilder::new()
-            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let res = provider.lookup_txt("vitalik.eth", "avatar").await.unwrap();
         assert_eq!(res, "https://euc.li/vitalik.eth")
@@ -466,26 +591,26 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_universal_resolver_integration() {
-        let provider = ProviderBuilder::new()
-            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let res = provider.resolve_name("ur.integration-tests.eth").await.unwrap();
         assert_eq!(res, address!("0x2222222222222222222222222222222222222222"));
     }
 
     #[tokio::test]
-    async fn test_get_resolver_rejects_extended_resolver() {
-        let provider = ProviderBuilder::new()
-            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+    async fn test_get_resolver_for_name_rejects_extended_resolver() {
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
-        let err = provider.get_resolver("ur.integration-tests.eth").await.unwrap_err();
+        let err = provider.get_resolver_for_name("ur.integration-tests.eth").await.unwrap_err();
         assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
     }
 
     #[tokio::test]
     async fn test_multicoin_resolver_integration() {
-        let provider = ProviderBuilder::new()
-            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let res = provider
             .resolve_name_for_coin_type(
@@ -502,8 +627,8 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_reverse_resolver_integration() {
-        let provider = ProviderBuilder::new()
-            .connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+        let provider =
+            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
 
         let res = provider
             .lookup_address(&address!("0xeE9eeaAB0Bb7D9B969D701f6f8212609EDeA252E"))
