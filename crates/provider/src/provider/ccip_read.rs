@@ -688,6 +688,17 @@ fn encode_batch_error(error: &CcipReadError) -> Bytes {
     alloy_sol_types::Revert::from(error.to_string()).abi_encode().into()
 }
 
+/// Returns a process-wide default HTTP CCIP Read client.
+///
+/// Reuses a single [`reqwest::Client`] so keep-alive / HTTP2 pooling is shared across
+/// [`ProviderCcipReadExt`] convenience calls.
+#[cfg(feature = "ccip-read-http")]
+pub fn shared_http_ccip_read_client() -> &'static CcipReadClient<HttpCcipReadGateway> {
+    use std::sync::OnceLock;
+    static CLIENT: OnceLock<CcipReadClient<HttpCcipReadGateway>> = OnceLock::new();
+    CLIENT.get_or_init(|| CcipReadClient::new(HttpCcipReadGateway::default()))
+}
+
 /// Extension methods for CCIP Read enabled provider calls.
 ///
 /// Requires the `ccip-read-http` feature (uses the default HTTP gateway).
@@ -721,7 +732,7 @@ where
         &self,
         transaction: N::TransactionRequest,
     ) -> Result<Bytes, CcipReadError> {
-        CcipReadClient::new(HttpCcipReadGateway::default()).call(self, transaction).await
+        shared_http_ccip_read_client().call(self, transaction).await
     }
 
     async fn call_with_ccip_read_at(
@@ -729,7 +740,7 @@ where
         transaction: N::TransactionRequest,
         block: BlockId,
     ) -> Result<Bytes, CcipReadError> {
-        CcipReadClient::new(HttpCcipReadGateway::default()).call_at(self, transaction, block).await
+        shared_http_ccip_read_client().call_at(self, transaction, block).await
     }
 }
 
