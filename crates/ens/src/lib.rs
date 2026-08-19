@@ -46,11 +46,18 @@ pub mod coin_type {
     ///
     /// Chain ID `1` (Ethereum mainnet) returns [`ETH`] (`60`) per SLIP-0044.
     /// All other chains use `0x80000000 | chain_id`.
-    pub fn evm_chain(chain_id: u32) -> u64 {
+    ///
+    /// Returns `None` for chain IDs of `0x80000000` and above: ENSIP-11 reserves
+    /// a 31-bit chain ID space, and larger IDs would collide with the coin types
+    /// of smaller ones (e.g. `0` and `0x80000000`).
+    pub const fn evm_chain(chain_id: u64) -> Option<u64> {
         if chain_id == 1 {
-            return ETH;
+            return Some(ETH);
         }
-        0x8000_0000u64 | u64::from(chain_id)
+        if chain_id >= 0x8000_0000 {
+            return None;
+        }
+        Some(0x8000_0000 | chain_id)
     }
 }
 
@@ -519,15 +526,18 @@ mod tests {
 
     #[test]
     fn test_coin_type_evm_chain() {
-        assert_eq!(coin_type::evm_chain(1), coin_type::ETH); // mainnet special case
-        assert_eq!(coin_type::evm_chain(8453), 0x8000_2105); // Base
-        assert_eq!(coin_type::evm_chain(10), 0x8000_000A); // Optimism
-        assert_eq!(coin_type::evm_chain(42161), 0x8000_A4B1); // Arbitrum One
+        assert_eq!(coin_type::evm_chain(1), Some(coin_type::ETH)); // mainnet special case
+        assert_eq!(coin_type::evm_chain(8453), Some(0x8000_2105)); // Base
+        assert_eq!(coin_type::evm_chain(10), Some(0x8000_000A)); // Optimism
+        assert_eq!(coin_type::evm_chain(42161), Some(0x8000_A4B1)); // Arbitrum One
     }
 
     #[test]
-    fn test_coin_type_evm_chain_does_not_reject_high_bit() {
-        assert_eq!(coin_type::evm_chain(0x8000_0000), 0x8000_0000);
+    fn test_coin_type_evm_chain_rejects_out_of_range_ids() {
+        // ENSIP-11 coin types are `0x80000000 | chainId` over a 31-bit chain ID
+        // space; IDs with the high bit set would collide with smaller IDs.
+        assert_eq!(coin_type::evm_chain(0x8000_0000), None);
+        assert_eq!(coin_type::evm_chain(u64::MAX), None);
     }
 }
 
@@ -615,7 +625,7 @@ mod provider_tests {
         let res = provider
             .resolve_name_for_coin_type(
                 "coins.integration-tests.eth",
-                coin_type::evm_chain(8453),
+                coin_type::evm_chain(8453).unwrap(),
             )
             .await
             .unwrap();
