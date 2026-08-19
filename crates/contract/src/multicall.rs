@@ -330,6 +330,136 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_nested_dynamic_in_tuple() {
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let usdc = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let weth_erc20 = ERC20::new(weth, &provider);
+        let usdc_erc20 = ERC20::new(usdc, &provider);
+
+        // Two dynamic multicalls nested inside a single tuple multicall, executed in one request.
+        let supplies_inner = provider
+            .multicall()
+            .dynamic()
+            .extend(vec![weth_erc20.totalSupply(), usdc_erc20.totalSupply()]);
+        let balances_inner = provider.multicall().dynamic().extend(vec![
+            weth_erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")),
+            usdc_erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")),
+        ]);
+
+        let (supplies, balances) = provider
+            .multicall()
+            .add_nested(supplies_inner)
+            .add_nested(balances_inner)
+            .aggregate()
+            .await
+            .unwrap();
+
+        assert_eq!(supplies.len(), 2);
+        assert_eq!(balances.len(), 2);
+
+        // Cross-check against the equivalent separate dynamic multicalls.
+        let supplies_ref = provider
+            .multicall()
+            .dynamic()
+            .extend(vec![weth_erc20.totalSupply(), usdc_erc20.totalSupply()])
+            .aggregate()
+            .await
+            .unwrap();
+        assert_eq!(supplies, supplies_ref);
+    }
+
+    #[tokio::test]
+    async fn test_nested_tuple_in_dynamic() {
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let usdc = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let weth_erc20 = ERC20::new(weth, &provider);
+        let usdc_erc20 = ERC20::new(usdc, &provider);
+
+        // A tuple multicall nested inside a dynamic multicall: one (totalSupply, balanceOf) tuple
+        // per token, all fetched in a single request.
+        let owner = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        let weth_tuple =
+            provider.multicall().add(weth_erc20.totalSupply()).add(weth_erc20.balanceOf(owner));
+        let usdc_tuple =
+            provider.multicall().add(usdc_erc20.totalSupply()).add(usdc_erc20.balanceOf(owner));
+
+        let results = provider
+            .multicall()
+            .dynamic_nested()
+            .extend_nested_dynamic(vec![weth_tuple, usdc_tuple])
+            .aggregate()
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+        // Each entry is the inner tuple's success returns: (totalSupplyReturn, balanceReturn).
+        let (weth_supply, weth_balance) = &results[0];
+        let (usdc_supply, usdc_balance) = &results[1];
+
+        // Cross-check the first tuple against a standalone tuple multicall.
+        let (weth_supply_ref, weth_balance_ref) = provider
+            .multicall()
+            .add(weth_erc20.totalSupply())
+            .add(weth_erc20.balanceOf(owner))
+            .aggregate()
+            .await
+            .unwrap();
+        assert_eq!(weth_supply, &weth_supply_ref);
+        assert_eq!(weth_balance, &weth_balance_ref);
+        let _ = (usdc_supply, usdc_balance);
+    }
+
+    #[tokio::test]
+    async fn test_nested_allow_failure_inner_index() {
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
+
+        let dummy = deploy_dummy(provider.clone()).await;
+        let erc20 = ERC20::new(weth, &provider);
+
+        // Inner tuple multicall with a failing-but-allowed call at inner index 1.
+        let inner =
+            provider.multicall().add(erc20.totalSupply()).add_call(dummy.fail().into_call(true));
+
+        // Outer tuple multicall, nested, fallible aggregation.
+        let (nested_res,) = provider.multicall().add_nested(inner).aggregate3().await.unwrap();
+
+        // The nested call itself succeeded (inner aggregate3 did not revert), so we get the inner
+        // results, with the failure indexed relative to the inner builder.
+        let (ts, fail) = nested_res.unwrap();
+        assert!(ts.is_ok());
+        assert!(matches!(fail.unwrap_err(), Failure { idx: 1, return_data: _ }));
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "nested multicall builders do not support payable/value calls")]
+    async fn test_nested_rejects_value() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let inner_with_value = provider.multicall().add_call(
+            CallItem::<ERC20::transferCall>::new(
+                address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"),
+                ERC20::transferCall {
+                    to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"),
+                    value: U256::ZERO,
+                }
+                .abi_encode()
+                .into(),
+            )
+            .value(U256::from(1)),
+        );
+
+        // Should panic: nested builders cannot carry value.
+        let _ = provider.multicall().add_nested(inner_with_value);
+    }
+
+    #[tokio::test]
     async fn test_extend_dynamic() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
         let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
