@@ -276,8 +276,9 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     ///
     /// # Errors
     ///
-    /// If the initial request fails, this method returns a local usage error for block hash filters
-    /// and for ranges that use [`BlockNumberOrTag::Pending`].
+    /// If the initial request fails, this method returns a local usage error for block hash
+    /// filters, and [`RpcError::NullResp`] if the range uses a `safe` or `finalized` tag that the
+    /// node cannot resolve.
     pub async fn query_raw(&self) -> TransportResult<Vec<Log>> {
         if let Ok(logs) = self.provider.get_logs(&self.filter).await {
             return Ok(logs);
@@ -430,9 +431,10 @@ impl<E: SolEvent> EventPoller<E> {
 /// Resolves a [`BlockNumberOrTag`] to a concrete block number.
 ///
 /// Returns `0` for [`BlockNumberOrTag::Earliest`] and uses [`Provider::get_block_number_by_id`]
-/// to resolve `Latest`, `Safe`, and `Finalized`.
+/// to resolve `Latest`, `Safe`, and `Finalized`. `Pending` is resolved to `Latest`.
 ///
-/// Returns a local usage error for [`BlockNumberOrTag::Pending`].
+/// Returns [`RpcError::NullResp`] if the node has no block for the requested `Safe` or `Finalized`
+/// tag.
 async fn resolve_block_tag<P: Provider<N>, N: Network>(
     provider: &P,
     tag: BlockNumberOrTag,
@@ -440,9 +442,9 @@ async fn resolve_block_tag<P: Provider<N>, N: Network>(
     match tag {
         BlockNumberOrTag::Number(number) => Ok(number),
         BlockNumberOrTag::Earliest => Ok(0),
-        BlockNumberOrTag::Pending => Err(RpcError::local_usage_str(
-            "chunked queries require a concrete block range, not a pending block tag",
-        )),
+        // The pending block has no stable number to chunk on, and nodes disagree on what it
+        // resolves to: some return `latest + 1`, others return null. Pin it to `latest`.
+        BlockNumberOrTag::Pending => provider.get_block_number().await,
         // Latest, Safe, Finalized
         _ => provider.get_block_number_by_id(tag.into()).await?.ok_or(RpcError::NullResp),
     }
@@ -807,32 +809,20 @@ mod tests {
         }
     }
 
-    /// Verifies that chunking rejects [`BlockNumberOrTag::Pending`] at either end of a range
+    /// Verifies that `pending` is resolved with `eth_blockNumber` rather than by fetching the
+    /// pending header, which nodes variously report as `latest + 1` or as null
     #[tokio::test]
-    async fn chunked_query_rejects_pending_block_tags() {
-        let filters = [
-            Filter::new().from_block(BlockNumberOrTag::Pending).to_block(BlockNumberOrTag::Pending),
-            Filter::new().from_block(1u64).to_block(BlockNumberOrTag::Pending),
-            Filter::new().from_block(BlockNumberOrTag::Pending).to_block(1u64),
-        ];
+    async fn resolve_block_tag_pins_pending_to_latest() {
+        let asserter = Asserter::new();
+        let provider =
+            alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter.clone());
 
-        for filter in filters {
-            let asserter = Asserter::new();
-            let provider =
-                alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        // The only queued response is an `eth_blockNumber` result, so a header fetch would fail
+        asserter.push_success(&7_u64);
 
-            // Force the numeric chunked fallback
-            asserter.push_failure_msg("full-range query failed");
+        let resolved = resolve_block_tag(&provider, BlockNumberOrTag::Pending).await.unwrap();
 
-            let block_option = filter.block_option;
-            let event: Event<_, MyContract::MyEvent, Ethereum> = Event::new(provider, filter);
-            let err = event.chunked().chunk_size(10).query_raw().await.unwrap_err();
-
-            assert!(
-                err.is_local_usage_error(),
-                "{block_option:?}: expected a usage error, got: {err}"
-            );
-        }
+        assert_eq!(resolved, 7);
     }
 
     /// Verifies that a chunked query resolves `finalized`, `safe`, and `latest` separately
@@ -860,13 +850,15 @@ mod tests {
             emitted.push(receipt.block_number.unwrap());
         }
 
-        for (tag, expected) in [
-            (BlockNumberOrTag::Finalized, &emitted[..1]),
-            (BlockNumberOrTag::Safe, &emitted[..2]),
-            (BlockNumberOrTag::Latest, &emitted[..3]),
-        ] {
+        let mut cutoffs = Vec::new();
+        for tag in [BlockNumberOrTag::Finalized, BlockNumberOrTag::Safe, BlockNumberOrTag::Latest] {
             let tag_block_number =
                 provider.get_block_by_number(tag).await.unwrap().unwrap().header.number;
+            let expected = emitted
+                .iter()
+                .copied()
+                .filter(|block| *block <= tag_block_number)
+                .collect::<Vec<_>>();
 
             // Anvil answers the full range in one call, so call get_logs_chunked() directly
             // to make sure the tag is resolved by the chunking path
@@ -885,6 +877,11 @@ mod tests {
                 actual, expected,
                 "{tag} (block {tag_block_number}) cut the range at the wrong block"
             );
+            cutoffs.push(actual.len());
         }
+
+        // Guards the setup above: if the three tags resolved to the same block the assertions
+        // would pass without ever exercising the per-tag resolution
+        assert_eq!(cutoffs, [1, 2, 3], "tags did not land on distinct blocks");
     }
 }
