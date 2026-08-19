@@ -701,7 +701,7 @@ mod provider {
         #[test]
         fn maps_resolver_not_found_wrapped_in_ccip_transport() {
             let revert: alloy_primitives::Bytes =
-                UniversalResolver23::ResolverNotFound { name: bytes!("03666f6f0365746800") }
+                UniversalResolver::ResolverNotFound { name: bytes!("03666f6f0365746800") }
                     .abi_encode()
                     .into();
             let payload = ErrorPayload::internal_error_with_message_and_obj(
