@@ -41,10 +41,6 @@ memchr = "2.7"
 tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-json-rpc.workspace = true
-alloy-pubsub.workspace = true
-interprocess = { version = "2", features = ["tokio"] }
-serde_json.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "time"] }
 tokio-test.workspace = true

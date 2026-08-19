@@ -1,4 +1,5 @@
 //! Drive a real [`IpcConnect`] against an in-process listener.
+#![cfg(unix)]
 #![allow(missing_docs)]
 
 use alloy_json_rpc::{Id, Request, ResponsePayload};
@@ -43,7 +44,6 @@ async fn read_n_json_values(reader: &mut (impl AsyncReadExt + Unpin), n: usize) 
 /// Concatenated success + JSON-RPC error + subscription notification must all
 /// be framed. The error is a protocol response, and the connection stays up
 /// for a follow-up request.
-#[cfg(unix)]
 #[tokio::test]
 async fn ipc_connect_delivers_concatenated_success_error_and_notification() {
     let (_dir, path, listener) = bind_temp_ipc();
@@ -101,7 +101,6 @@ async fn ipc_connect_delivers_concatenated_success_error_and_notification() {
 
 /// A multi-megabyte result written in small socket chunks must arrive as one
 /// response. This is the workload that is quadratic on main.
-#[cfg(unix)]
 #[tokio::test]
 async fn ipc_connect_reads_chunked_multimegabyte_response() {
     let (_dir, path, listener) = bind_temp_ipc();

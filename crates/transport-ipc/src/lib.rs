@@ -100,161 +100,6 @@ impl IpcBackend {
 /// Default capacity for the IPC buffer.
 const CAPACITY: usize = 4096;
 
-/// Why [`FrameScanner::scan`] could not produce a frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ScanError {
-    /// The first non-whitespace byte is neither `{` nor `[`.
-    InvalidStart,
-}
-
-/// Resumable search for the end of the next top-level JSON value.
-///
-/// Persisting `pos` across polls is what makes framing O(n) in the frame size:
-/// bytes are examined exactly once no matter how the socket chunks them.
-#[derive(Clone, Debug, Default)]
-struct FrameScanner {
-    /// Next byte to inspect. An index into the current buffer.
-    pos: usize,
-    /// Nesting depth of `{` / `[`. Zero means we have not started a value, or
-    /// we just finished one.
-    depth: usize,
-    /// True while inside a JSON string.
-    in_string: bool,
-    /// True when the previous in-string byte was an unconsumed `\`.
-    escaped: bool,
-    /// Total bytes inspected across all [`Self::scan`] calls. Used to lock the
-    /// O(n) complexity guarantee in tests.
-    examined: usize,
-}
-
-impl FrameScanner {
-    /// Reset framing state after a complete value is consumed from the buffer.
-    ///
-    /// `examined` is left intact so tests can sum work across many frames.
-    const fn reset(&mut self) {
-        self.pos = 0;
-        self.depth = 0;
-        self.in_string = false;
-        self.escaped = false;
-    }
-
-    /// Find the exclusive end offset of the next top-level JSON object or array.
-    ///
-    /// Returns `Ok(None)` when `buf` ends before the value is complete. Bytes
-    /// already inspected are not re-examined on the next call.
-    fn scan(&mut self, buf: &[u8]) -> std::result::Result<Option<usize>, ScanError> {
-        let start = self.pos;
-        let result = self.scan_from(buf);
-        self.examined = self.examined.saturating_add(self.pos.saturating_sub(start));
-        result
-    }
-
-    fn scan_from(&mut self, buf: &[u8]) -> std::result::Result<Option<usize>, ScanError> {
-        while self.pos < buf.len() {
-            if self.in_string {
-                if !self.skip_string(buf) {
-                    return Ok(None);
-                }
-                continue;
-            }
-
-            if self.depth == 0 {
-                let b = buf[self.pos];
-                match b {
-                    b' ' | b'\t' | b'\n' | b'\r' => {
-                        self.pos += 1;
-                    }
-                    b'{' | b'[' => {
-                        self.depth += 1;
-                        self.pos += 1;
-                    }
-                    _ => {
-                        self.pos += 1;
-                        return Err(ScanError::InvalidStart);
-                    }
-                }
-                continue;
-            }
-
-            // Inside a value: SIMD-skip to the next structural byte.
-            let Some(rel) = next_structural(&buf[self.pos..]) else {
-                self.pos = buf.len();
-                return Ok(None);
-            };
-            self.pos += rel;
-            match buf[self.pos] {
-                b'"' => {
-                    self.in_string = true;
-                    self.pos += 1;
-                }
-                b'{' | b'[' => {
-                    self.depth += 1;
-                    self.pos += 1;
-                }
-                b'}' | b']' => {
-                    self.depth -= 1;
-                    self.pos += 1;
-                    if self.depth == 0 {
-                        return Ok(Some(self.pos));
-                    }
-                }
-                _ => unreachable!("next_structural only yields {{}}[]\""),
-            }
-        }
-        Ok(None)
-    }
-
-    /// Advance past the current JSON string. Returns `false` when `buf` ends
-    /// before the closing quote (including a trailing unconsumed `\` — that
-    /// sets [`Self::escaped`] so the next call resumes correctly).
-    fn skip_string(&mut self, buf: &[u8]) -> bool {
-        if self.escaped {
-            if self.pos >= buf.len() {
-                return false;
-            }
-            self.escaped = false;
-            self.pos += 1;
-        }
-
-        while self.pos < buf.len() {
-            match memchr::memchr2(b'"', b'\\', &buf[self.pos..]) {
-                None => {
-                    self.pos = buf.len();
-                    return false;
-                }
-                Some(rel) => {
-                    let idx = self.pos + rel;
-                    if buf[idx] == b'\\' {
-                        if idx + 1 >= buf.len() {
-                            self.pos = buf.len();
-                            self.escaped = true;
-                            return false;
-                        }
-                        self.pos = idx + 2;
-                    } else {
-                        self.pos = idx + 1;
-                        self.in_string = false;
-                        return true;
-                    }
-                }
-            }
-        }
-        false
-    }
-}
-
-/// Offset of the next `{`, `}`, `[`, `]`, or `"` in `hay`, or `None`.
-fn next_structural(hay: &[u8]) -> Option<usize> {
-    let braces = memchr::memchr3(b'{', b'}', b'"', hay);
-    let brackets = memchr::memchr3(b'[', b']', b'"', hay);
-    match (braces, brackets) {
-        (Some(a), Some(b)) => Some(a.min(b)),
-        (Some(a), None) => Some(a),
-        (None, Some(b)) => Some(b),
-        (None, None) => None,
-    }
-}
-
 /// A stream of JSON-RPC items, read from an [`AsyncRead`] stream.
 #[derive(Debug)]
 #[pin_project::pin_project]
@@ -321,21 +166,15 @@ where
                 match de.next() {
                     Some(Ok(item)) => {
                         this.buf.advance(de.byte_offset());
+                        // The framer indexes into `buf`, so any advance resets it.
                         this.scanner.reset();
                         return Ready(Some(item));
                     }
-                    Some(Err(err)) if err.is_eof() || err.is_data() => {
-                        *this.partial = true;
-                    }
+                    // Incomplete, or complete but not an `Item`. Either way hand
+                    // the buffer to the framer instead of re-parsing it.
+                    Some(Err(err)) if err.is_eof() || err.is_data() => *this.partial = true,
                     Some(Err(err)) => {
-                        error!(
-                            %err,
-                            "IPC response contained invalid JSON. Buffer contents will be logged at trace level"
-                        );
-                        trace!(
-                            buffer = %String::from_utf8_lossy(this.buf.as_ref()),
-                            "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
-                        );
+                        log_invalid_json(&err, this.buf.as_ref());
                         return Ready(None);
                     }
                     None => {}
@@ -343,7 +182,7 @@ where
             }
 
             match this.scanner.scan(this.buf.as_ref()) {
-                Ok(Some(end)) => {
+                Scan::Frame(end) => {
                     debug!(buf_len = this.buf.len(), end, "Framed IPC JSON value");
                     let frame = &this.buf[..end];
                     match serde_json::from_slice::<Item>(frame) {
@@ -354,24 +193,14 @@ where
                             return Ready(Some(item));
                         }
                         Err(err) => {
-                            error!(
-                                %err,
-                                "IPC response contained invalid JSON. Buffer contents will be logged at trace level"
-                            );
-                            trace!(
-                                buffer = %String::from_utf8_lossy(frame),
-                                "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
-                            );
-                            this.buf.advance(end);
-                            this.scanner.reset();
-                            *this.partial = false;
+                            log_invalid_json(&err, frame);
                             return Ready(None);
                         }
                     }
                 }
-                Ok(None) => {
-                    // Need more bytes. Reserve so `poll_read_buf` can fill a
-                    // full page; `BytesMut::chunk_mut` otherwise yields ~64 B.
+                Scan::Incomplete => {
+                    // Reserve before reading so `poll_read_buf` always gets a
+                    // full page to fill, not whatever slack is left over.
                     this.buf.reserve(CAPACITY);
                     match ready!(poll_read_buf(this.reader.as_mut(), cx, this.buf)) {
                         Ok(0) => {
@@ -387,7 +216,7 @@ where
                         }
                     }
                 }
-                Err(ScanError::InvalidStart) => {
+                Scan::InvalidStart => {
                     error!("IPC stream contained a non-object, non-array JSON value");
                     trace!(
                         buffer = %String::from_utf8_lossy(this.buf.as_ref()),
@@ -398,6 +227,173 @@ where
             }
         }
     }
+}
+
+/// Outcome of a [`FrameScanner::scan`] pass.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Scan {
+    /// A complete top-level value ends at this exclusive offset.
+    Frame(usize),
+    /// The buffer ends before the value does.
+    Incomplete,
+    /// The first non-whitespace byte is neither `{` nor `[`.
+    InvalidStart,
+}
+
+/// Resumable search for the end of the next top-level JSON value.
+///
+/// Persisting `pos` across polls is what makes framing O(n) in the frame size:
+/// bytes are examined exactly once no matter how the socket chunks them.
+#[derive(Clone, Debug, Default)]
+struct FrameScanner {
+    /// Next byte to inspect. An index into the current buffer.
+    pos: usize,
+    /// Nesting depth of `{` / `[`. Zero means we have not started a value, or
+    /// we just finished one.
+    depth: usize,
+    /// True while inside a JSON string.
+    in_string: bool,
+    /// True when the previous in-string byte was an unconsumed `\`.
+    escaped: bool,
+    /// Total bytes inspected across all [`Self::scan`] calls. Locks the O(n)
+    /// guarantee in tests; not compiled into release builds.
+    #[cfg(test)]
+    examined: usize,
+}
+
+impl FrameScanner {
+    /// Reset framing state after a complete value is consumed from the buffer.
+    ///
+    /// `examined` is left intact so tests can sum work across many frames.
+    const fn reset(&mut self) {
+        self.pos = 0;
+        self.depth = 0;
+        self.in_string = false;
+        self.escaped = false;
+    }
+
+    /// Find the exclusive end offset of the next top-level JSON object or array.
+    ///
+    /// Bytes already inspected are not re-examined on the next call, so a value
+    /// split across reads still costs one pass over its bytes in total.
+    fn scan(&mut self, buf: &[u8]) -> Scan {
+        #[cfg(test)]
+        let start = self.pos;
+        let scan = self.scan_from(buf);
+        #[cfg(test)]
+        {
+            self.examined += self.pos - start;
+        }
+        scan
+    }
+
+    fn scan_from(&mut self, buf: &[u8]) -> Scan {
+        while self.pos < buf.len() {
+            if self.in_string {
+                if !self.skip_string(buf) {
+                    return Scan::Incomplete;
+                }
+                continue;
+            }
+
+            if self.depth == 0 {
+                match buf[self.pos] {
+                    b' ' | b'\t' | b'\n' | b'\r' => {
+                        self.pos += 1;
+                    }
+                    b'{' | b'[' => {
+                        self.depth += 1;
+                        self.pos += 1;
+                    }
+                    _ => {
+                        self.pos += 1;
+                        return Scan::InvalidStart;
+                    }
+                }
+                continue;
+            }
+
+            // Inside a value: SIMD-skip to the next structural byte.
+            let Some(rel) = next_structural(&buf[self.pos..]) else {
+                self.pos = buf.len();
+                return Scan::Incomplete;
+            };
+            self.pos += rel;
+            match buf[self.pos] {
+                b'"' => {
+                    self.in_string = true;
+                    self.pos += 1;
+                }
+                b'{' | b'[' => {
+                    self.depth += 1;
+                    self.pos += 1;
+                }
+                b'}' | b']' => {
+                    self.depth -= 1;
+                    self.pos += 1;
+                    if self.depth == 0 {
+                        return Scan::Frame(self.pos);
+                    }
+                }
+                _ => unreachable!("next_structural only yields {{}}[]\""),
+            }
+        }
+        Scan::Incomplete
+    }
+
+    /// Advance past the current JSON string. Returns `false` when `buf` ends
+    /// before the closing quote (including a trailing unconsumed `\` — that
+    /// sets [`Self::escaped`] so the next call resumes correctly).
+    fn skip_string(&mut self, buf: &[u8]) -> bool {
+        if self.escaped {
+            if self.pos >= buf.len() {
+                return false;
+            }
+            self.escaped = false;
+            self.pos += 1;
+        }
+
+        while self.pos < buf.len() {
+            let Some(rel) = memchr::memchr2(b'"', b'\\', &buf[self.pos..]) else {
+                self.pos = buf.len();
+                return false;
+            };
+            let idx = self.pos + rel;
+            if buf[idx] != b'\\' {
+                self.pos = idx + 1;
+                self.in_string = false;
+                return true;
+            }
+            // Skip the escaped byte too, deferring if it has not arrived yet.
+            if idx + 1 >= buf.len() {
+                self.pos = buf.len();
+                self.escaped = true;
+                return false;
+            }
+            self.pos = idx + 2;
+        }
+        false
+    }
+}
+
+/// Offset of the next `{`, `}`, `[`, `]`, or `"` in `hay`, or `None`.
+///
+/// `memchr` takes at most three needles, so this scans for the openers and the
+/// quote first, then for a closer within whatever prefix that left.
+fn next_structural(hay: &[u8]) -> Option<usize> {
+    match memchr::memchr3(b'"', b'{', b'[', hay) {
+        Some(open) => memchr::memchr2(b'}', b']', &hay[..open]).or(Some(open)),
+        None => memchr::memchr2(b'}', b']', hay),
+    }
+}
+
+/// Log a payload that failed to deserialize, before ending the stream.
+fn log_invalid_json(err: &serde_json::Error, buf: &[u8]) {
+    error!(%err, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
+    trace!(
+        buffer = %String::from_utf8_lossy(buf),
+        "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
+    );
 }
 
 #[cfg(test)]
@@ -416,36 +412,34 @@ mod tests {
         }
     }"#;
 
-    fn serde_frame_end(buf: &[u8]) -> Option<usize> {
+    fn serde_frame_end(buf: &[u8]) -> usize {
         let mut de = serde_json::Deserializer::from_slice(buf).into_iter::<Box<RawValue>>();
-        match de.next() {
-            Some(Ok(_)) => Some(de.byte_offset()),
-            _ => None,
-        }
+        de.next().expect("no value").expect("not well-formed");
+        de.byte_offset()
     }
 
     #[test]
     fn frame_scanner_table() {
         struct Case {
             input: &'static [u8],
-            expected: std::result::Result<Option<usize>, ScanError>,
+            expected: Scan,
         }
 
         let cases = [
-            Case { input: b"", expected: Ok(None) },
-            Case { input: b"   \n\t", expected: Ok(None) },
-            Case { input: br#"{"a":1}"#, expected: Ok(Some(7)) },
-            Case { input: br#"[1,2]"#, expected: Ok(Some(5)) },
-            Case { input: br#"  {"a":1}"#, expected: Ok(Some(9)) },
-            Case { input: br#"{"a":{"b":[1,2]}}"#, expected: Ok(Some(17)) },
-            Case { input: br#"{"a":1}{"b":2}"#, expected: Ok(Some(7)) },
-            Case { input: br#"{"a":"}][{"}"#, expected: Ok(Some(12)) },
-            Case { input: br#"{"a":"\""}"#, expected: Ok(Some(10)) },
-            Case { input: br#"{"a":"\\"}"#, expected: Ok(Some(10)) },
-            Case { input: b"too many requests", expected: Err(ScanError::InvalidStart) },
-            Case { input: b"1", expected: Err(ScanError::InvalidStart) },
-            Case { input: br#""hi""#, expected: Err(ScanError::InvalidStart) },
-            Case { input: br#"{"a":1"#, expected: Ok(None) },
+            Case { input: b"", expected: Scan::Incomplete },
+            Case { input: b"   \n\t", expected: Scan::Incomplete },
+            Case { input: br#"{"a":1}"#, expected: Scan::Frame(7) },
+            Case { input: br#"[1,2]"#, expected: Scan::Frame(5) },
+            Case { input: br#"  {"a":1}"#, expected: Scan::Frame(9) },
+            Case { input: br#"{"a":{"b":[1,2]}}"#, expected: Scan::Frame(17) },
+            Case { input: br#"{"a":1}{"b":2}"#, expected: Scan::Frame(7) },
+            Case { input: br#"{"a":"}][{"}"#, expected: Scan::Frame(12) },
+            Case { input: br#"{"a":"\""}"#, expected: Scan::Frame(10) },
+            Case { input: br#"{"a":"\\"}"#, expected: Scan::Frame(10) },
+            Case { input: b"too many requests", expected: Scan::InvalidStart },
+            Case { input: b"1", expected: Scan::InvalidStart },
+            Case { input: br#""hi""#, expected: Scan::InvalidStart },
+            Case { input: br#"{"a":1"#, expected: Scan::Incomplete },
         ];
 
         for (i, case) in cases.iter().enumerate() {
@@ -460,11 +454,11 @@ mod tests {
         let frame = br#"{"jsonrpc":"2.0","id":1,"result":"0x1"}"#;
         let mut scanner = FrameScanner::default();
         for i in 0..frame.len() {
-            let got = scanner.scan(&frame[..=i]).unwrap();
+            let got = scanner.scan(&frame[..=i]);
             if i + 1 < frame.len() {
-                assert_eq!(got, None, "must not emit before the last byte (i={i})");
+                assert_eq!(got, Scan::Incomplete, "must not emit before the last byte (i={i})");
             } else {
-                assert_eq!(got, Some(frame.len()));
+                assert_eq!(got, Scan::Frame(frame.len()));
             }
         }
         assert_eq!(scanner.examined, frame.len());
@@ -486,9 +480,8 @@ mod tests {
 
         for raw in corpus {
             let mut scanner = FrameScanner::default();
-            let scanned = scanner.scan(raw).expect("corpus entries are well-formed objects/arrays");
-            let serde_end = serde_frame_end(raw);
-            assert_eq!(scanned, serde_end, "input={}", String::from_utf8_lossy(raw));
+            let expected = Scan::Frame(serde_frame_end(raw));
+            assert_eq!(scanner.scan(raw), expected, "input={}", String::from_utf8_lossy(raw));
         }
     }
 
@@ -500,14 +493,14 @@ mod tests {
 
         let mut scanner = FrameScanner::default();
         const CHUNK: usize = 4096;
-        let mut end = None;
+        let mut end = Scan::Incomplete;
         for i in (CHUNK..=frame.len()).step_by(CHUNK) {
-            end = scanner.scan(&frame[..i]).unwrap();
+            end = scanner.scan(&frame[..i]);
         }
         if frame.len() % CHUNK != 0 {
-            end = scanner.scan(&frame).unwrap();
+            end = scanner.scan(&frame);
         }
-        assert_eq!(end, Some(frame.len()));
+        assert_eq!(end, Scan::Frame(frame.len()));
         assert!(
             scanner.examined <= frame.len().saturating_add(CHUNK),
             "examined {} bytes for a {}-byte frame; scan must be linear",
@@ -531,10 +524,9 @@ mod tests {
         let mut count = 0usize;
         while offset < buf.len() {
             scanner.reset();
-            let end = scanner
-                .scan(&buf[offset..])
-                .expect("concatenated frames are well-formed")
-                .expect("each frame is complete");
+            let Scan::Frame(end) = scanner.scan(&buf[offset..]) else {
+                panic!("each concatenated frame is complete");
+            };
             offset += end;
             count += 1;
         }
