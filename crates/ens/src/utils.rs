@@ -30,6 +30,13 @@ impl std::error::Error for DnsEncodeError {}
 /// This preserves the original infallible API and does not validate the name. Use
 /// [`try_dns_encode`] when encoding untrusted input for the Universal Resolver.
 ///
+/// # Warning
+///
+/// An oversized label's length prefix is silently truncated (`label.len() as u8`),
+/// producing corrupted DNS wire data. Labels longer than 255 bytes therefore do
+/// not round-trip. Prefer [`try_dns_encode`], which returns
+/// [`DnsEncodeError::LabelTooLong`] instead.
+///
 /// # Examples
 ///
 /// ```
