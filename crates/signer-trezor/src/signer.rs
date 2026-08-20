@@ -710,11 +710,11 @@ mod tests {
             vec![0x8000002c, 0x8000003c, 0x80000000, 0, 5]
         );
         assert_eq!(
-            TrezorSigner::convert_path(&DerivationType::TrezorTestnet(0)),
+            TrezorSigner::convert_path(&DerivationType::TrezorLegacyTestnet(0)),
             vec![0x8000002c, 0x80000001, 0x80000000, 0, 0]
         );
         assert_eq!(
-            TrezorSigner::convert_path(&DerivationType::TrezorTestnet(2)),
+            TrezorSigner::convert_path(&DerivationType::TrezorLegacyTestnet(2)),
             vec![0x8000002c, 0x80000001, 0x80000000, 0, 2]
         );
         assert_eq!(
@@ -727,8 +727,8 @@ mod tests {
     fn test_derivation_type_display() {
         assert_eq!(DerivationType::TrezorLive(0).to_string(), "m/44'/60'/0'/0/0");
         assert_eq!(DerivationType::TrezorLive(10).to_string(), "m/44'/60'/0'/0/10");
-        assert_eq!(DerivationType::TrezorTestnet(0).to_string(), "m/44'/1'/0'/0/0");
-        assert_eq!(DerivationType::TrezorTestnet(3).to_string(), "m/44'/1'/0'/0/3");
+        assert_eq!(DerivationType::TrezorLegacyTestnet(0).to_string(), "m/44'/1'/0'/0/0");
+        assert_eq!(DerivationType::TrezorLegacyTestnet(3).to_string(), "m/44'/1'/0'/0/3");
         assert_eq!(
             DerivationType::Other("m/44'/60'/0'/0".to_string()).to_string(),
             "m/44'/60'/0'/0"
