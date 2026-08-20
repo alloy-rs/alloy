@@ -178,6 +178,10 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
+        // `connect_async_tls_with_config` only exists when tokio-tungstenite is built with a
+        // TLS backend. Without one there is no TLS to configure, so fall back to the plain
+        // connect and keep `--no-default-features` building.
+        #[cfg(any(feature = "rustls-tls", feature = "native-tls"))]
         let (socket, _) = tokio_tungstenite::connect_async_tls_with_config(
             req,
             self.config,
@@ -186,6 +190,10 @@ impl PubSubConnect for WsConnect {
         )
         .await
         .map_err(TransportErrorKind::custom)?;
+        #[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
+        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
+            .await
+            .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
