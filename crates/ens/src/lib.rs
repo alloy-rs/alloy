@@ -188,6 +188,11 @@ mod contract {
         ///
         /// Spec: <https://docs.ens.domains/ensip/23>
         ///
+        /// `resolve` keeps unnamed returns so downstream `resolveReturn._0` / `_1`
+        /// still compile. Reverse uses the deployed ENSIP-23 ABI
+        /// `reverse(bytes,uint256)`; the historical 1-arg `reverse(bytes reverseName)`
+        /// binding did not match the chain and is not preserved.
+        ///
         /// Note: CCIP Read requires client-side handling of the `OffchainLookup` revert
         /// (ERC-3668). Alloy does not currently implement this; calls to names that require
         /// CCIP Read will surface as [`EnsError::Resolve`].
@@ -221,10 +226,10 @@ mod contract {
             ///
             /// Returns the ABI-encoded result of the resolver call and the resolver address.
             /// Reverts with `OffchainLookup` when CCIP Read (ERC-3668) is required.
-            function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory result, address resolver);
+            function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory, address);
 
             /// Like `resolve`, but uses `gateways` for CCIP Read instead of the default.
-            function resolveWithGateways(bytes calldata name, bytes calldata data, string[] memory gateways) public view returns (bytes memory result, address resolver);
+            function resolveWithGateways(bytes calldata name, bytes calldata data, string[] memory gateways) public view returns (bytes memory, address);
 
             /// Reverse-resolves an address to its primary ENS name.
             ///
@@ -237,8 +242,27 @@ mod contract {
         }
     }
 
+    /// Returns the resolver address when it is safe to call `addr`/`text`/`name` directly.
+    ///
+    /// Extended (ENSIP-10) and parent/wildcard resolvers must be queried through the
+    /// Universal Resolver instead.
+    pub(crate) fn direct_resolver_address(
+        info: &UniversalResolver::ResolverInfo,
+        name: &str,
+    ) -> Result<alloy_primitives::Address, EnsError> {
+        if info.extended || !info.offset.is_zero() {
+            Err(EnsError::RequiresUniversalResolver(name.to_string()))
+        } else {
+            Ok(info.resolver)
+        }
+    }
+
     /// Error type for ENS resolution.
+    ///
+    /// New variants (`RequiresUniversalResolver`, `DnsEncode`, `InvalidResponse`) are
+    /// an intentional semver break relative to Alloy 1.x `EnsError`.
     #[derive(Debug, thiserror::Error)]
+    #[non_exhaustive]
     pub enum EnsError {
         /// Failed to get the resolver for this name.
         #[error("Failed to get ENS resolver: {0}")]
@@ -388,14 +412,8 @@ mod provider {
                 .await
                 .map_err(|error| map_ur_error(error, name, EnsError::Resolver))?;
 
-            // Extended and parent/wildcard resolvers must be queried through the
-            // Universal Resolver. Returning a raw instance invites incorrect direct
-            // `addr`/`text` calls (e.g. ur.integration-tests.eth).
-            if info.extended || !info.offset.is_zero() {
-                return Err(EnsError::RequiresUniversalResolver(name.to_string()));
-            }
-
-            Ok(EnsResolverInstance::new(info.resolver, self))
+            let resolver = crate::direct_resolver_address(&info, name)?;
+            Ok(EnsResolverInstance::new(resolver, self))
         }
 
         async fn get_resolver(
@@ -436,7 +454,7 @@ mod provider {
                 .await
                 .map_err(|error| map_ur_error(error, name, EnsError::Resolve))?;
 
-            Address::abi_decode(ret.result.as_ref()).map_err(|_| EnsError::InvalidResponse)
+            Address::abi_decode(ret._0.as_ref()).map_err(|_| EnsError::InvalidResponse)
         }
 
         async fn resolve_name_for_coin_type(
@@ -459,7 +477,7 @@ mod provider {
                 .await
                 .map_err(|error| map_ur_error(error, name, EnsError::Resolve))?;
 
-            Bytes::abi_decode(ret.result.as_ref()).map_err(|_| EnsError::InvalidResponse)
+            Bytes::abi_decode(ret._0.as_ref()).map_err(|_| EnsError::InvalidResponse)
         }
 
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError> {
@@ -486,7 +504,7 @@ mod provider {
                 .await
                 .map_err(|error| map_ur_error(error, name, EnsError::ResolveTxtRecord))?;
 
-            String::abi_decode(ret.result.as_ref()).map_err(|_| EnsError::InvalidResponse)
+            String::abi_decode(ret._0.as_ref()).map_err(|_| EnsError::InvalidResponse)
         }
     }
 
@@ -542,6 +560,60 @@ mod tests {
         // space; IDs with the high bit set would collide with smaller IDs.
         assert_eq!(coin_type::evm_chain(0x8000_0000), None);
         assert_eq!(coin_type::evm_chain(u64::MAX), None);
+    }
+}
+
+#[cfg(all(test, feature = "contract"))]
+mod resolver_info_tests {
+    use super::*;
+    use alloy_primitives::{address, Address, Bytes, B256, U256};
+
+    fn info(extended: bool, offset: u64, resolver: Address) -> UniversalResolver::ResolverInfo {
+        UniversalResolver::ResolverInfo {
+            name: Bytes::new(),
+            offset: U256::from(offset),
+            node: B256::ZERO,
+            resolver,
+            extended,
+        }
+    }
+
+    #[test]
+    fn preserves_legacy_universal_resolver_binding_shape() {
+        let _ = UniversalResolver::resolveReturn { _0: Default::default(), _1: Address::ZERO };
+        let _ = UniversalResolver::reverseCall {
+            lookupAddress: Default::default(),
+            coinType: Default::default(),
+        };
+    }
+
+    #[test]
+    fn direct_resolver_accepts_unextended_zero_offset() {
+        let resolver = address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63");
+        assert_eq!(
+            direct_resolver_address(&info(false, 0, resolver), "vitalik.eth").unwrap(),
+            resolver
+        );
+    }
+
+    #[test]
+    fn direct_resolver_rejects_extended() {
+        let err = direct_resolver_address(
+            &info(true, 0, address!("0x1111111111111111111111111111111111111111")),
+            "ur.integration-tests.eth",
+        )
+        .unwrap_err();
+        assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
+    }
+
+    #[test]
+    fn direct_resolver_rejects_wildcard_offset() {
+        let err = direct_resolver_address(
+            &info(false, 4, address!("0x1111111111111111111111111111111111111111")),
+            "sub.wildcard.eth",
+        )
+        .unwrap_err();
+        assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
     }
 }
 
