@@ -5,8 +5,10 @@ use alloy_consensus::{
     TxEnvelope, TxLegacy,
 };
 use alloy_eips::{
+    eip4844::{Blob, Bytes48},
     eip2718::{Decodable2718, Encodable2718},
     eip4895::Withdrawals,
+    eip7594::CELLS_PER_EXT_BLOB,
 };
 use alloy_primitives::Signature;
 use alloy_rlp::{Decodable, Encodable, Header as RlpHeader, EMPTY_STRING_CODE};
@@ -182,6 +184,53 @@ fn main() {
         &corpus_dir,
         "sidecar-variant-eip7594-empty",
         BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594::default()),
+    );
+    let sidecar_eip4844 = BlobTransactionSidecar {
+        blobs: vec![Blob::ZERO],
+        commitments: vec![Bytes48::ZERO],
+        proofs: vec![Bytes48::ZERO],
+    };
+    seed(&corpus_dir, "sidecar-eip4844-one-blob", sidecar_eip4844.clone());
+    seed(
+        &corpus_dir,
+        "sidecar-variant-eip4844-one-blob",
+        BlobTransactionSidecarVariant::Eip4844(sidecar_eip4844),
+    );
+    let sidecar_eip7594 = BlobTransactionSidecarEip7594::new(
+        vec![Blob::ZERO],
+        vec![Bytes48::ZERO],
+        vec![Bytes48::ZERO; CELLS_PER_EXT_BLOB],
+    );
+    seed(&corpus_dir, "sidecar-eip7594-one-blob", sidecar_eip7594.clone());
+    seed(
+        &corpus_dir,
+        "sidecar-variant-eip7594-one-blob",
+        BlobTransactionSidecarVariant::Eip7594(sidecar_eip7594),
+    );
+    let populated_receipt = ReceiptWithBloom {
+        receipt: Receipt {
+            status: true.into(),
+            cumulative_gas_used: 21_000,
+            logs: vec![Default::default()],
+        },
+        logs_bloom: Default::default(),
+    };
+    seed(
+        &corpus_dir,
+        "receipt-envelope-eip1559-populated",
+        ReceiptEnvelope::Eip1559(populated_receipt.clone()),
+    );
+    seed(
+        &corpus_dir,
+        "receipts-envelope-populated",
+        Receipts {
+            receipt_vec: vec![vec![ReceiptEnvelope::Eip1559(populated_receipt.clone())]],
+        },
+    );
+    seed(
+        &corpus_dir,
+        "receipts-with-bloom-populated",
+        Receipts { receipt_vec: vec![vec![populated_receipt]] },
     );
     seed(
         &corpus_dir,
