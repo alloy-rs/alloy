@@ -115,6 +115,10 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service a request.
     fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
+        if in_flight.is_subscription() {
+            self.subs.clear_cancelled(in_flight.request().params_hash());
+        }
+
         let brv = in_flight.request();
 
         self.dispatch_request(brv.serialized().to_owned())?;
@@ -179,16 +183,20 @@ impl<T: PubSubConnect> PubSubService<T> {
     ) -> TransportResult<()> {
         let request = in_flight.request;
         let id = request.id().clone();
+        let local_id = request.params_hash();
 
-        let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
+        if let Some(sub) = self.subs.upsert(request, server_id, in_flight.channel_size) {
+            // Serialized B256 is always a valid serialized U256 too.
+            let ser_alias = to_json_raw_value(sub.local_id())?;
 
-        // Serialized B256 is always a valid serialized U256 too.
-        let ser_alias = to_json_raw_value(sub.local_id())?;
-
-        // We send back a success response with the new subscription ID.
-        // We don't care if the channel is dead.
-        let _ =
-            in_flight.tx.send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) }));
+            // We send back a success response with the new subscription ID.
+            // We don't care if the channel is dead.
+            let _ = in_flight
+                .tx
+                .send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) }));
+        } else {
+            debug!(%local_id, "Dropping late subscribe response for cancelled subscription");
+        }
 
         Ok(())
     }
