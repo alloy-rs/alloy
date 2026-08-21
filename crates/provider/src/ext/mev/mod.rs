@@ -1,7 +1,14 @@
+mod priority_update_registry;
 mod with_auth;
 
-pub use self::with_auth::{
-    sign_flashbots_payload, verify_flashbots_signature, FlashbotsSignatureError, MevBuilder,
+pub use self::{
+    priority_update_registry::{
+        priority_update_registry_domain, sign_priority_update, PrioUpdateRegistry, SignedUpdate,
+        UpdateState, PRIORITY_UPDATE_REGISTRY_ADDRESS,
+    },
+    with_auth::{
+        sign_flashbots_payload, verify_flashbots_signature, FlashbotsSignatureError, MevBuilder,
+    },
 };
 use crate::Provider;
 use alloy_network::Network;
