@@ -167,7 +167,7 @@ impl TrezorSigner {
         derivation: &DerivationType,
     ) -> Result<Address, TrezorError> {
         let mut client = self.get_client()?;
-        let address_str = client.ethereum_get_address(Self::convert_path(derivation))?;
+        let address_str = client.ethereum_get_address(Self::convert_path(derivation)?)?;
         Ok(address_str.parse()?)
     }
 
@@ -178,7 +178,7 @@ impl TrezorSigner {
         tx: &dyn SignableTransaction<Signature>,
     ) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
-        let path = Self::convert_path(&self.derivation);
+        let path = Self::convert_path(&self.derivation)?;
         let request = build_sign_request(tx)?;
 
         let signature = match request {
@@ -211,27 +211,48 @@ impl TrezorSigner {
     #[instrument(skip(message), fields(message=hex::encode(message)), ret)]
     async fn sign_message_inner(&self, message: &[u8]) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
-        let apath = Self::convert_path(&self.derivation);
+        let apath = Self::convert_path(&self.derivation)?;
         let signature = client.ethereum_sign_message(message.into(), apath)?;
         signature_from_trezor(signature)
     }
 
     // helper which converts a derivation path to [u32]
-    fn convert_path(derivation: &DerivationType) -> Vec<u32> {
+    fn convert_path(derivation: &DerivationType) -> Result<Vec<u32>, TrezorError> {
         let derivation = derivation.to_string();
         let elements = derivation.split('/').skip(1).collect::<Vec<_>>();
 
         let mut path = vec![];
         for derivation_index in elements {
             let hardened = derivation_index.contains('\'');
-            let mut index = derivation_index.replace('\'', "").parse::<u32>().unwrap();
-            if hardened {
-                index |= 0x80000000;
+            let index = derivation_index.replace('\'', "").parse::<u32>().map_err(|e| {
+                TrezorError::InvalidDerivationPath(e.to_string())
+            })?;
+            // Reject raw indices that already set the harden bit (e.g. 2147483648 ≡ 0').
+            if index >= 0x8000_0000 {
+                return Err(TrezorError::InvalidDerivationPath(format!(
+                    "index {index} is out of range (use \' for hardened segments)"
+                )));
             }
+            let index = if hardened { index | 0x8000_0000 } else { index };
             path.push(index);
         }
 
-        path
+        Ok(path)
+    }
+}
+
+#[cfg(test)]
+mod convert_path_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_raw_hardened_index_without_marker() {
+        let err = TrezorSigner::convert_path(&DerivationType::Other("m/2147483648".into()))
+            .unwrap_err();
+        assert!(matches!(err, TrezorError::InvalidDerivationPath(_)));
+
+        let ok = TrezorSigner::convert_path(&DerivationType::Other("m/0'".into())).unwrap();
+        assert_eq!(ok, vec![0x8000_0000]);
     }
 }
 
