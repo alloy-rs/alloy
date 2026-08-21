@@ -1,9 +1,10 @@
 use alloy_consensus::{
     BlobTransactionSidecar, BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, Block,
     BlockBody, EthereumReceipt, EthereumTxEnvelope, Extended, Header, Receipt, ReceiptEnvelope,
-    ReceiptWithBloom, Receipts, SignableTransaction, TxEip1559, TxEip2930, TxEip4844, TxEip7702,
-    TxEnvelope, TxLegacy,
+    ReceiptWithBloom, Receipts, SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844,
+    TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy,
 };
+use alloy_consensus::transaction::PooledTransaction;
 use alloy_eips::{
     eip4844::{Blob, Bytes48},
     eip2718::{Decodable2718, Encodable2718},
@@ -18,6 +19,8 @@ include!("types.rs");
 
 type BasicTxEnvelope = EthereumTxEnvelope<TxEip4844>;
 type ExtendedTransaction = Extended<TxEip1559, TxEip2930>;
+type VariantPooledTransaction =
+    EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>>;
 
 fn write_seed(corpus_dir: &Path, name: &str, bytes: &[u8]) {
     let path = corpus_dir.join(name);
@@ -202,6 +205,25 @@ fn main() {
         vec![Bytes48::ZERO; CELLS_PER_EXT_BLOB],
     );
     seed(&corpus_dir, "sidecar-eip7594-one-blob", sidecar_eip7594.clone());
+    let signature = Signature::test_signature();
+    let pooled_eip7594 = PooledTransaction::Eip4844(Signed::new_unhashed(
+        TxEip4844WithSidecar::from_tx_and_sidecar(
+            TxEip4844::default(),
+            sidecar_eip7594.clone(),
+        ),
+        signature,
+    ));
+    seed(&corpus_dir, "pooled-eip7594-one-blob-network", pooled_eip7594.clone());
+    seed_2718(&corpus_dir, "pooled-eip7594-one-blob-direct", pooled_eip7594);
+    let variant_pooled = VariantPooledTransaction::Eip4844(Signed::new_unhashed(
+        TxEip4844WithSidecar::from_tx_and_sidecar(
+            TxEip4844::default(),
+            BlobTransactionSidecarVariant::Eip7594(sidecar_eip7594.clone()),
+        ),
+        signature,
+    ));
+    seed(&corpus_dir, "variant-pooled-eip7594-network", variant_pooled.clone());
+    seed_2718(&corpus_dir, "variant-pooled-eip7594-direct", variant_pooled);
     seed(
         &corpus_dir,
         "sidecar-variant-eip7594-one-blob",
@@ -248,7 +270,6 @@ fn main() {
         "receipts-with-bloom-empty",
         Receipts::<ReceiptWithBloom<Receipt>>::default(),
     );
-    let signature = Signature::test_signature();
     seed_2718(
         &corpus_dir,
         "tx-envelope-legacy-default",

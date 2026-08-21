@@ -3,8 +3,10 @@
 use alloy_consensus::{
     BlobTransactionSidecar, BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, Block,
     BlockBody, EthereumReceipt, EthereumTxEnvelope, Extended, Header, Receipt, ReceiptEnvelope,
-    ReceiptWithBloom, Receipts, TxEip1559, TxEip2930, TxEip4844, TxEip7702, TxEnvelope, TxLegacy,
+    ReceiptWithBloom, Receipts, TxEip1559, TxEip2930, TxEip4844, TxEip4844WithSidecar,
+    TxEip7702, TxEnvelope, TxLegacy,
 };
+use alloy_consensus::transaction::PooledTransaction;
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip4895::{Withdrawal, Withdrawals},
@@ -16,6 +18,8 @@ include!("../types.rs");
 
 type BasicTxEnvelope = EthereumTxEnvelope<TxEip4844>;
 type ExtendedTransaction = Extended<TxEip1559, TxEip2930>;
+type VariantPooledTransaction =
+    EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>>;
 
 fn is_explicitly_tagged_legacy(data: &[u8]) -> bool {
     // `EthereumTxEnvelope` currently normalizes an explicitly type-0-prefixed legacy transaction
@@ -151,6 +155,12 @@ fn raw_roundtrip_properties(data: &[u8]) {
     assert_roundtrip::<TxEip1559>(data, "TxEip1559");
     assert_roundtrip::<TxEip4844>(data, "TxEip4844");
     assert_roundtrip::<TxEip7702>(data, "TxEip7702");
+    if !is_explicitly_tagged_legacy(data) {
+        assert_roundtrip::<PooledTransaction>(data, "PooledTransaction");
+        assert_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
+        assert_2718_roundtrip::<PooledTransaction>(data, "PooledTransaction");
+        assert_2718_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
+    }
     assert_roundtrip::<ExtendedTransaction>(data, "Extended<TxEip1559, TxEip2930>");
     assert_roundtrip::<BlobTransactionSidecar>(data, "BlobTransactionSidecar");
     assert_roundtrip::<BlobTransactionSidecarEip7594>(data, "BlobTransactionSidecarEip7594");
