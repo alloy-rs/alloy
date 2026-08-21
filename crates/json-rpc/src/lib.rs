@@ -87,7 +87,7 @@ mod error;
 pub use error::RpcError;
 
 mod notification;
-pub use notification::{EthNotification, PubSubItem, SubId};
+pub use notification::{EthNotification, PubSubItem, PubSubItems, PubSubItemsIter, SubId};
 
 mod packet;
 pub use packet::{BorrowedResponsePacket, RequestPacket, ResponsePacket};

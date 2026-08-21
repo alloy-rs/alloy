@@ -49,9 +49,12 @@ impl IpcBackend {
     fn spawn(mut self) {
         let fut = async move {
             let (read, mut writer) = self.stream.split();
-            let mut read = ReadJsonStream::new(read).fuse();
+            // Parse each message as one-or-many items so a JSON-RPC batch
+            // response (a single JSON array) is expanded into its individual
+            // responses before being forwarded to the frontend.
+            let mut read = ReadJsonStream::<_, alloy_json_rpc::PubSubItems>::new(read).fuse();
 
-            let err = loop {
+            let err = 'outer: loop {
                 select! {
                     biased;
                     item = self.interface.recv_from_frontend() => {
@@ -73,10 +76,12 @@ impl IpcBackend {
                     // Read from the socket.
                     item = read.next() => {
                         match item {
-                            Some(item) => {
-                                if self.interface.send_to_frontend(item).is_err() {
-                                    debug!("Frontend has gone away");
-                                    break false;
+                            Some(items) => {
+                                for item in items {
+                                    if self.interface.send_to_frontend(item).is_err() {
+                                        debug!("Frontend has gone away");
+                                        break 'outer false;
+                                    }
                                 }
                             }
                             None => {
