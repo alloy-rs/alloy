@@ -73,7 +73,7 @@ http.workspace = true
 tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
-reqwest = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["json", "stream"], optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
@@ -108,6 +108,13 @@ tokio-tungstenite.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]
+# ERC-3668 / ENSIP-21 protocol client. Does not enable an HTTP gateway or the
+# provider's reqwest JSON-RPC transport — pair with `ccip-read-http` or supply a
+# custom [`CcipReadGateway`].
+ccip-read = []
+# Default HTTPS [`HttpCcipReadGateway`] backed by the `reqwest` crate only.
+# Does not enable `alloy-transport-http` / `alloy-rpc-client` reqwest transport.
+ccip-read-http = ["ccip-read", "dep:reqwest"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",
@@ -122,9 +129,9 @@ ws = ["ws-base", "alloy-rpc-client/ws", "alloy-transport-ws/aws-lc-rs"]
 ws-ring = ["ws-base", "alloy-rpc-client/ws-ring", "alloy-transport-ws/ring"]
 ws-native-tls = ["ws-base", "alloy-rpc-client/ws-native-tls", "alloy-transport-ws/native-tls"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
-reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
-reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
-reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls"]
+reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls", "reqwest?/default-tls"]
+reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls", "reqwest?/rustls"]
+reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls", "reqwest?/native-tls"]
 admin-api = ["dep:alloy-rpc-types-admin"]
 anvil-api = ["dep:alloy-rpc-types-anvil"]
 anvil-node = ["anvil-api", "reqwest", "dep:alloy-node-bindings"]

@@ -8,22 +8,58 @@
 
 //! ENS Name resolving utilities.
 
-use alloy_primitives::{address, Address, Keccak256, B256};
-use std::{borrow::Cow, str::FromStr};
+mod utils;
+pub use utils::{dns_encode, namehash, reverse_address, try_dns_encode, DnsEncodeError};
 
-/// ENS registry address (`0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e`)
+use alloy_primitives::{address, Address};
+use std::str::FromStr;
+
+/// ENS Universal Resolver address (`0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe`).
+///
+/// The primary entry-point for ENS name resolution. Supports wildcard resolvers
+/// and CCIP Read (ERC-3668).
+pub const UNIVERSAL_RESOLVER_ADDRESS: Address =
+    address!("0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe");
+
+/// ENS registry address (`0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e`).
+#[deprecated(
+    note = "resolution now routes through the Universal Resolver; use `UNIVERSAL_RESOLVER_ADDRESS` and the Universal Resolver helpers"
+)]
 pub const ENS_ADDRESS: Address = address!("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e");
 
-/// ENS Universal Resolver address on Ethereum Mainnet
-/// (`0xeeeeeeee14d718c2b47d9923deab1335e144eeee`)
-///
-/// The Universal Resolver is the canonical entry point for all ENS resolution.
-/// Resolution may require EIP-3668 CCIP Read, which must be handled outside this crate's helpers.
-pub const UNIVERSAL_RESOLVER_ADDRESS: Address =
-    address!("0xeeeeeeee14d718c2b47d9923deab1335e144eeee");
-
-/// ENS const for registrar domain
+/// ENS registry domain for reverse records: `addr.reverse`.
+#[deprecated(
+    note = "reverse resolution now routes through the Universal Resolver; use `reverse_address` or `lookup_address`"
+)]
 pub const ENS_REVERSE_REGISTRAR_DOMAIN: &str = "addr.reverse";
+
+/// Helpers for ENS multichain coin types.
+///
+/// Non-EVM chains use their static SLIP-0044 coin type according to ENSIP-9.
+/// EVM-compatible chains follow ENSIP-11: `coinType = 0x80000000 | chainId`.
+/// Use [`evm_chain`][coin_type::evm_chain] to derive an EVM coin type.
+pub mod coin_type {
+    /// Ethereum mainnet (SLIP-0044, coin type 60).
+    pub const ETH: u64 = 60;
+
+    /// Converts an EVM chain ID to its ENSIP-11 coin type.
+    ///
+    /// Chain ID `1` (Ethereum mainnet) returns [`ETH`] (`60`) per SLIP-0044.
+    /// All other chains use `0x80000000 | chain_id`.
+    ///
+    /// Returns `None` for chain IDs of `0x80000000` and above: ENSIP-11 reserves
+    /// a 31-bit chain ID space, and larger IDs would collide with the coin types
+    /// of smaller ones (e.g. `0` and `0x80000000`).
+    pub const fn evm_chain(chain_id: u64) -> Option<u64> {
+        if chain_id == 1 {
+            return Some(ETH);
+        }
+        if chain_id >= 0x8000_0000 {
+            return None;
+        }
+        Some(0x8000_0000 | chain_id)
+    }
+}
 
 #[cfg(feature = "contract")]
 pub use contract::*;
@@ -97,9 +133,12 @@ impl FromStr for NameOrAddress {
 mod contract {
     use alloy_sol_types::sol;
 
-    // ENS Registry and Resolver contracts.
     sol! {
         /// ENS Registry contract.
+        ///
+        /// Deprecated: retained for backwards compatibility. Resolution now routes
+        /// through the [`UniversalResolver`], which handles wildcard resolvers and
+        /// CCIP Read.
         #[sol(rpc)]
         contract EnsRegistry {
             /// Returns the resolver for the specified node.
@@ -109,93 +148,219 @@ mod contract {
             function owner(bytes32 node) view returns (address);
         }
 
-        /// ENS Resolver interface.
+        /// ENS Reverse Registrar contract.
+        ///
+        /// Deprecated: retained for backwards compatibility. Reverse resolution now
+        /// routes through the [`UniversalResolver`].
+        #[sol(rpc)]
+        contract ReverseRegistrar {}
+
+        /// ENS Resolver interface (ENSIP-1).
         #[sol(rpc)]
         contract EnsResolver {
-            /// Returns the address associated with the specified node.
+            /// Returns the Ethereum address associated with the specified node.
             function addr(bytes32 node) view returns (address);
 
             /// Returns the name associated with an ENS node, for reverse records.
             function name(bytes32 node) view returns (string);
 
-            /// Returns the txt associated with an ENS node
-            function text(bytes32 node,string calldata key) view virtual returns (string memory);
+            /// Returns the text record value for the specified key.
+            function text(bytes32 node, string calldata key) view virtual returns (string memory);
         }
 
-        /// ENS Universal Resolver contract.
+        /// ENS Multicoin Resolver interface (ENSIP-11).
         ///
-        /// The `resolve` item models the canonical Universal Resolver entry point.
+        /// Provides multichain address resolution. Use with the Universal Resolver and
+        /// coin types from ENSIP-9 or [`coin_type::evm_chain`][crate::coin_type::evm_chain].
+        #[sol(rpc)]
+        contract EnsMulticoinResolver {
+            /// Returns the address for `node` on the chain identified by `coin_type`.
+            ///
+            /// The returned bytes are the raw address encoding for that coin type
+            /// (e.g., 20 raw bytes for EVM chains, script bytes for Bitcoin).
+            function addr(bytes32 node, uint256 coin_type) view returns (bytes memory);
+        }
+
+        /// ENS Universal Resolver (ENSIP-23).
         ///
-        /// It may signal EIP-3668 CCIP Read with an `OffchainLookup` revert. This binding does not
-        /// follow that redirect; the caller must provide CCIP-Read handling separately.
+        /// The single entry-point for all ENS resolution. Handles routing to wildcard
+        /// resolvers and CCIP Read (ERC-3668).
         ///
-        /// The legacy `reverse(bytes)` item below does **not** match the deployed canonical
-        /// resolver's `reverse(bytes,uint256)` ABI and must not be used with
-        /// [`UNIVERSAL_RESOLVER_ADDRESS`](crate::UNIVERSAL_RESOLVER_ADDRESS).
+        /// Spec: <https://docs.ens.domains/ensip/23>
+        ///
+        /// `resolve` keeps unnamed returns so downstream `resolveReturn._0` / `_1`
+        /// still compile. Reverse uses the deployed ENSIP-23 ABI
+        /// `reverse(bytes,uint256)`; the historical 1-arg `reverse(bytes reverseName)`
+        /// binding did not match the chain and is not preserved.
+        ///
+        /// Provider-based ENS helpers handle `OffchainLookup` reverts using ERC-3668 and
+        /// the ENSIP-21 batch gateway protocol.
         #[sol(rpc)]
         contract UniversalResolver {
-            /// Resolves an ENS name with the given encoded resolver call data.
+            error ResolverNotFound(bytes name);
+            error ResolverNotContract(bytes name, address resolver);
+            error ReverseAddressMismatch(string primary, bytes primaryAddress);
+            error UnsupportedResolverProfile(bytes4 selector);
+            error ResolverError(bytes errorData);
+
+            struct ResolverInfo {
+                bytes name;
+                uint256 offset;
+                bytes32 node;
+                address resolver;
+                bool extended;
+            }
+
+            /// Like `findResolver`, but reverts with `ResolverNotFound` if no resolver exists.
+            function requireResolver(bytes memory name) public view returns (ResolverInfo memory info);
+
+            /// Returns the resolver for `name` (DNS wire-format) without performing resolution.
+            ///
+            /// Returns `(resolver, node, offset)` where `resolver` is the contract address,
+            /// `node` is the namehash, and `offset` is the byte offset into `name` at which
+            /// the resolver was found (for wildcard/parent resolution).
+            function findResolver(bytes memory name) public view returns (address, bytes32, uint256);
+
+            /// Resolves `name` (DNS wire-format) using the encoded `data` call.
+            ///
+            /// Returns the ABI-encoded result of the resolver call and the resolver address.
+            /// Reverts with `OffchainLookup` when CCIP Read (ERC-3668) is required.
             function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory, address);
 
-            /// A legacy reverse-resolution ABI retained for compatibility.
-            ///
-            /// This selector and return shape do not match the deployed canonical Universal
-            /// Resolver. Do not call it at [`UNIVERSAL_RESOLVER_ADDRESS`](crate::UNIVERSAL_RESOLVER_ADDRESS).
-            function reverse(bytes calldata reverseName) external view returns (string memory, address, address, address);
-        }
+            /// Like `resolve`, but uses `gateways` for CCIP Read instead of the default.
+            function resolveWithGateways(bytes calldata name, bytes calldata data, string[] memory gateways) public view returns (bytes memory, address);
 
-        /// ENS Reverse Registrar contract
-        #[sol(rpc)]
-        contract ReverseRegistrar {}
+            /// Reverse-resolves an address to its primary ENS name.
+            ///
+            /// `lookupAddress` is the raw byte encoding of the address.
+            /// `coinType` specifies the chain (use [`coin_type::ETH`] for Ethereum).
+            function reverse(bytes calldata lookupAddress, uint256 coinType) external view returns (string memory name, address resolver, address reverseResolver);
+
+            /// Like `reverse`, but uses `gateways` for CCIP Read instead of the default.
+            function reverseWithGateways(bytes calldata lookupAddress, uint256 coinType, string[] memory gateways) public view returns (string memory name, address resolver, address reverseResolver);
+        }
+    }
+
+    /// Returns the resolver address when it is safe to call `addr`/`text`/`name` directly.
+    ///
+    /// Extended (ENSIP-10) and parent/wildcard resolvers must be queried through the
+    /// Universal Resolver instead.
+    pub(crate) fn direct_resolver_address(
+        info: &UniversalResolver::ResolverInfo,
+        name: &str,
+    ) -> Result<alloy_primitives::Address, EnsError> {
+        if info.extended || !info.offset.is_zero() {
+            Err(EnsError::RequiresUniversalResolver(name.to_string()))
+        } else {
+            Ok(info.resolver)
+        }
     }
 
     /// Error type for ENS resolution.
+    ///
+    /// New variants (`RequiresUniversalResolver`, `DnsEncode`, `InvalidResponse`) are
+    /// an intentional semver break relative to Alloy 1.x `EnsError`.
     #[derive(Debug, thiserror::Error)]
+    #[non_exhaustive]
     pub enum EnsError {
-        /// Failed to get resolver from the ENS registry.
-        #[error("Failed to get resolver from the ENS registry: {0}")]
+        /// Failed to get the resolver for this name.
+        #[error("Failed to get ENS resolver: {0}")]
         Resolver(alloy_contract::Error),
-        /// Failed to get resolver from the ENS registry.
+        /// No resolver found for the given name.
         #[error("ENS resolver not found for name {0:?}")]
         ResolverNotFound(String),
-        /// Failed to get reverse registrar from the ENS registry.
+        /// Direct resolver calls are unsafe for this name; use Universal Resolver helpers.
+        ///
+        /// Returned when the name resolves through an ENSIP-10 extended resolver or a
+        /// parent/wildcard resolver. Calling `addr`/`text`/`name` on the raw resolver
+        /// instance can return incorrect data — use `resolve_name`, `lookup_txt`, or
+        /// related helpers instead.
+        #[error(
+            "ENS name {0:?} requires Universal Resolver resolution (extended or wildcard resolver)"
+        )]
+        RequiresUniversalResolver(String),
+        /// Failed to get the reverse registrar from the ENS registry.
+        #[deprecated(
+            note = "only produced by the deprecated registry-based `get_reverse_registrar` helper"
+        )]
         #[error("Failed to get reverse registrar from the ENS registry: {0}")]
         RevRegistrar(alloy_contract::Error),
-        /// Failed to get reverse registrar from the ENS registry.
+        /// No reverse registrar found for `addr.reverse`.
+        #[deprecated(
+            note = "only produced by the deprecated registry-based `get_reverse_registrar` helper"
+        )]
         #[error("ENS reverse registrar not found for addr.reverse")]
         ReverseRegistrarNotFound,
-        /// Failed to lookup ENS name from an address.
+        /// Failed to perform a reverse lookup.
         #[error("Failed to lookup ENS name from an address: {0}")]
         Lookup(alloy_contract::Error),
         /// Failed to resolve ENS name to an address.
         #[error("Failed to resolve ENS name to an address: {0}")]
         Resolve(alloy_contract::Error),
-        /// Failed to get txt records of ENS name.
-        #[error("Failed to resolve txt record: {0}")]
+        /// Failed to get a text record for an ENS name.
+        #[error("Failed to resolve text record: {0}")]
         ResolveTxtRecord(alloy_contract::Error),
+        /// Failed to DNS-encode the ENS name for the Universal Resolver.
+        #[error("Failed to DNS-encode ENS name: {0}")]
+        DnsEncode(#[from] crate::DnsEncodeError),
+        /// Failed to decode the Universal Resolver response.
+        #[error("Failed to decode Universal Resolver response")]
+        InvalidResponse,
+        /// Failed while performing a CCIP Read request.
+        ///
+        /// Constructed only for non-transport CCIP failures. Transport errors are
+        /// mapped to [`EnsError::Resolve`], [`EnsError::Lookup`], or
+        /// [`EnsError::ResolveTxtRecord`] via context-aware helpers — do not use
+        /// `EnsError::from(CcipReadError)`.
+        #[cfg(feature = "provider")]
+        #[error("Failed to perform CCIP Read: {0}")]
+        CcipRead(#[source] alloy_provider::CcipReadError),
     }
 }
 
 #[cfg(feature = "provider")]
 mod provider {
+    #[allow(deprecated)]
     use crate::{
-        dns_encode, namehash, reverse_address, EnsError, EnsRegistry, EnsResolver,
-        EnsResolver::EnsResolverInstance, ReverseRegistrar::ReverseRegistrarInstance,
-        UniversalResolver, ENS_ADDRESS, ENS_REVERSE_REGISTRAR_DOMAIN, UNIVERSAL_RESOLVER_ADDRESS,
+        coin_type, namehash, reverse_address, try_dns_encode, EnsError, EnsMulticoinResolver,
+        EnsRegistry, EnsResolver, EnsResolver::EnsResolverInstance,
+        ReverseRegistrar::ReverseRegistrarInstance, UniversalResolver, ENS_ADDRESS,
+        ENS_REVERSE_REGISTRAR_DOMAIN, UNIVERSAL_RESOLVER_ADDRESS,
     };
-    use alloy_primitives::{Address, Bytes, B256};
-    use alloy_provider::{Network, Provider};
-    use alloy_sol_types::SolCall;
+    use alloy_eips::BlockId;
+    use alloy_primitives::{Address, Bytes, B256, U256};
+    use alloy_provider::{CcipReadClient, CcipReadError, CcipReadGateway, Network, Provider};
+    use alloy_sol_types::{SolCall, SolValue};
 
     /// Extension trait for ENS contract calls.
-    ///
-    /// All ENS name strings must already be normalized according to ENSIP-15. These helpers do not
-    /// perform complete normalization or validation before hashing or DNS-encoding them;
-    /// [`namehash`] only removes `U+FE0F`.
     #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
     #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
     pub trait ProviderEnsExt<N: alloy_provider::Network, P: Provider<N>> {
-        /// Returns the resolver for the specified node. The `&str` is only used for error messages.
+        /// Returns the resolver contract instance for the given ENS name.
+        ///
+        /// Determines the resolver address via the Universal Resolver.
+        ///
+        /// Returns [`EnsError::RequiresUniversalResolver`] when the name uses an
+        /// ENSIP-10 extended resolver or a parent/wildcard resolver. In those cases
+        /// direct `addr`/`text`/`name` calls on the resolver are not equivalent to
+        /// Universal Resolver resolution — use [`Self::resolve_name`],
+        /// [`Self::lookup_txt`], or the other helpers instead.
+        async fn get_resolver_for_name(
+            &self,
+            name: &str,
+        ) -> Result<EnsResolverInstance<&P, N>, EnsError>;
+
+        /// Returns the resolver for the specified node.
+        ///
+        /// The `&str` is only used for error messages. Looks up the resolver via the
+        /// ENS registry, matching the historical Alloy API.
+        ///
+        /// Prefer [`Self::get_resolver_for_name`] or the Universal Resolver helpers
+        /// (`resolve_name`, `lookup_txt`, …). Registry-based resolver discovery does
+        /// not handle ENSIP-10 extended or wildcard resolvers correctly.
+        #[deprecated(
+            note = "registry-based resolver discovery; use `get_resolver_for_name` or Universal Resolver helpers"
+        )]
         async fn get_resolver(
             &self,
             node: B256,
@@ -203,35 +368,117 @@ mod provider {
         ) -> Result<EnsResolverInstance<&P, N>, EnsError>;
 
         /// Returns the reverse registrar for the specified node.
+        #[deprecated(
+            note = "reverse resolution now routes through the Universal Resolver; use `lookup_address` instead"
+        )]
         async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError>;
 
-        /// Performs a forward lookup of an already-normalized ENS name using the Universal
-        /// Resolver.
+        /// Performs a forward lookup of an ENS name to an Ethereum address.
         ///
-        /// The name must also satisfy [`dns_encode`]'s non-empty-label and length preconditions.
+        /// Routes through the [Universal Resolver], which handles wildcard resolvers
+        /// and CCIP Read (ERC-3668).
         ///
-        /// EIP-3668 CCIP-Read redirects are not followed by this helper and surface as a resolution
-        /// error unless handling is supplied outside it.
+        /// Uses the shared default HTTP CCIP Read client. For a custom gateway, URL
+        /// policy, or limits, use [`Self::resolve_name_with_ccip_read`].
+        ///
+        /// CCIP Read round trips issue an initial `eth_call`, an off-chain gateway
+        /// fetch, and a callback `eth_call`, all against [`BlockId::latest`]. Chain
+        /// state backing that tag can move between those steps. ERC-3668 resolvers
+        /// typically bind signed gateway payloads to the lookup; Alloy does not
+        /// enforce that itself.
+        ///
+        /// [Universal Resolver]: https://docs.ens.domains/web/ensv2-readiness
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError>;
 
-        /// Reads the legacy `{address}.addr.reverse` record through the ENS registry and resolver.
+        /// Like [`Self::resolve_name`], but uses the provided CCIP Read client.
         ///
-        /// This is not Universal Resolver multichain reverse resolution. The returned name is not
-        /// normalized or forward-verified; normalize it, resolve it, and compare the resulting
-        /// address before treating the name as an authenticated identity.
+        /// Pass a custom [`CcipReadClient`] to proxy, allowlist/blocklist, or otherwise
+        /// constrain contract-controlled gateway URLs as recommended by ERC-3668.
+        ///
+        /// Uses [`BlockId::latest`] for both the initial call and the CCIP callback.
+        /// See [`Self::resolve_name`] for the chain-head drift tradeoff.
+        async fn resolve_name_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            client: &CcipReadClient<G>,
+        ) -> Result<Address, EnsError>;
+
+        /// Resolves an ENS name to a multichain address for the given coin type (ENSIP-11).
+        ///
+        /// Returns the raw address bytes as stored in the resolver. The encoding varies
+        /// by coin type: 20 raw address bytes for EVM chains, script bytes for
+        /// Bitcoin, etc. Use [`coin_type::evm_chain`][crate::coin_type::evm_chain] for
+        /// EVM chains; for non-EVM chains, pass the static SLIP-0044 coin type.
+        async fn resolve_name_for_coin_type(
+            &self,
+            name: &str,
+            coin_type: u64,
+        ) -> Result<Bytes, EnsError>;
+
+        /// Like [`Self::resolve_name_for_coin_type`], but uses the provided CCIP Read client.
+        ///
+        /// Uses [`BlockId::latest`] for both the initial call and the CCIP callback.
+        /// See [`Self::resolve_name`] for the chain-head drift tradeoff.
+        async fn resolve_name_for_coin_type_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            coin_type: u64,
+            client: &CcipReadClient<G>,
+        ) -> Result<Bytes, EnsError>;
+
+        /// Performs a reverse lookup of an address to its primary ENS name.
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError>;
 
-        /// Looks up a text record for an already-normalized ENS name.
+        /// Like [`Self::lookup_address`], but uses the provided CCIP Read client.
+        ///
+        /// Uses [`BlockId::latest`] for both the initial call and the CCIP callback.
+        /// See [`Self::resolve_name`] for the chain-head drift tradeoff.
+        async fn lookup_address_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            address: &Address,
+            client: &CcipReadClient<G>,
+        ) -> Result<String, EnsError>;
+
+        /// Looks up a text record for an ENS name.
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError>;
+
+        /// Like [`Self::lookup_txt`], but uses the provided CCIP Read client.
+        ///
+        /// Uses [`BlockId::latest`] for both the initial call and the CCIP callback.
+        /// See [`Self::resolve_name`] for the chain-head drift tradeoff.
+        async fn lookup_txt_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            key: &str,
+            client: &CcipReadClient<G>,
+        ) -> Result<String, EnsError>;
     }
 
     #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
     #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
+    #[allow(deprecated)]
     impl<N, P> ProviderEnsExt<N, P> for P
     where
         P: Provider<N>,
         N: Network,
     {
+        async fn get_resolver_for_name(
+            &self,
+            name: &str,
+        ) -> Result<EnsResolverInstance<&P, N>, EnsError> {
+            let dns = try_dns_encode(name)?;
+
+            let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
+            let info = ur
+                .requireResolver(dns.into())
+                .call()
+                .await
+                .map_err(|error| map_ur_error(error, name, EnsError::Resolver))?;
+
+            let resolver = crate::direct_resolver_address(&info, name)?;
+            Ok(EnsResolverInstance::new(resolver, self))
+        }
+
         async fn get_resolver(
             &self,
             node: B256,
@@ -259,166 +506,221 @@ mod provider {
         }
 
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError> {
-            let dns_name = dns_encode(name);
-            let node = namehash(name);
-            let addr_call = EnsResolver::addrCall { node };
-            let call_data = Bytes::from(EnsResolver::addrCall::abi_encode(&addr_call));
-
-            let ur = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self);
-            let result = ur
-                .resolve(Bytes::from(dns_name), call_data)
-                .call()
+            self.resolve_name_with_ccip_read(name, alloy_provider::shared_http_ccip_read_client())
                 .await
-                .map_err(EnsError::Resolve)?;
+        }
 
-            let result_bytes = result._0;
-            if result_bytes.len() < 32 {
-                return Err(EnsError::ResolverNotFound(name.to_string()));
-            }
-            let addr = Address::from_slice(&result_bytes[result_bytes.len() - 20..]);
-            Ok(addr)
+        async fn resolve_name_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            client: &CcipReadClient<G>,
+        ) -> Result<Address, EnsError> {
+            let node = namehash(name);
+            let dns = try_dns_encode(name)?;
+            let calldata = EnsResolver::addrCall { node }.abi_encode();
+
+            let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
+                .resolve(dns.into(), calldata.into())
+                .into_transaction_request();
+            let output = client
+                .call_at(self, transaction, BlockId::latest())
+                .await
+                .map_err(|error| map_ccip_error(error, name, EnsError::Resolve))?;
+            let ret = UniversalResolver::resolveCall::abi_decode_returns(&output)
+                .map_err(|_| EnsError::InvalidResponse)?;
+
+            Address::abi_decode(ret._0.as_ref()).map_err(|_| EnsError::InvalidResponse)
+        }
+
+        async fn resolve_name_for_coin_type(
+            &self,
+            name: &str,
+            coin_type: u64,
+        ) -> Result<Bytes, EnsError> {
+            self.resolve_name_for_coin_type_with_ccip_read(
+                name,
+                coin_type,
+                alloy_provider::shared_http_ccip_read_client(),
+            )
+            .await
+        }
+
+        async fn resolve_name_for_coin_type_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            coin_type: u64,
+            client: &CcipReadClient<G>,
+        ) -> Result<Bytes, EnsError> {
+            let node = namehash(name);
+            let dns = try_dns_encode(name)?;
+            let calldata =
+                EnsMulticoinResolver::addrCall { node, coin_type: U256::from(coin_type) }
+                    .abi_encode();
+
+            let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
+                .resolve(dns.into(), calldata.into())
+                .into_transaction_request();
+            let output = client
+                .call_at(self, transaction, BlockId::latest())
+                .await
+                .map_err(|error| map_ccip_error(error, name, EnsError::Resolve))?;
+            let ret = UniversalResolver::resolveCall::abi_decode_returns(&output)
+                .map_err(|_| EnsError::InvalidResponse)?;
+
+            Bytes::abi_decode(ret._0.as_ref()).map_err(|_| EnsError::InvalidResponse)
         }
 
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError> {
-            let name = reverse_address(address);
-            let node = namehash(&name);
-            let resolver = self.get_resolver(node, &name).await?;
-            let name = resolver.name(node).call().await.map_err(EnsError::Lookup)?;
-            Ok(name)
+            self.lookup_address_with_ccip_read(
+                address,
+                alloy_provider::shared_http_ccip_read_client(),
+            )
+            .await
+        }
+
+        async fn lookup_address_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            address: &Address,
+            client: &CcipReadClient<G>,
+        ) -> Result<String, EnsError> {
+            let reverse_name = reverse_address(address);
+            let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
+                .reverse(Bytes::copy_from_slice(address.as_slice()), U256::from(coin_type::ETH))
+                .into_transaction_request();
+            let output = client
+                .call_at(self, transaction, BlockId::latest())
+                .await
+                .map_err(|error| map_ccip_error(error, &reverse_name, EnsError::Lookup))?;
+            let ret = UniversalResolver::reverseCall::abi_decode_returns(&output)
+                .map_err(|_| EnsError::InvalidResponse)?;
+
+            Ok(ret.name)
         }
 
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError> {
+            self.lookup_txt_with_ccip_read(
+                name,
+                key,
+                alloy_provider::shared_http_ccip_read_client(),
+            )
+            .await
+        }
+
+        async fn lookup_txt_with_ccip_read<G: CcipReadGateway>(
+            &self,
+            name: &str,
+            key: &str,
+            client: &CcipReadClient<G>,
+        ) -> Result<String, EnsError> {
             let node = namehash(name);
-            let resolver = self.get_resolver(node, name).await?;
-            let txt_value = resolver
-                .text(node, key.to_string())
-                .call()
+            let dns = try_dns_encode(name)?;
+            let calldata = EnsResolver::textCall { node, key: key.to_string() }.abi_encode();
+
+            let transaction = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, self)
+                .resolve(dns.into(), calldata.into())
+                .into_transaction_request();
+            let output = client
+                .call_at(self, transaction, BlockId::latest())
                 .await
-                .map_err(EnsError::ResolveTxtRecord)?;
-            Ok(txt_value)
+                .map_err(|error| map_ccip_error(error, name, EnsError::ResolveTxtRecord))?;
+            let ret = UniversalResolver::resolveCall::abi_decode_returns(&output)
+                .map_err(|_| EnsError::InvalidResponse)?;
+
+            String::abi_decode(ret._0.as_ref()).map_err(|_| EnsError::InvalidResponse)
         }
     }
-}
 
-/// Returns the ENS namehash as specified in [EIP-137](https://eips.ethereum.org/EIPS/eip-137).
-///
-/// `name` must already be ENSIP-15 normalized. Apart from removing the `U+FE0F` variation selector,
-/// this function hashes labels verbatim and does not normalize or validate them.
-pub fn namehash(name: &str) -> B256 {
-    if name.is_empty() {
-        return B256::ZERO;
+    /// Maps Universal Resolver contract errors, preserving [`EnsError::ResolverNotFound`].
+    fn map_ur_error(
+        error: alloy_contract::Error,
+        name: &str,
+        fallback: impl FnOnce(alloy_contract::Error) -> EnsError,
+    ) -> EnsError {
+        if error.as_decoded_error::<UniversalResolver::ResolverNotFound>().is_some() {
+            EnsError::ResolverNotFound(name.to_string())
+        } else {
+            fallback(error)
+        }
     }
 
-    // Remove the variation selector `U+FE0F` if present.
-    const VARIATION_SELECTOR: char = '\u{fe0f}';
-    let name = if name.contains(VARIATION_SELECTOR) {
-        Cow::Owned(name.replace(VARIATION_SELECTOR, ""))
-    } else {
-        Cow::Borrowed(name)
-    };
-
-    // Generate the node starting from the right.
-    // This buffer is `[node @ [u8; 32], label_hash @ [u8; 32]]`.
-    let mut buffer = [0u8; 64];
-    for label in name.rsplit('.') {
-        // node = keccak256([node, keccak256(label)])
-
-        // Hash the label.
-        let mut label_hasher = Keccak256::new();
-        label_hasher.update(label.as_bytes());
-        label_hasher.finalize_into(&mut buffer[32..]);
-
-        // Hash both the node and the label hash, writing into the node.
-        let mut buffer_hasher = Keccak256::new();
-        buffer_hasher.update(buffer.as_slice());
-        buffer_hasher.finalize_into(&mut buffer[..32]);
+    fn map_ccip_error(
+        error: CcipReadError,
+        name: &str,
+        map_transport: impl FnOnce(alloy_contract::Error) -> EnsError,
+    ) -> EnsError {
+        match error {
+            CcipReadError::Transport(error) => map_ur_error(error.into(), name, map_transport),
+            error => EnsError::CcipRead(error),
+        }
     }
-    buffer[..32].try_into().unwrap()
-}
 
-/// Encodes a domain name into DNS wire format as specified in
-/// [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035).
-///
-/// Each label is prefixed with its length byte, and the name is terminated with a
-/// zero-length label (null byte).
-///
-/// This is an unchecked encoder: `name` must already be ENSIP-15 normalized and non-empty, must
-/// not contain empty labels (including leading, trailing, or repeated dots), and each UTF-8 label
-/// length must fit in a `u8`. The caller is also responsible for the applicable ENSIP-10 and DNS
-/// length limits. Invalid input is encoded without an error; an oversized label's length prefix is
-/// truncated.
-///
-/// # Examples
-///
-/// ```
-/// use alloy_ens::dns_encode;
-/// assert_eq!(dns_encode("eth"), vec![3, b'e', b't', b'h', 0]);
-/// assert_eq!(
-///     dns_encode("vitalik.eth"),
-///     vec![7, b'v', b'i', b't', b'a', b'l', b'i', b'k', 3, b'e', b't', b'h', 0]
-/// );
-/// ```
-pub fn dns_encode(name: &str) -> Vec<u8> {
-    let mut result = Vec::with_capacity(name.len() + 2);
-    for label in name.split('.') {
-        result.push(label.len() as u8);
-        result.extend_from_slice(label.as_bytes());
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use alloy_json_rpc::ErrorPayload;
+        use alloy_primitives::{bytes, Address};
+        use alloy_provider::{
+            transport::{TransportError, TransportErrorKind},
+            CcipReadGatewayError,
+        };
+        use alloy_sol_types::SolError;
+
+        #[test]
+        fn preserves_existing_ens_transport_error_category() {
+            let error = CcipReadError::Transport(TransportErrorKind::custom_str("test"));
+            assert!(matches!(
+                map_ccip_error(error, "test.eth", EnsError::Resolve),
+                EnsError::Resolve(_)
+            ));
+        }
+
+        #[test]
+        fn maps_non_transport_ccip_errors_to_ccip_read() {
+            let gateway = CcipReadError::Gateway(CcipReadGatewayError::new("gateway down"));
+            assert!(matches!(
+                map_ccip_error(gateway, "test.eth", EnsError::Resolve),
+                EnsError::CcipRead(_)
+            ));
+
+            let redirects = CcipReadError::TooManyRedirects(4);
+            assert!(matches!(
+                map_ccip_error(redirects, "test.eth", EnsError::Resolve),
+                EnsError::CcipRead(_)
+            ));
+
+            let mismatch = CcipReadError::SenderMismatch {
+                sender: Address::ZERO,
+                target: Address::repeat_byte(1),
+            };
+            assert!(matches!(
+                map_ccip_error(mismatch, "test.eth", EnsError::Resolve),
+                EnsError::CcipRead(_)
+            ));
+        }
+
+        #[test]
+        fn maps_resolver_not_found_wrapped_in_ccip_transport() {
+            let revert: alloy_primitives::Bytes =
+                UniversalResolver::ResolverNotFound { name: bytes!("03666f6f0365746800") }
+                    .abi_encode()
+                    .into();
+            let payload = ErrorPayload::internal_error_with_message_and_obj(
+                "execution reverted".into(),
+                serde_json::value::to_raw_value(&revert).unwrap(),
+            );
+            let error = CcipReadError::Transport(TransportError::ErrorResp(payload));
+            assert!(matches!(
+                map_ccip_error(error, "foo.eth", EnsError::Resolve),
+                EnsError::ResolverNotFound(name) if name == "foo.eth"
+            ));
+        }
     }
-    result.push(0);
-    result
-}
-
-/// Returns the reverse-registrar name of an address.
-pub fn reverse_address(addr: &Address) -> String {
-    format!("{addr:x}.{ENS_REVERSE_REGISTRAR_DOMAIN}")
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
-    use alloy_primitives::hex;
-
-    fn assert_hex(hash: B256, val: &str) {
-        assert_eq!(hash.0[..], hex::decode(val).unwrap()[..]);
-    }
-
-    #[test]
-    fn test_namehash() {
-        for (name, expected) in &[
-            ("", "0x0000000000000000000000000000000000000000000000000000000000000000"),
-            ("eth", "0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae"),
-            ("foo.eth", "0xde9b09fd7c5f901e23a3f19fecc54828e9c848539801e86591bd9801b019f84f"),
-            ("alice.eth", "0x787192fc5378cc32aa956ddfdedbf26b24e8d78e40109add0eea2c1a012c3dec"),
-            ("ret↩️rn.eth", "0x3de5f4c02db61b221e7de7f1c40e29b6e2f07eb48d65bf7e304715cd9ed33b24"),
-        ] {
-            assert_hex(namehash(name), expected);
-        }
-    }
-
-    #[test]
-    fn test_dns_encode() {
-        assert_eq!(dns_encode("eth"), vec![3, b'e', b't', b'h', 0]);
-        assert_eq!(
-            dns_encode("vitalik.eth"),
-            vec![7, b'v', b'i', b't', b'a', b'l', b'i', b'k', 3, b'e', b't', b'h', 0]
-        );
-    }
-
-    #[test]
-    fn test_reverse_address() {
-        for (addr, expected) in [
-            (
-                "0x314159265dd8dbb310642f98f50c066173c1259b",
-                "314159265dd8dbb310642f98f50c066173c1259b.addr.reverse",
-            ),
-            (
-                "0x28679A1a632125fbBf7A68d850E50623194A709E",
-                "28679a1a632125fbbf7a68d850e50623194a709e.addr.reverse",
-            ),
-        ] {
-            assert_eq!(reverse_address(&addr.parse().unwrap()), expected, "{addr}");
-        }
-    }
+    use std::str::FromStr;
 
     #[test]
     fn test_invalid_address() {
@@ -431,28 +733,109 @@ mod test {
             assert!(NameOrAddress::from_str(addr).is_err());
         }
     }
+
+    #[test]
+    fn test_name_or_address_dns_detection() {
+        assert!(matches!(NameOrAddress::from_str("foo.eth"), Ok(NameOrAddress::Name(_))));
+        assert!(matches!(NameOrAddress::from_str("ensfairy.xyz"), Ok(NameOrAddress::Name(_))));
+        assert!(matches!(NameOrAddress::from_str("sub.foo.eth"), Ok(NameOrAddress::Name(_))));
+    }
+
+    #[test]
+    fn test_coin_type_evm_chain() {
+        assert_eq!(coin_type::evm_chain(1), Some(coin_type::ETH)); // mainnet special case
+        assert_eq!(coin_type::evm_chain(8453), Some(0x8000_2105)); // Base
+        assert_eq!(coin_type::evm_chain(10), Some(0x8000_000A)); // Optimism
+        assert_eq!(coin_type::evm_chain(42161), Some(0x8000_A4B1)); // Arbitrum One
+    }
+
+    #[test]
+    fn test_coin_type_evm_chain_rejects_out_of_range_ids() {
+        // ENSIP-11 coin types are `0x80000000 | chainId` over a 31-bit chain ID
+        // space; IDs with the high bit set would collide with smaller IDs.
+        assert_eq!(coin_type::evm_chain(0x8000_0000), None);
+        assert_eq!(coin_type::evm_chain(u64::MAX), None);
+    }
+}
+
+#[cfg(all(test, feature = "contract"))]
+mod resolver_info_tests {
+    use super::*;
+    use alloy_primitives::{address, Address, Bytes, B256, U256};
+
+    fn info(extended: bool, offset: u64, resolver: Address) -> UniversalResolver::ResolverInfo {
+        UniversalResolver::ResolverInfo {
+            name: Bytes::new(),
+            offset: U256::from(offset),
+            node: B256::ZERO,
+            resolver,
+            extended,
+        }
+    }
+
+    #[test]
+    fn preserves_legacy_universal_resolver_binding_shape() {
+        let _ = UniversalResolver::resolveReturn { _0: Default::default(), _1: Address::ZERO };
+        let _ = UniversalResolver::reverseCall {
+            lookupAddress: Default::default(),
+            coinType: Default::default(),
+        };
+    }
+
+    #[test]
+    fn direct_resolver_accepts_unextended_zero_offset() {
+        let resolver = address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63");
+        assert_eq!(
+            direct_resolver_address(&info(false, 0, resolver), "vitalik.eth").unwrap(),
+            resolver
+        );
+    }
+
+    #[test]
+    fn direct_resolver_rejects_extended() {
+        let err = direct_resolver_address(
+            &info(true, 0, address!("0x1111111111111111111111111111111111111111")),
+            "ur.integration-tests.eth",
+        )
+        .unwrap_err();
+        assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
+    }
+
+    #[test]
+    fn direct_resolver_rejects_wildcard_offset() {
+        let err = direct_resolver_address(
+            &info(false, 4, address!("0x1111111111111111111111111111111111111111")),
+            "sub.wildcard.eth",
+        )
+        .unwrap_err();
+        assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
+    }
 }
 
 #[cfg(all(test, feature = "provider"))]
-mod tests {
+mod provider_tests {
+    #![allow(deprecated)]
+
     use super::*;
     use alloy_primitives::address;
     use alloy_provider::ProviderBuilder;
 
+    const MAINNET_RPC_URL: &str = "https://ethereum.reth.rs/rpc";
+
+    fn provider() -> impl alloy_provider::Provider {
+        ProviderBuilder::new().connect_http(MAINNET_RPC_URL.parse().unwrap())
+    }
+
     #[tokio::test]
     async fn test_reverse_registrar_fetching_mainnet() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
-
+        let provider = provider();
         let res = provider.get_reverse_registrar().await;
         assert_eq!(*res.unwrap().address(), address!("0xa58E81fe9b61B5c3fE2AFD33CF304c454AbFc7Cb"));
     }
 
     #[tokio::test]
     async fn test_pub_resolver_fetching_mainnet() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
-
+        let provider = provider();
         let name = "vitalik.eth";
         let node = namehash(name);
         let res = provider.get_resolver(node, name).await;
@@ -460,57 +843,97 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_resolve_name_via_universal_resolver() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
-
-        let addr = provider.resolve_name("ur.integration-tests.eth").await.unwrap();
-        assert_eq!(addr, address!("0x2222222222222222222222222222222222222222"));
+    async fn test_get_resolver_for_name_mainnet() {
+        let provider = provider();
+        let res = provider.get_resolver_for_name("vitalik.eth").await;
+        assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
     }
 
     #[tokio::test]
-    async fn test_lookup_address_via_universal_resolver() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+    async fn test_pub_resolver_text() {
+        let provider = provider();
+        let name = "vitalik.eth";
+        let node = namehash(name);
+        let res = provider.get_resolver(node, name).await.unwrap();
+        let text = res.text(node, "avatar".to_string()).call().await.unwrap();
+        assert_eq!(text, "https://euc.li/vitalik.eth")
+    }
 
-        let name = provider
-            .lookup_address(&address!("0xeE9eeaAB0Bb7D9B969D701f6f8212609EDeA252E"))
+    // Canonical fixtures:
+    // https://github.com/ensdomains/resolution-tests/blob/main/test-cases.json
+
+    #[tokio::test]
+    async fn test_universal_resolver() {
+        let provider = provider();
+        let res = provider.resolve_name("ur.integration-tests.eth").await.unwrap();
+        assert_eq!(res, address!("0x2222222222222222222222222222222222222222"));
+    }
+
+    #[tokio::test]
+    async fn test_get_resolver_for_name_rejects_extended_resolver() {
+        let provider = provider();
+        let err = provider.get_resolver_for_name("ur.integration-tests.eth").await.unwrap_err();
+        assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
+    }
+
+    #[tokio::test]
+    async fn test_forward_base_onchain() {
+        let provider = provider();
+        let res = provider
+            .resolve_name_for_coin_type(
+                "coins.integration-tests.eth",
+                coin_type::evm_chain(8453).unwrap(),
+            )
             .await
             .unwrap();
-        assert_eq!(name, "devrel.enslabs.eth");
+        assert_eq!(res.as_ref(), address!("0xa66E90D515F576f49Af2dF40952476D56F72A420").as_slice());
     }
 
     #[tokio::test]
-    async fn test_lookup_txt_via_universal_resolver() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+    async fn test_forward_wildcard() {
+        let provider = provider();
+        let res = provider.resolve_name("moo331.nft-owner.eth").await.unwrap();
+        assert_eq!(res, address!("0x51050ec063d393217B436747617aD1C2285Aeeee"));
+    }
 
-        let avatar = provider.lookup_txt("integration-tests.eth", "avatar").await.unwrap();
+    #[tokio::test]
+    async fn test_forward_eth_offchain() {
+        let provider = provider();
+        let res = provider.resolve_name("test.offchaindemo.eth").await.unwrap();
+        assert_eq!(res, address!("0x779981590E7Ccc0CFAe8040Ce7151324747cDb97"));
+    }
+
+    #[tokio::test]
+    async fn test_forward_text_onchain() {
+        let provider = provider();
+        let res = provider.lookup_txt("integration-tests.eth", "avatar").await.unwrap();
         assert_eq!(
-            avatar,
+            res,
             "https://raw.githubusercontent.com/ensdomains/resolution-tests/refs/heads/main/assets/avatar.svg"
         );
     }
 
     #[tokio::test]
-    async fn test_pub_resolver_text() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
-
-        let name = "vitalik.eth";
-        let node = namehash(name);
-        let res = provider.get_resolver(node, name).await.unwrap();
-        let txt = res.text(node, "avatar".to_string()).call().await.unwrap();
-        assert_eq!(txt, "https://euc.li/vitalik.eth")
+    async fn test_forward_text_offchain() {
+        let provider = provider();
+        let res = provider.lookup_txt("test.offchaindemo.eth", "description").await.unwrap();
+        assert_eq!(res, "asdflkjasdflkjasdf");
     }
 
     #[tokio::test]
-    async fn test_pub_resolver_fetching_txt() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap());
+    async fn test_reverse_eth() {
+        let provider = provider();
+        let res = provider
+            .lookup_address(&address!("0xeE9eeaAB0Bb7D9B969D701f6f8212609EDeA252E"))
+            .await
+            .unwrap();
+        assert_eq!(res, "devrel.enslabs.eth");
+    }
 
-        let name = "vitalik.eth";
-        let res = provider.lookup_txt(name, "avatar").await.unwrap();
-        assert_eq!(res, "https://euc.li/vitalik.eth")
+    #[tokio::test]
+    async fn test_forward_dns_offchain() {
+        let provider = provider();
+        let res = provider.resolve_name("pokersback.com").await.unwrap();
+        assert_eq!(res, address!("0x534631Bcf33BDb069fB20A93d2fdb9e4D4dD42CF"));
     }
 }
