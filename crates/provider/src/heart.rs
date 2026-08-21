@@ -3,13 +3,13 @@
 use crate::{blocks::Paused, Provider, RootProvider};
 use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
-use alloy_network::{BlockResponse, Network};
+use alloy_network::{BlockResponse, Network, ReceiptResponse};
 use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
     TxHash, B256,
 };
 use alloy_transport::{utils::Spawnable, TransportError};
-use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
+use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
@@ -226,42 +226,46 @@ impl<N: Network> PendingTransactionBuilder<N> {
         let hash = self.config.tx_hash;
         let required_confirmations = self.config.required_confirmations;
         let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
-
-        // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
-        // block the tx was mined in. Only apply this for single confirmation to respect the
-        // confirmation setting.
-        let mut interval = if required_confirmations > 1 {
-            None
-        } else {
-            Some(interval(self.provider.client().poll_interval()))
-        };
+        let mut interval = interval(self.provider.client().poll_interval());
 
         loop {
             let mut confirmed = false;
-
-            // If more than 1 block confirmations is specified then we can rely on the regular
-            // watch_pending_transaction and dont need this workaround for the above mentioned race
-            // condition
-            let tick_fut = if let Some(interval) = interval.as_mut() {
-                interval.tick().map(|_| ()).left_future()
-            } else {
-                pending::<()>().right_future()
-            };
+            let mut watcher_err = None;
 
             select! {
-                _ = tick_fut => {},
+                _ = interval.tick() => {},
                 res = &mut pending_tx => {
-                    let _ = res?;
-                    confirmed = true;
+                    match res {
+                        Ok(_) => confirmed = true,
+                        Err(err) => watcher_err = Some(err),
+                    }
                 }
             }
 
             // try to fetch the receipt
             let receipt = self.provider.get_transaction_receipt(hash).await?;
             if let Some(receipt) = receipt {
+                if required_confirmations > 1 {
+                    let Some(block_number) = receipt.block_number() else {
+                        if let Some(err) = watcher_err {
+                            return Err(err);
+                        }
+                        continue;
+                    };
+                    let latest_block = self.provider.get_block_number().await?;
+                    if latest_block < block_number + required_confirmations - 1 {
+                        if let Some(err) = watcher_err {
+                            return Err(err);
+                        }
+                        continue;
+                    }
+                }
                 return Ok(receipt);
             }
 
+            if let Some(err) = watcher_err {
+                return Err(err);
+            }
             if confirmed {
                 return Err(RpcError::NullResp.into());
             }
