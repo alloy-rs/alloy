@@ -46,22 +46,6 @@ where
     assert_eq!(&reencoded[..], &data[..consumed], "{name}: encode(decode(bytes)) != bytes");
 }
 
-fn assert_stable_roundtrip<T>(data: &[u8], name: &str)
-where
-    T: Decodable + Encodable + PartialEq + core::fmt::Debug,
-{
-    let mut input = data;
-    let Ok(decoded) = T::decode(&mut input) else {
-        return;
-    };
-
-    let reencoded = alloy_rlp::encode(&decoded);
-    let mut canonical = reencoded.as_slice();
-    let decoded_again = T::decode(&mut canonical).expect("canonical re-encoding must decode");
-    assert!(canonical.is_empty(), "{name}: canonical decode left a suffix");
-    assert_eq!(decoded_again, decoded, "{name}: decode(encode(decode(bytes))) changed value");
-}
-
 fn assert_sealed_block_roundtrip(data: &[u8]) {
     let mut input = data;
     let Ok(sealed) = Block::<BasicTxEnvelope>::decode_sealed(&mut input) else {
@@ -167,10 +151,7 @@ fn raw_roundtrip_properties(data: &[u8]) {
     assert_roundtrip::<Header>(data, "Header");
     assert_roundtrip::<BlockBody<BasicTxEnvelope>>(data, "BlockBody<BasicTxEnvelope>");
     assert_roundtrip::<Block<BasicTxEnvelope>>(data, "Block<BasicTxEnvelope>");
-    // Signed transactions and unsigned EIP-155 signing payloads share the same nine-field RLP
-    // shape, so arbitrary bytes are not injective for `TxLegacy`. Signed canonicality is checked
-    // through `TxEnvelope` below.
-    assert_stable_roundtrip::<TxLegacy>(data, "TxLegacy");
+    assert_roundtrip::<TxLegacy>(data, "TxLegacy");
     assert_roundtrip::<TxEip2930>(data, "TxEip2930");
     assert_roundtrip::<TxEip1559>(data, "TxEip1559");
     assert_roundtrip::<TxEip4844>(data, "TxEip4844");
