@@ -9,7 +9,7 @@ use alloy_eips::{
     eip4844::{Blob, Bytes48},
     eip2718::{Decodable2718, Encodable2718},
     eip4895::Withdrawals,
-    eip7594::CELLS_PER_EXT_BLOB,
+    eip7594::{CELLS_PER_EXT_BLOB, Decodable7594, Encodable7594},
 };
 use alloy_primitives::Signature;
 use alloy_rlp::{Decodable, Encodable, Header as RlpHeader, EMPTY_STRING_CODE};
@@ -47,6 +47,18 @@ where
     value.encode_2718(&mut bytes);
     let decoded = T::decode_2718_exact(&bytes).unwrap_or_else(|err| panic!("{name}: {err:?}"));
     assert_eq!(decoded, value, "{name}: decode_2718(encode_2718(value)) differs");
+    write_seed(corpus_dir, name, &bytes);
+}
+
+fn seed_7594<T>(corpus_dir: &Path, name: &str, value: T)
+where
+    T: Debug + PartialEq + Encodable7594 + Decodable7594,
+{
+    let bytes = value.encoded_7594();
+    let mut input = bytes.as_slice();
+    let decoded = T::decode_7594(&mut input).unwrap_or_else(|err| panic!("{name}: {err:?}"));
+    assert!(input.is_empty(), "{name}: decode_7594 left trailing bytes");
+    assert_eq!(decoded, value, "{name}: decode_7594(encode_7594(value)) differs");
     write_seed(corpus_dir, name, &bytes);
 }
 
@@ -194,6 +206,11 @@ fn main() {
         proofs: vec![Bytes48::ZERO],
     };
     seed(&corpus_dir, "sidecar-eip4844-one-blob", sidecar_eip4844.clone());
+    seed_7594(
+        &corpus_dir,
+        "sidecar-eip4844-one-blob-fields-7594",
+        sidecar_eip4844.clone(),
+    );
     seed(
         &corpus_dir,
         "sidecar-variant-eip4844-one-blob",
@@ -205,6 +222,11 @@ fn main() {
         vec![Bytes48::ZERO; CELLS_PER_EXT_BLOB],
     );
     seed(&corpus_dir, "sidecar-eip7594-one-blob", sidecar_eip7594.clone());
+    seed_7594(
+        &corpus_dir,
+        "sidecar-eip7594-one-blob-fields-7594",
+        sidecar_eip7594.clone(),
+    );
     let signature = Signature::test_signature();
     let pooled_eip7594 = PooledTransaction::Eip4844(Signed::new_unhashed(
         TxEip4844WithSidecar::from_tx_and_sidecar(
@@ -227,6 +249,11 @@ fn main() {
     seed(
         &corpus_dir,
         "sidecar-variant-eip7594-one-blob",
+        BlobTransactionSidecarVariant::Eip7594(sidecar_eip7594.clone()),
+    );
+    seed_7594(
+        &corpus_dir,
+        "sidecar-variant-eip7594-one-blob-fields-7594",
         BlobTransactionSidecarVariant::Eip7594(sidecar_eip7594),
     );
     let populated_receipt = ReceiptWithBloom {

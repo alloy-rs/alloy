@@ -10,6 +10,7 @@ use alloy_consensus::transaction::PooledTransaction;
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip4895::{Withdrawal, Withdrawals},
+    eip7594::{Decodable7594, Encodable7594},
 };
 use alloy_rlp::{Decodable, Encodable};
 use libfuzzer_sys::fuzz_target;
@@ -123,6 +124,25 @@ where
     }
 }
 
+fn assert_7594_roundtrip<T>(data: &[u8], name: &str)
+where
+    T: Decodable7594 + Encodable7594,
+{
+    let mut input = data;
+    let Ok(decoded) = T::decode_7594(&mut input) else {
+        return;
+    };
+
+    let consumed = data.len() - input.len();
+    let mut reencoded = Vec::with_capacity(consumed);
+    decoded.encode_7594(&mut reencoded);
+    assert_eq!(
+        &reencoded[..],
+        &data[..consumed],
+        "{name}: encode_7594(decode_7594(bytes)) != bytes"
+    );
+}
+
 fn assert_fallback_error_preserves_cursor(data: &[u8]) {
     let mut input = data;
     if TxEnvelope::fallback_decode(&mut input).is_err() {
@@ -165,6 +185,15 @@ fn raw_roundtrip_properties(data: &[u8]) {
     assert_roundtrip::<BlobTransactionSidecar>(data, "BlobTransactionSidecar");
     assert_roundtrip::<BlobTransactionSidecarEip7594>(data, "BlobTransactionSidecarEip7594");
     assert_roundtrip::<BlobTransactionSidecarVariant>(data, "BlobTransactionSidecarVariant");
+    assert_7594_roundtrip::<BlobTransactionSidecar>(data, "BlobTransactionSidecar::7594");
+    assert_7594_roundtrip::<BlobTransactionSidecarEip7594>(
+        data,
+        "BlobTransactionSidecarEip7594::7594",
+    );
+    assert_7594_roundtrip::<BlobTransactionSidecarVariant>(
+        data,
+        "BlobTransactionSidecarVariant::7594",
+    );
     assert_roundtrip::<ReceiptEnvelope>(data, "ReceiptEnvelope");
     assert_roundtrip::<ReceiptWithBloom<Receipt>>(data, "ReceiptWithBloom<Receipt>");
     assert_roundtrip::<ReceiptWithBloom<EthereumReceipt>>(
