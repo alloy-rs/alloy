@@ -140,7 +140,7 @@ sol! {
 /// Returns the [`Eip712Domain`] of the priority update registry for the given chain.
 ///
 /// The domain is `("PrioUpdateRegistry", "1", chain_id, `[`PRIORITY_UPDATE_REGISTRY_ADDRESS`]`)`.
-pub fn priority_update_registry_domain(chain_id: ChainId) -> Eip712Domain {
+pub const fn priority_update_registry_domain(chain_id: ChainId) -> Eip712Domain {
     eip712_domain! {
         name: "PrioUpdateRegistry",
         version: "1",
