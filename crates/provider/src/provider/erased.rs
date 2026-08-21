@@ -23,7 +23,7 @@ use alloy_rpc_types_eth::{
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
     EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
-    StorageValuesRequest, StorageValuesResponse, SyncStatus,
+    SignTransaction, StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -426,16 +426,19 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.send_transaction_sync_internal(SendableTx::Builder(tx)).await
     }
 
-    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+    async fn sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<SignTransaction<N::TransactionResponse>> {
         self.0.sign_transaction(tx).await
     }
 
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    ) -> TransportResult<FillTransaction<N::UnsignedTx>>
     where
-        N::TxEnvelope: RpcRecv,
+        N::UnsignedTx: RpcRecv,
     {
         self.0.fill_transaction(tx).await
     }
