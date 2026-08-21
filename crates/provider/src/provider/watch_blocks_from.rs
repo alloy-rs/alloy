@@ -616,7 +616,11 @@ mod tests {
                 true
             }
 
-            fn backoff_hint(&self, _error: &alloy_transport::TransportError) -> Option<Duration> {
+            fn backoff_hint(
+                &self,
+                _error: &alloy_transport::TransportError,
+                _num_retries: u32,
+            ) -> Option<Duration> {
                 None
             }
         }
