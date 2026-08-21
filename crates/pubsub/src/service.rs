@@ -4,7 +4,7 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
-use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
+use alloy_json_rpc::{PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -134,11 +134,10 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // TODO: ideally we can send this with an unused id
-            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
-            let brv = req.serialize().expect("no ser error").take_request();
-
-            self.dispatch_request(brv)?;
+            let req_id = self.in_flights.next_unused_id();
+            let req = Request::new("eth_unsubscribe", req_id, [server_id.clone()]);
+            let (in_flight, _rx) = InFlight::new(req.serialize().expect("no ser error"), 0);
+            self.service_request(in_flight)?;
         }
         self.subs.remove_sub(local_id);
         Ok(())
@@ -323,7 +322,7 @@ fn reconnect_retry_interval(base_interval: Duration, retry_count: u32) -> Durati
 mod tests {
     use super::*;
     use crate::ConnectionInterface;
-    use alloy_json_rpc::Request;
+    use alloy_json_rpc::{Id, Request, SubId};
     use std::{
         sync::{
             atomic::{AtomicUsize, Ordering},
@@ -589,5 +588,41 @@ mod tests {
             1,
             "default close_with_error should trigger exactly one reconnect"
         );
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_uses_unused_id_and_registers_inflight() {
+        let (handle, mut interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect::default(),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+
+        let req = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let (in_flight, _rx) = InFlight::new(req, 16);
+        service.in_flights.insert(in_flight);
+
+        let subscribe_req =
+            Request::new("eth_subscribe", Id::Number(99), ["newHeads"]).serialize().unwrap();
+        let sub = service.subs.upsert(subscribe_req, SubId::String("server-sub-id".to_owned()), 16);
+        let local_id = *sub.local_id();
+
+        service.service_unsubscribe(local_id).unwrap();
+
+        let outbound = timeout(Duration::from_secs(1), interface.recv_from_frontend())
+            .await
+            .expect("unsubscribe request should be sent")
+            .expect("frontend request channel should stay open");
+        let outbound: serde_json::Value =
+            serde_json::from_str(outbound.get()).expect("valid json-rpc request");
+
+        assert_eq!(outbound["method"], "eth_unsubscribe");
+        assert_eq!(outbound["id"], "alloy-internal-unsubscribe-0");
+        assert_eq!(service.in_flights.len(), 2);
+        assert!(service.subs.server_id_for(&local_id).is_none());
     }
 }
