@@ -3,8 +3,8 @@ mod with_auth;
 
 pub use self::{
     priority_update_registry::{
-        priority_update_registry_domain, sign_priority_update, PrioUpdateRegistry, SignedUpdate,
-        UpdateState, PRIORITY_UPDATE_REGISTRY_ADDRESS,
+        priority_update_registry_domain, PrioUpdateRegistry, SignedUpdate, UpdateState,
+        PRIORITY_UPDATE_REGISTRY_ADDRESS,
     },
     with_auth::{
         sign_flashbots_payload, verify_flashbots_signature, FlashbotsSignatureError, MevBuilder,

@@ -11,7 +11,7 @@
 //!
 //! Priority updates are either submitted directly by an authorized updater via
 //! `updateState`, or relayed as EIP-712 signed updates via `batchUpdateStateWithSignature`.
-//! Use [`sign_priority_update`] to create such a [`SignedUpdate`] from an [`UpdateState`]
+//! Use [`UpdateState::sign`] to create such a [`SignedUpdate`] from an [`UpdateState`]
 //! message.
 //!
 //! Builders currently ingest priority update transactions from makers over builder-specific
@@ -149,52 +149,54 @@ pub const fn priority_update_registry_domain(chain_id: ChainId) -> Eip712Domain 
     }
 }
 
-/// Signs the given [`UpdateState`] message for the priority update registry on the given
-/// chain, returning a [`SignedUpdate`] that can be relayed by anyone via
-/// `PrioUpdateRegistry::batchUpdateStateWithSignature`.
-///
-/// Note: signatures are not single-use, a [`SignedUpdate`] remains relayable as long as the
-/// lane's stored timestamp does not exceed `updateTimestamp` and `updateTimestamp` is within
-/// the registry's accepted window. Replays always produce the same on-chain state.
-///
-/// # Example
-///
-/// ```
-/// use alloy_primitives::U256;
-/// use alloy_provider::ext::{sign_priority_update, UpdateState};
-/// use alloy_signer_local::PrivateKeySigner;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let signer = PrivateKeySigner::random();
-/// let update = UpdateState {
-///     target: "0x5979458912f80b96d30d4220af8e2e4925a33320".parse()?,
-///     laneIndex: U256::ZERO,
-///     updateTimestamp: 1753977388,
-///     slots: vec![U256::from(1)],
-/// };
-/// let signed = sign_priority_update(&signer, 1, update).await?;
-/// assert_eq!(signed.signer, signer.address());
-/// # Ok(())
-/// # }
-/// ```
-pub async fn sign_priority_update<S>(
-    signer: &S,
-    chain_id: ChainId,
-    update: UpdateState,
-) -> Result<SignedUpdate, alloy_signer::Error>
-where
-    S: Signer + Send + Sync,
-{
-    let hash = update.eip712_signing_hash(&priority_update_registry_domain(chain_id));
-    let signature = signer.sign_hash(&hash).await?;
-    Ok(SignedUpdate {
-        target: update.target,
-        signer: signer.address(),
-        laneIndex: update.laneIndex,
-        updateTimestamp: update.updateTimestamp,
-        slots: update.slots,
-        signature: signature.as_bytes().into(),
-    })
+impl UpdateState {
+    /// Signs this update for the priority update registry on the given chain, returning a
+    /// [`SignedUpdate`] that can be relayed by anyone via
+    /// `PrioUpdateRegistry::batchUpdateStateWithSignature`.
+    ///
+    /// Note: signatures are not single-use, a [`SignedUpdate`] remains relayable as long as
+    /// the lane's stored timestamp does not exceed `updateTimestamp` and `updateTimestamp` is
+    /// within the registry's accepted window. Replays always produce the same on-chain state.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use alloy_primitives::U256;
+    /// use alloy_provider::ext::UpdateState;
+    /// use alloy_signer_local::PrivateKeySigner;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let signer = PrivateKeySigner::random();
+    /// let update = UpdateState {
+    ///     target: "0x5979458912f80b96d30d4220af8e2e4925a33320".parse()?,
+    ///     laneIndex: U256::ZERO,
+    ///     updateTimestamp: 1753977388,
+    ///     slots: vec![U256::from(1)],
+    /// };
+    /// let signed = update.sign(&signer, 1).await?;
+    /// assert_eq!(signed.signer, signer.address());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn sign<S>(
+        self,
+        signer: &S,
+        chain_id: ChainId,
+    ) -> Result<SignedUpdate, alloy_signer::Error>
+    where
+        S: Signer + Send + Sync,
+    {
+        let hash = self.eip712_signing_hash(&priority_update_registry_domain(chain_id));
+        let signature = signer.sign_hash(&hash).await?;
+        Ok(SignedUpdate {
+            target: self.target,
+            signer: signer.address(),
+            laneIndex: self.laneIndex,
+            updateTimestamp: self.updateTimestamp,
+            slots: self.slots,
+            signature: signature.as_bytes().into(),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -228,7 +230,7 @@ mod tests {
             slots: vec![U256::from(1), U256::from(2)],
         };
 
-        let signed = sign_priority_update(&signer, 1, update.clone()).await.unwrap();
+        let signed = update.clone().sign(&signer, 1).await.unwrap();
         assert_eq!(signed.signer, signer.address());
         assert_eq!(signed.target, update.target);
         assert_eq!(signed.slots, update.slots);
