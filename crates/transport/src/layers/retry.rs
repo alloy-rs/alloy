@@ -121,10 +121,20 @@ pub trait RetryPolicy: Send + Sync + std::fmt::Debug {
     fn should_retry(&self, error: &TransportError) -> bool;
 
     /// Providers may include the `backoff` in the error response directly.
+    fn backoff_hint(&self, error: &TransportError) -> Option<std::time::Duration>;
+
+    /// Provides a backoff hint for the retry that is about to be attempted.
     ///
-    /// `num_retries` is the one-based number of the retry that is about to be attempted.
-    fn backoff_hint(&self, error: &TransportError, num_retries: u32)
-        -> Option<std::time::Duration>;
+    /// `num_retries` is the one-based retry number. The default implementation preserves the
+    /// behavior of policies that do not need the retry count.
+    fn backoff_hint_with_retry_count(
+        &self,
+        error: &TransportError,
+        num_retries: u32,
+    ) -> Option<std::time::Duration> {
+        let _ = num_retries;
+        self.backoff_hint(error)
+    }
 }
 
 impl RetryPolicy for RateLimitRetryPolicy {
@@ -133,11 +143,7 @@ impl RetryPolicy for RateLimitRetryPolicy {
     }
 
     /// Provides a backoff hint if the error response contains it
-    fn backoff_hint(
-        &self,
-        error: &TransportError,
-        _num_retries: u32,
-    ) -> Option<std::time::Duration> {
+    fn backoff_hint(&self, error: &TransportError) -> Option<std::time::Duration> {
         error.backoff_hint()
     }
 }
@@ -165,8 +171,16 @@ impl<P: RetryPolicy> RetryPolicy for OrRetryPolicyFn<P> {
         self.inner.as_ref()(error) || self.base.should_retry(error)
     }
 
-    fn backoff_hint(&self, error: &TransportError, num_retries: u32) -> Option<Duration> {
-        self.base.backoff_hint(error, num_retries)
+    fn backoff_hint(&self, error: &TransportError) -> Option<Duration> {
+        self.base.backoff_hint(error)
+    }
+
+    fn backoff_hint_with_retry_count(
+        &self,
+        error: &TransportError,
+        num_retries: u32,
+    ) -> Option<Duration> {
+        self.base.backoff_hint_with_retry_count(error, num_retries)
     }
 }
 
@@ -295,7 +309,8 @@ where
 
                     // try to extract the requested backoff from the error or compute the next
                     // backoff based on retry count
-                    let backoff_hint = this.policy.backoff_hint(&err, rate_limit_retry_number);
+                    let backoff_hint =
+                        this.policy.backoff_hint_with_retry_count(&err, rate_limit_retry_number);
                     let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
 
                     let seconds_to_wait_for_compute_budget = compute_unit_offset_in_secs(
@@ -363,14 +378,22 @@ mod tests {
                 true
             }
 
-            fn backoff_hint(&self, _error: &TransportError, num_retries: u32) -> Option<Duration> {
+            fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
+                None
+            }
+
+            fn backoff_hint_with_retry_count(
+                &self,
+                _error: &TransportError,
+                num_retries: u32,
+            ) -> Option<Duration> {
                 self.0.lock().unwrap().push(num_retries);
                 Some(Duration::ZERO)
             }
         }
 
         let retry_numbers = Arc::new(std::sync::Mutex::new(Vec::new()));
-        let policy = RecordingPolicy(retry_numbers.clone());
+        let policy = OrRetryPolicyFn::new(RecordingPolicy(retry_numbers.clone()), |_| false);
         let failing_service = tower::service_fn(|_| -> TransportFut<'static> {
             Box::pin(async { Err(TransportErrorKind::custom_str("test error")) })
         });
@@ -384,6 +407,39 @@ mod tests {
 
         assert!(service.call(request).await.is_err());
         assert_eq!(*retry_numbers.lock().unwrap(), [1, 2, 3]);
+    }
+
+    #[tokio::test]
+    async fn backoff_hint_without_retry_count_remains_compatible() {
+        #[derive(Clone, Debug)]
+        struct LegacyPolicy(Arc<AtomicU32>);
+
+        impl RetryPolicy for LegacyPolicy {
+            fn should_retry(&self, _error: &TransportError) -> bool {
+                true
+            }
+
+            fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Some(Duration::ZERO)
+            }
+        }
+
+        let backoff_hint_calls = Arc::new(AtomicU32::new(0));
+        let policy = LegacyPolicy(backoff_hint_calls.clone());
+        let failing_service = tower::service_fn(|_| -> TransportFut<'static> {
+            Box::pin(async { Err(TransportErrorKind::custom_str("test error")) })
+        });
+        let mut service =
+            RetryBackoffLayer::new_with_policy(3, 0, u64::MAX, policy).layer(failing_service);
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        assert!(service.call(request).await.is_err());
+        assert_eq!(backoff_hint_calls.load(Ordering::SeqCst), 3);
     }
 
     #[tokio::test]
