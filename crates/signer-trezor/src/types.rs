@@ -6,10 +6,10 @@ use alloy_primitives::hex;
 use std::fmt;
 use thiserror::Error;
 
-/// Trezor wallet type.
+/// A Trezor derivation-path preset.
 #[derive(Clone, Debug)]
 pub enum DerivationType {
-    /// Trezor Live-generated HD path
+    /// Standard path `m/44'/60'/0'/0/<index>`.
     TrezorLive(usize),
     /// Any other path.
     ///
@@ -42,8 +42,7 @@ pub enum TrezorError {
     /// Signature Error
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),
-    /// Thrown when trying to sign an EIP-712 struct with an incompatible Trezor Ethereum app
-    /// version.
+    /// Device firmware is older than the minimum accepted during signer construction.
     #[error("Trezor Ethereum app requires at least version {0:?}")]
     UnsupportedFirmwareVersion(String),
     /// Need to provide a chain ID for EIP-155 signing.

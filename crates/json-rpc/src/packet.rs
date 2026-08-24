@@ -133,8 +133,11 @@ impl RequestPacket {
         self.requests().iter().map(|req| req.method())
     }
 
-    /// Retrieves the combined headers from all requests in the packet. If
-    /// multiple requests contain the same header, the last one wins.
+    /// Retrieves the combined HTTP headers from all requests in the packet.
+    ///
+    /// Headers are appended in request order, retaining every value for a repeated name. An HTTP
+    /// batch is sent as one request, so these headers apply to the whole packet rather than to
+    /// individual JSON-RPC calls.
     pub fn headers(&self) -> HeaderMap {
         self.requests().iter().fold(HeaderMap::new(), |mut acc, req| {
             if let Some(http_header_extension) = req.meta().extensions().get::<HeaderMap>() {

@@ -137,7 +137,7 @@ impl From<Bytes> for PayloadExtras {
 /// See:
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/shanghai.md#response>
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum ExecutionPayloadFieldV2 {
@@ -145,6 +145,31 @@ pub enum ExecutionPayloadFieldV2 {
     V1(ExecutionPayloadV1),
     /// V2 payload
     V2(ExecutionPayloadV2),
+}
+
+// Deserializes untagged ExecutionPayloadFieldV2 as V2 if withdrawals are present, V1 otherwise.
+// A derived untagged impl would try V1 first, which also matches V2 input and drops withdrawals.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for ExecutionPayloadFieldV2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            #[serde(flatten)]
+            payload_inner: ExecutionPayloadV1,
+            withdrawals: Option<Vec<Withdrawal>>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        Ok(match helper.withdrawals {
+            Some(withdrawals) => {
+                Self::V2(ExecutionPayloadV2 { payload_inner: helper.payload_inner, withdrawals })
+            }
+            None => Self::V1(helper.payload_inner),
+        })
+    }
 }
 
 impl ExecutionPayloadFieldV2 {
@@ -740,7 +765,10 @@ impl ExecutionPayloadV1 {
         BlockNumHash::new(self.block_number, self.block_hash)
     }
 
-    /// Converts [`ExecutionPayloadV1`] to [`Block`]
+    /// Converts [`ExecutionPayloadV1`] to an unsealed [`Block`].
+    ///
+    /// This does not recompute or compare the payload's advertised [`Self::block_hash`]. Callers
+    /// performing Engine API validation must hash the returned block and compare it separately.
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
         self.try_into_block_with(|tx| {
             T::decode_2718_exact(tx.as_ref())
@@ -847,6 +875,8 @@ impl ExecutionPayloadV1 {
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`] using the given block hash.
+    ///
+    /// The supplied hash is stored verbatim without checking it against the block.
     pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
     where
         T: Encodable2718,
@@ -2263,6 +2293,10 @@ impl TryFrom<BlobsBundleV2> for BlobsBundleV1 {
 
 /// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2],
 /// [ExecutionPayloadV3], or [ExecutionPayloadV4].
+///
+/// Payload-to-block conversions return an unsealed block and do not recompute or compare the
+/// advertised `block_hash`. Callers performing Engine API validation must hash the returned block
+/// and compare it separately.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
@@ -2350,6 +2384,10 @@ impl ExecutionPayload {
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     /// See also [`ExecutionPayloadSidecar::from_block`].
+    ///
+    /// The supplied hash is stored verbatim without checking it against the block. The payload
+    /// version is inferred from the block access-list hash, parent beacon block root, and
+    /// withdrawals.
     pub fn from_block_unchecked<T, H>(
         block_hash: B256,
         block: &Block<T, H>,
@@ -2443,6 +2481,7 @@ impl ExecutionPayload {
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
     ///
     /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    /// The payload's advertised `block_hash` is not recomputed or compared.
     ///
     /// # Note
     ///
@@ -2492,6 +2531,9 @@ impl ExecutionPayload {
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`].
+    ///
+    /// The returned block is unsealed, and the payload's advertised `block_hash` is not recomputed
+    /// or compared.
     ///
     /// Caution: This does not set fields that are not part of the payload and only part of the
     /// [`ExecutionPayloadSidecar`]:
@@ -3923,6 +3965,85 @@ impl core::fmt::Display for PayloadStatusEnum {
     }
 }
 
+/// This structure contains the result of processing a payload in the Bogota Engine API.
+///
+/// It extends [`PayloadStatus`] with the EIP-7805 inclusion-list validation result.
+///
+/// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/bogota.md#payloadstatusv2>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct PayloadStatusV2 {
+    /// The common payload status fields.
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub payload_inner: PayloadStatus,
+    /// Whether the payload satisfied the inclusion-list constraints if it was deemed valid.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub inclusion_list_satisfied: Option<bool>,
+}
+
+impl PayloadStatusV2 {
+    /// Creates a new payload status.
+    pub const fn new(
+        payload_status: PayloadStatus,
+        inclusion_list_satisfied: Option<bool>,
+    ) -> Self {
+        Self { payload_inner: payload_status, inclusion_list_satisfied }
+    }
+
+    /// Sets whether the payload satisfied the inclusion-list constraints.
+    pub const fn with_inclusion_list_satisfied(mut self, satisfied: bool) -> Self {
+        self.inclusion_list_satisfied = Some(satisfied);
+        self
+    }
+
+    /// Returns true if the payload status is syncing.
+    pub const fn is_syncing(&self) -> bool {
+        self.payload_inner.is_syncing()
+    }
+
+    /// Returns true if the payload status is valid.
+    pub const fn is_valid(&self) -> bool {
+        self.payload_inner.is_valid()
+    }
+
+    /// Returns true if the payload status is invalid.
+    pub const fn is_invalid(&self) -> bool {
+        self.payload_inner.is_invalid()
+    }
+}
+
+impl From<PayloadStatus> for PayloadStatusV2 {
+    fn from(payload_status: PayloadStatus) -> Self {
+        Self::new(payload_status, None)
+    }
+}
+
+/// Downgrades a V2 payload status, discarding its inclusion-list validation result.
+impl From<PayloadStatusV2> for PayloadStatus {
+    fn from(payload_status: PayloadStatusV2) -> Self {
+        payload_status.payload_inner
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for PayloadStatusV2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(4))?;
+        map.serialize_entry("status", self.payload_inner.status.as_str())?;
+        map.serialize_entry("latestValidHash", &self.payload_inner.latest_valid_hash)?;
+        map.serialize_entry("validationError", &self.payload_inner.status.validation_error())?;
+        map.serialize_entry("inclusionListSatisfied", &self.inclusion_list_satisfied)?;
+        map.end()
+    }
+}
+
 /// Struct aggregating [`ExecutionPayload`] and [`ExecutionPayloadSidecar`] and encapsulating
 /// complete payload supplied for execution.
 #[derive(Debug, Clone)]
@@ -3995,6 +4116,7 @@ impl ExecutionData {
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
     ///
     /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    /// The payload's advertised `block_hash` is not recomputed or compared.
     ///
     /// # Note
     ///
@@ -4422,6 +4544,36 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
+    fn serde_payload_status_v2() {
+        let json = r#"{"status":"VALID","latestValidHash":null,"validationError":null,"inclusionListSatisfied":true}"#;
+        let status: PayloadStatusV2 = serde_json::from_str(json).unwrap();
+        assert!(status.is_valid());
+        assert!(status.payload_inner.latest_valid_hash.is_none());
+        assert_eq!(status.inclusion_list_satisfied, Some(true));
+        assert_eq!(serde_json::to_string(&status).unwrap(), json);
+
+        let json = r#"{"status":"SYNCING","latestValidHash":null,"validationError":null,"inclusionListSatisfied":null}"#;
+        let status: PayloadStatusV2 = serde_json::from_str(json).unwrap();
+        assert!(status.is_syncing());
+        assert_eq!(status.inclusion_list_satisfied, None);
+        assert_eq!(serde_json::to_string(&status).unwrap(), json);
+    }
+
+    #[test]
+    fn payload_status_v2_conversions() {
+        let v1 = PayloadStatus::from_status(PayloadStatusEnum::Valid)
+            .with_latest_valid_hash(B256::with_last_byte(1));
+
+        let v2: PayloadStatusV2 = v1.clone().into();
+        assert_eq!(v2.payload_inner, v1);
+        assert_eq!(v2.inclusion_list_satisfied, None);
+
+        let downgraded: PayloadStatus = v2.with_inclusion_list_satisfied(true).into();
+        assert_eq!(downgraded, v1);
+    }
+
+    #[test]
     fn payload_attributes_builder_setters() {
         let withdrawal = Withdrawal {
             index: 1,
@@ -4730,6 +4882,44 @@ mod tests {
         // pulled from a geth response getPayloadV3 in hive tests
         let response = r#"{"executionPayload":{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"},"blockValue":"0x0","blobsBundle":{"commitments":[],"proofs":[],"blobs":[]},"shouldOverrideBuilder":false}"#;
         let envelope: ExecutionPayloadEnvelopeV3 = serde_json::from_str(response).unwrap();
+        assert_eq!(serde_json::to_string(&envelope).unwrap(), response);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_roundtrip_execution_payload_field_v2() {
+        // withdrawals must select the V2 variant instead of collapsing into V1
+        let s = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]}"#;
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(s).unwrap();
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(s).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V2(payload_v2));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s);
+
+        // empty withdrawals still mean V2
+        let s_empty = s.replace(
+            r#"[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]"#,
+            "[]",
+        );
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(&s_empty).unwrap();
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(&s_empty).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V2(payload_v2));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s_empty);
+
+        // no withdrawals field means V1
+        let s_v1 = s_empty.replace(r#","withdrawals":[]"#, "");
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(&s_v1).unwrap();
+        let payload_v1: ExecutionPayloadV1 = serde_json::from_str(&s_v1).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V1(payload_v1));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s_v1);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_roundtrip_execution_payload_envelope_v2() {
+        // a getPayloadV2 response with withdrawals in the payload
+        let response = r#"{"executionPayload":{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]},"blockValue":"0x123"}"#;
+        let envelope: ExecutionPayloadEnvelopeV2 = serde_json::from_str(response).unwrap();
+        assert!(matches!(envelope.execution_payload, ExecutionPayloadFieldV2::V2(_)));
         assert_eq!(serde_json::to_string(&envelope).unwrap(), response);
     }
 

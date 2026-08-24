@@ -2,8 +2,10 @@
 
 use serde::{Deserialize, Deserializer};
 
-/// For use with serde's `deserialize_with` on a sequence that must be
-/// deserialized as a single but optional (i.e. possibly `null`) value.
+/// Deserializes an explicit `null` as [`Default::default`] and any other value as `T`.
+///
+/// Use with Serde's `deserialize_with`. Add `#[serde(default)]` separately if a missing field
+/// should also use its default.
 pub fn null_as_default<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
     T: Deserialize<'de> + Default,
@@ -12,7 +14,10 @@ where
     Option::<T>::deserialize(deserializer).map(Option::unwrap_or_default)
 }
 
-/// For use with serde's `deserialize_with` on a field that must be missing.
+/// Deserializes an explicit `null` as [`None`] and rejects a non-null value.
+///
+/// Use with Serde's `deserialize_with`. Add `#[serde(default)]` to accept a missing field as
+/// [`None`]; Serde handles that case without calling this function.
 pub fn reject_if_some<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     T: Deserialize<'de>,

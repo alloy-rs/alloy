@@ -371,19 +371,26 @@ where
     ///
     /// ```rust
     /// # use alloy_consensus::{TypedTransaction, SignableTransaction};
-    /// # use alloy_primitives::{address, U256};
-    /// # use alloy_provider::ProviderBuilder;
+    /// # use alloy_primitives::{Address, U256};
+    /// # use alloy_provider::{Provider, ProviderBuilder};
     /// # use alloy_rpc_types_eth::TransactionRequest;
     /// # use alloy_network::{NetworkTransactionBuilder, TransactionBuilder};
     ///
     /// # #[cfg(feature = "anvil-node")]
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    ///     // Create transaction request
-    ///     let tx_request = TransactionRequest::default()
-    ///         .with_from(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))
-    ///         .with_value(U256::from(1000));
+    ///     // Do not add a wallet: this example needs the filled request, not a signed envelope.
+    ///     let provider = ProviderBuilder::new().connect_anvil();
+    ///     let from = provider
+    ///         .get_accounts()
+    ///         .await?
+    ///         .into_iter()
+    ///         .next()
+    ///         .expect("Anvil provides funded accounts");
     ///
-    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+    ///     let tx_request = TransactionRequest::default()
+    ///         .with_from(from)
+    ///         .with_to(Address::ZERO)
+    ///         .with_value(U256::from(1000));
     ///
     ///     // Fill transaction with provider data
     ///     let filled_tx = provider.fill(tx_request).await?;

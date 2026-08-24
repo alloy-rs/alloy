@@ -275,7 +275,10 @@ impl<T, H> Block<T, H> {
 }
 
 impl<T: TransactionResponse, H> Block<T, H> {
-    /// Converts a block with Tx hashes into a full block.
+    /// Converts a block with transaction hashes into a full block.
+    ///
+    /// This replaces the transaction representation without validating the supplied transaction
+    /// hashes, count, or order against the original block or its transactions root.
     pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
     }
@@ -304,7 +307,7 @@ impl<T> Block<T> {
         self.header.hash
     }
 
-    /// Returns a sealed reference of the header: `Sealed<&alloy_consensus::Header>`
+    /// Returns a sealed reference of the header using its stored RPC hash without verification.
     pub const fn sealed_header(&self) -> Sealed<&alloy_consensus::Header> {
         Sealed::new_unchecked(&self.header.inner, self.header.hash)
     }
@@ -356,7 +359,8 @@ impl<T> Block<T> {
         .into_block(header.into_consensus())
     }
 
-    /// Same as [`Self::into_consensus`] but returns the block as [`Sealed`] with the block's hash.
+    /// Same as [`Self::into_consensus`] but returns the block as [`Sealed`] with its stored RPC
+    /// hash, without verification or recomputation.
     pub fn into_consensus_sealed(self) -> Sealed<alloy_consensus::Block<T>> {
         let hash = self.header.hash;
         Sealed::new_unchecked(self.into_consensus(), hash)
@@ -375,12 +379,16 @@ where
 /// RPC representation of block header, wrapping a consensus header.
 ///
 /// This wraps the consensus header and adds additional fields for RPC.
+///
+/// The block hash is trusted metadata received from RPC or a seal, not a live view of `inner`.
+/// Mutating or mapping the inner header does not recompute the hash and can make the two
+/// inconsistent. Use [`Self::new`] or reseal the inner header when a recomputed hash is required.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Header<H = alloy_consensus::Header> {
-    /// Hash of the block
+    /// Hash of the block as received from RPC or a trusted seal.
     pub hash: BlockHash,
     /// Inner consensus header.
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -415,6 +423,8 @@ impl<H> Header<H> {
     }
 
     /// Consumes the type and returns the [`Sealed`] header.
+    ///
+    /// This uses the stored hash without verification or recomputation.
     pub fn into_sealed(self) -> Sealed<H> {
         Sealed::new_unchecked(self.inner, self.hash)
     }
@@ -447,6 +457,8 @@ impl<H> Header<H> {
     }
 
     /// Applies the given closure to the inner header.
+    ///
+    /// The stored hash is preserved without checking that the mapped header has the same hash.
     #[expect(clippy::use_self)]
     pub fn map<H1>(self, f: impl FnOnce(H) -> H1) -> Header<H1> {
         let Header { hash, inner, total_difficulty, size } = self;
@@ -455,6 +467,8 @@ impl<H> Header<H> {
     }
 
     /// Applies the given fallible closure to the inner header.
+    ///
+    /// The stored hash is preserved without checking that the mapped header has the same hash.
     #[expect(clippy::use_self)]
     pub fn try_map<H1, E>(self, f: impl FnOnce(H) -> Result<H1, E>) -> Result<Header<H1>, E> {
         let Header { hash, inner, total_difficulty, size } = self;

@@ -144,15 +144,17 @@ impl GethInstance {
 
     /// Takes the stderr contained in the child process.
     ///
-    /// This leaves a `None` in its place, so calling methods that require a stderr to be present
-    /// will fail if called after this.
+    /// Stderr is available only when [`Geth::keep_stderr`] was set. This leaves `None` in its
+    /// place, so later calls that require stderr return [`NodeError::NoStderr`].
     pub fn stderr(&mut self) -> Result<ChildStderr, NodeError> {
         self.pid.stderr.take().ok_or(NodeError::NoStderr)
     }
 
-    /// Blocks until geth adds the specified peer, using 20s as the timeout.
+    /// Blocks until geth adds the specified peer, using a 20-second deadline checked between
+    /// complete stderr lines. A live process that emits no newline can block past the deadline.
     ///
-    /// Requires the stderr to be present in the `GethInstance`.
+    /// Requires [`Geth::keep_stderr`] to have been set and [`Self::stderr`] not to have taken the
+    /// handle.
     pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeError> {
         let mut stderr = self.pid.stderr.as_mut().ok_or(NodeError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
@@ -181,21 +183,23 @@ impl Drop for GethInstance {
 
 /// Builder for launching `geth`.
 ///
-/// # Panics
-///
-/// If `spawn` is called without `geth` being available in the user's $PATH
+/// The default mode is an isolated development chain. [`Geth::p2p_port`] and
+/// [`Geth::disable_discovery`] switch to non-dev mode; [`Geth::dev`] and [`Geth::block_time`]
+/// switch back to dev mode. [`Geth::spawn`] panics on any startup failure; use
+/// [`Geth::try_spawn`] to handle errors.
 ///
 /// # Example
 ///
 /// ```no_run
 /// use alloy_node_bindings::Geth;
 ///
-/// let port = 8545u16;
-/// let url = format!("http://localhost:{}", port).to_string();
-///
-/// let geth = Geth::new().port(port).block_time(5000u64).spawn();
+/// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
+/// let geth = Geth::new().block_time(1).try_spawn()?;
+/// println!("Geth is listening at {}", geth.endpoint());
 ///
 /// drop(geth); // this will kill the instance
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug, Default)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
@@ -217,7 +221,7 @@ pub struct Geth {
 }
 
 impl Geth {
-    /// Creates an empty Geth builder.
+    /// Creates a Geth builder in dev mode.
     pub fn new() -> Self {
         Self::default()
     }
@@ -308,7 +312,7 @@ impl Geth {
         self
     }
 
-    /// Sets the block-time which will be used when the `geth-cli` instance is launched.
+    /// Sets the dev-chain block interval in seconds.
     ///
     /// This will put the geth instance in `dev` mode, discarding any previously set options that
     /// cannot be used in dev mode.
@@ -388,7 +392,8 @@ impl Geth {
 
     /// Keep the handle to geth's stderr in order to read from it.
     ///
-    /// Caution: if the stderr handle isn't used, this can end up blocking.
+    /// This is required by [`GethInstance::stderr`] and [`GethInstance::wait_to_add_peer`].
+    /// Caution: if the stderr handle is not continuously consumed, the child process can block.
     pub const fn keep_stderr(mut self) -> Self {
         self.keep_err = true;
         self
@@ -442,7 +447,13 @@ impl Geth {
         self.try_spawn().unwrap()
     }
 
-    /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
+    /// Consumes the builder, spawns `geth`, and waits for its HTTP and active networking services
+    /// to report ready.
+    ///
+    /// Returns an error if the process cannot be started, reports a fatal startup error, or does
+    /// not become ready before [`NODE_STARTUP_TIMEOUT`] is observed. The deadline is checked
+    /// between complete stderr lines; a live process that emits no newline can block this call
+    /// past the deadline.
     pub fn try_spawn(mut self) -> Result<GethInstance, NodeError> {
         let bin_path = self
             .program

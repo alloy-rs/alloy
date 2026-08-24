@@ -250,12 +250,11 @@ impl<T> Default for Receipts<T> {
     }
 }
 
-/// [`Receipt`] with calculated bloom filter.
+/// A receipt paired with a precomputed logs bloom.
 ///
-/// This convenience type allows us to lazily calculate the bloom filter for a
-/// receipt, similar to [`Sealed`].
-///
-/// [`Sealed`]: crate::Sealed
+/// Consistency is not verified or automatically maintained. Prefer [`Receipt::with_bloom`] or
+/// [`From<R>`](From) to calculate it, and recompute it after changing bloom-relevant log addresses
+/// or topics.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -318,15 +317,13 @@ where
 }
 
 impl<R> ReceiptWithBloom<R> {
-    /// Converts the receipt type by applying the given closure to it.
-    ///
-    /// Returns the type with the new receipt type.
+    /// Converts the receipt type while reusing the existing bloom without validation.
     pub fn map_receipt<U>(self, f: impl FnOnce(R) -> U) -> ReceiptWithBloom<U> {
         let Self { receipt, logs_bloom } = self;
         ReceiptWithBloom { receipt: f(receipt), logs_bloom }
     }
 
-    /// Create new [ReceiptWithBloom]
+    /// Creates a receipt with a caller-supplied bloom without verifying consistency.
     pub const fn new(receipt: R, logs_bloom: Bloom) -> Self {
         Self { receipt, logs_bloom }
     }
@@ -343,9 +340,9 @@ impl<R> ReceiptWithBloom<R> {
 }
 
 impl<L> ReceiptWithBloom<Receipt<L>> {
-    /// Converts the receipt's log type by applying a function to each log.
+    /// Converts the receipt's log type while reusing the existing bloom.
     ///
-    /// Returns the receipt with the new log type.
+    /// Use this only when the mapping preserves bloom-relevant log addresses and topics.
     pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> ReceiptWithBloom<Receipt<U>> {
         let Self { receipt, logs_bloom } = self;
         ReceiptWithBloom { receipt: receipt.map_logs(f), logs_bloom }

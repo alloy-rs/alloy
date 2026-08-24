@@ -1,13 +1,14 @@
 use crate::Provider;
 use alloy_eips::eip7685::RequestsOrHash;
 use alloy_network::Network;
-use alloy_primitives::{BlockHash, Bytes, B256, U64};
+use alloy_primitives::{BlockHash, Bytes, B128, B256, U64};
 use alloy_rpc_types_engine::{
     BlobAndProofV1, BlobAndProofV2, ClientVersionV1, ExecutionPayloadBodiesV1,
     ExecutionPayloadBodiesV2, ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3,
     ExecutionPayloadEnvelopeV4, ExecutionPayloadEnvelopeV5, ExecutionPayloadEnvelopeV6,
     ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4,
-    ForkchoiceState, ForkchoiceUpdated, PayloadAttributes, PayloadId, PayloadStatus,
+    ForkchoiceState, ForkchoiceUpdated, ForkchoiceUpdatedResponseV2, PayloadAttributes, PayloadId,
+    PayloadStatus, PayloadStatusV2,
 };
 use alloy_transport::TransportResult;
 
@@ -76,6 +77,18 @@ pub trait EngineApi<N>: Send + Sync {
         execution_requests: RequestsOrHash,
     ) -> TransportResult<PayloadStatus>;
 
+    /// Sends the given payload to the execution layer client, as specified for the Bogota fork.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/bogota.md#engine_newpayloadv6>
+    async fn new_payload_v6(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: RequestsOrHash,
+        inclusion_list_transactions: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatusV2>;
+
     /// Updates the execution layer client with the given fork choice, as specified for the Paris
     /// fork.
     ///
@@ -119,6 +132,22 @@ pub trait EngineApi<N>: Send + Sync {
         fork_choice_state: ForkchoiceState,
         payload_attributes: Option<PayloadAttributes>,
     ) -> TransportResult<ForkchoiceUpdated>;
+
+    /// Updates the execution layer client with the given fork choice, as specified for the Bogota
+    /// fork.
+    ///
+    /// `custody_columns` is the custody-column bitmask used for [EIP-8070] sparse blobpool
+    /// signaling. It must be 16 bytes when set.
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/bogota.md#engine_forkchoiceupdatedv5>
+    async fn fork_choice_updated_v5(
+        &self,
+        fork_choice_state: ForkchoiceState,
+        payload_attributes: Option<PayloadAttributes>,
+        custody_columns: Option<B128>,
+    ) -> TransportResult<ForkchoiceUpdatedResponseV2>;
 
     /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Paris fork.
@@ -362,6 +391,28 @@ where
             .await
     }
 
+    async fn new_payload_v6(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: RequestsOrHash,
+        inclusion_list_transactions: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatusV2> {
+        self.client()
+            .request(
+                "engine_newPayloadV6",
+                (
+                    payload,
+                    versioned_hashes,
+                    parent_beacon_block_root,
+                    execution_requests,
+                    inclusion_list_transactions,
+                ),
+            )
+            .await
+    }
+
     async fn fork_choice_updated_v1(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -399,6 +450,20 @@ where
     ) -> TransportResult<ForkchoiceUpdated> {
         self.client()
             .request("engine_forkchoiceUpdatedV4", (fork_choice_state, payload_attributes))
+            .await
+    }
+
+    async fn fork_choice_updated_v5(
+        &self,
+        fork_choice_state: ForkchoiceState,
+        payload_attributes: Option<PayloadAttributes>,
+        custody_columns: Option<B128>,
+    ) -> TransportResult<ForkchoiceUpdatedResponseV2> {
+        self.client()
+            .request(
+                "engine_forkchoiceUpdatedV5",
+                (fork_choice_state, payload_attributes, custody_columns),
+            )
             .await
     }
 

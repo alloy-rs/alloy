@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use std::fmt;
 use trezor_client::client::Trezor;
 
-// we need firmware that supports EIP-1559 and EIP-712
+// We require firmware that supports EIP-1559 transaction signing.
 const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
 const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 
@@ -16,8 +16,11 @@ const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 ///
 /// This is a simple wrapper around the [Trezor transport](Trezor).
 ///
-/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
-/// will always return an error.
+/// Device operations are available through the asynchronous [`Signer`] and
+/// [`alloy_network::TxSigner`] traits; [`alloy_signer::SignerSync`] is not implemented. The
+/// underlying USB operations are blocking. Raw digest signing is unsupported, while
+/// [`Signer::sign_message`] performs EIP-191 personal-message signing and requires confirmation on
+/// the device.
 pub struct TrezorSigner {
     derivation: DerivationType,
     session_id: Vec<u8>,
@@ -86,7 +89,12 @@ impl alloy_network::TxSigner<Signature> for TrezorSigner {
 alloy_network::impl_into_wallet!(TrezorSigner);
 
 impl TrezorSigner {
-    /// Instantiates a new Trezor signer.
+    /// Connects to the unique available Trezor device and reads the derived address.
+    ///
+    /// Exactly one device or emulator must be discoverable. Firmware major version 1 requires
+    /// version 1.11.1 or newer, and major version 2 requires 2.5.1 or newer. `chain_id` applies
+    /// only to transaction signing: it fills a missing transaction chain ID and rejects a
+    /// different one.
     #[instrument(ret)]
     pub async fn new(
         derivation: DerivationType,
@@ -108,7 +116,7 @@ impl TrezorSigner {
             1 => FIRMWARE_1_MIN_VERSION,
             2 => FIRMWARE_2_MIN_VERSION,
             // unknown major version, possibly newer models that we don't know about yet
-            // it's probably safe to assume they support EIP-1559 and EIP-712
+            // It's probably safe to assume they support EIP-1559.
             _ => return Ok(()),
         };
 
@@ -144,12 +152,15 @@ impl TrezorSigner {
         Ok(client)
     }
 
-    /// Get the account which corresponds to our derivation path
+    /// Re-queries the address for this signer's derivation path.
+    ///
+    /// This does not request on-device display confirmation. [`Signer::address`] returns the
+    /// address cached when this signer was constructed.
     pub async fn get_address(&self) -> Result<Address, TrezorError> {
         self.get_address_with_path(&self.derivation).await
     }
 
-    /// Gets the account which corresponds to the provided derivation path
+    /// Queries the address for `derivation` without requesting on-device display confirmation.
     #[instrument(ret)]
     pub async fn get_address_with_path(
         &self,
@@ -160,9 +171,7 @@ impl TrezorSigner {
         Ok(address_str.parse()?)
     }
 
-    /// Signs an Ethereum transaction (requires confirmation on the Trezor).
-    ///
-    /// Does not apply EIP-155.
+    /// Signs a legacy or EIP-1559 transaction and requires confirmation on the Trezor.
     #[doc(alias = "sign_transaction_inner")]
     async fn sign_tx_inner(
         &self,

@@ -18,6 +18,7 @@ pub use self::{
         AccountChangeKind, AccountState, DiffMode, DiffStateKind, PreStateConfig, PreStateFrame,
         PreStateMode,
     },
+    state_gas::StateGasTrace,
 };
 
 pub mod call;
@@ -26,6 +27,7 @@ pub mod four_byte;
 pub mod mux;
 pub mod noop;
 pub mod pre_state;
+pub mod state_gas;
 
 /// Error when the inner tracer from [GethTrace] is mismatching to the target tracer.
 #[derive(Debug, thiserror::Error)]
@@ -49,6 +51,21 @@ pub struct BlockTraceResult {
     pub traces: Vec<TraceResult>,
 }
 
+/// Result for one block emitted by a `debug_traceChain` subscription.
+///
+/// <https://github.com/ethereum/go-ethereum/blob/e25efd2c62175e82b364c0344d77c882aa951f68/eth/tracers/api.go#L190-L196>
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChainBlockTraceResult {
+    /// Block number corresponding to the trace task.
+    pub block: U256,
+    /// Block hash corresponding to the trace task.
+    pub hash: B256,
+    /// Trace results produced by the trace task.
+    ///
+    /// Geth leaves entries after the first transaction-level tracing failure as `null`.
+    pub traces: Vec<Option<TraceResult>>,
+}
+
 /// Geth Default struct log trace frame
 ///
 /// <https://github.com/ethereum/go-ethereum/blob/a9ef135e2dd53682d106c6a2aede9187026cc1de/eth/tracers/logger/logger.go#L406-L411>
@@ -59,6 +76,35 @@ pub struct DefaultFrame {
     pub failed: bool,
     /// How much gas was used.
     pub gas: u64,
+    /// Gross execution-dimension gas used by the transaction.
+    ///
+    /// These fields are optional because pre-Amsterdam responses omit them. The
+    /// optional representation preserves decoding of both old and new responses;
+    /// adding them is JSON-RPC backward-compatible, but adding public Rust fields
+    /// can require downstream struct literals to use `..Default::default()`.
+    #[serde(
+        default,
+        with = "alloy_serde::quantity::opt",
+        rename = "executionGasUsed",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub execution_gas_used: Option<u64>,
+    /// Gross state-dimension gas used by the transaction.
+    #[serde(
+        default,
+        with = "alloy_serde::quantity::opt",
+        rename = "stateGasUsed",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub state_gas_used: Option<u64>,
+    /// EIP-3529 gas refund applied at the transaction boundary.
+    #[serde(
+        default,
+        with = "alloy_serde::quantity::opt",
+        rename = "gasRefund",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub gas_refund: Option<u64>,
     /// Output of the transaction
     pub return_value: Bytes,
     /// Recorded traces of the transaction
@@ -79,6 +125,13 @@ pub struct StructLog {
     /// cost for executing op
     #[serde(rename = "gasCost")]
     pub gas_cost: u64,
+    /// Net state-dimension gas change caused by this opcode. This can be negative
+    /// for source-based state-gas refunds under EIP-8037.
+    #[serde(default, rename = "stateGasCost", skip_serializing_if = "Option::is_none")]
+    pub state_gas_cost: Option<i64>,
+    /// State-gas reservoir remaining before this opcode.
+    #[serde(default, rename = "stateGasReservoir", skip_serializing_if = "Option::is_none")]
+    pub state_gas_reservoir: Option<u64>,
     /// Current call depth
     pub depth: u64,
     /// Error message if any
@@ -136,6 +189,8 @@ pub enum GethTrace {
     FourByteTracer(FourByteFrame),
     /// The response for pre-state byte tracer
     PreStateTracer(PreStateFrame),
+    /// The response for the EIP-8037 state-gas tracer
+    StateGasTracer(StateGasTrace),
     /// An empty json response
     NoopTracer(NoopFrame),
     /// The response for mux tracer
@@ -168,6 +223,11 @@ impl GethTrace {
     /// Returns true if this is a pre-state frame.
     pub const fn is_pre_state(&self) -> bool {
         matches!(self, Self::PreStateTracer(_))
+    }
+
+    /// Returns true if this is a state-gas trace.
+    pub const fn is_state_gas(&self) -> bool {
+        matches!(self, Self::StateGasTracer(_))
     }
 
     /// Returns true if this is a noop frame.
@@ -221,6 +281,14 @@ impl GethTrace {
     pub fn try_into_pre_state_frame(self) -> Result<PreStateFrame, UnexpectedTracerError> {
         match self {
             Self::PreStateTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [StateGasTrace]
+    pub fn try_into_state_gas_trace(self) -> Result<StateGasTrace, UnexpectedTracerError> {
+        match self {
+            Self::StateGasTracer(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
     }
@@ -294,6 +362,12 @@ impl From<PreStateFrame> for GethTrace {
     }
 }
 
+impl From<StateGasTrace> for GethTrace {
+    fn from(value: StateGasTrace) -> Self {
+        Self::StateGasTracer(value)
+    }
+}
+
 impl From<NoopFrame> for GethTrace {
     fn from(value: NoopFrame) -> Self {
         Self::NoopTracer(value)
@@ -346,6 +420,9 @@ pub enum GethDebugBuiltInTracerType {
     /// The output is an object where the keys correspond to account addresses.
     #[serde(rename = "prestateTracer")]
     PreStateTracer,
+    /// The EIP-8037 state-gas summary tracer.
+    #[serde(rename = "stateGasTracer")]
+    StateGasTracer,
     /// This tracer is a noop. It returns an empty object and is only meant for testing the setup.
     #[serde(rename = "noopTracer")]
     NoopTracer,
@@ -387,6 +464,7 @@ impl GethDebugTracerType {
                 GethDebugBuiltInTracerType::CallTracer => "callTracer",
                 GethDebugBuiltInTracerType::FlatCallTracer => "flatCallTracer",
                 GethDebugBuiltInTracerType::PreStateTracer => "prestateTracer",
+                GethDebugBuiltInTracerType::StateGasTracer => "stateGasTracer",
                 GethDebugBuiltInTracerType::NoopTracer => "noopTracer",
                 GethDebugBuiltInTracerType::MuxTracer => "muxTracer",
                 GethDebugBuiltInTracerType::Erc7562Tracer => "erc7562Tracer",
@@ -520,8 +598,11 @@ pub struct GethDebugTracingOptions {
     /// This could be [CallConfig] or [PreStateConfig] depending on the tracer.
     #[serde(default, skip_serializing_if = "GethDebugTracerConfig::is_null")]
     pub tracer_config: GethDebugTracerConfig,
-    /// A string of decimal integers that overrides the JavaScript-based tracing calls default
-    /// timeout of 5 seconds.
+    /// A Go duration string, such as `5s`, that overrides the default five-second timeout for
+    /// JavaScript-based tracing calls.
+    ///
+    /// [`Self::with_timeout`] represents the supplied duration as integer milliseconds, for
+    /// example `2500ms`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<String>,
 }
@@ -556,6 +637,11 @@ impl GethDebugTracingOptions {
     /// Creates new options for [`GethDebugBuiltInTracerType::PreStateTracer`]
     pub fn prestate_tracer(config: PreStateConfig) -> Self {
         Self::new_tracer(GethDebugBuiltInTracerType::PreStateTracer).with_prestate_config(config)
+    }
+
+    /// Creates new options for the EIP-8037 state-gas tracer.
+    pub fn state_gas_tracer() -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::StateGasTracer)
     }
 
     /// Creates new options for [`GethDebugBuiltInTracerType::FourByteTracer`]
@@ -837,6 +923,35 @@ fn serialize_string_storage_map_opt<S: Serializer>(
 mod tests {
     use super::*;
     use similar_asserts::assert_eq;
+
+    #[test]
+    fn serde_chain_block_trace_result() {
+        let block_hash = B256::repeat_byte(0x11);
+        let tx_hash = B256::repeat_byte(0x22);
+        let result = ChainBlockTraceResult {
+            block: U256::from(2),
+            hash: block_hash,
+            traces: vec![
+                Some(TraceResult::Error {
+                    error: "trace failed".to_string(),
+                    tx_hash: Some(tx_hash),
+                }),
+                None,
+            ],
+        };
+
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            serde_json::json!({
+                "block": "0x2",
+                "hash": block_hash,
+                "traces": [
+                    {"error": "trace failed", "txHash": tx_hash},
+                    null
+                ]
+            })
+        );
+    }
 
     #[test]
     fn test_return_data_prefix() {

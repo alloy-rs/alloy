@@ -62,7 +62,7 @@ impl MnemonicBuilder<English> {
         Self::default()
     }
 
-    /// Creates a new  [`MnemonicBuilder`] with the [`English`] wordlist and the given phrase
+    /// Creates a new [`MnemonicBuilder`] with the [`English`] wordlist and the given phrase.
     pub fn from_phrase<P: Into<String>>(phrase: P) -> Self {
         Self::english().phrase(phrase)
     }
@@ -106,39 +106,39 @@ impl MnemonicBuilder<English> {
 }
 
 impl<W: Wordlist> MnemonicBuilder<W> {
-    /// Sets the phrase in the mnemonic builder. The phrase can either be a string or a path to
-    /// the file that contains the phrase. Once a phrase is provided, the key will be generated
-    /// deterministically by calling the `build` method.
+    /// Sets the space-separated mnemonic phrase.
+    ///
+    /// The value is parsed as phrase words, not as a file path. Once supplied,
+    /// [`build`](Self::build) derives the signer deterministically.
     ///
     /// # Examples
     ///
     /// ```
-    /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_signer_local::{MnemonicBuilder, coins_bip39::English};
     ///
     /// let signer = MnemonicBuilder::<English>::default()
     ///     .phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about")
     ///     .build()?;
-    /// # Ok(())
-    /// # }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn phrase<P: Into<String>>(mut self, phrase: P) -> Self {
         self.phrase = Some(phrase.into());
         self
     }
 
-    /// Sets the word count of a mnemonic phrase to be generated at random. If the `phrase` field
-    /// is set, then `word_count` will be ignored.
+    /// Sets the word count of a mnemonic phrase to generate with
+    /// [`build_random`](Self::build_random).
+    ///
+    /// Valid BIP-39 word counts are 12, 15, 18, 21, and 24. Random generation returns an error if
+    /// a phrase was also supplied.
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
+    /// ```
     /// use alloy_signer_local::{coins_bip39::English, MnemonicBuilder};
     ///
-    /// let signer = MnemonicBuilder::<English>::default().word_count(24).build()?;
-    /// # Ok(())
-    /// # }
+    /// let signer = MnemonicBuilder::<English>::default().word_count(24).build_random()?;
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub const fn word_count(mut self, count: usize) -> Self {
         self.word_count = count;
@@ -162,14 +162,25 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         &self.derivation_path
     }
 
-    /// Sets the password used to construct the seed from the mnemonic phrase.
+    /// Sets the optional BIP-39 passphrase used to derive the seed.
+    ///
+    /// This is not encryption: the same mnemonic with a different passphrase silently derives a
+    /// different wallet. The passphrase is required to recover the same keys later.
     pub fn password<T: Into<String>>(mut self, password: T) -> Self {
         self.password = Some(password.into());
         self
     }
 
-    /// Sets the path to which the randomly generated phrase will be written to. This field is
-    /// ignored when building a wallet from the provided mnemonic phrase.
+    /// Sets the directory where a randomly generated phrase will be written.
+    ///
+    /// [`build_random`](Self::build_random) writes the phrase in plaintext to a file named after
+    /// the derived signer address. The directory must already exist. This setting is ignored by
+    /// [`build`](Self::build) when deriving from a supplied phrase.
+    ///
+    /// # Security
+    ///
+    /// The file contains the wallet recovery secret in plaintext. Restrict its permissions and do
+    /// not use this option unless plaintext storage is intended.
     pub fn write_to<P: Into<PathBuf>>(mut self, path: P) -> Self {
         self.write_to = Some(path.into());
         self
