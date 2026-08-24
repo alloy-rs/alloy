@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [eip7594] Reconstruct sidecars from sparse cells ([#4120](https://github.com/alloy-rs/alloy/issues/4120))
 - [consensus] Add EIP-8070 blob clearing helpers ([#4121](https://github.com/alloy-rs/alloy/issues/4121))
 
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ### Styling
 
 - [eips] Remove redundant format import ([#4134](https://github.com/alloy-rs/alloy/issues/4134))

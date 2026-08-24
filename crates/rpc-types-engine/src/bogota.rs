@@ -50,6 +50,11 @@ impl MaybeBogotaPayloadFields {
         Self { fields: None }
     }
 
+    /// Returns `true` if no Bogota fields are present.
+    pub const fn is_none(&self) -> bool {
+        self.fields.is_none()
+    }
+
     /// Consumes `self` and returns the contained [`BogotaPayloadFields`], if present.
     pub fn into_inner(self) -> Option<BogotaPayloadFields> {
         self.fields
