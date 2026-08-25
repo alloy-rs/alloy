@@ -3,11 +3,12 @@
 use crate::{blocks::Paused, Provider, RootProvider};
 use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
-use alloy_network::{BlockResponse, Network};
+use alloy_network::{primitives::ReceiptResponse, BlockResponse, Network};
 use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
-    TxHash, B256,
+    TxHash, B256, U64,
 };
+use alloy_rpc_client::WeakClient;
 use alloy_transport::{utils::Spawnable, TransportError};
 use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
 use std::{
@@ -462,10 +463,23 @@ impl HeartbeatHandle {
     }
 }
 
+/// The result of rechecking unconfirmed transactions against their receipts.
+///
+/// See [`Heartbeat::spawn_recheck`].
+struct RecheckResult {
+    /// The chain height reported by the server, if the request succeeded.
+    current_height: Option<u64>,
+    /// Transactions found to be mined, with the block number of their receipt.
+    mined: Vec<(B256, u64)>,
+}
+
 /// A heartbeat task that receives blocks and watches for transactions.
 pub(crate) struct Heartbeat<N, S> {
     /// The stream of incoming blocks to watch.
     stream: futures::stream::Fuse<S>,
+
+    /// The client, used to periodically recheck unconfirmed transactions against their receipts.
+    client: WeakClient,
 
     /// Lookbehind blocks in form of mapping block number -> vector of transaction hashes.
     past_blocks: VecDeque<(u64, B256HashSet)>,
@@ -487,9 +501,10 @@ pub(crate) struct Heartbeat<N, S> {
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Create a new heartbeat task.
-    pub(crate) fn new(stream: S, is_paused: Arc<Paused>) -> Self {
+    pub(crate) fn new(stream: S, is_paused: Arc<Paused>, client: WeakClient) -> Self {
         Self {
             stream: stream.fuse(),
+            client,
             past_blocks: Default::default(),
             unconfirmed: Default::default(),
             waiting_confs: Default::default(),
@@ -679,6 +694,79 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
         self.check_confirmations(block_height);
     }
+
+    /// Spawn a task that rechecks all unconfirmed transactions against their receipts, and
+    /// fetches the current chain height.
+    ///
+    /// The block stream is the primary confirmation path, but it can permanently miss a
+    /// transaction's block when the RPC server returns stale block numbers or serves requests
+    /// from inconsistent replicas (e.g. behind a load balancer). Without a recheck, such a
+    /// transaction would never resolve. The result is sent back to the heartbeat and applied in
+    /// [`Self::apply_recheck`].
+    ///
+    /// See <https://github.com/alloy-rs/alloy/issues/3881>.
+    fn spawn_recheck(&self, tx: mpsc::Sender<RecheckResult>) {
+        let client = self.client.clone();
+        let hashes: Vec<B256> = self.unconfirmed.keys().copied().collect();
+        let fut = async move {
+            let Some(client) = client.upgrade() else { return };
+
+            let current_height = client
+                .request::<_, U64>("eth_blockNumber", ())
+                .await
+                .inspect_err(|err| debug!(%err, "failed to fetch block number for recheck"))
+                .ok()
+                .map(|n| n.to::<u64>());
+
+            let mut mined = Vec::new();
+            for hash in hashes {
+                match client
+                    .request::<_, Option<N::ReceiptResponse>>("eth_getTransactionReceipt", (hash,))
+                    .await
+                {
+                    Ok(Some(receipt)) => {
+                        if let Some(number) = receipt.block_number() {
+                            mined.push((hash, number));
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(err) => debug!(tx=%hash, %err, "failed to fetch receipt for recheck"),
+                }
+            }
+
+            let _ = tx.send(RecheckResult { current_height, mined }).await;
+        };
+        fut.spawn_task();
+    }
+
+    /// Apply the result of a receipt recheck: transactions found mined are moved out of the
+    /// unconfirmed set, and the reported chain height releases any transactions that have
+    /// enough confirmations.
+    fn apply_recheck(&mut self, result: RecheckResult) {
+        let known_height = self.past_blocks.back().map(|(height, _)| *height);
+        let current_height = result.current_height.max(known_height);
+
+        for (hash, received_at) in result.mined {
+            let Some(mut watcher) = self.unconfirmed.remove(&hash) else { continue };
+            debug!(tx=%hash, %received_at, "found receipt for unconfirmed transaction");
+
+            let confirmations = watcher.config.required_confirmations;
+            let confirmed_at = received_at + confirmations - 1;
+            if current_height.is_some_and(|height| confirmed_at <= height) {
+                watcher.notify(Ok(()));
+            } else {
+                // Ensure reorg handling can move this watcher back if needed.
+                if watcher.received_at_block.is_none() {
+                    watcher.received_at_block = Some(received_at);
+                }
+                self.waiting_confs.entry(confirmed_at).or_default().push(watcher);
+            }
+        }
+
+        if let Some(height) = current_height {
+            self.check_confirmations(height);
+        }
+    }
 }
 
 #[cfg(target_family = "wasm")]
@@ -708,12 +796,28 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 
     async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
+        // The interval at which unconfirmed transactions are rechecked against their receipts.
+        let recheck_period = self
+            .client
+            .upgrade()
+            .map(|client| client.poll_interval())
+            .unwrap_or_else(|| Duration::from_secs(1));
+        // Held for the lifetime of the loop, so `recheck_rx` never yields `None`.
+        let (recheck_tx, mut recheck_rx) = mpsc::channel::<RecheckResult>(1);
+        let mut recheck_running = false;
+        let mut next_recheck = Instant::now() + recheck_period;
+
         'shutdown: loop {
             {
                 self.update_pause_state();
 
                 let next_reap = self.next_reap();
                 let sleep = std::pin::pin!(sleep_until(next_reap.into()));
+
+                // Only recheck receipts while there are transactions to resolve, and never
+                // more than one recheck at a time.
+                let can_recheck = self.has_pending_transactions() && !recheck_running;
+                let recheck_sleep = std::pin::pin!(sleep_until(next_recheck.into()));
 
                 // We bias the select so that we always handle new messages
                 // before checking blocks, and reap timeouts are last.
@@ -731,6 +835,20 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                         self.handle_new_block(block);
                     },
 
+                    // Apply the result of a receipt recheck.
+                    Some(result) = recheck_rx.recv() => {
+                        recheck_running = false;
+                        self.apply_recheck(result);
+                    },
+
+                    // Periodically recheck unconfirmed transactions against their receipts,
+                    // in case the block stream missed the block they were mined in.
+                    _ = recheck_sleep, if can_recheck => {
+                        next_recheck = Instant::now() + recheck_period;
+                        recheck_running = true;
+                        self.spawn_recheck(recheck_tx.clone());
+                    },
+
                     // This arm ensures we always wake up to reap timeouts,
                     // even if there are no other events.
                     _ = sleep => {},
@@ -740,5 +858,212 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Always reap timeouts
             self.reap_timeouts();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Provider;
+    use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
+    use alloy_network::Ethereum;
+    use alloy_node_bindings::Anvil;
+    use alloy_rpc_client::ClientBuilder;
+    use alloy_transport::{TransportError, TransportFut};
+    use serde_json::value::RawValue;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use tower::{Layer, Service};
+
+    /// Simulates an RPC server behind a load balancer serving inconsistent data
+    /// (<https://github.com/alloy-rs/alloy/issues/3881>): `eth_blockNumber` returns a pinned,
+    /// possibly stale value, and block bodies are served without their transactions, so the
+    /// heartbeat never observes the watched transaction. Receipts pass through unchanged.
+    #[derive(Clone)]
+    struct StaleRpcLayer {
+        block_number: Arc<AtomicU64>,
+    }
+
+    #[derive(Clone)]
+    struct StaleRpcService<S> {
+        inner: S,
+        block_number: Arc<AtomicU64>,
+    }
+
+    impl<S> Layer<S> for StaleRpcLayer {
+        type Service = StaleRpcService<S>;
+
+        fn layer(&self, inner: S) -> Self::Service {
+            StaleRpcService { inner, block_number: self.block_number.clone() }
+        }
+    }
+
+    impl<S> Service<RequestPacket> for StaleRpcService<S>
+    where
+        S: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>
+            + Send
+            + 'static,
+        S::Future: Send + 'static,
+    {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(
+            &mut self,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            self.inner.poll_ready(cx)
+        }
+
+        fn call(&mut self, req: RequestPacket) -> Self::Future {
+            let method = match &req {
+                RequestPacket::Single(req) => req.method().to_string(),
+                RequestPacket::Batch(_) => String::new(),
+            };
+
+            if method == "eth_blockNumber" {
+                let RequestPacket::Single(req) = req else { unreachable!() };
+                let number = self.block_number.load(Ordering::Relaxed);
+                return Box::pin(async move {
+                    let raw = RawValue::from_string(format!("\"0x{number:x}\"")).unwrap();
+                    Ok(ResponsePacket::Single(Response {
+                        id: req.id().clone(),
+                        payload: ResponsePayload::Success(raw),
+                    }))
+                });
+            }
+
+            let strip_txs = method == "eth_getBlockByNumber";
+            let fut = self.inner.call(req);
+            Box::pin(async move {
+                let resp = fut.await?;
+                if !strip_txs {
+                    return Ok(resp);
+                }
+                let ResponsePacket::Single(mut resp) = resp else { return Ok(resp) };
+                if let ResponsePayload::Success(raw) = &resp.payload {
+                    if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(raw.get()) {
+                        if value.is_object() {
+                            value["transactions"] = serde_json::json!([]);
+                            resp.payload = ResponsePayload::Success(
+                                RawValue::from_string(value.to_string()).unwrap(),
+                            );
+                        }
+                    }
+                }
+                Ok(ResponsePacket::Single(resp))
+            })
+        }
+    }
+
+    struct StaleRpc {
+        _anvil: alloy_node_bindings::AnvilInstance,
+        provider: crate::RootProvider<Ethereum>,
+        block_number: Arc<AtomicU64>,
+        tx_hash: TxHash,
+    }
+
+    /// Spawns an anvil node behind a [`StaleRpcLayer`] and sends a transaction, without mining
+    /// it, so that watchers register before its block exists.
+    async fn stale_rpc_setup() -> StaleRpc {
+        let anvil = Anvil::new().arg("--no-mining").spawn();
+
+        let block_number = Arc::new(AtomicU64::new(0));
+        let layer = StaleRpcLayer { block_number: block_number.clone() };
+        let client = ClientBuilder::default().layer(layer).http(anvil.endpoint_url());
+        client.set_poll_interval(Duration::from_millis(50));
+        let provider = crate::RootProvider::<Ethereum>::new(client);
+
+        let accounts = anvil.addresses();
+        let tx = serde_json::json!({
+            "from": accounts[0],
+            "to": accounts[1],
+            "value": "0x1",
+        });
+        let tx_hash: TxHash =
+            provider.raw_request("eth_sendTransaction".into(), (tx,)).await.unwrap();
+
+        StaleRpc { _anvil: anvil, provider, block_number, tx_hash }
+    }
+
+    impl StaleRpc {
+        /// Mines the transaction (block 1) plus enough blocks for the given confirmations, and
+        /// lets the "stale" block number catch up to the tip. Block bodies remain inconsistent,
+        /// so the heartbeat still never observes the transaction in a block.
+        async fn mine_confirmations(&self, confirmations: u64) {
+            for _ in 0..confirmations {
+                let _: String = self.provider.raw_request("evm_mine".into(), ()).await.unwrap();
+            }
+            self.block_number.store(confirmations, Ordering::Relaxed);
+        }
+    }
+
+    /// Waits for the given future, panicking if it does not resolve in time.
+    async fn expect_resolves<T>(fut: tokio::task::JoinHandle<T>) -> T {
+        tokio::time::timeout(Duration::from_secs(5), fut)
+            .await
+            .expect("watcher hung despite the transaction being confirmed")
+            .unwrap()
+    }
+
+    /// `watch()` must resolve via the heartbeat's receipt recheck instead of hanging.
+    async fn watch_with_stale_rpc(confirmations: u64) {
+        let rpc = stale_rpc_setup().await;
+
+        let builder = PendingTransactionBuilder::<Ethereum>::new(rpc.provider.clone(), rpc.tx_hash)
+            .with_required_confirmations(confirmations);
+        let watch = tokio::spawn(builder.watch());
+
+        // Let the registration pre-check observe the transaction as pending before mining.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        rpc.mine_confirmations(confirmations).await;
+
+        let hash = expect_resolves(watch).await.unwrap();
+        assert_eq!(hash, rpc.tx_hash);
+    }
+
+    #[tokio::test]
+    async fn watch_resolves_when_heartbeat_misses_block() {
+        watch_with_stale_rpc(1).await;
+    }
+
+    #[tokio::test]
+    async fn watch_resolves_when_heartbeat_misses_block_multiple_confirmations() {
+        watch_with_stale_rpc(3).await;
+    }
+
+    /// The raw [`PendingTransaction`] future returned by `register()` must also resolve: the
+    /// recheck lives in the heartbeat, not in any particular consumer.
+    #[tokio::test]
+    async fn register_resolves_when_heartbeat_misses_block() {
+        let rpc = stale_rpc_setup().await;
+
+        let builder = PendingTransactionBuilder::<Ethereum>::new(rpc.provider.clone(), rpc.tx_hash)
+            .with_required_confirmations(2);
+        let pending = builder.register().await.unwrap();
+        let pending = tokio::spawn(pending);
+
+        rpc.mine_confirmations(2).await;
+
+        let hash = expect_resolves(pending).await.unwrap();
+        assert_eq!(hash, rpc.tx_hash);
+    }
+
+    /// `get_receipt()` with more than one confirmation has no receipt-polling workaround of its
+    /// own and relies entirely on the heartbeat; the recheck must resolve it too.
+    #[tokio::test]
+    async fn get_receipt_resolves_when_heartbeat_misses_block() {
+        let rpc = stale_rpc_setup().await;
+
+        let builder = PendingTransactionBuilder::<Ethereum>::new(rpc.provider.clone(), rpc.tx_hash)
+            .with_required_confirmations(2);
+        let receipt = tokio::spawn(builder.get_receipt());
+
+        // Let the registration pre-check observe the transaction as pending before mining.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        rpc.mine_confirmations(2).await;
+
+        let receipt = expect_resolves(receipt).await.unwrap();
+        assert_eq!(receipt.block_number(), Some(1));
     }
 }
