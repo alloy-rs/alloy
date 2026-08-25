@@ -45,6 +45,8 @@ pub struct EthNotification<T = Box<serde_json::value::RawValue>> {
 pub enum PubSubItem {
     /// A [`Response`] to a JSON-RPC request.
     Response(Response),
+    /// A batch of [`Response`]s to a JSON-RPC batch request.
+    BatchResponse(Vec<Response>),
     /// An Ethereum-style notification.
     Notification(EthNotification),
 }
@@ -52,6 +54,12 @@ pub enum PubSubItem {
 impl From<Response> for PubSubItem {
     fn from(response: Response) -> Self {
         Self::Response(response)
+    }
+}
+
+impl From<Vec<Response>> for PubSubItem {
+    fn from(responses: Vec<Response>) -> Self {
+        Self::BatchResponse(responses)
     }
 }
 
@@ -72,7 +80,20 @@ impl<'de> Deserialize<'de> for PubSubItem {
             type Value = PubSubItem;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("a JSON-RPC response or an Ethereum-style notification")
+                formatter.write_str(
+                    "a JSON-RPC response, a batch of JSON-RPC responses, or an Ethereum-style notification",
+                )
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut responses = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+                while let Some(response) = seq.next_element()? {
+                    responses.push(response);
+                }
+                Ok(PubSubItem::BatchResponse(responses))
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -255,6 +276,38 @@ mod tests {
             }
             _ => panic!("unexpected deserialization result"),
         }
+    }
+
+    #[test]
+    fn deserializer_test_batch_response() {
+        // A batch of JSON-RPC responses, as returned for a batch request.
+        let batch = r#"
+            [
+                { "jsonrpc": "2.0", "id": 1, "result": "0x1" },
+                { "jsonrpc": "2.0", "id": 2, "error": { "code": -32601, "message": "Method not found" } }
+            ]"#;
+
+        let deser = serde_json::from_str::<PubSubItem>(batch).unwrap();
+
+        match deser {
+            PubSubItem::BatchResponse(responses) => {
+                assert_eq!(responses.len(), 2);
+                assert_eq!(responses[0].id, 1.into());
+                assert!(matches!(responses[0].payload, ResponsePayload::Success(_)));
+                assert_eq!(responses[1].id, 2.into());
+                match &responses[1].payload {
+                    ResponsePayload::Failure(error) => assert_eq!(error.code, -32601),
+                    _ => panic!("unexpected payload"),
+                }
+            }
+            _ => panic!("unexpected deserialization result"),
+        }
+    }
+
+    #[test]
+    fn deserializer_test_empty_batch_response() {
+        let deser = serde_json::from_str::<PubSubItem>("[]").unwrap();
+        assert!(matches!(deser, PubSubItem::BatchResponse(responses) if responses.is_empty()));
     }
 
     #[test]
