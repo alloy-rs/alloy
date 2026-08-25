@@ -13,23 +13,23 @@ repository = "https://github.com/alloy-rs/alloy"
 exclude = ["benches/", "tests/", "testdata/"]
 
 [workspace.lints.rust]
-missing-debug-implementations = "warn"
-missing-docs = "warn"
-unreachable-pub = "warn"
-unused-must-use = "deny"
-rust-2018-idioms = "deny"
-unnameable-types = "warn"
+missing_debug_implementations = "warn"
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_must_use = "deny"
+rust_2018_idioms = "deny"
+unnameable_types = "warn"
 
 [workspace.lints.rustdoc]
 all = "warn"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
-missing-const-for-fn = "warn"
-use-self = "warn"
-redundant-clone = "warn"
-large-enum-variant = "allow"
-result-large-err = "allow"
+missing_const_for_fn = "warn"
+use_self = "warn"
+redundant_clone = "warn"
+large_enum_variant = "allow"
+result_large_err = "allow"
 
 [workspace.dependencies]
 alloy-consensus = { version = "2.4.1", path = "crates/consensus", default-features = false }
