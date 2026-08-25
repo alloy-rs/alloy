@@ -17,7 +17,7 @@ missing_debug_implementations = "warn"
 missing_docs = "warn"
 unreachable_pub = "warn"
 unused_must_use = "deny"
-rust_2018_idioms = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
 unnameable_types = "warn"
 
 [workspace.lints.rustdoc]
