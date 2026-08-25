@@ -6,7 +6,7 @@ use alloy_json_rpc::RpcError;
 use alloy_network::{primitives::ReceiptResponse, BlockResponse, Network};
 use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
-    TxHash, B256, U64,
+    TxHash, B256,
 };
 use alloy_rpc_client::WeakClient;
 use alloy_transport::{utils::Spawnable, TransportError};
@@ -463,15 +463,10 @@ impl HeartbeatHandle {
     }
 }
 
-/// The result of rechecking unconfirmed transactions against their receipts.
+/// Transactions found to be mined by a receipt recheck, with the block number of their receipt.
 ///
 /// See [`Heartbeat::spawn_recheck`].
-struct RecheckResult {
-    /// The chain height reported by the server, if the request succeeded.
-    current_height: Option<u64>,
-    /// Transactions found to be mined, with the block number of their receipt.
-    mined: Vec<(B256, u64)>,
-}
+type RecheckResult = Vec<(B256, u64)>;
 
 /// A heartbeat task that receives blocks and watches for transactions.
 pub(crate) struct Heartbeat<N, S> {
@@ -695,8 +690,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         self.check_confirmations(block_height);
     }
 
-    /// Spawn a task that rechecks all unconfirmed transactions against their receipts, and
-    /// fetches the current chain height.
+    /// Spawn a task that rechecks all unconfirmed transactions against their receipts.
     ///
     /// The block stream is the primary confirmation path, but it can permanently miss a
     /// transaction's block when the RPC server returns stale block numbers or serves requests
@@ -704,21 +698,25 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// transaction would never resolve. The result is sent back to the heartbeat and applied in
     /// [`Self::apply_recheck`].
     ///
+    /// The chain height is deliberately *not* requested here: in the failure this recheck exists
+    /// to fix, the server's `eth_blockNumber` is the very thing that is stale, so asking it could
+    /// never release the watcher. A receipt in block `n` already proves the chain is at least `n`
+    /// blocks long, so the receipts carry the height themselves.
+    ///
     /// See <https://github.com/alloy-rs/alloy/issues/3881>.
     fn spawn_recheck(&self, tx: mpsc::Sender<RecheckResult>) {
         let client = self.client.clone();
         let hashes: Vec<B256> = self.unconfirmed.keys().copied().collect();
         let fut = async move {
-            let Some(client) = client.upgrade() else { return };
+            let mut mined = RecheckResult::new();
 
-            let current_height = client
-                .request::<_, U64>("eth_blockNumber", ())
-                .await
-                .inspect_err(|err| debug!(%err, "failed to fetch block number for recheck"))
-                .ok()
-                .map(|n| n.to::<u64>());
+            // The heartbeat waits for a reply before scheduling the next recheck, so a reply must
+            // be sent on every path, including this one.
+            let Some(client) = client.upgrade() else {
+                let _ = tx.send(mined).await;
+                return;
+            };
 
-            let mut mined = Vec::new();
             for hash in hashes {
                 match client
                     .request::<_, Option<N::ReceiptResponse>>("eth_getTransactionReceipt", (hash,))
@@ -734,19 +732,24 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                 }
             }
 
-            let _ = tx.send(RecheckResult { current_height, mined }).await;
+            let _ = tx.send(mined).await;
         };
         fut.spawn_task();
     }
 
     /// Apply the result of a receipt recheck: transactions found mined are moved out of the
-    /// unconfirmed set, and the reported chain height releases any transactions that have
+    /// unconfirmed set, and the resulting chain height releases any transactions that have
     /// enough confirmations.
-    fn apply_recheck(&mut self, result: RecheckResult) {
+    ///
+    /// The height is derived from the receipts themselves rather than from `eth_blockNumber`: a
+    /// receipt in block `n` proves the chain reached block `n`, which is a lower bound the stale
+    /// server cannot contradict. It is combined with the highest block the stream has seen.
+    fn apply_recheck(&mut self, mined: RecheckResult) {
         let known_height = self.past_blocks.back().map(|(height, _)| *height);
-        let current_height = result.current_height.max(known_height);
+        let receipt_height = mined.iter().map(|(_, number)| *number).max();
+        let current_height = receipt_height.max(known_height);
 
-        for (hash, received_at) in result.mined {
+        for (hash, received_at) in mined {
             let Some(mut watcher) = self.unconfirmed.remove(&hash) else { continue };
             debug!(tx=%hash, %received_at, "found receipt for unconfirmed transaction");
 
@@ -835,16 +838,18 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                         self.handle_new_block(block);
                     },
 
-                    // Apply the result of a receipt recheck.
+                    // Apply the result of a receipt recheck. The next recheck is scheduled from
+                    // here, once the previous one has landed, so that a recheck taking longer
+                    // than `recheck_period` does not immediately trigger the next.
                     Some(result) = recheck_rx.recv() => {
                         recheck_running = false;
+                        next_recheck = Instant::now() + recheck_period;
                         self.apply_recheck(result);
                     },
 
                     // Periodically recheck unconfirmed transactions against their receipts,
                     // in case the block stream missed the block they were mined in.
                     _ = recheck_sleep, if can_recheck => {
-                        next_recheck = Instant::now() + recheck_period;
                         recheck_running = true;
                         self.spawn_recheck(recheck_tx.clone());
                     },
@@ -1030,6 +1035,28 @@ mod tests {
     #[tokio::test]
     async fn watch_resolves_when_heartbeat_misses_block_multiple_confirmations() {
         watch_with_stale_rpc(3).await;
+    }
+
+    /// The scenario reported in <https://github.com/alloy-rs/alloy/issues/3881>: the server's
+    /// `eth_blockNumber` is stale and *never* catches up, so asking it for the chain height can
+    /// never release the watcher. The receipt itself proves the chain reached that block, so a
+    /// single-confirmation watcher must still resolve.
+    #[tokio::test]
+    async fn watch_resolves_when_block_number_never_catches_up() {
+        let rpc = stale_rpc_setup().await;
+
+        let builder = PendingTransactionBuilder::<Ethereum>::new(rpc.provider.clone(), rpc.tx_hash)
+            .with_required_confirmations(1);
+        let watch = tokio::spawn(builder.watch());
+
+        // Let the registration pre-check observe the transaction as pending before mining.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        // Mine the transaction's block, but leave the reported block number pinned at 0.
+        let _: String = rpc.provider.raw_request("evm_mine".into(), ()).await.unwrap();
+
+        let hash = expect_resolves(watch).await.unwrap();
+        assert_eq!(hash, rpc.tx_hash);
     }
 
     /// The raw [`PendingTransaction`] future returned by `register()` must also resolve: the
