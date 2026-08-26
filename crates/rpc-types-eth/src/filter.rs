@@ -760,9 +760,9 @@ impl Filter {
     /// This checks [`Log<LogData>`], the raw, primitive type carrying un-parsed
     /// [`LogData`].
     ///
-    /// - For un-parsed RPC logs [`crate::Log<LogData>`], see [`Self::rpc_matches`] and
-    ///   [`Self::rpc_matches_parsed`].
-    /// - For parsed [`Log`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    /// - For un-parsed RPC logs [`crate::Log<LogData>`] see [`Self::rpc_matches`].
+    /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    /// - For parsed RPC [`crate::Log<T>`]s see [`Self::rpc_matches_parsed`].
     pub fn matches(&self, log: &Log) -> bool {
         if !self.matches_address(log.address) {
             return false;
@@ -777,9 +777,9 @@ impl Filter {
     /// This function checks [`crate::Log<LogData>`], the RPC type carrying
     /// un-parsed [`LogData`].
     ///
+    /// - For un-parsed [`Log<LogData>`] see [`Self::matches`].
     /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
-    /// - For parsed [`crate::Log<T>`]s (e.g. those returned by a contract), see
-    ///   [`Self::rpc_matches`].
+    /// - For parsed RPC [`crate::Log<T>`]s see [`Self::rpc_matches_parsed`].
     pub fn rpc_matches(&self, log: &crate::Log) -> bool {
         self.matches_log_block(log) && self.matches(&log.inner)
     }
