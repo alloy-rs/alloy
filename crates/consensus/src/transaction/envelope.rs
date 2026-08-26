@@ -14,11 +14,9 @@ use alloy_primitives::{Bytes, Signature, B256};
 ///
 /// # Note:
 ///
-/// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
-/// Therefore we must ensure that encoding returns the precise byte-array that
-/// was decoded, preserving the presence or absence of the `TransactionType`
-/// flag.
+/// Represents an untagged legacy transaction, or a typed EIP-2718 variant. Binary decoding
+/// rejects a literal `0x00` type prefix; legacy transactions use the untagged fallback
+/// encoding.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub type TxEnvelope = EthereumTxEnvelope<TxEip4844Variant>;
@@ -468,11 +466,9 @@ impl TryFrom<EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransa
 ///
 /// # Note:
 ///
-/// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
-/// Therefore we must ensure that encoding returns the precise byte-array that
-/// was decoded, preserving the presence or absence of the `TransactionType`
-/// flag.
+/// Represents an untagged legacy transaction, or a typed EIP-2718 variant. Binary decoding
+/// rejects a literal `0x00` type prefix; legacy transactions use the untagged fallback
+/// encoding.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, TransactionEnvelope)]
@@ -1541,6 +1537,36 @@ mod tests {
             TxEnvelope::decode_2718_exact(&eip1559_encoded).unwrap(),
             eip1559_envelope,
             "a genuine type-tagged EIP-1559 transaction must still decode correctly"
+        );
+    }
+
+    #[test]
+    fn tagged_legacy_type_byte_is_rejected() {
+        // Per EIP-2718, `0x00` is not an assigned `TransactionType` -- legacy transactions are
+        // the untagged form. A literal `0x00` type-prefix byte must be rejected at decode, not
+        // accepted and silently re-encoded untagged (which would fail to round-trip).
+        let legacy = TxLegacy {
+            chain_id: None,
+            nonce: 0,
+            gas_limit: 21_000,
+            gas_price: 10,
+            to: Address::repeat_byte(0x11).into(),
+            value: U256::ZERO,
+            ..Default::default()
+        }
+        .into_signed(Signature::test_signature());
+        let legacy_envelope: TxEnvelope = legacy.into();
+        let untagged = legacy_envelope.encoded_2718();
+
+        // Sanity: the untagged bytes still decode fine and round-trip.
+        assert_eq!(TxEnvelope::decode_2718_exact(&untagged).unwrap(), legacy_envelope);
+
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&untagged);
+        assert!(
+            TxEnvelope::decode_2718_exact(&tagged).is_err(),
+            "a literal 0x00 type-prefix byte must be rejected, not accepted and re-encoded \
+             untagged"
         );
     }
 

@@ -699,4 +699,30 @@ mod fallback_decode_flatten_tests {
             other => panic!("expected Ethereum(Legacy(..)), got {other:?}"),
         }
     }
+
+    #[test]
+    fn flattened_variant_rejects_tagged_legacy_type_byte() {
+        // The tagged counterpart of the test above: a literal `0x00` type-prefix byte must be
+        // rejected through the flattened variant's `typed_decode` dispatch too, not just through
+        // the top-level envelope's.
+        let legacy = TxLegacy {
+            chain_id: None,
+            nonce: 2,
+            gas_limit: 1_000_000,
+            gas_price: 10_000_000_000,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            ..Default::default()
+        }
+        .into_signed(Signature::test_signature().with_parity(true));
+
+        let ethereum_envelope: TxEnvelope = legacy.into();
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&ethereum_envelope.encoded_2718());
+
+        assert!(
+            MyEnvelope::decode_2718_exact(&tagged).is_err(),
+            "a literal 0x00 type-prefix byte must be rejected through the flattened variant"
+        );
+    }
 }

@@ -543,6 +543,10 @@ where
     T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
 {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        if ty == 0 {
+            return Err(Eip2718Error::UnexpectedType(0));
+        }
+
         let decoded = T::rlp_decode_signed(buf)?;
 
         if decoded.ty() != ty {
