@@ -1085,6 +1085,33 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_2718_rejects_tagged_0x00_legacy() {
+        use alloy_eips::eip2718::Decodable2718;
+
+        let tx = TxLegacy {
+            chain_id: None,
+            nonce: 0,
+            gas_price: 10,
+            gas_limit: 21_000,
+            to: TxKind::Call([0x11; 20].into()),
+            value: U256::ZERO,
+            input: Default::default(),
+        };
+        let sig = Signature::new(U256::from(1), U256::from(2), false);
+        let untagged = tx.into_signed(sig).encoded_2718();
+
+        let mut tagged = vec![0x00u8];
+        tagged.extend_from_slice(&untagged);
+
+        // Untagged legacy must decode successfully
+        assert!(TxEnvelope::decode_2718_exact(&untagged).is_ok());
+
+        // Tagged 0x00 legacy must be rejected per EIP-2718
+        let res = TxEnvelope::decode_2718_exact(&tagged);
+        assert!(res.is_err(), "0x00-tagged legacy should be rejected, got: {res:?}");
+    }
+
+    #[test]
     #[cfg(feature = "k256")]
     // Test vector from https://etherscan.io/tx/0xce4dc6d7a7549a98ee3b071b67e970879ff51b5b95d1c340bacd80fa1e1aab31
     fn test_decode_live_1559_tx() {

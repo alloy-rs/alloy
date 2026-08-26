@@ -141,7 +141,6 @@ impl<Eip4844: RlpEcdsaDecodableTx> EthereumTypedTransaction<Eip4844> {
 
         let tx_type = buf.get_u8();
         match tx_type {
-            0x00 => Ok(Self::Legacy(TxLegacy::decode(buf)?)),
             0x01 => Ok(Self::Eip2930(TxEip2930::decode(buf)?)),
             0x02 => Ok(Self::Eip1559(TxEip1559::decode(buf)?)),
             0x03 => Ok(Self::Eip4844(Eip4844::rlp_decode(buf)?)),
