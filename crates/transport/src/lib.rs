@@ -23,7 +23,7 @@ pub mod mock;
 mod error;
 #[doc(hidden)]
 pub use error::TransportErrorKind;
-pub use error::{HttpError, TransportError, TransportResult};
+pub use error::{rpc_error_code, HttpError, TransportError, TransportResult};
 
 mod r#trait;
 pub use r#trait::Transport;

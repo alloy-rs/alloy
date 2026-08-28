@@ -10,6 +10,27 @@ pub type TransportError<ErrResp = Box<RawValue>> = RpcError<TransportErrorKind, 
 /// A transport result is a [`Result`] containing a [`TransportError`].
 pub type TransportResult<T, ErrResp = Box<RawValue>> = RpcResult<T, TransportErrorKind, ErrResp>;
 
+/// Returns the JSON-RPC error code reported by a transport error.
+///
+/// This extracts the code from both regular JSON-RPC error responses and JSON-RPC errors wrapped
+/// in an HTTP error response. HTTP response bodies may contain human-readable diagnostics after
+/// the JSON-RPC error.
+pub fn rpc_error_code(error: &TransportError) -> Option<i64> {
+    if let Some(response) = error.as_error_resp() {
+        return Some(response.code);
+    }
+    let TransportError::Transport(error) = error else { return None };
+    error.as_http_error().and_then(|error| rpc_error_code_from_body(&error.body))
+}
+
+fn rpc_error_code_from_body(body: &str) -> Option<i64> {
+    // Parse the first complete JSON value so that diagnostics appended by HTTP transports do not
+    // obscure an otherwise valid JSON-RPC error.
+    let value =
+        serde_json::Deserializer::from_str(body).into_iter::<serde_json::Value>().next()?.ok()?;
+    value.get("error").unwrap_or(&value).get("code")?.as_i64()
+}
+
 /// Transport error.
 ///
 /// All transport errors are wrapped in this enum.
@@ -419,5 +440,34 @@ mod tests {
         assert!(kind.is_http_error());
         assert_eq!(kind.retry_after(), Some(Duration::from_secs(52)));
         assert_eq!(kind.as_http_error().unwrap().status, 429);
+    }
+
+    #[test]
+    fn extracts_rpc_error_code() {
+        let error = TransportError::ErrorResp(ErrorPayload::invalid_request());
+        assert_eq!(rpc_error_code(&error), Some(-32600));
+
+        let error = TransportErrorKind::http_error(
+            400,
+            r#"{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"}}"#.to_owned(),
+        );
+        assert_eq!(rpc_error_code(&error), Some(-32601));
+    }
+
+    #[test]
+    fn extracts_rpc_error_code_from_http_body_with_diagnostics() {
+        let error = TransportErrorKind::http_error(
+            400,
+            "{\"code\":-32000,\"message\":\"Server error\"}\nupstream request failed".to_owned(),
+        );
+        assert_eq!(rpc_error_code(&error), Some(-32000));
+    }
+
+    #[test]
+    fn rpc_error_code_returns_none_for_unrelated_errors() {
+        assert_eq!(rpc_error_code(&TransportErrorKind::backend_gone()), None);
+
+        let error = TransportErrorKind::http_error(500, "not JSON".to_owned());
+        assert_eq!(rpc_error_code(&error), None);
     }
 }
