@@ -19,6 +19,8 @@ pub mod checksum;
 mod optional;
 pub use self::optional::*;
 
+pub mod lenient;
+
 pub mod quantity;
 
 /// Storage related helpers.
