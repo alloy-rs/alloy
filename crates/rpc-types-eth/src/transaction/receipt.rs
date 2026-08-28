@@ -1,6 +1,6 @@
 use crate::Log;
 use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType};
-use alloy_network_primitives::ReceiptResponse;
+use alloy_network_primitives::{ReceiptResponse, ReceiptResponseMut};
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_sol_types::SolEvent;
 
@@ -312,6 +312,12 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
     }
 }
 
+impl<T: TxReceipt<Log = Log>> ReceiptResponseMut for TransactionReceipt<T> {
+    fn set_contract_address(&mut self, contract_address: Option<Address>) {
+        self.contract_address = contract_address;
+    }
+}
+
 impl From<TransactionReceipt> for TransactionReceipt<ReceiptEnvelope<alloy_primitives::Log>> {
     fn from(value: TransactionReceipt) -> Self {
         value.into_primitives_receipt()
@@ -327,6 +333,60 @@ mod test {
     use arbitrary::Arbitrary;
     use rand::Rng;
     use similar_asserts::assert_eq;
+
+    /// Patches a receipt through the [`ReceiptResponseMut`] bound, so the test fails to compile
+    /// if the trait is unusable in generic code.
+    fn patch_contract_address<R: ReceiptResponseMut>(
+        receipt: &mut R,
+        contract_address: Option<Address>,
+    ) -> Option<Address> {
+        receipt.set_contract_address(contract_address);
+        // reachable through the `ReceiptResponse` supertrait
+        receipt.contract_address()
+    }
+
+    #[test]
+    fn set_contract_address_through_trait() {
+        // A CREATE2 deployment through a factory: the node reports no contract address, but the
+        // caller knows the deployed address.
+        let mut receipt = TransactionReceipt {
+            inner: ReceiptEnvelope::Eip1559(ReceiptWithBloom {
+                receipt: Receipt {
+                    status: Eip658Value::Eip658(true),
+                    cumulative_gas_used: 0,
+                    logs: Vec::new(),
+                },
+                logs_bloom: Bloom::ZERO,
+            }),
+            transaction_hash: B256::ZERO,
+            transaction_index: Some(0),
+            block_hash: None,
+            block_number: None,
+            gas_used: 0,
+            effective_gas_price: 0,
+            blob_gas_used: None,
+            blob_gas_price: None,
+            from: Address::ZERO,
+            to: None,
+            contract_address: None,
+        };
+        assert_eq!(receipt.contract_address(), None);
+
+        let deployed = address!("d937e6195ddf60b91de26a27c59492bbb48690fa");
+        assert_eq!(patch_contract_address(&mut receipt, Some(deployed)), Some(deployed));
+        assert_eq!(receipt.contract_address, Some(deployed));
+
+        assert_eq!(patch_contract_address(&mut receipt, None), None);
+        assert_eq!(receipt.contract_address, None);
+
+        // the `WithOtherFields` forwarding impl
+        #[cfg(feature = "serde")]
+        {
+            let mut receipt = alloy_serde::WithOtherFields::new(receipt);
+            assert_eq!(patch_contract_address(&mut receipt, Some(deployed)), Some(deployed));
+            assert_eq!(receipt.inner.contract_address, Some(deployed));
+        }
+    }
 
     #[test]
     fn transaction_receipt_arbitrary() {

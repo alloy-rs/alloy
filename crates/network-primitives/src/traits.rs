@@ -107,6 +107,25 @@ pub trait ReceiptResponse {
     }
 }
 
+/// Mutable access to the fields of a [`ReceiptResponse`].
+///
+/// This is a separate trait rather than additional methods on [`ReceiptResponse`] because that
+/// trait is implemented outside of alloy for network-specific receipt types, and adding required
+/// methods to it would be a breaking change for every external implementor. Implementing this
+/// trait is opt-in and can be done independently.
+///
+/// The primary use case is patching a receipt whose reported `contractAddress` is absent because
+/// the deployment happened through a factory, for example a CREATE2 deployment: the node reports
+/// no contract address, but the caller knows the deployed address and needs to write it back.
+pub trait ReceiptResponseMut: ReceiptResponse {
+    /// Sets the address of the created contract, or `None` if the transaction was not a
+    /// deployment.
+    ///
+    /// This takes an [`Option`] to mirror [`ReceiptResponse::contract_address`], so that the
+    /// field can also be cleared.
+    fn set_contract_address(&mut self, contract_address: Option<Address>);
+}
+
 /// Transaction JSON-RPC response. Aggregates transaction data with its block and signer context.
 ///
 /// The optional fee accessors split fixed-price and dynamic-fee consensus caps by transaction type
@@ -300,6 +319,12 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
 
     fn state_root(&self) -> Option<B256> {
         self.inner.state_root()
+    }
+}
+
+impl<T: ReceiptResponseMut> ReceiptResponseMut for WithOtherFields<T> {
+    fn set_contract_address(&mut self, contract_address: Option<Address>) {
+        self.inner.set_contract_address(contract_address);
     }
 }
 

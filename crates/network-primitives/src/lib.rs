@@ -11,7 +11,8 @@ extern crate alloc;
 
 mod traits;
 pub use traits::{
-    BlockResponse, HeaderResponse, ReceiptResponse, TransactionFailedError, TransactionResponse,
+    BlockResponse, HeaderResponse, ReceiptResponse, ReceiptResponseMut, TransactionFailedError,
+    TransactionResponse,
 };
 
 mod block;

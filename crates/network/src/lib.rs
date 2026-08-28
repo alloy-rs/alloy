@@ -33,7 +33,7 @@ pub use any::{
 pub use alloy_eips::eip2718;
 use alloy_eips::Typed2718;
 pub use alloy_network_primitives::{
-    self as primitives, BlockResponse, ReceiptResponse, TransactionResponse,
+    self as primitives, BlockResponse, ReceiptResponse, ReceiptResponseMut, TransactionResponse,
 };
 
 /// Captures type info for network-specific RPC requests/responses.

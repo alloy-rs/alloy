@@ -1,5 +1,5 @@
 use alloy_consensus_any::AnyReceiptEnvelope;
-use alloy_network_primitives::ReceiptResponse;
+use alloy_network_primitives::{ReceiptResponse, ReceiptResponseMut};
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_rpc_types_eth::{Log, TransactionReceipt};
 use alloy_serde::{OtherFields, WithOtherFields};
@@ -269,6 +269,12 @@ impl ReceiptResponse for AnyTransactionReceipt {
 
     fn state_root(&self) -> Option<B256> {
         self.0.inner.state_root()
+    }
+}
+
+impl ReceiptResponseMut for AnyTransactionReceipt {
+    fn set_contract_address(&mut self, contract_address: Option<Address>) {
+        self.0.inner.contract_address = contract_address;
     }
 }
 
