@@ -1,4 +1,4 @@
-use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
+use alloy_json_rpc::{ErrorPayload, ErrorResponseBody, Id, RpcError, RpcResult};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug, time::Duration};
@@ -218,6 +218,12 @@ impl HttpError {
     }
 }
 
+impl ErrorResponseBody for TransportErrorKind {
+    fn error_response_body(&self) -> Option<&str> {
+        self.as_http_error().map(|err| err.body.as_str())
+    }
+}
+
 /// Extension trait to implement methods for [`RpcError<TransportErrorKind, E>`].
 pub(crate) trait RpcErrorExt {
     /// Analyzes whether to retry the request depending on the error.
@@ -419,5 +425,34 @@ mod tests {
         assert!(kind.is_http_error());
         assert_eq!(kind.retry_after(), Some(Duration::from_secs(52)));
         assert_eq!(kind.as_http_error().unwrap().status, 429);
+    }
+
+    #[test]
+    fn extracts_rpc_error_code() {
+        let error: TransportError = TransportError::ErrorResp(ErrorPayload::invalid_request());
+        assert_eq!(error.error_code(), Some(-32600));
+
+        let error = TransportErrorKind::http_error(
+            400,
+            r#"{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"}}"#.to_owned(),
+        );
+        assert_eq!(error.error_code(), Some(-32601));
+    }
+
+    #[test]
+    fn extracts_rpc_error_code_from_http_body_with_diagnostics() {
+        let error = TransportErrorKind::http_error(
+            400,
+            "{\"code\":-32000,\"message\":\"Server error\"}\nupstream request failed".to_owned(),
+        );
+        assert_eq!(error.error_code(), Some(-32000));
+    }
+
+    #[test]
+    fn rpc_error_code_returns_none_for_unrelated_errors() {
+        assert_eq!(TransportErrorKind::backend_gone().error_code(), None);
+
+        let error = TransportErrorKind::http_error(500, "not JSON".to_owned());
+        assert_eq!(error.error_code(), None);
     }
 }
