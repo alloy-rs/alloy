@@ -27,6 +27,39 @@ pub fn guess_local_url(s: impl AsRef<str>) -> bool {
     _guess_local_url(s.as_ref())
 }
 
+/// Returns an RPC URL safe for display by retaining only its scheme, host, and port.
+///
+/// Username, password, path, query, and fragment are stripped, so provider URLs that carry an API
+/// key in any of those places can be included in error messages and logs. Input that does not parse
+/// as a URL is replaced with a `<redacted>` placeholder rather than echoed back, since a malformed
+/// URL may still contain a secret.
+///
+/// # Examples
+///
+/// ```
+/// use alloy_transport::utils::redact_url;
+///
+/// assert_eq!(
+///     redact_url("https://user:pass@example.com:8545/key?token=secret"),
+///     "https://example.com:8545/"
+/// );
+/// assert_eq!(redact_url("not a url"), "<redacted>");
+/// ```
+pub fn redact_url(s: impl AsRef<str>) -> String {
+    fn _redact_url(url: &str) -> String {
+        let Ok(mut url) = url.parse::<Url>() else {
+            return "<redacted>".to_owned();
+        };
+        let _ = url.set_username("");
+        let _ = url.set_password(None);
+        url.set_path("");
+        url.set_query(None);
+        url.set_fragment(None);
+        url.into()
+    }
+    _redact_url(s.as_ref())
+}
+
 #[doc(hidden)]
 pub trait Spawnable {
     /// Spawn the future as a task.
@@ -68,5 +101,23 @@ where
 {
     fn spawn_task(self) {
         tokio::task::spawn_local(self);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn redacts_url_credentials_and_resource() {
+        assert_eq!(
+            redact_url("https://user:password@example.com:8545/private-key?token=secret#fragment"),
+            "https://example.com:8545/"
+        );
+        assert_eq!(
+            redact_url("https://eth-mainnet.example.com/v2/api-key"),
+            "https://eth-mainnet.example.com/"
+        );
+        assert_eq!(redact_url("not a URL with secret"), "<redacted>");
     }
 }
