@@ -84,7 +84,7 @@ mod common;
 pub use common::Id;
 
 mod error;
-pub use error::{ErrorResponseBody, RpcError};
+pub use error::{ErrorResponseCode, RpcError};
 
 mod notification;
 pub use notification::{EthNotification, PubSubItem, SubId};

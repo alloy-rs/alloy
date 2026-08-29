@@ -2,15 +2,20 @@ use crate::{ErrorPayload, RpcRecv};
 use alloy_primitives::B256;
 use serde_json::value::RawValue;
 
-/// A transport error kind that may carry the raw body of an error response.
+/// A transport error that may carry a JSON-RPC error in its raw response body.
 ///
 /// [`RpcError`] is generic over its transport error, which is defined by downstream transport
-/// crates and therefore opaque here. This trait is the minimal hook those crates implement so that
-/// [`RpcError::error_code`] can look inside error responses that never made it through JSON-RPC
-/// decoding, such as a JSON-RPC error served with a non-2xx HTTP status.
-pub trait ErrorResponseBody {
-    /// Returns the raw body of the error response this error carries, if any.
-    fn error_response_body(&self) -> Option<&str>;
+/// crates and therefore opaque here. This trait is the hook those crates implement so that
+/// [`RpcError::error_code`] can reach JSON-RPC errors that never made it through JSON-RPC decoding,
+/// such as an error served with a non-2xx HTTP status.
+///
+/// Implementors own the parsing, since they own the wire format their body arrives in.
+pub trait ErrorResponseCode {
+    /// Returns the JSON-RPC error code carried in this error's raw response body, if the body
+    /// contains a JSON-RPC error at all.
+    ///
+    /// Returns `None` when the error carries no body, or when the body is not a JSON-RPC error.
+    fn error_response_code(&self) -> Option<i32>;
 }
 
 /// An RPC error.
@@ -161,7 +166,7 @@ impl<E, ErrResp> RpcError<E, ErrResp> {
     }
 }
 
-impl<E: ErrorResponseBody, ErrResp> RpcError<E, ErrResp> {
+impl<E: ErrorResponseCode, ErrResp> RpcError<E, ErrResp> {
     /// Returns the JSON-RPC error code this error reports, if any.
     ///
     /// This covers regular JSON-RPC error responses as well as JSON-RPC errors that a provider
@@ -175,8 +180,8 @@ impl<E: ErrorResponseBody, ErrResp> RpcError<E, ErrResp> {
     /// use alloy_json_rpc::{ErrorPayload, RpcError};
     ///
     /// # struct NoBody;
-    /// # impl alloy_json_rpc::ErrorResponseBody for NoBody {
-    /// #     fn error_response_body(&self) -> Option<&str> {
+    /// # impl alloy_json_rpc::ErrorResponseCode for NoBody {
+    /// #     fn error_response_code(&self) -> Option<i32> {
     /// #         None
     /// #     }
     /// # }
@@ -187,7 +192,7 @@ impl<E: ErrorResponseBody, ErrResp> RpcError<E, ErrResp> {
         if let Some(payload) = self.as_error_resp() {
             return Some(payload.code);
         }
-        error_code_from_body(self.as_transport_err()?.error_response_body()?)
+        self.as_transport_err()?.error_response_code().map(i64::from)
     }
 }
 
@@ -229,32 +234,21 @@ impl<E> RpcError<E, Box<RawValue>> {
     }
 }
 
-/// Extracts a JSON-RPC error code from a raw error response body.
-///
-/// Accepts both a full JSON-RPC error response and a bare error object.
-fn error_code_from_body(body: &str) -> Option<i64> {
-    // Transports may append human-readable diagnostics after the JSON-RPC body, so parse the first
-    // complete JSON value instead of requiring the entire body to be JSON.
-    let value =
-        serde_json::Deserializer::from_str(body).into_iter::<serde_json::Value>().next()?.ok()?;
-    value.get("error").unwrap_or(&value).get("code")?.as_i64()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// A stand-in transport error carrying an optional raw error-response body.
-    struct Body(Option<&'static str>);
+    /// A stand-in transport error that reports a JSON-RPC code from its response body.
+    struct Body(Option<i32>);
 
-    impl ErrorResponseBody for Body {
-        fn error_response_body(&self) -> Option<&str> {
+    impl ErrorResponseCode for Body {
+        fn error_response_code(&self) -> Option<i32> {
             self.0
         }
     }
 
-    fn transport(body: Option<&'static str>) -> RpcError<Body> {
-        RpcError::Transport(Body(body))
+    fn transport(code: Option<i32>) -> RpcError<Body> {
+        RpcError::Transport(Body(code))
     }
 
     #[test]
@@ -264,36 +258,22 @@ mod tests {
     }
 
     #[test]
-    fn error_code_from_error_response_body() {
-        let nested =
-            transport(Some(r#"{"jsonrpc":"2.0","error":{"code":-32601,"message":"no method"}}"#));
-        assert_eq!(nested.error_code(), Some(-32601));
-
-        let bare = transport(Some(r#"{"code":-32000,"message":"Server error"}"#));
-        assert_eq!(bare.error_code(), Some(-32000));
-    }
-
-    #[test]
-    fn error_code_ignores_trailing_diagnostics() {
-        let error = transport(Some(
-            "{\"code\":-32000,\"message\":\"Server error\"}\nupstream request failed",
-        ));
-        assert_eq!(error.error_code(), Some(-32000));
+    fn error_code_from_transport_body() {
+        assert_eq!(transport(Some(-32601)).error_code(), Some(-32601));
     }
 
     #[test]
     fn error_code_none_for_unrelated_errors() {
         assert_eq!(transport(None).error_code(), None);
-        assert_eq!(transport(Some("not JSON")).error_code(), None);
         assert_eq!(RpcError::<Body>::NullResp.error_code(), None);
     }
 
     #[test]
     fn error_code_is_callable_generically() {
-        fn code<E: ErrorResponseBody, ErrResp>(err: &RpcError<E, ErrResp>) -> Option<i64> {
+        fn code<E: ErrorResponseCode, ErrResp>(err: &RpcError<E, ErrResp>) -> Option<i64> {
             err.error_code()
         }
 
-        assert_eq!(code(&transport(Some(r#"{"code":-32602}"#))), Some(-32602));
+        assert_eq!(code(&transport(Some(-32602))), Some(-32602));
     }
 }

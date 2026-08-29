@@ -1,4 +1,4 @@
-use alloy_json_rpc::{ErrorPayload, ErrorResponseBody, Id, RpcError, RpcResult};
+use alloy_json_rpc::{ErrorPayload, ErrorResponseCode, Id, RpcError, RpcResult};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug, time::Duration};
@@ -218,10 +218,21 @@ impl HttpError {
     }
 }
 
-impl ErrorResponseBody for TransportErrorKind {
-    fn error_response_body(&self) -> Option<&str> {
-        self.as_http_error().map(|err| err.body.as_str())
+impl ErrorResponseCode for TransportErrorKind {
+    fn error_response_code(&self) -> Option<i32> {
+        error_code_from_body(&self.as_http_error()?.body)
     }
+}
+
+/// Extracts a JSON-RPC error code from a raw HTTP error response body.
+///
+/// Accepts both a full JSON-RPC error response and a bare error object.
+fn error_code_from_body(body: &str) -> Option<i32> {
+    // HTTP transports may append human-readable diagnostics after the JSON-RPC body, so parse the
+    // first complete JSON value instead of requiring the entire body to be JSON.
+    let value =
+        serde_json::Deserializer::from_str(body).into_iter::<serde_json::Value>().next()?.ok()?;
+    value.get("error").unwrap_or(&value).get("code")?.as_i64()?.try_into().ok()
 }
 
 /// Extension trait to implement methods for [`RpcError<TransportErrorKind, E>`].
@@ -437,6 +448,11 @@ mod tests {
             r#"{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"}}"#.to_owned(),
         );
         assert_eq!(error.error_code(), Some(-32601));
+
+        // a bare error object, without the enclosing response
+        let error =
+            TransportErrorKind::http_error(400, r#"{"code":-32000,"message":"err"}"#.to_owned());
+        assert_eq!(error.error_code(), Some(-32000));
     }
 
     #[test]
@@ -453,6 +469,10 @@ mod tests {
         assert_eq!(TransportErrorKind::backend_gone().error_code(), None);
 
         let error = TransportErrorKind::http_error(500, "not JSON".to_owned());
+        assert_eq!(error.error_code(), None);
+
+        // a code outside the JSON-RPC range is not a JSON-RPC error code
+        let error = TransportErrorKind::http_error(500, r#"{"code":4294967296}"#.to_owned());
         assert_eq!(error.error_code(), None);
     }
 }
