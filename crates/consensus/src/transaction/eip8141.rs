@@ -50,7 +50,6 @@ pub struct TxEip8141 {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_priority_fee_per_gas: u128,
     /// Max fee per gas.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_fee_per_gas: U256,
     /// Max fee per blob gas.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
