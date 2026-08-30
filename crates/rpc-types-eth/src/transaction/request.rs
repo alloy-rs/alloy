@@ -1345,7 +1345,7 @@ impl From<TxEip1559> for TransactionRequest {
         } = tx;
         Self {
             to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
-            max_fee_per_gas: Some(max_fee_per_gas.saturating_to()),
+            max_fee_per_gas: Some(max_fee_per_gas),
             max_priority_fee_per_gas: Some(max_priority_fee_per_gas),
             gas: Some(gas_limit),
             value: Some(value),
