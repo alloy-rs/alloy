@@ -51,7 +51,7 @@ pub struct TxEip8141 {
     pub max_priority_fee_per_gas: u128,
     /// Max fee per gas.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub max_fee_per_gas: u128,
+    pub max_fee_per_gas: U256,
     /// Max fee per blob gas.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_fee_per_blob_gas: u128,
@@ -335,7 +335,7 @@ impl Transaction for TxEip8141 {
 
     #[inline]
     fn max_fee_per_gas(&self) -> u128 {
-        self.max_fee_per_gas
+        self.max_fee_per_gas.saturating_to()
     }
 
     #[inline]
@@ -355,7 +355,7 @@ impl Transaction for TxEip8141 {
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         alloy_eips::eip1559::calc_effective_gas_price(
-            self.max_fee_per_gas,
+            self.max_fee_per_gas.saturating_to(),
             self.max_priority_fee_per_gas,
             base_fee,
         )
@@ -462,7 +462,7 @@ pub(super) mod serde_bincode_compat {
         frames: Cow<'a, [Frame]>,
         signatures: Cow<'a, [FrameSignature]>,
         max_priority_fee_per_gas: u128,
-        max_fee_per_gas: u128,
+        max_fee_per_gas: U256,
         max_fee_per_blob_gas: u128,
         blob_versioned_hashes: Cow<'a, [B256]>,
     }
@@ -681,10 +681,7 @@ mod tests {
             + calldata_len as u64 * 4 * FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN;
         assert_eq!(tx.calculate_gas_limit(), expected.max(floor));
         assert_eq!(tx.gas_limit(), expected.max(floor));
-        assert_eq!(
-            tx.calculate_calldata_floor(),
-            floor
-        );
+        assert_eq!(tx.calculate_calldata_floor(), floor);
     }
 
     #[test]
