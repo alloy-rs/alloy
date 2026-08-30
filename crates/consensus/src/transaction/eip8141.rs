@@ -434,7 +434,7 @@ impl Decodable for TxEip8141 {
 pub(super) mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_eips::eip8141::{Frame, FrameSignature};
-    use alloy_primitives::{Address, ChainId, B256};
+    use alloy_primitives::{Address, ChainId, B256, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
