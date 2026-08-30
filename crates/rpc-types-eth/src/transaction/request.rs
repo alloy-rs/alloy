@@ -1464,7 +1464,7 @@ impl From<TxEip8141> for TransactionRequest {
         } = tx;
         Self {
             from: Some(sender),
-            max_fee_per_gas: Some(max_fee_per_gas),
+            max_fee_per_gas: Some(max_fee_per_gas.saturating_to()),
             max_priority_fee_per_gas: Some(max_priority_fee_per_gas),
             max_fee_per_blob_gas: Some(max_fee_per_blob_gas),
             nonce: Some(nonce),
