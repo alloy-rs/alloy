@@ -718,7 +718,7 @@ impl TransactionRequest {
             frames: self.frames.expect("checked"),
             signatures: self.signatures.expect("checked"),
             max_priority_fee_per_gas: self.max_priority_fee_per_gas.expect("checked"),
-            max_fee_per_gas: self.max_fee_per_gas.expect("checked"),
+            max_fee_per_gas: U256::from(self.max_fee_per_gas.expect("checked")),
             max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked"),
             blob_versioned_hashes: self.blob_versioned_hashes.unwrap_or_default(),
         })
@@ -1345,7 +1345,7 @@ impl From<TxEip1559> for TransactionRequest {
         } = tx;
         Self {
             to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
-            max_fee_per_gas: Some(max_fee_per_gas),
+            max_fee_per_gas: Some(max_fee_per_gas.saturating_to()),
             max_priority_fee_per_gas: Some(max_priority_fee_per_gas),
             gas: Some(gas_limit),
             value: Some(value),
