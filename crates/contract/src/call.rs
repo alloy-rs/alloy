@@ -106,10 +106,6 @@ impl<N: Network> Future for SendSyncFut<'_, N> {
 /// A builder for sending a transaction via `eth_sendTransaction`, or calling a contract via
 /// `eth_call`.
 ///
-/// The builder can be `.await`ed directly, which is equivalent to invoking [`call`].
-/// Prefer using [`call`] when possible, as `await`ing the builder directly will consume it, and
-/// currently also boxes the future due to type system limitations.
-///
 /// A call builder can currently be instantiated in the following ways:
 /// - by [`sol!`][sol]-generated contract structs' methods (through the `#[sol(rpc)]` attribute)
 ///   ([`SolCallBuilder`]);
@@ -117,8 +113,6 @@ impl<N: Network> Future for SendSyncFut<'_, N> {
 /// - using [`CallBuilder::new_raw`] ([`RawCallBuilder`]).
 ///
 /// Each method represents a different way to decode the output of the contract call.
-///
-/// [`call`]: CallBuilder::call
 ///
 /// # Note
 ///
@@ -202,7 +196,7 @@ impl<N: Network> Future for SendSyncFut<'_, N> {
 ///
 /// [sol]: alloy_sol_types::sol
 #[derive(Clone)]
-#[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
+#[must_use = "call builders do nothing unless you `.call` or `.send` them"]
 pub struct CallBuilder<P, D, N: Network = Ethereum> {
     pub(crate) request: N::TransactionRequest,
     block: BlockId,
