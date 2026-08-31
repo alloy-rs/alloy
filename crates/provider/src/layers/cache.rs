@@ -673,10 +673,12 @@ mod tests {
                 *provider.send_transaction(req).await.expect("failed to send tx").tx_hash();
 
             let tx = provider.get_transaction_by_hash(tx_hash).await.unwrap(); // Received from RPC.
-            let tx2 = provider.get_transaction_by_hash(tx_hash).await.unwrap(); // Received from cache.
+            let tx2 = provider.get_transaction_by_hash(tx_hash).await.unwrap(); // Received from
+                                                                                // cache.
             assert_eq!(tx, tx2);
 
-            let receipt = provider.get_transaction_receipt(tx_hash).await.unwrap(); // Received from RPC.
+            let receipt = provider.get_transaction_receipt(tx_hash).await.unwrap(); // Received from
+                                                                                    // RPC.
             let receipt2 = provider.get_transaction_receipt(tx_hash).await.unwrap(); // Received from cache.
 
             assert_eq!(receipt, receipt2);
