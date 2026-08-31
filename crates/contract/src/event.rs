@@ -6,7 +6,7 @@ use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topi
 use alloy_sol_types::SolEvent;
 use alloy_transport::{BoxFuture, RpcError, TransportResult};
 use futures::Stream;
-use futures_util::StreamExt;
+use futures_util::{StreamExt, TryStreamExt};
 use std::{fmt, marker::PhantomData};
 
 /// Helper for managing the event filter before querying or streaming its logs
@@ -305,11 +305,7 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
             return Ok(vec![]);
         }
 
-        let all_results: Vec<TransportResult<(u64, Vec<Log>)>> =
-            self.chunk_stream(from, to).collect().await;
-
-        let mut resolved: Vec<(u64, Vec<Log>)> =
-            all_results.into_iter().collect::<TransportResult<Vec<_>>>()?;
+        let mut resolved: Vec<(u64, Vec<Log>)> = self.chunk_stream(from, to).try_collect().await?;
 
         resolved.sort_by_key(|(block_num, _)| *block_num);
         Ok(resolved.into_iter().flat_map(|(_, logs)| logs).collect())
@@ -790,6 +786,30 @@ mod tests {
 
         assert_eq!(chunked.len(), 3, "expected exactly 3 events across all chunks");
         assert_eq!(chunked, reference, "chunked result must match full-range query");
+    }
+
+    /// Verifies that a chunked query stops sending requests once a chunk's fallback fails
+    #[tokio::test]
+    async fn chunked_query_stops_querying_after_first_error() {
+        let asserter = Asserter::new();
+        let provider =
+            alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        let queued = 250;
+        for _ in 0..queued {
+            asserter.push_failure_msg("rate limit exceeded");
+        }
+
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
+        let chunked =
+            event.from_block(0u64).to_block(999u64).chunked().chunk_size(10).concurrent(5);
+
+        let err = chunked.get_logs_chunked().await.unwrap_err();
+        assert!(err.is_error_resp(), "expected the queued RPC error, got: {err}");
+
+        let requests = queued - asserter.read_q().len();
+        // A failing chunk costs two requests: the chunk query, then the first block of its fallback
+        assert_eq!(requests, 2, "only the first failing chunk should've been queried");
     }
 
     /// Verifies that `safe` and `finalized` fail with `NullResp` when the node has no such block
