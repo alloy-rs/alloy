@@ -1890,6 +1890,7 @@ mod tests {
     use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_consensus::{Transaction, TxEnvelope};
     use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
+    use alloy_eips::eip2718::Decodable2718;
     use alloy_network::{
         AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
     };
@@ -2861,7 +2862,7 @@ mod tests {
 
                 let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
 
-                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
+                let tx = TxEnvelope::decode_2718(&mut signed_tx.as_slice()).unwrap();
 
                 let signer = tx.recover_signer().unwrap();
 

@@ -1053,7 +1053,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{Recovered, SignableTransaction, SignerRecoverable},
+        transaction::{PooledTransaction, Recovered, SignableTransaction, SignerRecoverable},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
@@ -1067,7 +1067,7 @@ mod tests {
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
     use alloy_primitives::{hex, Address, Signature, U256};
-    use alloy_rlp::Decodable;
+    use alloy_rlp::{Decodable, Header};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]
@@ -1086,7 +1086,7 @@ mod tests {
         use alloy_primitives::address;
 
         let raw_tx = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
-        let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+        let res = TxEnvelope::decode_2718(&mut raw_tx.as_slice()).unwrap();
 
         assert_eq!(res.tx_type(), TxType::Eip1559);
 
@@ -1603,7 +1603,7 @@ mod tests {
         tagged.extend_from_slice(&envelope.encoded_2718());
         // Network framing of a typed payload: an RLP string header followed by the payload.
         let mut tagged_network = Vec::new();
-        alloy_rlp::Header { list: false, payload_length: tagged.len() }.encode(&mut tagged_network);
+        Header { list: false, payload_length: tagged.len() }.encode(&mut tagged_network);
         tagged_network.extend_from_slice(&tagged);
 
         assert!(matches!(
@@ -1629,6 +1629,19 @@ mod tests {
             <Signed<TxLegacy> as Decodable2718>::network_decode(&mut tagged_network.as_slice()),
             Err(Eip2718Error::UnexpectedType(0))
         ));
+        assert!(
+            PooledTransaction::decode_2718_exact(&tagged).is_err(),
+            "pooled envelopes must also reject a literal 0x00 type-prefix byte"
+        );
+
+        // The p2p representation wraps the direct EIP-2718 bytes in an RLP string. This used to
+        // bypass the fuzzer's `data.first() == Some(&0)` exclusion because its first byte is the
+        // RLP string header rather than the transaction type.
+        let mut pooled_network_input = tagged_network.as_slice();
+        assert!(
+            PooledTransaction::decode(&mut pooled_network_input).is_err(),
+            "pooled network envelopes must reject an RLP-wrapped 0x00-tagged legacy transaction"
+        );
     }
 
     #[cfg(feature = "serde")]
@@ -2233,7 +2246,7 @@ mod tests {
 
         // Test vector from https://etherscan.io/tx/0xce4dc6d7a7549a98ee3b071b67e970879ff51b5b95d1c340bacd80fa1e1aab31
         let raw_tx = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
-        let tx = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+        let tx = TxEnvelope::decode_2718(&mut raw_tx.as_slice()).unwrap();
 
         // Recover using the standard method
         let from_standard = tx.recover_signer().unwrap();
@@ -2295,7 +2308,7 @@ mod tests {
 
         // EIP-1559 tx
         let raw_eip1559 = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
-        let tx_eip1559 = TxEnvelope::decode(&mut raw_eip1559.as_slice()).unwrap();
+        let tx_eip1559 = TxEnvelope::decode_2718(&mut raw_eip1559.as_slice()).unwrap();
 
         // Use a single buffer for both recoveries
         let mut buf = alloc::vec::Vec::new();
