@@ -612,7 +612,9 @@ pub(crate) mod serde_bincode_compat {
 
         #[test]
         fn test_frame_receipt_bincode_roundtrip() {
-            use alloy_eips::eip8141::{FrameReceipt, FrameReceiptPayload, FrameStatus};
+            use alloy_eips::eip8141::{
+                FrameGasUsed, FrameReceipt, FrameReceiptPayload, FrameStatus,
+            };
             use alloy_primitives::{address, Log};
 
             #[serde_as]
@@ -629,7 +631,7 @@ pub(crate) mod serde_bincode_compat {
                         payer: address!("0x0000000000000000000000000000000000000001"),
                         frame_receipts: vec![FrameReceipt {
                             status: FrameStatus::Success,
-                            gas_used: 21,
+                            gas_used: FrameGasUsed { execution: 21, state: 0 },
                             logs: vec![Log::default()],
                         }],
                     },

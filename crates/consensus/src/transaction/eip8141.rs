@@ -6,7 +6,7 @@ use alloy_eips::{
     eip8141::{
         constants::{
             FRAME_TX_DATA_TOKEN_STANDARD_COST, FRAME_TX_INTRINSIC_COST, FRAME_TX_PER_FRAME_COST,
-            FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE,
+            FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE, TX_VALUE_COST,
         },
         Frame, FrameMode, FrameSignature, TransactionFees,
     },
@@ -203,6 +203,21 @@ impl TxEip8141 {
             .fold(0u64, |acc, signature| acc.saturating_add(signature.verification_gas()))
     }
 
+    /// Returns the intrinsic value-transfer cost for frames with an explicit non-sender target.
+    pub fn value_transfer_gas(&self) -> u64 {
+        self.frames.iter().fold(0u64, |acc, frame| {
+            let costs = if !frame.value.is_zero()
+                && !frame.target.is_empty()
+                && frame.target_address() != Some(self.sender)
+            {
+                TX_VALUE_COST
+            } else {
+                0
+            };
+            acc.saturating_add(costs)
+        })
+    }
+
     /// Returns the EIP-7623 token count of the frame transaction's charged byte fields.
     ///
     /// Only frame data and signature signer, message, and signature bytes are charged. RLP
@@ -237,6 +252,7 @@ impl TxEip8141 {
             .saturating_add((self.frames.len() as u64).saturating_mul(FRAME_TX_PER_FRAME_COST))
             .saturating_add(self.frame_calldata_tokens().saturating_mul(data_token_cost))
             .saturating_add(self.signature_verification_gas())
+            .saturating_add(self.value_transfer_gas())
             .saturating_add(self.total_frame_gas_limit())
     }
 
@@ -252,6 +268,7 @@ impl TxEip8141 {
         FRAME_TX_INTRINSIC_COST
             .saturating_add((self.frames.len() as u64).saturating_mul(FRAME_TX_PER_FRAME_COST))
             .saturating_add(self.signature_verification_gas())
+            .saturating_add(self.value_transfer_gas())
             // EIP-7976 charges every calldata byte as four floor tokens.
             .saturating_add(
                 self.frame_calldata_len()
@@ -435,7 +452,7 @@ impl Decodable for TxEip8141 {
 pub(super) mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_eips::eip8141::{Frame, FrameSignature, TransactionFees};
-    use alloy_primitives::{Address, ChainId, B256, U256};
+    use alloy_primitives::{Address, ChainId, B256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
@@ -710,7 +727,7 @@ mod tests {
         assert_eq!(tx.frame_calldata_len(), 0);
         assert_eq!(
             tx.calculate_calldata_floor(),
-            FRAME_TX_INTRINSIC_COST + FRAME_TX_PER_FRAME_COST
+            FRAME_TX_INTRINSIC_COST + FRAME_TX_PER_FRAME_COST + TX_VALUE_COST
         );
     }
 }

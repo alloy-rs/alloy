@@ -708,7 +708,9 @@ mod test {
     };
     use alloy_eips::{
         eip2718::{Decodable2718, Encodable2718},
-        eip8141::{constants::FRAME_TX_TYPE, FrameReceipt, FrameReceiptPayload, FrameStatus},
+        eip8141::{
+            constants::FRAME_TX_TYPE, FrameGasUsed, FrameReceipt, FrameReceiptPayload, FrameStatus,
+        },
     };
     use alloy_primitives::{Address, Bloom, Log};
 
@@ -783,7 +785,7 @@ mod test {
             payer: Address::repeat_byte(0x11),
             frame_receipts: alloc::vec![FrameReceipt {
                 status: FrameStatus::Success,
-                gas_used: 21,
+                gas_used: FrameGasUsed { execution: 21, state: 0 },
                 logs: alloc::vec![Log::default()],
             }],
         });
