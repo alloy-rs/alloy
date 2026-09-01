@@ -27,7 +27,8 @@ const DEFAULT_AVG_COST: u64 = 20u64;
 /// A Transport Layer that is responsible for retrying requests based on the
 /// error type. See [`TransportError`].
 ///
-/// TransportError: crate::error::TransportError
+/// A retry re-sends the complete [`RequestPacket`], including every member of
+/// a batch. See [`RetryBackoffService`] for replay-safety details.
 #[derive(Debug, Clone)]
 pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
     /// The maximum number of retries for rate limit errors.
@@ -44,6 +45,11 @@ pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
 
 impl RetryBackoffLayer {
     /// Creates a new retry layer with the given parameters and the default [RateLimitRetryPolicy].
+    ///
+    /// `max_rate_limit_retries` is the number of attempts after the initial
+    /// request. `initial_backoff` is a fixed base component in milliseconds unless the retry
+    /// policy supplies a hint; a compute-budget queue offset can add to the actual delay. It is not
+    /// an exponential base.
     pub const fn new(
         max_rate_limit_retries: u32,
         initial_backoff: u64,
@@ -190,6 +196,17 @@ impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
 
 /// A Tower Service used by the RetryBackoffLayer that is responsible for retrying requests based
 /// on the error type. See [TransportError] and [RateLimitRetryPolicy].
+///
+/// # Replay safety
+///
+/// Each retry sends the complete [`RequestPacket`] again with the same IDs.
+/// When the policy retries a batch response, successful members are replayed
+/// along with the failed member. Only the first error in response order decides
+/// whether a batch is retried; later retryable errors are ignored when an
+/// earlier error is not retryable. The remote server may also have processed a
+/// request whose response was lost. Use this service only for operations that
+/// are safe to execute more than once, or route non-idempotent methods around
+/// this layer.
 #[derive(Debug, Clone)]
 pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
@@ -297,8 +314,9 @@ where
                         current_queued_reqs,
                         ahead_in_queue,
                     );
-                    let total_backoff = next_backoff
-                        + std::time::Duration::from_secs(seconds_to_wait_for_compute_budget);
+                    let total_backoff = next_backoff.saturating_add(
+                        std::time::Duration::from_secs(seconds_to_wait_for_compute_budget),
+                    );
 
                     trace!(
                         total_backoff_millis = total_backoff.as_millis(),

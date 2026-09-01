@@ -4,6 +4,7 @@ use crate::{
     eip4844::{self, DATA_GAS_PER_BLOB},
     eip7594, eip7691, eip7892,
 };
+use alloy_primitives::U256;
 
 /// BLOB_BASE_COST represents the minimum execution gas required to include a blob in a block,
 /// as defined by [EIP-7918 (Decoupling Blob Gas from Execution Gas)](https://eips.ethereum.org/EIPS/eip-7918).
@@ -128,7 +129,7 @@ impl BlobParams {
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas`, `blob_gas_used` and `base_fee_per_gas`.
     #[inline]
-    pub const fn next_block_excess_blob_gas_osaka(
+    pub fn next_block_excess_blob_gas_osaka(
         &self,
         excess_blob_gas: u64,
         blob_gas_used: u64,
@@ -140,8 +141,8 @@ impl BlobParams {
             return 0;
         }
 
-        if self.blob_base_cost as u128 * base_fee_per_gas as u128
-            > DATA_GAS_PER_BLOB as u128 * self.calc_blob_fee(excess_blob_gas)
+        if U256::from(self.blob_base_cost) * U256::from(base_fee_per_gas)
+            > U256::from(DATA_GAS_PER_BLOB) * U256::from(self.calc_blob_fee(excess_blob_gas))
         {
             let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
                 / self.max_blob_count;
@@ -153,7 +154,7 @@ impl BlobParams {
 
     /// Calculates the blob fee for block based on its `excess_blob_gas`.
     #[inline]
-    pub const fn calc_blob_fee(&self, excess_blob_gas: u64) -> u128 {
+    pub fn calc_blob_fee(&self, excess_blob_gas: u64) -> u128 {
         eip4844::fake_exponential(self.min_blob_fee, excess_blob_gas as u128, self.update_fraction)
     }
 }

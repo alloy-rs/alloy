@@ -174,16 +174,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// ```no_run
     /// # use alloy_provider::Provider;
-    /// # use alloy_eips::BlockId;
-    /// # use alloy_rpc_types_eth::state::StateOverride;
-    /// # use alloy_transport::BoxTransport;
-    /// # async fn example<P: Provider>(
-    /// #    provider: P,
-    /// #    my_overrides: StateOverride
-    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<P: Provider>(provider: P) -> Result<(), Box<dyn std::error::Error>> {
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
-    /// let output = provider.call(tx).await?;
+    /// let output = provider.call(tx).latest().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -1346,22 +1340,29 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
     }
 
-    /// Broadcasts a transaction to the network.
+    /// Runs any configured transaction fillers and broadcasts a transaction to the network.
+    ///
+    /// The resulting [`SendableTx`] determines submission. An envelope is submitted with
+    /// `eth_sendRawTransaction`; a request builder uses `eth_sendTransaction`, so the node must be
+    /// able to sign for its `from` account. A [`WalletFiller`](crate::fillers::WalletFiller)
+    /// normally transforms a builder into a locally signed envelope, and custom fillers may do the
+    /// same.
     ///
     /// Returns a [`PendingTransactionBuilder`] which can be used to configure
-    /// how and when to await the transaction's confirmation.
+    /// how and when to await the transaction's confirmation. The default is one confirmation with
+    /// no timeout. [`PendingTransactionBuilder::watch`] waits and returns the transaction hash;
+    /// [`PendingTransactionBuilder::get_receipt`] waits and then fetches the receipt.
     ///
     /// # Examples
     ///
-    /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
+    /// See [`PendingTransactionBuilder`] for more examples.
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
-    /// let tx_hash = provider.send_transaction(tx)
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// let receipt = provider.send_transaction(tx)
     ///     .await?
     ///     .with_required_confirmations(2)
-    ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
-    ///     .watch()
+    ///     .get_receipt()
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -2093,7 +2094,7 @@ mod tests {
     #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
+        for url in ["wss://ethereum.reth.rs/ws"] {
             let _ = ProviderBuilder::<_, _, Ethereum>::default().connect(url).await.unwrap();
         }
     }

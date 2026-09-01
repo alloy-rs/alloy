@@ -102,6 +102,12 @@ impl AnyRpcBlock {
         self.0.into_inner()
     }
 
+    /// Consumes the type and returns the block header with the block's additional fields.
+    pub fn into_header_with_other(self) -> WithOtherFields<AnyRpcHeader> {
+        let WithOtherFields { inner, other } = self.0;
+        WithOtherFields { inner: inner.header, other }
+    }
+
     /// Attempts to convert the inner RPC [`Block`] into a consensus block.
     ///
     /// Returns an [`AnyConversionError`] if any of the conversions fail.
@@ -580,6 +586,23 @@ mod tests {
 
         let _block: alloy_consensus::Block<TxEnvelope, alloy_consensus::Header> =
             block.try_into().unwrap();
+    }
+
+    #[test]
+    fn preserves_other_fields_when_converting_any_block_into_header() {
+        let mut block = AnyRpcBlock::new(
+            Block::new(
+                AnyRpcHeader::from_sealed(AnyHeader::default().seal(B256::ZERO)),
+                BlockTransactions::Full(vec![]),
+            )
+            .into(),
+        );
+        block.other.insert("timestampMillis".to_owned(), serde_json::json!(1_234_567));
+
+        let header = block.into_header_with_other();
+
+        assert_eq!(header.hash, B256::ZERO);
+        assert_eq!(header.other.get("timestampMillis"), Some(&serde_json::json!(1_234_567)));
     }
 
     #[test]

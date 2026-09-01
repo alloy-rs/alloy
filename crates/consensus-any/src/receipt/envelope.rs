@@ -10,10 +10,8 @@ use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
-/// This enum distinguishes between tagged and untagged legacy receipts, as the
-/// in-protocol Merkle tree may commit to EITHER 0-prefixed or raw. Therefore
-/// we must ensure that encoding returns the precise byte-array that was
-/// decoded, preserving the presence or absence of the `TransactionType` flag.
+/// Represents legacy and typed EIP-2718 receipts. Type ID 0 is encoded as untagged legacy; this
+/// type does not preserve a literal `0x00` prefix.
 ///
 /// Transaction receipt payloads are specified in their respective EIPs.
 ///

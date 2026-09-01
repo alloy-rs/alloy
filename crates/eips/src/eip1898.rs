@@ -570,16 +570,18 @@ impl serde::Serialize for BlockId {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeStruct;
-
         match self {
             Self::Hash(RpcBlockHash { block_hash, require_canonical }) => {
-                let mut s = serializer.serialize_struct("BlockIdEip1898", 1)?;
-                s.serialize_field("blockHash", block_hash)?;
                 if let Some(require_canonical) = require_canonical {
+                    use serde::ser::SerializeStruct;
+
+                    let mut s = serializer.serialize_struct("BlockIdEip1898", 2)?;
+                    s.serialize_field("blockHash", block_hash)?;
                     s.serialize_field("requireCanonical", require_canonical)?;
+                    s.end()
+                } else {
+                    block_hash.serialize(serializer)
                 }
-                s.end()
             }
             Self::Number(num) => num.serialize(serializer),
         }
@@ -1660,8 +1662,41 @@ mod tests {
     fn serde_blockid_hash() {
         let block_id = BlockId::from(B256::default());
         let serialized = serde_json::to_string(&block_id).unwrap();
+        assert_eq!(
+            serialized,
+            "\"0x0000000000000000000000000000000000000000000000000000000000000000\""
+        );
         let deserialized: BlockId = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, block_id)
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_blockid_hash_param() {
+        let params = (BlockId::hash(HASH),);
+        let serialized = serde_json::to_string(&params).unwrap();
+        assert_eq!(
+            serialized,
+            "[\"0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9\"]"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_blockid_canonical_hash() {
+        for require_canonical in [true, false] {
+            let block_id = BlockId::from((HASH, Some(require_canonical)));
+            let serialized = serde_json::to_value(block_id).unwrap();
+            assert_eq!(
+                serialized,
+                serde_json::json!({
+                    "blockHash": HASH,
+                    "requireCanonical": require_canonical,
+                })
+            );
+            let deserialized: BlockId = serde_json::from_value(serialized).unwrap();
+            assert_eq!(deserialized, block_id);
+        }
     }
 
     #[test]
@@ -1695,7 +1730,10 @@ mod tests {
                 .unwrap();
         assert_eq!(BlockId::from(hash), block_id);
         let serialized = serde_json::to_string(&BlockId::from(hash)).unwrap();
-        assert_eq!("{\"blockHash\":\"0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3\"}", serialized)
+        assert_eq!(
+            "\"0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3\"",
+            serialized
+        )
     }
 
     #[test]

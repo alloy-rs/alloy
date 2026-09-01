@@ -67,7 +67,10 @@ tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
 either.workspace = true
-http = { workspace = true, optional = true }
+http.workspace = true
+
+[target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
+tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
 reqwest = { workspace = true, optional = true }
@@ -135,5 +138,5 @@ trace-api = ["dep:alloy-rpc-types-trace"]
 rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
 throttle = ["alloy-transport/throttle"]
-mev-api = ["dep:alloy-rpc-types-mev", "dep:http"]
-more-tuple-impls = []
+mev-api = ["dep:alloy-rpc-types-mev"]
+more-tuple-impls = ["alloy-sol-types/more-tuple-impls"]
