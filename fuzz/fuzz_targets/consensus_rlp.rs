@@ -7,6 +7,7 @@ use alloy_consensus::{
     TxEip7702, TxEnvelope, TxLegacy,
 };
 use alloy_consensus::transaction::PooledTransaction;
+use alloy_consensus_any::AnyReceiptEnvelope;
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip4895::{Withdrawal, Withdrawals},
@@ -21,15 +22,6 @@ type BasicTxEnvelope = EthereumTxEnvelope<TxEip4844>;
 type ExtendedTransaction = Extended<TxEip1559, TxEip2930>;
 type VariantPooledTransaction =
     EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>>;
-
-fn is_explicitly_tagged_legacy(data: &[u8]) -> bool {
-    // `EthereumTxEnvelope` currently normalizes an explicitly type-0-prefixed legacy transaction
-    // to the ordinary untagged legacy encoding: its `Legacy` variant does not retain whether the
-    // input contained the optional 0x00 prefix. That known representation ambiguity is therefore
-    // outside the injectivity oracle; all untagged legacy and nonzero typed encodings remain in
-    // scope.
-    data.first() == Some(&0)
-}
 
 fn assert_roundtrip<T>(data: &[u8], name: &str)
 where
@@ -108,6 +100,25 @@ where
     }
 }
 
+fn assert_2718_network_roundtrip<T>(data: &[u8], name: &str)
+where
+    T: Decodable2718 + Encodable2718,
+{
+    let mut input = data;
+    let Ok(decoded) = T::network_decode(&mut input) else {
+        return;
+    };
+
+    let consumed = data.len() - input.len();
+    let mut reencoded = Vec::with_capacity(consumed);
+    decoded.network_encode(&mut reencoded);
+    assert_eq!(
+        &reencoded[..],
+        &data[..consumed],
+        "{name}: network_encode(network_decode(bytes)) != bytes"
+    );
+}
+
 fn assert_7594_roundtrip<T>(data: &[u8], name: &str)
 where
     T: Decodable7594 + Encodable7594,
@@ -135,9 +146,6 @@ fn assert_fallback_error_preserves_cursor(data: &[u8]) {
 }
 
 fn assert_tx_envelope_roundtrips(data: &[u8]) {
-    if is_explicitly_tagged_legacy(data) {
-        return;
-    }
     assert_roundtrip::<BasicTxEnvelope>(data, "BasicTxEnvelope");
     assert_2718_roundtrip::<TxEnvelope>(data, "TxEnvelope");
 }
@@ -156,12 +164,12 @@ fn raw_roundtrip_properties(data: &[u8]) {
     assert_roundtrip::<TxEip1559>(data, "TxEip1559");
     assert_roundtrip::<TxEip4844>(data, "TxEip4844");
     assert_roundtrip::<TxEip7702>(data, "TxEip7702");
-    if !is_explicitly_tagged_legacy(data) {
-        assert_roundtrip::<PooledTransaction>(data, "PooledTransaction");
-        assert_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
-        assert_2718_roundtrip::<PooledTransaction>(data, "PooledTransaction");
-        assert_2718_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
-    }
+    assert_roundtrip::<PooledTransaction>(data, "PooledTransaction");
+    assert_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
+    assert_2718_roundtrip::<PooledTransaction>(data, "PooledTransaction");
+    assert_2718_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
+    assert_2718_network_roundtrip::<PooledTransaction>(data, "PooledTransaction");
+    assert_2718_network_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
     assert_roundtrip::<ExtendedTransaction>(data, "Extended<TxEip1559, TxEip2930>");
     assert_roundtrip::<BlobTransactionSidecar>(data, "BlobTransactionSidecar");
     assert_roundtrip::<BlobTransactionSidecarEip7594>(data, "BlobTransactionSidecarEip7594");
@@ -181,6 +189,14 @@ fn raw_roundtrip_properties(data: &[u8]) {
         data,
         "ReceiptWithBloom<EthereumReceipt>",
     );
+    assert_2718_roundtrip::<ReceiptWithBloom<EthereumReceipt>>(
+        data,
+        "ReceiptWithBloom<EthereumReceipt>",
+    );
+    assert_2718_network_roundtrip::<ReceiptWithBloom<EthereumReceipt>>(
+        data,
+        "ReceiptWithBloom<EthereumReceipt>",
+    );
     assert_roundtrip::<Receipts<ReceiptEnvelope>>(data, "Receipts<ReceiptEnvelope>");
     assert_roundtrip::<Receipts<ReceiptWithBloom<Receipt>>>(
         data,
@@ -192,6 +208,9 @@ fn raw_roundtrip_properties(data: &[u8]) {
     assert_sealed_header_roundtrip(data);
     assert_tx_envelope_roundtrips(data);
     assert_2718_roundtrip::<ReceiptEnvelope>(data, "ReceiptEnvelope");
+    assert_2718_network_roundtrip::<ReceiptEnvelope>(data, "ReceiptEnvelope");
+    assert_2718_roundtrip::<AnyReceiptEnvelope>(data, "AnyReceiptEnvelope");
+    assert_2718_network_roundtrip::<AnyReceiptEnvelope>(data, "AnyReceiptEnvelope");
     assert_fallback_error_preserves_cursor(data);
 }
 

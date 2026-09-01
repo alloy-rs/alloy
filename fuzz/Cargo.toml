@@ -9,6 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 alloy-consensus = { path = "../crates/consensus" }
+alloy-consensus-any = { path = "../crates/consensus-any" }
 alloy-eips = { path = "../crates/eips" }
 alloy-primitives = "1.6.1"
 alloy-rlp = "0.3.16"
@@ -16,6 +17,7 @@ libfuzzer-sys = "0.4"
 
 [build-dependencies]
 alloy-consensus = { path = "../crates/consensus" }
+alloy-consensus-any = { path = "../crates/consensus-any" }
 alloy-eips = { path = "../crates/eips" }
 alloy-primitives = "1.6.1"
 alloy-rlp = "0.3.16"

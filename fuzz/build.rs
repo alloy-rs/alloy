@@ -5,6 +5,7 @@ use alloy_consensus::{
     TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy,
 };
 use alloy_consensus::transaction::PooledTransaction;
+use alloy_consensus_any::AnyReceiptEnvelope;
 use alloy_eips::{
     eip4844::{Blob, Bytes48},
     eip2718::{Decodable2718, Encodable2718},
@@ -291,6 +292,72 @@ fn main() {
         "receipt-with-bloom-ethereum-empty",
         ReceiptWithBloom::<EthereumReceipt>::default(),
     );
+    let ethereum_legacy_receipt = ReceiptWithBloom::<EthereumReceipt>::default();
+    seed_2718(
+        &corpus_dir,
+        "receipt-with-bloom-ethereum-legacy-direct",
+        ethereum_legacy_receipt.clone(),
+    );
+    let mut tagged_ethereum_legacy_receipt = vec![0x00];
+    tagged_ethereum_legacy_receipt.extend_from_slice(&ethereum_legacy_receipt.encoded_2718());
+    assert!(
+        ReceiptWithBloom::<EthereumReceipt>::decode_2718_exact(
+            &tagged_ethereum_legacy_receipt
+        )
+        .is_err()
+    );
+    write_seed(
+        &corpus_dir,
+        "receipt-with-bloom-ethereum-tagged-legacy-rejected",
+        &tagged_ethereum_legacy_receipt,
+    );
+    let mut network_tagged_ethereum_legacy_receipt = Vec::new();
+    RlpHeader {
+        list: false,
+        payload_length: tagged_ethereum_legacy_receipt.len(),
+    }
+    .encode(&mut network_tagged_ethereum_legacy_receipt);
+    network_tagged_ethereum_legacy_receipt
+        .extend_from_slice(&tagged_ethereum_legacy_receipt);
+    assert!(
+        ReceiptWithBloom::<EthereumReceipt>::network_decode(
+            &mut network_tagged_ethereum_legacy_receipt.as_slice()
+        )
+        .is_err()
+    );
+    write_seed(
+        &corpus_dir,
+        "receipt-with-bloom-ethereum-network-tagged-legacy-rejected",
+        &network_tagged_ethereum_legacy_receipt,
+    );
+    let any_legacy_receipt =
+        AnyReceiptEnvelope { inner: ReceiptWithBloom::default(), r#type: 0 };
+    seed_2718(
+        &corpus_dir,
+        "any-receipt-envelope-legacy-empty",
+        any_legacy_receipt.clone(),
+    );
+    let mut tagged_any_legacy_receipt = vec![0x00];
+    tagged_any_legacy_receipt.extend_from_slice(&any_legacy_receipt.encoded_2718());
+    assert!(AnyReceiptEnvelope::decode_2718_exact(&tagged_any_legacy_receipt).is_err());
+    write_seed(
+        &corpus_dir,
+        "any-receipt-envelope-tagged-legacy-rejected",
+        &tagged_any_legacy_receipt,
+    );
+    let mut network_tagged_any_legacy_receipt = Vec::new();
+    RlpHeader { list: false, payload_length: tagged_any_legacy_receipt.len() }
+        .encode(&mut network_tagged_any_legacy_receipt);
+    network_tagged_any_legacy_receipt.extend_from_slice(&tagged_any_legacy_receipt);
+    assert!(
+        AnyReceiptEnvelope::network_decode(&mut network_tagged_any_legacy_receipt.as_slice())
+            .is_err()
+    );
+    write_seed(
+        &corpus_dir,
+        "any-receipt-envelope-network-tagged-legacy-rejected",
+        &network_tagged_any_legacy_receipt,
+    );
     seed(&corpus_dir, "receipts-envelope-empty", Receipts::<ReceiptEnvelope>::default());
     seed(
         &corpus_dir,
@@ -301,6 +368,29 @@ fn main() {
         &corpus_dir,
         "tx-envelope-legacy-default",
         TxEnvelope::Legacy(TxLegacy::default().into_signed(signature)),
+    );
+    let legacy = TxEnvelope::Legacy(TxLegacy::default().into_signed(signature));
+    let mut tagged_legacy = vec![0x00];
+    tagged_legacy.extend_from_slice(&legacy.encoded_2718());
+    assert!(
+        TxEnvelope::decode_2718_exact(&tagged_legacy).is_err(),
+        "an explicit type-0 prefix must not be accepted as a legacy transaction"
+    );
+    write_seed(&corpus_dir, "tx-envelope-tagged-legacy-rejected", &tagged_legacy);
+
+    let mut network_tagged_legacy =
+        Vec::with_capacity(RlpHeader { list: false, payload_length: tagged_legacy.len() }.length());
+    RlpHeader { list: false, payload_length: tagged_legacy.len() }
+        .encode(&mut network_tagged_legacy);
+    network_tagged_legacy.extend_from_slice(&tagged_legacy);
+    assert!(
+        TxEnvelope::decode(&mut network_tagged_legacy.as_slice()).is_err(),
+        "an RLP-wrapped type-0 prefix must not be accepted as a legacy network transaction"
+    );
+    write_seed(
+        &corpus_dir,
+        "tx-envelope-network-tagged-legacy-rejected",
+        &network_tagged_legacy,
     );
     seed_2718(
         &corpus_dir,
