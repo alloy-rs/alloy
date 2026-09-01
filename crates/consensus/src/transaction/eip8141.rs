@@ -8,7 +8,7 @@ use alloy_eips::{
             FRAME_TX_DATA_TOKEN_STANDARD_COST, FRAME_TX_INTRINSIC_COST, FRAME_TX_PER_FRAME_COST,
             FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE,
         },
-        Frame, FrameMode, FrameSignature,
+        Frame, FrameMode, FrameSignature, TransactionFees,
     },
     Decodable2718, Encodable2718, Typed2718,
 };
@@ -46,14 +46,8 @@ pub struct TxEip8141 {
     pub frames: Vec<Frame>,
     /// Signature entries available to validation and execution code.
     pub signatures: Vec<FrameSignature>,
-    /// Max priority fee per gas.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub max_priority_fee_per_gas: u128,
-    /// Max fee per gas.
-    pub max_fee_per_gas: U256,
-    /// Max fee per blob gas.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub max_fee_per_blob_gas: u128,
+    /// EIP-8141 fee parameters.
+    pub fees: TransactionFees,
     /// Blob versioned hashes.
     pub blob_versioned_hashes: Vec<B256>,
 }
@@ -73,9 +67,7 @@ impl TxEip8141 {
             + self.sender.length()
             + self.frames.length()
             + self.signatures.length()
-            + self.max_priority_fee_per_gas.length()
-            + self.max_fee_per_gas.length()
-            + self.max_fee_per_blob_gas.length()
+            + self.fees.length()
             + self.blob_versioned_hashes.length()
     }
 
@@ -86,9 +78,7 @@ impl TxEip8141 {
         self.sender.encode(out);
         self.frames.encode(out);
         self.signatures.encode(out);
-        self.max_priority_fee_per_gas.encode(out);
-        self.max_fee_per_gas.encode(out);
-        self.max_fee_per_blob_gas.encode(out);
+        self.fees.encode(out);
         self.blob_versioned_hashes.encode(out);
     }
 
@@ -100,9 +90,7 @@ impl TxEip8141 {
             sender: Decodable::decode(buf)?,
             frames: Decodable::decode(buf)?,
             signatures: Decodable::decode(buf)?,
-            max_priority_fee_per_gas: Decodable::decode(buf)?,
-            max_fee_per_gas: Decodable::decode(buf)?,
-            max_fee_per_blob_gas: Decodable::decode(buf)?,
+            fees: Decodable::decode(buf)?,
             blob_versioned_hashes: Decodable::decode(buf)?,
         })
     }
@@ -193,7 +181,19 @@ impl TxEip8141 {
 
     /// Returns the sum of all frame gas limits.
     pub fn total_frame_gas_limit(&self) -> u64 {
-        self.frames.iter().fold(0u64, |acc, frame| acc.saturating_add(frame.gas_limit))
+        self.frames.iter().fold(0u64, |acc, frame| {
+            acc.saturating_add(frame.limits.execution.saturating_add(frame.limits.state))
+        })
+    }
+
+    /// Returns the sum of all frame execution gas limits.
+    pub fn total_frame_execution_gas_limit(&self) -> u64 {
+        self.frames.iter().fold(0u64, |acc, frame| acc.saturating_add(frame.limits.execution))
+    }
+
+    /// Returns the sum of all frame state gas limits.
+    pub fn total_frame_state_gas_limit(&self) -> u64 {
+        self.frames.iter().fold(0u64, |acc, frame| acc.saturating_add(frame.limits.state))
     }
 
     /// Returns the gas charged for protocol validation of all signature entries.
@@ -243,7 +243,8 @@ impl TxEip8141 {
     /// Calculates the derived total gas limit of this frame transaction.
     pub fn calculate_gas_limit(&self) -> u64 {
         let standard = self.calculate_gas_limit_with_token_cost(FRAME_TX_DATA_TOKEN_STANDARD_COST);
-        standard.max(self.calculate_calldata_floor())
+        standard
+            .max(self.calculate_calldata_floor().saturating_add(self.total_frame_state_gas_limit()))
     }
 
     /// Calculates the calldata floor gas for this frame transaction.
@@ -334,28 +335,28 @@ impl Transaction for TxEip8141 {
 
     #[inline]
     fn max_fee_per_gas(&self) -> u128 {
-        self.max_fee_per_gas.saturating_to()
+        self.fees.max_fee_per_gas.saturating_to()
     }
 
     #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        Some(self.max_priority_fee_per_gas)
+        Some(self.fees.max_priority_fee_per_gas.saturating_to())
     }
 
     #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        Some(self.max_fee_per_blob_gas)
+        Some(self.fees.max_fee_per_blob_gas.saturating_to())
     }
 
     #[inline]
     fn priority_fee_or_price(&self) -> u128 {
-        self.max_priority_fee_per_gas
+        self.fees.max_priority_fee_per_gas.saturating_to()
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         alloy_eips::eip1559::calc_effective_gas_price(
-            self.max_fee_per_gas.saturating_to(),
-            self.max_priority_fee_per_gas,
+            self.fees.max_fee_per_gas.saturating_to(),
+            self.fees.max_priority_fee_per_gas.saturating_to(),
             base_fee,
         )
     }
@@ -433,7 +434,7 @@ impl Decodable for TxEip8141 {
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {
     use alloc::borrow::Cow;
-    use alloy_eips::eip8141::{Frame, FrameSignature};
+    use alloy_eips::eip8141::{Frame, FrameSignature, TransactionFees};
     use alloy_primitives::{Address, ChainId, B256, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
@@ -460,9 +461,7 @@ pub(super) mod serde_bincode_compat {
         sender: Address,
         frames: Cow<'a, [Frame]>,
         signatures: Cow<'a, [FrameSignature]>,
-        max_priority_fee_per_gas: u128,
-        max_fee_per_gas: U256,
-        max_fee_per_blob_gas: u128,
+        fees: TransactionFees,
         blob_versioned_hashes: Cow<'a, [B256]>,
     }
 
@@ -474,9 +473,7 @@ pub(super) mod serde_bincode_compat {
                 sender: value.sender,
                 frames: Cow::Borrowed(value.frames.as_slice()),
                 signatures: Cow::Borrowed(value.signatures.as_slice()),
-                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
-                max_fee_per_gas: value.max_fee_per_gas,
-                max_fee_per_blob_gas: value.max_fee_per_blob_gas,
+                fees: value.fees,
                 blob_versioned_hashes: Cow::Borrowed(value.blob_versioned_hashes.as_slice()),
             }
         }
@@ -490,9 +487,7 @@ pub(super) mod serde_bincode_compat {
                 sender: value.sender,
                 frames: value.frames.into_owned(),
                 signatures: value.signatures.into_owned(),
-                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
-                max_fee_per_gas: value.max_fee_per_gas,
-                max_fee_per_blob_gas: value.max_fee_per_blob_gas,
+                fees: value.fees,
                 blob_versioned_hashes: value.blob_versioned_hashes.into_owned(),
             }
         }
@@ -553,7 +548,9 @@ pub(super) mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_eips::eip8141::{ApprovalScope, FrameMode, SignatureScheme};
+    use alloy_eips::eip8141::{
+        ApprovalScope, FrameLimits, FrameMode, SignatureScheme, TransactionFees,
+    };
     use alloy_primitives::{Address, Bytes, U256};
 
     #[test]
@@ -566,7 +563,7 @@ mod tests {
                 mode: FrameMode::Verify,
                 flags: ApprovalScope::ExecutionAndPayment.into(),
                 target: Bytes::new(),
-                gas_limit: 21_000,
+                limits: FrameLimits { execution: 21_000, state: 0 },
                 value: U256::ZERO,
                 data: Bytes::new(),
             }],
@@ -576,9 +573,11 @@ mod tests {
                 msg: Bytes::new(),
                 signature: Bytes::copy_from_slice(&[0x22; 65]),
             }],
-            max_priority_fee_per_gas: 1,
-            max_fee_per_gas: 10,
-            max_fee_per_blob_gas: 0,
+            fees: TransactionFees {
+                max_priority_fee_per_gas: U256::from(1),
+                max_fee_per_gas: U256::from(10),
+                max_fee_per_blob_gas: U256::ZERO,
+            },
             blob_versioned_hashes: Vec::new(),
         };
 
@@ -603,9 +602,11 @@ mod tests {
                 msg: Bytes::new(),
                 signature: Bytes::copy_from_slice(&[0x22; 32]),
             }],
-            max_priority_fee_per_gas: 1,
-            max_fee_per_gas: 10,
-            max_fee_per_blob_gas: 0,
+            fees: TransactionFees {
+                max_priority_fee_per_gas: U256::from(1),
+                max_fee_per_gas: U256::from(10),
+                max_fee_per_blob_gas: U256::ZERO,
+            },
             blob_versioned_hashes: Vec::new(),
         };
 
@@ -645,11 +646,15 @@ mod tests {
         let tx = TxEip8141 {
             frames: vec![
                 Frame {
-                    gas_limit: 10,
+                    limits: FrameLimits { execution: 10, state: 3 },
                     data: Bytes::copy_from_slice(&[0, 1]),
                     ..Default::default()
                 },
-                Frame { gas_limit: 20, data: Bytes::copy_from_slice(&[2]), ..Default::default() },
+                Frame {
+                    limits: FrameLimits { execution: 20, state: 4 },
+                    data: Bytes::copy_from_slice(&[2]),
+                    ..Default::default()
+                },
             ],
             signatures: vec![FrameSignature {
                 scheme: SignatureScheme::Secp256k1,
@@ -668,9 +673,11 @@ mod tests {
             + 2 * FRAME_TX_PER_FRAME_COST
             + calldata_tokens * FRAME_TX_DATA_TOKEN_STANDARD_COST
             + 2_800
-            + 30;
+            + 37;
 
-        assert_eq!(tx.total_frame_gas_limit(), 30);
+        assert_eq!(tx.total_frame_gas_limit(), 37);
+        assert_eq!(tx.total_frame_execution_gas_limit(), 30);
+        assert_eq!(tx.total_frame_state_gas_limit(), 7);
         assert_eq!(tx.signature_verification_gas(), 2_800);
         assert_eq!(tx.frame_calldata_tokens(), calldata_tokens);
         assert_eq!(tx.frame_calldata_len(), calldata_len);
@@ -678,8 +685,9 @@ mod tests {
             + 2 * FRAME_TX_PER_FRAME_COST
             + 2_800
             + calldata_len as u64 * 4 * FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN;
-        assert_eq!(tx.calculate_gas_limit(), expected.max(floor));
-        assert_eq!(tx.gas_limit(), expected.max(floor));
+        let floor_with_state = floor + tx.total_frame_state_gas_limit();
+        assert_eq!(tx.calculate_gas_limit(), expected.max(floor_with_state));
+        assert_eq!(tx.gas_limit(), expected.max(floor_with_state));
         assert_eq!(tx.calculate_calldata_floor(), floor);
     }
 
@@ -690,7 +698,7 @@ mod tests {
                 mode: FrameMode::Sender,
                 flags: ApprovalScope::ExecutionAndPayment.into(),
                 target: Bytes::copy_from_slice(Address::repeat_byte(0x44).as_slice()),
-                gas_limit: u64::MAX,
+                limits: FrameLimits { execution: u64::MAX, state: u64::MAX },
                 value: U256::MAX,
                 data: Bytes::new(),
             }],

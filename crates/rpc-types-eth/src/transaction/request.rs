@@ -13,7 +13,7 @@ use alloy_consensus::{
 };
 use alloy_eips::{
     eip7702::SignedAuthorization,
-    eip8141::{Frame, FrameSignature},
+    eip8141::{Frame, FrameSignature, TransactionFees},
 };
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
@@ -717,9 +717,13 @@ impl TransactionRequest {
             sender: self.from.expect("checked"),
             frames: self.frames.expect("checked"),
             signatures: self.signatures.expect("checked"),
-            max_priority_fee_per_gas: self.max_priority_fee_per_gas.expect("checked"),
-            max_fee_per_gas: U256::from(self.max_fee_per_gas.expect("checked")),
-            max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked"),
+            fees: TransactionFees {
+                max_priority_fee_per_gas: U256::from(
+                    self.max_priority_fee_per_gas.expect("checked"),
+                ),
+                max_fee_per_gas: U256::from(self.max_fee_per_gas.expect("checked")),
+                max_fee_per_blob_gas: U256::from(self.max_fee_per_blob_gas.expect("checked")),
+            },
             blob_versioned_hashes: self.blob_versioned_hashes.unwrap_or_default(),
         })
     }
@@ -1456,17 +1460,15 @@ impl From<TxEip8141> for TransactionRequest {
             sender,
             frames,
             signatures,
-            max_priority_fee_per_gas,
-            max_fee_per_gas,
-            max_fee_per_blob_gas,
+            fees,
             blob_versioned_hashes,
             ..
         } = tx;
         Self {
             from: Some(sender),
-            max_fee_per_gas: Some(max_fee_per_gas.saturating_to()),
-            max_priority_fee_per_gas: Some(max_priority_fee_per_gas),
-            max_fee_per_blob_gas: Some(max_fee_per_blob_gas),
+            max_fee_per_gas: Some(fees.max_fee_per_gas.saturating_to()),
+            max_priority_fee_per_gas: Some(fees.max_priority_fee_per_gas.saturating_to()),
+            max_fee_per_blob_gas: Some(fees.max_fee_per_blob_gas.saturating_to()),
             nonce: Some(nonce),
             chain_id: Some(chain_id),
             blob_versioned_hashes: Some(blob_versioned_hashes),
