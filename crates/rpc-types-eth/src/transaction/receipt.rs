@@ -143,15 +143,8 @@ impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
 
 impl TransactionReceipt {
     /// Returns the status of the transaction.
-    pub const fn status(&self) -> bool {
-        match &self.inner {
-            ReceiptEnvelope::Eip1559(receipt)
-            | ReceiptEnvelope::Eip2930(receipt)
-            | ReceiptEnvelope::Eip4844(receipt)
-            | ReceiptEnvelope::Eip7702(receipt)
-            | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status.coerce_status(),
-            ReceiptEnvelope::Eip8141(_) => true,
-        }
+    pub fn status(&self) -> bool {
+        self.inner.status()
     }
 
     /// Returns the transaction type.

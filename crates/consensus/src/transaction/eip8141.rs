@@ -1,14 +1,17 @@
 use alloc::vec::Vec;
+use core::fmt;
 
 use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result, IsTyped2718},
+    eip7594::{Decodable7594, Encodable7594},
     eip7702::SignedAuthorization,
     eip8141::{
         constants::{
-            FRAME_TX_DATA_TOKEN_STANDARD_COST, FRAME_TX_INTRINSIC_COST, FRAME_TX_PER_FRAME_COST,
-            FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE, TX_VALUE_COST,
+            FRAME_FLAGS_MASK, FRAME_TX_DATA_TOKEN_STANDARD_COST, FRAME_TX_INTRINSIC_COST,
+            FRAME_TX_PER_FRAME_COST, FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE,
+            MAX_FRAMES, TX_VALUE_COST,
         },
-        Frame, FrameMode, FrameSignature, TransactionFees,
+        Frame, FrameMode, FrameSignature, SignatureScheme, TransactionFees,
     },
     Decodable2718, Encodable2718, Typed2718,
 };
@@ -52,11 +55,267 @@ pub struct TxEip8141 {
     pub blob_versioned_hashes: Vec<B256>,
 }
 
+/// An EIP-8141 frame transaction paired with its EIP-7594 blob sidecar.
+///
+/// The sidecar is network data and is excluded from the transaction hash. It is encoded after the
+/// canonical frame transaction payload when the transaction is propagated over the network.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TxEip8141WithSidecar<T> {
+    /// The canonical EIP-8141 transaction.
+    pub tx: TxEip8141,
+    /// The EIP-7594 blob sidecar.
+    pub sidecar: T,
+}
+
+impl<T> TxEip8141WithSidecar<T> {
+    /// Creates a frame transaction with a network sidecar.
+    pub const fn new(tx: TxEip8141, sidecar: T) -> Self {
+        Self { tx, sidecar }
+    }
+
+    /// Returns the canonical transaction.
+    pub const fn tx(&self) -> &TxEip8141 {
+        &self.tx
+    }
+
+    /// Returns the sidecar.
+    pub const fn sidecar(&self) -> &T {
+        &self.sidecar
+    }
+
+    /// Splits the transaction and sidecar.
+    pub fn into_parts(self) -> (TxEip8141, T) {
+        (self.tx, self.sidecar)
+    }
+}
+
+impl<T> Sealable for TxEip8141WithSidecar<T> {
+    fn hash_slow(&self) -> B256 {
+        self.tx.tx_hash()
+    }
+}
+
+impl<T> Typed2718 for TxEip8141WithSidecar<T> {
+    fn ty(&self) -> u8 {
+        FRAME_TX_TYPE
+    }
+}
+
+impl<T: Encodable7594> Encodable for TxEip8141WithSidecar<T> {
+    fn encode(&self, out: &mut dyn BufMut) {
+        let payload_length = self.tx.rlp_encoded_length() + self.sidecar.encode_7594_len();
+        Header { list: true, payload_length }.encode(out);
+        self.tx.rlp_encode(out);
+        self.sidecar.encode_7594(out);
+    }
+
+    fn length(&self) -> usize {
+        let payload_length = self.tx.rlp_encoded_length() + self.sidecar.encode_7594_len();
+        Header { list: true, payload_length }.length_with_payload()
+    }
+}
+
+impl<T: Encodable7594 + Send + Sync> Encodable2718 for TxEip8141WithSidecar<T> {
+    fn encode_2718_len(&self) -> usize {
+        self.length() + 1
+    }
+
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        out.put_u8(FRAME_TX_TYPE);
+        self.encode(out);
+    }
+}
+
+impl<T: Decodable7594 + Clone> Decodable for TxEip8141WithSidecar<T> {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        let remaining = buf.len();
+        let tx = TxEip8141::decode(buf)?;
+        let sidecar = T::decode_7594(buf)?;
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+        Ok(Self { tx, sidecar })
+    }
+}
+
+impl<T: Decodable7594 + Clone> Decodable2718 for TxEip8141WithSidecar<T> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        if ty != FRAME_TX_TYPE {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+        Self::decode(buf).map_err(Into::into)
+    }
+
+    fn fallback_decode(_buf: &mut &[u8]) -> Eip2718Result<Self> {
+        Err(Eip2718Error::UnexpectedType(FRAME_TX_TYPE))
+    }
+}
+
+impl<T: fmt::Debug + Send + Sync + 'static> Transaction for TxEip8141WithSidecar<T> {
+    fn chain_id(&self) -> Option<ChainId> {
+        self.tx.chain_id()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.tx.nonce()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.tx.gas_limit()
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        self.tx.gas_price()
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.tx.max_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.tx.max_priority_fee_per_gas()
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.tx.max_fee_per_blob_gas()
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.tx.priority_fee_or_price()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.tx.effective_gas_price(base_fee)
+    }
+
+    fn is_dynamic_fee(&self) -> bool {
+        self.tx.is_dynamic_fee()
+    }
+
+    fn kind(&self) -> TxKind {
+        self.tx.kind()
+    }
+
+    fn is_create(&self) -> bool {
+        self.tx.is_create()
+    }
+
+    fn value(&self) -> U256 {
+        self.tx.value()
+    }
+
+    fn input(&self) -> &Bytes {
+        self.tx.input()
+    }
+
+    fn access_list(&self) -> Option<&alloy_eips::eip2930::AccessList> {
+        self.tx.access_list()
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.tx.blob_versioned_hashes()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.tx.authorization_list()
+    }
+}
+
 impl TxEip8141 {
     /// Get the transaction type.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type() -> u8 {
         FRAME_TX_TYPE
+    }
+
+    /// Validates the structural constraints that can be checked without executing a frame.
+    ///
+    /// Signature validity itself is checked by the selected frame validation scheme. This method
+    /// only rejects malformed transactions that must not reach signing, pooling, or execution.
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.frames.is_empty() || self.frames.len() > MAX_FRAMES {
+            return Err("EIP-8141 transaction must contain between 1 and 64 frames");
+        }
+        if self.fees.max_priority_fee_per_gas > self.fees.max_fee_per_gas {
+            return Err("max priority fee exceeds max fee");
+        }
+        if !self.blob_versioned_hashes.is_empty() {
+            if self.fees.max_fee_per_blob_gas.is_zero() {
+                return Err("blob hashes require a non-zero blob fee");
+            }
+            if self.blob_versioned_hashes.iter().any(|hash| hash[0] != 0x01) {
+                return Err("invalid EIP-4844 versioned hash");
+            }
+        } else if !self.fees.max_fee_per_blob_gas.is_zero() {
+            return Err("blob fee is non-zero without blob hashes");
+        }
+
+        for signature in &self.signatures {
+            match signature.scheme {
+                SignatureScheme::Arbitrary => {
+                    if !signature.signer.is_empty() {
+                        return Err("arbitrary signatures must not contain signer metadata");
+                    }
+                }
+                SignatureScheme::Secp256k1 => {
+                    if signature.signer.len() != 20 || signature.signature.len() != 65 {
+                        return Err("invalid secp256k1 frame signature dimensions");
+                    }
+                }
+                SignatureScheme::P256 => {
+                    if signature.signer.len() != 20 || signature.signature.len() != 64 {
+                        return Err("invalid P-256 frame signature dimensions");
+                    }
+                }
+            }
+            if !signature.msg.is_empty()
+                && (signature.msg.len() != 32 || signature.msg.iter().all(|byte| *byte == 0))
+            {
+                return Err("frame signature message must be empty or a non-zero 32-byte digest");
+            }
+        }
+
+        let mut execution_gas = 0u64;
+        let mut state_gas = 0u64;
+        for (index, frame) in self.frames.iter().enumerate() {
+            if !frame.has_valid_target_encoding() {
+                return Err("invalid EIP-8141 frame target");
+            }
+            if frame.flags & !FRAME_FLAGS_MASK != 0 {
+                return Err("reserved EIP-8141 frame flag is set");
+            }
+            if !frame.value.is_zero() && frame.mode != FrameMode::Sender {
+                return Err("frame value is only valid in sender mode");
+            }
+            if frame.is_atomic_batch()
+                && (frame.mode == FrameMode::Verify
+                    || index + 1 == self.frames.len()
+                    || frame.allowed_scope() != 0)
+            {
+                return Err("invalid atomic EIP-8141 frame");
+            }
+            if frame.is_expiry_verifier() && !frame.has_valid_expiry_verifier_fields() {
+                return Err("invalid expiry verifier frame");
+            }
+            execution_gas = execution_gas
+                .checked_add(frame.limits.execution)
+                .ok_or("frame execution gas limit overflows u64")?;
+            state_gas = state_gas
+                .checked_add(frame.limits.state)
+                .ok_or("frame state gas limit overflows u64")?;
+        }
+
+        let _ = execution_gas.checked_add(state_gas).ok_or("frame gas limit overflows u64")?;
+        let _ = self
+            .signature_verification_gas()
+            .checked_add(self.value_transfer_gas())
+            .ok_or("frame intrinsic gas overflows u64")?;
+        Ok(())
     }
 
     /// Outputs the length of the transaction's fields, without an RLP header.
@@ -279,7 +538,7 @@ impl TxEip8141 {
 
     /// Calculates a heuristic for the in-memory size of the [TxEip8141] transaction.
     #[inline]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         size_of::<Self>()
             + self.frames.capacity() * size_of::<Frame>()
             + self.signatures.capacity() * size_of::<FrameSignature>()
@@ -701,7 +960,7 @@ mod tests {
         let floor = FRAME_TX_INTRINSIC_COST
             + 2 * FRAME_TX_PER_FRAME_COST
             + 2_800
-            + calldata_len as u64 * 4 * FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN;
+            + calldata_len * 4 * FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN;
         let floor_with_state = floor + tx.total_frame_state_gas_limit();
         assert_eq!(tx.calculate_gas_limit(), expected.max(floor_with_state));
         assert_eq!(tx.gas_limit(), expected.max(floor_with_state));

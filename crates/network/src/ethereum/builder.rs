@@ -196,7 +196,7 @@ mod tests {
         transaction::Recovered, BlobTransactionSidecar, SignableTransaction, TxEip1559, TxEnvelope,
         TxType, TypedTransaction,
     };
-    use alloy_eips::eip7702::Authorization;
+    use alloy_eips::{eip7702::Authorization, eip8141::Frame};
     use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U160, U256};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
     use std::str::FromStr;
@@ -225,7 +225,7 @@ mod tests {
             max_fee_per_gas: Some(2),
             max_fee_per_blob_gas: Some(0),
             transaction_type: Some(TxType::Eip8141 as u8),
-            frames: Some(Vec::new()),
+            frames: Some(vec![Frame::default()]),
             signatures: Some(Vec::new()),
             ..Default::default()
         };

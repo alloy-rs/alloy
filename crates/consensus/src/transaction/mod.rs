@@ -18,7 +18,7 @@ pub use eip7702::TxEip7702;
 
 /// [EIP-8141] frame transaction helpers and types.
 pub mod eip8141;
-pub use eip8141::TxEip8141;
+pub use eip8141::{TxEip8141, TxEip8141WithSidecar};
 
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]

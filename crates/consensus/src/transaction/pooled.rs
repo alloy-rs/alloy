@@ -2,10 +2,14 @@
 //! protocol.
 
 use super::EthereumTxEnvelope;
-use crate::{error::ValueError, Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
+use crate::{
+    error::ValueError, transaction::TxEip8141WithSidecar, Signed, TransactionEnvelope, TxEip1559,
+    TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxLegacy,
+};
 use alloy_eips::eip7594::{
     BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, Encodable7594,
 };
+use alloy_primitives::{Sealable, Sealed};
 
 /// Pooled transaction format for Osaka and later.
 ///
@@ -23,8 +27,149 @@ use alloy_eips::eip7594::{
 ///
 /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 /// [EIP-7594]: https://eips.ethereum.org/EIPS/eip-7594
-pub type PooledTransaction =
+pub type PooledBlobTransaction =
     EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>;
+
+/// Exact pooled transaction envelope for the current protocol.
+///
+/// EIP-4844 and EIP-8141 transactions carry an EIP-7594 sidecar in the p2p representation. The
+/// sidecar is never included in the transaction hash or block transaction trie.
+#[derive(Clone, Debug, TransactionEnvelope)]
+#[envelope(
+    alloy_consensus = crate,
+    tx_type_name = PooledTxType,
+    typed = PooledTypedTransaction,
+    arbitrary_cfg(feature = "arbitrary")
+)]
+pub enum PooledTransaction {
+    /// An untagged legacy transaction.
+    #[envelope(ty = 0)]
+    Legacy(Signed<TxLegacy>),
+    /// An EIP-2930 transaction.
+    #[envelope(ty = 1)]
+    Eip2930(Signed<TxEip2930>),
+    /// An EIP-1559 transaction.
+    #[envelope(ty = 2)]
+    Eip1559(Signed<TxEip1559>),
+    /// An EIP-4844 transaction with its EIP-7594 sidecar.
+    #[envelope(ty = 3)]
+    Eip4844(Signed<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>),
+    /// An EIP-7702 transaction.
+    #[envelope(ty = 4)]
+    Eip7702(Signed<TxEip7702>),
+    /// An EIP-8141 transaction with its EIP-7594 sidecar.
+    #[envelope(ty = 6)]
+    Eip8141(Sealed<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>>),
+}
+
+impl PooledTransaction {
+    /// Returns the transaction type.
+    pub const fn tx_type(&self) -> crate::TxType {
+        match self {
+            Self::Legacy(_) => crate::TxType::Legacy,
+            Self::Eip2930(_) => crate::TxType::Eip2930,
+            Self::Eip1559(_) => crate::TxType::Eip1559,
+            Self::Eip4844(_) => crate::TxType::Eip4844,
+            Self::Eip7702(_) => crate::TxType::Eip7702,
+            Self::Eip8141(_) => crate::TxType::Eip8141,
+        }
+    }
+
+    /// Returns true if this is a legacy transaction.
+    pub const fn is_legacy(&self) -> bool {
+        matches!(self, Self::Legacy(_))
+    }
+
+    /// Returns true if this is an EIP-2930 transaction.
+    pub const fn is_eip2930(&self) -> bool {
+        matches!(self, Self::Eip2930(_))
+    }
+
+    /// Returns true if this is an EIP-1559 transaction.
+    pub const fn is_eip1559(&self) -> bool {
+        matches!(self, Self::Eip1559(_))
+    }
+
+    /// Returns true if this is an EIP-4844 transaction.
+    pub const fn is_eip4844(&self) -> bool {
+        matches!(self, Self::Eip4844(_))
+    }
+
+    /// Returns true if this is an EIP-7702 transaction.
+    pub const fn is_eip7702(&self) -> bool {
+        matches!(self, Self::Eip7702(_))
+    }
+
+    /// Returns true if this is an EIP-8141 transaction.
+    pub const fn is_eip8141(&self) -> bool {
+        matches!(self, Self::Eip8141(_))
+    }
+
+    /// Clears blob data while retaining commitments and proofs for eth/72 propagation.
+    pub fn clear_eip7594_blobs(&mut self) {
+        match self {
+            Self::Eip4844(tx) => tx.tx_mut().sidecar.clear_eip7594_blobs(),
+            Self::Eip8141(tx) => tx.inner_mut().sidecar.clear_eip7594_blobs(),
+            _ => {}
+        }
+    }
+
+    /// Returns the EIP-4844 pooled transaction, if this is one.
+    pub const fn as_eip4844(
+        &self,
+    ) -> Option<&Signed<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>> {
+        match self {
+            Self::Eip4844(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Returns the EIP-8141 pooled transaction, if this is one.
+    pub const fn as_eip8141(
+        &self,
+    ) -> Option<&Sealed<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>>> {
+        match self {
+            Self::Eip8141(tx) => Some(tx),
+            _ => None,
+        }
+    }
+}
+
+impl From<Signed<TxLegacy>> for PooledTransaction {
+    fn from(value: Signed<TxLegacy>) -> Self {
+        Self::Legacy(value)
+    }
+}
+
+impl From<Signed<TxEip2930>> for PooledTransaction {
+    fn from(value: Signed<TxEip2930>) -> Self {
+        Self::Eip2930(value)
+    }
+}
+
+impl From<Signed<TxEip1559>> for PooledTransaction {
+    fn from(value: Signed<TxEip1559>) -> Self {
+        Self::Eip1559(value)
+    }
+}
+
+impl From<Signed<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>> for PooledTransaction {
+    fn from(value: Signed<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>) -> Self {
+        Self::Eip4844(value)
+    }
+}
+
+impl From<Signed<TxEip7702>> for PooledTransaction {
+    fn from(value: Signed<TxEip7702>) -> Self {
+        Self::Eip7702(value)
+    }
+}
+
+impl From<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>> for PooledTransaction {
+    fn from(value: TxEip8141WithSidecar<BlobTransactionSidecarEip7594>) -> Self {
+        Self::Eip8141(value.seal_slow())
+    }
+}
 
 impl EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>> {
     /// Clears EIP-7594 blob payloads while retaining commitments and cell proofs.

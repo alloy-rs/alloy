@@ -7,9 +7,11 @@ use alloc::{
     vec::Vec,
 };
 use alloy_consensus::{
-    error::ValueError, transaction::Recovered, BlobTransactionSidecarVariant, SignableTransaction,
-    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEip8141,
-    TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
+    error::ValueError,
+    transaction::{Recovered, TxEip8141WithSidecar},
+    BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, SignableTransaction, TxEip1559,
+    TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEip8141, TxEnvelope,
+    TxLegacy, TxType, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip7702::SignedAuthorization,
@@ -149,6 +151,13 @@ pub struct TransactionRequest {
     /// Signature entries for EIP-8141 frame transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub signatures: Option<Vec<FrameSignature>>,
+    /// Lossless fee values retained when an EIP-8141 transaction is converted back into a
+    /// request. The public RPC fee fields remain `u128` for compatibility with other transaction
+    /// types, so this metadata prevents a Rust transaction/request roundtrip from truncating a
+    /// valid 256-bit EIP-8141 fee.
+    #[doc(hidden)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub eip8141_fees: Option<TransactionFees>,
 }
 
 impl TransactionRequest {
@@ -202,6 +211,7 @@ impl TransactionRequest {
             authorization_list,
             frames: None,
             signatures: None,
+            eip8141_fees: None,
         }
     }
 
@@ -676,7 +686,8 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_8141` to
     /// check if the request can be built.
-    pub fn build_8141(self) -> Result<TxEip8141, ValueError<Self>> {
+    pub fn build_8141(mut self) -> Result<TxEip8141, ValueError<Self>> {
+        self.populate_blob_hashes();
         if self.from.is_none() {
             return Err(ValueError::new(self, "Missing 'sender' field for Eip8141 transaction."));
         }
@@ -711,21 +722,42 @@ impl TransactionRequest {
             ));
         }
 
-        Ok(TxEip8141 {
+        let request = self.clone();
+        let tx = TxEip8141 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: self.nonce.expect("checked"),
             sender: self.from.expect("checked"),
             frames: self.frames.expect("checked"),
             signatures: self.signatures.expect("checked"),
-            fees: TransactionFees {
+            fees: self.eip8141_fees.unwrap_or(TransactionFees {
                 max_priority_fee_per_gas: U256::from(
                     self.max_priority_fee_per_gas.expect("checked"),
                 ),
                 max_fee_per_gas: U256::from(self.max_fee_per_gas.expect("checked")),
                 max_fee_per_blob_gas: U256::from(self.max_fee_per_blob_gas.expect("checked")),
-            },
+            }),
             blob_versioned_hashes: self.blob_versioned_hashes.unwrap_or_default(),
-        })
+        };
+        tx.validate().map_err(|error| ValueError::new(request, error))?;
+        Ok(tx)
+    }
+
+    /// Builds an EIP-8141 transaction with its EIP-7594 network sidecar.
+    ///
+    /// The sidecar is excluded from the transaction hash and block transaction encoding. Use this
+    /// form when constructing the pooled transaction that is propagated over the network.
+    pub fn build_8141_with_sidecar(
+        &self,
+    ) -> Result<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>, ValueError<Self>> {
+        let Some(sidecar) = self.sidecar.as_ref().and_then(|sidecar| sidecar.as_eip7594()).cloned()
+        else {
+            return Err(ValueError::new(
+                self.clone(),
+                "Missing EIP-7594 'sidecar' field for Eip8141 transaction.",
+            ));
+        };
+        let tx = self.clone().build_8141()?;
+        Ok(TxEip8141WithSidecar::new(tx, sidecar))
     }
 
     /// Ensures `to` field is set to an address which is required by:
@@ -826,7 +858,6 @@ impl TransactionRequest {
                 self.value = None;
                 self.input = Default::default();
                 self.access_list = None;
-                self.sidecar = None;
                 self.authorization_list = None;
             }
         }
@@ -1139,6 +1170,10 @@ impl TransactionRequest {
         }
         if self.signatures.is_none() {
             missing.push("signatures");
+        }
+
+        if missing.is_empty() && self.clone().build_8141().is_err() {
+            missing.push("valid_eip8141_fields");
         }
 
         if missing.is_empty() {
@@ -1475,8 +1510,18 @@ impl From<TxEip8141> for TransactionRequest {
             transaction_type: Some(ty),
             frames: Some(frames),
             signatures: Some(signatures),
+            eip8141_fees: Some(fees),
             ..Default::default()
         }
+    }
+}
+
+impl From<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>> for TransactionRequest {
+    fn from(tx: TxEip8141WithSidecar<BlobTransactionSidecarEip7594>) -> Self {
+        let (tx, sidecar) = tx.into_parts();
+        let mut request: Self = tx.into();
+        request.sidecar = Some(sidecar.into());
+        request
     }
 }
 
@@ -1721,6 +1766,7 @@ pub(super) mod serde_bincode_compat {
                     .map(|list| list.into_iter().map(Into::into).collect()),
                 frames: value.frames.map(Cow::into_owned),
                 signatures: value.signatures.map(Cow::into_owned),
+                eip8141_fees: None,
             }
         }
     }

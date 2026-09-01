@@ -1,5 +1,8 @@
-use crate::{Network, NetworkWallet, TxSigner};
-use alloy_consensus::{SignableTransaction, Signed};
+use crate::{
+    any::{AnyNetwork, AnyTxEnvelope, AnyTypedTransaction},
+    Network, NetworkWallet, TxSigner,
+};
+use alloy_consensus::{Sealable, SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_primitives::{map::AddressHashMap, Address, Signature};
 use std::{fmt::Debug, sync::Arc};
 
@@ -120,11 +123,7 @@ impl EthereumWallet {
     }
 }
 
-impl<N: Network> NetworkWallet<N> for EthereumWallet
-where
-    N::TxEnvelope: From<Signed<N::UnsignedTx>>,
-    N::UnsignedTx: SignableTransaction<Signature>,
-{
+impl NetworkWallet<Ethereum> for EthereumWallet {
     fn default_signer_address(&self) -> Address {
         self.default
     }
@@ -140,8 +139,49 @@ where
     async fn sign_transaction_from(
         &self,
         sender: Address,
-        mut tx: N::UnsignedTx,
-    ) -> alloy_signer::Result<N::TxEnvelope> {
+        mut tx: TypedTransaction,
+    ) -> alloy_signer::Result<TxEnvelope> {
+        if let TypedTransaction::Eip8141(tx) = &tx {
+            if tx.sender != sender {
+                return Err(alloy_signer::Error::other(format!(
+                    "frame transaction sender {sender} does not match its sender field {}",
+                    tx.sender
+                )));
+            }
+            return Ok(TxEnvelope::Eip8141(tx.clone().seal_slow()));
+        }
+        let sig = self.sign_transaction_inner(sender, &mut tx).await?;
+        Ok(tx.into_signed(sig).into())
+    }
+}
+
+impl NetworkWallet<AnyNetwork> for EthereumWallet {
+    fn default_signer_address(&self) -> Address {
+        self.default
+    }
+
+    fn has_signer_for(&self, address: &Address) -> bool {
+        self.signers.contains_key(address)
+    }
+
+    fn signer_addresses(&self) -> impl Iterator<Item = Address> {
+        self.signers.keys().copied()
+    }
+
+    async fn sign_transaction_from(
+        &self,
+        sender: Address,
+        mut tx: AnyTypedTransaction,
+    ) -> alloy_signer::Result<AnyTxEnvelope> {
+        if let AnyTypedTransaction::Ethereum(TypedTransaction::Eip8141(tx)) = &tx {
+            if tx.sender != sender {
+                return Err(alloy_signer::Error::other(format!(
+                    "frame transaction sender {sender} does not match its sender field {}",
+                    tx.sender
+                )));
+            }
+            return Ok(AnyTxEnvelope::Ethereum(TxEnvelope::Eip8141(tx.clone().seal_slow())));
+        }
         let sig = self.sign_transaction_inner(sender, &mut tx).await?;
         Ok(tx.into_signed(sig).into())
     }

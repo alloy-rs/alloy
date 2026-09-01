@@ -1124,8 +1124,10 @@ pub mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(any(feature = "secp256k1", feature = "k256"))]
+    use crate::transaction::SignerRecoverable;
     use crate::{
-        transaction::{Recovered, SignableTransaction, SignerRecoverable},
+        transaction::{Recovered, SignableTransaction},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;

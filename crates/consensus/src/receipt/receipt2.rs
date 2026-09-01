@@ -122,7 +122,7 @@ impl<T, L> EthereumReceipt<T, L> {
 
 impl<T, L> TxReceipt for EthereumReceipt<T, L>
 where
-    EthereumReceipt<T, L>: Clone + Debug + PartialEq + Eq + Send + Sync,
+    Self: Clone + Debug + PartialEq + Eq + Send + Sync,
     L: AsRef<Log> + Send + Sync,
 {
     type Log = L;
@@ -134,7 +134,10 @@ where
     fn status(&self) -> bool {
         match self {
             Self::Standard(receipt) => receipt.success,
-            Self::Frame { .. } => true,
+            Self::Frame { payload, .. } => payload
+                .frame_receipts
+                .iter()
+                .all(|frame| matches!(frame.status, alloy_eips::eip8141::FrameStatus::Success)),
         }
     }
 
@@ -379,13 +382,10 @@ where
 {
     fn from(value: ReceiptEnvelope<T>) -> Self {
         match value {
-            ReceiptEnvelope::Eip8141(payload) => {
+            ReceiptEnvelope::Eip8141(receipt) => {
+                let super::envelope::FrameReceiptEnvelope { payload, logs } = receipt;
                 let payload = payload.map_logs(Into::into);
-                let logs = payload
-                    .frame_receipts
-                    .iter()
-                    .flat_map(|receipt| receipt.logs.iter().cloned())
-                    .collect();
+                let logs = logs.into_iter().map(Into::into).collect();
                 Self::Frame { payload, logs }
             }
             envelope => Self::Standard(EthereumReceiptData::from(envelope)),
