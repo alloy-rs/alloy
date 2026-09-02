@@ -1,4 +1,5 @@
 use crate::{
+    error::ValueError,
     proofs::ordered_trie_root_with_encoder,
     receipt::{
         Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt,
@@ -93,12 +94,17 @@ impl<T: Default, L: Default> Default for EthereumReceipt<T, L> {
 
 impl<T, L> EthereumReceipt<T, L> {
     /// Maps the receipt log type by applying a function to each log.
-    pub fn map_logs<U>(self, mut f: impl FnMut(L) -> U) -> EthereumReceipt<T, U> {
+    pub fn map_logs<U: Clone>(self, f: impl FnMut(L) -> U) -> EthereumReceipt<T, U> {
         match self {
             Self::Standard(receipt) => EthereumReceipt::Standard(receipt.map_logs(f)),
-            Self::Frame { payload, logs } => {
-                let logs = logs.into_iter().map(&mut f).collect();
-                EthereumReceipt::Frame { payload: payload.map_logs(f), logs }
+            Self::Frame { payload, .. } => {
+                let payload = payload.map_logs(f);
+                let logs = payload
+                    .frame_receipts
+                    .iter()
+                    .flat_map(|receipt| receipt.logs.iter().cloned())
+                    .collect();
+                EthereumReceipt::Frame { payload, logs }
             }
         }
     }
@@ -361,18 +367,26 @@ impl<T: TxTy> InMemorySize for EthereumReceiptData<T> {
     }
 }
 
-impl<T> From<ReceiptEnvelope<T>> for EthereumReceiptData<TxType>
+impl<T> TryFrom<ReceiptEnvelope<T>> for EthereumReceiptData<TxType>
 where
     T: Into<Log>,
 {
-    fn from(value: ReceiptEnvelope<T>) -> Self {
+    type Error = ValueError<ReceiptEnvelope<T>>;
+
+    fn try_from(value: ReceiptEnvelope<T>) -> Result<Self, Self::Error> {
+        if matches!(value, ReceiptEnvelope::Eip8141(_)) {
+            return Err(ValueError::new_static(
+                value,
+                "EIP-8141 receipts cannot be represented by EthereumReceiptData",
+            ));
+        }
         let value = value.into_primitives_receipt();
-        Self {
+        Ok(Self {
             tx_type: value.tx_type(),
             success: value.is_success(),
             cumulative_gas_used: value.cumulative_gas_used(),
             logs: value.into_logs(),
-        }
+        })
     }
 }
 
@@ -383,12 +397,19 @@ where
     fn from(value: ReceiptEnvelope<T>) -> Self {
         match value {
             ReceiptEnvelope::Eip8141(receipt) => {
-                let super::envelope::FrameReceiptEnvelope { payload, logs } = receipt;
+                let (payload, _) = receipt.into_parts();
                 let payload = payload.map_logs(Into::into);
-                let logs = logs.into_iter().map(Into::into).collect();
+                let logs = payload
+                    .frame_receipts
+                    .iter()
+                    .flat_map(|receipt| receipt.logs.iter().cloned())
+                    .collect();
                 Self::Frame { payload, logs }
             }
-            envelope => Self::Standard(EthereumReceiptData::from(envelope)),
+            envelope => match EthereumReceiptData::try_from(envelope) {
+                Ok(receipt) => Self::Standard(receipt),
+                Err(_) => unreachable!("EIP-8141 receipt handled above"),
+            },
         }
     }
 }
@@ -403,23 +424,29 @@ impl<T, L> From<EthereumReceiptData<T, L>> for crate::Receipt<L> {
     }
 }
 
-impl<L> From<EthereumReceiptData<TxType, L>> for ReceiptEnvelope<L>
+impl<L> TryFrom<EthereumReceiptData<TxType, L>> for ReceiptEnvelope<L>
 where
     L: Send + Sync + Clone + Debug + Eq + AsRef<Log>,
 {
-    fn from(value: EthereumReceiptData<TxType, L>) -> Self {
+    type Error = ValueError<EthereumReceiptData<TxType, L>>;
+
+    fn try_from(value: EthereumReceiptData<TxType, L>) -> Result<Self, Self::Error> {
         let tx_type = value.tx_type;
+        if tx_type == TxType::Eip8141 {
+            return Err(ValueError::new_static(
+                value,
+                "EIP-8141 receipts require a FrameReceiptPayload",
+            ));
+        }
         let receipt = value.into_with_bloom().map_receipt(Into::into);
-        match tx_type {
+        Ok(match tx_type {
             TxType::Legacy => Self::Legacy(receipt),
             TxType::Eip2930 => Self::Eip2930(receipt),
             TxType::Eip1559 => Self::Eip1559(receipt),
             TxType::Eip4844 => Self::Eip4844(receipt),
             TxType::Eip7702 => Self::Eip7702(receipt),
-            TxType::Eip8141 => {
-                panic!("EIP-8141 receipts require FrameReceiptPayload and cannot be built from EthereumReceiptData")
-            }
-        }
+            TxType::Eip8141 => unreachable!("EIP-8141 receipt handled above"),
+        })
     }
 }
 

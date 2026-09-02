@@ -60,9 +60,9 @@ pub enum ReceiptEnvelope<T = Log> {
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct FrameReceiptEnvelope<T> {
     /// The consensus EIP-8141 receipt payload.
-    pub payload: FrameReceiptPayload<T>,
+    payload: FrameReceiptPayload<T>,
     /// Logs in frame execution order.
-    pub logs: Vec<T>,
+    logs: Vec<T>,
 }
 
 impl<T: Clone> From<FrameReceiptPayload<T>> for FrameReceiptEnvelope<T> {
@@ -83,6 +83,21 @@ impl<T> FrameReceiptEnvelope<T> {
         T: Clone,
     {
         payload.into()
+    }
+
+    /// Returns the consensus EIP-8141 receipt payload.
+    pub const fn payload(&self) -> &FrameReceiptPayload<T> {
+        &self.payload
+    }
+
+    /// Returns the flattened logs in frame execution order.
+    pub fn logs(&self) -> &[T] {
+        &self.logs
+    }
+
+    /// Splits this envelope into its consensus payload and derived flattened logs.
+    pub fn into_parts(self) -> (FrameReceiptPayload<T>, Vec<T>) {
+        (self.payload, self.logs)
     }
 }
 
@@ -223,7 +238,7 @@ impl<T> ReceiptEnvelope<T> {
     /// Converts the receipt's log type by applying a function to each log.
     ///
     /// Returns the receipt with the new log type.
-    pub fn map_logs<U>(self, mut f: impl FnMut(T) -> U) -> ReceiptEnvelope<U> {
+    pub fn map_logs<U: Clone>(self, mut f: impl FnMut(T) -> U) -> ReceiptEnvelope<U> {
         match self {
             Self::Legacy(r) => ReceiptEnvelope::Legacy(r.map_logs(f)),
             Self::Eip2930(r) => ReceiptEnvelope::Eip2930(r.map_logs(f)),
@@ -231,11 +246,8 @@ impl<T> ReceiptEnvelope<T> {
             Self::Eip4844(r) => ReceiptEnvelope::Eip4844(r.map_logs(f)),
             Self::Eip7702(r) => ReceiptEnvelope::Eip7702(r.map_logs(f)),
             Self::Eip8141(r) => {
-                let FrameReceiptEnvelope { payload, logs } = r;
-                ReceiptEnvelope::Eip8141(FrameReceiptEnvelope {
-                    payload: payload.map_logs(&mut f),
-                    logs: logs.into_iter().map(f).collect(),
-                })
+                let (payload, _) = r.into_parts();
+                ReceiptEnvelope::Eip8141(payload.map_logs(&mut f).into())
             }
         }
     }
@@ -926,5 +938,32 @@ mod test {
             ReceiptEnvelope::rlp_decode_with_bloom(&mut network_encoded.as_slice()).unwrap();
         assert_eq!(decoded_with_bloom.receipt, decoded);
         assert_eq!(decoded_with_bloom.logs_bloom, logs_bloom);
+    }
+
+    #[test]
+    fn frame_receipt_log_mapping_keeps_payload_and_flattened_logs_in_sync() {
+        let envelope = ReceiptEnvelope::Eip8141(
+            FrameReceiptPayload {
+                cumulative_gas_used: 1,
+                payer: Address::ZERO,
+                frame_receipts: alloc::vec![FrameReceipt {
+                    status: FrameStatus::Success,
+                    gas_used: FrameGasUsed::default(),
+                    logs: alloc::vec![10u64, 20],
+                }],
+            }
+            .into(),
+        );
+
+        let mut calls = 0;
+        let mapped = envelope.map_logs(|_| {
+            calls += 1;
+            calls
+        });
+        let ReceiptEnvelope::Eip8141(mapped) = mapped else { unreachable!() };
+
+        assert_eq!(calls, 2);
+        assert_eq!(mapped.logs(), &[1, 2]);
+        assert_eq!(mapped.payload().frame_receipts[0].logs, [1, 2]);
     }
 }

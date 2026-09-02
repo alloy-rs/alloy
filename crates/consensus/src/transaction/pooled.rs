@@ -3,8 +3,10 @@
 
 use super::EthereumTxEnvelope;
 use crate::{
-    error::ValueError, transaction::TxEip8141WithSidecar, Signed, TransactionEnvelope, TxEip1559,
-    TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxLegacy,
+    error::ValueError,
+    transaction::{TxEip8141, TxEip8141Variant, TxEip8141WithSidecar},
+    Signed, TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
+    TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
 use alloy_eips::eip7594::{
     BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, Encodable7594,
@@ -32,7 +34,8 @@ pub type PooledBlobTransaction =
 
 /// Exact pooled transaction envelope for the current protocol.
 ///
-/// EIP-4844 and EIP-8141 transactions carry an EIP-7594 sidecar in the p2p representation. The
+/// EIP-4844 transactions and EIP-8141 transactions with blobs carry an EIP-7594 sidecar in the
+/// p2p representation. Non-blob EIP-8141 transactions use their canonical representation. A
 /// sidecar is never included in the transaction hash or block transaction trie.
 #[derive(Clone, Debug, TransactionEnvelope)]
 #[envelope(
@@ -57,9 +60,9 @@ pub enum PooledTransaction {
     /// An EIP-7702 transaction.
     #[envelope(ty = 4)]
     Eip7702(Signed<TxEip7702>),
-    /// An EIP-8141 transaction with its EIP-7594 sidecar.
+    /// An EIP-8141 transaction, optionally with its EIP-7594 sidecar.
     #[envelope(ty = 6)]
-    Eip8141(Sealed<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>>),
+    Eip8141(Sealed<TxEip8141Variant<BlobTransactionSidecarEip7594>>),
 }
 
 impl PooledTransaction {
@@ -109,7 +112,11 @@ impl PooledTransaction {
     pub fn clear_eip7594_blobs(&mut self) {
         match self {
             Self::Eip4844(tx) => tx.tx_mut().sidecar.clear_eip7594_blobs(),
-            Self::Eip8141(tx) => tx.inner_mut().sidecar.clear_eip7594_blobs(),
+            Self::Eip8141(tx) => {
+                if let Some(sidecar) = tx.inner_mut().sidecar_mut() {
+                    sidecar.clear_eip7594_blobs();
+                }
+            }
             _ => {}
         }
     }
@@ -127,7 +134,7 @@ impl PooledTransaction {
     /// Returns the EIP-8141 pooled transaction, if this is one.
     pub const fn as_eip8141(
         &self,
-    ) -> Option<&Sealed<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>>> {
+    ) -> Option<&Sealed<TxEip8141Variant<BlobTransactionSidecarEip7594>>> {
         match self {
             Self::Eip8141(tx) => Some(tx),
             _ => None,
@@ -167,7 +174,13 @@ impl From<Signed<TxEip7702>> for PooledTransaction {
 
 impl From<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>> for PooledTransaction {
     fn from(value: TxEip8141WithSidecar<BlobTransactionSidecarEip7594>) -> Self {
-        Self::Eip8141(value.seal_slow())
+        Self::Eip8141(TxEip8141Variant::from(value).seal_slow())
+    }
+}
+
+impl From<TxEip8141> for PooledTransaction {
+    fn from(value: TxEip8141) -> Self {
+        Self::Eip8141(TxEip8141Variant::from(value).seal_slow())
     }
 }
 
@@ -492,5 +505,29 @@ mod tests {
             let decoded = PooledTransaction::decode_2718(&mut encoded.as_ref()).unwrap();
             assert_eq!(pooled_tx, decoded);
         }
+    }
+
+    #[test]
+    fn pooled_eip8141_roundtrips_with_and_without_sidecar() {
+        let tx = TxEip8141 {
+            chain_id: 1,
+            frames: vec![alloy_eips::eip8141::Frame::default()],
+            ..Default::default()
+        };
+
+        let pooled: PooledTransaction = tx.clone().into();
+        let encoded = pooled.encoded_2718();
+        let decoded = PooledTransaction::decode_2718(&mut encoded.as_ref()).unwrap();
+        assert_eq!(pooled, decoded);
+        assert!(matches!(decoded.as_eip8141().unwrap().inner(), TxEip8141Variant::TxEip8141(_)));
+
+        let pooled: PooledTransaction = TxEip8141WithSidecar::new(tx, eip7594_sidecar()).into();
+        let encoded = pooled.encoded_2718();
+        let decoded = PooledTransaction::decode_2718(&mut encoded.as_ref()).unwrap();
+        assert_eq!(pooled, decoded);
+        assert!(matches!(
+            decoded.as_eip8141().unwrap().inner(),
+            TxEip8141Variant::TxEip8141WithSidecar(_)
+        ));
     }
 }
