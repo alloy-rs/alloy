@@ -6,7 +6,7 @@ use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topi
 use alloy_sol_types::SolEvent;
 use alloy_transport::{BoxFuture, RpcError, TransportResult};
 use futures::Stream;
-use futures_util::StreamExt;
+use futures_util::{StreamExt, TryStreamExt};
 use std::{fmt, marker::PhantomData};
 
 /// Helper for managing the event filter before querying or streaming its logs
@@ -202,7 +202,7 @@ impl<P: Clone, E, N> Event<&P, E, N> {
 /// Attempts the full block range optimistically first. If that fails, the range is split into
 /// `chunk_size`-block windows queried concurrently (bounded by `max_concurrent`). If an
 /// individual chunk still fails, each block in that chunk is queried individually.
-#[must_use = "ChunkedEvent does nothing unless you call `query` or `query_raw`"]
+#[must_use = "ChunkedEvent does nothing unless you call a query or stream method"]
 #[derive(Clone)]
 pub struct ChunkedEvent<P, E, N = Ethereum> {
     provider: P,
@@ -286,9 +286,64 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
         self.get_logs_chunked().await
     }
 
+    /// Streams matching event logs, fetching them in ordered chunks and decoding each log.
+    ///
+    /// Unlike [`query`](Self::query), this method does not attempt to query the full block range
+    /// first. It queries up to [`chunk_size`](Self::chunk_size) blocks per stream item, with at
+    /// most [`max_concurrent`](Self::concurrent) requests in flight. If an individual chunk
+    /// request fails, it falls back to querying each block in that chunk individually.
+    ///
+    /// # Errors
+    ///
+    /// Returns a local usage error for block hash filters, and [`RpcError::NullResp`] if the range
+    /// uses a `safe` or `finalized` tag that the node cannot resolve. RPC and decoding errors that
+    /// occur while querying chunks are yielded by the returned stream.
+    pub async fn query_stream(
+        &self,
+    ) -> Result<impl Stream<Item = Result<(E, Log), Error>> + use<P, E, N>, Error> {
+        let stream = self.query_raw_stream().await?;
+        Ok(stream
+            .map(|result| result.map_err(Error::from).and_then(|log| Ok((decode_log(&log)?, log)))))
+    }
+
+    /// Streams matching raw event logs, fetching them in ordered chunks.
+    ///
+    /// Unlike [`query_raw`](Self::query_raw), this method does not attempt to query the full block
+    /// range first. It queries up to [`chunk_size`](Self::chunk_size) blocks per stream item, with
+    /// at most [`max_concurrent`](Self::concurrent) requests in flight. If an individual chunk
+    /// request fails, it falls back to querying each block in that chunk individually.
+    ///
+    /// # Errors
+    ///
+    /// Returns a local usage error for block hash filters, and [`RpcError::NullResp`] if the range
+    /// uses a `safe` or `finalized` tag that the node cannot resolve. RPC errors that occur while
+    /// querying chunks are yielded by the returned stream.
+    pub async fn query_raw_stream(
+        &self,
+    ) -> TransportResult<impl Stream<Item = TransportResult<Log>> + use<P, E, N>> {
+        let (from, to) = self.resolved_block_range().await?;
+        Ok(self
+            .chunk_stream(from, to)
+            .map_ok(|(_, logs)| futures::stream::iter(logs.into_iter().map(Ok)))
+            .try_flatten())
+    }
+
     /// Divides the block range into chunks and queries them concurrently, falling back to
     /// single-block queries for any chunk that fails.
     async fn get_logs_chunked(&self) -> TransportResult<Vec<Log>> {
+        let (from, to) = self.resolved_block_range().await?;
+
+        let all_results: Vec<TransportResult<(u64, Vec<Log>)>> =
+            self.chunk_stream(from, to).collect().await;
+
+        let mut resolved: Vec<(u64, Vec<Log>)> =
+            all_results.into_iter().collect::<TransportResult<Vec<_>>>()?;
+
+        resolved.sort_by_key(|(block_num, _)| *block_num);
+        Ok(resolved.into_iter().flat_map(|(_, logs)| logs).collect())
+    }
+
+    async fn resolved_block_range(&self) -> TransportResult<(u64, u64)> {
         let FilterBlockOption::Range { from_block, to_block } = self.filter.block_option else {
             return Err(RpcError::local_usage_str(
                 "chunked queries require a block range filter, not a block hash filter",
@@ -301,25 +356,13 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
         let to =
             resolve_block_tag(&self.provider, to_block.unwrap_or(BlockNumberOrTag::Latest)).await?;
 
-        if from > to {
-            return Ok(vec![]);
-        }
-
-        let all_results: Vec<TransportResult<(u64, Vec<Log>)>> =
-            self.chunk_stream(from, to).collect().await;
-
-        let mut resolved: Vec<(u64, Vec<Log>)> =
-            all_results.into_iter().collect::<TransportResult<Vec<_>>>()?;
-
-        resolved.sort_by_key(|(block_num, _)| *block_num);
-        Ok(resolved.into_iter().flat_map(|(_, logs)| logs).collect())
+        Ok((from, to))
     }
 
     /// Returns a stream of per-chunk results over `[from, to]`.
     ///
     /// Each item is the result of querying one `chunk_size`-block window, falling back to
-    /// single-block queries if the chunk request fails. Results may arrive out of order due to
-    /// concurrent dispatch; callers are responsible for sorting if order matters.
+    /// single-block queries if the chunk request fails. Results are yielded in block-range order.
     fn chunk_stream(
         &self,
         from: u64,
@@ -335,13 +378,13 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
                 let provider = provider.clone();
                 async move { query_chunk(&provider, &chunk_filter, start_block, end_block).await }
             })
-            .buffer_unordered(max_concurrent)
+            .buffered(max_concurrent)
     }
 }
 
 /// Lazily generates `(start, end)` block pairs for each chunk to avoid OOM on huge ranges.
 fn chunk_ranges(from: u64, to: u64, chunk_size: u64) -> impl Iterator<Item = (u64, u64)> {
-    std::iter::successors(Some(from), move |&prev| {
+    std::iter::successors((from <= to).then_some(from), move |&prev| {
         let end = prev.saturating_add(chunk_size - 1).min(to);
         if end >= to {
             None
@@ -754,8 +797,8 @@ mod tests {
         }
     }
 
-    /// Verifies that the chunked query algorithm collects the correct logs and preserves
-    /// block ordering when events are spread across a range requiring multiple chunks.
+    /// Verifies that the chunked query APIs collect and stream the correct logs in block order
+    /// when events are spread across a range requiring multiple chunks.
     #[tokio::test]
     async fn chunked_query_collects_and_orders_logs() {
         use alloy_provider::ext::AnvilApi;
@@ -785,9 +828,35 @@ mod tests {
         let event =
             contract.MyEvent_filter().from_block(0u64).to_block(100u64).chunked().chunk_size(7);
 
+        let streamed = event
+            .query_raw_stream()
+            .await
+            .unwrap()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<TransportResult<Vec<_>>>()
+            .unwrap();
+
+        let decoded = event
+            .query_stream()
+            .await
+            .unwrap()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, Error>>()
+            .unwrap();
+
         let chunked = event.get_logs_chunked().await.unwrap();
         let reference = event.query_raw().await.unwrap();
 
+        assert_eq!(streamed, reference, "streamed results should match full-range query");
+        assert_eq!(
+            decoded.into_iter().map(|(_, log)| log).collect::<Vec<_>>(),
+            reference,
+            "decoded stream should preserve raw logs"
+        );
         assert_eq!(chunked.len(), 3, "expected exactly 3 events across all chunks");
         assert_eq!(chunked, reference, "chunked result must match full-range query");
     }
