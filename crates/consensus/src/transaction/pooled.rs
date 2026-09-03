@@ -227,6 +227,27 @@ impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for PooledTransactionV
     }
 }
 
+impl<T> TryFrom<EthereumTxEnvelope<TxEip4844>> for PooledTransactionVariant<T> {
+    type Error = ValueError<EthereumTxEnvelope<TxEip4844>>;
+
+    fn try_from(value: EthereumTxEnvelope<TxEip4844>) -> Result<Self, Self::Error> {
+        match value {
+            EthereumTxEnvelope::Legacy(tx) => Ok(Self::Legacy(tx)),
+            EthereumTxEnvelope::Eip2930(tx) => Ok(Self::Eip2930(tx)),
+            EthereumTxEnvelope::Eip1559(tx) => Ok(Self::Eip1559(tx)),
+            EthereumTxEnvelope::Eip4844(tx) => Err(ValueError::new_static(
+                EthereumTxEnvelope::Eip4844(tx),
+                "pooled transaction requires a blob sidecar",
+            )),
+            EthereumTxEnvelope::Eip7702(tx) => Ok(Self::Eip7702(tx)),
+            EthereumTxEnvelope::Eip8141(tx) => {
+                let (tx, hash) = tx.into_parts();
+                Ok(Self::Eip8141(Sealed::new_unchecked(tx.into(), hash)))
+            }
+        }
+    }
+}
+
 impl<T: Encodable7594> TxHashRef for PooledTransactionVariant<T> {
     fn tx_hash(&self) -> &B256 {
         match self {
