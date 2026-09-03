@@ -315,6 +315,7 @@ impl From<GenesisAccount> for TrieAccount {
             balance: account.balance,
             storage_root,
             code_hash,
+            extension: (),
         }
     }
 }
