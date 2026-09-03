@@ -211,6 +211,22 @@ impl<T> From<TxEip8141> for PooledTransactionVariant<T> {
     }
 }
 
+impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for PooledTransactionVariant<T> {
+    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar<T>>) -> Self {
+        match value {
+            EthereumTxEnvelope::Legacy(tx) => Self::Legacy(tx),
+            EthereumTxEnvelope::Eip2930(tx) => Self::Eip2930(tx),
+            EthereumTxEnvelope::Eip1559(tx) => Self::Eip1559(tx),
+            EthereumTxEnvelope::Eip4844(tx) => Self::Eip4844(tx),
+            EthereumTxEnvelope::Eip7702(tx) => Self::Eip7702(tx),
+            EthereumTxEnvelope::Eip8141(tx) => {
+                let (tx, hash) = tx.into_parts();
+                Self::Eip8141(Sealed::new_unchecked(tx.into(), hash))
+            }
+        }
+    }
+}
+
 impl<T: Encodable7594> TxHashRef for PooledTransactionVariant<T> {
     fn tx_hash(&self) -> &B256 {
         match self {
