@@ -14,3 +14,10 @@ pub use block::AnyHeader;
 
 mod receipt;
 pub use receipt::AnyReceiptEnvelope;
+
+// Unknown transaction types require std (OnceLock) and serde (OtherFields).
+// They are gated behind the std feature which enables those deps.
+#[cfg(feature = "std")]
+mod unknown;
+#[cfg(feature = "std")]
+pub use unknown::{AnyTxType, DeserMemo, UnknownTxEnvelope, UnknownTypedTransaction};
