@@ -294,6 +294,7 @@ impl From<GenesisAccount> for TrieAccount {
             balance: account.balance,
             storage_root,
             code_hash: account.code.map_or(KECCAK_EMPTY, keccak256),
+            extension: (),
         }
     }
 }
