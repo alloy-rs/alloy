@@ -41,7 +41,9 @@ pub use alloy_eips::eip4844::{
 };
 
 pub mod pooled;
-pub use pooled::PooledTransaction;
+pub use pooled::{
+    PooledTransaction, PooledTransactionVariant, PooledTransactionWithSidecarVariant,
+};
 
 /// Re-export for convenience
 pub use either::Either;
