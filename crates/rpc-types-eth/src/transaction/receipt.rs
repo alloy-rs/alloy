@@ -198,7 +198,10 @@ impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
     /// Converts the receipt's log type by applying a function to each log.
     ///
     /// Returns the receipt with the new log type.
-    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> TransactionReceipt<ReceiptEnvelope<U>> {
+    pub fn map_logs<U: Clone>(
+        self,
+        f: impl FnMut(L) -> U,
+    ) -> TransactionReceipt<ReceiptEnvelope<U>> {
         self.map_inner(|inner| inner.map_logs(f))
     }
 
