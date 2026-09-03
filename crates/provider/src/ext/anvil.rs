@@ -529,16 +529,19 @@ mod tests {
     use super::*;
     use crate::{
         fillers::{ChainIdFiller, GasFiller},
-        ProviderBuilder,
+        ProviderBuilder, WalletProvider,
     };
     use alloy_consensus::{BlockHeader, SidecarBuilder, SimpleCoder};
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::{AnyNetwork, TransactionBuilder, TransactionBuilder4844};
     use alloy_network_primitives::BlockResponse as _;
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, B256};
+    use alloy_rpc_client::RpcClient;
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::{sol, SolCall};
     use alloy_transport::mock::Asserter;
+    use std::time::Duration;
 
     const FORK_URL: &str = "https://ethereum.reth.rs/rpc";
 
@@ -700,6 +703,45 @@ mod tests {
         let num = provider.get_block_number().await.unwrap();
 
         assert_eq!(num, start_num + 10);
+    }
+
+    #[tokio::test]
+    async fn get_receipt_recovers_when_heartbeat_misses_confirmed_transaction() {
+        let anvil = Anvil::new().spawn();
+        let wallet = anvil.wallet().unwrap();
+        let client = RpcClient::builder()
+            .http(anvil.endpoint_url())
+            .with_poll_interval(Duration::from_millis(10));
+        let provider = ProviderBuilder::new().wallet(wallet).connect_client(client);
+        provider.anvil_set_auto_mine(false).await.unwrap();
+
+        for attempt in 1..=20 {
+            let tx = TransactionRequest::default()
+                .with_to(provider.default_signer_address())
+                .with_value(U256::from(1));
+            let pending = provider.send_transaction(tx).await.unwrap();
+            let tx_hash = *pending.tx_hash();
+
+            let watcher = tokio::spawn(async move {
+                pending
+                    .with_required_confirmations(3)
+                    .with_timeout(Some(Duration::from_millis(150)))
+                    .get_receipt()
+                    .await
+            });
+
+            // Let the heartbeat register the transaction, then mine enough blocks to satisfy the
+            // confirmation target. If the block stream initializes after mining, it only looks
+            // back one block and misses the transaction in the first of these three blocks.
+            tokio::task::yield_now().await;
+            provider.anvil_mine(Some(3), None).await.unwrap();
+
+            let receipt = watcher
+                .await
+                .unwrap()
+                .unwrap_or_else(|err| panic!("attempt {attempt} failed: {err}"));
+            assert_eq!(receipt.transaction_hash, tx_hash);
+        }
     }
 
     #[tokio::test]
