@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::fmt;
+use core::{fmt, mem::size_of};
 
 use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result, IsTyped2718},
@@ -22,6 +22,60 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use crate::Transaction;
 
 static EMPTY_INPUT: Bytes = Bytes::new();
+
+struct SigningFrameSignature<'a>(&'a FrameSignature);
+
+impl Encodable for SigningFrameSignature<'_> {
+    fn encode(&self, out: &mut dyn BufMut) {
+        let signature = self.0;
+        Header { list: true, payload_length: self.payload_length() }.encode(out);
+        signature.scheme.encode(out);
+        signature.signer.encode(out);
+        signature.msg.encode(out);
+        if signature.msg.is_empty() {
+            EMPTY_INPUT.encode(out);
+        } else {
+            signature.signature.encode(out);
+        }
+    }
+
+    fn length(&self) -> usize {
+        Header { list: true, payload_length: self.payload_length() }.length_with_payload()
+    }
+}
+
+impl SigningFrameSignature<'_> {
+    fn payload_length(&self) -> usize {
+        let signature = self.0;
+        signature.scheme.length()
+            + signature.signer.length()
+            + signature.msg.length()
+            + if signature.msg.is_empty() {
+                EMPTY_INPUT.length()
+            } else {
+                signature.signature.length()
+            }
+    }
+}
+
+struct SigningFrameSignatures<'a>(&'a [FrameSignature]);
+
+impl Encodable for SigningFrameSignatures<'_> {
+    fn encode(&self, out: &mut dyn BufMut) {
+        let payload_length =
+            self.0.iter().map(|signature| SigningFrameSignature(signature).length()).sum();
+        Header { list: true, payload_length }.encode(out);
+        for signature in self.0 {
+            SigningFrameSignature(signature).encode(out);
+        }
+    }
+
+    fn length(&self) -> usize {
+        let payload_length =
+            self.0.iter().map(|signature| SigningFrameSignature(signature).length()).sum();
+        Header { list: true, payload_length }.length_with_payload()
+    }
+}
 
 /// Counts frame transaction calldata tokens.
 ///
@@ -219,20 +273,40 @@ impl<T: fmt::Debug + Send + Sync + 'static> Transaction for TxEip8141Variant<T> 
         self.tx().max_fee_per_gas()
     }
 
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.tx().max_fee_per_gas_u256()
+    }
+
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.tx().max_priority_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.tx().max_priority_fee_per_gas_u256()
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.tx().max_fee_per_blob_gas()
     }
 
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.tx().max_fee_per_blob_gas_u256()
+    }
+
     fn priority_fee_or_price(&self) -> u128 {
         self.tx().priority_fee_or_price()
     }
 
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.tx().priority_fee_or_price_u256()
+    }
+
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         self.tx().effective_gas_price(base_fee)
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        self.tx().effective_gas_price_u256(base_fee)
     }
 
     fn is_dynamic_fee(&self) -> bool {
@@ -377,20 +451,40 @@ impl<T: fmt::Debug + Send + Sync + 'static> Transaction for TxEip8141WithSidecar
         self.tx.max_fee_per_gas()
     }
 
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.tx.max_fee_per_gas_u256()
+    }
+
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.tx.max_priority_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.tx.max_priority_fee_per_gas_u256()
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.tx.max_fee_per_blob_gas()
     }
 
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.tx.max_fee_per_blob_gas_u256()
+    }
+
     fn priority_fee_or_price(&self) -> u128 {
         self.tx.priority_fee_or_price()
     }
 
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.tx.priority_fee_or_price_u256()
+    }
+
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         self.tx.effective_gas_price(base_fee)
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        self.tx.effective_gas_price_u256(base_fee)
     }
 
     fn is_dynamic_fee(&self) -> bool {
@@ -615,19 +709,35 @@ impl TxEip8141 {
     /// Raw signature bytes are elided for signatures whose `msg` field is empty.
     pub fn encode_for_signing(&self, out: &mut dyn BufMut) {
         out.put_u8(Self::tx_type());
-
-        let mut tx = self.clone();
-        for signature in &mut tx.signatures {
-            if signature.msg.is_empty() {
-                signature.signature = Bytes::new();
-            }
-        }
-        tx.rlp_encode(out);
+        let signatures = SigningFrameSignatures(&self.signatures);
+        let payload_length = self.chain_id.length()
+            + self.nonce.length()
+            + self.sender.length()
+            + self.frames.length()
+            + signatures.length()
+            + self.fees.length()
+            + self.blob_versioned_hashes.length();
+        Header { list: true, payload_length }.encode(out);
+        self.chain_id.encode(out);
+        self.nonce.encode(out);
+        self.sender.encode(out);
+        self.frames.encode(out);
+        signatures.encode(out);
+        self.fees.encode(out);
+        self.blob_versioned_hashes.encode(out);
     }
 
     /// Returns the length of the EIP-8141 signature payload.
     pub fn payload_len_for_signature(&self) -> usize {
-        self.eip2718_encoded_length()
+        let signatures = SigningFrameSignatures(&self.signatures);
+        let payload_length = self.chain_id.length()
+            + self.nonce.length()
+            + self.sender.length()
+            + self.frames.length()
+            + signatures.length()
+            + self.fees.length()
+            + self.blob_versioned_hashes.length();
+        1 + Header { list: true, payload_length }.length_with_payload()
     }
 
     /// Calculates the canonical EIP-8141 signature hash.
@@ -773,11 +883,19 @@ impl TxEip8141 {
 
     /// Calculates a heuristic for the in-memory size of the [TxEip8141] transaction.
     #[inline]
-    pub const fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         size_of::<Self>()
             + self.frames.capacity() * size_of::<Frame>()
             + self.signatures.capacity() * size_of::<FrameSignature>()
             + self.blob_versioned_hashes.capacity() * size_of::<B256>()
+            + self.frames.iter().map(|frame| frame.target.len() + frame.data.len()).sum::<usize>()
+            + self
+                .signatures
+                .iter()
+                .map(|signature| {
+                    signature.signer.len() + signature.msg.len() + signature.signature.len()
+                })
+                .sum::<usize>()
     }
 }
 
@@ -849,9 +967,17 @@ impl Transaction for TxEip8141 {
         self.fees.max_fee_per_gas.saturating_to()
     }
 
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.fees.max_fee_per_gas
+    }
+
     #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         Some(self.fees.max_priority_fee_per_gas.saturating_to())
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        Some(self.fees.max_priority_fee_per_gas)
     }
 
     #[inline]
@@ -859,9 +985,17 @@ impl Transaction for TxEip8141 {
         Some(self.fees.max_fee_per_blob_gas.saturating_to())
     }
 
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        Some(self.fees.max_fee_per_blob_gas)
+    }
+
     #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.fees.max_priority_fee_per_gas.saturating_to()
+    }
+
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.fees.max_priority_fee_per_gas
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
@@ -870,6 +1004,14 @@ impl Transaction for TxEip8141 {
             self.fees.max_priority_fee_per_gas.saturating_to(),
             base_fee,
         )
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        base_fee.map_or(self.fees.max_fee_per_gas, |base_fee| {
+            self.fees
+                .max_fee_per_gas
+                .min(U256::from(base_fee).saturating_add(self.fees.max_priority_fee_per_gas))
+        })
     }
 
     #[inline]
@@ -1059,6 +1201,7 @@ pub(super) mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{EthereumTxEnvelope, TxEip4844};
     use alloy_eips::eip8141::{
         constants::{ATOMIC_BATCH_FLAG, EXPIRY_DATA_LENGTH, EXPIRY_VERIFIER},
         ApprovalScope, FrameLimits, FrameMode, SignatureScheme, TransactionFees,
@@ -1201,6 +1344,84 @@ mod tests {
         let second = tx.signature_hash();
 
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn signing_encoding_elides_only_transaction_hash_signatures() {
+        let tx = TxEip8141 {
+            signatures: vec![
+                FrameSignature {
+                    scheme: SignatureScheme::Arbitrary,
+                    signer: Bytes::new(),
+                    msg: Bytes::new(),
+                    signature: Bytes::copy_from_slice(&[0x11; 64]),
+                },
+                FrameSignature {
+                    scheme: SignatureScheme::Arbitrary,
+                    signer: Bytes::new(),
+                    msg: Bytes::copy_from_slice(&[0x22; 32]),
+                    signature: Bytes::copy_from_slice(&[0x33; 64]),
+                },
+            ],
+            ..Default::default()
+        };
+        let mut reference = tx.clone();
+        reference.signatures[0].signature = Bytes::new();
+
+        let mut expected = Vec::new();
+        reference.eip2718_encode(&mut expected);
+        let mut actual = Vec::new();
+        tx.encode_for_signing(&mut actual);
+
+        assert_eq!(actual, expected);
+        assert_eq!(tx.payload_len_for_signature(), actual.len());
+    }
+
+    #[test]
+    fn exposes_full_width_fee_values_through_wrappers() {
+        let high = U256::from(u128::MAX) + U256::from(1);
+        let tx = TxEip8141 {
+            fees: TransactionFees {
+                max_priority_fee_per_gas: high + U256::from(20),
+                max_fee_per_gas: high + U256::from(100),
+                max_fee_per_blob_gas: high + U256::from(200),
+            },
+            ..Default::default()
+        };
+        let expected_effective = high + U256::from(30);
+
+        assert_eq!(tx.max_fee_per_gas(), u128::MAX);
+        assert_eq!(tx.max_fee_per_gas_u256(), tx.fees.max_fee_per_gas);
+        assert_eq!(tx.max_priority_fee_per_gas_u256(), Some(tx.fees.max_priority_fee_per_gas));
+        assert_eq!(tx.max_fee_per_blob_gas_u256(), Some(tx.fees.max_fee_per_blob_gas));
+        assert_eq!(tx.effective_gas_price_u256(Some(10)), expected_effective);
+        assert_eq!(tx.effective_tip_per_gas_u256(10), Some(tx.fees.max_priority_fee_per_gas));
+
+        let variant = TxEip8141Variant::<()>::from(tx.clone());
+        assert_eq!(variant.effective_gas_price_u256(Some(10)), expected_effective);
+
+        let with_sidecar = TxEip8141WithSidecar::new(tx.clone(), ());
+        assert_eq!(with_sidecar.effective_gas_price_u256(Some(10)), expected_effective);
+
+        let envelope: EthereumTxEnvelope<TxEip4844> = EthereumTxEnvelope::Eip8141(tx.seal_slow());
+        assert_eq!(envelope.effective_gas_price_u256(Some(10)), expected_effective);
+    }
+
+    #[test]
+    fn size_includes_nested_frame_and_signature_bytes() {
+        let empty = TxEip8141 {
+            frames: vec![Frame::default()],
+            signatures: vec![FrameSignature::default()],
+            ..Default::default()
+        };
+        let mut populated = empty.clone();
+        populated.frames[0].target = Bytes::copy_from_slice(&[0x11; 20]);
+        populated.frames[0].data = Bytes::copy_from_slice(&[0x22; 128]);
+        populated.signatures[0].signer = Bytes::copy_from_slice(&[0x33; 20]);
+        populated.signatures[0].msg = Bytes::copy_from_slice(&[0x44; 32]);
+        populated.signatures[0].signature = Bytes::copy_from_slice(&[0x55; 65]);
+
+        assert_eq!(populated.size() - empty.size(), 20 + 128 + 20 + 32 + 65);
     }
 
     #[test]
