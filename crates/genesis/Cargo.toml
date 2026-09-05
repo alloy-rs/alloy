@@ -23,9 +23,9 @@ rustdoc-args = [
 workspace = true
 
 [dependencies]
-alloy-eips = { workspace = true, features = ["serde"] }
+alloy-eips = { version = "2.4.1", features = ["serde"], default-features = false }
 alloy-primitives.workspace = true
-alloy-serde.workspace = true
+alloy-serde = { version = "2.4.1", default-features = false }
 alloy-trie = { workspace = true, features = ["ethereum"] }
 
 # serde
