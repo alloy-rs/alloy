@@ -27,7 +27,7 @@ use futures::{stream, StreamExt};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::Semaphore;
 
-mod decode;
+mod bounds;
 
 #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 mod http;
@@ -303,7 +303,7 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
             }
             redirects += 1;
 
-            decode::offchain_lookup(&revert, &self.config)?;
+            bounds::offchain_lookup(&revert, &self.config)?;
             let lookup = abi::OffchainLookup::abi_decode(&revert)
                 .map_err(CcipReadError::InvalidOffchainLookup)?;
             if lookup.sender != target {
@@ -361,16 +361,9 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
         context: &'a BatchContext<'a>,
     ) -> CcipFuture<'a, Result<Bytes, CcipReadError>> {
         Box::pin(async move {
-            decode::batch(&data, context.config)?;
+            bounds::batch(&data, context.config)?;
             let call = abi::queryCall::abi_decode(&data)
                 .map_err(|err| CcipReadError::InvalidBatch(err.to_string()))?;
-            if call.requests.len() > context.config.max_batch_size {
-                return Err(CcipReadError::InvalidBatch(format!(
-                    "batch contains {} requests; limit is {}",
-                    call.requests.len(),
-                    context.config.max_batch_size
-                )));
-            }
 
             let requests = call.requests.into_iter().map(|request| {
                 let request = CcipReadRequest {
@@ -727,12 +720,12 @@ mod tests {
         let urls = 4 + word_at(&canonical, 4 + 32);
         let mut excessive = canonical.to_vec();
         excessive[urls..urls + 32].fill(0xff);
-        assert!(decode::offchain_lookup(&excessive, &config).is_err());
+        assert!(bounds::offchain_lookup(&excessive, &config).is_err());
 
         let mut invalid_offset = canonical.to_vec();
         invalid_offset[4 + 32..4 + 64].fill(0xff);
         assert!(matches!(
-            decode::offchain_lookup(&invalid_offset, &config),
+            bounds::offchain_lookup(&invalid_offset, &config),
             Err(CcipReadError::InvalidOffchainLookup(_))
         ));
 
@@ -740,9 +733,9 @@ mod tests {
         let string = urls + 32 + word_at(&canonical, urls + 32) + 32;
         invalid_utf8[string..string + 256].fill(0xff);
         let config = CcipReadConfig { max_revert_data_size: canonical.len(), ..config };
-        decode::offchain_lookup(&canonical, &config).unwrap();
+        bounds::offchain_lookup(&canonical, &config).unwrap();
         assert!(matches!(
-            decode::offchain_lookup(&invalid_utf8, &config),
+            bounds::offchain_lookup(&invalid_utf8, &config),
             Err(CcipReadError::ResourceLimit(_))
         ));
 
@@ -750,7 +743,7 @@ mod tests {
         let array = 4 + word_at(&batch, 4);
         batch[array..array + 32]
             .copy_from_slice(&U256::from(config.max_batch_size + 1).to_be_bytes::<32>());
-        assert!(matches!(decode::batch(&batch, &config), Err(CcipReadError::ResourceLimit(_))));
+        assert!(matches!(bounds::batch(&batch, &config), Err(CcipReadError::ResourceLimit(_))));
     }
 
     #[tokio::test]
