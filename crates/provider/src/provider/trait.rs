@@ -34,7 +34,7 @@ use alloy_rpc_types_eth::{
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
     EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
-    StorageValuesRequest, StorageValuesResponse, SyncStatus,
+    SignTransaction, StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -1494,21 +1494,23 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// [`send_raw_transaction`](Self::send_raw_transaction).
     ///
     /// The `eth_signTransaction` method is not supported by regular nodes.
-    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+    async fn sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<SignTransaction<N::TransactionResponse>> {
         self.client().request("eth_signTransaction", (tx,)).await
     }
 
     /// Fills a transaction with missing fields using default values.
     ///
     /// This method prepares a transaction by populating missing fields such as gas limit,
-    /// gas price, or nonce with appropriate default values. The response includes both the
-    /// RLP-encoded signed transaction and the filled transaction.
+    /// gas price, or nonce with appropriate default values.
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    ) -> TransportResult<FillTransaction<N::UnsignedTx>>
     where
-        N::TxEnvelope: RpcRecv,
+        N::UnsignedTx: RpcRecv,
     {
         self.client().request("eth_fillTransaction", (tx,)).await
     }
@@ -2839,11 +2841,11 @@ mod tests {
                     .value(U256::from(100))
                     .gas_limit(21000);
 
-                let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
+                let signed = provider.sign_transaction(tx).await.unwrap();
+                let tx = TxEnvelope::decode(&mut signed.raw.as_ref()).unwrap();
 
-                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
-
-                let signer = tx.recover_signer().unwrap();
+                assert_eq!(signed.tx.as_ref(), &tx);
+                let signer = signed.tx.inner.recover_signer().unwrap();
 
                 assert_eq!(signer, from);
             })
@@ -2951,9 +2953,6 @@ mod tests {
             .with_value(U256::from(100));
 
         let filled = provider.fill_transaction(tx).await.unwrap();
-
-        // Verify the response contains RLP-encoded raw bytes
-        assert!(!filled.raw.is_empty(), "raw transaction bytes should not be empty");
 
         // Verify the filled transaction has required fields populated
         let filled_tx = &filled.tx;
