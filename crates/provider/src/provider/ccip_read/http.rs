@@ -103,13 +103,13 @@ fn expand_url(
     data: &str,
     limit: usize,
 ) -> Result<String, CcipReadGatewayError> {
-    let senders = template.matches("{sender}").count();
-    let datas = template.matches("{data}").count();
-    let literal_len = template.len() - senders * 8 - datas * 6;
-    let len = senders
+    let sender_count = template.matches("{sender}").count();
+    let data_count = template.matches("{data}").count();
+    let literal_len = template.len() - sender_count * 8 - data_count * 6;
+    let len = sender_count
         .checked_mul(sender.len())
         .and_then(|len| {
-            datas.checked_mul(data.len()).and_then(|data_len| len.checked_add(data_len))
+            data_count.checked_mul(data.len()).and_then(|data_len| len.checked_add(data_len))
         })
         .and_then(|len| len.checked_add(literal_len))
         .filter(|len| *len <= limit)
