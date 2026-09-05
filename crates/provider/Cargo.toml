@@ -73,7 +73,7 @@ http.workspace = true
 tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
-reqwest = { workspace = true, features = ["json", "stream"], optional = true }
+reqwest = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
@@ -108,12 +108,11 @@ tokio-tungstenite.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]
-# ERC-3668 / ENSIP-21 protocol client. Does not enable an HTTP gateway or the
-# provider's reqwest JSON-RPC transport — pair with `ccip-read-http` or supply a
-# custom [`CcipReadGateway`].
+# ERC-3668 CCIP Read client. Pair with `ccip-read-http` for the default HTTP gateway, or
+# supply a custom `CcipReadGateway`.
 ccip-read = []
-# Default HTTPS [`HttpCcipReadGateway`] backed by the `reqwest` crate only.
-# Does not enable `alloy-transport-http` / `alloy-rpc-client` reqwest transport.
+# Default `reqwest`-backed CCIP Read HTTP gateway. Enable one of the `reqwest-*-tls` features
+# for HTTPS gateways.
 ccip-read-http = ["ccip-read", "dep:reqwest"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [

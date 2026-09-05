@@ -215,6 +215,7 @@ provider-anvil-node = [
     "alloy-provider?/anvil-node",
     "node-bindings",
 ]
+provider-ccip-read = ["providers", "alloy-provider?/ccip-read-http"]
 
 # pubsub
 pubsub = [
