@@ -2177,6 +2177,7 @@ mod tests {
             fn backoff_hint(
                 &self,
                 _error: &alloy_transport::TransportError,
+                _num_retries: u32,
             ) -> Option<std::time::Duration> {
                 None
             }
