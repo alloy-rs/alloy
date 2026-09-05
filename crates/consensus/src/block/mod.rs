@@ -309,7 +309,7 @@ impl<T: Transaction, H> BlockBody<T, H> {
     /// Returns an iterator over all blob versioned hashes from the block body.
     #[inline]
     pub fn blob_versioned_hashes_iter(&self) -> impl Iterator<Item = &B256> + '_ {
-        self.eip4844_transactions_iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
+        self.transactions.iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
     }
 }
 

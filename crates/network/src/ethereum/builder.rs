@@ -117,6 +117,22 @@ impl TransactionBuilder for TransactionRequest {
 }
 
 impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
+    fn should_fill_gas(&self) -> bool {
+        self.preferred_type() != TxType::Eip8141
+    }
+
+    fn build_presigned_with_sidecar(self) -> Result<(alloy_consensus::TxEnvelope, Bytes), Self> {
+        use alloy_eips::Encodable2718;
+        use alloy_primitives::Sealable;
+        if self.preferred_type() != TxType::Eip8141 || self.sidecar.is_none() {
+            return Err(self);
+        }
+        let pooled = self.build_8141_with_sidecar().map_err(|error| error.into_value())?;
+        let encoded = pooled.encoded_2718().into();
+        let (tx, _) = pooled.into_parts();
+        Ok((alloy_consensus::TxEnvelope::Eip8141(tx.seal_slow()), encoded))
+    }
+
     fn can_submit(&self) -> bool {
         // value and data may be None. If they are, they will be set to default.
         // gas fields and nonce may be None, if they are, they will be populated
@@ -125,6 +141,9 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn can_build(&self) -> bool {
+        if self.preferred_type() == TxType::Eip8141 {
+            return self.complete_8141().is_ok();
+        }
         // value and data may be none. If they are, they will be set to default
         // values.
 
@@ -139,8 +158,7 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
         let eip4844 = eip1559 && self.sidecar.is_some() && self.to.is_some();
 
         let eip7702 = eip1559 && self.authorization_list().is_some();
-        let eip8141 = self.complete_8141().is_ok();
-        (common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)) || eip8141
+        common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)
     }
 
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
@@ -171,11 +189,13 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn build_unsigned(self) -> BuildResult<TypedTransaction, Ethereum> {
-        if let Err((tx_type, missing)) = self.missing_keys() {
-            return Err(TransactionBuilderError::InvalidTransactionRequest(tx_type, missing)
-                .into_unbuilt(self));
-        }
-        Ok(self.build_typed_tx().expect("checked by missing_keys"))
+        self.build_typed_tx().map_err(|request| {
+            let (tx_type, missing) = request.missing_keys().err().unwrap_or_else(|| {
+                (request.preferred_type(), vec!["use a pooled frame sidecar for raw submission"])
+            });
+            TransactionBuilderError::InvalidTransactionRequest(tx_type, missing)
+                .into_unbuilt(request)
+        })
     }
 
     async fn build<W: NetworkWallet<Ethereum>>(

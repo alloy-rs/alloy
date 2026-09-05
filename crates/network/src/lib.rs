@@ -68,6 +68,12 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     #[doc(alias = "UnsignedTransaction")]
     type UnsignedTx: From<Self::TxEnvelope>;
 
+    /// Converts a transaction that carries its own authorization into an envelope.
+    /// Networks using outer signatures leave the transaction unchanged.
+    fn try_into_presigned(tx: Self::UnsignedTx) -> Result<Self::TxEnvelope, Self::UnsignedTx> {
+        Err(tx)
+    }
+
     /// The network receipt envelope type.
     #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
     type ReceiptEnvelope: Eip2718Envelope + TxReceipt;

@@ -202,28 +202,32 @@ impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for Receip
             return Ok(Self::Eip8141(payload.into()));
         }
 
-        Ok(Self::from_typed(ty, receipt))
+        Self::from_typed(ty, receipt)
+            .map_err(|_| serde::de::Error::custom("frame receipt requires a frame payload"))
     }
 }
 
 impl<T> ReceiptEnvelope<T> {
     /// Creates the envelope for a given type and receipt.
-    pub fn from_typed<R>(tx_type: TxType, receipt: R) -> Self
+    ///
+    /// Returns the original receipt on error for EIP-8141, which requires a frame payload.
+    pub fn from_typed<R>(tx_type: TxType, receipt: R) -> Result<Self, crate::error::ValueError<R>>
     where
         R: Into<ReceiptWithBloom<Receipt<T>>>,
     {
-        match tx_type {
+        Ok(match tx_type {
             TxType::Legacy => Self::Legacy(receipt.into()),
             TxType::Eip2930 => Self::Eip2930(receipt.into()),
             TxType::Eip1559 => Self::Eip1559(receipt.into()),
             TxType::Eip4844 => Self::Eip4844(receipt.into()),
             TxType::Eip7702 => Self::Eip7702(receipt.into()),
             TxType::Eip8141 => {
-                panic!(
-                    "EIP-8141 receipts use FrameReceiptPayload; construct ReceiptEnvelope::Eip8141"
-                )
+                return Err(crate::error::ValueError::new_static(
+                    receipt,
+                    "EIP-8141 receipts require a FrameReceiptPayload",
+                ));
             }
-        }
+        })
     }
 
     /// Converts the receipt's log type by applying a function to each log.
@@ -322,10 +326,13 @@ impl<T> ReceiptEnvelope<T> {
     }
 
     /// Return the receipt's bloom.
-    pub const fn logs_bloom(&self) -> &Bloom {
+    pub fn logs_bloom(&self) -> Bloom
+    where
+        T: AsRef<Log>,
+    {
         match self.as_receipt_with_bloom() {
-            Some(receipt) => &receipt.logs_bloom,
-            None => panic!("EIP-8141 receipts do not carry a cached top-level logs bloom"),
+            Some(receipt) => receipt.logs_bloom,
+            None => logs_bloom(self.logs().iter().map(AsRef::as_ref)),
         }
     }
 
@@ -354,15 +361,21 @@ impl<T> ReceiptEnvelope<T> {
     }
 
     /// Consumes the type and returns the underlying [`Receipt`].
-    pub fn into_receipt(self) -> Receipt<T> {
-        match self {
+    /// Returns the original envelope on error for a frame receipt.
+    pub fn into_receipt(self) -> Result<Receipt<T>, crate::error::ValueError<Self>> {
+        Ok(match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
             | Self::Eip1559(t)
             | Self::Eip4844(t)
             | Self::Eip7702(t) => t.receipt,
-            Self::Eip8141(_) => panic!("EIP-8141 receipts use FrameReceiptPayload"),
-        }
+            Self::Eip8141(_) => {
+                return Err(crate::error::ValueError::new_static(
+                    self,
+                    "EIP-8141 receipts use FrameReceiptPayload",
+                ))
+            }
+        })
     }
 
     /// Return the inner receipt for normal receipt types.
@@ -437,7 +450,7 @@ where
     }
 }
 
-impl ReceiptEnvelope {
+impl<T: Encodable> ReceiptEnvelope<T> {
     /// Get the length of the inner receipt in the 2718 encoding.
     pub fn inner_length(&self) -> usize {
         match self {
@@ -558,15 +571,18 @@ impl InMemorySize for ReceiptEnvelope {
                 | Self::Eip7702(receipt) => {
                     receipt.receipt.logs.iter().map(InMemorySize::size).sum::<usize>()
                 }
-                Self::Eip8141(receipt) => receipt
-                    .payload
-                    .frame_receipts
-                    .iter()
-                    .map(|frame| {
-                        core::mem::size_of_val(frame)
-                            + frame.logs.iter().map(InMemorySize::size).sum::<usize>()
-                    })
-                    .sum::<usize>(),
+                Self::Eip8141(receipt) => {
+                    receipt.logs.iter().map(InMemorySize::size).sum::<usize>()
+                        + receipt
+                            .payload
+                            .frame_receipts
+                            .iter()
+                            .map(|frame| {
+                                core::mem::size_of_val(frame)
+                                    + frame.logs.iter().map(InMemorySize::size).sum::<usize>()
+                            })
+                            .sum::<usize>()
+                }
             }
     }
 }
@@ -701,15 +717,19 @@ pub(crate) mod serde_bincode_compat {
                     success: value.status(),
                     cumulative_gas_used: receipt.payload.cumulative_gas_used,
                     logs_bloom: Cow::Owned(Default::default()),
-                    logs: Cow::Owned(value.clone().into_logs()),
+                    logs: Cow::Borrowed(value.logs()),
                     payer: Some(receipt.payload.payer),
                     frame_receipts: Some(Cow::Borrowed(&receipt.payload.frame_receipts)),
                 },
-                _ => Self {
+                super::ReceiptEnvelope::Legacy(receipt)
+                | super::ReceiptEnvelope::Eip2930(receipt)
+                | super::ReceiptEnvelope::Eip1559(receipt)
+                | super::ReceiptEnvelope::Eip4844(receipt)
+                | super::ReceiptEnvelope::Eip7702(receipt) => Self {
                     tx_type: value.tx_type(),
                     success: value.status(),
                     cumulative_gas_used: value.cumulative_gas_used(),
-                    logs_bloom: Cow::Borrowed(value.logs_bloom()),
+                    logs_bloom: Cow::Borrowed(&receipt.logs_bloom),
                     logs: Cow::Borrowed(value.logs()),
                     payer: None,
                     frame_receipts: None,
@@ -939,7 +959,8 @@ mod test {
     #[test]
     fn convert_envelope() {
         let receipt = Receipt::<Log>::default();
-        let _envelope = ReceiptEnvelope::from_typed(TxType::Eip7702, receipt);
+        let envelope = ReceiptEnvelope::from_typed(TxType::Eip7702, receipt).unwrap();
+        assert!(matches!(envelope, ReceiptEnvelope::Eip7702(_)));
     }
 
     #[test]

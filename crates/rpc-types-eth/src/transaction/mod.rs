@@ -243,7 +243,13 @@ where
 impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
     /// Consumes the transaction and returns it as [`Signed`] with [`EthereumTypedTransaction`] as
     /// the transaction type.
-    pub fn into_signed(self) -> Signed<EthereumTypedTransaction<Eip4844>>
+    /// Returns an error for a frame transaction, which has no outer signature.
+    pub fn into_signed(
+        self,
+    ) -> Result<
+        Signed<EthereumTypedTransaction<Eip4844>>,
+        alloy_consensus::error::ValueError<EthereumTxEnvelope<Eip4844>>,
+    >
     where
         EthereumTypedTransaction<Eip4844>: From<Eip4844>,
     {
@@ -251,11 +257,18 @@ impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
     }
 
     /// Consumes the transaction and returns it a [`Recovered`] signed [`EthereumTypedTransaction`].
-    pub fn into_signed_recovered(self) -> Recovered<Signed<EthereumTypedTransaction<Eip4844>>>
+    /// Returns an error for a frame transaction, which has no outer signature.
+    pub fn into_signed_recovered(
+        self,
+    ) -> Result<
+        Recovered<Signed<EthereumTypedTransaction<Eip4844>>>,
+        alloy_consensus::error::ValueError<EthereumTxEnvelope<Eip4844>>,
+    >
     where
         EthereumTypedTransaction<Eip4844>: From<Eip4844>,
     {
-        self.inner.map(|tx| tx.into_signed())
+        let (tx, signer) = self.inner.into_parts();
+        tx.into_signed().map(|tx| Recovered::new_unchecked(tx, signer))
     }
 }
 
@@ -363,17 +376,47 @@ where
     }
 }
 
-impl<Eip4844> From<Transaction<EthereumTxEnvelope<Eip4844>>>
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>>
     for Signed<EthereumTypedTransaction<Eip4844>>
 where
     EthereumTypedTransaction<Eip4844>: From<Eip4844>,
 {
-    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
+    type Error = alloy_consensus::error::ValueError<EthereumTxEnvelope<Eip4844>>;
+
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
         tx.into_signed()
     }
 }
 
 impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
+    fn frame_transaction(&self) -> Option<&alloy_consensus::TxEip8141> {
+        self.inner.frame_transaction()
+    }
+
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.inner.max_fee_per_gas_u256()
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.inner.max_priority_fee_per_gas_u256()
+    }
+
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.inner.max_fee_per_blob_gas_u256()
+    }
+
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.inner.priority_fee_or_price_u256()
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        self.inner.effective_gas_price_u256(base_fee)
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        self.inner.effective_tip_per_gas_u256(base_fee)
+    }
+
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }

@@ -92,6 +92,11 @@ use alloy_eips::Typed2718;
 #[doc(alias = "Tx")]
 #[auto_impl::auto_impl(&, Arc)]
 pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static {
+    /// Returns the canonical frame transaction, if this is an EIP-8141 transaction.
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        None
+    }
+
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -349,6 +354,10 @@ pub trait SignableTransaction<Signature>: Transaction {
 
 #[cfg(feature = "serde")]
 impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        self.inner.frame_transaction()
+    }
+
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
@@ -467,6 +476,13 @@ where
     L: Transaction,
     R: Transaction,
 {
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        match self {
+            Self::Left(tx) => tx.frame_transaction(),
+            Self::Right(tx) => tx.frame_transaction(),
+        }
+    }
+
     fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::Left(tx) => tx.chain_id(),

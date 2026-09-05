@@ -277,6 +277,77 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
 impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
     for EthereumTypedTransaction<Eip4844>
 {
+    fn rlp_header_signed(&self, signature: &Signature) -> alloy_rlp::Header {
+        match self {
+            Self::Legacy(tx) => tx.rlp_header_signed(signature),
+            Self::Eip2930(tx) => tx.rlp_header_signed(signature),
+            Self::Eip1559(tx) => tx.rlp_header_signed(signature),
+            Self::Eip4844(tx) => tx.rlp_header_signed(signature),
+            Self::Eip7702(tx) => tx.rlp_header_signed(signature),
+            Self::Eip8141(tx) => tx.rlp_header(),
+        }
+    }
+
+    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip2930(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip1559(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip4844(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip7702(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip8141(tx) => tx.rlp_encoded_length(),
+        }
+    }
+
+    fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        match self {
+            Self::Legacy(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip2930(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip1559(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip4844(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip7702(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip8141(tx) => tx.rlp_encode(out),
+        }
+    }
+
+    fn eip2718_encoded_length(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip2930(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip1559(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip4844(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip7702(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip8141(tx) => tx.eip2718_encoded_length(),
+        }
+    }
+
+    fn network_header(&self, signature: &Signature) -> alloy_rlp::Header {
+        match self {
+            Self::Legacy(tx) => tx.network_header(signature),
+            Self::Eip2930(tx) => tx.network_header(signature),
+            Self::Eip1559(tx) => tx.network_header(signature),
+            Self::Eip4844(tx) => tx.network_header(signature),
+            Self::Eip7702(tx) => tx.network_header(signature),
+            Self::Eip8141(tx) => {
+                alloy_rlp::Header { list: false, payload_length: tx.eip2718_encoded_length() }
+            }
+        }
+    }
+
+    fn network_encoded_length(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.network_encoded_length(signature),
+            Self::Eip2930(tx) => tx.network_encoded_length(signature),
+            Self::Eip1559(tx) => tx.network_encoded_length(signature),
+            Self::Eip4844(tx) => tx.network_encoded_length(signature),
+            Self::Eip7702(tx) => tx.network_encoded_length(signature),
+            Self::Eip8141(tx) => {
+                alloy_rlp::Header { list: false, payload_length: tx.eip2718_encoded_length() }
+                    .length_with_payload()
+            }
+        }
+    }
+
     fn rlp_encoded_fields_length(&self) -> usize {
         match self {
             Self::Legacy(tx) => tx.rlp_encoded_fields_length(),

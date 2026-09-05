@@ -312,6 +312,10 @@ where
 }
 
 impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<T, Sig> {
+    fn frame_transaction(&self) -> Option<&crate::TxEip8141> {
+        self.tx.frame_transaction()
+    }
+
     #[inline]
     fn chain_id(&self) -> Option<u64> {
         self.tx.chain_id()
@@ -426,6 +430,10 @@ impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<
 }
 
 impl<T: Transaction> Transaction for Sealed<T> {
+    fn frame_transaction(&self) -> Option<&crate::TxEip8141> {
+        self.inner().frame_transaction()
+    }
+
     #[inline]
     fn chain_id(&self) -> Option<u64> {
         self.inner().chain_id()

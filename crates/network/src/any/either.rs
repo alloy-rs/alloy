@@ -77,6 +77,13 @@ impl From<AnyTxEnvelope> for WithOtherFields<TransactionRequest> {
 }
 
 impl TransactionTrait for AnyTypedTransaction {
+    fn frame_transaction(&self) -> Option<&alloy_consensus::TxEip8141> {
+        match self {
+            Self::Ethereum(tx) => tx.frame_transaction(),
+            Self::Unknown(_) => None,
+        }
+    }
+
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         match self {
@@ -494,6 +501,13 @@ impl Decodable2718 for AnyTxEnvelope {
 }
 
 impl TransactionTrait for AnyTxEnvelope {
+    fn frame_transaction(&self) -> Option<&alloy_consensus::TxEip8141> {
+        match self {
+            Self::Ethereum(tx) => tx.frame_transaction(),
+            Self::Unknown(_) => None,
+        }
+    }
+
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         match self {

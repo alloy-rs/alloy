@@ -121,6 +121,10 @@ where
     B: Transaction,
     T: Transaction,
 {
+    fn frame_transaction(&self) -> Option<&crate::TxEip8141> {
+        delegate!(self => tx.frame_transaction())
+    }
+
     fn chain_id(&self) -> Option<ChainId> {
         delegate!(self => tx.chain_id())
     }

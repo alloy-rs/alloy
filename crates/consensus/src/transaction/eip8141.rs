@@ -235,7 +235,13 @@ impl<T: Decodable7594 + Clone> Decodable for TxEip8141Variant<T> {
                 return Ok(Self::TxEip8141WithSidecar(tx));
             }
         }
-        TxEip8141::decode(buf).map(Self::TxEip8141)
+        let tx = TxEip8141::decode(buf)?;
+        if !tx.blob_versioned_hashes.is_empty() {
+            return Err(alloy_rlp::Error::Custom(
+                "pooled frame transaction requires a blob sidecar",
+            ));
+        }
+        Ok(Self::TxEip8141(tx))
     }
 }
 
@@ -253,6 +259,10 @@ impl<T: Decodable7594 + Clone> Decodable2718 for TxEip8141Variant<T> {
 }
 
 impl<T: fmt::Debug + Send + Sync + 'static> Transaction for TxEip8141Variant<T> {
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        Some(self.tx())
+    }
+
     fn chain_id(&self) -> Option<ChainId> {
         self.tx().chain_id()
     }
@@ -263,6 +273,244 @@ impl<T: fmt::Debug + Send + Sync + 'static> Transaction for TxEip8141Variant<T> 
 
     fn gas_limit(&self) -> u64 {
         self.tx().gas_limit()
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        self.tx().gas_price()
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.tx().max_fee_per_gas()
+    }
+
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.tx().max_fee_per_gas_u256()
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.tx().max_priority_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.tx().max_priority_fee_per_gas_u256()
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.tx().max_fee_per_blob_gas()
+    }
+
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.tx().max_fee_per_blob_gas_u256()
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.tx().priority_fee_or_price()
+    }
+
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.tx().priority_fee_or_price_u256()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.tx().effective_gas_price(base_fee)
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        self.tx().effective_gas_price_u256(base_fee)
+    }
+
+    fn is_dynamic_fee(&self) -> bool {
+        true
+    }
+
+    fn kind(&self) -> TxKind {
+        self.tx().kind()
+    }
+
+    fn is_create(&self) -> bool {
+        false
+    }
+
+    fn value(&self) -> U256 {
+        U256::ZERO
+    }
+
+    fn input(&self) -> &Bytes {
+        self.tx().input()
+    }
+
+    fn access_list(&self) -> Option<&alloy_eips::eip2930::AccessList> {
+        None
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        Some(&self.tx().blob_versioned_hashes)
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
+    }
+}
+
+/// Immutable pooled frame transaction with its derived gas limit computed once.
+/// Only sidecar mutation is exposed; canonical fields cannot invalidate the gas cache.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CachedFrameTransaction<T> {
+    inner: TxEip8141Variant<T>,
+    gas_limit: u64,
+}
+
+impl<T> CachedFrameTransaction<T> {
+    /// Computes the derived gas limit and freezes the canonical transaction fields.
+    pub fn new(inner: TxEip8141Variant<T>) -> Self {
+        let gas_limit = inner.tx().calculate_gas_limit();
+        Self { inner, gas_limit }
+    }
+
+    /// Returns the canonical transaction.
+    pub const fn tx(&self) -> &TxEip8141 {
+        self.inner.tx()
+    }
+
+    /// Returns the sidecar, if any.
+    pub const fn sidecar(&self) -> Option<&T> {
+        self.inner.sidecar()
+    }
+
+    /// Mutates only network data, leaving the canonical transaction and gas cache unchanged.
+    pub const fn sidecar_mut(&mut self) -> Option<&mut T> {
+        self.inner.sidecar_mut()
+    }
+
+    /// Unwraps the transaction, discarding derived metadata.
+    pub fn into_inner(self) -> TxEip8141Variant<T> {
+        self.inner
+    }
+
+    /// Returns the cached gas limit.
+    pub const fn gas_limit(&self) -> u64 {
+        self.gas_limit
+    }
+}
+
+impl<T> From<TxEip8141Variant<T>> for CachedFrameTransaction<T> {
+    fn from(tx: TxEip8141Variant<T>) -> Self {
+        Self::new(tx)
+    }
+}
+
+impl<T> From<TxEip8141> for CachedFrameTransaction<T> {
+    fn from(tx: TxEip8141) -> Self {
+        Self::new(tx.into())
+    }
+}
+
+impl<T> From<TxEip8141WithSidecar<T>> for CachedFrameTransaction<T> {
+    fn from(tx: TxEip8141WithSidecar<T>) -> Self {
+        Self::new(tx.into())
+    }
+}
+
+impl<T> Sealable for CachedFrameTransaction<T> {
+    fn hash_slow(&self) -> B256 {
+        self.inner.hash_slow()
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for CachedFrameTransaction<T> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut tx = TxEip8141::arbitrary(u)?;
+        if u.arbitrary()? {
+            Ok(TxEip8141WithSidecar::new(tx, u.arbitrary()?).into())
+        } else {
+            // A bare pooled transaction cannot advertise blobs without their sidecar.
+            tx.blob_versioned_hashes.clear();
+            Ok(tx.into())
+        }
+    }
+}
+
+impl<T> Typed2718 for CachedFrameTransaction<T> {
+    fn ty(&self) -> u8 {
+        FRAME_TX_TYPE
+    }
+}
+
+impl<T> IsTyped2718 for CachedFrameTransaction<T> {
+    fn is_type(ty: u8) -> bool {
+        ty == FRAME_TX_TYPE
+    }
+}
+
+impl<T: Encodable7594> Encodable for CachedFrameTransaction<T> {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.inner.encode(out);
+    }
+    fn length(&self) -> usize {
+        self.inner.length()
+    }
+}
+
+impl<T: Decodable7594 + Clone> Decodable for CachedFrameTransaction<T> {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        TxEip8141Variant::decode(buf).map(Self::new)
+    }
+}
+
+impl<T: Encodable7594 + Send + Sync> Encodable2718 for CachedFrameTransaction<T> {
+    fn encode_2718_len(&self) -> usize {
+        self.inner.encode_2718_len()
+    }
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        self.inner.encode_2718(out);
+    }
+}
+
+impl<T: Decodable7594 + Clone> Decodable2718 for CachedFrameTransaction<T> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        TxEip8141Variant::typed_decode(ty, buf).map(Self::new)
+    }
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        TxEip8141Variant::fallback_decode(buf).map(Self::new)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: serde::Serialize> serde::Serialize for CachedFrameTransaction<T> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.inner.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for CachedFrameTransaction<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let inner = TxEip8141Variant::deserialize(deserializer)?;
+        if inner.sidecar().is_none() && !inner.tx().blob_versioned_hashes.is_empty() {
+            return Err(serde::de::Error::custom(
+                "pooled frame transaction requires a blob sidecar",
+            ));
+        }
+        Ok(Self::new(inner))
+    }
+}
+
+impl<T: fmt::Debug + Send + Sync + 'static> Transaction for CachedFrameTransaction<T> {
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        Some(self.tx())
+    }
+
+    fn chain_id(&self) -> Option<ChainId> {
+        self.tx().chain_id()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.tx().nonce()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.gas_limit
     }
 
     fn gas_price(&self) -> Option<u128> {
@@ -431,6 +679,10 @@ impl<T: Decodable7594 + Clone> Decodable2718 for TxEip8141WithSidecar<T> {
 }
 
 impl<T: fmt::Debug + Send + Sync + 'static> Transaction for TxEip8141WithSidecar<T> {
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        Some(&self.tx)
+    }
+
     fn chain_id(&self) -> Option<ChainId> {
         self.tx.chain_id()
     }
@@ -527,118 +779,20 @@ impl TxEip8141 {
         FRAME_TX_TYPE
     }
 
-    /// Validates the structural constraints that can be checked without executing a frame.
-    ///
-    /// Signature validity itself is checked by the selected frame validation scheme. This method
-    /// only rejects malformed transactions that must not reach signing, pooling, or execution.
+    /// Returns a borrowed view for validation and gas accounting.
+    pub fn as_frame_ref(&self) -> TxEip8141Ref<'_> {
+        TxEip8141Ref {
+            sender: self.sender,
+            frames: &self.frames,
+            signatures: &self.signatures,
+            fees: &self.fees,
+            blob_versioned_hashes: &self.blob_versioned_hashes,
+        }
+    }
+
+    /// Validates the structural constraints without executing a frame.
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.frames.is_empty() || self.frames.len() > MAX_FRAMES {
-            return Err("EIP-8141 transaction must contain between 1 and 64 frames");
-        }
-        if self.fees.max_priority_fee_per_gas > self.fees.max_fee_per_gas {
-            return Err("max priority fee exceeds max fee");
-        }
-        if !self.blob_versioned_hashes.is_empty() {
-            if self.fees.max_fee_per_blob_gas.is_zero() {
-                return Err("blob hashes require a non-zero blob fee");
-            }
-            if self.blob_versioned_hashes.iter().any(|hash| hash[0] != 0x01) {
-                return Err("invalid EIP-4844 versioned hash");
-            }
-        } else if !self.fees.max_fee_per_blob_gas.is_zero() {
-            return Err("blob fee is non-zero without blob hashes");
-        }
-
-        for signature in &self.signatures {
-            match signature.scheme {
-                SignatureScheme::Arbitrary => {
-                    if !signature.signer.is_empty() {
-                        return Err("arbitrary signatures must not contain signer metadata");
-                    }
-                }
-                SignatureScheme::Secp256k1 => {
-                    if !matches!(signature.signer.len(), 0 | 20) || signature.signature.len() != 65
-                    {
-                        return Err("invalid secp256k1 frame signature dimensions");
-                    }
-                }
-                SignatureScheme::P256 => {
-                    if !matches!(signature.signer.len(), 0 | 20) || signature.signature.len() != 128
-                    {
-                        return Err("invalid P-256 frame signature dimensions");
-                    }
-                }
-            }
-            if !signature.msg.is_empty()
-                && (signature.msg.len() != 32 || signature.msg.iter().all(|byte| *byte == 0))
-            {
-                return Err("frame signature message must be empty or a non-zero 32-byte digest");
-            }
-        }
-
-        let mut execution_gas = 0u64;
-        let mut state_gas = 0u64;
-        let mut expiry_verifiers = 0u8;
-        for (index, frame) in self.frames.iter().enumerate() {
-            if !frame.has_valid_target_encoding() {
-                return Err("invalid EIP-8141 frame target");
-            }
-            if frame.flags & !FRAME_FLAGS_MASK != 0 {
-                return Err("reserved EIP-8141 frame flag is set");
-            }
-            if !frame.value.is_zero() && frame.mode != FrameMode::Sender {
-                return Err("frame value is only valid in sender mode");
-            }
-            if frame.allowed_scope() & u8::from(ApprovalScope::Execution) != 0
-                && !frame.target.is_empty()
-                && frame.target_address() != Some(self.sender)
-            {
-                return Err("execution approval target must resolve to the transaction sender");
-            }
-            if frame.is_atomic_batch()
-                && (frame.mode == FrameMode::Verify
-                    || index + 1 == self.frames.len()
-                    || self.frames[index + 1].mode == FrameMode::Verify)
-            {
-                return Err("invalid atomic EIP-8141 frame");
-            }
-            let is_atomic_batch_member = frame.is_atomic_batch()
-                || index
-                    .checked_sub(1)
-                    .is_some_and(|previous| self.frames[previous].is_atomic_batch());
-            if is_atomic_batch_member && frame.allowed_scope() != 0 {
-                return Err("atomic batch frames must not approve payment or execution");
-            }
-            if frame.is_expiry_verifier() {
-                expiry_verifiers = expiry_verifiers.saturating_add(1);
-                if expiry_verifiers > 1 {
-                    return Err("EIP-8141 transaction may contain at most one expiry verifier");
-                }
-                if !frame.has_valid_expiry_verifier_fields() {
-                    return Err("invalid expiry verifier frame");
-                }
-            }
-            execution_gas = execution_gas
-                .checked_add(frame.limits.execution)
-                .ok_or("frame execution gas limit overflows u64")?;
-            state_gas = state_gas
-                .checked_add(frame.limits.state)
-                .ok_or("frame state gas limit overflows u64")?;
-        }
-
-        let _ = execution_gas.checked_add(state_gas).ok_or("frame gas limit overflows u64")?;
-        let _ = self
-            .signature_verification_gas()
-            .checked_add(self.value_transfer_gas())
-            .ok_or("frame intrinsic gas overflows u64")?;
-        if self
-            .calculate_execution_gas_limit_with_token_cost(FRAME_TX_DATA_TOKEN_STANDARD_COST)
-            .max(self.calculate_calldata_floor())
-            > MAX_TX_GAS_LIMIT_OSAKA
-        {
-            return Err("EIP-8141 transaction exceeds the EIP-7825 execution gas cap");
-        }
-        Ok(())
+        self.as_frame_ref().validate()
     }
 
     /// Outputs the length of the transaction's fields, without an RLP header.
@@ -777,6 +931,209 @@ impl TxEip8141 {
         self.frames.get(index).is_some_and(Frame::is_expiry_verifier)
     }
 
+    /// See [`TxEip8141Ref::total_frame_gas_limit`].
+    pub fn total_frame_gas_limit(&self) -> u64 {
+        self.as_frame_ref().total_frame_gas_limit()
+    }
+
+    /// See [`TxEip8141Ref::total_frame_execution_gas_limit`].
+    pub fn total_frame_execution_gas_limit(&self) -> u64 {
+        self.as_frame_ref().total_frame_execution_gas_limit()
+    }
+
+    /// See [`TxEip8141Ref::total_frame_state_gas_limit`].
+    pub fn total_frame_state_gas_limit(&self) -> u64 {
+        self.as_frame_ref().total_frame_state_gas_limit()
+    }
+
+    /// See [`TxEip8141Ref::signature_verification_gas`].
+    pub fn signature_verification_gas(&self) -> u64 {
+        self.as_frame_ref().signature_verification_gas()
+    }
+
+    /// See [`TxEip8141Ref::value_transfer_gas`].
+    pub fn value_transfer_gas(&self) -> u64 {
+        self.as_frame_ref().value_transfer_gas()
+    }
+
+    /// See [`TxEip8141Ref::frame_calldata_tokens`].
+    pub fn frame_calldata_tokens(&self) -> u64 {
+        self.as_frame_ref().frame_calldata_tokens()
+    }
+
+    /// See [`TxEip8141Ref::frame_calldata_len`].
+    pub fn frame_calldata_len(&self) -> u64 {
+        self.as_frame_ref().frame_calldata_len()
+    }
+
+    /// See [`TxEip8141Ref::calculate_execution_gas_limit_with_token_cost`].
+    pub fn calculate_execution_gas_limit_with_token_cost(&self, data_token_cost: u64) -> u64 {
+        self.as_frame_ref().calculate_execution_gas_limit_with_token_cost(data_token_cost)
+    }
+
+    /// See [`TxEip8141Ref::calculate_gas_limit_with_token_cost`].
+    pub fn calculate_gas_limit_with_token_cost(&self, data_token_cost: u64) -> u64 {
+        self.as_frame_ref().calculate_gas_limit_with_token_cost(data_token_cost)
+    }
+
+    /// See [`TxEip8141Ref::calculate_gas_limit`].
+    pub fn calculate_gas_limit(&self) -> u64 {
+        self.as_frame_ref().calculate_gas_limit()
+    }
+
+    /// See [`TxEip8141Ref::calculate_calldata_floor`].
+    pub fn calculate_calldata_floor(&self) -> u64 {
+        self.as_frame_ref().calculate_calldata_floor()
+    }
+
+    /// Calculates a heuristic for the in-memory size of the [TxEip8141] transaction.
+    #[inline]
+    pub fn size(&self) -> usize {
+        size_of::<Self>()
+            + self.frames.capacity() * size_of::<Frame>()
+            + self.signatures.capacity() * size_of::<FrameSignature>()
+            + self.blob_versioned_hashes.capacity() * size_of::<B256>()
+            + self.frames.iter().map(|frame| frame.target.len() + frame.data.len()).sum::<usize>()
+            + self
+                .signatures
+                .iter()
+                .map(|signature| {
+                    signature.signer.len() + signature.msg.len() + signature.signature.len()
+                })
+                .sum::<usize>()
+    }
+}
+
+/// Borrowed frame fields for allocation-free structural validation and gas accounting.
+#[derive(Clone, Copy, Debug)]
+pub struct TxEip8141Ref<'a> {
+    /// Transaction sender.
+    pub sender: Address,
+    /// Frame list.
+    pub frames: &'a [Frame],
+    /// Signature list.
+    pub signatures: &'a [FrameSignature],
+    /// Fee parameters.
+    pub fees: &'a TransactionFees,
+    /// Blob hashes.
+    pub blob_versioned_hashes: &'a [B256],
+}
+
+impl TxEip8141Ref<'_> {
+    /// Validates the structural constraints that can be checked without executing a frame.
+    ///
+    /// Signature validity itself is checked by the selected frame validation scheme. This method
+    /// only rejects malformed transactions that must not reach signing, pooling, or execution.
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.frames.is_empty() || self.frames.len() > MAX_FRAMES {
+            return Err("EIP-8141 transaction must contain between 1 and 64 frames");
+        }
+        if self.fees.max_priority_fee_per_gas > self.fees.max_fee_per_gas {
+            return Err("max priority fee exceeds max fee");
+        }
+        if !self.blob_versioned_hashes.is_empty() {
+            if self.fees.max_fee_per_blob_gas.is_zero() {
+                return Err("blob hashes require a non-zero blob fee");
+            }
+            if self.blob_versioned_hashes.iter().any(|hash| hash[0] != 0x01) {
+                return Err("invalid EIP-4844 versioned hash");
+            }
+        } else if !self.fees.max_fee_per_blob_gas.is_zero() {
+            return Err("blob fee is non-zero without blob hashes");
+        }
+
+        for signature in self.signatures {
+            match signature.scheme {
+                SignatureScheme::Arbitrary => {
+                    if !signature.signer.is_empty() {
+                        return Err("arbitrary signatures must not contain signer metadata");
+                    }
+                }
+                SignatureScheme::Secp256k1 => {
+                    if !matches!(signature.signer.len(), 0 | 20) || signature.signature.len() != 65
+                    {
+                        return Err("invalid secp256k1 frame signature dimensions");
+                    }
+                }
+                SignatureScheme::P256 => {
+                    if !matches!(signature.signer.len(), 0 | 20) || signature.signature.len() != 128
+                    {
+                        return Err("invalid P-256 frame signature dimensions");
+                    }
+                }
+            }
+            if !signature.msg.is_empty()
+                && (signature.msg.len() != 32 || signature.msg.iter().all(|byte| *byte == 0))
+            {
+                return Err("frame signature message must be empty or a non-zero 32-byte digest");
+            }
+        }
+
+        let mut execution_gas = 0u64;
+        let mut state_gas = 0u64;
+        let mut expiry_verifiers = 0u8;
+        for (index, frame) in self.frames.iter().enumerate() {
+            if !frame.has_valid_target_encoding() {
+                return Err("invalid EIP-8141 frame target");
+            }
+            if frame.flags & !FRAME_FLAGS_MASK != 0 {
+                return Err("reserved EIP-8141 frame flag is set");
+            }
+            if !frame.value.is_zero() && frame.mode != FrameMode::Sender {
+                return Err("frame value is only valid in sender mode");
+            }
+            if frame.allowed_scope() & u8::from(ApprovalScope::Execution) != 0
+                && !frame.target.is_empty()
+                && frame.target_address() != Some(self.sender)
+            {
+                return Err("execution approval target must resolve to the transaction sender");
+            }
+            if frame.is_atomic_batch()
+                && (frame.mode == FrameMode::Verify
+                    || index + 1 == self.frames.len()
+                    || self.frames[index + 1].mode == FrameMode::Verify)
+            {
+                return Err("invalid atomic EIP-8141 frame");
+            }
+            let is_atomic_batch_member = frame.is_atomic_batch()
+                || index
+                    .checked_sub(1)
+                    .is_some_and(|previous| self.frames[previous].is_atomic_batch());
+            if is_atomic_batch_member && frame.allowed_scope() != 0 {
+                return Err("atomic batch frames must not approve payment or execution");
+            }
+            if frame.is_expiry_verifier() {
+                expiry_verifiers = expiry_verifiers.saturating_add(1);
+                if expiry_verifiers > 1 {
+                    return Err("EIP-8141 transaction may contain at most one expiry verifier");
+                }
+                if !frame.has_valid_expiry_verifier_fields() {
+                    return Err("invalid expiry verifier frame");
+                }
+            }
+            execution_gas = execution_gas
+                .checked_add(frame.limits.execution)
+                .ok_or("frame execution gas limit overflows u64")?;
+            state_gas = state_gas
+                .checked_add(frame.limits.state)
+                .ok_or("frame state gas limit overflows u64")?;
+        }
+
+        let _ = execution_gas.checked_add(state_gas).ok_or("frame gas limit overflows u64")?;
+        let _ = self
+            .signature_verification_gas()
+            .checked_add(self.value_transfer_gas())
+            .ok_or("frame intrinsic gas overflows u64")?;
+        if self
+            .calculate_execution_gas_limit_with_token_cost(FRAME_TX_DATA_TOKEN_STANDARD_COST)
+            .max(self.calculate_calldata_floor())
+            > MAX_TX_GAS_LIMIT_OSAKA
+        {
+            return Err("EIP-8141 transaction exceeds the EIP-7825 execution gas cap");
+        }
+        Ok(())
+    }
+
     /// Returns the sum of all frame gas limits.
     pub fn total_frame_gas_limit(&self) -> u64 {
         self.frames.iter().fold(0u64, |acc, frame| {
@@ -880,23 +1237,6 @@ impl TxEip8141 {
                     .saturating_mul(FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN),
             )
     }
-
-    /// Calculates a heuristic for the in-memory size of the [TxEip8141] transaction.
-    #[inline]
-    pub fn size(&self) -> usize {
-        size_of::<Self>()
-            + self.frames.capacity() * size_of::<Frame>()
-            + self.signatures.capacity() * size_of::<FrameSignature>()
-            + self.blob_versioned_hashes.capacity() * size_of::<B256>()
-            + self.frames.iter().map(|frame| frame.target.len() + frame.data.len()).sum::<usize>()
-            + self
-                .signatures
-                .iter()
-                .map(|signature| {
-                    signature.signer.len() + signature.msg.len() + signature.signature.len()
-                })
-                .sum::<usize>()
-    }
 }
 
 impl Typed2718 for TxEip8141 {
@@ -942,6 +1282,10 @@ impl Decodable2718 for TxEip8141 {
 }
 
 impl Transaction for TxEip8141 {
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        Some(self)
+    }
+
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)

@@ -62,6 +62,15 @@ pub struct AnyNetwork {
 }
 
 impl Network for AnyNetwork {
+    fn try_into_presigned(tx: Self::UnsignedTx) -> Result<Self::TxEnvelope, Self::UnsignedTx> {
+        match tx {
+            AnyTypedTransaction::Ethereum(tx) => crate::Ethereum::try_into_presigned(tx)
+                .map(AnyTxEnvelope::Ethereum)
+                .map_err(AnyTypedTransaction::Ethereum),
+            tx => Err(tx),
+        }
+    }
+
     type TxType = AnyTxType;
 
     type TxEnvelope = AnyTxEnvelope;
@@ -461,6 +470,10 @@ impl TryFrom<AnyRpcTransaction> for TxEnvelope {
 }
 
 impl alloy_consensus::Transaction for AnyRpcTransaction {
+    fn frame_transaction(&self) -> Option<&alloy_consensus::TxEip8141> {
+        self.inner.frame_transaction()
+    }
+
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }

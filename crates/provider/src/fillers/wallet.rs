@@ -99,6 +99,12 @@ where
             _ => return Ok(tx),
         };
 
+        let builder = match builder.build_presigned_with_sidecar() {
+            Ok((envelope, encoded)) => {
+                return Ok(SendableTx::EnvelopeWithSidecar { envelope, encoded })
+            }
+            Err(builder) => builder,
+        };
         let envelope = builder.build(&self.wallet).await.map_err(RpcError::local_usage)?;
 
         Ok(SendableTx::Envelope(envelope))

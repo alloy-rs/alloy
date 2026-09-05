@@ -151,12 +151,12 @@ pub struct TransactionRequest {
     /// Signature entries for EIP-8141 frame transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub signatures: Option<Vec<FrameSignature>>,
-    /// Lossless fee values retained when an EIP-8141 transaction is converted back into a
-    /// request. The public RPC fee fields remain `u128` for compatibility with other transaction
-    /// types, so this metadata prevents a Rust transaction/request roundtrip from truncating a
-    /// valid 256-bit EIP-8141 fee.
-    #[doc(hidden)]
-    #[cfg_attr(feature = "serde", serde(skip))]
+    /// Full-width frame fees. Each explicit top-level fee overrides its corresponding value.
+    /// Conversions omit top-level fees that cannot fit in `u128`, preserving them here instead.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, rename = "fees", skip_serializing_if = "Option::is_none")
+    )]
     pub eip8141_fees: Option<TransactionFees>,
 }
 
@@ -172,6 +172,11 @@ impl TransactionRequest {
     ///
     /// Note: This leaves the `from` field empty.
     pub fn from_transaction<T: TransactionTrait>(tx: T) -> Self {
+        if let Some(frame) = tx.frame_transaction() {
+            let mut request: Self = frame.clone().into();
+            request.from = None;
+            return request;
+        }
         let to = Some(tx.to().into());
         let gas = tx.gas_limit();
         let value = tx.value();
@@ -682,82 +687,101 @@ impl TransactionRequest {
         })
     }
 
-    /// Build an EIP-8141 frame transaction.
-    ///
-    /// Returns an error if required fields are missing. Use `complete_8141` to
-    /// check if the request can be built.
-    pub fn build_8141(mut self) -> Result<TxEip8141, ValueError<Self>> {
-        self.populate_blob_hashes();
-        if self.from.is_none() {
-            return Err(ValueError::new(self, "Missing 'sender' field for Eip8141 transaction."));
-        }
-        if self.nonce.is_none() {
-            return Err(ValueError::new(self, "Missing 'nonce' field for Eip8141 transaction."));
-        }
-        if self.frames.is_none() {
-            return Err(ValueError::new(self, "Missing 'frames' field for Eip8141 transaction."));
-        }
-        if self.signatures.is_none() {
-            return Err(ValueError::new(
-                self,
-                "Missing 'signatures' field for Eip8141 transaction.",
-            ));
-        }
-        if self.max_fee_per_gas.is_none() {
-            return Err(ValueError::new(
-                self,
-                "Missing 'max_fee_per_gas' field for Eip8141 transaction.",
-            ));
-        }
-        if self.max_priority_fee_per_gas.is_none() {
-            return Err(ValueError::new(
-                self,
-                "Missing 'max_priority_fee_per_gas' field for Eip8141 transaction.",
-            ));
-        }
-        if self.max_fee_per_blob_gas.is_none() {
-            return Err(ValueError::new(
-                self,
-                "Missing 'max_fee_per_blob_gas' field for Eip8141 transaction.",
-            ));
-        }
-
-        let request = self.clone();
-        let tx = TxEip8141 {
-            chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.expect("checked"),
-            sender: self.from.expect("checked"),
-            frames: self.frames.expect("checked"),
-            signatures: self.signatures.expect("checked"),
-            fees: self.eip8141_fees.unwrap_or(TransactionFees {
-                max_priority_fee_per_gas: U256::from(
-                    self.max_priority_fee_per_gas.expect("checked"),
-                ),
-                max_fee_per_gas: U256::from(self.max_fee_per_gas.expect("checked")),
-                max_fee_per_blob_gas: U256::from(self.max_fee_per_blob_gas.expect("checked")),
-            }),
-            blob_versioned_hashes: self.blob_versioned_hashes.unwrap_or_default(),
-        };
-        tx.validate().map_err(|error| ValueError::new(request, error))?;
-        Ok(tx)
+    /// Resolves frame fees. Explicit narrow fields override the full-width fallback.
+    fn resolved_frame_fees(&self) -> Result<TransactionFees, &'static str> {
+        let full = self.eip8141_fees.as_ref();
+        Ok(TransactionFees {
+            max_fee_per_gas: self
+                .max_fee_per_gas
+                .map(U256::from)
+                .or_else(|| full.map(|f| f.max_fee_per_gas))
+                .ok_or("max_fee_per_gas")?,
+            max_priority_fee_per_gas: self
+                .max_priority_fee_per_gas
+                .map(U256::from)
+                .or_else(|| full.map(|f| f.max_priority_fee_per_gas))
+                .ok_or("max_priority_fee_per_gas")?,
+            max_fee_per_blob_gas: self
+                .max_fee_per_blob_gas
+                .map(U256::from)
+                .or_else(|| full.map(|f| f.max_fee_per_blob_gas))
+                .ok_or("max_fee_per_blob_gas")?,
+        })
     }
 
-    /// Builds an EIP-8141 transaction with its EIP-7594 network sidecar.
-    ///
-    /// The sidecar is excluded from the transaction hash and block transaction encoding. Use this
-    /// form when constructing the pooled transaction that is propagated over the network.
-    pub fn build_8141_with_sidecar(
-        &self,
-    ) -> Result<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>, ValueError<Self>> {
-        let Some(sidecar) = self.sidecar.as_ref().and_then(|sidecar| sidecar.as_eip7594()).cloned()
-        else {
-            return Err(ValueError::new(
-                self.clone(),
-                "Missing EIP-7594 'sidecar' field for Eip8141 transaction.",
-            ));
+    fn validate_8141_fields(&self) -> Result<(TransactionFees, Option<Vec<B256>>), &'static str> {
+        let sender = self.from.ok_or("sender")?;
+        self.nonce.ok_or("nonce")?;
+        let frames = self.frames.as_deref().ok_or("frames")?;
+        let signatures = self.signatures.as_deref().ok_or("signatures")?;
+        let fees = self.resolved_frame_fees()?;
+        let hashes: alloc::borrow::Cow<'_, [B256]> = match &self.sidecar {
+            Some(sidecar) => {
+                if !sidecar.is_eip7594() {
+                    return Err("EIP-8141 requires an EIP-7594 sidecar");
+                }
+                let hashes: Vec<_> = sidecar.versioned_hashes().collect();
+                if self.blob_versioned_hashes.as_ref().is_some_and(|supplied| *supplied != hashes) {
+                    return Err("blob hashes do not match sidecar commitments");
+                }
+                alloc::borrow::Cow::Owned(hashes)
+            }
+            None => alloc::borrow::Cow::Borrowed(
+                self.blob_versioned_hashes.as_deref().unwrap_or_default(),
+            ),
         };
-        let tx = self.clone().build_8141()?;
-        Ok(TxEip8141WithSidecar::new(tx, sidecar))
+        alloy_consensus::transaction::eip8141::TxEip8141Ref {
+            sender,
+            frames,
+            signatures,
+            fees: &fees,
+            blob_versioned_hashes: &hashes,
+        }
+        .validate()?;
+        Ok((
+            fees,
+            match hashes {
+                alloc::borrow::Cow::Owned(hashes) => Some(hashes),
+                alloc::borrow::Cow::Borrowed(_) => None,
+            },
+        ))
+    }
+
+    /// Builds the canonical frame transaction. Use the sidecar builder for raw submission.
+    pub fn build_8141(self) -> Result<TxEip8141, ValueError<Self>> {
+        let (fees, hashes) = match self.validate_8141_fields() {
+            Ok(fields) => fields,
+            Err(error) => return Err(ValueError::new(self, error)),
+        };
+        Ok(self.into_frame_transaction(fees, hashes))
+    }
+
+    // Called only after validate_8141_fields. Move the owned fields without revalidating or
+    // cloning.
+    fn into_frame_transaction(self, fees: TransactionFees, hashes: Option<Vec<B256>>) -> TxEip8141 {
+        TxEip8141 {
+            chain_id: self.chain_id.unwrap_or(1),
+            nonce: self.nonce.unwrap_or_default(),
+            sender: self.from.unwrap_or_default(),
+            frames: self.frames.unwrap_or_default(),
+            signatures: self.signatures.unwrap_or_default(),
+            fees,
+            blob_versioned_hashes: hashes.or(self.blob_versioned_hashes).unwrap_or_default(),
+        }
+    }
+
+    /// Builds a frame transaction with its EIP-7594 sidecar, moving the blob data.
+    pub fn build_8141_with_sidecar(
+        mut self,
+    ) -> Result<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>, ValueError<Self>> {
+        let (fees, hashes) = match self.validate_8141_fields() {
+            Ok(fields) => fields,
+            Err(error) => return Err(ValueError::new(self, error)),
+        };
+        let Some(BlobTransactionSidecarVariant::Eip7594(sidecar)) = self.sidecar.take() else {
+            return Err(ValueError::new(self, "Missing EIP-7594 sidecar"));
+        };
+        Ok(TxEip8141WithSidecar::new(self.into_frame_transaction(fees, hashes), sidecar))
     }
 
     /// Ensures `to` field is set to an address which is required by:
@@ -806,7 +830,11 @@ impl TransactionRequest {
     /// server due to conflicting keys, and should only be called before
     /// submission via rpc.
     pub fn trim_conflicting_keys(&mut self) {
-        match self.preferred_type() {
+        let preferred_type = self.preferred_type();
+        if preferred_type != TxType::Eip8141 {
+            self.eip8141_fees = None;
+        }
+        match preferred_type {
             TxType::Legacy => {
                 self.max_fee_per_gas = None;
                 self.max_priority_fee_per_gas = None;
@@ -1025,16 +1053,8 @@ impl TransactionRequest {
     /// assert_eq!(request.minimal_tx_type(), TxType::Legacy);
     /// ```
     pub const fn preferred_type(&self) -> TxType {
-        if let Some(tx_type) = self.transaction_type {
-            match tx_type {
-                0 => return TxType::Legacy,
-                1 => return TxType::Eip2930,
-                2 => return TxType::Eip1559,
-                3 => return TxType::Eip4844,
-                4 => return TxType::Eip7702,
-                6 => return TxType::Eip8141,
-                _ => {}
-            }
+        if let Some(6) = self.transaction_type {
+            return TxType::Eip8141;
         }
 
         if self.frames.is_some() || self.signatures.is_some() {
@@ -1151,36 +1171,10 @@ impl TransactionRequest {
         }
     }
 
-    /// Check if all necessary keys are present to build an 8141 transaction,
-    /// returning a list of keys that are missing.
+    /// Checks frame request completeness and structure, returning the first missing or invalid
+    /// field.
     pub fn complete_8141(&self) -> Result<(), Vec<&'static str>> {
-        let mut missing = Vec::with_capacity(8);
-        if self.nonce.is_none() {
-            missing.push("nonce");
-        }
-        if self.from.is_none() {
-            missing.push("sender");
-        }
-        self.check_1559_fields(&mut missing);
-        if self.max_fee_per_blob_gas.is_none() {
-            missing.push("max_fee_per_blob_gas");
-        }
-        if self.frames.is_none() {
-            missing.push("frames");
-        }
-        if self.signatures.is_none() {
-            missing.push("signatures");
-        }
-
-        if missing.is_empty() && self.clone().build_8141().is_err() {
-            missing.push("valid_eip8141_fields");
-        }
-
-        if missing.is_empty() {
-            Ok(())
-        } else {
-            Err(missing)
-        }
+        self.validate_8141_fields().map(|_| ()).map_err(|error| vec![error])
     }
 
     /// Check if all necessary keys are present to build a legacy transaction,
@@ -1216,6 +1210,16 @@ impl TransactionRequest {
     /// When `Ok(...)` is returned, the `TypedTransaction` is guaranteed to be _complete_. Which
     /// is to say, that it is signable, and the signed version can be sent to the network.
     pub fn build_typed_tx(self) -> Result<TypedTransaction, Self> {
+        if self.preferred_type() == TxType::Eip8141 {
+            // The canonical envelope cannot carry frame sidecars. Providers use
+            // build_presigned_with_sidecar; manual callers use build_8141_with_sidecar.
+            if self.sidecar.is_some()
+                || self.blob_versioned_hashes.as_ref().is_some_and(|hashes| !hashes.is_empty())
+            {
+                return Err(self);
+            }
+            return self.build_8141().map(Into::into).map_err(ValueError::into_value);
+        }
         let Some(tx_type) = self.buildable_type() else {
             return Err(self);
         };
@@ -1227,7 +1231,9 @@ impl TransactionRequest {
             // `sidecar` is a hard requirement since this must be a _sendable_ transaction.
             TxType::Eip4844 => self.build_4844_with_sidecar().expect("checked)").into(),
             TxType::Eip7702 => self.build_7702().expect("checked)").into(),
-            TxType::Eip8141 => self.build_8141().expect("checked)").into(),
+            TxType::Eip8141 => {
+                return self.build_8141().map(Into::into).map_err(ValueError::into_value)
+            }
         })
     }
 
@@ -1501,16 +1507,19 @@ impl From<TxEip8141> for TransactionRequest {
         } = tx;
         Self {
             from: Some(sender),
-            max_fee_per_gas: Some(fees.max_fee_per_gas.saturating_to()),
-            max_priority_fee_per_gas: Some(fees.max_priority_fee_per_gas.saturating_to()),
-            max_fee_per_blob_gas: Some(fees.max_fee_per_blob_gas.saturating_to()),
+            max_fee_per_gas: fees.max_fee_per_gas.try_into().ok(),
+            max_priority_fee_per_gas: fees.max_priority_fee_per_gas.try_into().ok(),
+            max_fee_per_blob_gas: fees.max_fee_per_blob_gas.try_into().ok(),
             nonce: Some(nonce),
             chain_id: Some(chain_id),
             blob_versioned_hashes: Some(blob_versioned_hashes),
             transaction_type: Some(ty),
             frames: Some(frames),
             signatures: Some(signatures),
-            eip8141_fees: Some(fees),
+            eip8141_fees: (fees.max_fee_per_gas > U256::from(u128::MAX)
+                || fees.max_priority_fee_per_gas > U256::from(u128::MAX)
+                || fees.max_fee_per_blob_gas > U256::from(u128::MAX))
+            .then_some(fees),
             ..Default::default()
         }
     }
@@ -1707,6 +1716,8 @@ pub(super) mod serde_bincode_compat {
         pub frames: Option<Cow<'a, Vec<Frame>>>,
         /// Signature entries for EIP-8141 frame transactions.
         pub signatures: Option<Cow<'a, Vec<FrameSignature>>>,
+        /// Full-width frame fees.
+        pub eip8141_fees: Option<alloy_eips::eip8141::TransactionFees>,
     }
 
     impl<'a> From<&'a super::TransactionRequest> for TransactionRequest<'a> {
@@ -1734,6 +1745,7 @@ pub(super) mod serde_bincode_compat {
                     .map(|auths| auths.iter().map(Into::into).collect()),
                 frames: value.frames.as_ref().map(Cow::Borrowed),
                 signatures: value.signatures.as_ref().map(Cow::Borrowed),
+                eip8141_fees: value.eip8141_fees,
             }
         }
     }
@@ -1766,7 +1778,7 @@ pub(super) mod serde_bincode_compat {
                     .map(|list| list.into_iter().map(Into::into).collect()),
                 frames: value.frames.map(Cow::into_owned),
                 signatures: value.signatures.map(Cow::into_owned),
-                eip8141_fees: None,
+                eip8141_fees: value.eip8141_fees,
             }
         }
     }
@@ -1795,6 +1807,7 @@ pub(super) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use crate::TransactionRequest;
+        use alloy_primitives::U256;
         use arbitrary::Arbitrary;
         use bincode::config;
         use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -1802,6 +1815,31 @@ pub(super) mod serde_bincode_compat {
         use serde_with::serde_as;
 
         use super::super::serde_bincode_compat;
+
+        #[test]
+        fn frame_full_width_fees_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::TransactionRequest")]
+                transaction: TransactionRequest,
+            }
+            let tx = alloy_consensus::TxEip8141 {
+                frames: vec![Default::default()],
+                fees: alloy_eips::eip8141::TransactionFees {
+                    max_fee_per_gas: U256::MAX,
+                    max_priority_fee_per_gas: U256::from(1),
+                    max_fee_per_blob_gas: U256::ZERO,
+                },
+                ..Default::default()
+            };
+            let data = Data { transaction: tx.clone().into() };
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, data);
+            assert_eq!(decoded.transaction.build_8141().unwrap(), tx);
+        }
 
         #[test]
         fn test_tx_request_bincode_roundtrip() {

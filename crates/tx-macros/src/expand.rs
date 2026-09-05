@@ -386,6 +386,10 @@ impl Expander {
                     match self { #(Self::#variant_names(tx) => tx.gas_limit(),)* }
                 }
 
+                fn frame_transaction(&self) -> Option<&#alloy_consensus::TxEip8141> {
+                    match self { #(Self::#variant_names(tx) => tx.frame_transaction(),)* }
+                }
+
                 #[inline]
                 fn gas_price(&self) -> Option<u128> {
                     match self { #(Self::#variant_names(tx) => tx.gas_price(),)* }

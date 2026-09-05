@@ -1,10 +1,10 @@
 //! Defines the exact transaction variant that is allowed to be propagated over the eth p2p
 //! protocol.
 
-use super::EthereumTxEnvelope;
+use super::{eip8141::CachedFrameTransaction, EthereumTxEnvelope};
 use crate::{
     error::ValueError,
-    transaction::{TxEip4844Sidecar, TxEip8141, TxEip8141Variant, TxEip8141WithSidecar, TxHashRef},
+    transaction::{TxEip4844Sidecar, TxEip8141, TxEip8141WithSidecar, TxHashRef},
     InMemorySize, Signed, TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
     TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
@@ -72,7 +72,7 @@ pub enum PooledTransactionVariant<T> {
     Eip7702(Signed<TxEip7702>),
     /// An EIP-8141 transaction, optionally with its EIP-7594 sidecar.
     #[envelope(ty = 6)]
-    Eip8141(Sealed<TxEip8141Variant<BlobTransactionSidecarEip7594>>),
+    Eip8141(Sealed<CachedFrameTransaction<BlobTransactionSidecarEip7594>>),
 }
 
 impl<T> PooledTransactionVariant<T> {
@@ -129,7 +129,7 @@ impl<T> PooledTransactionVariant<T> {
     /// Returns the EIP-8141 pooled transaction, if this is one.
     pub const fn as_eip8141(
         &self,
-    ) -> Option<&Sealed<TxEip8141Variant<BlobTransactionSidecarEip7594>>> {
+    ) -> Option<&Sealed<CachedFrameTransaction<BlobTransactionSidecarEip7594>>> {
         match self {
             Self::Eip8141(tx) => Some(tx),
             _ => None,
@@ -201,19 +201,36 @@ impl<T> From<Signed<TxEip7702>> for PooledTransactionVariant<T> {
 
 impl<T> From<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>> for PooledTransactionVariant<T> {
     fn from(value: TxEip8141WithSidecar<BlobTransactionSidecarEip7594>) -> Self {
-        Self::Eip8141(TxEip8141Variant::from(value).seal_slow())
+        Self::Eip8141(CachedFrameTransaction::from(value).seal_slow())
     }
 }
 
-impl<T> From<TxEip8141> for PooledTransactionVariant<T> {
-    fn from(value: TxEip8141) -> Self {
-        Self::Eip8141(TxEip8141Variant::from(value).seal_slow())
+impl<T> TryFrom<TxEip8141> for PooledTransactionVariant<T> {
+    type Error = ValueError<TxEip8141>;
+
+    fn try_from(value: TxEip8141) -> Result<Self, Self::Error> {
+        if !value.blob_versioned_hashes.is_empty() {
+            return Err(ValueError::new_static(
+                value,
+                "pooled frame transaction requires a blob sidecar",
+            ));
+        }
+        Ok(Self::Eip8141(CachedFrameTransaction::from(value).seal_slow()))
     }
 }
 
-impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for PooledTransactionVariant<T> {
-    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar<T>>) -> Self {
-        match value {
+impl<T> TryFrom<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for PooledTransactionVariant<T> {
+    type Error = ValueError<EthereumTxEnvelope<TxEip4844WithSidecar<T>>>;
+
+    fn try_from(value: EthereumTxEnvelope<TxEip4844WithSidecar<T>>) -> Result<Self, Self::Error> {
+        if matches!(&value, EthereumTxEnvelope::Eip8141(tx) if !tx.blob_versioned_hashes.is_empty())
+        {
+            return Err(ValueError::new_static(
+                value,
+                "pooled frame transaction requires a blob sidecar",
+            ));
+        }
+        Ok(match value {
             EthereumTxEnvelope::Legacy(tx) => Self::Legacy(tx),
             EthereumTxEnvelope::Eip2930(tx) => Self::Eip2930(tx),
             EthereumTxEnvelope::Eip1559(tx) => Self::Eip1559(tx),
@@ -223,7 +240,7 @@ impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for PooledTransactionV
                 let (tx, hash) = tx.into_parts();
                 Self::Eip8141(Sealed::new_unchecked(tx.into(), hash))
             }
-        }
+        })
     }
 }
 
@@ -231,6 +248,13 @@ impl<T> TryFrom<EthereumTxEnvelope<TxEip4844>> for PooledTransactionVariant<T> {
     type Error = ValueError<EthereumTxEnvelope<TxEip4844>>;
 
     fn try_from(value: EthereumTxEnvelope<TxEip4844>) -> Result<Self, Self::Error> {
+        if matches!(&value, EthereumTxEnvelope::Eip8141(tx) if !tx.blob_versioned_hashes.is_empty())
+        {
+            return Err(ValueError::new_static(
+                value,
+                "pooled frame transaction requires a blob sidecar",
+            ));
+        }
         match value {
             EthereumTxEnvelope::Legacy(tx) => Ok(Self::Legacy(tx)),
             EthereumTxEnvelope::Eip2930(tx) => Ok(Self::Eip2930(tx)),
@@ -311,6 +335,7 @@ impl<T: TxEip4844Sidecar> InMemorySize for PooledTransactionVariant<T> {
                 tx.tx().size()
                     + tx.sidecar().map_or(0, TxEip4844Sidecar::size)
                     + core::mem::size_of::<B256>()
+                    + core::mem::size_of::<u64>()
             }
         }
     }
@@ -647,20 +672,17 @@ mod tests {
             ..Default::default()
         };
 
-        let pooled: PooledTransaction = tx.clone().into();
+        let pooled: PooledTransaction = tx.clone().try_into().unwrap();
         let encoded = pooled.encoded_2718();
         let decoded = PooledTransaction::decode_2718(&mut encoded.as_ref()).unwrap();
         assert_eq!(pooled, decoded);
-        assert!(matches!(decoded.as_eip8141().unwrap().inner(), TxEip8141Variant::TxEip8141(_)));
+        assert!(decoded.as_eip8141().unwrap().sidecar().is_none());
 
         let pooled: PooledTransaction = TxEip8141WithSidecar::new(tx, eip7594_sidecar()).into();
         let encoded = pooled.encoded_2718();
         let decoded = PooledTransaction::decode_2718(&mut encoded.as_ref()).unwrap();
         assert_eq!(pooled, decoded);
-        assert!(matches!(
-            decoded.as_eip8141().unwrap().inner(),
-            TxEip8141Variant::TxEip8141WithSidecar(_)
-        ));
+        assert!(decoded.as_eip8141().unwrap().sidecar().is_some());
     }
 
     #[test]
@@ -678,9 +700,6 @@ mod tests {
             PooledTransactionWithSidecarVariant::decode_2718(&mut encoded.as_ref()).unwrap();
 
         assert_eq!(pooled, decoded);
-        assert!(matches!(
-            decoded.as_eip8141().unwrap().inner(),
-            TxEip8141Variant::TxEip8141WithSidecar(_)
-        ));
+        assert!(decoded.as_eip8141().unwrap().sidecar().is_some());
     }
 }

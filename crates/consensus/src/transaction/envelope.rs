@@ -38,7 +38,12 @@ impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844Variant<T>> {
             Self::Eip1559(tx) => Ok(tx.into()),
             Self::Eip4844(tx) => EthereumTxEnvelope::try_from(tx).map_err(ValueError::convert),
             Self::Eip7702(tx) => Ok(tx.into()),
-            Self::Eip8141(tx) => Ok(EthereumTxEnvelope::Eip8141(tx)),
+            Self::Eip8141(tx) if tx.blob_versioned_hashes.is_empty() => {
+                Ok(EthereumTxEnvelope::Eip8141(tx))
+            }
+            tx @ Self::Eip8141(_) => {
+                Err(ValueError::new(tx, "pooled frame transaction requires a sidecar"))
+            }
         }
     }
 }
@@ -59,7 +64,12 @@ impl EthereumTxEnvelope<TxEip4844> {
                 Err(ValueError::new(tx.into(), "pooled transaction requires 4844 sidecar"))
             }
             Self::Eip7702(tx) => Ok(tx.into()),
-            Self::Eip8141(tx) => Ok(EthereumTxEnvelope::Eip8141(tx)),
+            Self::Eip8141(tx) if tx.blob_versioned_hashes.is_empty() => {
+                Ok(EthereumTxEnvelope::Eip8141(tx))
+            }
+            tx @ Self::Eip8141(_) => {
+                Err(ValueError::new(tx, "pooled frame transaction requires a sidecar"))
+            }
         }
     }
 
@@ -124,21 +134,20 @@ impl<T> EthereumTxEnvelope<T> {
     }
 
     /// Returns a mutable reference to the transaction's input.
+    /// Frame transactions have per-frame input instead and return `None`.
     #[doc(hidden)]
-    pub fn input_mut(&mut self) -> &mut Bytes
+    pub fn input_mut(&mut self) -> Option<&mut Bytes>
     where
         T: AsMut<TxEip4844>,
     {
-        match self {
+        Some(match self {
             Self::Eip1559(tx) => &mut tx.tx_mut().input,
             Self::Eip2930(tx) => &mut tx.tx_mut().input,
             Self::Legacy(tx) => &mut tx.tx_mut().input,
             Self::Eip7702(tx) => &mut tx.tx_mut().input,
             Self::Eip4844(tx) => &mut tx.tx_mut().as_mut().input,
-            Self::Eip8141(_) => {
-                panic!("EIP-8141 frame transactions do not expose mutable top-level input")
-            }
-        }
+            Self::Eip8141(_) => return None,
+        })
     }
 }
 
@@ -555,12 +564,14 @@ where
     }
 }
 
-impl<Eip4844: RlpEcdsaEncodableTx> From<EthereumTxEnvelope<Eip4844>>
+impl<Eip4844: RlpEcdsaEncodableTx> TryFrom<EthereumTxEnvelope<Eip4844>>
     for Signed<EthereumTypedTransaction<Eip4844>>
 where
     EthereumTypedTransaction<Eip4844>: From<Eip4844>,
 {
-    fn from(value: EthereumTxEnvelope<Eip4844>) -> Self {
+    type Error = ValueError<EthereumTxEnvelope<Eip4844>>;
+
+    fn try_from(value: EthereumTxEnvelope<Eip4844>) -> Result<Self, Self::Error> {
         value.into_signed()
     }
 }
@@ -638,20 +649,23 @@ impl<Eip4844> EthereumTxEnvelope<Eip4844> {
     }
 
     /// Consumes the type into a [`Signed`]
-    pub fn into_signed(self) -> Signed<EthereumTypedTransaction<Eip4844>>
+    pub fn into_signed(self) -> Result<Signed<EthereumTypedTransaction<Eip4844>>, ValueError<Self>>
     where
         EthereumTypedTransaction<Eip4844>: From<Eip4844>,
     {
-        match self {
+        Ok(match self {
             Self::Legacy(tx) => tx.convert(),
             Self::Eip2930(tx) => tx.convert(),
             Self::Eip1559(tx) => tx.convert(),
             Self::Eip4844(tx) => tx.convert(),
             Self::Eip7702(tx) => tx.convert(),
             Self::Eip8141(_) => {
-                panic!("EIP-8141 frame transactions do not have an outer transaction signature")
+                return Err(ValueError::new_static(
+                    self,
+                    "EIP-8141 frame transactions do not have an outer transaction signature",
+                ))
             }
-        }
+        })
     }
 }
 
@@ -825,18 +839,16 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
-    /// Return the reference to signature.
-    pub const fn signature(&self) -> &Signature {
-        match self {
+    /// Returns the outer signature, or `None` for self-authorized frame transactions.
+    pub const fn signature(&self) -> Option<&Signature> {
+        Some(match self {
             Self::Legacy(tx) => tx.signature(),
             Self::Eip2930(tx) => tx.signature(),
             Self::Eip1559(tx) => tx.signature(),
             Self::Eip4844(tx) => tx.signature(),
             Self::Eip7702(tx) => tx.signature(),
-            Self::Eip8141(_) => {
-                panic!("EIP-8141 frame transactions do not have an outer transaction signature")
-            }
-        }
+            Self::Eip8141(_) => return None,
+        })
     }
 
     /// Return the hash of the inner Signed.
@@ -2158,9 +2170,9 @@ mod tests {
 
         let tx = serde_json::from_str::<TxEnvelope>(raw_tx).unwrap();
 
-        assert_eq!(tx.signature().r(), U256::ZERO);
-        assert_eq!(tx.signature().s(), U256::ZERO);
-        assert!(!tx.signature().v());
+        assert_eq!(tx.signature().unwrap().r(), U256::ZERO);
+        assert_eq!(tx.signature().unwrap().s(), U256::ZERO);
+        assert!(!tx.signature().unwrap().v());
 
         assert_eq!(
             tx.hash(),
