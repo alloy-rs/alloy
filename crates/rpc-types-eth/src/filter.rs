@@ -421,9 +421,12 @@ pub struct Filter {
     pub address: FilterSet<Address>,
     /// Topic filters, with at most four positions.
     ///
-    /// Values within a position use OR semantics; populated positions use AND semantics. An empty
-    /// position is a wildcard and serializes as `null` when followed by a populated position.
-    pub topics: [Topic; 4],
+    /// Values within a position use OR semantics; populated positions use AND semantics. A [`None`]
+    /// position is unspecified: it matches anything and is truncated from the serialized array when
+    /// no later position is specified. An explicitly specified empty set is a wildcard that matches
+    /// any value but still requires the log to have a topic at that position; it serializes as
+    /// `null`.
+    pub topics: [Option<Topic>; 4],
 }
 
 impl Filter {
@@ -605,28 +608,28 @@ impl Filter {
     /// Sets event_signature(topic0) (the event name for non-anonymous events)
     #[must_use]
     pub fn event_signature<T: Into<Topic>>(mut self, topic: T) -> Self {
-        self.topics[0] = topic.into();
+        self.topics[0] = Some(topic.into());
         self
     }
 
     /// Sets the 1st indexed topic
     #[must_use]
     pub fn topic1<T: Into<Topic>>(mut self, topic: T) -> Self {
-        self.topics[1] = topic.into();
+        self.topics[1] = Some(topic.into());
         self
     }
 
     /// Sets the 2nd indexed topic
     #[must_use]
     pub fn topic2<T: Into<Topic>>(mut self, topic: T) -> Self {
-        self.topics[2] = topic.into();
+        self.topics[2] = Some(topic.into());
         self
     }
 
     /// Sets the 3rd indexed topic
     #[must_use]
     pub fn topic3<T: Into<Topic>>(mut self, topic: T) -> Self {
-        self.topics[3] = topic.into();
+        self.topics[3] = Some(topic.into());
         self
     }
 
@@ -655,7 +658,7 @@ impl Filter {
 
     /// Returns `true` if at least one topic is set
     pub fn has_topics(&self) -> bool {
-        self.topics.iter().any(|t| !t.is_empty())
+        self.topics.iter().flatten().any(|t| !t.is_empty())
     }
 
     /// Create the [`BloomFilter`] for the addresses.
@@ -665,7 +668,7 @@ impl Filter {
 
     /// Create a [`BloomFilter`] for each topic filter.
     pub fn topics_bloom_filter(&self) -> [Cow<'_, BloomFilter>; 4] {
-        self.topics.each_ref().map(|t| t.bloom_filter())
+        self.topics.each_ref().map(|t| t.as_ref().map(|t| t.bloom_filter()).unwrap_or_default())
     }
 
     /// Check whether the provided bloom contains all topics and the address we
@@ -678,9 +681,9 @@ impl Filter {
     /// Returns `true` if the filter matches the given topics.
     pub fn matches_topics(&self, topics: &[B256]) -> bool {
         self.topics.iter().zip_longest(topics.iter()).all(|topic| match topic {
-            Both(filter, log) => filter.matches(log),
-            Left(filter) => filter.is_empty(),
-            Right(_) => false,
+            Both(Some(filter), log) => filter.matches(log),
+            Left(None) | Both(None, _) | Right(_) => true,
+            Left(Some(_)) => false,
         })
     }
 
@@ -971,15 +974,16 @@ impl serde::Serialize for Filter {
             s.serialize_field("address", &address)?;
         }
 
-        let mut filtered_topics = Vec::with_capacity(self.topics.len());
-        let mut filtered_topics_len = 0;
-        for (i, topic) in self.topics.iter().enumerate() {
-            if !topic.is_empty() {
-                filtered_topics_len = i + 1;
-            }
-            filtered_topics.push(topic.to_value_or_array());
-        }
-        filtered_topics.truncate(filtered_topics_len);
+        // Truncate all of the `None` values (the unspecified topic filters) from the tail in order
+        // to preserve the correct quantity of topics which this filter constraints.
+        let mut filtered_topics = self
+            .topics
+            .iter()
+            .rev()
+            .skip_while(|topic| topic.is_none())
+            .map(|topic| topic.as_ref().and_then(FilterSet::to_value_or_array))
+            .collect::<Vec<_>>();
+        filtered_topics.reverse();
         s.serialize_field("topics", &filtered_topics)?;
 
         s.end()
@@ -1077,14 +1081,14 @@ impl<'de> serde::Deserialize<'de> for Filter {
                 if topics_vec.len() > 4 {
                     return Err(serde::de::Error::custom("exceeded maximum topics len"));
                 }
-                let mut topics: [Topic; 4] = [
+                let mut topics: [Option<Topic>; 4] = [
                     Default::default(),
                     Default::default(),
                     Default::default(),
                     Default::default(),
                 ];
                 for (idx, topic) in topics_vec.into_iter().enumerate() {
-                    topics[idx] = topic.map(|t| t.into()).unwrap_or_default();
+                    topics[idx] = Some(topic.map(|t| t.into()).unwrap_or_default());
                 }
 
                 let block_option = block_hash
@@ -1518,31 +1522,7 @@ impl FilteredParams {
 
     /// Returns `true` if the log matches the given topics
     pub fn filter_topics(&self, log_topics: &[B256]) -> bool {
-        let topics = match self.filter.as_ref() {
-            None => return true,
-            Some(f) => &f.topics,
-        };
-        for topic_tuple in topics.iter().zip_longest(log_topics.iter()) {
-            match topic_tuple {
-                // We exhausted the `log.topics`, so if there's a filter set for
-                // this topic index, there is no match. Otherwise (empty filter), continue.
-                Left(filter_topic) => {
-                    if !filter_topic.is_empty() {
-                        return false;
-                    }
-                }
-                // We exhausted the filter topics, therefore any subsequent log topic
-                // will match.
-                Right(_) => return true,
-                // Check that `log_topic` is included in `filter_topic`
-                Both(filter_topic, log_topic) => {
-                    if !filter_topic.matches(log_topic) {
-                        return false;
-                    }
-                }
-            }
-        }
-        true
+        self.filter.as_ref().is_none_or(|filter| filter.matches_topics(log_topics))
     }
 }
 
@@ -1713,16 +1693,20 @@ mod tests {
         assert_eq!(
             filter.topics,
             [
-                "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
-                "0x0000000000000000000000000c17e776cd218252adfca8d4e761d3fe757e9778"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
+                Some(
+                    "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into()
+                ),
+                Some(Default::default()),
+                Some(
+                    "0x0000000000000000000000000c17e776cd218252adfca8d4e761d3fe757e9778"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into()
+                ),
+                None,
             ]
         );
     }
@@ -1776,15 +1760,133 @@ mod tests {
         assert_eq!(
             filter.topics,
             [
-                "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
-                Default::default(),
-                Default::default(),
+                Some(
+                    "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into()
+                ),
+                Some(Default::default()),
+                Some(Default::default()),
+                None,
             ]
         );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serializing_trailing_explicit_wildcard_preserves_topic_count() {
+        let topic_a = B256::with_last_byte(1);
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [Some(topic_a.into()), Some(Default::default()), None, None],
+        };
+
+        assert_eq!(serialize(&filter), json!({ "topics": [topic_a, null] }));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serializing_middle_unspecified_topic_emits_null_and_truncates_tail() {
+        let topic_a = B256::with_last_byte(1);
+        let topic_b = B256::with_last_byte(2);
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [Some(topic_a.into()), None, Some(topic_b.into()), None],
+        };
+
+        assert_eq!(serialize(&filter), json!({ "topics": [topic_a, null, topic_b] }));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serializing_lone_trailing_wildcard_emits_all_nulls() {
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [None, None, None, Some(Default::default())],
+        };
+
+        assert_eq!(serialize(&filter), json!({ "topics": [null, null, null, null] }));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializing_explicit_nulls_marks_positions_as_specified() {
+        let topic_a = B256::with_last_byte(1);
+        let topic_b = B256::with_last_byte(2);
+        let json = json!({ "topics": [topic_a, null, topic_b, null] });
+
+        let filter = serde_json::from_value::<Filter>(json).unwrap();
+
+        assert_eq!(
+            filter.topics,
+            [
+                Some(topic_a.into()),
+                Some(Default::default()),
+                Some(topic_b.into()),
+                Some(Default::default()),
+            ]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializing_partial_topics_leaves_remaining_unspecified() {
+        let topic_a = B256::with_last_byte(1);
+        let json = json!({ "topics": [topic_a] });
+
+        let filter = serde_json::from_value::<Filter>(json).unwrap();
+
+        assert_eq!(filter.topics, [Some(topic_a.into()), None, None, None]);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializing_empty_topics_array_leaves_all_positions_unspecified() {
+        let json = json!({ "topics": [] });
+
+        let filter = serde_json::from_value::<Filter>(json).unwrap();
+
+        assert_eq!(filter.topics, [None, None, None, None]);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn trailing_explicit_wildcard_survives_round_trip() {
+        let signature = B256::with_last_byte(1);
+        let topic_a = B256::with_last_byte(2);
+        let topic_b = B256::with_last_byte(3);
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [
+                Some(signature.into()),
+                Some(vec![topic_a, topic_b].into()),
+                Some(Default::default()),
+                None,
+            ],
+        };
+
+        let round_tripped = serde_json::from_value::<Filter>(serialize(&filter)).unwrap();
+
+        assert_eq!(round_tripped, filter);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserialized_trailing_empty_array_requires_third_topic() {
+        let signature = B256::with_last_byte(1);
+        let topic_a = B256::with_last_byte(2);
+        let anything = B256::with_last_byte(3);
+        let json = json!({ "topics": [signature, [topic_a], []] });
+
+        let filter = serde_json::from_value::<Filter>(json).unwrap();
+
+        assert!(!filter.matches_topics(&[signature, topic_a]));
+        assert!(filter.matches_topics(&[signature, topic_a, anything]));
     }
 
     #[test]
@@ -1874,12 +1976,7 @@ mod tests {
         Filter {
             block_option: Default::default(),
             address: Default::default(),
-            topics: [
-                topic1.into(),
-                vec![topic2, topic3].into(),
-                Default::default(),
-                Default::default(),
-            ],
+            topics: [Some(topic1.into()), Some(vec![topic2, topic3].into()), None, None],
         }
     }
 
@@ -1920,12 +2017,7 @@ mod tests {
         let filter = Filter {
             block_option: Default::default(),
             address: address.into(),
-            topics: [
-                topic1.into(),
-                vec![topic2, topic3].into(),
-                Default::default(),
-                Default::default(),
-            ],
+            topics: [Some(topic1.into()), Some(vec![topic2, topic3].into()), None, None],
         };
 
         let log =
@@ -1944,12 +2036,7 @@ mod tests {
         let filter = Filter {
             block_option: Default::default(),
             address: Default::default(),
-            topics: [
-                Default::default(),
-                vec![topic2, topic3].into(),
-                Default::default(),
-                Default::default(),
-            ],
+            topics: [None, Some(vec![topic2, topic3].into()), None, None],
         };
 
         let log =
@@ -1968,12 +2055,7 @@ mod tests {
         let filter = Filter {
             block_option: Default::default(),
             address: Default::default(),
-            topics: [
-                Default::default(),
-                vec![topic1, topic2].into(),
-                Default::default(),
-                Default::default(),
-            ],
+            topics: [None, Some(vec![topic1, topic2].into()), None, None],
         };
 
         let log = Log {
@@ -2038,19 +2120,25 @@ mod tests {
                     .unwrap()
                     .into(),
                 topics: [
-                    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-                        .parse::<B256>()
-                        .unwrap()
-                        .into(),
-                    "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
-                        .parse::<B256>()
-                        .unwrap()
-                        .into(),
-                    "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
-                        .parse::<B256>()
-                        .unwrap()
-                        .into(),
-                    Default::default(),
+                    Some(
+                        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+                            .parse::<B256>()
+                            .unwrap()
+                            .into()
+                    ),
+                    Some(
+                        "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
+                            .parse::<B256>()
+                            .unwrap()
+                            .into()
+                    ),
+                    Some(
+                        "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
+                            .parse::<B256>()
+                            .unwrap()
+                            .into()
+                    ),
+                    None,
                 ],
             }
         );
@@ -2178,19 +2266,25 @@ mod tests {
                 .unwrap()
                 .into(),
             topics: [
-                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
+                Some(
+                    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into(),
+                ),
+                Some(
+                    "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into(),
+                ),
+                Some(
+                    "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into(),
+                ),
+                None,
             ],
         };
         assert!(filter.is_pending_block_filter());
@@ -2205,19 +2299,25 @@ mod tests {
                 .unwrap()
                 .into(),
             topics: [
-                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
+                Some(
+                    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into(),
+                ),
+                Some(
+                    "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into(),
+                ),
+                Some(
+                    "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
+                        .parse::<B256>()
+                        .unwrap()
+                        .into(),
+                ),
+                None,
             ],
         };
         assert!(!filter.is_pending_block_filter());
