@@ -4,7 +4,7 @@ use alloy_rlp::BufMut;
 use core::fmt;
 
 mod envelope;
-pub use envelope::ReceiptEnvelope;
+pub use envelope::{FrameReceiptEnvelope, ReceiptEnvelope};
 
 pub(crate) mod receipt2;
 pub use receipt2::{EthereumReceipt, TxTy};

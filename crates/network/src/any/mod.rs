@@ -62,6 +62,15 @@ pub struct AnyNetwork {
 }
 
 impl Network for AnyNetwork {
+    fn try_into_presigned(tx: Self::UnsignedTx) -> Result<Self::TxEnvelope, Self::UnsignedTx> {
+        match tx {
+            AnyTypedTransaction::Ethereum(tx) => crate::Ethereum::try_into_presigned(tx)
+                .map(AnyTxEnvelope::Ethereum)
+                .map_err(AnyTypedTransaction::Ethereum),
+            tx => Err(tx),
+        }
+    }
+
     type TxType = AnyTxType;
 
     type TxEnvelope = AnyTxEnvelope;
@@ -461,6 +470,10 @@ impl TryFrom<AnyRpcTransaction> for TxEnvelope {
 }
 
 impl alloy_consensus::Transaction for AnyRpcTransaction {
+    fn frame_transaction(&self) -> Option<&alloy_consensus::TxEip8141> {
+        self.inner.frame_transaction()
+    }
+
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }
@@ -481,20 +494,44 @@ impl alloy_consensus::Transaction for AnyRpcTransaction {
         alloy_consensus::Transaction::max_fee_per_gas(&self.inner)
     }
 
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.inner.max_fee_per_gas_u256()
+    }
+
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.inner.max_priority_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.inner.max_priority_fee_per_gas_u256()
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.inner.max_fee_per_blob_gas()
     }
 
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.inner.max_fee_per_blob_gas_u256()
+    }
+
     fn priority_fee_or_price(&self) -> u128 {
         self.inner.priority_fee_or_price()
     }
 
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.inner.priority_fee_or_price_u256()
+    }
+
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         self.inner.effective_gas_price(base_fee)
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        self.inner.effective_gas_price_u256(base_fee)
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        self.inner.effective_tip_per_gas_u256(base_fee)
     }
 
     fn is_dynamic_fee(&self) -> bool {

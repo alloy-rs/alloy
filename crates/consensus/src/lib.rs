@@ -33,9 +33,9 @@ pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
-    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, EthereumReceipt, Receipt,
-    ReceiptEnvelope, ReceiptWithBloom, Receipts, RlpDecodableReceipt, RlpEncodableReceipt,
-    TxReceipt, TxTy,
+    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, EthereumReceipt,
+    FrameReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts,
+    RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt, TxTy,
 };
 
 pub mod size;
@@ -50,7 +50,7 @@ pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
     EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction,
     TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
-    TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction,
+    TxEip7702, TxEip8141, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 
 pub use alloy_eips::{

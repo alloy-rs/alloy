@@ -117,6 +117,22 @@ impl TransactionBuilder for TransactionRequest {
 }
 
 impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
+    fn should_fill_gas(&self) -> bool {
+        self.preferred_type() != TxType::Eip8141
+    }
+
+    fn build_presigned_with_sidecar(self) -> Result<(alloy_consensus::TxEnvelope, Bytes), Self> {
+        use alloy_eips::Encodable2718;
+        use alloy_primitives::Sealable;
+        if self.preferred_type() != TxType::Eip8141 || self.sidecar.is_none() {
+            return Err(self);
+        }
+        let pooled = self.build_8141_with_sidecar().map_err(|error| error.into_value())?;
+        let encoded = pooled.encoded_2718().into();
+        let (tx, _) = pooled.into_parts();
+        Ok((alloy_consensus::TxEnvelope::Eip8141(tx.seal_slow()), encoded))
+    }
+
     fn can_submit(&self) -> bool {
         // value and data may be None. If they are, they will be set to default.
         // gas fields and nonce may be None, if they are, they will be populated
@@ -125,6 +141,9 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn can_build(&self) -> bool {
+        if self.preferred_type() == TxType::Eip8141 {
+            return self.complete_8141().is_ok();
+        }
         // value and data may be none. If they are, they will be set to default
         // values.
 
@@ -149,6 +168,7 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
             TxType::Eip1559 => self.complete_1559(),
             TxType::Eip4844 => self.complete_4844(),
             TxType::Eip7702 => self.complete_7702(),
+            TxType::Eip8141 => self.complete_8141(),
         }
     }
 
@@ -169,11 +189,13 @@ impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn build_unsigned(self) -> BuildResult<TypedTransaction, Ethereum> {
-        if let Err((tx_type, missing)) = self.missing_keys() {
-            return Err(TransactionBuilderError::InvalidTransactionRequest(tx_type, missing)
-                .into_unbuilt(self));
-        }
-        Ok(self.build_typed_tx().expect("checked by missing_keys"))
+        self.build_typed_tx().map_err(|request| {
+            let (tx_type, missing) = request.missing_keys().err().unwrap_or_else(|| {
+                (request.preferred_type(), vec!["use a pooled frame sidecar for raw submission"])
+            });
+            TransactionBuilderError::InvalidTransactionRequest(tx_type, missing)
+                .into_unbuilt(request)
+        })
     }
 
     async fn build<W: NetworkWallet<Ethereum>>(
@@ -194,7 +216,7 @@ mod tests {
         transaction::Recovered, BlobTransactionSidecar, SignableTransaction, TxEip1559, TxEnvelope,
         TxType, TypedTransaction,
     };
-    use alloy_eips::eip7702::Authorization;
+    use alloy_eips::{eip7702::Authorization, eip8141::Frame};
     use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U160, U256};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
     use std::str::FromStr;
@@ -212,6 +234,25 @@ mod tests {
         };
         let tx_req: TransactionRequest = tx.into();
         tx_req.build_unsigned().unwrap();
+    }
+
+    #[test]
+    fn builds_eip8141_without_explicit_gas_limit() {
+        let request = TransactionRequest {
+            from: Some(Address::ZERO),
+            nonce: Some(0),
+            max_priority_fee_per_gas: Some(1),
+            max_fee_per_gas: Some(2),
+            max_fee_per_blob_gas: Some(0),
+            transaction_type: Some(TxType::Eip8141 as u8),
+            frames: Some(vec![Frame::default()]),
+            signatures: Some(Vec::new()),
+            ..Default::default()
+        };
+
+        assert!(request.can_build());
+        assert!(request.complete_type(TxType::Eip8141).is_ok());
+        assert!(matches!(request.build_unsigned().unwrap(), TypedTransaction::Eip8141(_)));
     }
 
     #[test]

@@ -312,6 +312,10 @@ where
 }
 
 impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<T, Sig> {
+    fn frame_transaction(&self) -> Option<&crate::TxEip8141> {
+        self.tx.frame_transaction()
+    }
+
     #[inline]
     fn chain_id(&self) -> Option<u64> {
         self.tx.chain_id()
@@ -338,8 +342,18 @@ impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<
     }
 
     #[inline]
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.tx.max_fee_per_gas_u256()
+    }
+
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.tx.max_priority_fee_per_gas()
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.tx.max_priority_fee_per_gas_u256()
     }
 
     #[inline]
@@ -348,12 +362,30 @@ impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<
     }
 
     #[inline]
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.tx.max_fee_per_blob_gas_u256()
+    }
+
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.tx.priority_fee_or_price()
     }
 
+    #[inline]
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.tx.priority_fee_or_price_u256()
+    }
+
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         self.tx.effective_gas_price(base_fee)
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        self.tx.effective_gas_price_u256(base_fee)
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        self.tx.effective_tip_per_gas_u256(base_fee)
     }
 
     #[inline]
@@ -398,6 +430,10 @@ impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<
 }
 
 impl<T: Transaction> Transaction for Sealed<T> {
+    fn frame_transaction(&self) -> Option<&crate::TxEip8141> {
+        self.inner().frame_transaction()
+    }
+
     #[inline]
     fn chain_id(&self) -> Option<u64> {
         self.inner().chain_id()
@@ -424,8 +460,18 @@ impl<T: Transaction> Transaction for Sealed<T> {
     }
 
     #[inline]
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.inner().max_fee_per_gas_u256()
+    }
+
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.inner().max_priority_fee_per_gas()
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.inner().max_priority_fee_per_gas_u256()
     }
 
     #[inline]
@@ -434,12 +480,30 @@ impl<T: Transaction> Transaction for Sealed<T> {
     }
 
     #[inline]
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.inner().max_fee_per_blob_gas_u256()
+    }
+
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.inner().priority_fee_or_price()
     }
 
+    #[inline]
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.inner().priority_fee_or_price_u256()
+    }
+
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         self.inner().effective_gas_price(base_fee)
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        self.inner().effective_gas_price_u256(base_fee)
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        self.inner().effective_tip_per_gas_u256(base_fee)
     }
 
     #[inline]

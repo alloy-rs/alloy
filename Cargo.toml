@@ -89,6 +89,7 @@ alloy-chains = { version = "0.2", default-features = false }
 alloy-eip2124 = { version = "0.2.0", default-features = false }
 alloy-eip2930 = { version = "0.2.3", default-features = false }
 alloy-eip7702 = { version = "0.6.3", default-features = false }
+alloy-eip8141 = { version = "0.1.0", git = "https://github.com/Soubhik-10/eips", rev = "497889d89afe57b395c2ab67c21da7d5bfa554ee", default-features = false }
 alloy-eip7928 = { version = "0.4", default-features = false }
 
 # hardforks

@@ -143,14 +143,8 @@ impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
 
 impl TransactionReceipt {
     /// Returns the status of the transaction.
-    pub const fn status(&self) -> bool {
-        match &self.inner {
-            ReceiptEnvelope::Eip1559(receipt)
-            | ReceiptEnvelope::Eip2930(receipt)
-            | ReceiptEnvelope::Eip4844(receipt)
-            | ReceiptEnvelope::Eip7702(receipt)
-            | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status.coerce_status(),
-        }
+    pub fn status(&self) -> bool {
+        self.inner.status()
     }
 
     /// Returns the transaction type.
@@ -204,7 +198,10 @@ impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
     /// Converts the receipt's log type by applying a function to each log.
     ///
     /// Returns the receipt with the new log type.
-    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> TransactionReceipt<ReceiptEnvelope<U>> {
+    pub fn map_logs<U: Clone>(
+        self,
+        f: impl FnMut(L) -> U,
+    ) -> TransactionReceipt<ReceiptEnvelope<U>> {
         self.map_inner(|inner| inner.map_logs(f))
     }
 

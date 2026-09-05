@@ -14,6 +14,13 @@ pub enum SendableTx<N: Network> {
     Builder(N::TransactionRequest),
     /// A transaction that is signed and fully constructed.
     Envelope(N::TxEnvelope),
+    /// A canonical envelope with separately encoded network sidecar data.
+    EnvelopeWithSidecar {
+        /// Canonical transaction, excluding sidecar data.
+        envelope: N::TxEnvelope,
+        /// Raw submission bytes including the network sidecar.
+        encoded: alloy_primitives::Bytes,
+    },
 }
 
 impl<N: Network> SendableTx<N> {
@@ -40,24 +47,25 @@ impl<N: Network> SendableTx<N> {
 
     /// Check if the transaction is an envelope.
     pub const fn is_envelope(&self) -> bool {
-        matches!(self, Self::Envelope(_))
+        matches!(self, Self::Envelope(_) | Self::EnvelopeWithSidecar { .. })
     }
 
     /// Fallible cast to a built transaction envelope.
     pub const fn as_envelope(&self) -> Option<&N::TxEnvelope> {
         match self {
-            Self::Envelope(tx) => Some(tx),
+            Self::Envelope(tx) | Self::EnvelopeWithSidecar { envelope: tx, .. } => Some(tx),
             _ => None,
         }
     }
 
-    /// Returns the envelope if this variant is an [`SendableTx::Envelope`].
+    /// Returns the canonical envelope for either built variant, discarding network-only sidecar
+    /// bytes.
     ///
     /// Returns a [`SendableTxErr`] with the request object otherwise.
     pub fn try_into_envelope(self) -> Result<N::TxEnvelope, SendableTxErr<N::TransactionRequest>> {
         match self {
             Self::Builder(req) => Err(SendableTxErr::new(req)),
-            Self::Envelope(env) => Ok(env),
+            Self::Envelope(env) | Self::EnvelopeWithSidecar { envelope: env, .. } => Ok(env),
         }
     }
 
@@ -67,7 +75,9 @@ impl<N: Network> SendableTx<N> {
     pub fn try_into_request(self) -> Result<N::TransactionRequest, SendableTxErr<N::TxEnvelope>> {
         match self {
             Self::Builder(req) => Ok(req),
-            Self::Envelope(env) => Err(SendableTxErr::new(env)),
+            Self::Envelope(env) | Self::EnvelopeWithSidecar { envelope: env, .. } => {
+                Err(SendableTxErr::new(env))
+            }
         }
     }
 }
