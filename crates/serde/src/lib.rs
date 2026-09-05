@@ -19,7 +19,7 @@ pub mod checksum;
 mod optional;
 pub use self::optional::*;
 
-pub mod lenient;
+pub mod json_rpc;
 
 pub mod quantity;
 

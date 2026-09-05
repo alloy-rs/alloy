@@ -35,7 +35,7 @@ use serde::Deserializer;
 /// # use serde::Deserialize;
 /// #[derive(Deserialize)]
 /// struct Params {
-///     #[serde(deserialize_with = "alloy_serde::lenient::deserialize")]
+///     #[serde(deserialize_with = "alloy_serde::json_rpc::deserialize")]
 ///     value: U256,
 /// }
 ///
@@ -53,7 +53,7 @@ where
 
 /// Serde functions for leniently deserializing optional numbers.
 ///
-/// See [`lenient`](crate::lenient) for more information.
+/// See [`json_rpc`](crate::json_rpc) for more information.
 pub mod opt {
     use super::private::{Lenient, LenientNumber};
     use serde::{Deserialize, Deserializer};
@@ -65,7 +65,7 @@ pub mod opt {
     /// # use serde::Deserialize;
     /// #[derive(Deserialize)]
     /// struct Params {
-    ///     #[serde(default, deserialize_with = "alloy_serde::lenient::opt::deserialize")]
+    ///     #[serde(default, deserialize_with = "alloy_serde::json_rpc::opt::deserialize")]
     ///     value: Option<u64>,
     /// }
     ///
@@ -88,7 +88,7 @@ pub mod opt {
 /// Serde functions for leniently deserializing a single number that may be wrapped in a
 /// one-element sequence, which is the JSON-RPC positional parameter shape.
 ///
-/// See [`lenient`](crate::lenient) for more information.
+/// See [`json_rpc`](crate::json_rpc) for more information.
 pub mod seq {
     use super::private::{LenientNumber, ValueOrSeq};
     use serde::Deserializer;
@@ -101,7 +101,7 @@ pub mod seq {
     /// ```
     /// # use serde::Deserialize;
     /// #[derive(Deserialize)]
-    /// struct Params(#[serde(deserialize_with = "alloy_serde::lenient::seq::deserialize")] u64);
+    /// struct Params(#[serde(deserialize_with = "alloy_serde::json_rpc::seq::deserialize")] u64);
     ///
     /// for raw in ["100", r#""0x64""#, "[100]", r#"["0x64"]"#] {
     ///     assert_eq!(serde_json::from_str::<Params>(raw).unwrap().0, 100);
@@ -121,7 +121,7 @@ pub mod seq {
     /// Serde functions for leniently deserializing an optional single number that may be wrapped
     /// in a one-element sequence.
     ///
-    /// See [`lenient`](crate::lenient) for more information.
+    /// See [`json_rpc`](crate::json_rpc) for more information.
     pub mod opt {
         use super::super::private::{LenientNumber, OptionalValueOrSeq};
         use serde::Deserializer;
@@ -136,7 +136,7 @@ pub mod seq {
         /// # use serde::Deserialize;
         /// #[derive(Deserialize)]
         /// struct Params(
-        ///     #[serde(default, deserialize_with = "alloy_serde::lenient::seq::opt::deserialize")]
+        ///     #[serde(default, deserialize_with = "alloy_serde::json_rpc::seq::opt::deserialize")]
         ///     Option<u64>,
         /// );
         ///
@@ -158,7 +158,7 @@ pub mod seq {
     }
 }
 
-/// Private implementation details of the [`lenient`](self) module.
+/// Private implementation details of the [`json_rpc`](self) module.
 #[expect(unnameable_types)]
 mod private {
     use alloy_primitives::{Uint, U128, U16, U32, U64, U8};
