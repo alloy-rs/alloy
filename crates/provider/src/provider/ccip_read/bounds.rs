@@ -1,55 +1,62 @@
-//! Allocation-free checks before decoding contract-controlled dynamic ABI values.
+//! Allocation-free bounds checks before decoding contract-controlled dynamic ABI values.
+//!
+//! ABI offsets may alias the same tail data, so the decoded size can exceed the encoded size by a
+//! large factor. These checks walk the encoding without allocating and charge the decoded sizes
+//! against [`CcipReadConfig::max_revert_data_size`].
 
 use super::{CcipReadConfig, CcipReadError};
 use alloy_primitives::U256;
 use alloy_sol_types::Error;
 
-/// Checks counts and total decoded dynamic data, counting overlapping references separately.
+/// Checks an `OffchainLookup` revert: the URL count and the total decoded dynamic data, counting
+/// overlapping references separately.
 pub(super) fn offchain_lookup(data: &[u8], config: &CcipReadConfig) -> Result<(), CcipReadError> {
-    let mut limits = Limits::new(config);
-    let result = (|| {
-        let data = data.get(4..).ok_or(Error::Overrun)?;
-        let mut head = data;
-        word(&mut head)?; // sender
-        limits.urls(indirect(&mut head, data)?)?;
-        limits.bytes(indirect(&mut head, data)?, false)?;
-        word(&mut head)?; // callbackFunction
-        limits.bytes(indirect(&mut head, data)?, false)
-    })();
-    result.map_err(|error| match error {
+    offchain_lookup_fields(data, &mut Limits::new(config)).map_err(|error| match error {
         CheckError::Abi(error) => CcipReadError::InvalidOffchainLookup(error),
         CheckError::Limit(message) => CcipReadError::ResourceLimit(message.into()),
     })
 }
 
-/// Checks every request before allocating an ENSIP-21 batch, including nested batches.
+/// Checks every request of an ENSIP-21 `query` batch before allocating it, including nested
+/// batches.
 pub(super) fn batch(data: &[u8], config: &CcipReadConfig) -> Result<(), CcipReadError> {
-    let mut limits = Limits::new(config);
-    let result = (|| {
-        if data.len() > config.max_revert_data_size {
-            return Err(CheckError::Limit("batch data exceeds revert data size limit"));
-        }
-        let data = data.get(4..).ok_or(Error::Overrun)?;
-        let mut head = data;
-        let (count, array) = limits.array(
-            indirect(&mut head, data)?,
-            config.max_batch_size,
-            "batch request count exceeds configured limit",
-        )?;
-        let mut head = array;
-        for _ in 0..count {
-            let request = indirect(&mut head, array)?;
-            let mut fields = request;
-            word(&mut fields)?; // sender
-            limits.urls(indirect(&mut fields, request)?)?;
-            limits.bytes(indirect(&mut fields, request)?, false)?;
-        }
-        Ok(())
-    })();
-    result.map_err(|error| match error {
+    batch_requests(data, &mut Limits::new(config)).map_err(|error| match error {
         CheckError::Abi(error) => CcipReadError::InvalidBatch(error.to_string()),
         CheckError::Limit(message) => CcipReadError::ResourceLimit(message.into()),
     })
+}
+
+fn offchain_lookup_fields(data: &[u8], limits: &mut Limits<'_>) -> Result<(), CheckError> {
+    let data = data.get(4..).ok_or(Error::Overrun)?;
+    let mut head = data;
+    word(&mut head)?; // sender
+    limits.urls(indirect(&mut head, data)?)?;
+    limits.bytes(indirect(&mut head, data)?, false)?; // callData
+    word(&mut head)?; // callbackFunction
+    limits.bytes(indirect(&mut head, data)?, false) // extraData
+}
+
+fn batch_requests(data: &[u8], limits: &mut Limits<'_>) -> Result<(), CheckError> {
+    let config = limits.config;
+    if data.len() > config.max_revert_data_size {
+        return Err(CheckError::Limit("batch data exceeds revert data size limit"));
+    }
+    let data = data.get(4..).ok_or(Error::Overrun)?;
+    let mut head = data;
+    let (count, array) = limits.array(
+        indirect(&mut head, data)?,
+        config.max_batch_size,
+        "batch request count exceeds configured limit",
+    )?;
+    let mut head = array;
+    for _ in 0..count {
+        let request = indirect(&mut head, array)?;
+        let mut fields = request;
+        word(&mut fields)?; // sender
+        limits.urls(indirect(&mut fields, request)?)?;
+        limits.bytes(indirect(&mut fields, request)?, false)?; // data
+    }
+    Ok(())
 }
 
 enum CheckError {
