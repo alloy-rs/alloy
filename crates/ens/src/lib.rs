@@ -389,6 +389,7 @@ mod provider {
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError>;
 
         /// Like [`Self::lookup_address`], but follows CCIP Read redirects with `client`.
+        /// The same ENSIP-15 normalization check is required for the returned name.
         async fn lookup_address_with_ccip_read<G: CcipReadGateway>(
             &self,
             address: &Address,
