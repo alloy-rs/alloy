@@ -22,12 +22,22 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug)]
 pub struct HttpCcipReadGateway {
     client: reqwest::Client,
+    max_url_length: usize,
 }
 
 impl HttpCcipReadGateway {
     /// Creates a gateway using an existing HTTP client, keeping its timeout and redirect policy.
     pub const fn new(client: reqwest::Client) -> Self {
-        Self { client }
+        Self { client, max_url_length: 2_097_152 }
+    }
+
+    /// Sets the maximum expanded gateway URL length in bytes (default: 2 MiB).
+    ///
+    /// Expansion is checked before allocating the URL. This limit is independent of the
+    /// response size limit, so a large request may still retrieve a small response.
+    pub const fn with_max_url_length(mut self, max_url_length: usize) -> Self {
+        self.max_url_length = max_url_length;
+        self
     }
 
     /// Sends one gateway request for `template`.
@@ -38,7 +48,10 @@ impl HttpCcipReadGateway {
         data: &str,
         max_response_size: usize,
     ) -> Attempt {
-        let url = template.replace("{sender}", sender).replace("{data}", data);
+        let url = match expand_url(template, sender, data, self.max_url_length) {
+            Ok(url) => url,
+            Err(error) => return Attempt::Retry(error),
+        };
         let url = match Url::parse(&url) {
             Ok(url) if matches!(url.scheme(), "http" | "https") => url,
             Ok(_) => {
@@ -81,6 +94,48 @@ impl HttpCcipReadGateway {
             Err(error) => Attempt::failure(status, error),
         }
     }
+}
+
+/// Computes the final length before substituting contract-controlled URL placeholders.
+fn expand_url(
+    template: &str,
+    sender: &str,
+    data: &str,
+    limit: usize,
+) -> Result<String, CcipReadGatewayError> {
+    let senders = template.matches("{sender}").count();
+    let datas = template.matches("{data}").count();
+    let literal_len = template.len() - senders * 8 - datas * 6;
+    let len = senders
+        .checked_mul(sender.len())
+        .and_then(|len| {
+            datas.checked_mul(data.len()).and_then(|data_len| len.checked_add(data_len))
+        })
+        .and_then(|len| len.checked_add(literal_len))
+        .filter(|len| *len <= limit)
+        .ok_or_else(|| {
+            CcipReadGatewayError::new("expanded gateway URL exceeds configured size limit")
+        })?;
+    // The replacement values are hexadecimal and cannot introduce new placeholders. Build the
+    // URL in one pass to avoid an intermediate expansion larger than the final bounded result.
+    let mut url = String::with_capacity(len);
+    let mut rest = template;
+    while let Some(index) = rest.find('{') {
+        url.push_str(&rest[..index]);
+        rest = &rest[index..];
+        if let Some(suffix) = rest.strip_prefix("{sender}") {
+            url.push_str(sender);
+            rest = suffix;
+        } else if let Some(suffix) = rest.strip_prefix("{data}") {
+            url.push_str(data);
+            rest = suffix;
+        } else {
+            url.push('{');
+            rest = &rest[1..];
+        }
+    }
+    url.push_str(rest);
+    Ok(url)
 }
 
 impl Default for HttpCcipReadGateway {
@@ -243,13 +298,48 @@ fn response_message(body: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{address, bytes};
+    use alloy_primitives::{address, bytes, Address};
 
     fn message(attempt: &Attempt) -> &str {
         match attempt {
             Attempt::Data(_) => "",
             Attempt::Fatal(error) | Attempt::Retry(error) => &error.message,
         }
+    }
+
+    #[test]
+    fn bounds_template_expansion_and_preserves_placeholders() {
+        let data = format!("0x{}", "00".repeat(4096));
+        let template = format!("https://example.test/{}", "{data}".repeat(128));
+        assert!(expand_url(&template, "0x01", &data, 1024).is_err());
+        assert!(expand_url(&"a".repeat(1025), "0x01", "0x", 1024).is_err());
+
+        for template in ["{sender}/{data}/{sender}/{data}", "{{data}}/{unknown}", "plain", ""] {
+            let expected = template.replace("{sender}", "0x01").replace("{data}", "0x02");
+            assert_eq!(expand_url(template, "0x01", "0x02", expected.len()).unwrap(), expected);
+            if !expected.is_empty() {
+                assert!(expand_url(template, "0x01", "0x02", expected.len() - 1).is_err());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn oversized_url_is_rejected_before_network_and_falls_back() {
+        let gateway = HttpCcipReadGateway::default().with_max_url_length(1024);
+        let request = CcipReadRequest {
+            sender: Address::ZERO,
+            urls: vec![format!("https://example.test/{}", "{data}".repeat(128))],
+            data: vec![0; 4096].into(),
+        };
+        let error = gateway.request(&request, 16).await.unwrap_err();
+        assert!(error.message.contains("expanded gateway URL"));
+
+        // An invalid fallback is sufficient to show that the oversized first URL is retryable,
+        // without issuing a network request.
+        let mut request = request;
+        request.urls.push("ftp://example.test".into());
+        let error = gateway.request(&request, 16).await.unwrap_err();
+        assert!(error.message.contains("http or https"));
     }
 
     #[test]
