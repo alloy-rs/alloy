@@ -17,9 +17,10 @@ pub use prague::*;
 mod bogota;
 pub use bogota::*;
 mod sidecar;
+pub use sidecar::*;
+
 #[cfg(feature = "ssz")]
 pub mod ssz_engine_types;
-pub use sidecar::*;
 
 mod forkchoice;
 pub use forkchoice::*;
