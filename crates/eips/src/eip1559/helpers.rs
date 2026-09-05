@@ -122,13 +122,17 @@ pub fn calc_next_block_base_fee(
         // increased base fee.
         core::cmp::Ordering::Greater => {
             // Calculate the increase in base fee based on the formula defined by EIP-1559.
-            base_fee
-                + (core::cmp::max(
-                    // Ensure a minimum increase of 1.
-                    1,
-                    base_fee as u128 * (gas_used - gas_target) as u128
-                        / (gas_target as u128 * base_fee_params.max_change_denominator),
-                ) as u64)
+            // Use a saturating add to mirror the saturating subtraction in the decrease branch:
+            // `base_fee` and the computed increase are both valid `u64`s, but their sum can exceed
+            // `u64::MAX` (e.g. a congested block with a base fee near `u64::MAX`, or aggressive
+            // custom `BaseFeeParams`), which would panic in debug builds and silently wrap in
+            // release builds.
+            base_fee.saturating_add(core::cmp::max(
+                // Ensure a minimum increase of 1.
+                1,
+                base_fee as u128 * (gas_used - gas_target) as u128
+                    / (gas_target as u128 * base_fee_params.max_change_denominator),
+            ) as u64)
         }
         // If the gas used in the current block is less than the gas target, calculate a new
         // decreased base fee.
@@ -384,5 +388,16 @@ mod tests {
         let p = BaseFeeParams::ethereum();
         // gas_target = 1 / 2 = 0; gas_used > 0 used to hit a divide-by-zero in the increase path.
         assert_eq!(calc_next_block_base_fee(1, 1, 1_000_000_000, p), 1_000_000_000);
+    }
+
+    #[test]
+    fn next_base_fee_saturates_on_increase_overflow() {
+        let p = BaseFeeParams::ethereum();
+        // Congested block (gas_used == gas_limit, so gas_used > gas_target) with a base fee near
+        // `u64::MAX`. The increase (~base_fee / 8) used to be added to `base_fee` with an unchecked
+        // `+`, overflowing `u64`: this panicked in debug builds and silently wrapped to a
+        // garbage-low base fee in release builds. It must saturate at `u64::MAX` instead, mirroring
+        // the saturating decrease branch.
+        assert_eq!(calc_next_block_base_fee(30_000_000, 30_000_000, u64::MAX, p), u64::MAX);
     }
 }
