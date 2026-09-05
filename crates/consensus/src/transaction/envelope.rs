@@ -748,7 +748,7 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
-    /// Consumes the type and returns the [`TxEip4844`] variant if the transaction is an EIP-4844
+    /// Consumes the type and returns the EIP-4844 variant if the transaction is an EIP-4844
     /// transaction. Returns an error otherwise.
     pub fn try_into_eip4844(self) -> Result<Signed<Eip4844>, ValueError<Self>> {
         match self {
