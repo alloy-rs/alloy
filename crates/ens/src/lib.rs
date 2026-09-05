@@ -379,8 +379,13 @@ mod provider {
 
         /// Performs a reverse lookup of an address to its primary ENS name.
         ///
-        /// The Universal Resolver verifies that the primary name resolves back to `address`, and
-        /// returns an empty string if no primary name is set.
+        /// The Universal Resolver verifies that the raw primary name resolves back to `address`,
+        /// and returns an empty string if no primary name is set. Neither the Universal Resolver
+        /// nor this helper performs ENSIP-15 normalization of the returned name.
+        ///
+        /// Before using a non-empty result as an authenticated identity, normalize it according to
+        /// ENSIP-15 and reject it if normalization fails or changes the name. Normalizing and using
+        /// a changed name is insufficient: the address check applied to the original name.
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError>;
 
         /// Like [`Self::lookup_address`], but follows CCIP Read redirects with `client`.

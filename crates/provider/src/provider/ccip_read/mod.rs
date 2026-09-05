@@ -27,6 +27,8 @@ use futures::{stream, StreamExt};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::Semaphore;
 
+mod decode;
+
 #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
 mod http;
 #[cfg(all(feature = "ccip-read-http", not(all(target_os = "wasi", target_env = "p1"))))]
@@ -80,7 +82,10 @@ pub struct CcipReadConfig {
     pub max_total_requests: usize,
     /// Maximum number of fallback gateway URLs accepted in one request.
     pub max_gateway_urls: usize,
-    /// Maximum accepted `OffchainLookup` revert data size in bytes.
+    /// Maximum accepted `OffchainLookup` revert and nested batch data size in bytes.
+    ///
+    /// Also bounds decoded dynamic data and array offset tables before allocation. Repeated
+    /// references to the same ABI data are charged separately, including lossy UTF-8 expansion.
     pub max_revert_data_size: usize,
     /// Maximum accepted gateway response size in bytes.
     pub max_response_size: usize,
@@ -298,6 +303,7 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
             }
             redirects += 1;
 
+            decode::offchain_lookup(&revert, &self.config)?;
             let lookup = abi::OffchainLookup::abi_decode(&revert)
                 .map_err(CcipReadError::InvalidOffchainLookup)?;
             if lookup.sender != target {
@@ -322,17 +328,16 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
         context: &'a BatchContext<'a>,
     ) -> CcipFuture<'a, Result<Bytes, CcipReadError>> {
         Box::pin(async move {
-            if request.urls.iter().any(|url| url == BATCH_GATEWAY_SENTINEL) {
-                context.reserve(1)?;
-                return self.local_batch(request.data, context).await;
-            }
-
             if request.urls.len() > context.config.max_gateway_urls {
                 return Err(CcipReadError::ResourceLimit(format!(
                     "gateway URL count {} exceeds limit {}",
                     request.urls.len(),
                     context.config.max_gateway_urls
                 )));
+            }
+            if request.urls.iter().any(|url| url == BATCH_GATEWAY_SENTINEL) {
+                context.reserve(1)?;
+                return self.local_batch(request.data, context).await;
             }
             context.reserve(request.urls.len().max(1))?;
             let _permit =
@@ -356,6 +361,7 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
         context: &'a BatchContext<'a>,
     ) -> CcipFuture<'a, Result<Bytes, CcipReadError>> {
         Box::pin(async move {
+            decode::batch(&data, context.config)?;
             let call = abi::queryCall::abi_decode(&data)
                 .map_err(|err| CcipReadError::InvalidBatch(err.to_string()))?;
             if call.requests.len() > context.config.max_batch_size {
@@ -554,7 +560,7 @@ mod tests {
     use super::*;
     use crate::ProviderBuilder;
     use alloy_json_rpc::ErrorPayload;
-    use alloy_primitives::{address, bytes, fixed_bytes};
+    use alloy_primitives::{address, bytes, fixed_bytes, U256};
     use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
     use alloy_transport::mock::Asserter;
     use std::{
@@ -634,6 +640,117 @@ mod tests {
         }
         .abi_encode()
         .into()
+    }
+
+    fn word_at(data: &[u8], offset: usize) -> usize {
+        U256::from_be_slice(&data[offset..offset + 32]).to()
+    }
+
+    #[tokio::test]
+    async fn bounds_decoded_lookup_before_allocating_aliased_urls() {
+        let target = address!("1111111111111111111111111111111111111111");
+        let canonical =
+            offchain_lookup(target, vec!["a".repeat(1024), String::new()], Bytes::new());
+        let mut aliased = canonical.to_vec();
+        let array = 4 + word_at(&aliased, 4 + 32) + 32;
+        aliased.copy_within(array..array + 32, array + 32);
+
+        for (revert, limit, accepted) in [
+            (canonical.clone(), canonical.len(), true),
+            (Bytes::from(aliased.clone()), aliased.len(), false),
+            // Overlapping offsets remain supported when the decoded result fits the budget.
+            (Bytes::from(aliased), 4096, true),
+        ] {
+            let asserter = Asserter::new();
+            asserter.push_failure(revert_error(revert));
+            asserter.push_success(&bytes!("feed"));
+            let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+            let gateway = MockGateway::with_responses([Ok(bytes!("01"))]);
+            let client = CcipReadClient::new(gateway.clone())
+                .with_config(CcipReadConfig { max_revert_data_size: limit, ..Default::default() });
+            let result = client.call(&provider, TransactionRequest::default().to(target)).await;
+            if accepted {
+                assert_eq!(result.unwrap(), bytes!("feed"));
+            } else {
+                assert!(matches!(result, Err(CcipReadError::ResourceLimit(_))));
+                assert!(gateway.requests().is_empty());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn bounds_decoded_batch_before_allocating_aliased_requests() {
+        let sender = Address::ZERO;
+        let request = |data| abi::BatchGatewayRequest {
+            sender,
+            urls: vec!["https://example.test".into()],
+            data,
+        };
+        let canonical =
+            abi::queryCall { requests: vec![request(vec![1; 1024].into()), request(Bytes::new())] }
+                .abi_encode();
+        let mut aliased = canonical.clone();
+        let array = 4 + word_at(&aliased, 4) + 32;
+        aliased.copy_within(array..array + 32, array + 32);
+
+        for (data, accepted) in [(canonical, true), (aliased, false)] {
+            let gateway = MockGateway::with_responses([Ok(bytes!("01")), Ok(bytes!("02"))]);
+            let client = CcipReadClient::new(gateway.clone()).with_config(CcipReadConfig {
+                max_revert_data_size: data.len(),
+                ..Default::default()
+            });
+            let context = BatchContext::new(client.config());
+            let result = client
+                .fetch(
+                    CcipReadRequest {
+                        sender,
+                        urls: vec![BATCH_GATEWAY_SENTINEL.into()],
+                        data: data.into(),
+                    },
+                    &context,
+                )
+                .await;
+            if accepted {
+                let decoded = abi::queryCall::abi_decode_returns(&result.unwrap()).unwrap();
+                assert_eq!(decoded.failures, vec![false, false]);
+            } else {
+                assert!(matches!(result, Err(CcipReadError::ResourceLimit(_))));
+                assert!(gateway.requests().is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn checks_array_counts_offsets_and_lossy_strings_before_decoding() {
+        let config = CcipReadConfig::default();
+        let canonical = offchain_lookup(Address::ZERO, vec!["a".repeat(256)], Bytes::new());
+        let urls = 4 + word_at(&canonical, 4 + 32);
+        let mut excessive = canonical.to_vec();
+        excessive[urls..urls + 32].fill(0xff);
+        assert!(decode::offchain_lookup(&excessive, &config).is_err());
+
+        let mut invalid_offset = canonical.to_vec();
+        invalid_offset[4 + 32..4 + 64].fill(0xff);
+        assert!(matches!(
+            decode::offchain_lookup(&invalid_offset, &config),
+            Err(CcipReadError::InvalidOffchainLookup(_))
+        ));
+
+        let mut invalid_utf8 = canonical.to_vec();
+        let string = urls + 32 + word_at(&canonical, urls + 32) + 32;
+        invalid_utf8[string..string + 256].fill(0xff);
+        let config = CcipReadConfig { max_revert_data_size: canonical.len(), ..config };
+        decode::offchain_lookup(&canonical, &config).unwrap();
+        assert!(matches!(
+            decode::offchain_lookup(&invalid_utf8, &config),
+            Err(CcipReadError::ResourceLimit(_))
+        ));
+
+        let mut batch = abi::queryCall { requests: vec![] }.abi_encode();
+        let array = 4 + word_at(&batch, 4);
+        batch[array..array + 32]
+            .copy_from_slice(&U256::from(config.max_batch_size + 1).to_be_bytes::<32>());
+        assert!(matches!(decode::batch(&batch, &config), Err(CcipReadError::ResourceLimit(_))));
     }
 
     #[tokio::test]
