@@ -1,12 +1,13 @@
+use crate::ENS_REVERSE_REGISTRAR_DOMAIN;
 use alloy_primitives::{Address, Keccak256, B256};
 use std::borrow::Cow;
 
 /// Error returned by [`try_dns_encode`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DnsEncodeError {
-    /// A label in the name is empty (e.g., consecutive dots or leading/trailing dot).
+    /// A label in the name is empty, e.g. because of consecutive, leading, or trailing dots.
     EmptyLabel,
-    /// A label exceeds the 255-byte maximum used by ENS DNS wire encoding.
+    /// A label exceeds the 255-byte maximum of the ENS DNS wire encoding.
     LabelTooLong,
 }
 
@@ -21,21 +22,47 @@ impl std::fmt::Display for DnsEncodeError {
 
 impl std::error::Error for DnsEncodeError {}
 
+/// Returns the ENS namehash as specified in [EIP-137](https://eips.ethereum.org/EIPS/eip-137).
+///
+/// `name` must already be ENSIP-15 normalized. Apart from removing the `U+FE0F` variation selector,
+/// this function hashes labels verbatim and does not normalize or validate them.
+pub fn namehash(name: &str) -> B256 {
+    if name.is_empty() {
+        return B256::ZERO;
+    }
+
+    let name = strip_variation_selector(name);
+
+    // Generate the node starting from the right.
+    // This buffer is `[node @ [u8; 32], label_hash @ [u8; 32]]`.
+    let mut buffer = [0u8; 64];
+    for label in name.rsplit('.') {
+        // node = keccak256([node, keccak256(label)])
+
+        // Hash the label.
+        let mut label_hasher = Keccak256::new();
+        label_hasher.update(label.as_bytes());
+        label_hasher.finalize_into(&mut buffer[32..]);
+
+        // Hash both the node and the label hash, writing into the node.
+        let mut buffer_hasher = Keccak256::new();
+        buffer_hasher.update(buffer.as_slice());
+        buffer_hasher.finalize_into(&mut buffer[..32]);
+    }
+    buffer[..32].try_into().unwrap()
+}
+
 /// Encodes a domain name into DNS wire format as specified in
 /// [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035).
 ///
 /// Each label is prefixed with its length byte, and the name is terminated with a
 /// zero-length label (null byte).
 ///
-/// This preserves the original infallible API and does not validate the name. Use
-/// [`try_dns_encode`] when encoding untrusted input for the Universal Resolver.
-///
-/// # Warning
-///
-/// An oversized label's length prefix is silently truncated (`label.len() as u8`),
-/// producing corrupted DNS wire data. Labels longer than 255 bytes therefore do
-/// not round-trip. Prefer [`try_dns_encode`], which returns
-/// [`DnsEncodeError::LabelTooLong`] instead.
+/// This is an unchecked encoder: `name` must already be ENSIP-15 normalized and non-empty, must
+/// not contain empty labels (including leading, trailing, or repeated dots), and each UTF-8 label
+/// length must fit in a `u8`. Invalid input is encoded without an error, and an oversized label's
+/// length prefix is silently truncated, producing corrupted wire data. Use [`try_dns_encode`] to
+/// validate the name instead.
 ///
 /// # Examples
 ///
@@ -57,79 +84,51 @@ pub fn dns_encode(name: &str) -> Vec<u8> {
     result
 }
 
-/// DNS wire-format encodes an ENS name for use with the Universal Resolver's `resolve()`.
+/// Encodes an ENS name into DNS wire format for the Universal Resolver, validating its labels.
 ///
-/// Each label is prefixed with its byte length and the sequence is terminated with `\x00`.
-/// For example, `"foo.eth"` encodes to `[3, 'f', 'o', 'o', 3, 'e', 't', 'h', 0]`.
+/// Like [`dns_encode`], each label is prefixed with its byte length and the name is terminated
+/// with a null byte, but the `U+FE0F` variation selector is removed first so that the encoded name
+/// hashes to [`namehash`] on chain. Returns an error if any label is empty or exceeds 255 bytes,
+/// matching the ENS [`NameCoder`] limits.
 ///
-/// Returns an error if any label is empty or exceeds 255 bytes. This matches ENS
-/// [`NameCoder`](https://github.com/ensdomains/ens-contracts/blob/staging/contracts/utils/NameCoder.sol),
-/// which uses a full length byte (not the RFC 1035 63-octet DNS message limit).
+/// The empty name encodes to the root (`[0]`).
+///
+/// [`NameCoder`]: https://github.com/ensdomains/ens-contracts/blob/staging/contracts/utils/NameCoder.sol
 pub fn try_dns_encode(name: &str) -> Result<Vec<u8>, DnsEncodeError> {
     if name.is_empty() {
         return Ok(vec![0]);
     }
 
-    // Strip variation selector as in namehash.
-    const VARIATION_SELECTOR: char = '\u{fe0f}';
-    let name = if name.contains(VARIATION_SELECTOR) {
-        Cow::Owned(name.replace(VARIATION_SELECTOR, ""))
-    } else {
-        Cow::Borrowed(name)
-    };
-
+    let name = strip_variation_selector(name);
     let mut out = Vec::with_capacity(name.len() + 2);
     for label in name.split('.') {
-        let bytes = label.as_bytes();
-        if bytes.is_empty() {
+        let label = label.as_bytes();
+        if label.is_empty() {
             return Err(DnsEncodeError::EmptyLabel);
         }
-        if bytes.len() > 255 {
+        let Ok(len) = u8::try_from(label.len()) else {
             return Err(DnsEncodeError::LabelTooLong);
-        }
-        out.push(bytes.len() as u8);
-        out.extend_from_slice(bytes);
+        };
+        out.push(len);
+        out.extend_from_slice(label);
     }
     out.push(0);
     Ok(out)
 }
 
-/// Returns the ENS namehash as specified in [EIP-137](https://eips.ethereum.org/EIPS/eip-137).
-pub fn namehash(name: &str) -> B256 {
-    if name.is_empty() {
-        return B256::ZERO;
-    }
+/// Returns the reverse-registrar name of an address.
+pub fn reverse_address(addr: &Address) -> String {
+    format!("{addr:x}.{ENS_REVERSE_REGISTRAR_DOMAIN}")
+}
 
-    // Remove the variation selector `U+FE0F` if present.
+/// Removes the `U+FE0F` variation selector, which ENS ignores when hashing names.
+fn strip_variation_selector(name: &str) -> Cow<'_, str> {
     const VARIATION_SELECTOR: char = '\u{fe0f}';
-    let name = if name.contains(VARIATION_SELECTOR) {
+    if name.contains(VARIATION_SELECTOR) {
         Cow::Owned(name.replace(VARIATION_SELECTOR, ""))
     } else {
         Cow::Borrowed(name)
-    };
-
-    // Generate the node starting from the right.
-    // This buffer is `[node @ [u8; 32], label_hash @ [u8; 32]]`.
-    let mut buffer = [0u8; 64];
-    for label in name.rsplit('.') {
-        // node = keccak256([node, keccak256(label)])
-
-        // Hash the label.
-        let mut label_hasher = Keccak256::new();
-        label_hasher.update(label.as_bytes());
-        label_hasher.finalize_into(&mut buffer[32..]);
-
-        // Hash both the node and the label hash, writing into the node.
-        let mut buffer_hasher = Keccak256::new();
-        buffer_hasher.update(buffer.as_slice());
-        buffer_hasher.finalize_into(&mut buffer[..32]);
     }
-    buffer[..32].try_into().unwrap()
-}
-
-/// Returns the reverse-registrar name of an address.
-pub fn reverse_address(addr: &Address) -> String {
-    format!("{addr:x}.addr.reverse")
 }
 
 #[cfg(test)]
@@ -171,34 +170,22 @@ mod tests {
     }
 
     #[test]
-    fn test_dns_encode() {
-        assert_eq!(dns_encode("eth"), vec![3, b'e', b't', b'h', 0]);
-        assert_eq!(dns_encode("foo.eth"), vec![3, b'f', b'o', b'o', 3, b'e', b't', b'h', 0]);
-    }
-
-    #[test]
     fn test_try_dns_encode() {
         assert_eq!(try_dns_encode(""), Ok(vec![0]));
-        assert_eq!(
-            try_dns_encode("foo.eth"),
-            Ok(vec![3, b'f', b'o', b'o', 3, b'e', b't', b'h', 0])
-        );
-        assert_eq!(
-            try_dns_encode("alice.eth"),
-            Ok(vec![5, b'a', b'l', b'i', b'c', b'e', 3, b'e', b't', b'h', 0])
-        );
-        // Known vector: "integration-tests.eth"
+        assert_eq!(try_dns_encode("foo.eth"), Ok(dns_encode("foo.eth")));
         assert_eq!(
             try_dns_encode("integration-tests.eth"),
             Ok(hex::decode("11696e746567726174696f6e2d74657374730365746800").unwrap())
         );
-        // Empty label errors
-        assert_eq!(try_dns_encode(".eth").unwrap_err(), DnsEncodeError::EmptyLabel);
-        assert_eq!(try_dns_encode("foo..eth").unwrap_err(), DnsEncodeError::EmptyLabel);
-        // Labels up to 255 bytes are valid for ENS DNS wire encoding / NameCoder.
+        assert_eq!(try_dns_encode("ret↩️rn.eth"), Ok(dns_encode("ret↩rn.eth")));
+
+        assert_eq!(try_dns_encode(".eth"), Err(DnsEncodeError::EmptyLabel));
+        assert_eq!(try_dns_encode("foo..eth"), Err(DnsEncodeError::EmptyLabel));
+        assert_eq!(try_dns_encode("foo.eth."), Err(DnsEncodeError::EmptyLabel));
+
         let max_label = "a".repeat(255) + ".eth";
         assert!(try_dns_encode(&max_label).is_ok());
         let too_long = "a".repeat(256) + ".eth";
-        assert_eq!(try_dns_encode(&too_long).unwrap_err(), DnsEncodeError::LabelTooLong);
+        assert_eq!(try_dns_encode(&too_long), Err(DnsEncodeError::LabelTooLong));
     }
 }
