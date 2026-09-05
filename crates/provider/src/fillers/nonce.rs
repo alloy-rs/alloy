@@ -22,12 +22,10 @@ pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
         N: Network;
 }
 
-/// This [`NonceManager`] implementation will fetch the transaction count for any new account it
-/// sees.
-///
-/// Unlike [`CachedNonceManager`], this implementation does not store the transaction count locally,
-/// which results in more frequent calls to the provider, but it is more resilient to chain
-/// reorganizations.
+/// This [`NonceManager`] fetches the pending transaction count on every request and does not
+/// reserve nonces locally. It makes more RPC calls than [`CachedNonceManager`] and is more
+/// resilient to chain reorganizations, but concurrent transactions from the same address can
+/// receive the same nonce.
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct SimpleNonceManager;
@@ -46,9 +44,13 @@ impl NonceManager for SimpleNonceManager {
 
 /// Cached nonce manager
 ///
-/// This [`NonceManager`] implementation will fetch the transaction count for any new account it
-/// sees, store it locally and increment the locally stored nonce as transactions are sent via
-/// [`Provider::send_transaction`].
+/// This [`NonceManager`] fetches the pending transaction count the first time it sees an account,
+/// then reserves subsequent nonces locally as transactions are filled. Clones share the same
+/// per-address state, so they can allocate distinct nonces to concurrent requests.
+///
+/// The local nonce advances before broadcast. A failed submission, a chain reorganization, or a
+/// transaction sent through another manager can therefore leave it out of sync with the node; it
+/// does not resynchronize automatically.
 ///
 /// There is also an alternative implementation [`SimpleNonceManager`] that does not store the
 /// transaction count locally.
@@ -95,9 +97,10 @@ impl NonceManager for CachedNonceManager {
 /// # Note
 ///
 /// - If the transaction request does not have a sender set, this layer will not fill nonces.
-/// - Using two providers with their own nonce layer can potentially fill invalid nonces if
-///   transactions are sent from the same address, as the next nonce to be used is cached internally
-///   in the layer.
+/// - An explicit nonce is preserved and does not consult the manager.
+/// - For concurrent sends from one address, reuse a provider or cloned [`CachedNonceManager`]. Two
+///   independent cached managers can allocate conflicting nonces, while [`SimpleNonceManager`] does
+///   not reserve nonces between concurrent requests.
 ///
 /// # Example
 ///
@@ -134,8 +137,8 @@ impl<M: NonceManager> NonceFiller<M> {
 
     /// Creates a new [`NonceFiller`] with the [`SimpleNonceManager`].
     ///
-    /// [`SimpleNonceManager`] will fetch the transaction count for any new account it sees,
-    /// resulting in frequent RPC calls.
+    /// [`SimpleNonceManager`] fetches the pending transaction count for every request, resulting in
+    /// frequent RPC calls and no local nonce reservation.
     pub const fn simple() -> NonceFiller<SimpleNonceManager> {
         NonceFiller { nonce_manager: SimpleNonceManager }
     }
@@ -143,8 +146,9 @@ impl<M: NonceManager> NonceFiller<M> {
     /// Creates a new [`NonceFiller`] with the [`CachedNonceManager`].
     ///
     /// [`CachedNonceManager`] will fetch the transaction count for any new account it sees,
-    /// store it locally and increment the locally stored nonce as transactions are sent via
-    /// [`Provider::send_transaction`], reducing the number of RPC calls.
+    /// store it locally, and increment the locally stored nonce as transactions are filled,
+    /// reducing the number of RPC calls. Reservation happens before broadcast and also applies to
+    /// direct [`FillProvider::fill`](crate::fillers::FillProvider::fill) calls.
     pub fn cached() -> NonceFiller<CachedNonceManager> {
         NonceFiller { nonce_manager: CachedNonceManager::default() }
     }

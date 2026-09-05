@@ -47,7 +47,6 @@ coins-bip39 = { version = "0.12", default-features = false, features = [
 ], optional = true }
 
 # yubi
-elliptic-curve = { workspace = true, optional = true }
 yubihsm = { version = "0.42", features = [
     "secp256k1",
     "http",
@@ -81,7 +80,7 @@ keystore = ["dep:eth-keystore"]
 keystore-geth-compat = ["keystore", "eth-keystore?/geth-compat"]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39", "zeroize"]
 mnemonic-all-languages = ["mnemonic", "coins-bip39?/all-langs"]
-yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
+yubihsm = ["dep:yubihsm"]
 secp256k1 = [
 	"dep:secp256k1",
 	"alloy-consensus/secp256k1",

@@ -118,20 +118,26 @@ reqwest = [
 reqwest-default-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-default-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-default-tls",
+    "alloy-ens?/reqwest-default-tls",
 ]
 reqwest-rustls-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-rustls-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-rustls-tls",
+    "alloy-ens?/reqwest-rustls-tls",
 ]
 reqwest-native-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-native-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-native-tls",
+    "alloy-ens?/reqwest-native-tls",
 ]
 hyper = [
     "alloy-rpc-client?/hyper",
@@ -150,6 +156,7 @@ contract = [
     "json-abi",
     "json",
     "sol-types",
+    "alloy-ens?/contract",
 ]
 eips = ["dep:alloy-eips", "rlp"]
 ens = ["dep:alloy-ens"]
@@ -214,6 +221,7 @@ provider-anvil-node = [
     "alloy-provider?/anvil-node",
     "node-bindings",
 ]
+provider-ccip-read = ["providers", "alloy-provider?/ccip-read-http"]
 
 # pubsub
 pubsub = [
@@ -334,7 +342,11 @@ serde = [
     "dep:alloy-serde",
     "alloy-trie?/serde",
 ]
-serde-bincode-compat = ["alloy-consensus/serde-bincode-compat"]
+serde-bincode-compat = [
+    "alloy-consensus/serde-bincode-compat",
+    "alloy-eips?/serde-bincode-compat",
+    "alloy-genesis?/serde-bincode-compat",
+]
 ssz = ["alloy-rpc-types?/ssz", "alloy-eips?/ssz"]
 k256 = [
     "alloy-core/k256",
@@ -343,7 +355,11 @@ k256 = [
     "alloy-rpc-types?/k256",
     "alloy-eips?/k256",
 ]
-kzg = ["alloy-consensus?/kzg", "alloy-rpc-types?/kzg"]
+kzg = [
+    "alloy-consensus?/kzg",
+    "alloy-rpc-types?/kzg",
+    "alloy-eips?/kzg",
+]
 eip712 = [
     "alloy-core/eip712",
     "alloy-signer?/eip712",

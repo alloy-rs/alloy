@@ -19,11 +19,15 @@ use serde::{Deserialize, Serialize};
 use std::{io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc};
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
-/// In order to initialize the caching layer, the path to the cache file is provided along with the
-/// max number of items that are stored in the in-memory LRU cache.
+/// The cache is an in-memory LRU with a fixed maximum item count. Block-sensitive methods are
+/// cached only for explicit block numbers or hashes; dynamic tags such as `latest` and `pending`
+/// bypass the cache. Log queries are cached only when pinned to a block hash or a fixed numeric
+/// range. It also caches block receipts, included transactions, raw transactions, and transaction
+/// receipts; other [`Provider`] methods pass through to the inner provider.
 ///
-/// One can load the cache from the file system by calling `load_cache` and save the cache to the
-/// file system by calling `save_cache`.
+/// Persistence is opt-in. Obtain a [`SharedCache`] with [`CacheLayer::cache`] before applying the
+/// layer, retain that handle, and use [`SharedCache::load_cache`] or [`SharedCache::save_cache`].
+/// There is no automatic persistence or invalidation.
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
     /// In-memory LRU cache, mapping requests to responses.
@@ -64,9 +68,8 @@ where
 /// from the [`Provider`] trait. It attempts to fetch from the cache and fallbacks to
 /// the RPC in case of a cache miss.
 ///
-/// Most importantly, the [`CacheProvider`] adds `save_cache` and `load_cache` methods
-/// to the provider interface, allowing users to save the cache to disk and load it
-/// from there on demand.
+/// Access to persistence remains on the shared [`SharedCache`] handle obtained from
+/// [`CacheLayer::cache`].
 #[derive(Debug, Clone)]
 pub struct CacheProvider<P, N> {
     /// Inner provider.
@@ -108,9 +111,9 @@ macro_rules! rpc_call_with_block {
             });
 
             let res = result.await?;
-            // Insert into cache only for deterministic block identifiers (exclude tag-based ids
-            // like latest/pending/earliest). Caching tag-based results can lead to stale data.
-            if !$req.has_block_tag() {
+            // Insert into cache only for deterministic block identifiers. Caching tag-based or
+            // requireCanonical queries can lead to stale data.
+            if $req.should_cache() {
                 let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
                 let hash = $req.params_hash()?;
                 let _ = cache.put(hash, json_str);
@@ -128,7 +131,7 @@ macro_rules! rpc_call_with_block {
 /// This helps overriding [`Provider`] methods that return `RpcWithBlock`.
 macro_rules! cache_rpc_call_with_block {
     ($cache:expr, $client:expr, $req:expr) => {{
-        if $req.has_block_tag() {
+        if !$req.should_cache() {
             return rpc_call_with_block!($cache, $client, $req);
         }
 
@@ -162,9 +165,9 @@ where
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         let req = RequestType::new("eth_getBlockReceipts", (block,)).with_block_id(block);
 
-        let redirect = req.has_block_tag();
+        let should_cache = req.should_cache();
 
-        if !redirect {
+        if should_cache {
             let params_hash = req.params_hash().ok();
 
             if let Some(hash) = params_hash {
@@ -184,7 +187,7 @@ where
 
             let result = client.request(req.method(), req.params()).await?;
 
-            if !redirect {
+            if should_cache {
                 if let Some(ref receipts) = result {
                     let json_str =
                         serde_json::to_string(receipts).map_err(TransportErrorKind::custom)?;
@@ -400,9 +403,9 @@ where
         RpcWithBlock::new_provider(move |block_id| {
             let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
 
-            let redirect = req.has_block_tag();
+            let should_cache = req.should_cache();
 
-            if !redirect {
+            if should_cache {
                 let params_hash = req.params_hash().ok();
 
                 if let Some(hash) = params_hash {
@@ -427,7 +430,7 @@ where
                     .map_params(|params| ParamsWithBlock::new(params, block_id))
                     .await?;
 
-                if !redirect {
+                if should_cache {
                     let json_str =
                         serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
                     let hash = req.params_hash()?;
@@ -489,18 +492,19 @@ impl<Params: RpcSend> RequestType<Params> {
         self.params.clone()
     }
 
-    /// Returns true if the BlockId has been set to a tag value such as "latest", "earliest", or
-    /// "pending".
-    const fn has_block_tag(&self) -> bool {
+    /// Returns true if the request can be safely served from cache.
+    const fn should_cache(&self) -> bool {
         if let Some(block_id) = self.block_id {
-            return !matches!(
-                block_id,
-                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_))
-            );
+            return match block_id {
+                BlockId::Hash(hash) => !matches!(hash.require_canonical, Some(true)),
+                BlockId::Number(BlockNumberOrTag::Number(_)) => true,
+                _ => false,
+            };
         }
+
         // Treat absence of BlockId as tag-based (e.g., 'latest'), which is non-deterministic
         // and should not be cached.
-        true
+        false
     }
 }
 
@@ -532,7 +536,7 @@ impl SharedCache {
         self.max_items.get() as u32
     }
 
-    /// Puts a value into the cache, and returns the old value if it existed.
+    /// Puts a value into the cache and returns whether an existing value was replaced.
     pub fn put(&self, key: B256, value: String) -> TransportResult<bool> {
         Ok(self.inner.write().put(key, value).is_some())
     }
@@ -569,8 +573,10 @@ impl SharedCache {
         Ok(())
     }
 
-    /// Loads the cache from a file specified by the path.
-    /// If the file does not exist, it returns without error.
+    /// Loads entries from a file and merges them into the existing cache.
+    ///
+    /// Existing keys may be replaced, and entries beyond the configured capacity are evicted
+    /// according to the LRU policy. If the file does not exist, this returns without error.
     pub fn load_cache(&self, path: PathBuf) -> TransportResult<()> {
         if !path.exists() {
             return Ok(());
@@ -667,10 +673,12 @@ mod tests {
                 *provider.send_transaction(req).await.expect("failed to send tx").tx_hash();
 
             let tx = provider.get_transaction_by_hash(tx_hash).await.unwrap(); // Received from RPC.
-            let tx2 = provider.get_transaction_by_hash(tx_hash).await.unwrap(); // Received from cache.
+            let tx2 = provider.get_transaction_by_hash(tx_hash).await.unwrap(); // Received from
+                                                                                // cache.
             assert_eq!(tx, tx2);
 
-            let receipt = provider.get_transaction_receipt(tx_hash).await.unwrap(); // Received from RPC.
+            let receipt = provider.get_transaction_receipt(tx_hash).await.unwrap(); // Received from
+                                                                                    // RPC.
             let receipt2 = provider.get_transaction_receipt(tx_hash).await.unwrap(); // Received from cache.
 
             assert_eq!(receipt, receipt2);
@@ -709,6 +717,33 @@ mod tests {
         let second = provider.get_transaction_by_hash(tx_hash).await.unwrap();
         assert_eq!(second, Some(tx));
         assert!(shared_cache.get(&cache_key).is_some());
+    }
+
+    #[tokio::test]
+    async fn test_hash_canonical_block_ids_do_not_use_cache() {
+        let cache_layer = CacheLayer::new(100);
+        let shared_cache = cache_layer.cache();
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .layer(cache_layer)
+            .connect_mocked_client(asserter.clone());
+
+        let address = Address::repeat_byte(5);
+        let block_hash = B256::repeat_byte(0x11);
+        let block_id = BlockId::hash_canonical(block_hash);
+        let req = RequestType::new("eth_getBalance", address).with_block_id(block_id);
+        let cache_key = req.params_hash().unwrap();
+
+        asserter.push_success(&U256::from(456));
+        asserter.push_failure_msg("block is not canonical");
+
+        let first = provider.get_balance(address).block_id(block_id).await.unwrap();
+        assert_eq!(first, U256::from(456));
+        assert!(shared_cache.get(&cache_key).is_none());
+
+        let second = provider.get_balance(address).block_id(block_id).await;
+        assert!(second.is_err());
     }
 
     #[tokio::test]

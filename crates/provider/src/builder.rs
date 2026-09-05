@@ -114,6 +114,33 @@ where
 /// enabled, whereas `ProviderBuilder::default()` will instantiate it in its vanilla
 /// [`ProviderBuilder`] form i.e with no fillers enabled.
 ///
+/// # Filler ordering
+///
+/// For Ethereum, `new()` already includes gas, blob-gas, cached-nonce, and chain-ID fillers.
+/// Methods such as [`with_gas_estimation`](Self::with_gas_estimation) append another filler; they
+/// do not replace one from the recommended set. Start with
+/// [`disable_recommended_fillers`](Self::disable_recommended_fillers) (or `default()`) when
+/// assembling those fillers explicitly.
+///
+/// [`network`](Self::network) replaces the entire filler stack with the target network's
+/// recommended fillers, so select the network before adding custom fillers or a wallet. Fillers
+/// that modify a transaction request should be added before [`wallet`](Self::wallet), which signs
+/// the request and turns it into an envelope.
+///
+/// ```
+/// use alloy_provider::ProviderBuilder;
+///
+/// // Use the complete recommended set as-is.
+/// let _recommended = ProviderBuilder::new();
+///
+/// // Or opt out before assembling an explicit set; these calls append in order.
+/// let _custom = ProviderBuilder::new()
+///     .disable_recommended_fillers()
+///     .with_gas_estimation()
+///     .with_cached_nonce_management()
+///     .fetch_chain_id();
+/// ```
+///
 /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 #[derive(Debug)]
 pub struct ProviderBuilder<L, F, N = Ethereum> {
@@ -131,8 +158,8 @@ impl
 {
     /// Create a new [`ProviderBuilder`] with the recommended filler enabled.
     ///
-    /// Recommended fillers are preconfigured set of fillers that handle gas estimation, nonce
-    /// management, and chain-id fetching.
+    /// For Ethereum, the recommended set handles gas and blob-gas estimation, cached nonce
+    /// management, and chain-ID fetching.
     ///
     /// Building a provider with this setting enabled will return a [`crate::fillers::FillProvider`]
     /// with [`crate::utils::JoinedRecommendedFillers`].
@@ -171,8 +198,7 @@ impl ProviderBuilder<Identity, Identity, Ethereum> {
 }
 
 impl<L, N: Network> ProviderBuilder<L, Identity, N> {
-    /// Add preconfigured set of layers handling gas estimation, nonce
-    /// management, and chain-id fetching.
+    /// Add the network's preconfigured set of transaction fillers.
     pub fn with_recommended_fillers(
         self,
     ) -> ProviderBuilder<L, JoinFill<Identity, N::RecommendedFillers>, N>

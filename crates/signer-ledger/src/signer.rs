@@ -22,8 +22,10 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
 ///
-/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
-/// will always return an error.
+/// Device operations are available through the asynchronous [`Signer`] and
+/// [`alloy_network::TxSigner`] traits; [`alloy_signer::SignerSync`] is not implemented. Raw digest
+/// signing is unsupported, while [`Signer::sign_message`] performs EIP-191 personal-message
+/// signing and requires confirmation on the device.
 #[derive(Debug)]
 pub struct LedgerSigner {
     transport: Arc<Mutex<Ledger>>,
@@ -148,11 +150,15 @@ impl Signer for LedgerSigner {
 alloy_network::impl_into_wallet!(LedgerSigner);
 
 impl LedgerSigner {
-    /// Instantiate the application by acquiring a lock on the ledger device.
+    /// Connects to the first compatible Ledger device and reads the derived address.
+    ///
+    /// The device must be unlocked with its Ethereum app open. Set the transaction's chain ID
+    /// explicitly before signing. `chain_id` applies only to transaction signing and rejects a
+    /// conflicting transaction ID; do not rely on it to supply a missing ID.
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_signer_ledger::{HDPath, LedgerSigner};
     ///
@@ -171,7 +177,11 @@ impl LedgerSigner {
         Ok(Self { transport: Mutex::new(transport).into(), derivation, chain_id, address })
     }
 
-    /// Instantiate the application using a existing transport.
+    /// Creates a signer using an existing shared transport.
+    ///
+    /// The transport mutex serializes device operations and can be shared by signers using
+    /// different derivation paths. `chain_id` has the same transaction-only validation behavior
+    /// as in [`Self::new`].
     pub async fn new_with_transport(
         derivation: DerivationType,
         chain_id: Option<ChainId>,
@@ -186,12 +196,15 @@ impl LedgerSigner {
         Ok(Self { transport, derivation, chain_id, address })
     }
 
-    /// Get the account which corresponds to our derivation path
+    /// Re-queries the address for this signer's derivation path.
+    ///
+    /// This does not request on-device display confirmation. [`Signer::address`] returns the
+    /// address cached when this signer was constructed.
     pub async fn get_address(&self) -> Result<Address, LedgerError> {
         self.get_address_with_path(&self.derivation).await
     }
 
-    /// Gets the account which corresponds to the provided derivation path
+    /// Queries the address for `derivation` without requesting on-device display confirmation.
     pub async fn get_address_with_path(
         &self,
         derivation: &DerivationType,
@@ -232,7 +245,7 @@ impl LedgerSigner {
         Ok(address)
     }
 
-    /// Returns the semver of the Ethereum ledger app
+    /// Returns the semantic version of the Ledger Ethereum app.
     pub async fn version(&self) -> Result<semver::Version, LedgerError> {
         let transport = self.transport.lock().await;
 
@@ -256,9 +269,12 @@ impl LedgerSigner {
         Ok(version)
     }
 
-    /// Signs an Ethereum transaction's RLP bytes (requires confirmation on the ledger).
+    /// Signs an encoded transaction signing payload and requires confirmation on the Ledger.
     ///
-    /// Note that this does not apply EIP-155.
+    /// The payload must be legacy RLP or an EIP-2718 transaction type byte followed by its encoded
+    /// payload. This method does not encode a transaction, inject or check a chain ID, or accept a
+    /// transaction hash. Prefer [`alloy_network::TxSigner::sign_transaction`] when a
+    /// [`SignableTransaction`] is available.
     #[doc(alias = "sign_transaction_rlp")]
     pub async fn sign_tx_rlp(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
         let mut payload = Self::path_to_bytes(&self.derivation)?;
@@ -405,7 +421,6 @@ mod tests {
     use alloy_network::TxSigner;
     use alloy_primitives::{address, bytes, U256};
     use alloy_rlp::Decodable;
-    use serial_test::serial;
     use std::sync::OnceLock;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
@@ -427,7 +442,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_get_address() {
         let ledger = init_ledger().await;
@@ -436,7 +450,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_version() {
         let ledger = init_ledger().await;
@@ -453,7 +466,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_sign_tx_legacy() {
         // https://github.com/gakonst/ethers-rs/blob/90b87bd85be98caa8bb592b67f3f9acbc8a409cf/ethers-signers/src/ledger/app.rs#L321
@@ -476,7 +488,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_sign_tx_eip2930() {
         // From the Ledger Ethereum app example: https://github.com/LedgerHQ/app-ethereum/blob/2264f677568cbc1e3177f9eccb3c14a229ab3255/examples/signTx.py#L104-L106
@@ -492,7 +503,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_sign_tx_eip1559() {
         // From the Ledger Ethereum app example: https://github.com/LedgerHQ/app-ethereum/blob/2264f677568cbc1e3177f9eccb3c14a229ab3255/examples/signTx.py#L100-L102
@@ -514,7 +524,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     async fn test_sign_message() {
         let ledger = init_ledger().await;
@@ -526,7 +535,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     #[ignore]
     #[cfg(feature = "eip7702")]
     async fn test_sign_auth() {

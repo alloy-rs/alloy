@@ -21,7 +21,10 @@ use once_cell::race::OnceBox as OnceLock;
 #[cfg(feature = "std")]
 use std::sync::OnceLock;
 
-/// A transaction with a signature and hash seal.
+/// A transaction paired with a signature and a lazily cached or caller-supplied hash.
+///
+/// The cached hash is not a live view of the transaction. Mapping or mutating the inner value is
+/// valid only when the signed payload and signature preimage remain unchanged.
 #[derive(Debug, Clone)]
 pub struct Signed<T, Sig = Signature> {
     #[doc(alias = "transaction")]
@@ -32,7 +35,9 @@ pub struct Signed<T, Sig = Signature> {
 }
 
 impl<T, Sig> Signed<T, Sig> {
-    /// Instantiate from a transaction and signature. Does not verify the signature.
+    /// Instantiates a signed transaction with a caller-supplied hash.
+    ///
+    /// Neither the signature nor the supplied hash is verified against `tx`.
     pub fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
         let value = OnceLock::new();
         #[allow(clippy::useless_conversion)]
@@ -55,7 +60,8 @@ impl<T, Sig> Signed<T, Sig> {
     ///
     /// # Warning
     ///
-    /// Modifying the transaction structurally invalidates the signature and hash.
+    /// Modifying the transaction structurally invalidates the signature and any cached hash. The
+    /// cache is not automatically cleared.
     #[doc(hidden)]
     pub const fn tx_mut(&mut self) -> &mut T {
         &mut self.tx
@@ -97,8 +103,8 @@ impl<T, Sig> Signed<T, Sig> {
 
     /// Applies the given closure to the inner transaction type.
     ///
-    /// Caution: This is only intended for converting transaction types that are structurally
-    /// equivalent (produce the same hash).
+    /// The signature and cached hash are retained without recomputation. Use this only for
+    /// encoding-preserving conversions that produce the same signature preimage and hash.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Signed<Tx, Sig> {
         let Self { tx, signature, hash } = self;
         Signed { tx: f(tx), signature, hash }
@@ -106,8 +112,8 @@ impl<T, Sig> Signed<T, Sig> {
 
     /// Applies the given fallible closure to the inner transactions.
     ///
-    /// Caution: This is only intended for converting transaction types that are structurally
-    /// equivalent (produce the same hash).
+    /// The signature and cached hash are retained without recomputation. Use this only for
+    /// encoding-preserving conversions that produce the same signature preimage and hash.
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Signed<Tx, Sig>, E> {
         let Self { tx, signature, hash } = self;
         Ok(Signed { tx: f(tx)?, signature, hash })
@@ -547,7 +553,13 @@ where
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::rlp_decode_signed(buf).map_err(Into::into)
+        let decoded = T::rlp_decode_signed(buf)?;
+
+        if decoded.ty() != 0 {
+            return Err(Eip2718Error::UnexpectedType(0));
+        }
+
+        Ok(decoded)
     }
 }
 

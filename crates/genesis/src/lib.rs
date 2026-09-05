@@ -54,6 +54,7 @@ pub struct Genesis {
     // * base_fee_per_gas
     // * excess_blob_gas
     // * blob_gas_used
+    // * slot_number
     // * number
     // should NOT be set in a real genesis file, but are included here for compatibility with
     // consensus tests, which have genesis files with these fields populated.
@@ -66,6 +67,9 @@ pub struct Genesis {
     /// The genesis header blob gas used
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub blob_gas_used: Option<u64>,
+    /// The genesis header slot number (EIP-7843)
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub slot_number: Option<u64>,
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
@@ -189,6 +193,12 @@ impl Genesis {
         self
     }
 
+    /// Set the slot number.
+    pub const fn with_slot_number(mut self, slot_number: Option<u64>) -> Self {
+        self.slot_number = slot_number;
+        self
+    }
+
     /// Set the parent hash.
     pub const fn with_parent_hash(mut self, parent_hash: Option<B256>) -> Self {
         self.parent_hash = parent_hash;
@@ -255,6 +265,16 @@ impl GenesisAccount {
         self
     }
 
+    /// Returns the account bytecode if it is non-empty.
+    pub fn non_empty_code(&self) -> Option<&Bytes> {
+        self.code.as_ref().filter(|code| !code.is_empty())
+    }
+
+    /// Returns the hash of the account bytecode if it is non-empty.
+    pub fn code_hash(&self) -> Option<B256> {
+        self.non_empty_code().map(keccak256)
+    }
+
     /// Set the storage.
     pub fn with_storage(mut self, storage: Option<BTreeMap<B256, B256>>) -> Self {
         self.storage = storage;
@@ -277,6 +297,7 @@ impl GenesisAccount {
 
 impl From<GenesisAccount> for TrieAccount {
     fn from(account: GenesisAccount) -> Self {
+        let code_hash = account.code_hash().unwrap_or(KECCAK_EMPTY);
         let storage_root = account
             .storage
             .map(|storage| {
@@ -293,7 +314,7 @@ impl From<GenesisAccount> for TrieAccount {
             nonce: account.nonce.unwrap_or_default(),
             balance: account.balance,
             storage_root,
-            code_hash: account.code.map_or(KECCAK_EMPTY, keccak256),
+            code_hash,
         }
     }
 }
@@ -305,6 +326,9 @@ impl From<GenesisAccount> for TrieAccount {
 /// Governs crucial blockchain behavior and adaptability.
 ///
 /// Encapsulates parameters shaping network evolution and behavior.
+///
+/// `Default` is a minimally populated configuration with chain ID 1 and every fork activation
+/// unset. It is not Ethereum mainnet's historical chain configuration.
 ///
 /// See [geth's `ChainConfig`
 /// struct](https://github.com/ethereum/go-ethereum/blob/v1.14.0/params/config.go#L326)
@@ -398,6 +422,10 @@ pub struct ChainConfig {
     /// Amsterdam switch time (None = no fork, 0 = already on amsterdam).
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub amsterdam_time: Option<u64>,
+
+    /// Bogota switch time (None = no fork, 0 = already on bogota).
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
+    pub bogota_time: Option<u64>,
 
     /// BPO1 switch time (None = no fork, 0 = already on BPO1).
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
@@ -534,6 +562,8 @@ pub mod serde_bincode_compat {
         #[serde(default)]
         amsterdam_time: Option<u64>,
         #[serde(default)]
+        bogota_time: Option<u64>,
+        #[serde(default)]
         bpo1_time: Option<u64>,
         #[serde(default)]
         bpo2_time: Option<u64>,
@@ -587,6 +617,7 @@ pub mod serde_bincode_compat {
                 prague_time: value.prague_time,
                 osaka_time: value.osaka_time,
                 amsterdam_time: value.amsterdam_time,
+                bogota_time: value.bogota_time,
                 bpo1_time: value.bpo1_time,
                 bpo2_time: value.bpo2_time,
                 bpo3_time: value.bpo3_time,
@@ -636,6 +667,7 @@ pub mod serde_bincode_compat {
                 prague_time: value.prague_time,
                 osaka_time: value.osaka_time,
                 amsterdam_time: value.amsterdam_time,
+                bogota_time: value.bogota_time,
                 bpo1_time: value.bpo1_time,
                 bpo2_time: value.bpo2_time,
                 bpo3_time: value.bpo3_time,
@@ -749,6 +781,7 @@ pub mod serde_bincode_compat {
                 prague_time: None,
                 osaka_time: None,
                 amsterdam_time: None,
+                bogota_time: None,
                 bpo1_time: None,
                 bpo2_time: None,
                 bpo3_time: None,
@@ -807,6 +840,7 @@ pub mod serde_bincode_compat {
                 prague_time: None,
                 osaka_time: None,
                 amsterdam_time: None,
+                bogota_time: None,
                 bpo1_time: None,
                 bpo2_time: None,
                 bpo3_time: None,
@@ -909,6 +943,7 @@ impl ChainConfig {
         let mut osaka = None;
         let mut prague = None;
         let mut amsterdam = None;
+        let mut bogota = None;
         let mut scheduled = Vec::new();
 
         for (key, params) in &self.blob_schedule {
@@ -961,6 +996,11 @@ impl ChainConfig {
                         amsterdam = Some((timestamp, params));
                     }
                 }
+                "Bogota" => {
+                    if let Some(timestamp) = self.bogota_time {
+                        bogota = Some((timestamp, params));
+                    }
+                }
                 _ => (),
             }
         }
@@ -968,6 +1008,7 @@ impl ChainConfig {
         // we must insert amsterdam last because otherwise the ordering is incorrect if all have 0
         // timestamp
         scheduled.extend(amsterdam);
+        scheduled.extend(bogota);
 
         scheduled.sort_by_key(|(timestamp, _)| *timestamp);
 
@@ -1044,15 +1085,17 @@ impl ChainConfig {
         self.is_active_at_block(self.gray_glacier_block, block)
     }
 
-    /// Checks if the blockchain is active at or after the Shanghai fork block and the specified
-    /// timestamp.
+    /// Returns whether London is active at `block` and Shanghai is active at `timestamp`.
+    ///
+    /// Returns `false` if either activation is unset.
     pub fn is_shanghai_active_at_block_and_timestamp(&self, block: u64, timestamp: u64) -> bool {
         self.is_london_active_at_block(block)
             && self.is_active_at_timestamp(self.shanghai_time, timestamp)
     }
 
-    /// Checks if the blockchain is active at or after the Cancun fork block and the specified
-    /// timestamp.
+    /// Returns whether London is active at `block` and Cancun is active at `timestamp`.
+    ///
+    /// Returns `false` if either activation is unset.
     pub fn is_cancun_active_at_block_and_timestamp(&self, block: u64, timestamp: u64) -> bool {
         self.is_london_active_at_block(block)
             && self.is_active_at_timestamp(self.cancun_time, timestamp)
@@ -1095,6 +1138,7 @@ impl Default for ChainConfig {
             prague_time: None,
             osaka_time: None,
             amsterdam_time: None,
+            bogota_time: None,
             bpo1_time: None,
             bpo2_time: None,
             bpo3_time: None,
@@ -1315,6 +1359,27 @@ mod tests {
     "#;
 
         let _genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
+    }
+
+    #[test]
+    fn parse_slot_number() {
+        let geth_genesis = r#"
+    {
+        "difficulty": "0x20000",
+        "gasLimit": "0x1",
+        "alloc": {},
+        "slotNumber": "0x3e7",
+        "config": {
+          "chainId": 1
+        }
+    }
+    "#;
+
+        let genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
+        assert_eq!(genesis.slot_number, Some(999));
+
+        let ser = serde_json::to_value(&genesis).unwrap();
+        assert_eq!(ser["slotNumber"], "0x3e7");
     }
 
     #[test]
@@ -1972,6 +2037,7 @@ mod tests {
                 base_fee_per_gas: None,
                 excess_blob_gas: None,
                 blob_gas_used: None,
+                slot_number: None,
                 number: None,
                 parent_hash: Some(B256::ZERO),
                 alloc: BTreeMap::from_iter(vec![
@@ -2272,6 +2338,22 @@ mod tests {
 
         let result: Result<GenesisAccount, _> = serde_json::from_value(json_data);
         assert!(result.is_err()); // The deserialization should fail due to an empty string
+    }
+
+    #[test]
+    fn genesis_account_code_helpers() {
+        let account = GenesisAccount::default();
+        assert_eq!(account.non_empty_code(), None);
+        assert_eq!(account.code_hash(), None);
+
+        let account = GenesisAccount::default().with_code(Some(Bytes::new()));
+        assert_eq!(account.non_empty_code(), None);
+        assert_eq!(account.code_hash(), None);
+
+        let code = Bytes::from(vec![0x60, 0x61]);
+        let account = GenesisAccount::default().with_code(Some(code.clone()));
+        assert_eq!(account.non_empty_code(), Some(&code));
+        assert_eq!(account.code_hash(), Some(keccak256(&code)));
     }
 
     #[test]

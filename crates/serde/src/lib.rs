@@ -31,9 +31,10 @@ pub use ttd::*;
 mod other;
 pub use other::{OtherFields, WithOtherFields};
 
-/// Serialize a byte vec as a hex string _without_ the "0x" prefix.
+/// Serialize bytes as a hex string _without_ the "0x" prefix.
 ///
-/// This behaves the same as [`hex::encode`].
+/// This behaves the same as [`hex::encode`] and is intended for Serde's `serialize_with`
+/// attribute. It has no matching deserializer.
 pub fn serialize_hex_string_no_prefix<S, T>(x: T, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -42,7 +43,9 @@ where
     s.serialize_str(&hex::encode(x.as_ref()))
 }
 
-/// Serialize a [B256] as a hex string _without_ the "0x" prefix.
+/// Serialize a [`B256`] as a hex string _without_ the "0x" prefix.
+///
+/// This is intended for Serde's `serialize_with` attribute and has no matching deserializer.
 pub fn serialize_b256_hex_string_no_prefix<S>(x: &B256, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
