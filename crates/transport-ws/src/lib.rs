@@ -55,16 +55,23 @@ impl<T> WsBackend<T> {
     }
 
     /// Handle inbound text from the websocket.
+    ///
+    /// A message may be a single JSON-RPC response/notification object or, when
+    /// the server answers a JSON-RPC batch request, a single JSON array of
+    /// responses. In the batch case each element is forwarded to the frontend
+    /// individually so it can be routed to its waiter by JSON-RPC ID.
     #[expect(clippy::result_unit_err)]
     pub fn handle_text(&mut self, text: &str) -> Result<(), ()> {
         trace!(%text, "received message from websocket");
 
-        match serde_json::from_str(text) {
-            Ok(item) => {
-                trace!(?item, "deserialized message");
-                if let Err(err) = self.interface.send_to_frontend(item) {
-                    error!(item=?err.0, "failed to send deserialized item to handler");
-                    return Err(());
+        match serde_json::from_str::<alloy_json_rpc::PubSubItems>(text) {
+            Ok(items) => {
+                for item in items {
+                    trace!(?item, "deserialized message");
+                    if let Err(err) = self.interface.send_to_frontend(item) {
+                        error!(item=?err.0, "failed to send deserialized item to handler");
+                        return Err(());
+                    }
                 }
             }
             Err(err) => {
