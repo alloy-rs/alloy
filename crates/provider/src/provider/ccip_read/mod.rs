@@ -417,16 +417,23 @@ impl<'a> BatchContext<'a> {
     /// Reserves `count` gateway requests from the call's total budget.
     fn reserve(&self, count: usize) -> Result<(), CcipReadError> {
         let limit = self.config.max_total_requests;
-        self.total_requests
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
-                current.checked_add(count).filter(|next| *next <= limit)
-            })
-            .map(drop)
-            .map_err(|_| {
-                CcipReadError::ResourceLimit(format!(
+        let mut current = self.total_requests.load(Ordering::Relaxed);
+        loop {
+            let Some(next) = current.checked_add(count).filter(|next| *next <= limit) else {
+                return Err(CcipReadError::ResourceLimit(format!(
                     "total gateway request budget of {limit} exceeded"
-                ))
-            })
+                )));
+            };
+            match self.total_requests.compare_exchange_weak(
+                current,
+                next,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return Ok(()),
+                Err(actual) => current = actual,
+            }
+        }
     }
 }
 
