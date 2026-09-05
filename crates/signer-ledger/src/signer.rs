@@ -403,10 +403,17 @@ impl LedgerSigner {
         let mut bytes = vec![depth as u8];
         for derivation_index in elements {
             let hardened = derivation_index.contains('\'');
-            let mut index = derivation_index.replace('\'', "").parse::<u32>()?;
-            if hardened {
-                index |= 0x80000000;
+            let index = derivation_index.replace('\'', "").parse::<u32>().map_err(|e| {
+                LedgerError::InvalidDerivationPath(e.to_string())
+            })?;
+            // Reject raw indices that already set the harden bit (e.g. 2147483648 ≡ 0').
+            // Otherwise Other("m/2147483648") silently selects a hardened child.
+            if index >= 0x8000_0000 {
+                return Err(LedgerError::InvalidDerivationPath(format!(
+                    "index {index} is out of range (use \' for hardened segments)"
+                )));
             }
+            let index = if hardened { index | 0x8000_0000 } else { index };
 
             bytes.extend(index.to_be_bytes());
         }
@@ -463,6 +470,20 @@ mod tests {
         let err = LedgerSigner::path_to_bytes(&DerivationType::Other("m/44'/invalid/0".into()))
             .unwrap_err();
         assert!(matches!(err, LedgerError::InvalidDerivationPath(_)));
+    }
+
+    #[test]
+    fn rejects_raw_hardened_index_without_marker() {
+        let err = LedgerSigner::path_to_bytes(&DerivationType::Other("m/2147483648".into()))
+            .unwrap_err();
+        assert!(matches!(err, LedgerError::InvalidDerivationPath(_)));
+
+        let err = LedgerSigner::path_to_bytes(&DerivationType::Other("m/2147483648'".into()))
+            .unwrap_err();
+        assert!(matches!(err, LedgerError::InvalidDerivationPath(_)));
+
+        let ok = LedgerSigner::path_to_bytes(&DerivationType::Other("m/0'".into())).unwrap();
+        assert_eq!(ok, vec![1, 0x80, 0x00, 0x00, 0x00]);
     }
 
     #[tokio::test]
