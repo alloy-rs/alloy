@@ -25,30 +25,41 @@ use core::fmt;
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(tag = "type", bound(serialize = "T: serde::Serialize + AsRef<Log>"))
+)]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
 pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
+    #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
     Legacy(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 1, containing a [EIP-2930] receipt.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
+    #[cfg_attr(feature = "serde", serde(rename = "0x1", alias = "0x01"))]
     Eip2930(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 2, containing a [EIP-1559] receipt.
     ///
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
+    #[cfg_attr(feature = "serde", serde(rename = "0x2", alias = "0x02"))]
     Eip1559(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 3, containing a [EIP-4844] receipt.
     ///
     /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
+    #[cfg_attr(feature = "serde", serde(rename = "0x3", alias = "0x03"))]
     Eip4844(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 4, containing a [EIP-7702] receipt.
     ///
     /// [EIP-7702]: https://eips.ethereum.org/EIPS/eip-7702
+    #[cfg_attr(feature = "serde", serde(rename = "0x4", alias = "0x04"))]
     Eip7702(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 6, containing a [EIP-8141] frame receipt payload.
     ///
     /// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
+    #[cfg_attr(feature = "serde", serde(rename = "0x6", alias = "0x06"))]
     Eip8141(FrameReceiptEnvelope<T>),
 }
 
@@ -117,74 +128,15 @@ impl<T: Decodable + Clone> Decodable for FrameReceiptEnvelope<T> {
     }
 }
 
-/// Deserializes a receipt, treating a missing `type` field as [`TxType::Legacy`].
-///
-/// The `type` field is required by the JSON-RPC specification, but some
-/// Ethereum-compatible nodes omit it entirely. A receipt without a type flag is a
-/// pre-[EIP-2718] receipt, which is unambiguously legacy, so it is accepted rather
-/// than rejected.
-///
-/// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[cfg(feature = "serde")]
-impl<'de, T: serde::de::DeserializeOwned + Clone> serde::Deserialize<'de> for ReceiptEnvelope<T> {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = serde_json::Value::deserialize(deserializer)?;
-
-        #[derive(serde::Deserialize)]
-        struct ReceiptEnvelopeHelper<T> {
-            #[serde(flatten)]
-            receipt: ReceiptWithBloom<Receipt<T>>,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct TypeHelper {
-            #[serde(default, rename = "type", with = "alloy_serde::quantity::opt")]
-            ty: Option<u8>,
-        }
-
-        let ty = TypeHelper::deserialize(value.clone())
-            .map_err(serde::de::Error::custom)?
-            .ty
-            .unwrap_or(LEGACY_TX_TYPE_ID);
-        let ty = TxType::try_from(ty).map_err(serde::de::Error::custom)?;
-        if ty == TxType::Eip8141 {
-            let payload = serde_json::from_value::<FrameReceiptPayload<T>>(value)
-                .map_err(serde::de::Error::custom)?;
-            return Ok(Self::Eip8141(payload.into()));
-        }
-
-        let helper =
-            ReceiptEnvelopeHelper::<T>::deserialize(value).map_err(serde::de::Error::custom)?;
-        Ok(Self::from_typed(ty, helper.receipt))
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<T> serde::Serialize for ReceiptEnvelope<T>
+impl<T> serde::Serialize for FrameReceiptEnvelope<T>
 where
     T: serde::Serialize + AsRef<Log>,
 {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         #[derive(serde::Serialize)]
-        #[serde(tag = "type")]
-        enum Standard<'a, T> {
-            #[serde(rename = "0x0")]
-            Legacy(&'a ReceiptWithBloom<Receipt<T>>),
-            #[serde(rename = "0x1")]
-            Eip2930(&'a ReceiptWithBloom<Receipt<T>>),
-            #[serde(rename = "0x2")]
-            Eip1559(&'a ReceiptWithBloom<Receipt<T>>),
-            #[serde(rename = "0x3")]
-            Eip4844(&'a ReceiptWithBloom<Receipt<T>>),
-            #[serde(rename = "0x4")]
-            Eip7702(&'a ReceiptWithBloom<Receipt<T>>),
-        }
-
-        #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Frame<'a, T> {
-            #[serde(rename = "type", with = "alloy_serde::quantity")]
-            tx_type: u8,
             #[serde(with = "alloy_serde::quantity")]
             status: u8,
             #[serde(with = "alloy_serde::quantity")]
@@ -195,23 +147,62 @@ where
             frame_receipts: &'a [alloy_eips::eip8141::FrameReceipt<T>],
         }
 
-        match self {
-            Self::Legacy(receipt) => Standard::Legacy(receipt).serialize(serializer),
-            Self::Eip2930(receipt) => Standard::Eip2930(receipt).serialize(serializer),
-            Self::Eip1559(receipt) => Standard::Eip1559(receipt).serialize(serializer),
-            Self::Eip4844(receipt) => Standard::Eip4844(receipt).serialize(serializer),
-            Self::Eip7702(receipt) => Standard::Eip7702(receipt).serialize(serializer),
-            Self::Eip8141(receipt) => Frame {
-                tx_type: FRAME_TX_TYPE,
-                status: u8::from(self.status()),
-                cumulative_gas_used: receipt.payload.cumulative_gas_used,
-                logs: &receipt.logs,
-                logs_bloom: logs_bloom(receipt.logs.iter().map(AsRef::as_ref)),
-                payer: receipt.payload.payer,
-                frame_receipts: &receipt.payload.frame_receipts,
-            }
-            .serialize(serializer),
+        Frame {
+            status: u8::from(
+                self.payload
+                    .frame_receipts
+                    .iter()
+                    .all(|frame| matches!(frame.status, FrameStatus::Success)),
+            ),
+            cumulative_gas_used: self.payload.cumulative_gas_used,
+            logs: &self.logs,
+            logs_bloom: logs_bloom(self.logs.iter().map(AsRef::as_ref)),
+            payer: self.payload.payer,
+            frame_receipts: &self.payload.frame_receipts,
         }
+        .serialize(serializer)
+    }
+}
+
+/// Deserializes a receipt, treating a missing `type` field as [`TxType::Legacy`].
+///
+/// The `type` field is required by the JSON-RPC specification, but some
+/// Ethereum-compatible nodes omit it entirely. A receipt without a type flag is a
+/// pre-[EIP-2718] receipt, which is unambiguously legacy, so it is accepted rather
+/// than rejected.
+///
+/// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+#[cfg(feature = "serde")]
+impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for ReceiptEnvelope<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ReceiptEnvelopeHelper<T> {
+            #[serde(default, rename = "type", with = "alloy_serde::quantity::opt")]
+            ty: Option<u8>,
+            #[serde(flatten)]
+            receipt: ReceiptWithBloom<Receipt<T>>,
+            payer: Option<alloy_primitives::Address>,
+            frame_receipts: Option<Vec<alloy_eips::eip8141::FrameReceipt<T>>>,
+        }
+
+        let ReceiptEnvelopeHelper { ty, receipt, payer, frame_receipts } =
+            ReceiptEnvelopeHelper::<T>::deserialize(deserializer)?;
+        let ty = ty.unwrap_or(LEGACY_TX_TYPE_ID);
+        let ty = TxType::try_from(ty).map_err(serde::de::Error::custom)?;
+        if ty == TxType::Eip8141 {
+            let payer = payer.ok_or_else(|| serde::de::Error::missing_field("payer"))?;
+            let frame_receipts =
+                frame_receipts.ok_or_else(|| serde::de::Error::missing_field("frameReceipts"))?;
+            let payload = FrameReceiptPayload {
+                cumulative_gas_used: receipt.receipt.cumulative_gas_used,
+                payer,
+                frame_receipts,
+            };
+            return Ok(Self::Eip8141(payload.into()));
+        }
+
+        Ok(Self::from_typed(ty, receipt))
     }
 }
 
@@ -895,6 +886,54 @@ mod test {
         // An unknown type flag is still rejected.
         json["type"] = "0x7f".into();
         serde_json::from_value::<ReceiptEnvelope<()>>(json).unwrap_err();
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn standard_receipt_json_shape_is_preserved() {
+        let inner = super::ReceiptWithBloom::<Receipt<Log>> {
+            receipt: Receipt {
+                status: super::Eip658Value::Eip658(true),
+                cumulative_gas_used: 21_000,
+                logs: Default::default(),
+            },
+            logs_bloom: Default::default(),
+        };
+        let envelope = ReceiptEnvelope::Eip1559(inner);
+
+        let json = serde_json::to_value(&envelope).unwrap();
+        assert_eq!(json["type"], "0x2");
+        assert_eq!(json["status"], "0x1");
+        assert_eq!(json["cumulativeGasUsed"], "0x5208");
+
+        let decoded: ReceiptEnvelope<Log> = serde_json::from_value(json).unwrap();
+        assert_eq!(decoded, envelope);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn eip8141_receipt_json_roundtrip() {
+        let envelope = ReceiptEnvelope::Eip8141(
+            FrameReceiptPayload {
+                cumulative_gas_used: 42,
+                payer: Address::repeat_byte(0x11),
+                frame_receipts: alloc::vec![FrameReceipt {
+                    status: FrameStatus::Success,
+                    gas_used: FrameGasUsed { execution: 21, state: 1 },
+                    logs: alloc::vec![Log::default()],
+                }],
+            }
+            .into(),
+        );
+
+        let json = serde_json::to_value(&envelope).unwrap();
+        assert_eq!(json["type"], "0x6");
+        assert_eq!(json["status"], "0x1");
+        assert_eq!(json["cumulativeGasUsed"], "0x2a");
+        assert!(json.get("payload").is_none());
+
+        let decoded: ReceiptEnvelope<Log> = serde_json::from_value(json).unwrap();
+        assert_eq!(decoded, envelope);
     }
 
     #[test]
