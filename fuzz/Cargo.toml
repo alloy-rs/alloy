@@ -11,20 +11,31 @@ cargo-fuzz = true
 alloy-consensus = { path = "../crates/consensus" }
 alloy-consensus-any = { path = "../crates/consensus-any" }
 alloy-eips = { path = "../crates/eips" }
+alloy-rpc-types-engine = { path = "../crates/rpc-types-engine", features = ["ssz"] }
 alloy-primitives = "1.6.1"
 alloy-rlp = "0.3.16"
+ethereum_ssz = "0.10"
 libfuzzer-sys = "0.4"
 
 [build-dependencies]
 alloy-consensus = { path = "../crates/consensus" }
 alloy-consensus-any = { path = "../crates/consensus-any" }
 alloy-eips = { path = "../crates/eips" }
+alloy-rpc-types-engine = { path = "../crates/rpc-types-engine", features = ["ssz"] }
 alloy-primitives = "1.6.1"
 alloy-rlp = "0.3.16"
+ethereum_ssz = "0.10"
 
 [[bin]]
 name = "consensus_rlp"
 path = "fuzz_targets/consensus_rlp.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "engine_ssz"
+path = "fuzz_targets/engine_ssz.rs"
 test = false
 doc = false
 bench = false

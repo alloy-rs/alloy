@@ -7,13 +7,19 @@ use alloy_consensus::{
 use alloy_consensus::transaction::PooledTransaction;
 use alloy_consensus_any::AnyReceiptEnvelope;
 use alloy_eips::{
-    eip4844::{Blob, Bytes48},
+    eip4844::{Blob, BlobAndProofV1, BlobAndProofV2, Bytes48},
     eip2718::{Decodable2718, Encodable2718},
     eip4895::Withdrawals,
-    eip7594::{CELLS_PER_EXT_BLOB, Decodable7594, Encodable7594},
+    eip7594::{Cell, CELLS_PER_EXT_BLOB, Decodable7594, Encodable7594},
+    eip7685::Requests,
 };
-use alloy_primitives::Signature;
+use alloy_primitives::{B128, Bloom, Signature, U256};
 use alloy_rlp::{Decodable, Encodable, Header as RlpHeader, EMPTY_STRING_CODE};
+use alloy_rpc_types_engine::{
+    ssz_engine_types::*, BlobsBundleV1, BlobsBundleV2, ExecutionPayloadEnvelopeV3,
+    ForkchoiceState, PayloadId,
+};
+use ssz::{Decode as SszDecode, Encode as SszEncode};
 use std::{fmt::Debug, fs, path::Path};
 
 include!("types.rs");
@@ -61,6 +67,321 @@ where
     assert!(input.is_empty(), "{name}: decode_7594 left trailing bytes");
     assert_eq!(decoded, value, "{name}: decode_7594(encode_7594(value)) differs");
     write_seed(corpus_dir, name, &bytes);
+}
+
+fn seed_ssz<T>(corpus_dir: &Path, name: &str, value: T)
+where
+    T: Debug + PartialEq + SszDecode + SszEncode,
+{
+    let bytes = value.as_ssz_bytes();
+    let decoded = T::from_ssz_bytes(&bytes).unwrap_or_else(|err| panic!("{name}: {err:?}"));
+    assert_eq!(decoded, value, "{name}: decode(encode(value)) differs");
+    write_seed(corpus_dir, name, &bytes);
+}
+
+fn execution_payload_paris() -> ExecutionPayloadParis {
+    ExecutionPayloadParis {
+        parent_hash: B256::ZERO,
+        fee_recipient: Address::ZERO,
+        state_root: B256::ZERO,
+        receipts_root: B256::ZERO,
+        logs_bloom: Bloom::ZERO,
+        prev_randao: B256::ZERO,
+        block_number: 0,
+        gas_limit: 0,
+        gas_used: 0,
+        timestamp: 0,
+        extra_data: Bytes::from_static(b"ssz"),
+        base_fee_per_gas: U256::ZERO,
+        block_hash: B256::ZERO,
+        transactions: vec![Bytes::from_static(b"\x02\xc0")],
+    }
+}
+
+fn execution_payload_shanghai() -> ExecutionPayloadShanghai {
+    ExecutionPayloadShanghai {
+        payload_inner: execution_payload_paris(),
+        withdrawals: vec![Default::default()],
+    }
+}
+
+fn execution_payload_cancun() -> ExecutionPayloadCancun {
+    ExecutionPayloadCancun {
+        payload_inner: execution_payload_shanghai(),
+        blob_gas_used: 0,
+        excess_blob_gas: 0,
+    }
+}
+
+fn execution_payload_amsterdam() -> ExecutionPayloadAmsterdam {
+    ExecutionPayloadAmsterdam {
+        payload_inner: execution_payload_cancun(),
+        block_access_list: Bytes::from_static(b"\xc0"),
+        slot_number: 0,
+    }
+}
+
+fn engine_ssz_seeds() {
+    let corpus_dir = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
+        .join("corpus")
+        .join("engine_ssz");
+    fs::create_dir_all(&corpus_dir).expect("failed to create Engine SSZ corpus directory");
+
+    seed_ssz(&corpus_dir, "status-valid-kind", PayloadStatusKind::Valid);
+    seed_ssz(
+        &corpus_dir,
+        "validation-error",
+        ValidationError::try_from(Bytes::from_static(b"invalid payload")).unwrap(),
+    );
+    seed_ssz(&corpus_dir, "optional-hash-none", Optional::<B256>::none());
+    seed_ssz(
+        &corpus_dir,
+        "optional-hash-some",
+        Optional::some(B256::repeat_byte(0x42)),
+    );
+    seed_ssz(
+        &corpus_dir,
+        "payload-status-valid",
+        PayloadStatus {
+            status: PayloadStatusKind::Valid,
+            latest_valid_hash: Optional::some(B256::ZERO),
+            validation_error: Optional::none(),
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "payload-status-invalid",
+        PayloadStatus {
+            status: PayloadStatusKind::Invalid,
+            latest_valid_hash: Optional::none(),
+            validation_error: Optional::some(
+                ValidationError::try_from(Bytes::from_static(b"invalid payload")).unwrap(),
+            ),
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "forkchoice-response",
+        ForkchoiceUpdateResponse {
+            payload_status: PayloadStatus {
+                status: PayloadStatusKind::Syncing,
+                latest_valid_hash: Optional::none(),
+                validation_error: Optional::none(),
+            },
+            payload_id: Optional::some(PayloadId::default()),
+        },
+    );
+
+    seed_ssz(&corpus_dir, "attributes-paris", PayloadAttributesParis::default());
+    seed_ssz(&corpus_dir, "attributes-shanghai", PayloadAttributesShanghai::default());
+    seed_ssz(&corpus_dir, "attributes-cancun", PayloadAttributesCancun::default());
+    seed_ssz(&corpus_dir, "attributes-amsterdam", PayloadAttributesAmsterdam::default());
+
+    let requests = Requests::new(vec![Bytes::from_static(b"\x00\x01")]);
+    seed_ssz(
+        &corpus_dir,
+        "built-payload-paris",
+        BuiltPayloadParis { payload: execution_payload_paris(), block_value: U256::ZERO },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "built-payload-shanghai",
+        BuiltPayloadShanghai { payload: execution_payload_shanghai(), block_value: U256::ZERO },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "built-payload-cancun",
+        ExecutionPayloadEnvelopeV3 {
+            execution_payload: execution_payload_cancun(),
+            block_value: U256::ZERO,
+            blobs_bundle: BlobsBundleV1::default(),
+            should_override_builder: false,
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "built-payload-prague",
+        BuiltPayloadPrague {
+            payload: execution_payload_cancun(),
+            block_value: U256::ZERO,
+            blobs_bundle: BlobsBundleV1::default(),
+            execution_requests: requests.clone(),
+            should_override_builder: false,
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "built-payload-osaka",
+        BuiltPayloadOsaka {
+            payload: execution_payload_cancun(),
+            block_value: U256::ZERO,
+            blobs_bundle: BlobsBundleV2::default(),
+            execution_requests: requests.clone(),
+            should_override_builder: false,
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "built-payload-amsterdam",
+        BuiltPayloadAmsterdam {
+            payload: execution_payload_amsterdam(),
+            block_value: U256::ZERO,
+            blobs_bundle: BlobsBundleV2::default(),
+            execution_requests: requests.clone(),
+            should_override_builder: false,
+        },
+    );
+
+    seed_ssz(
+        &corpus_dir,
+        "new-payload-paris",
+        ExecutionPayloadEnvelopeParis::from(execution_payload_paris()),
+    );
+    seed_ssz(
+        &corpus_dir,
+        "new-payload-shanghai",
+        ExecutionPayloadEnvelopeShanghai::from(execution_payload_shanghai()),
+    );
+    seed_ssz(
+        &corpus_dir,
+        "new-payload-cancun",
+        ExecutionPayloadEnvelopeCancun::from((execution_payload_cancun(), B256::ZERO)),
+    );
+    seed_ssz(
+        &corpus_dir,
+        "new-payload-prague",
+        ExecutionPayloadEnvelopePrague::from((
+            execution_payload_cancun(),
+            B256::ZERO,
+            requests.clone(),
+        )),
+    );
+    seed_ssz(
+        &corpus_dir,
+        "new-payload-amsterdam",
+        ExecutionPayloadEnvelopeAmsterdam::from((
+            execution_payload_amsterdam(),
+            B256::ZERO,
+            requests,
+        )),
+    );
+
+    seed_ssz(
+        &corpus_dir,
+        "forkchoice-paris",
+        ForkchoiceUpdateParis {
+            forkchoice_state: ForkchoiceState::default(),
+            payload_attributes: Optional::some(PayloadAttributesParis::default()),
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "forkchoice-shanghai",
+        ForkchoiceUpdateShanghai {
+            forkchoice_state: ForkchoiceState::default(),
+            payload_attributes: Optional::some(PayloadAttributesShanghai::default()),
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "forkchoice-cancun",
+        ForkchoiceUpdateCancun {
+            forkchoice_state: ForkchoiceState::default(),
+            payload_attributes: Optional::some(PayloadAttributesCancun::default()),
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "forkchoice-amsterdam",
+        ForkchoiceUpdateAmsterdam {
+            forkchoice_state: ForkchoiceState::default(),
+            payload_attributes: Optional::some(PayloadAttributesAmsterdam::default()),
+            custody_columns: Optional::some(B128::ZERO),
+        },
+    );
+
+    let body_paris = ExecutionPayloadBodyParis {
+        transactions: vec![Bytes::from_static(b"\xc0")],
+    };
+    let body_shanghai = ExecutionPayloadBodyShanghai {
+        transactions: vec![Bytes::from_static(b"\x02\xc0")],
+        withdrawals: vec![Default::default()],
+    };
+    let body_amsterdam = ExecutionPayloadBodyAmsterdam {
+        transactions: vec![Bytes::from_static(b"\x04\xc0")],
+        withdrawals: vec![Default::default()],
+        block_access_list: Bytes::from_static(b"\xc0"),
+    };
+    seed_ssz(&corpus_dir, "body-paris", body_paris.clone());
+    seed_ssz(&corpus_dir, "body-shanghai", body_shanghai.clone());
+    seed_ssz(&corpus_dir, "body-amsterdam", body_amsterdam.clone());
+    seed_ssz(
+        &corpus_dir,
+        "bodies-by-hash",
+        BodiesByHashRequest { block_hashes: vec![B256::ZERO] },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "bodies-response-paris",
+        BodiesResponse { entries: vec![BodyEntry::available(body_paris), BodyEntry::unavailable()] },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "bodies-response-shanghai",
+        BodiesResponse {
+            entries: vec![BodyEntry::available(body_shanghai), BodyEntry::unavailable()],
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "bodies-response-amsterdam",
+        BodiesResponse {
+            entries: vec![BodyEntry::available(body_amsterdam), BodyEntry::unavailable()],
+        },
+    );
+
+    seed_ssz(
+        &corpus_dir,
+        "blobs-v1-request",
+        BlobsV1Request { versioned_hashes: vec![B256::ZERO] },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "blobs-v4-request",
+        BlobsV4Request { versioned_hashes: vec![B256::ZERO], indices_bitarray: B128::ZERO },
+    );
+    let cells_and_proofs = BlobCellsAndProofs {
+        blob_cells: vec![Optional::some(Cell::ZERO)],
+        proofs: vec![Optional::some(Bytes48::ZERO)],
+    };
+    seed_ssz(&corpus_dir, "blob-cells-and-proofs", cells_and_proofs.clone());
+    seed_ssz(
+        &corpus_dir,
+        "blobs-v1-response",
+        BlobsResponse {
+            entries: vec![BlobEntry {
+                available: true,
+                contents: BlobAndProofV1 { blob: Box::new(Blob::ZERO), proof: Bytes48::ZERO },
+            }],
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "blobs-v2-response",
+        BlobsResponse {
+            entries: vec![BlobEntry {
+                available: true,
+                contents: BlobAndProofV2 { blob: Box::new(Blob::ZERO), proofs: vec![] },
+            }],
+        },
+    );
+    seed_ssz(
+        &corpus_dir,
+        "blobs-v4-response",
+        BlobsResponse {
+            entries: vec![BlobEntry { available: true, contents: cells_and_proofs }],
+        },
+    );
 }
 
 /// `trailing(no_gaps)` treats a payload item as the next optional value rather than a `None`
@@ -398,4 +719,5 @@ fn main() {
         TxEnvelope::Eip1559(TxEip1559::default().into_signed(signature)),
     );
     seed(&corpus_dir, "withdrawals-empty", Withdrawals::default());
+    engine_ssz_seeds();
 }
