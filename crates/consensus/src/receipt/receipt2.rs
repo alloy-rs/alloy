@@ -157,6 +157,9 @@ impl<T: TxTy> Eip2718EncodableReceipt for EthereumReceipt<T> {
 
 impl<T: TxTy> Eip2718DecodableReceipt for EthereumReceipt<T> {
     fn typed_decode_with_bloom(ty: u8, buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>> {
+        if ty == 0 {
+            return Err(Eip2718Error::UnexpectedType(0));
+        }
         Ok(Self::rlp_decode_inner(buf, T::try_from(ty)?)?)
     }
 
@@ -201,6 +204,9 @@ impl<T: TxTy> RlpDecodableReceipt for EthereumReceipt<T> {
         let remaining = buf.len();
 
         let tx_type = T::decode(buf)?;
+        if tx_type.is_legacy() {
+            return Err(Eip2718Error::UnexpectedType(0).into());
+        }
         let this = Self::rlp_decode_inner(buf, tx_type)?;
 
         if buf.len() + header.payload_length != remaining {
