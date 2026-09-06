@@ -180,7 +180,7 @@ impl ssz::Decode for ValidationError {
 }
 
 /// REST-SSZ payload validation status tag. Error text lives in `PayloadStatus::validation_error`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ssz_derive::Encode)]
 #[ssz(enum_behaviour = "tag")]
 pub enum PayloadStatusKind {
     /// The payload is valid.
@@ -191,6 +191,32 @@ pub enum PayloadStatusKind {
     Syncing,
     /// The payload was accepted for later validation.
     Accepted,
+}
+
+impl ssz::Decode for PayloadStatusKind {
+    fn is_ssz_fixed_len() -> bool {
+        true
+    }
+
+    fn ssz_fixed_len() -> usize {
+        1
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        // The derive macro's tag decoder only reads the first byte, but `Decode` requires the
+        // supplied slice to be exact and reject trailing bytes.
+        let expected = <Self as ssz::Decode>::ssz_fixed_len();
+        if bytes.len() != expected {
+            return Err(ssz::DecodeError::InvalidByteLength { len: bytes.len(), expected });
+        }
+        match bytes[0] {
+            0 => Ok(Self::Valid),
+            1 => Ok(Self::Invalid),
+            2 => Ok(Self::Syncing),
+            3 => Ok(Self::Accepted),
+            other => Err(ssz::DecodeError::UnionSelectorInvalid(other)),
+        }
+    }
 }
 
 /// An Engine API v2 SSZ optional encoded as `List[T, 1]`.
