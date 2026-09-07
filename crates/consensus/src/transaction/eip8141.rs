@@ -87,16 +87,12 @@ pub fn count_frame_data_tokens(data: &[u8]) -> u64 {
 /// An EIP-8141 frame transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Eip8141Transaction", alias = "TransactionEip8141", alias = "Eip8141Tx")]
 pub struct TxEip8141 {
     /// EIP-155 replay protection chain ID.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub chain_id: ChainId,
     /// Sender nonce.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub nonce: u64,
     /// Intended transaction sender.
     pub sender: Address,
@@ -108,6 +104,282 @@ pub struct TxEip8141 {
     pub fees: TransactionFees,
     /// Blob versioned hashes.
     pub blob_versioned_hashes: Vec<B256>,
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for TxEip8141 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Frame<'a> {
+            #[serde(with = "alloy_serde::quantity")]
+            mode: u8,
+            #[serde(with = "alloy_serde::quantity")]
+            flags: u8,
+            to: Option<Address>,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_limit: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            state_limit: u64,
+            value: U256,
+            data: &'a Bytes,
+        }
+
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Signature<'a> {
+            #[serde(with = "alloy_serde::quantity")]
+            scheme: u8,
+            signer: Option<Address>,
+            msg: &'a Bytes,
+            signature: &'a Bytes,
+        }
+
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Transaction<'a> {
+            #[serde(with = "alloy_serde::quantity")]
+            chain_id: ChainId,
+            #[serde(with = "alloy_serde::quantity")]
+            nonce: u64,
+            sender: Address,
+            frames: Vec<Frame<'a>>,
+            signatures: Vec<Signature<'a>>,
+            max_priority_fee_per_gas: U256,
+            max_fee_per_gas: U256,
+            max_fee_per_blob_gas: U256,
+            blob_versioned_hashes: &'a [B256],
+        }
+
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Legacy<'a> {
+            #[serde(with = "alloy_serde::quantity")]
+            chain_id: ChainId,
+            #[serde(with = "alloy_serde::quantity")]
+            nonce: u64,
+            sender: Address,
+            frames: &'a [alloy_eips::eip8141::Frame],
+            signatures: &'a [alloy_eips::eip8141::FrameSignature],
+            fees: &'a TransactionFees,
+            blob_versioned_hashes: &'a [B256],
+        }
+
+        if !serializer.is_human_readable() {
+            return Legacy {
+                chain_id: self.chain_id,
+                nonce: self.nonce,
+                sender: self.sender,
+                frames: &self.frames,
+                signatures: &self.signatures,
+                fees: &self.fees,
+                blob_versioned_hashes: &self.blob_versioned_hashes,
+            }
+            .serialize(serializer);
+        }
+
+        let frames = self
+            .frames
+            .iter()
+            .map(|frame| {
+                let to = match frame.target.len() {
+                    0 => None,
+                    20 => Some(Address::from_slice(&frame.target)),
+                    _ => {
+                        return Err(serde::ser::Error::custom(
+                            "invalid EIP-8141 frame target length",
+                        ));
+                    }
+                };
+                Ok(Frame {
+                    mode: frame.mode.into(),
+                    flags: frame.flags,
+                    to,
+                    gas_limit: frame.limits.execution,
+                    state_limit: frame.limits.state,
+                    value: frame.value,
+                    data: &frame.data,
+                })
+            })
+            .collect::<Result<Vec<_>, S::Error>>()?;
+
+        let signatures = self
+            .signatures
+            .iter()
+            .map(|signature| {
+                let signer = match signature.signer.len() {
+                    0 => None,
+                    20 => Some(Address::from_slice(&signature.signer)),
+                    _ => {
+                        return Err(serde::ser::Error::custom(
+                            "invalid EIP-8141 signature signer length",
+                        ));
+                    }
+                };
+                Ok(Signature {
+                    scheme: signature.scheme.into(),
+                    signer,
+                    msg: &signature.msg,
+                    signature: &signature.signature,
+                })
+            })
+            .collect::<Result<Vec<_>, S::Error>>()?;
+
+        Transaction {
+            chain_id: self.chain_id,
+            nonce: self.nonce,
+            sender: self.sender,
+            frames,
+            signatures,
+            max_priority_fee_per_gas: self.fees.max_priority_fee_per_gas,
+            max_fee_per_gas: self.fees.max_fee_per_gas,
+            max_fee_per_blob_gas: self.fees.max_fee_per_blob_gas,
+            blob_versioned_hashes: &self.blob_versioned_hashes,
+        }
+        .serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for TxEip8141 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Transaction {
+            #[serde(with = "alloy_serde::quantity")]
+            chain_id: ChainId,
+            #[serde(with = "alloy_serde::quantity")]
+            nonce: u64,
+            sender: Address,
+            frames: Vec<Frame>,
+            signatures: Vec<FrameSignature>,
+            fees: TransactionFees,
+            blob_versioned_hashes: Vec<B256>,
+        }
+
+        fn parse_quantity(value: serde_json::Value) -> Result<serde_json::Value, &'static str> {
+            let Some(value) = value.as_str() else {
+                return Ok(value);
+            };
+            let Some(value) = value.strip_prefix("0x") else {
+                return Ok(serde_json::Value::String(value.to_owned()));
+            };
+            let value = u64::from_str_radix(value, 16).map_err(|_| "invalid quantity")?;
+            Ok(serde_json::Value::Number(value.into()))
+        }
+
+        fn parse_enum(value: &mut serde_json::Value, names: &[&str]) -> Result<(), &'static str> {
+            let Some(raw) = value.as_str() else {
+                return Ok(());
+            };
+            let Some(raw) = raw.strip_prefix("0x") else {
+                return Ok(());
+            };
+            let index = usize::from_str_radix(raw, 16).map_err(|_| "invalid enum quantity")?;
+            *value = serde_json::Value::String(
+                names.get(index).ok_or("invalid enum quantity")?.to_string(),
+            );
+            Ok(())
+        }
+
+        fn normalize_rpc(value: &mut serde_json::Value) -> Result<(), &'static str> {
+            let object = value.as_object_mut().ok_or("expected EIP-8141 transaction object")?;
+            if let Some(frames) = object.get_mut("frames").and_then(serde_json::Value::as_array_mut)
+            {
+                for frame in frames {
+                    let frame = frame.as_object_mut().ok_or("expected EIP-8141 frame object")?;
+                    if let Some(mode) = frame.get_mut("mode") {
+                        parse_enum(mode, &["Default", "Verify", "Sender"])?;
+                    }
+                    if let Some(flags) = frame.get_mut("flags") {
+                        *flags = parse_quantity(core::mem::take(flags))?;
+                    }
+                    if frame.get("target").is_none() {
+                        let target = match frame.remove("to") {
+                            Some(serde_json::Value::String(to)) => serde_json::Value::String(to),
+                            Some(serde_json::Value::Null) | None => {
+                                serde_json::Value::String("0x".to_owned())
+                            }
+                            Some(_) => return Err("invalid EIP-8141 frame target"),
+                        };
+                        frame.insert("target".to_owned(), target);
+                    }
+                    if frame.get("limits").is_none() {
+                        let execution =
+                            frame.remove("gasLimit").ok_or("missing EIP-8141 frame gas limit")?;
+                        let state = frame
+                            .remove("stateLimit")
+                            .ok_or("missing EIP-8141 frame state gas limit")?;
+                        let mut limits = serde_json::Map::new();
+                        limits.insert("execution".to_owned(), parse_quantity(execution)?);
+                        limits.insert("state".to_owned(), parse_quantity(state)?);
+                        frame.insert("limits".to_owned(), serde_json::Value::Object(limits));
+                    }
+                }
+            }
+
+            if let Some(signatures) =
+                object.get_mut("signatures").and_then(serde_json::Value::as_array_mut)
+            {
+                for signature in signatures {
+                    let signature =
+                        signature.as_object_mut().ok_or("expected EIP-8141 signature object")?;
+                    if let Some(scheme) = signature.get_mut("scheme") {
+                        parse_enum(scheme, &["Arbitrary", "Secp256k1", "P256"])?;
+                    }
+                    if signature.get("signer") == Some(&serde_json::Value::Null) {
+                        signature.insert(
+                            "signer".to_owned(),
+                            serde_json::Value::String("0x".to_owned()),
+                        );
+                    }
+                }
+            }
+
+            if object.get("fees").is_none() {
+                let mut fees = serde_json::Map::new();
+                for field in ["maxPriorityFeePerGas", "maxFeePerGas", "maxFeePerBlobGas"] {
+                    fees.insert(
+                        field.to_string(),
+                        object.remove(field).ok_or("missing EIP-8141 fee field")?,
+                    );
+                }
+                object.insert("fees".to_owned(), serde_json::Value::Object(fees));
+            }
+            Ok(())
+        }
+
+        if !deserializer.is_human_readable() {
+            return Transaction::deserialize(deserializer).map(|tx| Self {
+                chain_id: tx.chain_id,
+                nonce: tx.nonce,
+                sender: tx.sender,
+                frames: tx.frames,
+                signatures: tx.signatures,
+                fees: tx.fees,
+                blob_versioned_hashes: tx.blob_versioned_hashes,
+            });
+        }
+
+        let mut value = serde_json::Value::deserialize(deserializer)?;
+        normalize_rpc(&mut value).map_err(serde::de::Error::custom)?;
+        let tx = serde_json::from_value::<Transaction>(value).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            chain_id: tx.chain_id,
+            nonce: tx.nonce,
+            sender: tx.sender,
+            frames: tx.frames,
+            signatures: tx.signatures,
+            fees: tx.fees,
+            blob_versioned_hashes: tx.blob_versioned_hashes,
+        })
+    }
 }
 
 /// An EIP-8141 frame transaction paired with its EIP-7594 blob sidecar.
@@ -1660,6 +1932,56 @@ mod tests {
 
         assert_eq!(buf.len(), tx.length());
         assert_eq!(decoded, tx);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn json_uses_rpc_frame_fields() {
+        let tx = TxEip8141 {
+            chain_id: 1,
+            nonce: 2,
+            sender: Address::repeat_byte(0x11),
+            frames: vec![Frame {
+                mode: FrameMode::Verify,
+                flags: ApprovalScope::Execution.into(),
+                target: Bytes::new(),
+                limits: FrameLimits { execution: 21, state: 7 },
+                value: U256::from(9),
+                data: Bytes::from_static(&[0xaa]),
+            }],
+            signatures: vec![FrameSignature {
+                scheme: SignatureScheme::Secp256k1,
+                signer: Bytes::new(),
+                msg: Bytes::new(),
+                signature: Bytes::from_static(&[0xbb]),
+            }],
+            fees: TransactionFees {
+                max_priority_fee_per_gas: U256::from(1),
+                max_fee_per_gas: U256::from(10),
+                max_fee_per_blob_gas: U256::ZERO,
+            },
+            blob_versioned_hashes: Vec::new(),
+        };
+
+        let json = serde_json::to_value(&tx).unwrap();
+        let frame = &json["frames"][0];
+        let signature = &json["signatures"][0];
+        assert_eq!(json["chainId"], "0x1");
+        assert_eq!(frame["mode"], "0x1");
+        assert_eq!(frame["flags"], "0x2");
+        assert_eq!(frame["to"], serde_json::Value::Null);
+        assert_eq!(frame["gasLimit"], "0x15");
+        assert_eq!(frame["stateLimit"], "0x7");
+        assert!(frame.get("limits").is_none());
+        assert_eq!(json["maxFeePerGas"], "0xa");
+        assert!(json.get("fees").is_none());
+        assert_eq!(signature["scheme"], "0x1");
+        assert_eq!(signature["signer"], serde_json::Value::Null);
+        assert_eq!(serde_json::from_value::<TxEip8141>(json).unwrap(), tx);
+
+        let mut malformed = tx;
+        malformed.frames[0].target = Bytes::from_static(&[0x01]);
+        assert!(serde_json::to_value(malformed).is_err());
     }
 
     #[test]

@@ -136,6 +136,24 @@ where
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
+        struct GasUsed {
+            #[serde(with = "alloy_serde::quantity")]
+            execution: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            state: u64,
+        }
+
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct FrameReceipt<'a, T> {
+            #[serde(with = "alloy_serde::quantity")]
+            status: u8,
+            gas_used: GasUsed,
+            logs: &'a [T],
+        }
+
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
         struct Frame<'a, T> {
             #[serde(with = "alloy_serde::quantity")]
             status: u8,
@@ -144,8 +162,22 @@ where
             logs: &'a [T],
             logs_bloom: Bloom,
             payer: alloy_primitives::Address,
-            frame_receipts: &'a [alloy_eips::eip8141::FrameReceipt<T>],
+            frame_receipts: Vec<FrameReceipt<'a, T>>,
         }
+
+        let frame_receipts = self
+            .payload
+            .frame_receipts
+            .iter()
+            .map(|receipt| FrameReceipt {
+                status: receipt.status.into(),
+                gas_used: GasUsed {
+                    execution: receipt.gas_used.execution,
+                    state: receipt.gas_used.state,
+                },
+                logs: &receipt.logs,
+            })
+            .collect();
 
         Frame {
             status: u8::from(
@@ -158,7 +190,7 @@ where
             logs: &self.logs,
             logs_bloom: logs_bloom(self.logs.iter().map(AsRef::as_ref)),
             payer: self.payload.payer,
-            frame_receipts: &self.payload.frame_receipts,
+            frame_receipts,
         }
         .serialize(serializer)
     }
@@ -177,13 +209,31 @@ impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for Receip
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
+        struct GasUsed {
+            #[serde(with = "alloy_serde::quantity")]
+            execution: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            state: u64,
+        }
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct FrameReceipt<T> {
+            #[serde(with = "alloy_serde::quantity")]
+            status: u8,
+            gas_used: GasUsed,
+            logs: Vec<T>,
+        }
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
         struct ReceiptEnvelopeHelper<T> {
             #[serde(default, rename = "type", with = "alloy_serde::quantity::opt")]
             ty: Option<u8>,
             #[serde(flatten)]
             receipt: ReceiptWithBloom<Receipt<T>>,
             payer: Option<alloy_primitives::Address>,
-            frame_receipts: Option<Vec<alloy_eips::eip8141::FrameReceipt<T>>>,
+            frame_receipts: Option<Vec<FrameReceipt<T>>>,
         }
 
         let ReceiptEnvelopeHelper { ty, receipt, payer, frame_receipts } =
@@ -194,6 +244,22 @@ impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for Receip
             let payer = payer.ok_or_else(|| serde::de::Error::missing_field("payer"))?;
             let frame_receipts =
                 frame_receipts.ok_or_else(|| serde::de::Error::missing_field("frameReceipts"))?;
+            let frame_receipts = frame_receipts
+                .into_iter()
+                .map(|receipt| {
+                    let status = FrameStatus::try_from_u8(receipt.status).ok_or_else(|| {
+                        serde::de::Error::custom("invalid EIP-8141 frame receipt status")
+                    })?;
+                    Ok(alloy_eips::eip8141::FrameReceipt {
+                        status,
+                        gas_used: alloy_eips::eip8141::FrameGasUsed {
+                            execution: receipt.gas_used.execution,
+                            state: receipt.gas_used.state,
+                        },
+                        logs: receipt.logs,
+                    })
+                })
+                .collect::<Result<Vec<_>, D::Error>>()?;
             let payload = FrameReceiptPayload {
                 cumulative_gas_used: receipt.receipt.cumulative_gas_used,
                 payer,

@@ -41,22 +41,57 @@ impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for AnyRec
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
+        struct GasUsed {
+            #[serde(with = "alloy_serde::quantity")]
+            execution: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            state: u64,
+        }
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct FrameReceipt<T> {
+            #[serde(with = "alloy_serde::quantity")]
+            status: u8,
+            gas_used: GasUsed,
+            logs: Vec<T>,
+        }
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
         struct Fields<T> {
             #[serde(rename = "type", with = "alloy_serde::quantity")]
             ty: u8,
             #[serde(flatten)]
             receipt: ReceiptWithBloom<Receipt<T>>,
             payer: Option<alloy_primitives::Address>,
-            frame_receipts: Option<Vec<alloy_eips::eip8141::FrameReceipt<T>>>,
+            frame_receipts: Option<Vec<FrameReceipt<T>>>,
         }
         let fields = Fields::<T>::deserialize(deserializer)?;
         if fields.ty == 6 {
+            let frame_receipts = fields
+                .frame_receipts
+                .ok_or_else(|| serde::de::Error::missing_field("frameReceipts"))?
+                .into_iter()
+                .map(|receipt| {
+                    let status = alloy_eips::eip8141::FrameStatus::try_from_u8(receipt.status)
+                        .ok_or_else(|| {
+                            serde::de::Error::custom("invalid EIP-8141 frame receipt status")
+                        })?;
+                    Ok(alloy_eips::eip8141::FrameReceipt {
+                        status,
+                        gas_used: alloy_eips::eip8141::FrameGasUsed {
+                            execution: receipt.gas_used.execution,
+                            state: receipt.gas_used.state,
+                        },
+                        logs: receipt.logs,
+                    })
+                })
+                .collect::<Result<Vec<_>, D::Error>>()?;
             let payload = alloy_eips::eip8141::FrameReceiptPayload {
                 cumulative_gas_used: fields.receipt.receipt.cumulative_gas_used,
                 payer: fields.payer.ok_or_else(|| serde::de::Error::missing_field("payer"))?,
-                frame_receipts: fields
-                    .frame_receipts
-                    .ok_or_else(|| serde::de::Error::missing_field("frameReceipts"))?,
+                frame_receipts,
             };
             return Ok(Self::Ethereum(ReceiptEnvelope::Eip8141(payload.into())));
         }
