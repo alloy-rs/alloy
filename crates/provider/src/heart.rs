@@ -208,7 +208,38 @@ impl<N: Network> PendingTransactionBuilder<N> {
     /// - [`get_receipt`](Self::get_receipt) for fetching the receipt after the transaction has been
     ///   confirmed.
     pub async fn watch(self) -> Result<TxHash, PendingTransactionError> {
-        self.register().await?.await
+        let hash = self.config.tx_hash;
+        let required_confirmations = self.config.required_confirmations;
+        let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
+
+        // Fallback polling for single confirmation to prevent hangs when the heartbeat
+        // misses or skips the block the tx was mined in (e.g. HTTP poller intervals).
+        let mut interval = if required_confirmations > 1 {
+            None
+        } else {
+            Some(interval(self.provider.client().poll_interval()))
+        };
+
+        loop {
+            let tick_fut = if let Some(interval) = interval.as_mut() {
+                interval.tick().map(|_| ()).left_future()
+            } else {
+                pending::<()>().right_future()
+            };
+
+            select! {
+                _ = tick_fut => {},
+                res = &mut pending_tx => {
+                    return res;
+                }
+            }
+
+            // If the transaction has already been mined in a block skipped by the heartbeat,
+            // return its hash.
+            if let Ok(Some(_)) = self.provider.get_transaction_receipt(hash).await {
+                return Ok(hash);
+            }
+        }
     }
 
     /// Waits for the transaction to confirm with the given number of confirmations, and
