@@ -40,6 +40,16 @@ impl GracefulShutdown {
         child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
         let _ = child.wait();
     }
+
+    /// Best-effort force kill and reap helper for startup/error paths.
+    pub(crate) fn kill_and_wait(child: &mut Child) {
+        if matches!(child.try_wait(), Ok(Some(_))) {
+            return;
+        }
+
+        let _ = child.kill();
+        let _ = child.wait();
+    }
 }
 
 /// A bit of hack to find an unused TCP port.
@@ -201,6 +211,17 @@ mod tests {
             .unwrap();
 
         GracefulShutdown::shutdown(&mut child, 0, "sh");
+
+        assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kill_and_wait_reaps_child() {
+        let mut child =
+            std::process::Command::new("sh").arg("-c").arg("while :; do :; done").spawn().unwrap();
+
+        GracefulShutdown::kill_and_wait(&mut child);
 
         assert!(child.try_wait().unwrap().is_some());
     }
