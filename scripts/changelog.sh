@@ -17,8 +17,9 @@ if [[ "$crate" = */tests/* || "$crate" = *test-utils* ]]; then
     exit 0
 fi
 
-command=(git cliff --repository "$root" --config "$root/cliff.toml" "${@}")
-run_unless_dry_run "${command[@]}" --output "$root/CHANGELOG.md"
-if [ -n "$crate" ] && [ "$root" != "$crate" ]; then
-    run_unless_dry_run "${command[@]}" --include-path "$crate_glob" --output "$crate/CHANGELOG.md"
+changelog="$crate/CHANGELOG.md"
+if [ -f "$changelog" ] && grep -q '^## \[[0-9]' "$changelog"; then
+    run_unless_dry_run git cliff --repository "$root" --config "$root/cliff.toml" --include-path "$crate_glob" --unreleased "${@}" --prepend "$changelog"
+else
+    run_unless_dry_run git cliff --repository "$root" --config "$root/cliff.toml" --include-path "$crate_glob" "${@}" --output "$changelog"
 fi
