@@ -103,7 +103,7 @@ impl<N: Network> RootProvider<N> {
             let new_blocks = NewBlocks::<N>::new(self.inner.weak_client());
             let paused = new_blocks.paused.clone();
             let stream = new_blocks.into_stream();
-            Heartbeat::<N, _>::new(Box::pin(stream), paused).spawn()
+            Heartbeat::<N, _>::new(Box::pin(stream), paused, self.inner.weak_client()).spawn()
         })
     }
 }
