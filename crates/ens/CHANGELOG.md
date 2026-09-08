@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Features
+
+- [ens] Follow CCIP Read redirects during resolution ([#4185](https://github.com/alloy-rs/alloy/issues/4185))
+- [ens] Migrate resolution to the Universal Resolver ([#4183](https://github.com/alloy-rs/alloy/issues/4183))
+
 ## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
 
 ### Documentation

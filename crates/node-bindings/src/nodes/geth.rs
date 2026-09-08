@@ -13,7 +13,7 @@ use std::{
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStderr, Command, Stdio},
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tempfile::tempdir;
 use url::Url;
@@ -214,6 +214,7 @@ pub struct Geth {
     chain_id: Option<u64>,
     insecure_unlock: bool,
     keep_err: bool,
+    timeout: Option<u64>,
     genesis: Option<Genesis>,
     mode: NodeMode,
     clique_private_key: Option<SigningKey>,
@@ -390,6 +391,15 @@ impl Geth {
         self
     }
 
+    /// Sets the startup timeout in milliseconds.
+    ///
+    /// Defaults to [`NODE_STARTUP_TIMEOUT`]. The deadline is checked between complete stderr
+    /// lines, so a live process that emits no newline can block past the deadline.
+    pub const fn timeout(mut self, timeout: u64) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
     /// Keep the handle to geth's stderr in order to read from it.
     ///
     /// This is required by [`GethInstance::stderr`] and [`GethInstance::wait_to_add_peer`].
@@ -451,7 +461,8 @@ impl Geth {
     /// to report ready.
     ///
     /// Returns an error if the process cannot be started, reports a fatal startup error, or does
-    /// not become ready before [`NODE_STARTUP_TIMEOUT`] is observed. The deadline is checked
+    /// not become ready before the configured [`Self::timeout`] (defaulting to
+    /// [`NODE_STARTUP_TIMEOUT`]) is observed. The deadline is checked
     /// between complete stderr lines; a live process that emits no newline can block this call
     /// past the deadline.
     pub fn try_spawn(mut self) -> Result<GethInstance, NodeError> {
@@ -628,6 +639,7 @@ impl Geth {
 
         let stderr = child.stderr.take().ok_or(NodeError::NoStderr)?;
 
+        let timeout = self.timeout.map(Duration::from_millis).unwrap_or(NODE_STARTUP_TIMEOUT);
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
 
@@ -637,7 +649,7 @@ impl Geth {
         let mut ports_started = false;
 
         loop {
-            if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
+            if start.elapsed() >= timeout {
                 let _ = child.kill();
                 return Err(NodeError::Timeout);
             }
@@ -721,6 +733,27 @@ impl Geth {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn respects_startup_timeout() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let program = dir.path().join("geth");
+        // Emit a progress line after the default deadline, before announcing HTTP readiness.
+        std::fs::write(
+            &program,
+            "#!/bin/sh\nsleep 11\necho 'Initializing dev chain' >&2\necho 'HTTP server started endpoint=127.0.0.1:8545 auth=false' >&2\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(matches!(Geth::at(&program).timeout(0).try_spawn(), Err(NodeError::Timeout)));
+        let geth = Geth::at(&program).timeout(30_000).try_spawn().unwrap();
+        assert_eq!(geth.port(), 8545);
+        assert!(geth.p2p_port().is_none());
+    }
 
     #[test]
     fn can_set_host() {

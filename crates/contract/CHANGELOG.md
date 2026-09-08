@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Bug Fixes
+
+- [contract] Resolve block tags in chunked event queries ([#4145](https://github.com/alloy-rs/alloy/issues/4145))
+
+### Documentation
+
+- [contract] Remove stale .await guidance from CallBuilder ([#4178](https://github.com/alloy-rs/alloy/issues/4178))
+
+### Features
+
+- [contract] Add chunked event query streams ([#4180](https://github.com/alloy-rs/alloy/issues/4180))
+
+### Performance
+
+- [contract] Stop chunked event queries after fallback failure ([#4175](https://github.com/alloy-rs/alloy/issues/4175))
+
 ## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
 
 ### Documentation
