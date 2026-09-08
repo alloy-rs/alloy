@@ -5,7 +5,7 @@
 
 use crate::{LocalSigner, LocalSignerError, PrivateKeySigner};
 use alloy_signer::utils::secret_key_to_address;
-use coins_bip32::{path::DerivationPath, prelude::Parent, xkeys::XPriv};
+use coins_bip32::{path::DerivationPath, prelude::Parent, xkeys::XPriv, BIP32_HARDEN};
 use coins_bip39::{English, Mnemonic, Wordlist};
 use k256::ecdsa::SigningKey;
 use rand::Rng;
@@ -147,13 +147,21 @@ impl<W: Wordlist> MnemonicBuilder<W> {
 
     /// Sets the derivation path of the child key to be derived. The derivation path is calculated
     /// using the default derivation path prefix used in Ethereum, i.e. "m/44'/60'/0'/0/{index}".
+    ///
+    /// An `index` at or above the BIP-32 harden bit (`0x8000_0000`) is rejected. See
+    /// [`MnemonicBuilderError::HardenBitOverflow`] for why.
     pub fn index(self, index: u32) -> Result<Self, LocalSignerError> {
         self.derivation_path(format!("{DEFAULT_DERIVATION_PATH_PREFIX}{index}"))
     }
 
     /// Sets the derivation path of the child key to be derived.
+    ///
+    /// Path components at or above the BIP-32 harden bit (`0x8000_0000`) are rejected. See
+    /// [`MnemonicBuilderError::HardenBitOverflow`] for why.
     pub fn derivation_path<T: AsRef<str>>(mut self, path: T) -> Result<Self, LocalSignerError> {
-        self.derivation_path = path.as_ref().parse()?;
+        let path = path.as_ref();
+        check_harden_bit(path)?;
+        self.derivation_path = path.parse()?;
         Ok(self)
     }
 
@@ -381,6 +389,34 @@ pub enum MnemonicBuilderError {
     /// Error suggests that a phrase (path or words) was not expected but found.
     #[error("unexpected phrase found")]
     UnexpectedPhraseFound,
+    /// A derivation path component is at or above the BIP-32 harden bit (`0x8000_0000`).
+    ///
+    /// `coins-bip32` 0.12 applies the harden marker with an unchecked `index + 0x8000_0000`, so
+    /// such a component wraps instead of erroring: in release builds `m/44'/60'/0'/0/2147483648'`
+    /// silently derives the unhardened child `0`, and a bare `2147483648` silently becomes `0'`.
+    /// Rejecting these matches `coins-bip32` 0.13.1 and go-ethereum's `ParseDerivationPath`.
+    #[error(
+        "BIP-32 derivation path component `{0}` is at or above the harden bit (0x8000_0000); \
+         valid indices are 0..=2147483647, optionally suffixed with ' or h to harden"
+    )]
+    HardenBitOverflow(String),
+}
+
+/// Rejects path components that would overflow the BIP-32 harden bit.
+///
+/// Only the numeric range is checked here; malformed syntax is left to [`DerivationPath`]'s own
+/// parser so its error messages are preserved.
+fn check_harden_bit(path: &str) -> Result<(), MnemonicBuilderError> {
+    for component in path.split('/') {
+        let digits = component
+            .strip_suffix('\'')
+            .or_else(|| component.strip_suffix('h'))
+            .unwrap_or(component);
+        if digits.parse::<u32>().is_ok_and(|index| index >= BIP32_HARDEN) {
+            return Err(MnemonicBuilderError::HardenBitOverflow(component.to_string()));
+        }
+    }
+    Ok(())
 }
 
 fn xpriv_to_signer(xpriv: &XPriv) -> PrivateKeySigner {
@@ -393,6 +429,7 @@ fn xpriv_to_signer(xpriv: &XPriv) -> PrivateKeySigner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::address;
     use coins_bip39::English;
     use tempfile::tempdir;
 
@@ -553,5 +590,54 @@ mod tests {
             LocalSignerError::MnemonicBuilderError(MnemonicBuilderError::ExpectedPhraseNotFound)
         ));
         assert!(iter.next().is_none());
+    }
+
+    /// The BIP-32 harden bit overflow that silently derived the wrong key.
+    ///
+    /// `coins-bip32` 0.12 hardens with an unchecked `index + 0x8000_0000`. Verified against
+    /// 0.12.0 in a release build: `m/44'/60'/0'/0/2147483648'` wrapped to the *unhardened*
+    /// child `0` and handed back anvil account 0 below, with no error. A bare `2147483648`
+    /// wrapped the other way, silently becoming `0'` (it also re-encodes as `"m/0'"`).
+    /// Debug builds panicked on the overflow instead, so neither mode was usable.
+    #[test]
+    fn mnemonic_rejects_harden_bit_overflow() {
+        const ANVIL: &str = "test test test test test test test test test test test junk";
+
+        let build = |path: &str| {
+            MnemonicBuilder::<English>::default().phrase(ANVIL).derivation_path(path)?.build()
+        };
+
+        // The key the overflowing paths used to silently resolve to.
+        let account_0 = build("m/44'/60'/0'/0/0").unwrap();
+        assert_eq!(account_0.address(), address!("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"));
+
+        for path in [
+            "m/44'/60'/0'/0/2147483648'",
+            "m/44'/60'/0'/0/2147483648",
+            "m/2147483648h",
+            &format!("m/{}", u32::MAX),
+        ] {
+            let err = build(path).unwrap_err();
+            assert!(
+                matches!(
+                    err,
+                    LocalSignerError::MnemonicBuilderError(
+                        MnemonicBuilderError::HardenBitOverflow(_)
+                    )
+                ),
+                "{path} should be rejected as harden-bit overflow, got {err:?}"
+            );
+        }
+
+        // `index` builds the path itself, so it inherits the same guard.
+        assert!(MnemonicBuilder::<English>::english().index(BIP32_HARDEN).is_err());
+
+        // The boundary must stay usable: the largest valid hardened index still derives, and
+        // gives a key distinct from account 0 rather than collapsing onto it.
+        let max_hardened = build("m/44'/60'/0'/0/2147483647'").unwrap();
+        assert_ne!(max_hardened.address(), account_0.address());
+
+        // Malformed components are still the underlying parser's to report, not ours.
+        assert!(matches!(build("m/not-a-number").unwrap_err(), LocalSignerError::Bip32Error(_)));
     }
 }

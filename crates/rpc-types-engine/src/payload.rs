@@ -1879,6 +1879,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
         struct BlobsBundleRaw {
             commitments: Vec<alloy_consensus::Bytes48>,
             proofs: Vec<alloy_consensus::Bytes48>,
+            #[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")]
             blobs: Vec<alloy_consensus::Blob>,
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
@@ -2076,6 +2077,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
         struct BlobsBundleRaw {
             commitments: Vec<alloy_consensus::Bytes48>,
             proofs: Vec<alloy_consensus::Bytes48>,
+            #[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")]
             blobs: Vec<alloy_consensus::Blob>,
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
@@ -4242,7 +4244,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev1_not_empty_pass() {
         let blobs_bundle_v1 = BlobsBundleV1 {
             proofs: vec![Bytes48::default()],
@@ -4251,13 +4252,18 @@ mod tests {
         };
 
         let serialized = serde_json::to_string(&blobs_bundle_v1).unwrap();
-        let deserialized: BlobsBundleV1 = serde_json::from_str(&serialized).unwrap();
+        // Limit the stack to catch large fixed-array temporaries during blob deserialization.
+        let deserialized = std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(move || serde_json::from_str::<BlobsBundleV1>(&serialized).unwrap())
+            .unwrap()
+            .join()
+            .unwrap();
         assert_eq!(deserialized, blobs_bundle_v1);
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev1_not_empty_fail() {
         let blobs_bundle_v1 = BlobsBundleV1 {
             proofs: vec![Bytes48::default(), Bytes48::default()],
@@ -4273,7 +4279,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev2_not_empty_pass() {
         let commitments = vec![Bytes48::default()];
 
@@ -4284,13 +4289,18 @@ mod tests {
         };
 
         let serialized = serde_json::to_string(&blobs_bundle_v2).unwrap();
-        let deserialized: BlobsBundleV2 = serde_json::from_str(&serialized).unwrap();
+        // Limit the stack to catch large fixed-array temporaries during blob deserialization.
+        let deserialized = std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(move || serde_json::from_str::<BlobsBundleV2>(&serialized).unwrap())
+            .unwrap()
+            .join()
+            .unwrap();
         assert_eq!(deserialized, blobs_bundle_v2);
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev2_not_empty_fail() {
         let blobs_bundle_v2 = BlobsBundleV2 {
             proofs: vec![Bytes48::default()],

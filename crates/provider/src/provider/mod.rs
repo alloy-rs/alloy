@@ -1,6 +1,11 @@
 mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
+#[cfg(feature = "ccip-read")]
+mod ccip_read;
+#[cfg(feature = "ccip-read")]
+pub use ccip_read::*;
+
 mod get_block;
 #[cfg(feature = "pubsub")]
 pub use get_block::SubFullBlocks;
