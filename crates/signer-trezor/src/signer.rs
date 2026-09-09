@@ -215,9 +215,10 @@ impl TrezorSigner {
         let mut path = vec![];
         for derivation_index in elements {
             let hardened = derivation_index.contains('\'');
-            let index = derivation_index.replace('\'', "").parse::<u32>().map_err(|e| {
-                TrezorError::InvalidDerivationPath(e.to_string())
-            })?;
+            let index = derivation_index
+                .replace('\'', "")
+                .parse::<u32>()
+                .map_err(|e| TrezorError::InvalidDerivationPath(e.to_string()))?;
             // Reject raw indices that already set the harden bit (e.g. 2147483648 ≡ 0').
             if index >= 0x8000_0000 {
                 return Err(TrezorError::InvalidDerivationPath(format!(
@@ -238,8 +239,8 @@ mod convert_path_tests {
 
     #[test]
     fn rejects_raw_hardened_index_without_marker() {
-        let err = TrezorSigner::convert_path(&DerivationType::Other("m/2147483648".into()))
-            .unwrap_err();
+        let err =
+            TrezorSigner::convert_path(&DerivationType::Other("m/2147483648".into())).unwrap_err();
         assert!(matches!(err, TrezorError::InvalidDerivationPath(_)));
 
         let ok = TrezorSigner::convert_path(&DerivationType::Other("m/0'".into())).unwrap();

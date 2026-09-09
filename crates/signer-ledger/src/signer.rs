@@ -387,9 +387,10 @@ impl LedgerSigner {
         let mut bytes = vec![depth as u8];
         for derivation_index in elements {
             let hardened = derivation_index.contains('\'');
-            let index = derivation_index.replace('\'', "").parse::<u32>().map_err(|e| {
-                LedgerError::InvalidDerivationPath(e.to_string())
-            })?;
+            let index = derivation_index
+                .replace('\'', "")
+                .parse::<u32>()
+                .map_err(|e| LedgerError::InvalidDerivationPath(e.to_string()))?;
             // Reject raw indices that already set the harden bit (e.g. 2147483648 ≡ 0').
             // Otherwise Other("m/2147483648") silently selects a hardened child.
             if index >= 0x8000_0000 {
@@ -458,8 +459,8 @@ mod tests {
 
     #[test]
     fn rejects_raw_hardened_index_without_marker() {
-        let err = LedgerSigner::path_to_bytes(&DerivationType::Other("m/2147483648".into()))
-            .unwrap_err();
+        let err =
+            LedgerSigner::path_to_bytes(&DerivationType::Other("m/2147483648".into())).unwrap_err();
         assert!(matches!(err, LedgerError::InvalidDerivationPath(_)));
 
         let err = LedgerSigner::path_to_bytes(&DerivationType::Other("m/2147483648'".into()))
