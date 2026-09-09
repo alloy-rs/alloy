@@ -19,6 +19,8 @@ use alloy_eips::{
 };
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, OtherFields};
+#[cfg(feature = "account-ext")]
+pub use alloy_trie::AccountExtension;
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
 use core::str::FromStr;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
@@ -224,7 +226,7 @@ pub struct GenesisAccount {
     /// Complete RLP fields appended to the account trie leaf.
     #[cfg(feature = "account-ext")]
     #[serde(default, skip_serializing_if = "alloy_trie::AccountExtension::is_empty")]
-    pub extension: alloy_trie::AccountExtension,
+    pub extension: AccountExtension,
     /// The nonce of the account at genesis.
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
     pub nonce: Option<u64>,
@@ -1240,6 +1242,17 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "account-ext")]
+    #[test]
+    fn genesis_extension_is_committed_to_the_trie() {
+        let account: super::GenesisAccount =
+            serde_json::from_str(r#"{"balance":"0x0","extension":"0x0102"}"#).unwrap();
+        let pointer = account.extension.as_ptr();
+        let trie = account.into_trie_account();
+        assert_eq!(trie.extension.as_ref(), &[1, 2]);
+        assert_eq!(trie.extension.as_ptr(), pointer);
+        assert_ne!(trie.trie_hash_slow(), alloy_trie::TrieAccount::default().trie_hash_slow());
+    }
     use super::*;
     use alloc::{collections::BTreeMap, vec};
     use alloy_primitives::{hex, Bytes};
