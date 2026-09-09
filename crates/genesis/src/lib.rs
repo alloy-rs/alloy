@@ -221,6 +221,10 @@ impl Genesis {
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct GenesisAccount {
+    /// Complete RLP fields appended to the account trie leaf.
+    #[cfg(feature = "account-ext")]
+    #[serde(default, skip_serializing_if = "alloy_trie::AccountExtension::is_empty")]
+    pub extension: alloy_trie::AccountExtension,
     /// The nonce of the account at genesis.
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
     pub nonce: Option<u64>,
@@ -315,7 +319,8 @@ impl From<GenesisAccount> for TrieAccount {
             balance: account.balance,
             storage_root,
             code_hash,
-            extension: (),
+            #[cfg(feature = "account-ext")]
+            extension: account.extension,
         }
     }
 }
@@ -1297,6 +1302,8 @@ mod tests {
             code: Some(b"code".into()),
             storage: Some(BTreeMap::default()),
             private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
         };
         let mut updated_account = BTreeMap::default();
         updated_account.insert(same_address, new_alloc_account);
@@ -2051,6 +2058,8 @@ mod tests {
                         code: None,
                         storage: None,
                         private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
                     },
                 ),
                 (
@@ -2061,6 +2070,8 @@ mod tests {
                         code: Some(Bytes::from_str("0x12").unwrap()),
                         storage: None,
                         private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
                     },
                 ),
                 (
@@ -2078,6 +2089,8 @@ mod tests {
     unwrap(),                         ),
                         ])),
                         private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
                     },
                 ),
                 (
@@ -2088,6 +2101,8 @@ mod tests {
                         code: None,
                         storage: None,
                         private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
                     },
                 ),
                 (
@@ -2098,6 +2113,8 @@ mod tests {
                         code: None,
                         storage: None,
                         private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
                     },
                 ),
                 (
@@ -2108,6 +2125,8 @@ mod tests {
                         code: None,
                         storage: None,
                         private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
                     },
                 ),
                 (
@@ -2118,6 +2137,8 @@ mod tests {
                         code: None,
                         storage: None,
                         private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
                     },
                 ),
                 (
@@ -2128,6 +2149,8 @@ mod tests {
                         code: None,
                         storage: None,
                         private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
                     },
                 ),
             ]),
@@ -2386,6 +2409,8 @@ mod tests {
             code: Some(Bytes::from(vec![0x60, 0x61])),
             storage: Some(storage),
             private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
         };
 
         // Convert the GenesisAccount to a TrieAccount
@@ -2414,6 +2439,8 @@ mod tests {
             code: None,
             storage: Some(storage),
             private_key: None,
+            #[cfg(feature = "account-ext")]
+            extension: Default::default(),
         };
 
         // Convert the GenesisAccount to a TrieAccount
