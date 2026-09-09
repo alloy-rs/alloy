@@ -74,14 +74,12 @@ pub struct TransactionRequest {
         )
     )]
     pub max_fee_per_blob_gas: Option<u128>,
-    /// The combined gas limit for the transaction, including intrinsic costs.
+    /// The gas limit for the transaction, including intrinsic costs.
     ///
-    /// On networks with [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), this funds both regular
-    /// (execution) gas and state gas. The protocol splits it into regular gas and a state
-    /// reservoir; callers still supply one limit. The regular gas cap applies independently.
-    /// Without EIP-8037, state creation uses the ordinary gas schedule with no separate reservoir.
-    /// Use `eth_estimateGas` with the target network's rules. Receipt gas or net trace consumption
-    /// may be too low because gas can be required before a later refund or state refill.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this single limit funds both execution
+    /// and state gas; the protocol splits it into regular gas and a state reservoir. A receipt's
+    /// `gasUsed` or a trace's net consumption can be too low as a limit, because gas may be needed
+    /// before a later refund or state refill. Use `eth_estimateGas` against the target network.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -219,9 +217,7 @@ impl TransactionRequest {
         self
     }
 
-    /// Sets the combined transaction gas limit, including intrinsic, regular, and EIP-8037 state
-    /// gas. See [`Self::gas`] for the reservoir model and why charged gas is not a sufficient
-    /// estimate.
+    /// Sets the gas limit for the transaction. See [`Self::gas`].
     pub const fn gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas = Some(gas_limit);
         self
@@ -1474,15 +1470,7 @@ pub(super) mod serde_bincode_compat {
         pub max_priority_fee_per_gas: Option<u128>,
         /// The max fee per blob gas for EIP-4844 blob transactions.
         pub max_fee_per_blob_gas: Option<u128>,
-        /// The combined gas limit for the transaction, including intrinsic costs.
-        ///
-        /// On networks with [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), this funds both regular
-        /// (execution) gas and state gas. The protocol splits it into regular gas and a state
-        /// reservoir; callers still supply one limit. The regular gas cap applies
-        /// independently. Without EIP-8037, state creation uses the ordinary gas schedule
-        /// with no separate reservoir. Use `eth_estimateGas` with the target network's
-        /// rules. Receipt gas or net trace consumption may be too low because gas can be
-        /// required before a later refund or state refill.
+        /// The gas limit for the transaction.
         pub gas: Option<u64>,
         /// The value transferred in the transaction, in wei.
         pub value: Option<U256>,

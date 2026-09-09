@@ -60,12 +60,8 @@ pub struct EthereumReceipt<T = TxType, L = Log> {
     /// This is the `statusCode`
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "status"))]
     pub success: bool,
-    /// Cumulative charged receipt gas through this transaction, including this transaction's gas.
-    /// Includes intrinsic costs and, where [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) is
-    /// active, both regular (execution) and net state gas, after ordinary refunds and the calldata
-    /// floor. Excludes blob gas. This is not just this transaction's gas or the EIP-8037 block
-    /// header's `gasUsed`, which uses the maximum of the block's two dimensions instead of
-    /// their sum.
+    /// Cumulative gas used in the block up to and including this transaction.
+    /// See [`TxReceipt::cumulative_gas_used`](crate::TxReceipt::cumulative_gas_used).
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub cumulative_gas_used: u64,
     /// Log send from contracts.

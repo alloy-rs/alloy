@@ -90,6 +90,7 @@ pub struct DefaultFrame {
         default,
         with = "alloy_serde::quantity::opt",
         rename = "executionGasUsed",
+        alias = "regularGasUsed",
         skip_serializing_if = "Option::is_none"
     )]
     pub execution_gas_used: Option<u64>,

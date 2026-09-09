@@ -55,17 +55,16 @@ pub struct Header {
     /// zero; formally Hi.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub number: BlockNumber,
-    /// Block gas limit; under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), bounds each of
-    /// the accumulated regular (execution) and state gas dimensions, not their sum.
-    /// Without EIP-8037 this is the ordinary single-dimensional block gas limit. Excludes blob
-    /// gas.
+    /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) it bounds each of the block's two
+    /// gas dimensions (execution and state) separately, not their sum.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_limit: u64,
-    /// Gas used for block capacity and base-fee accounting.
-    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), the maximum of the accumulated
-    /// regular (execution) and state gas dimensions, not their sum or cumulative receipt gas.
-    /// EIP-7778 keeps ordinary refunds in block usage; state gas is still net of state refills.
-    /// Without these EIPs, the network's ordinary block gas rules apply. Excludes blob gas.
+    /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this is the larger of the block's
+    /// execution-gas and state-gas totals, counted before refunds ([EIP-7778](https://eips.ethereum.org/EIPS/eip-7778)),
+    /// so it need not equal the last receipt's `cumulativeGasUsed`. State totals remain net of
+    /// state refills.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
     /// A scalar value equal to the reasonable output of Unix’s time() at this block’s inception;
@@ -654,16 +653,16 @@ pub trait BlockHeader {
     /// Retrieves the block number
     fn number(&self) -> BlockNumber;
 
-    /// Block gas limit; under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), bounds each of
-    /// the accumulated regular (execution) and state gas dimensions, not their sum.
-    /// Without EIP-8037 this is the ordinary single-dimensional block gas limit. Excludes blob gas.
+    /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) it bounds each of the block's two
+    /// gas dimensions (execution and state) separately, not their sum.
     fn gas_limit(&self) -> u64;
 
-    /// Gas used for block capacity and base-fee accounting.
-    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), the maximum of the accumulated
-    /// regular (execution) and state gas dimensions, not their sum or cumulative receipt gas.
-    /// EIP-7778 keeps ordinary refunds in block usage; state gas is still net of state refills.
-    /// Without these EIPs, the network's ordinary block gas rules apply. Excludes blob gas.
+    /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this is the larger of the block's
+    /// execution-gas and state-gas totals, counted before refunds ([EIP-7778](https://eips.ethereum.org/EIPS/eip-7778)),
+    /// so it need not equal the last receipt's `cumulativeGasUsed`. State totals remain net of
+    /// state refills.
     fn gas_used(&self) -> u64;
 
     /// Retrieves the timestamp of the block

@@ -42,11 +42,10 @@
 //! if it does not implement the tracer. `None` means not reported, not zero.
 //!
 //! The tracing wire format is still described by an
-//! [execution-apis proposal](https://github.com/ethereum/execution-apis/pull/852); support and
-//! historical responses depend on the node. Alloy uses the wire name `executionGasUsed`; older
-//! proposal/node revisions may use `regularGasUsed`, which these fields do not alias. Match the
-//! node's response schema to the Alloy version. These types decode responses; they do not enable
-//! EIPs.
+//! [execution-apis proposal](https://github.com/ethereum/execution-apis/pull/852), which names the
+//! execution dimension `regularGasUsed`. Alloy serializes `executionGasUsed` and accepts both names
+//! when decoding. Support and historical responses depend on the node; these types decode
+//! responses, they do not enable EIPs.
 
 use serde::{Deserialize, Serialize};
 
@@ -72,7 +71,7 @@ pub struct StateGasTrace {
     /// Without EIP-8037, state creation remains part of the ordinary gas schedule. A floor can
     /// make this value larger than the execution work actually consumed; use `gas_used` for
     /// receipt gas.
-    #[serde(with = "alloy_serde::quantity")]
+    #[serde(with = "alloy_serde::quantity", alias = "regularGasUsed")]
     pub execution_gas_used: u64,
     /// Net [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) state gas for the whole transaction.
     ///
@@ -97,7 +96,7 @@ pub struct StateGasTrace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geth::{GethDebugTracingOptions, GethTrace, StructLog};
+    use crate::geth::{CallFrame, DefaultFrame, GethDebugTracingOptions, GethTrace, StructLog};
 
     #[test]
     fn test_state_gas_trace_serde() {
@@ -142,6 +141,53 @@ mod tests {
 
         let options = GethDebugTracingOptions::state_gas_tracer();
         assert_eq!(options.tracer.unwrap().as_str(), "stateGasTracer");
+    }
+
+    #[test]
+    fn execution_gas_field_names() {
+        for name in ["executionGasUsed", "regularGasUsed"] {
+            let summary = serde_json::json!({
+                "gasUsed": "0x5208",
+                name: "0x5208",
+                "stateGasUsed": "0x0",
+                "gasRefund": "0x0"
+            });
+            let trace: StateGasTrace = serde_json::from_value(summary.clone()).unwrap();
+            assert_eq!(trace.execution_gas_used, 21_000);
+            let wrapped: GethTrace = serde_json::from_value(summary).unwrap();
+            assert_eq!(wrapped.try_into_state_gas_trace().unwrap().execution_gas_used, 21_000);
+            let encoded = serde_json::to_value(trace).unwrap();
+            assert_eq!(encoded["executionGasUsed"], "0x5208");
+            assert!(encoded.get("regularGasUsed").is_none());
+
+            let call: CallFrame = serde_json::from_value(serde_json::json!({
+                "type": "CALL",
+                "from": "0x0000000000000000000000000000000000000000",
+                "input": "0x",
+                name: "0x5208"
+            }))
+            .unwrap();
+            assert_eq!(call.execution_gas_used, Some(alloy_primitives::U256::from(21_000)));
+            let encoded = serde_json::to_value(call).unwrap();
+            assert_eq!(encoded["executionGasUsed"], "0x5208");
+            assert!(encoded.get("regularGasUsed").is_none());
+
+            // The opcode tracer proposal uses JSON integers; accept quantities as well.
+            for value in [serde_json::json!(21_000), serde_json::json!("0x5208")] {
+                let frame: DefaultFrame = serde_json::from_value(serde_json::json!({
+                    "failed": false,
+                    "gas": 21_000,
+                    "returnValue": "0x",
+                    "structLogs": [],
+                    name: value
+                }))
+                .unwrap();
+                assert_eq!(frame.execution_gas_used, Some(21_000));
+                let encoded = serde_json::to_value(frame).unwrap();
+                assert_eq!(encoded["executionGasUsed"], "0x5208");
+                assert!(encoded.get("regularGasUsed").is_none());
+            }
+        }
     }
 
     #[test]
