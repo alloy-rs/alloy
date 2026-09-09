@@ -219,7 +219,7 @@ impl HttpError {
 }
 
 impl ErrorResponseCode for TransportErrorKind {
-    fn error_response_code(&self) -> Option<i32> {
+    fn error_response_code(&self) -> Option<i64> {
         error_code_from_body(&self.as_http_error()?.body)
     }
 }
@@ -227,12 +227,12 @@ impl ErrorResponseCode for TransportErrorKind {
 /// Extracts a JSON-RPC error code from a raw HTTP error response body.
 ///
 /// Accepts both a full JSON-RPC error response and a bare error object.
-fn error_code_from_body(body: &str) -> Option<i32> {
+fn error_code_from_body(body: &str) -> Option<i64> {
     // HTTP transports may append human-readable diagnostics after the JSON-RPC body, so parse the
     // first complete JSON value instead of requiring the entire body to be JSON.
     let value =
         serde_json::Deserializer::from_str(body).into_iter::<serde_json::Value>().next()?.ok()?;
-    value.get("error").unwrap_or(&value).get("code")?.as_i64()?.try_into().ok()
+    value.get("error").unwrap_or(&value).get("code")?.as_i64()
 }
 
 /// Extension trait to implement methods for [`RpcError<TransportErrorKind, E>`].
@@ -456,6 +456,24 @@ mod tests {
     }
 
     #[test]
+    fn extracts_rpc_error_codes_outside_i32_range() {
+        for code in [i64::MIN, i64::from(i32::MIN) - 1, i64::from(i32::MAX) + 1, i64::MAX] {
+            let mut payload = ErrorPayload::invalid_request();
+            payload.code = code;
+            let error: TransportError = TransportError::ErrorResp(payload);
+            assert_eq!(error.error_code(), Some(code));
+
+            for body in [
+                format!(r#"{{"code":{code},"message":"err"}}"#),
+                format!(r#"{{"jsonrpc":"2.0","error":{{"code":{code},"message":"err"}}}}"#),
+            ] {
+                let error = TransportErrorKind::http_error(400, body);
+                assert_eq!(error.error_code(), Some(code));
+            }
+        }
+    }
+
+    #[test]
     fn extracts_rpc_error_code_from_http_body_with_diagnostics() {
         let error = TransportErrorKind::http_error(
             400,
@@ -471,8 +489,9 @@ mod tests {
         let error = TransportErrorKind::http_error(500, "not JSON".to_owned());
         assert_eq!(error.error_code(), None);
 
-        // a code outside the JSON-RPC range is not a JSON-RPC error code
-        let error = TransportErrorKind::http_error(500, r#"{"code":4294967296}"#.to_owned());
+        // a code outside the supported i64 range cannot be represented
+        let error =
+            TransportErrorKind::http_error(500, r#"{"code":9223372036854775808}"#.to_owned());
         assert_eq!(error.error_code(), None);
     }
 }

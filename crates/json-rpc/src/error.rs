@@ -15,7 +15,7 @@ pub trait ErrorResponseCode {
     /// contains a JSON-RPC error at all.
     ///
     /// Returns `None` when the error carries no body, or when the body is not a JSON-RPC error.
-    fn error_response_code(&self) -> Option<i32>;
+    fn error_response_code(&self) -> Option<i64>;
 }
 
 /// An RPC error.
@@ -181,7 +181,7 @@ impl<E: ErrorResponseCode, ErrResp> RpcError<E, ErrResp> {
     ///
     /// # struct NoBody;
     /// # impl alloy_json_rpc::ErrorResponseCode for NoBody {
-    /// #     fn error_response_code(&self) -> Option<i32> {
+    /// #     fn error_response_code(&self) -> Option<i64> {
     /// #         None
     /// #     }
     /// # }
@@ -192,7 +192,7 @@ impl<E: ErrorResponseCode, ErrResp> RpcError<E, ErrResp> {
         if let Some(payload) = self.as_error_resp() {
             return Some(payload.code);
         }
-        self.as_transport_err()?.error_response_code().map(i64::from)
+        self.as_transport_err()?.error_response_code()
     }
 }
 
@@ -239,15 +239,15 @@ mod tests {
     use super::*;
 
     /// A stand-in transport error that reports a JSON-RPC code from its response body.
-    struct Body(Option<i32>);
+    struct Body(Option<i64>);
 
     impl ErrorResponseCode for Body {
-        fn error_response_code(&self) -> Option<i32> {
+        fn error_response_code(&self) -> Option<i64> {
             self.0
         }
     }
 
-    fn transport(code: Option<i32>) -> RpcError<Body> {
+    fn transport(code: Option<i64>) -> RpcError<Body> {
         RpcError::Transport(Body(code))
     }
 
