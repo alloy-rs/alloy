@@ -6,10 +6,12 @@ use alloy_primitives::{
 
 // re-export account type for `eth_getAccount`
 pub use alloy_consensus::TrieAccount as Account;
+#[cfg(feature = "account-ext")]
+use alloy_trie::AccountExtension;
 
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccountInfo {
     /// Account balance
@@ -19,6 +21,32 @@ pub struct AccountInfo {
     pub nonce: u64,
     /// Account code
     pub code: Bytes,
+    /// Chain-specific account payload.
+    #[cfg(feature = "account-ext")]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub extension: AccountExtension,
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for AccountInfo {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+
+        #[cfg(feature = "account-ext")]
+        let include_extension = !serializer.is_human_readable() || !self.extension.is_empty();
+        #[cfg(not(feature = "account-ext"))]
+        let include_extension = false;
+        let mut state =
+            serializer.serialize_struct("AccountInfo", 3 + usize::from(include_extension))?;
+        state.serialize_field("balance", &self.balance)?;
+        state.serialize_field("nonce", &alloy_primitives::U64::from(self.nonce))?;
+        state.serialize_field("code", &self.code)?;
+        #[cfg(feature = "account-ext")]
+        if include_extension {
+            state.serialize_field("extension", &self.extension)?;
+        }
+        state.end()
+    }
 }
 
 impl AccountInfo {
@@ -43,9 +71,38 @@ impl AccountInfo {
     /// - code hash is the Keccak256 hash of the empty string `""`
     /// - balance is zero
     /// - nonce is zero
+    /// - the account extension is empty, if enabled
     #[inline]
     pub fn is_empty(&self) -> bool {
+        #[cfg(feature = "account-ext")]
+        if !self.extension.is_empty() {
+            return false;
+        }
         self.is_empty_code_hash() && self.balance.is_zero() && self.nonce == 0
+    }
+}
+
+#[cfg(all(test, feature = "serde", feature = "account-ext"))]
+mod account_info_tests {
+    use super::*;
+
+    #[test]
+    fn extension_serde_and_emptiness() {
+        let legacy = serde_json::json!({"balance": "0x0", "nonce": "0x0", "code": "0x"});
+        let mut info: AccountInfo = serde_json::from_value(legacy.clone()).unwrap();
+        assert!(info.is_empty());
+        assert_eq!(serde_json::to_value(&info).unwrap(), legacy);
+        for payload in [Vec::new(), vec![0x01]] {
+            info.extension = payload.clone().into();
+            assert_eq!(info.is_empty(), payload.is_empty());
+            let json = serde_json::to_value(&info).unwrap();
+            assert_eq!(serde_json::from_value::<AccountInfo>(json).unwrap(), info);
+            let bytes = bincode::serde::encode_to_vec(&info, bincode::config::standard()).unwrap();
+            let (decoded, consumed): (AccountInfo, usize) =
+                bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+            assert_eq!(decoded, info);
+            assert_eq!(consumed, bytes.len());
+        }
     }
 }
 

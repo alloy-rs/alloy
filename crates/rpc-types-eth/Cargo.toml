@@ -23,6 +23,7 @@ rustdoc-args = [
 workspace = true
 
 [dependencies]
+alloy-trie = { workspace = true, optional = true }
 alloy-eips.workspace = true
 alloy-consensus.workspace = true
 alloy-consensus-any.workspace = true
@@ -61,6 +62,7 @@ assert_matches.workspace = true
 bincode = { workspace = true, features = ["serde"] }
 
 [features]
+account-ext = ["dep:alloy-trie", "alloy-trie/account-ext", "alloy-trie/serde"]
 default = ["std", "serde"]
 std = [
 	"alloy-primitives/std",
