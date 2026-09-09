@@ -56,13 +56,17 @@ pub trait ReceiptResponse {
     /// Index within the block.
     fn transaction_index(&self) -> Option<u64>;
 
-    /// Gas used by this transaction alone.
+    /// Total gas charged for this transaction alone, after refunds and the applicable calldata
+    /// floor. Includes intrinsic costs and both regular (execution) and net state gas where
+    /// [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) is active. Without it, state creation costs
+    /// use the ordinary gas schedule. Excludes blob gas. This is not a gas-limit estimate.
     fn gas_used(&self) -> u64;
 
     /// Effective gas price.
     fn effective_gas_price(&self) -> u128;
 
-    /// Returns the execution-gas cost in wei: `gas_used * effective_gas_price`.
+    /// Returns the transaction gas fee in wei: `gas_used * effective_gas_price`.
+    /// Includes regular (execution) and state gas where EIP-8037 is active.
     ///
     /// This excludes blob-gas charges, transferred value, and network-specific fee components;
     /// it is not the sender's total balance change. The ordinary `u128` multiplication can
@@ -83,7 +87,10 @@ pub trait ReceiptResponse {
     /// Address of the receiver, or `None` for contract creation.
     fn to(&self) -> Option<Address>;
 
-    /// Returns the gas used in the block up to and including this transaction.
+    /// Returns cumulative receipt gas through this transaction, including this transaction's gas.
+    /// Under EIP-8037 this sums charged regular and state gas. It is not the block header's
+    /// `gasUsed`, which uses the larger of the block's two gas dimensions, with its own
+    /// refund/floor rules.
     fn cumulative_gas_used(&self) -> u64;
 
     /// Returns the post-transaction state root carried by pre-[EIP-658] receipts.

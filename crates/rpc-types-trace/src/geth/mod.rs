@@ -74,14 +74,18 @@ pub struct ChainBlockTraceResult {
 pub struct DefaultFrame {
     /// Whether the transaction failed
     pub failed: bool,
-    /// How much gas was used.
+    /// Total transaction gas charged, matching receipt `gasUsed`.
+    /// Includes regular and EIP-8037 state gas, intrinsic costs, refunds, and the calldata floor.
+    /// Excludes blob gas. Do not add `state_gas_used` again or use this as a gas-limit estimate.
     pub gas: u64,
-    /// Gross execution-dimension gas used by the transaction.
+    /// Regular (execution) gas contribution to block accounting, excluding EIP-8037 state gas.
     ///
-    /// These fields are optional because pre-Amsterdam responses omit them. The
-    /// optional representation preserves decoding of both old and new responses;
-    /// adding them is JSON-RPC backward-compatible, but adding public Rust fields
-    /// can require downstream struct literals to use `..Default::default()`.
+    /// Includes intrinsic gas and the execution-dimension calldata floor; before ordinary refunds
+    /// under EIP-7778. This is not receipt gas. See the
+    /// [gas accounting guide](crate::geth::state_gas) and
+    /// [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    ///
+    /// Optional because older forks and nodes can omit this field; `None` does not mean zero.
     #[serde(
         default,
         with = "alloy_serde::quantity::opt",
@@ -89,7 +93,12 @@ pub struct DefaultFrame {
         skip_serializing_if = "Option::is_none"
     )]
     pub execution_gas_used: Option<u64>,
-    /// Gross state-dimension gas used by the transaction.
+    /// Net EIP-8037 state gas for the whole transaction, excluding regular execution gas.
+    ///
+    /// Includes state creation charges after state refills and rollback, not peak state gas
+    /// demand. Do not subtract `gas_refund` from this already-net transaction value.
+    /// Zero when reported for an inactive EIP-8037 fork; `None` means the node did not report it.
+    /// See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
     #[serde(
         default,
         with = "alloy_serde::quantity::opt",
@@ -97,7 +106,12 @@ pub struct DefaultFrame {
         skip_serializing_if = "Option::is_none"
     )]
     pub state_gas_used: Option<u64>,
-    /// EIP-3529 gas refund applied at the transaction boundary.
+    /// Ordinary transaction refund reported after transaction-boundary refund processing.
+    ///
+    /// Subject to the [EIP-3529](https://eips.ethereum.org/EIPS/eip-3529) cap; not a raw frame counter.
+    /// Excludes EIP-8037 state refills and unused gas. The calldata floor can limit the fee
+    /// saving; use the transaction's receipt gas for the final charge. `None` means not
+    /// reported.
     #[serde(
         default,
         with = "alloy_serde::quantity::opt",
@@ -120,16 +134,28 @@ pub struct StructLog {
     pub pc: u64,
     /// opcode to be executed
     pub op: Cow<'static, str>,
-    /// remaining gas
+    /// Regular gas remaining before this opcode, excluding the EIP-8037 state gas reservoir.
+    /// This is the `GAS`/`gasleft()` dimension. State charges can spill into it and refills can
+    /// raise it. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
     pub gas: u64,
-    /// cost for executing op
+    /// Gas charged to the regular gas counter for this opcode.
+    /// Under EIP-8037 this can include state gas spilling out of an empty reservoir; it excludes
+    /// state gas paid from the reservoir. It is not necessarily a pure execution-gas charge.
+    /// Do not blindly add `state_gas_cost`, which can overlap with spillover.
     #[serde(rename = "gasCost")]
     pub gas_cost: u64,
-    /// Net state-dimension gas change caused by this opcode. This can be negative
-    /// for source-based state-gas refunds under EIP-8037.
+    /// Net EIP-8037 state gas charged by this opcode, regardless of which gas pool paid it.
+    /// Positive means a charge; negative means a state refill, not an EIP-3529 refund.
+    /// `None` means not reported. Summing steps cannot reconstruct transaction state gas:
+    /// account creation, code deposit, authorization processing, and rollback can occur outside
+    /// steps. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
     #[serde(default, rename = "stateGasCost", skip_serializing_if = "Option::is_none")]
     pub state_gas_cost: Option<i64>,
-    /// State-gas reservoir remaining before this opcode.
+    /// EIP-8037 state gas reservoir remaining before this opcode, excluded from `gas`.
+    /// State charges spend it first, then spill into regular gas. Regular execution cannot spend
+    /// it. It is passed to child frames in full, outside the 63/64 rule; it is not a per-call
+    /// gas limit. `Some(0)` means an empty reservoir, not that state gas is disabled. `None`
+    /// means not reported. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
     #[serde(default, rename = "stateGasReservoir", skip_serializing_if = "Option::is_none")]
     pub state_gas_reservoir: Option<u64>,
     /// Current call depth
@@ -157,7 +183,8 @@ pub struct StructLog {
         serialize_with = "serialize_string_storage_map_opt"
     )]
     pub storage: Option<BTreeMap<B256, B256>>,
-    /// Refund counter
+    /// Ordinary transaction refund counter at this step, before the transaction-wide cap/floor.
+    /// Excludes EIP-8037 state refills. This is not the applied refund or available execution gas.
     #[serde(default, rename = "refund", skip_serializing_if = "Option::is_none")]
     pub refund_counter: Option<u64>,
 }
@@ -639,7 +666,9 @@ impl GethDebugTracingOptions {
         Self::new_tracer(GethDebugBuiltInTracerType::PreStateTracer).with_prestate_config(config)
     }
 
-    /// Creates new options for the EIP-8037 state-gas tracer.
+    /// Requests the EIP-8037 transaction gas breakdown as [`StateGasTrace`].
+    /// Requires node support for `stateGasTracer`; selecting it does not activate EIP-8037.
+    /// See the [gas accounting guide](crate::geth::state_gas) for fields and network support.
     pub fn state_gas_tracer() -> Self {
         Self::new_tracer(GethDebugBuiltInTracerType::StateGasTracer)
     }

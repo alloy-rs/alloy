@@ -30,7 +30,15 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Number of the block this transaction was included within.
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
-    /// Gas used by this transaction alone.
+    /// Total gas charged for this transaction alone, after refunds and the applicable calldata
+    /// floor.
+    ///
+    /// Includes intrinsic gas and, on networks with [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037),
+    /// both regular (execution) gas and net state gas. Do not add trace `stateGasUsed` again.
+    /// Before EIP-8037, state creation costs are included under the ordinary gas schedule.
+    /// Excludes blob gas and network-specific fee components. This is not a sufficient gas limit:
+    /// execution can require gas that is later refunded or returned. Use `eth_estimateGas` to
+    /// estimate.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
     /// The price paid post-execution by the transaction, in wei per gas (base fee plus priority
