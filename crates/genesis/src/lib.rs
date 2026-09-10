@@ -223,7 +223,7 @@ impl Genesis {
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct GenesisAccount {
-    /// Complete RLP fields appended to the account trie leaf.
+    /// Raw chain-specific bytes, encoded as a fifth RLP string in the account trie leaf.
     #[cfg(feature = "account-ext")]
     #[serde(default, skip_serializing_if = "alloy_trie::AccountExtension::is_empty")]
     pub extension: AccountExtension,
@@ -1246,10 +1246,10 @@ mod tests {
     #[test]
     fn genesis_extension_is_committed_to_the_trie() {
         let account: super::GenesisAccount =
-            serde_json::from_str(r#"{"balance":"0x0","extension":"0x0102"}"#).unwrap();
+            serde_json::from_str(r#"{"balance":"0x0","extension":"0x82aa"}"#).unwrap();
         let pointer = account.extension.as_ptr();
         let trie = account.into_trie_account();
-        assert_eq!(trie.extension.as_ref(), &[1, 2]);
+        assert_eq!(trie.extension.as_ref(), &[0x82, 0xaa]);
         assert_eq!(trie.extension.as_ptr(), pointer);
         assert_ne!(trie.trie_hash_slow(), alloy_trie::TrieAccount::default().trie_hash_slow());
     }

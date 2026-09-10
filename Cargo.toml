@@ -174,4 +174,4 @@ tempfile = "3.20"
 tower-http = "0.6.1"
 
 [patch.crates-io]
-alloy-trie = { git = "https://github.com/alloy-rs/trie", rev = "288294aa3fbe9e699bb2d8bd966bb7ff3ec59882" }
+alloy-trie = { git = "https://github.com/alloy-rs/trie", rev = "169955f" }

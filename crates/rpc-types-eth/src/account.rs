@@ -92,12 +92,15 @@ mod account_info_tests {
         let mut info: AccountInfo = serde_json::from_value(legacy.clone()).unwrap();
         assert!(info.is_empty());
         assert_eq!(serde_json::to_value(&info).unwrap(), legacy);
-        for payload in [Vec::new(), vec![0x01]] {
+        for payload in [Vec::new(), vec![0x82, 0xaa], vec![42; 2048]] {
             info.extension = payload.clone().into();
             assert_eq!(info.is_empty(), payload.is_empty());
             let json = serde_json::to_value(&info).unwrap();
             assert_eq!(serde_json::from_value::<AccountInfo>(json).unwrap(), info);
             let bytes = bincode::serde::encode_to_vec(&info, bincode::config::standard()).unwrap();
+            let mut suffix = (payload.len() as u16).to_be_bytes().to_vec();
+            suffix.extend_from_slice(&payload);
+            assert!(bytes.ends_with(&suffix));
             let (decoded, consumed): (AccountInfo, usize) =
                 bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
             assert_eq!(decoded, info);
