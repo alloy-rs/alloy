@@ -56,9 +56,13 @@ pub enum PendingTransactionError {
 
 /// A builder for configuring a pending transaction watcher.
 ///
+/// By default, pending transactions have a timeout of
+/// [`DEFAULT_PENDING_TX_TIMEOUT`] (5 minutes). Use
+/// [`with_timeout`](Self::with_timeout) to set a custom timeout or `None` to disable it.
+///
 /// # Examples
 ///
-/// Send and wait for a transaction to be confirmed 2 times, with a timeout of 60 seconds:
+/// Send and wait for a transaction to be confirmed 2 times, with a custom timeout of 60 seconds:
 ///
 /// ```no_run
 /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
@@ -176,11 +180,17 @@ impl<N: Network> PendingTransactionBuilder<N> {
     }
 
     /// Sets the timeout.
+    ///
+    /// Pass `None` to disable the timeout entirely. The default timeout is
+    /// [`DEFAULT_PENDING_TX_TIMEOUT`].
     pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.config.set_timeout(timeout);
     }
 
     /// Sets the timeout.
+    ///
+    /// Pass `None` to disable the timeout entirely. The default timeout is
+    /// [`DEFAULT_PENDING_TX_TIMEOUT`].
     pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.config.timeout = timeout;
         self
@@ -269,10 +279,20 @@ impl<N: Network> PendingTransactionBuilder<N> {
     }
 }
 
+/// Default timeout for pending transactions (5 minutes).
+///
+/// This prevents pending transaction watchers from hanging indefinitely when a transaction is
+/// never confirmed. Use [`PendingTransactionConfig::with_timeout(None)`] to explicitly disable
+/// the timeout.
+pub const DEFAULT_PENDING_TX_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
 /// Configuration for watching a pending transaction.
 ///
 /// This type can be used to create a [`PendingTransactionBuilder`], but in general it is only used
 /// internally.
+///
+/// By default, new configurations have a timeout of [`DEFAULT_PENDING_TX_TIMEOUT`] (5 minutes).
+/// Use [`with_timeout(None)`](Self::with_timeout) to explicitly disable the timeout.
 #[must_use = "this type does nothing unless you call `with_provider`"]
 #[derive(Clone, Debug)]
 #[doc(alias = "PendingTxConfig", alias = "TxPendingConfig")]
@@ -290,8 +310,11 @@ pub struct PendingTransactionConfig {
 
 impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
+    ///
+    /// The default timeout is [`DEFAULT_PENDING_TX_TIMEOUT`] (5 minutes). Use
+    /// [`with_timeout(None)`](Self::with_timeout) to disable the timeout.
     pub const fn new(tx_hash: TxHash) -> Self {
-        Self { tx_hash, required_confirmations: 1, timeout: None }
+        Self { tx_hash, required_confirmations: 1, timeout: Some(DEFAULT_PENDING_TX_TIMEOUT) }
     }
 
     /// Returns the transaction hash.
@@ -338,11 +361,17 @@ impl PendingTransactionConfig {
     }
 
     /// Sets the timeout.
+    ///
+    /// Pass `None` to disable the timeout entirely. The default timeout is
+    /// [`DEFAULT_PENDING_TX_TIMEOUT`].
     pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.timeout = timeout;
     }
 
     /// Sets the timeout.
+    ///
+    /// Pass `None` to disable the timeout entirely. The default timeout is
+    /// [`DEFAULT_PENDING_TX_TIMEOUT`].
     pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.timeout = timeout;
         self
