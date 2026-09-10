@@ -61,7 +61,7 @@ pub struct EthereumReceipt<T = TxType, L = Log> {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "status"))]
     pub success: bool,
     /// Cumulative gas used in the block up to and including this transaction.
-    /// See [`TxReceipt::cumulative_gas_used`](crate::TxReceipt::cumulative_gas_used).
+    /// See [`TxReceipt::cumulative_gas_used`].
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
