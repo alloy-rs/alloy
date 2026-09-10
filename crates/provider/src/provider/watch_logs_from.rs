@@ -6,8 +6,8 @@ use crate::transport::TransportErrorKind;
 use alloy_consensus::BlockHeader;
 use alloy_eips::BlockNumberOrTag;
 use alloy_json_rpc::RpcError;
-use alloy_network::{BlockResponse as _, Network};
-use alloy_network_primitives::{BlockTransactionsKind, HeaderResponse};
+use alloy_network::{BlockResponse, Network};
+use alloy_network_primitives::{BlockTransactions, BlockTransactionsKind, HeaderResponse};
 use alloy_primitives::B256;
 use alloy_rpc_client::{RpcCall, RpcClientInner, WeakClient};
 use alloy_rpc_types_eth::{Filter, Log};
@@ -36,10 +36,20 @@ pub struct BlockLogs<N: Network> {
     pub logs: Vec<Log>,
 }
 
-impl<N: Network> BlockLogs<N> {
-    /// Returns the header for the block these logs belong to.
-    pub fn header(&self) -> &N::HeaderResponse {
+impl<N: Network> BlockResponse for BlockLogs<N> {
+    type Header = N::HeaderResponse;
+    type Transaction = N::TransactionResponse;
+
+    fn header(&self) -> &Self::Header {
         self.block.header()
+    }
+
+    fn transactions(&self) -> &BlockTransactions<Self::Transaction> {
+        self.block.transactions()
+    }
+
+    fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
+        self.block.transactions_mut()
     }
 }
 
@@ -135,7 +145,7 @@ impl<N: Network> WatchLogsFrom<N> {
 
     /// Converts this builder into a canonical-stream builder that emits
     /// [`CanonicalEvent`](crate::CanonicalEvent) deltas on reorgs.
-    pub const fn canonical(self) -> WatchCanonicalLogsFrom<N> {
+    pub fn canonical(self) -> WatchCanonicalLogsFrom<N> {
         WatchCanonicalLogsFrom::new(self)
     }
 
