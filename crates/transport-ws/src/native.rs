@@ -330,3 +330,41 @@ mod tests {
         assert!(ws.auth().is_none());
     }
 }
+
+#[cfg(test)]
+mod handshake_error_tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn handshake_failure_retains_http_status_and_body() {
+        for status in [408, 429, 500, 502, 503, 504, 401, 403] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move {
+                let (socket, _) = listener.accept().await.unwrap();
+                let result = tokio_tungstenite::accept_hdr_async(
+                    socket,
+                    move |_: &tungstenite::handshake::server::Request,
+                          _: tungstenite::handshake::server::Response| {
+                        Err(http::Response::builder()
+                            .status(status)
+                            .body(Some("handshake rejected".into()))
+                            .unwrap())
+                    },
+                )
+                .await;
+                assert!(result.is_err());
+            });
+            let error = WsConnect::new(format!("ws://{address}")).connect().await.unwrap_err();
+            match error.as_transport_err() {
+                Some(TransportErrorKind::HttpError(error)) => {
+                    assert_eq!(error.status, status);
+                    assert_eq!(error.body, "handshake rejected");
+                }
+                other => panic!("handshake status {status} lost its HTTP type: {other:?}"),
+            }
+            server.await.unwrap();
+        }
+    }
+}

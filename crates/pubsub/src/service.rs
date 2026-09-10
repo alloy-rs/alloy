@@ -591,3 +591,95 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod recovery_regressions {
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    use tokio::time::timeout;
+
+    #[derive(Debug)]
+    struct NextConnection(std::sync::Mutex<Option<ConnectionHandle>>);
+    impl PubSubConnect for NextConnection {
+        fn is_local(&self) -> bool {
+            true
+        }
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            self.0.lock().unwrap().take().ok_or_else(TransportErrorKind::backend_gone)
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct Refused(Arc<AtomicUsize>);
+
+    impl PubSubConnect for Refused {
+        fn is_local(&self) -> bool {
+            true
+        }
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(TransportErrorKind::custom(std::io::Error::from(
+                std::io::ErrorKind::ConnectionRefused,
+            )))
+        }
+    }
+
+    #[tokio::test]
+    async fn dropping_frontend_stops_reconnect_work() {
+        let (handle, interface) = ConnectionHandle::new();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle,
+            connector: Refused(calls.clone()),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+        interface.close_with_error();
+        timeout(Duration::from_secs(1), async {
+            while calls.load(Ordering::SeqCst) == 0 {
+                sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(tx);
+        sleep(Duration::from_millis(50)).await;
+        let stopped = calls.load(Ordering::SeqCst);
+        sleep(Duration::from_secs(4)).await;
+        assert_eq!(calls.load(Ordering::SeqCst), stopped, "closed provider kept reconnecting");
+    }
+
+    #[tokio::test]
+    async fn cancelled_request_does_not_replay_after_reconnect() {
+        let (handle, interface) = ConnectionHandle::new();
+        let (new_handle, mut new_interface) = ConnectionHandle::new();
+        let connector = NextConnection(std::sync::Mutex::new(Some(new_handle)));
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        let request =
+            Request::new("eth_call", Id::Number(91), ("exact", "0x123")).serialize().unwrap();
+        let (pending, rx) = InFlight::new(request, 16);
+        service.in_flights.insert(pending);
+        drop(rx);
+        drop(interface);
+        service.reconnect().await.unwrap();
+        assert!(
+            timeout(Duration::from_millis(100), new_interface.recv_from_frontend()).await.is_err(),
+            "cancelled request was replayed"
+        );
+        assert_eq!(service.in_flights.len(), 0);
+        drop(tx);
+    }
+}
