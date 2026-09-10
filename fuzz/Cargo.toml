@@ -1,0 +1,38 @@
+[package]
+name = "alloy-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+# Stand-alone workspace so cargo-fuzz does not inherit alloy's root workspace.
+
+[dependencies]
+libfuzzer-sys = "0.4"
+alloy-consensus = { path = "../crates/consensus", default-features = false, features = ["std", "k256"] }
+alloy-eips = { path = "../crates/eips", default-features = false, features = ["std", "k256", "kzg-sidecar"] }
+alloy-rlp = { version = "0.3.9", default-features = false }
+
+[[bin]]
+name = "tx_envelope_2718"
+path = "fuzz_targets/tx_envelope_2718.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pooled_transaction_2718"
+path = "fuzz_targets/pooled_transaction_2718.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "blob_sidecar_eip4844"
+path = "fuzz_targets/blob_sidecar_eip4844.rs"
+test = false
+doc = false
+bench = false
