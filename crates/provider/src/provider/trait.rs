@@ -1317,6 +1317,20 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_sendRawTransactionSync", (rlp_hex,)).await
     }
 
+    /// Variant of `eth_sendRawTransactionSync` RPC method with timeout.
+    /// See [`Provider::send_raw_transaction_sync`] for more details.
+    ///
+    /// Note: This is only available on certain clients that support the
+    /// `eth_sendRawTransactionSync` RPC method, such as Anvil.
+    async fn send_raw_transaction_sync_with_timeout(
+        &self,
+        encoded_tx: &[u8],
+        timeout: u64,
+    ) -> TransportResult<N::ReceiptResponse> {
+        let rlp_hex = hex::encode_prefixed(encoded_tx);
+        self.client().request("eth_sendRawTransactionSync", (rlp_hex, timeout)).await
+    }
+
     /// Broadcasts a raw transaction RLP bytes with a conditional [`TransactionConditional`] to the
     /// network.
     ///
@@ -2258,6 +2272,76 @@ mod tests {
         // The main idea that returned receipt should be already mined
         assert!(receipt.block_number().is_some(), "transaction should be mined");
         assert!(receipt.transaction_hash() != B256::ZERO, "should have valid tx hash");
+    }
+
+    #[tokio::test]
+    async fn test_send_raw_transaction_sync_with_timeout_success() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        // Create a transaction
+        let tx = TransactionRequest {
+            nonce: Some(0),
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        // Build and sign the transaction to get the envelope
+        let tx_envelope = tx.build(&provider.wallet()).await.expect("failed to build tx");
+
+        // Encode the transaction
+        let encoded = tx_envelope.encoded_2718();
+
+        // Send using the sync method - this directly returns the receipt
+        let receipt = provider
+            .send_raw_transaction_sync_with_timeout(&encoded, 5000)
+            .await
+            .expect("failed to send raw tx sync");
+
+        // Verify receipt
+        assert_eq!(receipt.to(), Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")));
+        // The main idea that returned receipt should be already mined
+        assert!(receipt.block_number().is_some(), "transaction should be mined");
+        assert!(receipt.transaction_hash() != B256::ZERO, "should have valid tx hash");
+    }
+
+    #[tokio::test]
+    async fn test_send_raw_transaction_sync_with_timeout_fail() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        // Create a transaction
+        let tx = TransactionRequest {
+            nonce: Some(0),
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        // Build and sign the transaction to get the envelope
+        let tx_envelope = tx.build(&provider.wallet()).await.expect("failed to build tx");
+
+        // Encode the transaction
+        let encoded = tx_envelope.encoded_2718();
+
+        // Send using the sync method - this has to return ErrorResp
+        let rpc_error = provider
+            .send_raw_transaction_sync_with_timeout(&encoded, 1)
+            .await
+            .expect_err("timeout should fire");
+
+        let error_payload = rpc_error.as_error_resp().expect("error should be ErrorResp");
+
+        // Verify error code
+        assert_eq!(error_payload.code, 4);
+        // Data has to contain transaction hash
+        let data = error_payload.data.as_ref().expect("data should contain tx hash");
+        let data_str = data.get().trim_matches('"').trim();
+        let tx_hash: B256 = data_str.parse().expect("data should contain tx hash");
+        assert!(tx_hash != B256::ZERO, "error payload data should have valid tx hash");
     }
 
     #[tokio::test]
