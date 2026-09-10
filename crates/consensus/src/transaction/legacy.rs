@@ -368,30 +368,56 @@ impl Encodable for TxLegacy {
 
 impl Decodable for TxLegacy {
     fn decode(data: &mut &[u8]) -> Result<Self> {
-        let header = Header::decode(data)?;
-        let remaining_len = data.len();
+        let mut payload = Header::decode_bytes(data, true)?;
+        let mut transaction = Self::rlp_decode_fields(&mut payload)?;
 
-        let transaction_payload_len = header.payload_length;
-
-        if transaction_payload_len > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
+        // If the payload has more fields, they must be the EIP-155 chain ID and zero sentinels.
+        if !payload.is_empty() {
+            transaction.chain_id = Some(Decodable::decode(&mut payload)?);
+            let r: U256 = Decodable::decode(&mut payload)?;
+            let s: U256 = Decodable::decode(&mut payload)?;
+            if !r.is_zero() || !s.is_zero() {
+                return Err(alloy_rlp::Error::Custom("non-zero EIP-155 signing sentinel"));
+            }
         }
 
-        let mut transaction = Self::rlp_decode_fields(data)?;
-
-        // If we still have data, it should be an eip-155 encoded chain_id
-        if !data.is_empty() {
-            transaction.chain_id = Some(Decodable::decode(data)?);
-            let _: U256 = Decodable::decode(data)?; // r
-            let _: U256 = Decodable::decode(data)?; // s
-        }
-
-        let decoded = remaining_len - data.len();
-        if decoded != transaction_payload_len {
+        if !payload.is_empty() {
             return Err(alloy_rlp::Error::UnexpectedLength);
         }
 
         Ok(transaction)
+    }
+}
+
+#[cfg(test)]
+mod rlp_tests {
+    use super::TxLegacy;
+    use alloy_rlp::{Decodable, Header};
+
+    #[test]
+    fn unsigned_decode_is_canonical_and_bounded() {
+        let tx = TxLegacy { chain_id: Some(1), ..Default::default() };
+        let encoded = alloy_rlp::encode(&tx);
+
+        let mut with_suffix = encoded.to_vec();
+        with_suffix.push(0x01);
+        let mut input = with_suffix.as_slice();
+        assert_eq!(TxLegacy::decode(&mut input).unwrap(), tx);
+        assert_eq!(input, &[0x01]);
+
+        let mut payload = encoded.as_ref();
+        let header = Header::decode(&mut payload).unwrap();
+        let mut string_wrapped = Vec::with_capacity(encoded.len());
+        Header { list: false, payload_length: header.payload_length }.encode(&mut string_wrapped);
+        string_wrapped.extend_from_slice(payload);
+        assert!(TxLegacy::decode(&mut string_wrapped.as_slice()).is_err());
+
+        assert_eq!(&encoded[encoded.len() - 2..], &[0x80, 0x80]);
+        for sentinel in [encoded.len() - 2, encoded.len() - 1] {
+            let mut nonzero = encoded.to_vec();
+            nonzero[sentinel] = 0x01;
+            assert!(TxLegacy::decode(&mut nonzero.as_slice()).is_err());
+        }
     }
 }
 
