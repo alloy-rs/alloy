@@ -20,6 +20,50 @@ pub trait TuplePush<T> {
     type Pushed;
 }
 
+/// Decodes the return data of a single multicall entry.
+///
+/// Implemented for every [`SolCall`] (a plain call) and for [`Nested`](crate::Nested) (a whole
+/// nested multicall), so an entry can be either without changing the return types of plain calls.
+#[doc(hidden)]
+pub trait CallDecoder {
+    /// The decoded return value on the success path (used by `aggregate`).
+    type SuccessReturn;
+
+    /// The decoded return value on the fallible path (used by `aggregate3`/`tryAggregate`).
+    type ResultReturn;
+
+    /// Decode the raw return bytes of this entry, assuming the call succeeded.
+    fn abi_decode_success(data: &Bytes) -> Result<Self::SuccessReturn>;
+
+    /// Decode a [`MulticallResult`] for this entry, preserving per-call failures.
+    fn abi_decode_result(idx: usize, result: &MulticallResult) -> Self::ResultReturn;
+
+    /// Convert a [`Self::ResultReturn`] into a [`Self::SuccessReturn`], failing if the call failed.
+    fn try_into_success(result: Self::ResultReturn) -> Result<Self::SuccessReturn>;
+}
+
+impl<D: SolCall> CallDecoder for D {
+    type SuccessReturn = D::Return;
+    type ResultReturn = core::result::Result<D::Return, Failure>;
+
+    fn abi_decode_success(data: &Bytes) -> Result<Self::SuccessReturn> {
+        D::abi_decode_returns(data).map_err(MulticallError::DecodeError)
+    }
+
+    fn abi_decode_result(idx: usize, result: &MulticallResult) -> Self::ResultReturn {
+        if result.success {
+            D::abi_decode_returns(&result.returnData)
+                .map_err(|_| Failure { idx, return_data: result.returnData.clone() })
+        } else {
+            Err(Failure { idx, return_data: result.returnData.clone() })
+        }
+    }
+
+    fn try_into_success(result: Self::ResultReturn) -> Result<Self::SuccessReturn> {
+        result.map_err(|f| MulticallError::CallFailed(f.return_data))
+    }
+}
+
 /// A trait for tuples of SolCalls that can be decoded
 #[doc(hidden)]
 pub trait CallTuple: Sealed {
@@ -92,7 +136,7 @@ pub struct Empty;
 
 impl Sealed for Empty {}
 
-impl<T: SolCall> TuplePush<T> for Empty {
+impl<T: CallDecoder> TuplePush<T> for Empty {
     type Pushed = (T,);
 }
 
@@ -110,24 +154,24 @@ impl CallTuple for Empty {
     }
 }
 
-impl<D: SolCall> Sealed for Dynamic<D> {}
+impl<D: CallDecoder> Sealed for Dynamic<D> {}
 
 // Macro to implement for tuples of different sizes
 macro_rules! impl_tuple {
     ($($idx:tt => $ty:ident),+) => {
-        impl<$($ty: SolCall,)+> Sealed for ($($ty,)+) {}
+        impl<$($ty: CallDecoder,)+> Sealed for ($($ty,)+) {}
 
         // Implement pushing a new type onto the tuple
-        impl<T: SolCall, $($ty: SolCall,)+> TuplePush<T> for ($($ty,)+) {
+        impl<T: CallDecoder, $($ty: CallDecoder,)+> TuplePush<T> for ($($ty,)+) {
             type Pushed = ($($ty,)+ T,);
         }
 
         // Implement decoding for the tuple
-        impl<$($ty: SolCall,)+> CallTuple for ($($ty,)+) {
-            // The Returns associated type is a tuple of each SolCall's Return type
-            type Returns = ($(Result<$ty::Return, Failure>,)+);
+        impl<$($ty: CallDecoder,)+> CallTuple for ($($ty,)+) {
+            // The Returns associated type is a tuple of each entry's fallible return type
+            type Returns = ($(<$ty as CallDecoder>::ResultReturn,)+);
 
-            type SuccessReturns = ($($ty::Return,)+);
+            type SuccessReturns = ($(<$ty as CallDecoder>::SuccessReturn,)+);
 
             fn decode_returns(data: &[Bytes]) -> Result<Self::SuccessReturns> {
                 if data.len() != count!($($ty),+) {
@@ -135,7 +179,7 @@ macro_rules! impl_tuple {
                 }
 
                 // Decode each return value in order
-                Ok(($($ty::abi_decode_returns(&data[$idx]).map_err(MulticallError::DecodeError)?,)+))
+                Ok(($(<$ty as CallDecoder>::abi_decode_success(&data[$idx])?,)+))
             }
 
             fn decode_return_results(results: &[MulticallResult]) -> Result<Self::Returns> {
@@ -143,22 +187,11 @@ macro_rules! impl_tuple {
                     return Err(MulticallError::NoReturnData);
                 }
 
-                Ok(($(
-                    match &results[$idx].success {
-                        true => $ty::abi_decode_returns(&results[$idx].returnData)
-                            .or_else(|_| Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() })),
-                        false => Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() }),
-                    },
-                )+))
+                Ok(($(<$ty as CallDecoder>::abi_decode_result($idx, &results[$idx]),)+))
             }
 
             fn try_into_success(results: Self::Returns) -> Result<Self::SuccessReturns> {
-                Ok(($(
-                    match results.$idx {
-                        Ok(value) => value,
-                        Err(failure) => return Err(MulticallError::CallFailed(failure.return_data)),
-                    },
-                )+))
+                Ok(($(<$ty as CallDecoder>::try_into_success(results.$idx)?,)+))
             }
         }
     };
