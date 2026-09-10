@@ -11,7 +11,7 @@ use alloy_trie::AccountExtension;
 
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccountInfo {
     /// Account balance
@@ -23,30 +23,11 @@ pub struct AccountInfo {
     pub code: Bytes,
     /// Chain-specific account payload.
     #[cfg(feature = "account-ext")]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "AccountExtension::is_empty")
+    )]
     pub extension: AccountExtension,
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for AccountInfo {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeStruct;
-
-        #[cfg(feature = "account-ext")]
-        let include_extension = !serializer.is_human_readable() || !self.extension.is_empty();
-        #[cfg(not(feature = "account-ext"))]
-        let include_extension = false;
-        let mut state =
-            serializer.serialize_struct("AccountInfo", 3 + usize::from(include_extension))?;
-        state.serialize_field("balance", &self.balance)?;
-        state.serialize_field("nonce", &alloy_primitives::U64::from(self.nonce))?;
-        state.serialize_field("code", &self.code)?;
-        #[cfg(feature = "account-ext")]
-        if include_extension {
-            state.serialize_field("extension", &self.extension)?;
-        }
-        state.end()
-    }
 }
 
 impl AccountInfo {
@@ -92,19 +73,27 @@ mod account_info_tests {
         let mut info: AccountInfo = serde_json::from_value(legacy.clone()).unwrap();
         assert!(info.is_empty());
         assert_eq!(serde_json::to_value(&info).unwrap(), legacy);
+        #[derive(serde::Serialize, serde::Deserialize)]
+        struct LegacyAccountInfo {
+            balance: U256,
+            #[serde(with = "alloy_serde::quantity")]
+            nonce: u64,
+            code: Bytes,
+        }
+        let legacy =
+            LegacyAccountInfo { balance: info.balance, nonce: info.nonce, code: info.code.clone() };
+        let encoded = rmp_serde::to_vec(&info).unwrap();
+        assert_eq!(encoded, rmp_serde::to_vec(&legacy).unwrap());
+        let decoded: LegacyAccountInfo = rmp_serde::from_slice(&encoded).unwrap();
+        assert_eq!(rmp_serde::to_vec(&decoded).unwrap(), encoded);
         for payload in [Vec::new(), vec![0x82, 0xaa], vec![42; 2048]] {
             info.extension = payload.clone().into();
             assert_eq!(info.is_empty(), payload.is_empty());
             let json = serde_json::to_value(&info).unwrap();
             assert_eq!(serde_json::from_value::<AccountInfo>(json).unwrap(), info);
-            let bytes = bincode::serde::encode_to_vec(&info, bincode::config::standard()).unwrap();
-            let mut suffix = (payload.len() as u16).to_be_bytes().to_vec();
-            suffix.extend_from_slice(&payload);
-            assert!(bytes.ends_with(&suffix));
-            let (decoded, consumed): (AccountInfo, usize) =
-                bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+            let bytes = rmp_serde::to_vec(&info).unwrap();
+            let decoded: AccountInfo = rmp_serde::from_slice(&bytes).unwrap();
             assert_eq!(decoded, info);
-            assert_eq!(consumed, bytes.len());
         }
     }
 }
