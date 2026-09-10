@@ -4,7 +4,7 @@
 
 use alloc::{borrow::Cow, vec::Vec};
 use alloy_primitives::{keccak256, Bytes, Sealable, Sealed, B256};
-use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
+use alloy_rlp::{Buf, BufMut, Header};
 use auto_impl::auto_impl;
 use core::fmt;
 
@@ -167,6 +167,12 @@ pub trait Decodable2718: Sized {
         if h.list {
             return Self::fallback_decode(buf);
         }
+
+        // `Header::decode` does not advance past a canonical single byte. Such an input is a
+        // direct EIP-2718 type prefix, not the RLP string required by the network encoding.
+        if h_decode.len() == buf.len() {
+            return Err(alloy_rlp::Error::UnexpectedLength.into());
+        }
         *buf = h_decode;
 
         let remaining_len = buf.len();
@@ -178,10 +184,7 @@ pub trait Decodable2718: Sized {
         let tx = Self::typed_decode(ty, buf)?;
 
         let bytes_consumed = remaining_len - buf.len();
-        // because Header::decode works for single bytes (including the tx type), returning a
-        // string Header with payload_length of 1, we need to make sure this check is only
-        // performed for transactions with a string header
-        if bytes_consumed != h.payload_length && h_decode[0] > EMPTY_STRING_CODE {
+        if bytes_consumed != h.payload_length {
             return Err(alloy_rlp::Error::UnexpectedLength.into());
         }
 

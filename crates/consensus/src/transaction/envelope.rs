@@ -1449,6 +1449,17 @@ mod tests {
     }
 
     #[test]
+    fn network_decode_rejects_unwrapped_typed_transaction() {
+        let tx = TxEnvelope::Eip1559(TxEip1559::default().into_signed(Signature::test_signature()));
+        let encoded = tx.encoded_2718();
+        assert_eq!(encoded.first().copied(), Some(TxType::Eip1559 as u8));
+
+        let mut input = encoded.as_slice();
+        assert!(TxEnvelope::network_decode(&mut input).is_err());
+        assert_eq!(input, encoded.as_slice());
+    }
+
+    #[test]
     fn decode_encode_known_rpc_transaction() {
         // test data pulled from hive test that sends blob transactions
         let network_data_path =
