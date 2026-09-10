@@ -65,6 +65,7 @@ bincode = { workspace = true, features = ["serde"] }
 account-ext = ["dep:alloy-trie", "alloy-trie/account-ext", "alloy-trie/serde"]
 default = ["std", "serde"]
 std = [
+	"alloy-trie?/std",
 	"alloy-primitives/std",
 	"alloy-consensus/std",
 	"alloy-eips/std",
@@ -79,6 +80,7 @@ std = [
 	"thiserror/std"
 ]
 serde = [
+	"alloy-trie?/serde",
 	"dep:serde",
 	"dep:serde_json",
 	"dep:alloy-serde",
@@ -90,6 +92,7 @@ serde = [
 	"alloy-network-primitives/serde"
 ]
 arbitrary = [
+	"alloy-trie?/arbitrary",
 	"std",
 	"dep:arbitrary",
 	"alloy-consensus/arbitrary",
