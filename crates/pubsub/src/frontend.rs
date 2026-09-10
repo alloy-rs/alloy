@@ -2,7 +2,7 @@ use crate::{ix::PubSubInstruction, managers::InFlight, RawSubscription};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, SerializedRequest};
 use alloy_primitives::B256;
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut, TransportResult};
-use futures::{future::try_join_all, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt};
 use std::{
     future::Future,
     sync::{
@@ -89,15 +89,49 @@ impl PubSubFrontend {
         .instrument(debug_span!("request", %method_name))
     }
 
-    /// Send a packet of requests, by breaking it up into individual requests.
+    /// Send a batch of requests as a single JSON-RPC batch.
     ///
-    /// Once all responses are received, we return a single response packet.
+    /// The requests are serialized into a single JSON array and sent over the
+    /// backend in one message. Responses are returned in the same order as the
+    /// requests.
+    pub fn send_batch(
+        &self,
+        reqs: Vec<SerializedRequest>,
+    ) -> impl Future<Output = TransportResult<Vec<Response>>> + Send + 'static {
+        let tx = self.tx.clone();
+        let channel_size = self.channel_size.load(Ordering::Relaxed);
+
+        async move {
+            if reqs.is_empty() {
+                return Ok(vec![]);
+            }
+
+            debug!(len = reqs.len(), "sending batch request to backend");
+            let (in_flights, rxs): (Vec<_>, Vec<_>) =
+                reqs.into_iter().map(|req| InFlight::new(req, channel_size)).unzip();
+            tx.send(PubSubInstruction::BatchRequest(in_flights))
+                .map_err(|_| TransportErrorKind::backend_gone())?;
+
+            let mut responses = Vec::with_capacity(rxs.len());
+            for rx in rxs {
+                responses.push(rx.await.map_err(|_| TransportErrorKind::backend_gone())??);
+            }
+            Ok(responses)
+        }
+        .instrument(debug_span!("batch_request"))
+    }
+
+    /// Send a packet of requests.
+    ///
+    /// A single request is sent as-is. A batch is serialized into a single
+    /// JSON-RPC batch message, preserving batch semantics on the wire. Once
+    /// all responses are received, we return a single response packet.
     pub fn send_packet(&self, req: RequestPacket) -> TransportFut<'static> {
         match req {
             RequestPacket::Single(req) => self.send(req).map_ok(ResponsePacket::Single).boxed(),
-            RequestPacket::Batch(reqs) => try_join_all(reqs.into_iter().map(|req| self.send(req)))
-                .map_ok(ResponsePacket::Batch)
-                .boxed(),
+            RequestPacket::Batch(reqs) => {
+                self.send_batch(reqs).map_ok(ResponsePacket::Batch).boxed()
+            }
         }
     }
 
