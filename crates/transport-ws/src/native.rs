@@ -1,6 +1,8 @@
 use crate::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    utils::Spawnable, Authorization, TransportError, TransportErrorKind, TransportResult,
+};
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -23,14 +25,6 @@ pub struct WsConnect {
     auth: Option<Authorization>,
     /// The websocket config.
     config: Option<WebSocketConfig>,
-    /// Max number of retries before failing and exiting the connection.
-    /// Default is 10.
-    max_retries: u32,
-    /// The base interval between retries.
-    ///
-    /// Reconnect retries use capped exponential backoff from this base interval.
-    /// Default is 3 seconds.
-    retry_interval: Duration,
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
@@ -45,14 +39,7 @@ impl WsConnect {
         let url = url.into();
         let auth =
             url::Url::parse(&url).ok().and_then(|parsed| Authorization::extract_from_url(&parsed));
-        Self {
-            url,
-            auth,
-            config: None,
-            max_retries: 10,
-            retry_interval: Duration::from_secs(3),
-            keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
-        }
+        Self { url, auth, config: None, keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE) }
     }
 
     /// Sets the authorization header.
@@ -88,22 +75,6 @@ impl WsConnect {
     /// Get the websocket config.
     pub const fn config(&self) -> Option<&WebSocketConfig> {
         self.config.as_ref()
-    }
-
-    /// Sets the max number of retries before failing and exiting the connection.
-    /// Default is 10.
-    pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
-        self.max_retries = max_retries;
-        self
-    }
-
-    /// Sets the base interval between retries.
-    ///
-    /// Reconnect retries use capped exponential backoff from this base interval.
-    /// Default is 3 seconds.
-    pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
-        self.retry_interval = retry_interval;
-        self
     }
 
     /// Sets the keepalive ping interval.
@@ -146,14 +117,31 @@ impl PubSubConnect for WsConnect {
         let req = request.map_err(TransportErrorKind::custom)?;
         let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
             .await
-            .map_err(TransportErrorKind::custom)?;
+            .map_err(handshake_error)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
 
         backend.spawn();
 
-        Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
+        Ok(handle)
+    }
+}
+
+// Keep handshake HTTP evidence visible to the pubsub reconnect policy.
+fn handshake_error(error: tungstenite::Error) -> TransportError {
+    match error {
+        tungstenite::Error::Http(response) => TransportErrorKind::http_error(
+            response.status().as_u16(),
+            String::from_utf8_lossy(response.body().as_deref().unwrap_or_default()).into_owned(),
+        ),
+        tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed => {
+            TransportErrorKind::custom(std::io::Error::from(std::io::ErrorKind::ConnectionReset))
+        }
+        tungstenite::Error::Protocol(tungstenite::error::ProtocolError::HandshakeIncomplete) => {
+            TransportErrorKind::custom(std::io::Error::from(std::io::ErrorKind::UnexpectedEof))
+        }
+        error => TransportErrorKind::custom(error),
     }
 }
 
@@ -334,7 +322,67 @@ mod tests {
 #[cfg(test)]
 mod handshake_error_tests {
     use super::*;
-    use tokio::net::TcpListener;
+    use alloy_json_rpc::{Id, Request};
+    use serde_json::{json, Value};
+    use tokio::{net::TcpListener, sync::oneshot, time::timeout};
+
+    #[tokio::test]
+    async fn subscription_recovers_after_temporary_handshake_rejection() {
+        timeout(Duration::from_secs(3), async {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let (ready_tx, ready_rx) = oneshot::channel();
+            let (done_tx, done_rx) = oneshot::channel();
+            let server = tokio::spawn(async move {
+                let (socket, _) = listener.accept().await.unwrap();
+                let mut socket = tokio_tungstenite::accept_async(socket).await.unwrap();
+                let request: Value = serde_json::from_str(
+                    socket.next().await.unwrap().unwrap().to_text().unwrap(),
+                ).unwrap();
+                assert_eq!(request, json!({"jsonrpc":"2.0", "id":91,
+                    "method":"eth_subscribe", "params":["newHeads"]}));
+                socket.send(Message::Text(json!({"jsonrpc":"2.0", "id":91,
+                    "result":"original-subscription"}).to_string().into())).await.unwrap();
+                ready_rx.await.unwrap();
+                drop(socket);
+
+                let (socket, _) = listener.accept().await.unwrap();
+                let rejected = tokio_tungstenite::accept_hdr_async(socket,
+                    |_: &tungstenite::handshake::server::Request,
+                     _: tungstenite::handshake::server::Response| {
+                        Err(http::Response::builder().status(503)
+                            .body(Some("temporarily unavailable".into())).unwrap())
+                    }).await;
+                assert!(rejected.is_err());
+
+                let (socket, _) = listener.accept().await.unwrap();
+                let mut socket = tokio_tungstenite::accept_async(socket).await.unwrap();
+                let replay: Value = serde_json::from_str(
+                    socket.next().await.unwrap().unwrap().to_text().unwrap(),
+                ).unwrap();
+                assert_eq!(replay, request, "replay must preserve ID and subscription parameters");
+                socket.send(Message::Text(json!({"jsonrpc":"2.0", "id":91,
+                    "result":"replacement-subscription"}).to_string().into())).await.unwrap();
+                socket.send(Message::Text(json!({"jsonrpc":"2.0", "method":"eth_subscription",
+                    "params":{"subscription":"replacement-subscription", "result":{"number":"0x123"}}})
+                    .to_string().into())).await.unwrap();
+                done_rx.await.unwrap();
+            });
+            let frontend = WsConnect::new(format!("ws://{address}")).into_service().await.unwrap();
+            let request = Request::new("eth_subscribe", Id::Number(91), ("newHeads",))
+                .serialize().unwrap();
+            let response = frontend.send(request).await.unwrap();
+            let local_id = response.try_success_as().unwrap().unwrap();
+            let mut subscription = frontend.get_subscription(local_id).await.unwrap();
+            ready_tx.send(()).unwrap();
+            let notification: Value = serde_json::from_str(subscription.recv().await.unwrap().get()).unwrap();
+            assert_eq!(notification, json!({"number":"0x123"}));
+            assert_eq!(*subscription.local_id(), local_id);
+            done_tx.send(()).unwrap();
+            drop(frontend);
+            server.await.unwrap();
+        }).await.expect("subscription must survive the HTTP 503 reconnect");
+    }
 
     #[tokio::test]
     async fn handshake_failure_retains_http_status_and_body() {

@@ -49,3 +49,6 @@ aws-lc-rs = ["rustls-tls", "rustls?/aws-lc-rs"]
 ring = ["rustls-tls", "rustls?/ring"]
 native-tls = ["tokio-tungstenite/native-tls"]
 rustls-tls = ["dep:rustls", "tokio-tungstenite/rustls-tls-webpki-roots"]
+
+[dev-dependencies]
+alloy-json-rpc.workspace = true
