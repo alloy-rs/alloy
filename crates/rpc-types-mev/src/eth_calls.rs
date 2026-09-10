@@ -227,10 +227,20 @@ pub struct EthCancelPrivateTransaction {
 ///
 /// Note: this is for `eth_sendBundle` and not `mev_sendBundle`
 ///
-/// This implement the refund capabilities from here:
+/// This is a superset of the fields accepted by the major block builders.
+///
+/// It implements the refund and replacement capabilities from BuilderNet:
 /// <https://buildernet.org/docs/api#eth_sendbundle>
+/// as well as the extensions supported by Titan, Quasar and Bombora:
+/// <https://docs.titanbuilder.xyz/api/eth_sendbundle>
+/// <https://docs.quasar.win/api/eth_sendbundle>
+/// <https://bombora.build/docs/eth-sendBundle>
 /// But keeps compatibility with original Flashbots API:
 /// <https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint#eth_sendbundle>
+///
+/// Note: not all builders support all fields, fields that are unsupported by a builder are
+/// usually ignored. Builder-specific fields without dedicated support here can be set via
+/// [`EthSendBundle::extra_fields`].
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EthSendBundle {
@@ -259,6 +269,28 @@ pub struct EthSendBundle {
     /// UUID that can be used to cancel/replace this bundle
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replacement_uuid: Option<String>,
+    /// A monotonically increasing sequence number for bundles sharing the same
+    /// `replacementUuid`. Later bundles must have a higher sequence number, otherwise they are
+    /// dropped. If `0` or omitted, ordering falls back to builder receive time.
+    ///
+    /// Supported by Titan, Quasar and Bombora:
+    /// <https://docs.titanbuilder.xyz/api/eth_sendbundle>
+    /// <https://docs.quasar.win/api/eth_sendbundle>
+    /// <https://bombora.build/docs/eth-sendBundle>
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub replacement_seq_number: Option<u64>,
+    /// Used to order bundles sharing the same `replacementUuid`, BuilderNet's equivalent of
+    /// `replacementSeqNumber`: <https://buildernet.org/docs/api#eth_sendbundle>
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub replacement_nonce: Option<u64>,
     /// A list of tx hashes that are allowed to be discarded
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dropping_tx_hashes: Vec<TxHash>,
@@ -273,8 +305,36 @@ pub struct EthSendBundle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refund_recipient: Option<Address>,
     /// A list of tx hashes used to determine the refund
+    ///
+    /// Note: builders that support this usually only allow a single entry and default to the
+    /// last transaction in the bundle.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub refund_tx_hashes: Vec<TxHash>,
+    /// The identity that BuilderNet refunds should be attributed to:
+    /// <https://buildernet.org/docs/api#eth_sendbundle>
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refund_identity: Option<Address>,
+    /// If true, the `refundPercent` refund is processed asynchronously via BuilderNet's delayed
+    /// refund flow: <https://buildernet.org/docs/api#eth_sendbundle>
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delayed_refund: Option<bool>,
+    /// The version of the bundle format, set to `v2` to enable BuilderNet's target pool fields
+    /// (`desiredState`, `targetAddresses`, `targetSlots`):
+    /// <https://buildernet.org/docs/api#eth_sendbundle>
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Desired placement of the bundle within the block, e.g. `BottomOfBlock`. Requires
+    /// `version: "v2"`: <https://buildernet.org/docs/api#eth_sendbundle>
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub desired_state: Option<String>,
+    /// Contract addresses whose state the bundle targets. Requires `version: "v2"`:
+    /// <https://buildernet.org/docs/api#eth_sendbundle>
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_addresses: Vec<Address>,
+    /// Hex-encoded storage slots per target address. Requires `version: "v2"`:
+    /// <https://buildernet.org/docs/api#eth_sendbundle>
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_slots: Vec<Vec<U256>>,
     /// Additional fields that are specific to the builder
     #[serde(flatten, default)]
     pub extra_fields: OtherFields,
@@ -438,9 +498,14 @@ pub struct EthSendBlobs {
 
 /// Bundle of transactions for `eth_sendEndOfBlockBundle`
 ///
+/// End-of-block bundles are only included if at least one of their `targetPools` was modified
+/// earlier in the block: after a block is built, the bundle is re-simulated on the end-of-block
+/// state and appended on success.
+///
 /// For more details see:
-/// <https://docs.titanbuilder.xyz/api/eth_sendendofblockbundle> or
-/// <https://docs.quasar.win/eth_sendendofblockbundle>
+/// <https://docs.titanbuilder.xyz/api/eth_sendendofblockbundle>,
+/// <https://docs.quasar.win/api/eth_sendendofblockbundle> or
+/// <https://bombora.build/docs/eth-sendEndOfBlockBundle>
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EthSendEndOfBlockBundle {
@@ -455,6 +520,21 @@ pub struct EthSendEndOfBlockBundle {
     /// Pool addresses targeted by the bundle
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub target_pools: Vec<Address>,
+    /// UUID that can be used to cancel/replace this bundle
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replacement_uuid: Option<String>,
+    /// A monotonically increasing sequence number for bundles sharing the same
+    /// `replacementUuid`. Later bundles must have a higher sequence number, otherwise they are
+    /// dropped. If `0` or omitted, ordering falls back to builder receive time.
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub replacement_seq_number: Option<u64>,
+    /// Additional fields that are specific to the builder
+    #[serde(flatten, default)]
+    pub extra_fields: OtherFields,
 }
 
 #[cfg(test)]
@@ -589,6 +669,7 @@ mod tests {
                 "0x4444444444444444444444444444444444444444444444444444444444444444"
             )],
             extra_fields: OtherFields::from_iter([("customField", json!(42))]),
+            ..Default::default()
         };
         let s = r#"
             {
@@ -609,6 +690,73 @@ mod tests {
         let value = serde_json::to_value(&bundle).unwrap();
 
         assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn can_serde_eth_send_bundle_builder_extensions() {
+        let s = r#"{
+                "txs": ["0x1234"],
+                "blockNumber": "0x1",
+                "replacementUuid": "11111111-1111-4111-8111-111111111111",
+                "replacementSeqNumber": 2,
+                "replacementNonce": 3,
+                "refundIdentity": "0x5555555555555555555555555555555555555555",
+                "delayedRefund": true,
+                "version": "v2",
+                "desiredState": "BottomOfBlock",
+                "targetAddresses": ["0x6666666666666666666666666666666666666666"],
+                "targetSlots": [["0x1", "0x2"]]
+            }"#;
+        let bundle = serde_json::from_str::<EthSendBundle>(s).unwrap();
+        assert_eq!(bundle.replacement_seq_number, Some(2));
+        assert_eq!(bundle.replacement_nonce, Some(3));
+        assert_eq!(
+            bundle.refund_identity,
+            Some(address!("0x5555555555555555555555555555555555555555"))
+        );
+        assert_eq!(bundle.delayed_refund, Some(true));
+        assert_eq!(bundle.version.as_deref(), Some("v2"));
+        assert_eq!(bundle.desired_state.as_deref(), Some("BottomOfBlock"));
+        assert_eq!(
+            bundle.target_addresses,
+            vec![address!("0x6666666666666666666666666666666666666666")]
+        );
+        assert_eq!(
+            bundle.target_slots,
+            vec![vec![alloy_primitives::U256::from(1), alloy_primitives::U256::from(2)]]
+        );
+        // typed fields must not leak into the flattened extra fields
+        assert!(bundle.extra_fields.is_empty());
+
+        let value = serde_json::to_value(&bundle).unwrap();
+        let rt = serde_json::from_value::<EthSendBundle>(value).unwrap();
+        assert_eq!(rt, bundle);
+    }
+
+    #[test]
+    fn can_serde_eth_send_end_of_block_bundle() {
+        let s = r#"{
+                "txs": ["0x1234"],
+                "blockNumber": "0x1234567",
+                "revertingTxHashes": ["0x1111111111111111111111111111111111111111111111111111111111111111"],
+                "targetPools": ["0x11b815efb8f581194ae79006d24e0d814b7697f6"],
+                "replacementUuid": "11111111-1111-4111-8111-111111111111",
+                "replacementSeqNumber": 1
+            }"#;
+        let bundle = serde_json::from_str::<crate::EthSendEndOfBlockBundle>(s).unwrap();
+        assert_eq!(
+            bundle.replacement_uuid.as_deref(),
+            Some("11111111-1111-4111-8111-111111111111")
+        );
+        assert_eq!(bundle.replacement_seq_number, Some(1));
+        assert_eq!(
+            bundle.target_pools,
+            vec![address!("0x11b815efb8f581194ae79006d24e0d814b7697f6")]
+        );
+
+        let value = serde_json::to_value(&bundle).unwrap();
+        let rt = serde_json::from_value::<crate::EthSendEndOfBlockBundle>(value).unwrap();
+        assert_eq!(rt, bundle);
     }
 
     #[test]
