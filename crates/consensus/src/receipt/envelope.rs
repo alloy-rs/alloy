@@ -553,4 +553,35 @@ mod test {
         let receipt = Receipt::<Log>::default();
         let _envelope = ReceiptEnvelope::from_typed(TxType::Eip7702, receipt);
     }
+
+    #[test]
+    fn tagged_legacy_receipt_envelope_is_rejected() {
+        use alloc::{vec, vec::Vec};
+        use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
+        use alloy_rlp::{Decodable, Header};
+
+        let envelope = ReceiptEnvelope::<Log>::Legacy(Default::default());
+        let encoded = envelope.encoded_2718();
+        assert!(encoded[0] >= 0xc0, "sanity: legacy receipts are encoded as a bare RLP list");
+        assert_eq!(ReceiptEnvelope::decode_2718_exact(&encoded).unwrap(), envelope);
+        assert_eq!(ReceiptEnvelope::network_decode(&mut encoded.as_slice()).unwrap(), envelope);
+        assert_eq!(ReceiptEnvelope::decode(&mut encoded.as_slice()).unwrap(), envelope);
+
+        // A literal `0x00` type byte is rejected in both the raw EIP-2718 and the network framing.
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&encoded);
+        let mut tagged_network = Vec::new();
+        Header { list: false, payload_length: tagged.len() }.encode(&mut tagged_network);
+        tagged_network.extend_from_slice(&tagged);
+
+        assert!(matches!(
+            ReceiptEnvelope::decode_2718_exact(&tagged),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            ReceiptEnvelope::network_decode(&mut tagged_network.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(ReceiptEnvelope::decode(&mut tagged_network.as_slice()).is_err());
+    }
 }
