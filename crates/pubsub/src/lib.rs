@@ -36,7 +36,7 @@ pub use sub::{
 use getrandom as _; // Enable rand's browser entropy source.
 
 mod recovery;
-pub use recovery::{with_request_deadline, PartialBatchError, RecoveryBackoff};
+pub use recovery::{with_request_timings, PartialBatchError, RecoveryBackoff, RequestTimings};
 
 // Preserve the transport's native and browser clock implementations.
 mod time {

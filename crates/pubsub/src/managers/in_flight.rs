@@ -1,4 +1,7 @@
-use crate::{recovery::REQUEST_DEADLINE, time::Instant};
+use crate::{
+    recovery::{RequestTimings, REQUEST_TIMINGS},
+    time::Instant,
+};
 use alloy_json_rpc::{Response, ResponsePayload, SerializedRequest, SubId};
 use alloy_transport::{TransportError, TransportResult};
 use std::{fmt, sync::Arc};
@@ -11,6 +14,7 @@ use tokio::sync::oneshot;
 pub struct InFlight {
     /// Monotonic deadline supplied by the provider.
     pub deadline: Option<Instant>,
+    timings: Option<RequestTimings>,
     pub(crate) identity: Arc<()>,
     pub(crate) subscription_replay: bool,
     /// The request
@@ -40,13 +44,16 @@ impl InFlight {
         channel_size: usize,
     ) -> (Self, oneshot::Receiver<TransportResult<Response>>) {
         let (tx, rx) = oneshot::channel();
+        let timings = REQUEST_TIMINGS.try_with(Clone::clone).ok();
+        let deadline = timings.as_ref().and_then(|timings| timings.deadline(request.id()));
 
         (
             Self {
                 request,
                 channel_size,
                 tx,
-                deadline: REQUEST_DEADLINE.try_with(|deadline| *deadline).ok(),
+                deadline,
+                timings,
                 identity: Arc::new(()),
                 subscription_replay: false,
             },
@@ -75,8 +82,14 @@ impl InFlight {
     /// request. If the request is a subscription and the response is not an
     /// error, the subscription ID and the in-flight request are returned.
     pub fn fulfill(self, resp: Response) -> Option<(SubId, Self)> {
-        if !self.is_live() {
+        let received_at = Instant::now();
+        if (self.tx.is_closed() && !self.subscription_replay)
+            || self.deadline.is_some_and(|deadline| received_at >= deadline)
+        {
             return None;
+        }
+        if let Some(timings) = &self.timings {
+            timings.record_response(self.request.id(), received_at);
         }
         if self.is_subscription() {
             if let ResponsePayload::Success(val) = resp.payload {
