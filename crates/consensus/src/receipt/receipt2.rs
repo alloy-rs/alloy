@@ -157,6 +157,13 @@ impl<T: TxTy> Eip2718EncodableReceipt for EthereumReceipt<T> {
 
 impl<T: TxTy> Eip2718DecodableReceipt for EthereumReceipt<T> {
     fn typed_decode_with_bloom(ty: u8, buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>> {
+        // Legacy receipts are untagged: `eip2718_encode_with_bloom` never emits a `0x00` type
+        // byte, so a literal `0x00` prefix must be rejected rather than decoded as legacy, which
+        // would not round-trip. Untagged legacy receipts are handled by
+        // `fallback_decode_with_bloom`.
+        if ty == 0 {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
         Ok(Self::rlp_decode_inner(buf, T::try_from(ty)?)?)
     }
 
@@ -201,6 +208,11 @@ impl<T: TxTy> RlpDecodableReceipt for EthereumReceipt<T> {
         let remaining = buf.len();
 
         let tx_type = T::decode(buf)?;
+        // A string header only ever wraps a typed receipt. Legacy receipts are encoded as a bare
+        // list, so a zero type flag behind a string header must be rejected.
+        if tx_type.is_legacy() {
+            return Err(Eip2718Error::UnexpectedType(tx_type.ty()).into());
+        }
         let this = Self::rlp_decode_inner(buf, tx_type)?;
 
         if buf.len() + header.payload_length != remaining {
@@ -429,5 +441,109 @@ pub(crate) mod serde_bincode_compat {
                 bincode::serde::decode_from_slice(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+    use alloy_eips::eip2718::Decodable2718;
+
+    fn receipt(tx_type: TxType) -> ReceiptWithBloom<EthereumReceipt> {
+        EthereumReceipt { tx_type, success: true, cumulative_gas_used: 21_000, logs: vec![] }
+            .into_with_bloom()
+    }
+
+    /// Wraps an EIP-2718 payload in the RLP string header used by the network encoding of typed
+    /// receipts.
+    fn network_framed(payload: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        Header { list: false, payload_length: payload.len() }.encode(&mut out);
+        out.extend_from_slice(payload);
+        out
+    }
+
+    #[test]
+    fn legacy_receipt_roundtrips_untagged_on_all_decode_paths() {
+        let receipt = receipt(TxType::Legacy);
+        let encoded = receipt.encoded_2718();
+        assert!(encoded[0] >= 0xc0, "sanity: legacy receipts are encoded as a bare RLP list");
+        // The network encoding of a legacy receipt is the bare list as well, without a header.
+        let mut network = Vec::new();
+        receipt.network_encode(&mut network);
+        assert_eq!(network, encoded);
+
+        assert_eq!(
+            ReceiptWithBloom::<EthereumReceipt>::decode_2718_exact(&encoded).unwrap(),
+            receipt
+        );
+        assert_eq!(
+            ReceiptWithBloom::<EthereumReceipt>::network_decode(&mut encoded.as_slice()).unwrap(),
+            receipt
+        );
+        assert_eq!(
+            ReceiptWithBloom::<EthereumReceipt>::decode(&mut encoded.as_slice()).unwrap(),
+            receipt
+        );
+    }
+
+    #[test]
+    fn typed_receipt_roundtrips_on_all_decode_paths() {
+        let receipt = receipt(TxType::Eip1559);
+        let encoded = receipt.encoded_2718();
+        assert_eq!(encoded[0], 0x02, "sanity: typed receipts are prefixed with their type byte");
+        let mut network = Vec::new();
+        receipt.network_encode(&mut network);
+        assert_eq!(network, network_framed(&encoded));
+
+        assert_eq!(
+            ReceiptWithBloom::<EthereumReceipt>::decode_2718_exact(&encoded).unwrap(),
+            receipt
+        );
+        assert_eq!(
+            ReceiptWithBloom::<EthereumReceipt>::network_decode(&mut network.as_slice()).unwrap(),
+            receipt
+        );
+        assert_eq!(
+            ReceiptWithBloom::<EthereumReceipt>::decode(&mut network.as_slice()).unwrap(),
+            receipt
+        );
+    }
+
+    #[test]
+    fn tagged_legacy_receipt_is_rejected_on_all_decode_paths() {
+        // Per EIP-2718, legacy receipts are untagged and `0x00` is not an assigned type. The
+        // encoder never emits a `0x00` prefix, so accepting one on decode would re-encode the
+        // receipt differently from the bytes that were decoded.
+        let encoded = receipt(TxType::Legacy).encoded_2718();
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&encoded);
+        let tagged_network = network_framed(&tagged);
+
+        assert!(matches!(
+            ReceiptWithBloom::<EthereumReceipt>::decode_2718_exact(&tagged),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            ReceiptWithBloom::<EthereumReceipt>::decode_2718(&mut tagged.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            ReceiptWithBloom::<EthereumReceipt>::network_decode(&mut tagged_network.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(
+            ReceiptWithBloom::<EthereumReceipt>::decode(&mut tagged_network.as_slice()).is_err()
+        );
+
+        // `rlp_decode_with_bloom` reads the type flag as an RLP integer, so `0x80` (the RLP
+        // encoding of zero) is the only way to reach the legacy type through a string header.
+        let mut rlp_zero_tagged = vec![0x80];
+        rlp_zero_tagged.extend_from_slice(&encoded);
+        assert!(ReceiptWithBloom::<EthereumReceipt>::decode(
+            &mut network_framed(&rlp_zero_tagged).as_slice()
+        )
+        .is_err());
     }
 }

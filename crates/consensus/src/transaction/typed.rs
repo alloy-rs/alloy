@@ -134,14 +134,14 @@ impl<Eip4844: RlpEcdsaDecodableTx> EthereumTypedTransaction<Eip4844> {
 
         let first_byte = buf[0];
 
-        // Eip2718: legacy transactions start with >= 0xc0
+        // Eip2718: legacy transactions are untagged and start with >= 0xc0. A literal `0x00`
+        // type byte is not a valid type flag and is rejected below.
         if first_byte >= 0xc0 {
             return Ok(Self::Legacy(TxLegacy::decode(buf)?));
         }
 
         let tx_type = buf.get_u8();
         match tx_type {
-            0x00 => Ok(Self::Legacy(TxLegacy::decode(buf)?)),
             0x01 => Ok(Self::Eip2930(TxEip2930::decode(buf)?)),
             0x02 => Ok(Self::Eip1559(TxEip1559::decode(buf)?)),
             0x03 => Ok(Self::Eip4844(Eip4844::rlp_decode(buf)?)),
@@ -573,6 +573,32 @@ mod tests {
         if let Err(err) = result {
             assert!(matches!(err, alloy_eips::eip2718::Eip2718Error::UnexpectedType(0x99)));
         }
+    }
+
+    #[test]
+    fn test_decode_unsigned_rejects_tagged_legacy() {
+        let tx = TypedTransaction::Legacy(TxLegacy {
+            chain_id: Some(1),
+            nonce: 0,
+            gas_price: 1,
+            gas_limit: 2,
+            to: Address::ZERO.into(),
+            value: U256::ZERO,
+            input: Bytes::default(),
+        });
+        let mut encoded = Vec::new();
+        tx.encode_for_signing(&mut encoded);
+        assert!(encoded[0] >= 0xc0, "sanity: unsigned legacy txs are encoded as a bare RLP list");
+        assert_eq!(TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap(), tx);
+
+        // Legacy transactions are untagged, so a literal `0x00` type byte must be rejected rather
+        // than decoded as legacy, which would not round-trip through `encode_for_signing`.
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&encoded);
+        assert!(matches!(
+            TypedTransaction::decode_unsigned(&mut tagged.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0x00))
+        ));
     }
 
     #[test]
