@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use alloy_primitives::Bytes;
+use alloy_rlp::{Encodable, Header};
 use serde::{Deserialize, Serialize};
 
 /// Represents the execution witness of a block. Contains lists of required preimages and
@@ -73,23 +74,19 @@ impl ExecutionWitness {
     /// The headers must contain valid RLP-encoded block headers; they are not validated here.
     ///
     /// See <https://github.com/ethereum/go-ethereum/blob/7538039f06792da46a91165e7eda98917edcfde2/core/stateless/encoding.go>.
-    #[cfg(feature = "rlp")]
     pub fn encode_witness(&self) -> Bytes {
         let mut fields = Vec::new();
-        alloy_rlp::Header {
-            list: true,
-            payload_length: self.headers.iter().map(|header| header.len()).sum(),
-        }
-        .encode(&mut fields);
+        Header { list: true, payload_length: self.headers.iter().map(|header| header.len()).sum() }
+            .encode(&mut fields);
         for header in &self.headers {
             fields.extend_from_slice(header);
         }
-        alloy_rlp::Encodable::encode(&self.codes, &mut fields);
-        alloy_rlp::Encodable::encode(&self.state, &mut fields);
-        alloy_rlp::Header { list: true, payload_length: 0 }.encode(&mut fields);
+        self.codes.encode(&mut fields);
+        self.state.encode(&mut fields);
+        Header { list: true, payload_length: 0 }.encode(&mut fields);
 
         let mut encoded = Vec::new();
-        alloy_rlp::Header { list: true, payload_length: fields.len() }.encode(&mut encoded);
+        Header { list: true, payload_length: fields.len() }.encode(&mut encoded);
         encoded.extend_from_slice(&fields);
         encoded.into()
     }
@@ -101,16 +98,12 @@ impl ExecutionWitness {
     }
 
     /// Sets the `headers` field by RLP-encoding each item.
-    #[cfg(feature = "rlp")]
-    pub fn with_headers<H: alloy_rlp::Encodable>(
-        mut self,
-        headers: impl IntoIterator<Item = H>,
-    ) -> Self {
+    pub fn with_headers<H: Encodable>(mut self, headers: impl IntoIterator<Item = H>) -> Self {
         self.headers = headers
             .into_iter()
             .map(|header| {
                 let mut buf = Vec::new();
-                alloy_rlp::Encodable::encode(&header, &mut buf);
+                header.encode(&mut buf);
                 buf.into()
             })
             .collect();
@@ -118,7 +111,7 @@ impl ExecutionWitness {
     }
 }
 
-#[cfg(all(test, feature = "rlp"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use alloc::vec;
