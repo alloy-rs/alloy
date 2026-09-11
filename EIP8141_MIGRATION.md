@@ -20,6 +20,16 @@ conventional receipt payload. These differences are explicit in the API:
 The aggregate frame receipt status means “all frames succeeded.” This is a
 convenience policy, not a consensus field in the frame receipt encoding.
 
+## Typed frame fields
+
+Frame targets and signature signers are `FrameAddress` values and signature
+messages are `SignatureMessage` values. Decoding rejects malformed address and
+message lengths and the reserved zero digest, so consensus types never hold a
+malformed target, signer, or message. Use `resolve_frame_target()` or
+`Frame::resolved_target()` to substitute the sender for an empty target, and
+`FrameSignature::validate_structure_with_sender()` for the remaining structural
+signature checks; `TxEip8141::validate()` applies them to every entry.
+
 ## Building and sending
 
 The provider's wallet filler preserves an EIP-7594 sidecar in

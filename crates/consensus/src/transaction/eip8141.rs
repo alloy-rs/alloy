@@ -8,11 +8,11 @@ use alloy_eips::{
     eip7825::MAX_TX_GAS_LIMIT_OSAKA,
     eip8141::{
         constants::{
-            FRAME_FLAGS_MASK, FRAME_TX_DATA_TOKEN_STANDARD_COST, FRAME_TX_INTRINSIC_COST,
-            FRAME_TX_PER_FRAME_COST, FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE,
-            MAX_FRAMES, TX_VALUE_COST,
+            FRAME_TX_DATA_TOKEN_STANDARD_COST, FRAME_TX_INTRINSIC_COST, FRAME_TX_PER_FRAME_COST,
+            FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE, MAX_FRAMES, TX_VALUE_COST,
         },
-        ApprovalScope, Frame, FrameMode, FrameSignature, SignatureScheme, TransactionFees,
+        ApprovalScope, Eip8141Error, Frame, FrameMode, FrameSignature, SignatureMessage,
+        TransactionFees,
     },
     Decodable2718, Encodable2718, Typed2718,
 };
@@ -32,7 +32,7 @@ impl Encodable for SigningFrameSignature<'_> {
         signature.scheme.encode(out);
         signature.signer.encode(out);
         signature.msg.encode(out);
-        if signature.msg.is_empty() {
+        if signature.signs_transaction_hash() {
             EMPTY_INPUT.encode(out);
         } else {
             signature.signature.encode(out);
@@ -50,7 +50,7 @@ impl SigningFrameSignature<'_> {
         signature.scheme.length()
             + signature.signer.length()
             + signature.msg.length()
-            + if signature.msg.is_empty() {
+            + if signature.signs_transaction_hash() {
                 EMPTY_INPUT.length()
             } else {
                 signature.signature.length()
@@ -134,7 +134,7 @@ impl serde::Serialize for TxEip8141 {
             #[serde(with = "alloy_serde::quantity")]
             scheme: u8,
             signer: Option<Address>,
-            msg: &'a Bytes,
+            msg: SignatureMessage,
             signature: &'a Bytes,
         }
 
@@ -184,49 +184,27 @@ impl serde::Serialize for TxEip8141 {
         let frames = self
             .frames
             .iter()
-            .map(|frame| {
-                let to = match frame.target.len() {
-                    0 => None,
-                    20 => Some(Address::from_slice(&frame.target)),
-                    _ => {
-                        return Err(serde::ser::Error::custom(
-                            "invalid EIP-8141 frame target length",
-                        ));
-                    }
-                };
-                Ok(Frame {
-                    mode: frame.mode.into(),
-                    flags: frame.flags,
-                    to,
-                    gas_limit: frame.limits.execution,
-                    state_limit: frame.limits.state,
-                    value: frame.value,
-                    data: &frame.data,
-                })
+            .map(|frame| Frame {
+                mode: frame.mode.into(),
+                flags: frame.flags,
+                to: frame.target_address(),
+                gas_limit: frame.limits.execution,
+                state_limit: frame.limits.state,
+                value: frame.value,
+                data: &frame.data,
             })
-            .collect::<Result<Vec<_>, S::Error>>()?;
+            .collect();
 
         let signatures = self
             .signatures
             .iter()
-            .map(|signature| {
-                let signer = match signature.signer.len() {
-                    0 => None,
-                    20 => Some(Address::from_slice(&signature.signer)),
-                    _ => {
-                        return Err(serde::ser::Error::custom(
-                            "invalid EIP-8141 signature signer length",
-                        ));
-                    }
-                };
-                Ok(Signature {
-                    scheme: signature.scheme.into(),
-                    signer,
-                    msg: &signature.msg,
-                    signature: &signature.signature,
-                })
+            .map(|signature| Signature {
+                scheme: signature.scheme.into(),
+                signer: signature.signer.address(),
+                msg: signature.msg,
+                signature: &signature.signature,
             })
-            .collect::<Result<Vec<_>, S::Error>>()?;
+            .collect();
 
         Transaction {
             chain_id: self.chain_id,
@@ -263,51 +241,18 @@ impl<'de> serde::Deserialize<'de> for TxEip8141 {
             blob_versioned_hashes: Vec<B256>,
         }
 
-        fn parse_quantity(value: serde_json::Value) -> Result<serde_json::Value, &'static str> {
-            let Some(value) = value.as_str() else {
-                return Ok(value);
-            };
-            let Some(value) = value.strip_prefix("0x") else {
-                return Ok(serde_json::Value::String(value.to_owned()));
-            };
-            let value = u64::from_str_radix(value, 16).map_err(|_| "invalid quantity")?;
-            Ok(serde_json::Value::Number(value.into()))
-        }
-
-        fn parse_enum(value: &mut serde_json::Value, names: &[&str]) -> Result<(), &'static str> {
-            let Some(raw) = value.as_str() else {
-                return Ok(());
-            };
-            let Some(raw) = raw.strip_prefix("0x") else {
-                return Ok(());
-            };
-            let index = usize::from_str_radix(raw, 16).map_err(|_| "invalid enum quantity")?;
-            *value = serde_json::Value::String(
-                names.get(index).ok_or("invalid enum quantity")?.to_string(),
-            );
-            Ok(())
-        }
-
+        /// Maps the flattened RPC frame and fee fields onto the consensus field layout.
+        ///
+        /// Discriminants, quantities, and optional addresses already deserialize from their RPC
+        /// encodings, including `null` signers and targets.
         fn normalize_rpc(value: &mut serde_json::Value) -> Result<(), &'static str> {
             let object = value.as_object_mut().ok_or("expected EIP-8141 transaction object")?;
             if let Some(frames) = object.get_mut("frames").and_then(serde_json::Value::as_array_mut)
             {
                 for frame in frames {
                     let frame = frame.as_object_mut().ok_or("expected EIP-8141 frame object")?;
-                    if let Some(mode) = frame.get_mut("mode") {
-                        parse_enum(mode, &["Default", "Verify", "Sender"])?;
-                    }
-                    if let Some(flags) = frame.get_mut("flags") {
-                        *flags = parse_quantity(core::mem::take(flags))?;
-                    }
                     if frame.get("target").is_none() {
-                        let target = match frame.remove("to") {
-                            Some(serde_json::Value::String(to)) => serde_json::Value::String(to),
-                            Some(serde_json::Value::Null) | None => {
-                                serde_json::Value::String("0x".to_owned())
-                            }
-                            Some(_) => return Err("invalid EIP-8141 frame target"),
-                        };
+                        let target = frame.remove("to").unwrap_or(serde_json::Value::Null);
                         frame.insert("target".to_owned(), target);
                     }
                     if frame.get("limits").is_none() {
@@ -317,27 +262,9 @@ impl<'de> serde::Deserialize<'de> for TxEip8141 {
                             .remove("stateLimit")
                             .ok_or("missing EIP-8141 frame state gas limit")?;
                         let mut limits = serde_json::Map::new();
-                        limits.insert("execution".to_owned(), parse_quantity(execution)?);
-                        limits.insert("state".to_owned(), parse_quantity(state)?);
+                        limits.insert("execution".to_owned(), execution);
+                        limits.insert("state".to_owned(), state);
                         frame.insert("limits".to_owned(), serde_json::Value::Object(limits));
-                    }
-                }
-            }
-
-            if let Some(signatures) =
-                object.get_mut("signatures").and_then(serde_json::Value::as_array_mut)
-            {
-                for signature in signatures {
-                    let signature =
-                        signature.as_object_mut().ok_or("expected EIP-8141 signature object")?;
-                    if let Some(scheme) = signature.get_mut("scheme") {
-                        parse_enum(scheme, &["Arbitrary", "Secp256k1", "P256"])?;
-                    }
-                    if signature.get("signer") == Some(&serde_json::Value::Null) {
-                        signature.insert(
-                            "signer".to_owned(),
-                            serde_json::Value::String("0x".to_owned()),
-                        );
                     }
                 }
             }
@@ -1187,15 +1114,14 @@ impl TxEip8141 {
 
     /// Resolves a frame target against this transaction.
     ///
-    /// An empty frame target resolves to the transaction sender. A malformed non-empty target
-    /// returns `None`.
-    pub fn resolve_frame_target(&self, frame: &Frame) -> Option<Address> {
-        frame.target_address().or_else(|| frame.target.is_empty().then_some(self.sender))
+    /// An empty frame target resolves to the transaction sender.
+    pub const fn resolve_frame_target(&self, frame: &Frame) -> Address {
+        frame.resolved_target(self.sender)
     }
 
     /// Resolves the target for the frame at `index`.
     pub fn resolve_frame_target_at(&self, index: usize) -> Option<Address> {
-        self.frames.get(index).and_then(|frame| self.resolve_frame_target(frame))
+        self.frames.get(index).map(|frame| self.resolve_frame_target(frame))
     }
 
     /// Returns whether the frame at `index` is an expiry verifier frame.
@@ -1265,14 +1191,8 @@ impl TxEip8141 {
             + self.frames.capacity() * size_of::<Frame>()
             + self.signatures.capacity() * size_of::<FrameSignature>()
             + self.blob_versioned_hashes.capacity() * size_of::<B256>()
-            + self.frames.iter().map(|frame| frame.target.len() + frame.data.len()).sum::<usize>()
-            + self
-                .signatures
-                .iter()
-                .map(|signature| {
-                    signature.signer.len() + signature.msg.len() + signature.signature.len()
-                })
-                .sum::<usize>()
+            + self.frames.iter().map(|frame| frame.data.len()).sum::<usize>()
+            + self.signatures.iter().map(|signature| signature.signature.len()).sum::<usize>()
     }
 }
 
@@ -1294,8 +1214,9 @@ pub struct TxEip8141Ref<'a> {
 impl TxEip8141Ref<'_> {
     /// Validates the structural constraints that can be checked without executing a frame.
     ///
-    /// Signature validity itself is checked by the selected frame validation scheme. This method
-    /// only rejects malformed transactions that must not reach signing, pooling, or execution.
+    /// Cryptographic signature validity is checked by the selected frame validation scheme. This
+    /// method only rejects malformed transactions that must not reach signing, pooling, or
+    /// execution.
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.frames.is_empty() || self.frames.len() > MAX_FRAMES {
             return Err("EIP-8141 transaction must contain between 1 and 64 frames");
@@ -1315,48 +1236,35 @@ impl TxEip8141Ref<'_> {
         }
 
         for signature in self.signatures {
-            match signature.scheme {
-                SignatureScheme::Arbitrary => {
-                    if !signature.signer.is_empty() {
-                        return Err("arbitrary signatures must not contain signer metadata");
-                    }
+            signature.validate_structure_with_sender(self.sender).map_err(|err| match err {
+                Eip8141Error::UnexpectedSigner => {
+                    "arbitrary signatures must not contain signer metadata"
                 }
-                SignatureScheme::Secp256k1 => {
-                    if !matches!(signature.signer.len(), 0 | 20) || signature.signature.len() != 65
-                    {
-                        return Err("invalid secp256k1 frame signature dimensions");
-                    }
+                Eip8141Error::InvalidSignatureLength { .. } => "invalid frame signature length",
+                Eip8141Error::InvalidParity(_) | Eip8141Error::InvalidSignatureScalar => {
+                    "frame signature is not canonical"
                 }
-                SignatureScheme::P256 => {
-                    if !matches!(signature.signer.len(), 0 | 20) || signature.signature.len() != 128
-                    {
-                        return Err("invalid P-256 frame signature dimensions");
-                    }
+                Eip8141Error::P256SignerMismatch { .. } => {
+                    "P-256 public key does not match the resolved signer"
                 }
-            }
-            if !signature.msg.is_empty()
-                && (signature.msg.len() != 32 || signature.msg.iter().all(|byte| *byte == 0))
-            {
-                return Err("frame signature message must be empty or a non-zero 32-byte digest");
-            }
+                _ => "invalid frame signature entry",
+            })?;
         }
 
         let mut execution_gas = 0u64;
         let mut state_gas = 0u64;
         let mut expiry_verifiers = 0u8;
         for (index, frame) in self.frames.iter().enumerate() {
-            if !frame.has_valid_target_encoding() {
-                return Err("invalid EIP-8141 frame target");
-            }
-            if frame.flags & !FRAME_FLAGS_MASK != 0 {
+            if frame.has_reserved_flags() {
                 return Err("reserved EIP-8141 frame flag is set");
             }
             if !frame.value.is_zero() && frame.mode != FrameMode::Sender {
                 return Err("frame value is only valid in sender mode");
             }
-            if frame.allowed_scope() & u8::from(ApprovalScope::Execution) != 0
-                && !frame.target.is_empty()
-                && frame.target_address() != Some(self.sender)
+            if matches!(
+                frame.allowed_scope(),
+                ApprovalScope::Execution | ApprovalScope::ExecutionAndPayment
+            ) && frame.resolved_target(self.sender) != self.sender
             {
                 return Err("execution approval target must resolve to the transaction sender");
             }
@@ -1371,7 +1279,7 @@ impl TxEip8141Ref<'_> {
                 || index
                     .checked_sub(1)
                     .is_some_and(|previous| self.frames[previous].is_atomic_batch());
-            if is_atomic_batch_member && frame.allowed_scope() != 0 {
+            if is_atomic_batch_member && frame.allowed_scope() != ApprovalScope::None {
                 return Err("atomic batch frames must not approve payment or execution");
             }
             if frame.is_expiry_verifier() {
@@ -1433,14 +1341,12 @@ impl TxEip8141Ref<'_> {
     /// Returns the intrinsic value-transfer cost for frames with an explicit non-sender target.
     pub fn value_transfer_gas(&self) -> u64 {
         self.frames.iter().fold(0u64, |acc, frame| {
-            let costs = if !frame.value.is_zero()
-                && !frame.target.is_empty()
-                && frame.target_address() != Some(self.sender)
-            {
-                TX_VALUE_COST
-            } else {
-                0
-            };
+            let costs =
+                if !frame.value.is_zero() && frame.resolved_target(self.sender) != self.sender {
+                    TX_VALUE_COST
+                } else {
+                    0
+                };
             acc.saturating_add(costs)
         })
     }
@@ -1456,8 +1362,8 @@ impl TxEip8141Ref<'_> {
             .iter()
             .fold(0u64, |acc, frame| acc.saturating_add(count_frame_data_tokens(&frame.data)));
         self.signatures.iter().fold(frame_tokens, |acc, signature| {
-            acc.saturating_add(count_frame_data_tokens(&signature.signer))
-                .saturating_add(count_frame_data_tokens(&signature.msg))
+            acc.saturating_add(count_frame_data_tokens(signature.signer.as_bytes()))
+                .saturating_add(count_frame_data_tokens(signature.msg.as_bytes()))
                 .saturating_add(count_frame_data_tokens(&signature.signature))
         })
     }
@@ -1467,8 +1373,8 @@ impl TxEip8141Ref<'_> {
         let frame_data_len =
             self.frames.iter().fold(0u64, |acc, frame| acc.saturating_add(frame.data.len() as u64));
         self.signatures.iter().fold(frame_data_len, |acc, signature| {
-            acc.saturating_add(signature.signer.len() as u64)
-                .saturating_add(signature.msg.len() as u64)
+            acc.saturating_add(signature.signer.as_bytes().len() as u64)
+                .saturating_add(signature.msg.as_bytes().len() as u64)
                 .saturating_add(signature.signature.len() as u64)
         })
     }
@@ -1820,33 +1726,45 @@ mod tests {
     use crate::{EthereumTxEnvelope, TxEip4844};
     use alloy_eips::eip8141::{
         constants::{ATOMIC_BATCH_FLAG, EXPIRY_DATA_LENGTH, EXPIRY_VERIFIER},
-        ApprovalScope, FrameLimits, FrameMode, SignatureScheme, TransactionFees,
+        ApprovalScope, FrameAddress, FrameLimits, FrameMode, SignatureMessage, SignatureScheme,
+        TransactionFees,
     };
-    use alloy_primitives::{Address, Bytes, U256};
+    use alloy_primitives::{Address, Bytes, B256, U256};
 
     fn valid_tx() -> TxEip8141 {
         TxEip8141 { frames: vec![Frame::default()], ..Default::default() }
     }
 
     #[test]
-    fn validates_protocol_signature_dimensions() {
+    fn validates_protocol_signature_structure() {
+        let mut secp256k1 = vec![0u8; 65];
+        secp256k1[32] = 1;
+        secp256k1[64] = 1;
         let mut tx = valid_tx();
         tx.signatures.push(FrameSignature {
             scheme: SignatureScheme::Secp256k1,
-            signer: Bytes::new(),
-            msg: Bytes::new(),
-            signature: Bytes::from(vec![0x11; 65]),
+            signer: FrameAddress::Empty,
+            msg: SignatureMessage::TransactionHash,
+            signature: secp256k1.into(),
         });
         assert!(tx.validate().is_ok());
 
+        let mut p256 = vec![0u8; 128];
+        p256[31] = 1;
+        p256[63] = 1;
+        p256[64..].fill(0x33);
         tx.signatures[0] = FrameSignature {
             scheme: SignatureScheme::P256,
-            signer: Bytes::from(vec![0x22; 20]),
-            msg: Bytes::new(),
-            signature: Bytes::from(vec![0x33; 128]),
+            signer: Address::from_raw_public_key(&[0x33; 64]).into(),
+            msg: SignatureMessage::TransactionHash,
+            signature: p256.into(),
         };
         assert!(tx.validate().is_ok());
 
+        tx.signatures[0].signer = Address::repeat_byte(0x22).into();
+        assert!(tx.validate().is_err());
+
+        tx.signatures[0].signer = FrameAddress::Empty;
         tx.signatures[0].signature = Bytes::from(vec![0x33; 64]);
         assert!(tx.validate().is_err());
     }
@@ -1856,10 +1774,10 @@ mod tests {
         let mut tx = valid_tx();
         tx.sender = Address::repeat_byte(0x11);
         tx.frames[0].flags = ApprovalScope::Execution.into();
-        tx.frames[0].target = Bytes::copy_from_slice(Address::repeat_byte(0x22).as_slice());
+        tx.frames[0].target = Address::repeat_byte(0x22).into();
         assert!(tx.validate().is_err());
 
-        tx.frames[0].target = Bytes::copy_from_slice(tx.sender.as_slice());
+        tx.frames[0].target = tx.sender.into();
         assert!(tx.validate().is_ok());
 
         tx.frames = vec![
@@ -1877,7 +1795,7 @@ mod tests {
     fn rejects_multiple_expiry_verifiers() {
         let expiry = Frame {
             mode: FrameMode::Verify,
-            target: Bytes::copy_from_slice(EXPIRY_VERIFIER.as_slice()),
+            target: EXPIRY_VERIFIER.into(),
             data: Bytes::from(vec![0; EXPIRY_DATA_LENGTH]),
             ..Default::default()
         };
@@ -1907,15 +1825,15 @@ mod tests {
             frames: vec![Frame {
                 mode: FrameMode::Verify,
                 flags: ApprovalScope::ExecutionAndPayment.into(),
-                target: Bytes::new(),
+                target: FrameAddress::Empty,
                 limits: FrameLimits { execution: 21_000, state: 0 },
                 value: U256::ZERO,
                 data: Bytes::new(),
             }],
             signatures: vec![FrameSignature {
                 scheme: SignatureScheme::Secp256k1,
-                signer: Bytes::copy_from_slice(&[0x11; 20]),
-                msg: Bytes::new(),
+                signer: Address::repeat_byte(0x11).into(),
+                msg: SignatureMessage::TransactionHash,
                 signature: Bytes::copy_from_slice(&[0x22; 65]),
             }],
             fees: TransactionFees {
@@ -1944,15 +1862,15 @@ mod tests {
             frames: vec![Frame {
                 mode: FrameMode::Verify,
                 flags: ApprovalScope::Execution.into(),
-                target: Bytes::new(),
+                target: FrameAddress::Empty,
                 limits: FrameLimits { execution: 21, state: 7 },
                 value: U256::from(9),
                 data: Bytes::from_static(&[0xaa]),
             }],
             signatures: vec![FrameSignature {
                 scheme: SignatureScheme::Secp256k1,
-                signer: Bytes::new(),
-                msg: Bytes::new(),
+                signer: FrameAddress::Empty,
+                msg: SignatureMessage::TransactionHash,
                 signature: Bytes::from_static(&[0xbb]),
             }],
             fees: TransactionFees {
@@ -1978,10 +1896,6 @@ mod tests {
         assert_eq!(signature["scheme"], "0x1");
         assert_eq!(signature["signer"], serde_json::Value::Null);
         assert_eq!(serde_json::from_value::<TxEip8141>(json).unwrap(), tx);
-
-        let mut malformed = tx;
-        malformed.frames[0].target = Bytes::from_static(&[0x01]);
-        assert!(serde_json::to_value(malformed).is_err());
     }
 
     #[test]
@@ -1993,8 +1907,8 @@ mod tests {
             frames: Vec::new(),
             signatures: vec![FrameSignature {
                 scheme: SignatureScheme::Arbitrary,
-                signer: Bytes::new(),
-                msg: Bytes::new(),
+                signer: FrameAddress::Empty,
+                msg: SignatureMessage::TransactionHash,
                 signature: Bytes::copy_from_slice(&[0x22; 32]),
             }],
             fees: TransactionFees {
@@ -2018,14 +1932,14 @@ mod tests {
             signatures: vec![
                 FrameSignature {
                     scheme: SignatureScheme::Arbitrary,
-                    signer: Bytes::new(),
-                    msg: Bytes::new(),
+                    signer: FrameAddress::Empty,
+                    msg: SignatureMessage::TransactionHash,
                     signature: Bytes::copy_from_slice(&[0x11; 64]),
                 },
                 FrameSignature {
                     scheme: SignatureScheme::Arbitrary,
-                    signer: Bytes::new(),
-                    msg: Bytes::copy_from_slice(&[0x22; 32]),
+                    signer: FrameAddress::Empty,
+                    msg: SignatureMessage::Explicit(B256::repeat_byte(0x22)),
                     signature: Bytes::copy_from_slice(&[0x33; 64]),
                 },
             ],
@@ -2081,13 +1995,13 @@ mod tests {
             ..Default::default()
         };
         let mut populated = empty.clone();
-        populated.frames[0].target = Bytes::copy_from_slice(&[0x11; 20]);
+        populated.frames[0].target = Address::repeat_byte(0x11).into();
         populated.frames[0].data = Bytes::copy_from_slice(&[0x22; 128]);
-        populated.signatures[0].signer = Bytes::copy_from_slice(&[0x33; 20]);
-        populated.signatures[0].msg = Bytes::copy_from_slice(&[0x44; 32]);
+        populated.signatures[0].signer = Address::repeat_byte(0x33).into();
+        populated.signatures[0].msg = SignatureMessage::Explicit(B256::repeat_byte(0x44));
         populated.signatures[0].signature = Bytes::copy_from_slice(&[0x55; 65]);
 
-        assert_eq!(populated.size() - empty.size(), 20 + 128 + 20 + 32 + 65);
+        assert_eq!(populated.size() - empty.size(), 128 + 65);
     }
 
     #[test]
@@ -2097,10 +2011,14 @@ mod tests {
         let tx = TxEip8141 {
             sender,
             frames: vec![
-                Frame { mode: FrameMode::Default, target: Bytes::new(), ..Default::default() },
+                Frame {
+                    mode: FrameMode::Default,
+                    target: FrameAddress::Empty,
+                    ..Default::default()
+                },
                 Frame {
                     mode: FrameMode::Sender,
-                    target: Bytes::copy_from_slice(target.as_slice()),
+                    target: target.into(),
                     data: Bytes::copy_from_slice(&[0xaa, 0xbb]),
                     ..Default::default()
                 },
@@ -2131,8 +2049,8 @@ mod tests {
             ],
             signatures: vec![FrameSignature {
                 scheme: SignatureScheme::Secp256k1,
-                signer: Bytes::copy_from_slice(&[0x11; 20]),
-                msg: Bytes::new(),
+                signer: Address::repeat_byte(0x11).into(),
+                msg: SignatureMessage::TransactionHash,
                 signature: Bytes::copy_from_slice(&[0x22; 65]),
             }],
             ..Default::default()
@@ -2170,7 +2088,7 @@ mod tests {
             frames: vec![Frame {
                 mode: FrameMode::Sender,
                 flags: ApprovalScope::ExecutionAndPayment.into(),
-                target: Bytes::copy_from_slice(Address::repeat_byte(0x44).as_slice()),
+                target: Address::repeat_byte(0x44).into(),
                 limits: FrameLimits { execution: u64::MAX, state: u64::MAX },
                 value: U256::MAX,
                 data: Bytes::new(),
