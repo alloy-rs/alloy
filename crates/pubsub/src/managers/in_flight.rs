@@ -1,6 +1,10 @@
+use crate::{
+    recovery::{RequestTimings, REQUEST_TIMINGS},
+    time::Instant,
+};
 use alloy_json_rpc::{Response, ResponsePayload, SerializedRequest, SubId};
 use alloy_transport::{TransportError, TransportResult};
-use std::fmt;
+use std::{fmt, sync::Arc};
 use tokio::sync::oneshot;
 
 /// An in-flight JSON-RPC request.
@@ -8,6 +12,11 @@ use tokio::sync::oneshot;
 /// This struct contains the request that was sent, as well as a channel to
 /// receive the response on.
 pub struct InFlight {
+    /// Monotonic deadline supplied by the provider.
+    pub deadline: Option<Instant>,
+    timings: Option<RequestTimings>,
+    pub(crate) identity: Arc<()>,
+    pub(crate) subscription_replay: bool,
     /// The request
     pub request: SerializedRequest,
 
@@ -35,8 +44,26 @@ impl InFlight {
         channel_size: usize,
     ) -> (Self, oneshot::Receiver<TransportResult<Response>>) {
         let (tx, rx) = oneshot::channel();
+        let timings = REQUEST_TIMINGS.try_with(Clone::clone).ok();
+        let deadline = timings.as_ref().and_then(|timings| timings.deadline(request.id()));
 
-        (Self { request, channel_size, tx }, rx)
+        (
+            Self {
+                request,
+                channel_size,
+                tx,
+                deadline,
+                timings,
+                identity: Arc::new(()),
+                subscription_replay: false,
+            },
+            rx,
+        )
+    }
+
+    pub(crate) fn is_live(&self) -> bool {
+        (self.subscription_replay || !self.tx.is_closed())
+            && self.deadline.is_none_or(|deadline| Instant::now() < deadline)
     }
 
     /// Check if the request is a subscription.
@@ -55,6 +82,15 @@ impl InFlight {
     /// request. If the request is a subscription and the response is not an
     /// error, the subscription ID and the in-flight request are returned.
     pub fn fulfill(self, resp: Response) -> Option<(SubId, Self)> {
+        let received_at = Instant::now();
+        if (self.tx.is_closed() && !self.subscription_replay)
+            || self.deadline.is_some_and(|deadline| received_at >= deadline)
+        {
+            return None;
+        }
+        if let Some(timings) = &self.timings {
+            timings.record_response(self.request.id(), received_at);
+        }
         if self.is_subscription() {
             if let ResponsePayload::Success(val) = resp.payload {
                 let sub_id: serde_json::Result<SubId> = serde_json::from_str(val.get());

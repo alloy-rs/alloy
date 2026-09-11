@@ -487,7 +487,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Finish the layer stack by providing a connection string with custom configuration.
     ///
     /// This method allows for fine-grained control over connection settings
-    /// such as authentication, retry behavior, and transport-specific options.
+    /// such as authentication and transport-specific options.
     /// The transport type is extracted from the connection string and configured
     /// using the provided [`ConnectionConfig`].
     ///
@@ -497,12 +497,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_provider::{ConnectionConfig, ProviderBuilder};
     /// use alloy_transport::Authorization;
-    /// use std::time::Duration;
     ///
-    /// let config = ConnectionConfig::new()
-    ///     .with_auth(Authorization::bearer("my-token"))
-    ///     .with_max_retries(3)
-    ///     .with_retry_interval(Duration::from_secs(2));
+    /// let config = ConnectionConfig::new().with_auth(Authorization::bearer("my-token"));
     ///
     /// let provider =
     ///     ProviderBuilder::new().connect_with_config("ws://localhost:8545", config).await?;
