@@ -10,8 +10,10 @@ use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
 /// local ID.
 ///
 /// This type is mostly a wrapper around [`broadcast::Receiver`], and exposes
-/// the same methods. Dropping it removes this receiver but does not unsubscribe
-/// from the server; use [`PubSubFrontend::unsubscribe`] for that.
+/// the same methods. Dropping it removes this receiver. Under
+/// [`crate::SubscriptionRetentionPolicy::WhileReceivers`], dropping the final
+/// receiver makes the subscription eligible for cleanup. Use
+/// [`PubSubFrontend::unsubscribe`] to force cleanup regardless of retention.
 ///
 /// [`PubSubFrontend::unsubscribe`]: crate::PubSubFrontend::unsubscribe
 #[derive(Debug)]
@@ -131,9 +133,10 @@ impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
 /// that fail to deserialize, while [`SubResultStream`] yields those
 /// deserialization errors.
 ///
-/// Dropping this receiver does not unsubscribe from the server. Use
-/// [`PubSubFrontend::unsubscribe`] with [`Subscription::local_id`] when the
-/// subscription is no longer needed.
+/// Dropping this receiver makes the subscription eligible for cleanup when it
+/// is the final receiver under [`crate::SubscriptionRetentionPolicy::WhileReceivers`].
+/// Use [`PubSubFrontend::unsubscribe`] with [`Subscription::local_id`] to force
+/// cleanup regardless of retention.
 ///
 /// [`PubSubFrontend::unsubscribe`]: crate::PubSubFrontend::unsubscribe
 #[derive(Debug)]
