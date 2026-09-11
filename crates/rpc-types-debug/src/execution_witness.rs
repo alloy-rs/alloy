@@ -75,19 +75,27 @@ impl ExecutionWitness {
     ///
     /// See <https://github.com/ethereum/go-ethereum/blob/7538039f06792da46a91165e7eda98917edcfde2/core/stateless/encoding.go>.
     pub fn encode_witness(&self) -> Bytes {
-        let mut fields = Vec::new();
-        Header { list: true, payload_length: self.headers.iter().map(|header| header.len()).sum() }
-            .encode(&mut fields);
+        let headers = Header {
+            list: true,
+            payload_length: self.headers.iter().map(|header| header.len()).sum(),
+        };
+        let keys = Header { list: true, payload_length: 0 };
+        let witness = Header {
+            list: true,
+            payload_length: headers.length_with_payload()
+                + self.codes.length()
+                + self.state.length()
+                + keys.length(),
+        };
+        let mut encoded = Vec::with_capacity(witness.length_with_payload());
+        witness.encode(&mut encoded);
+        headers.encode(&mut encoded);
         for header in &self.headers {
-            fields.extend_from_slice(header);
+            encoded.extend_from_slice(header);
         }
-        self.codes.encode(&mut fields);
-        self.state.encode(&mut fields);
-        Header { list: true, payload_length: 0 }.encode(&mut fields);
-
-        let mut encoded = Vec::new();
-        Header { list: true, payload_length: fields.len() }.encode(&mut encoded);
-        encoded.extend_from_slice(&fields);
+        self.codes.encode(&mut encoded);
+        self.state.encode(&mut encoded);
+        keys.encode(&mut encoded);
         encoded.into()
     }
 
@@ -129,6 +137,14 @@ mod tests {
             witness.encode_witness().as_ref(),
             &hex!("d2c4c101c102c584636f6465c5846e6f6465c0")
         );
+    }
+
+    #[test]
+    fn encode_witness_long_rlp_payload() {
+        let witness =
+            ExecutionWitness { codes: vec![Bytes::from(vec![0x7f; 56])], ..Default::default() };
+        let expected = [&hex!("f83fc0f83ab838")[..], &[0x7f; 56], &hex!("c0c0")].concat();
+        assert_eq!(witness.encode_witness().as_ref(), expected);
     }
 
     #[test]
