@@ -121,6 +121,10 @@ where
     B: Transaction,
     T: Transaction,
 {
+    fn frame_transaction(&self) -> Option<&crate::TxEip8141> {
+        delegate!(self => tx.frame_transaction())
+    }
+
     fn chain_id(&self) -> Option<ChainId> {
         delegate!(self => tx.chain_id())
     }
@@ -141,20 +145,44 @@ where
         delegate!(self => tx.max_fee_per_gas())
     }
 
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        delegate!(self => tx.max_fee_per_gas_u256())
+    }
+
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         delegate!(self => tx.max_priority_fee_per_gas())
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        delegate!(self => tx.max_priority_fee_per_gas_u256())
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         delegate!(self => tx.max_fee_per_blob_gas())
     }
 
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        delegate!(self => tx.max_fee_per_blob_gas_u256())
+    }
+
     fn priority_fee_or_price(&self) -> u128 {
         delegate!(self => tx.priority_fee_or_price())
     }
 
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        delegate!(self => tx.priority_fee_or_price_u256())
+    }
+
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         delegate!(self => tx.effective_gas_price(base_fee))
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        delegate!(self => tx.effective_gas_price_u256(base_fee))
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        delegate!(self => tx.effective_tip_per_gas_u256(base_fee))
     }
 
     fn is_dynamic_fee(&self) -> bool {

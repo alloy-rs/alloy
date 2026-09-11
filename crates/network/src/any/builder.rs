@@ -112,6 +112,19 @@ impl TransactionBuilder for WithOtherFields<TransactionRequest> {
 }
 
 impl NetworkTransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
+    fn should_fill_gas(&self) -> bool {
+        <TransactionRequest as NetworkTransactionBuilder<crate::Ethereum>>::should_fill_gas(
+            &self.inner,
+        )
+    }
+
+    fn build_presigned_with_sidecar(self) -> Result<(crate::AnyTxEnvelope, Bytes), Self> {
+        let Self { inner, other } = self;
+        <TransactionRequest as NetworkTransactionBuilder<crate::Ethereum>>::build_presigned_with_sidecar(inner)
+            .map(|(envelope, encoded)| (crate::AnyTxEnvelope::Ethereum(envelope), encoded))
+            .map_err(|inner| Self { inner, other })
+    }
+
     fn can_submit(&self) -> bool {
         self.deref().can_submit()
     }

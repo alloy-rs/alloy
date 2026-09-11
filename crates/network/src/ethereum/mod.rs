@@ -12,6 +12,16 @@ pub struct Ethereum {
 }
 
 impl Network for Ethereum {
+    fn try_into_presigned(tx: Self::UnsignedTx) -> Result<Self::TxEnvelope, Self::UnsignedTx> {
+        use alloy_primitives::Sealable;
+        match tx {
+            alloy_consensus::TypedTransaction::Eip8141(tx) => {
+                Ok(alloy_consensus::TxEnvelope::Eip8141(tx.seal_slow()))
+            }
+            tx => Err(tx),
+        }
+    }
+
     type TxType = alloy_consensus::TxType;
 
     type TxEnvelope = alloy_consensus::TxEnvelope;

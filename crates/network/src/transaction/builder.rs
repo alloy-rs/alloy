@@ -308,6 +308,21 @@ pub trait TransactionBuilder: Default + Sized + Send + Sync + 'static {
 /// and [`build`](Self::build) methods.
 #[doc(alias = "NetworkTxBuilder")]
 pub trait NetworkTransactionBuilder<N: Network>: TransactionBuilder {
+    /// Whether standard gas fillers may estimate and set top-level gas fields.
+    /// Self-authorized formats with per-frame gas budgets must supply their own fees.
+    fn should_fill_gas(&self) -> bool {
+        true
+    }
+
+    /// Builds a self-authorized transaction with its network-only sidecar.
+    /// Returns the original request when this path is not applicable or cannot be built.
+    /// The envelope remains canonical; the bytes retain the sidecar for raw submission.
+    fn build_presigned_with_sidecar(
+        self,
+    ) -> Result<(N::TxEnvelope, alloy_primitives::Bytes), Self> {
+        Err(self)
+    }
+
     /// True if the builder contains all necessary information to be submitted
     /// to the `eth_sendTransaction` endpoint.
     fn can_submit(&self) -> bool;

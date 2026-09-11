@@ -1,4 +1,5 @@
 use crate::{
+    error::ValueError,
     proofs::ordered_trie_root_with_encoder,
     receipt::{
         Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt,
@@ -261,18 +262,26 @@ impl<T: TxTy> InMemorySize for EthereumReceipt<T> {
     }
 }
 
-impl<T> From<ReceiptEnvelope<T>> for EthereumReceipt<TxType>
+impl<T> TryFrom<ReceiptEnvelope<T>> for EthereumReceipt<TxType>
 where
     T: Into<Log>,
 {
-    fn from(value: ReceiptEnvelope<T>) -> Self {
+    type Error = ValueError<ReceiptEnvelope<T>>;
+
+    fn try_from(value: ReceiptEnvelope<T>) -> Result<Self, Self::Error> {
+        if matches!(value, ReceiptEnvelope::Eip8141(_)) {
+            return Err(ValueError::new_static(
+                value,
+                "EIP-8141 receipts cannot be represented by EthereumReceipt",
+            ));
+        }
         let value = value.into_primitives_receipt();
-        Self {
+        Ok(Self {
             tx_type: value.tx_type(),
             success: value.is_success(),
             cumulative_gas_used: value.cumulative_gas_used(),
             logs: value.into_logs(),
-        }
+        })
     }
 }
 
@@ -286,20 +295,29 @@ impl<T, L> From<EthereumReceipt<T, L>> for crate::Receipt<L> {
     }
 }
 
-impl<L> From<EthereumReceipt<TxType, L>> for ReceiptEnvelope<L>
+impl<L> TryFrom<EthereumReceipt<TxType, L>> for ReceiptEnvelope<L>
 where
     L: Send + Sync + Clone + Debug + Eq + AsRef<Log>,
 {
-    fn from(value: EthereumReceipt<TxType, L>) -> Self {
+    type Error = ValueError<EthereumReceipt<TxType, L>>;
+
+    fn try_from(value: EthereumReceipt<TxType, L>) -> Result<Self, Self::Error> {
         let tx_type = value.tx_type;
+        if tx_type == TxType::Eip8141 {
+            return Err(ValueError::new_static(
+                value,
+                "EIP-8141 receipts require a FrameReceiptPayload",
+            ));
+        }
         let receipt = value.into_with_bloom().map_receipt(Into::into);
-        match tx_type {
+        Ok(match tx_type {
             TxType::Legacy => Self::Legacy(receipt),
             TxType::Eip2930 => Self::Eip2930(receipt),
             TxType::Eip1559 => Self::Eip1559(receipt),
             TxType::Eip4844 => Self::Eip4844(receipt),
             TxType::Eip7702 => Self::Eip7702(receipt),
-        }
+            TxType::Eip8141 => unreachable!("EIP-8141 receipt handled above"),
+        })
     }
 }
 
@@ -429,5 +447,38 @@ pub(crate) mod serde_bincode_compat {
                 bincode::serde::decode_from_slice(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_eips::eip8141::FrameReceiptPayload;
+
+    #[test]
+    fn ethereum_receipt_conversions_reject_frame_receipts() {
+        let envelope = ReceiptEnvelope::<Log>::Eip8141(FrameReceiptPayload::default().into());
+        assert!(EthereumReceipt::try_from(envelope).is_err());
+
+        let receipt = EthereumReceipt {
+            tx_type: TxType::Eip8141,
+            success: true,
+            cumulative_gas_used: 0,
+            logs: Vec::<Log>::new(),
+        };
+        assert!(ReceiptEnvelope::try_from(receipt).is_err());
+    }
+
+    #[test]
+    fn ethereum_receipt_standard_conversion_roundtrip() {
+        let receipt = EthereumReceipt {
+            tx_type: TxType::Eip1559,
+            success: true,
+            cumulative_gas_used: 21_000,
+            logs: Vec::<Log>::new(),
+        };
+
+        let envelope = ReceiptEnvelope::try_from(receipt.clone()).unwrap();
+        assert_eq!(EthereumReceipt::try_from(envelope).unwrap(), receipt);
     }
 }

@@ -309,7 +309,7 @@ impl<T: Transaction, H> BlockBody<T, H> {
     /// Returns an iterator over all blob versioned hashes from the block body.
     #[inline]
     pub fn blob_versioned_hashes_iter(&self) -> impl Iterator<Item = &B256> + '_ {
-        self.eip4844_transactions_iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
+        self.transactions.iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
     }
 }
 
@@ -324,6 +324,12 @@ impl<T: Typed2718, H> BlockBody<T, H> {
     #[inline]
     pub fn has_eip7702_transactions(&self) -> bool {
         self.transactions.iter().any(|tx| tx.is_eip7702())
+    }
+
+    /// Returns whether or not the block body contains any EIP-8141 transactions.
+    #[inline]
+    pub fn has_eip8141_transactions(&self) -> bool {
+        self.transactions.iter().any(|tx| tx.is_eip8141())
     }
 
     /// Returns an iterator over all blob transactions of the block.

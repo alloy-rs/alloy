@@ -1410,6 +1410,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
                 let encoded_tx = tx.encoded_2718();
                 self.send_raw_transaction(&encoded_tx).await
             }
+            SendableTx::EnvelopeWithSidecar { encoded, .. } => {
+                self.send_raw_transaction(&encoded).await
+            }
         }
     }
 
@@ -1486,6 +1489,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             SendableTx::Envelope(tx) => {
                 let encoded_tx = tx.encoded_2718();
                 self.send_raw_transaction_sync(&encoded_tx).await
+            }
+            SendableTx::EnvelopeWithSidecar { encoded, .. } => {
+                self.send_raw_transaction_sync(&encoded).await
             }
         }
     }

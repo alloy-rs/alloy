@@ -781,7 +781,7 @@ pub mod serde_bincode_compat {
                 prague_time: None,
                 osaka_time: None,
                 amsterdam_time: None,
-                bogota_time: None,
+                bogota_time: Some(700),
                 bpo1_time: None,
                 bpo2_time: None,
                 bpo3_time: None,
@@ -804,6 +804,16 @@ pub mod serde_bincode_compat {
             let (decoded, _) =
                 bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
+        }
+
+        #[test]
+        fn test_bogota_time_json_roundtrip() {
+            let config: ChainConfig =
+                serde_json::from_str(r#"{"chainId":1,"bogotaTime":42}"#).unwrap();
+            assert_eq!(config.bogota_time, Some(42));
+
+            let encoded = serde_json::to_value(config).unwrap();
+            assert_eq!(encoded["bogotaTime"], 42);
         }
 
         #[test]
