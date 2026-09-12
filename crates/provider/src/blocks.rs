@@ -49,12 +49,18 @@ impl Paused {
     /// Returns `true` if the method actually waited for the paused state to become unpaused,
     /// or `false` if it was already unpaused when called.
     async fn wait(&self) -> bool {
-        if !self.is_paused() {
-            return false;
+        let mut waited = false;
+        loop {
+            // Create the notification before checking the flag so notify_waiters cannot
+            // fall between the check and registration. Recheck after waking: receipt
+            // recovery may already have paused the heartbeat again.
+            let notified = self.notify.notified();
+            if !self.is_paused() {
+                return waited;
+            }
+            notified.await;
+            waited = true;
         }
-        self.notify.notified().await;
-        debug_assert!(!self.is_paused());
-        true
     }
 }
 
@@ -309,5 +315,25 @@ mod tests {
         for (i, block) in blocks.iter().enumerate() {
             assert_eq!(block.header.number, first + i as u64);
         }
+    }
+}
+
+#[cfg(test)]
+mod pause_tests {
+    use super::*;
+    use futures::FutureExt;
+
+    #[tokio::test]
+    async fn pause_again_before_stream_resumes() {
+        let paused = Paused::default();
+        paused.set_paused(true);
+        let mut wait = Box::pin(paused.wait());
+        assert!((&mut wait).now_or_never().is_none());
+        paused.set_paused(false);
+        paused.set_paused(true);
+        assert!((&mut wait).now_or_never().is_none());
+        paused.set_paused(false);
+        assert!(wait.await);
+        assert!(!paused.wait().await);
     }
 }
