@@ -74,7 +74,12 @@ pub struct TransactionRequest {
         )
     )]
     pub max_fee_per_blob_gas: Option<u128>,
-    /// The gas limit for the transaction.
+    /// The gas limit for the transaction, including intrinsic costs.
+    ///
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this single limit funds both execution
+    /// and state gas; the protocol splits it into regular gas and a state reservoir. A receipt's
+    /// `gasUsed` or a trace's net consumption can be too low as a limit, because gas may be needed
+    /// before a later refund or state refill. Use `eth_estimateGas` against the target network.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -212,7 +217,7 @@ impl TransactionRequest {
         self
     }
 
-    /// Sets the gas limit for the transaction.
+    /// Sets the gas limit for the transaction. See [`Self::gas`].
     pub const fn gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas = Some(gas_limit);
         self

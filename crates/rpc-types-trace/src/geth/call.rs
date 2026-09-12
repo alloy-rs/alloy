@@ -11,26 +11,56 @@ use serde::{Deserialize, Serialize};
 pub struct CallFrame {
     /// The address of that initiated the call.
     pub from: Address,
-    /// How much gas was left before the call.
+    /// Gas allowance before the call. For nested frames, regular gas excluding the EIP-8037
+    /// reservoir. The reservoir is passed separately in full, outside the regular-gas 63/64
+    /// rule. The top-level frame describes the transaction; do not interpret this as a
+    /// per-frame combined budget.
     #[serde(default)]
     pub gas: U256,
-    /// How much gas was used by the call.
+    /// Gas used by this call, including nested execution; do not sum parents and their children.
+    /// On the top-level transaction frame this is receipt gas, including both EIP-8037 dimensions,
+    /// after refunds and the calldata floor. Do not add `state_gas_used` to that total.
+    /// Nested-frame gas semantics vary by client and are not a transaction fee or gas-limit
+    /// estimate. See the [tracing schema proposal](https://github.com/ethereum/execution-apis/pull/852).
     #[serde(default, rename = "gasUsed")]
     pub gas_used: U256,
-    /// Gross execution-dimension gas used by the transaction.
+    /// Regular (execution) gas contribution to block accounting, excluding EIP-8037 state gas.
     ///
-    /// This is present on the top-level frame for Amsterdam and later blocks.
-    /// See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) and the
-    /// [execution-apis call tracer proposal](https://github.com/ethereum/execution-apis/pull/852).
-    #[serde(default, rename = "executionGasUsed", skip_serializing_if = "Option::is_none")]
+    /// Includes intrinsic gas and the execution-dimension calldata floor; before ordinary refunds
+    /// under EIP-7778. This is not receipt gas. See the
+    /// [gas accounting guide](crate::geth::state_gas) and
+    /// [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    ///
+    /// A transaction summary on the top-level frame when supported; not a per-child breakdown.
+    /// `None` means not reported (for example, a nested frame, older fork, or unsupported node).
+    #[serde(
+        default,
+        rename = "executionGasUsed",
+        alias = "regularGasUsed",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub execution_gas_used: Option<U256>,
-    /// Gross state-dimension gas used by the transaction.
+    /// Net EIP-8037 state gas for the whole transaction, excluding regular execution gas.
+    ///
+    /// Includes state creation charges after state refills and rollback, not peak state gas
+    /// demand. Do not subtract `gas_refund` or `state_gas_refund` from this already-net
+    /// transaction value. Zero when reported for an inactive EIP-8037 fork; `None` means the
+    /// node did not report it. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    /// This transaction summary is reported on the top-level frame when supported.
     #[serde(default, rename = "stateGasUsed", skip_serializing_if = "Option::is_none")]
     pub state_gas_used: Option<U256>,
-    /// EIP-3529 gas refund applied at the transaction boundary.
+    /// Ordinary transaction refund reported after transaction-boundary refund processing.
+    ///
+    /// Subject to the [EIP-3529](https://eips.ethereum.org/EIPS/eip-3529) cap; not a raw frame counter.
+    /// Excludes EIP-8037 state refills and unused gas. The calldata floor can limit the fee
+    /// saving; use the transaction's receipt gas for the final charge. `None` means not
+    /// reported. This transaction summary is reported on the top-level frame when supported.
     #[serde(default, rename = "gasRefund", skip_serializing_if = "Option::is_none")]
     pub gas_refund: Option<U256>,
-    /// State gas refunded within the transaction.
+    /// Total EIP-8037 state gas refilled within the transaction, which the proposal calls
+    /// "source-based state-gas refunds". Already netted out of `state_gas_used`; do not subtract
+    /// it again. Optional in the proposal and only meaningful on the top-level frame; `None`
+    /// means not reported. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
     #[serde(default, rename = "stateGasRefund", skip_serializing_if = "Option::is_none")]
     pub state_gas_refund: Option<U256>,
     /// The address of the contract that was called.

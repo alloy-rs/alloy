@@ -56,9 +56,15 @@ pub struct Header {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub number: BlockNumber,
     /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) it bounds each of the block's two
+    /// gas dimensions (execution and state) separately, not their sum.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_limit: u64,
     /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this is the larger of the block's
+    /// execution-gas and state-gas totals, counted before refunds ([EIP-7778](https://eips.ethereum.org/EIPS/eip-7778)),
+    /// so it need not equal the last receipt's `cumulativeGasUsed`. State totals remain net of
+    /// state refills.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
     /// A scalar value equal to the reasonable output of Unix’s time() at this block’s inception;
@@ -647,10 +653,16 @@ pub trait BlockHeader {
     /// Retrieves the block number
     fn number(&self) -> BlockNumber;
 
-    /// Retrieves the gas limit of the block
+    /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) it bounds each of the block's two
+    /// gas dimensions (execution and state) separately, not their sum.
     fn gas_limit(&self) -> u64;
 
-    /// Retrieves the gas used by the block
+    /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this is the larger of the block's
+    /// execution-gas and state-gas totals, counted before refunds ([EIP-7778](https://eips.ethereum.org/EIPS/eip-7778)),
+    /// so it need not equal the last receipt's `cumulativeGasUsed`. State totals remain net of
+    /// state refills.
     fn gas_used(&self) -> u64;
 
     /// Retrieves the timestamp of the block

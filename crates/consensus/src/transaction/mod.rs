@@ -92,6 +92,9 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     fn nonce(&self) -> u64;
 
     /// Get `gas_limit`.
+    ///
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this single limit funds both execution
+    /// and state gas via the reservoir model.
     fn gas_limit(&self) -> u64;
 
     /// Get `gas_price`.

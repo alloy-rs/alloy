@@ -89,7 +89,11 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
         ReceiptWithBloom { logs_bloom, receipt: self }
     }
 
-    /// Returns the cumulative gas used in the block after this transaction was executed.
+    /// Returns the cumulative gas used in the block up to and including this transaction.
+    ///
+    /// This is charged gas, after refunds and the calldata floor. Under
+    /// [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) it includes both execution and state gas, so
+    /// the last receipt's value need not equal the block header's `gasUsed`.
     fn cumulative_gas_used(&self) -> u64;
 
     /// Returns the logs emitted by this transaction.
