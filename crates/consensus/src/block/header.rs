@@ -5,7 +5,10 @@ use crate::{
 };
 use alloc::vec::Vec;
 use alloy_eips::{
-    eip1559::{calc_next_block_base_fee, BaseFeeParams},
+    eip1559::{
+        calc_next_block_base_fee, calculate_block_gas_limit_with_bound_divisor, BaseFeeParams,
+        GAS_LIMIT_BOUND_DIVISOR,
+    },
     eip1898::BlockWithParent,
     eip7840::BlobParams,
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
@@ -572,6 +575,17 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
     }
 }
 
+/// Error returned when a block's gas limit is not the closest possible value to the desired gas
+/// limit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("gas limit mismatch: got {got}, expected {expected}")]
+pub struct GasLimitMismatch {
+    /// The gas limit from the block header.
+    pub got: u64,
+    /// The closest valid gas limit to the desired gas limit.
+    pub expected: u64,
+}
+
 /// Trait for extracting specific Ethereum block data from a header
 #[auto_impl::auto_impl(&, Arc)]
 pub trait BlockHeader {
@@ -730,6 +744,51 @@ pub trait BlockHeader {
             self.base_fee_per_gas()?,
             base_fee_params,
         ))
+    }
+
+    /// Validates that a child block's gas limit is the closest possible value to the desired gas
+    /// limit, using the default [`GAS_LIMIT_BOUND_DIVISOR`].
+    ///
+    /// `self` is the parent block header and `gas_limit` is the child block's gas limit.
+    ///
+    /// Ref: <https://github.com/flashbots/builder/blob/a742641e24df68bc2fc476199b012b0abce40ffe/core/blockchain.go#L2474-L2477>
+    fn validate_gas_limit(
+        &self,
+        desired_gas_limit: u64,
+        gas_limit: u64,
+    ) -> Result<(), GasLimitMismatch> {
+        self.validate_gas_limit_with_bound_divisor(
+            desired_gas_limit,
+            gas_limit,
+            GAS_LIMIT_BOUND_DIVISOR,
+        )
+    }
+
+    /// Validates that a child block's gas limit is the closest possible value to the desired gas
+    /// limit, using the provided gas limit bound divisor.
+    ///
+    /// `self` is the parent block header and `gas_limit` is the child block's gas limit.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `gas_limit_bound_divisor` is zero.
+    fn validate_gas_limit_with_bound_divisor(
+        &self,
+        desired_gas_limit: u64,
+        gas_limit: u64,
+        gas_limit_bound_divisor: u64,
+    ) -> Result<(), GasLimitMismatch> {
+        let expected = calculate_block_gas_limit_with_bound_divisor(
+            self.gas_limit(),
+            desired_gas_limit,
+            gas_limit_bound_divisor,
+        );
+
+        if gas_limit != expected {
+            return Err(GasLimitMismatch { got: gas_limit, expected });
+        }
+
+        Ok(())
     }
 
     /// Returns the parent block's number and hash
@@ -1143,6 +1202,29 @@ pub(crate) mod serde_bincode_compat {
 mod tests {
     use super::*;
     use alloy_primitives::{b256, hex};
+
+    #[test]
+    fn validate_gas_limit() {
+        let parent = Header { gas_limit: 30_000_000, ..Default::default() };
+
+        assert_eq!(parent.validate_gas_limit(30_000_000, 30_000_000), Ok(()));
+        assert_eq!(parent.validate_gas_limit(20_000_000, 29_970_705), Ok(()));
+
+        let err = parent.validate_gas_limit(40_000_000, 30_000_000).unwrap_err();
+        assert_eq!(err, GasLimitMismatch { got: 30_000_000, expected: 30_029_295 });
+        assert_eq!(err.to_string(), "gas limit mismatch: got 30000000, expected 30029295");
+    }
+
+    #[test]
+    fn validate_gas_limit_with_custom_bound_divisor() {
+        let parent = Header { gas_limit: 1_000, ..Default::default() };
+
+        assert_eq!(parent.validate_gas_limit_with_bound_divisor(2_000, 1_099, 10), Ok(()));
+        assert_eq!(
+            parent.validate_gas_limit_with_bound_divisor(2_000, 1_098, 10),
+            Err(GasLimitMismatch { got: 1_098, expected: 1_099 })
+        );
+    }
 
     #[test]
     fn decode_header_rlp() {

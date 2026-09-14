@@ -15,7 +15,20 @@ use alloy_rpc_types_eth::{
     BlockId, SignedAuthorization,
 };
 use alloy_sol_types::SolCall;
-use std::marker::PhantomData;
+use alloy_transport::{BoxFuture, TransportResult};
+use std::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+use tokio::time::{timeout as timeout_future, Timeout};
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use wasmtimer::tokio::{timeout as timeout_future, Timeout};
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -30,12 +43,68 @@ pub type DynCallBuilder<P, N = Ethereum> = CallBuilder<P, Function, N>;
 /// [`CallBuilder`] that does not have a call decoder.
 pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
 
+/// Future returned by [`CallBuilder::send_sync`].
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct SendSyncFut<'a, N: Network> {
+    inner: BoxFuture<'a, TransportResult<N::ReceiptResponse>>,
+}
+
+impl<'a, N: Network> SendSyncFut<'a, N> {
+    fn new(inner: BoxFuture<'a, TransportResult<N::ReceiptResponse>>) -> Self {
+        Self { inner }
+    }
+
+    /// Wraps this future in a client-side timeout.
+    ///
+    /// The timeout only stops waiting for the response. The transaction may still have been
+    /// submitted to the network, so it may be unsafe to retry it without checking its status.
+    /// Awaiting the returned future produces a timeout result around the existing contract result,
+    /// so the two error cases can be handled separately.
+    ///
+    /// This is unrelated to the server-side `timeout` parameter of `eth_sendRawTransactionSync`
+    /// defined by [EIP-7966], which will be exposed separately as a request option.
+    ///
+    /// [EIP-7966]: https://eips.ethereum.org/EIPS/eip-7966
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example<P: alloy_provider::Provider>(
+    /// #     call: &alloy_contract::RawCallBuilder<P>,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// use std::time::Duration;
+    ///
+    /// let receipt = call.send_sync().timeout(Duration::from_secs(30)).await??;
+    /// # let _ = receipt;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// On Tokio-backed targets, including WASI, the returned future panics when polled if there
+    /// is no current Tokio timer, for example when polled outside of a Tokio runtime.
+    pub fn timeout(self, duration: Duration) -> Timeout<Self> {
+        timeout_future(duration, self)
+    }
+}
+
+impl<N: Network> std::fmt::Debug for SendSyncFut<'_, N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SendSyncFut").finish_non_exhaustive()
+    }
+}
+
+impl<N: Network> Future for SendSyncFut<'_, N> {
+    type Output = Result<N::ReceiptResponse>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.inner.as_mut().poll(cx).map(|result| result.map_err(Into::into))
+    }
+}
+
 /// A builder for sending a transaction via `eth_sendTransaction`, or calling a contract via
 /// `eth_call`.
-///
-/// The builder can be `.await`ed directly, which is equivalent to invoking [`call`].
-/// Prefer using [`call`] when possible, as `await`ing the builder directly will consume it, and
-/// currently also boxes the future due to type system limitations.
 ///
 /// A call builder can currently be instantiated in the following ways:
 /// - by [`sol!`][sol]-generated contract structs' methods (through the `#[sol(rpc)]` attribute)
@@ -45,12 +114,13 @@ pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
 ///
 /// Each method represents a different way to decode the output of the contract call.
 ///
-/// [`call`]: CallBuilder::call
-///
 /// # Note
 ///
-/// This will set [state overrides](https://geth.ethereum.org/docs/rpc/ns-eth#3-object---state-override-set)
-/// for `eth_call`, but this is not supported by all clients.
+/// The selected block and
+/// [state overrides](https://geth.ethereum.org/docs/rpc/ns-eth#3-object---state-override-set)
+/// apply only to [`call`](Self::call), [`call_raw`](Self::call_raw), and
+/// [`estimate_gas`](Self::estimate_gas). They do not modify transactions built or submitted from
+/// this builder. State overrides are not supported by all clients.
 ///
 /// # Examples
 ///
@@ -126,7 +196,7 @@ pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
 ///
 /// [sol]: alloy_sol_types::sol
 #[derive(Clone)]
-#[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
+#[must_use = "call builders do nothing unless you `.call` or `.send` them"]
 pub struct CallBuilder<P, D, N: Network = Ethereum> {
     pub(crate) request: N::TransactionRequest,
     block: BlockId,
@@ -138,39 +208,50 @@ pub struct CallBuilder<P, D, N: Network = Ethereum> {
 }
 
 impl<P, D, N: Network> CallBuilder<P, D, N> {
-    /// Converts the call builder to the inner transaction request
+    /// Consumes the builder and returns its inner transaction request.
+    ///
+    /// The provider, decoder, selected block, and state overrides are stored separately from the
+    /// transaction request and are discarded.
     pub fn into_transaction_request(self) -> N::TransactionRequest {
         self.request
     }
 
-    /// Builds and returns a RLP-encoded unsigned transaction from the call that can be signed.
+    /// Builds and returns the unsigned transaction's encoded signing preimage.
+    ///
+    /// This does not use the provider or its fillers. The request must already contain every field
+    /// required by the selected transaction type, including gas, nonce, and fee fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction request is incomplete or otherwise invalid.
     ///
     /// # Examples
     ///
     /// ```no_run
+    /// # use alloy_primitives::Address;
     /// # use alloy_provider::ProviderBuilder;
     /// # use alloy_sol_types::sol;
     ///
     /// sol! {
-    ///     #[sol(rpc, bytecode = "0x")]
-    ///    contract Counter {
-    ///        uint128 public counter;
-    ///
-    ///        function increment() external {
-    ///            counter += 1;
-    ///        }
-    ///    }
+    ///     #[sol(rpc)]
+    ///     interface Counter {
+    ///         function increment() external;
+    ///     }
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+    /// fn main() {
+    ///     let provider = ProviderBuilder::new().connect_anvil();
+    ///     let counter = Counter::new(Address::ZERO, &provider);
     ///
-    ///     let my_contract = Counter::deploy(provider).await.unwrap();
-    ///
-    ///     let call = my_contract.increment();
-    ///
-    ///     let unsigned_raw_tx: Vec<u8> = call.build_unsigned_raw_transaction().unwrap();
+    ///     let unsigned_raw_tx: Vec<u8> = counter
+    ///         .increment()
+    ///         .chain_id(31_337)
+    ///         .nonce(0)
+    ///         .gas(50_000)
+    ///         .max_fee_per_gas(20_000_000_000)
+    ///         .max_priority_fee_per_gas(1_000_000_000)
+    ///         .build_unsigned_raw_transaction()
+    ///         .unwrap();
     ///
     ///     assert!(!unsigned_raw_tx.is_empty())
     /// }
@@ -183,37 +264,50 @@ impl<P, D, N: Network> CallBuilder<P, D, N> {
         Ok(tx.encoded_for_signing())
     }
 
-    /// Build a RLP-encoded signed raw transaction for the call that can be sent to the network
+    /// Builds an EIP-2718-encoded signed transaction for the call that can be sent to the network
     /// using [`Provider::send_raw_transaction`].
+    ///
+    /// The signer can fill or validate the chain ID according to its [`TxSigner`] implementation.
+    /// This method does not use the provider or its fillers, so the request must already contain
+    /// every other field required by the selected transaction type, including gas, nonce, and fee
+    /// fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction request is incomplete or invalid, or if signing fails.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// # use alloy_provider::{ProviderBuilder, Provider};
-    /// # use alloy_sol_types::sol;
+    /// # use alloy_primitives::Address;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
     /// # use alloy_signer_local::PrivateKeySigner;
+    /// # use alloy_sol_types::sol;
     ///
     /// sol! {
-    ///    #[sol(rpc, bytecode = "0x")]
-    ///   contract Counter {
-    ///      uint128 public counter;
-    ///
-    ///     function increment() external {
-    ///        counter += 1;
-    ///    }
-    ///  }
+    ///     #[sol(rpc)]
+    ///     interface Counter {
+    ///         function increment() external;
+    ///     }
     /// }
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+    ///     let provider = ProviderBuilder::new().connect_anvil();
+    ///     let counter = Counter::new(Address::ZERO, &provider);
+    ///     let signer: PrivateKeySigner =
+    ///         "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
     ///
-    ///     let my_contract = Counter::deploy(&provider).await.unwrap();
-    ///
-    ///     let call = my_contract.increment();
-    ///
-    ///     let pk_signer: PrivateKeySigner = "0x..".parse().unwrap();
-    ///     let signed_raw_tx: Vec<u8> = call.build_raw_transaction(pk_signer).await.unwrap();
+    ///     let signed_raw_tx: Vec<u8> = counter
+    ///         .increment()
+    ///         .chain_id(31_337)
+    ///         .nonce(0)
+    ///         .gas(50_000)
+    ///         .max_fee_per_gas(20_000_000_000)
+    ///         .max_priority_fee_per_gas(1_000_000_000)
+    ///         .build_raw_transaction(signer)
+    ///         .await
+    ///         .unwrap();
     ///
     ///     let tx = provider.send_raw_transaction(&signed_raw_tx).await.unwrap();
     /// }
@@ -494,13 +588,20 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         self
     }
 
-    /// Sets the `block` field for sending the tx to the chain
+    /// Sets the block used by [`call`](Self::call), [`call_raw`](Self::call_raw), and
+    /// [`estimate_gas`](Self::estimate_gas).
+    ///
+    /// This does not affect transactions built or submitted from this builder.
     pub const fn block(mut self, block: BlockId) -> Self {
         self.block = block;
         self
     }
 
     /// Sets the [state override set](https://geth.ethereum.org/docs/rpc/ns-eth#3-object---state-override-set).
+    ///
+    /// The overrides apply to [`call`](Self::call), [`call_raw`](Self::call_raw), and
+    /// [`estimate_gas`](Self::estimate_gas), but do not affect transactions built or submitted from
+    /// this builder.
     ///
     /// # Note
     ///
@@ -626,12 +727,13 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     /// Returns the transaction receipt if the transaction was confirmed.
     ///
     /// See [`Provider::send_transaction_sync`] for more information.
+    /// Use [`SendSyncFut::timeout`] to limit how long to wait for the response.
     ///
     /// # Note
     ///
     /// Not all providers and clients support `eth_sendRawTransactionSync` yet.
-    pub async fn send_sync(&self) -> Result<N::ReceiptResponse> {
-        Ok(self.provider.send_transaction_sync(self.request.clone()).await?)
+    pub fn send_sync(&self) -> SendSyncFut<'_, N> {
+        SendSyncFut::new(self.provider.send_transaction_sync(self.request.clone()))
     }
 
     /// Calculates the address that will be created by the transaction, if any.
@@ -693,6 +795,15 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil();
         let call_builder = EmptyConstructor::deploy_builder(&provider);
         assert_eq!(*call_builder.calldata(), bytes!("6942"));
+    }
+
+    #[tokio::test]
+    async fn send_sync_with_timeout() {
+        let inner: BoxFuture<'_, TransportResult<<Ethereum as Network>::ReceiptResponse>> =
+            Box::pin(std::future::pending());
+        let future = SendSyncFut::<Ethereum>::new(inner);
+
+        assert!(future.timeout(Duration::ZERO).await.is_err());
     }
 
     sol! {
@@ -858,7 +969,12 @@ mod tests {
 
         let my_state_builder = my_contract.myState();
         assert_eq!(my_state_builder.calldata()[..], MyContract::myStateCall {}.abi_encode(),);
-        let my_state = my_state_builder.call().await.unwrap();
+        let my_state = my_state_builder
+            .call()
+            .timeout(Duration::from_secs(30))
+            .await
+            .expect("eth_call timed out")
+            .unwrap();
         assert!(my_state);
 
         let do_stuff_builder = my_contract.doStuff(U256::from(0x69), true);
@@ -923,7 +1039,9 @@ mod tests {
             .max_fee_per_gas(max_fee_per_gas.to())
             .max_priority_fee_per_gas(max_priority_fee_per_gas.to())
             .send_sync()
+            .timeout(Duration::from_secs(30))
             .await
+            .expect("synchronous transaction timed out")
             .expect("Could not send transaction");
         let transaction_hash = receipt.transaction_hash;
         let transaction = provider

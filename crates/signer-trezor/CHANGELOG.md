@@ -5,10 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0](https://github.com/alloy-rs/alloy/releases/tag/v2.0.0) - 2026-04-13
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
 
 ### Miscellaneous Tasks
 
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+
+## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
+
+### Bug Fixes
+
+- [signer-trezor] Reject unsupported tx types ([#3959](https://github.com/alloy-rs/alloy/issues/3959))
+- [signer-trezor] Dispatch EIP-1559 by tx type ([#3958](https://github.com/alloy-rs/alloy/issues/3958))
+
+### Dependencies
+
+- [deps] Bump trezor-client to 0.1.6 ([#4079](https://github.com/alloy-rs/alloy/issues/4079))
+
+### Miscellaneous Tasks
+
+- Release 2.2.0
+- Release 2.2.0
+- Release 2.1.1
+- Release 2.1.0
+- Release 2.0.5
+
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Miscellaneous Tasks
+
+- Release 2.0.4
+
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
+
+### Miscellaneous Tasks
+
+- Release 2.0.3
+- Release 2.0.2
+- Release 2.0.1
+- Release 2.0.0
 - Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
 - Release 1.8.2
 

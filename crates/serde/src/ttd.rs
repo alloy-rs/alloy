@@ -1,14 +1,16 @@
-//! Serde functions for encoding the TTD using a Geth compatible format.
+//! Serde functions for encoding terminal total difficulty (TTD) using a geth-compatible format.
 //!
-//! In Go `big.Int` is marshalled as a JSON number without quotes. Numbers are arbitrary
-//! precision in JSON, so this is valid JSON.
+//! Human-readable serializers emit values that fit in [`u128`] as unquoted decimal numbers. Larger
+//! values use [`U256`]'s standard human-readable representation, a quoted hex string.
+//! Most values above [`u64::MAX`] through [`u128::MAX`] therefore do not round-trip through this
+//! helper: serialization emits an unquoted number that deserialization rejects. Use a quoted
+//! decimal or hex representation at the wire boundary when those values must round-trip.
 //!
-//! These functions serialize the TTD as a JSON number, if the value fits within `u128`.
-//!
-//! The TTD is parsed from:
-//!   - JSON numbers: direct `u64` values, or the specific Ethereum mainnet TTD (e.g., `5.875e22` if
-//!     represented as a float). Other floats or negative numbers will error.
-//!   - JSON strings: these are parsed as `U256` (allowing hex or decimal strings).
+//! Human-readable deserializers accept `null`, hex or decimal strings parsed as [`U256`], JSON
+//! integers up to [`u64::MAX`], and geth's unquoted Ethereum mainnet TTD
+//! (`58750000000000000000000`). `serde_json` represents larger JSON numbers as `f64`, so nearby
+//! integer literals that round to the same float are also normalized to that mainnet value; other
+//! numbers outside the `u64` range are rejected.
 //!
 //! For non-human-readable formats, the default `serde` behavior for `Option<U256>` is used.
 
@@ -16,9 +18,7 @@ use alloy_primitives::U256;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
-/// Serializes an optional TTD as a JSON number.
-///
-/// It returns an error, if the TTD value is larger than 128-bit.
+/// Serializes an optional TTD using the format described in the [module documentation](self).
 pub fn serialize<S>(value: &Option<U256>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -39,7 +39,7 @@ where
     }
 }
 
-/// Deserializes an optional TTD value from JSON number or string.
+/// Deserializes an optional TTD using the formats described in the [module documentation](self).
 pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<U256>, D::Error>
 where
     D: Deserializer<'de>,
@@ -52,8 +52,7 @@ where
     }
 }
 
-/// Supports parsing the TTD as an `Option<u64>`, or `Option<f64>` specifically for the mainnet TTD
-/// (5.875e22).
+/// Compatibility alias for [`deserialize`].
 pub fn deserialize_json_ttd_opt<'de, D>(deserializer: D) -> Result<Option<U256>, D::Error>
 where
     D: Deserializer<'de>,

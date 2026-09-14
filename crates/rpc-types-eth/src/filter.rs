@@ -15,7 +15,13 @@ use itertools::{
     Itertools,
 };
 
-/// FilterSet is a set of values that will be used to filter logs.
+/// A set of values used to filter logs.
+///
+/// Values in the set are ORed. An empty set is a wildcard and matches every value. When used in a
+/// [`Filter`], an empty address set is omitted. An empty topic position before a later populated
+/// position is serialized as `null`; trailing empty positions are omitted. The [`Filter`]
+/// deserializer normalizes `null`, an empty array, or a topic array containing `null` to this
+/// wildcard representation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(from = "HashSet<T>"))]
@@ -399,23 +405,24 @@ impl Default for FilterBlockOption {
 }
 
 /// Filter for logs.
+///
+/// Addresses use OR semantics. Values within one topic position use OR semantics, while populated
+/// topic positions use AND semantics. Empty address and topic sets are wildcards. Block ranges are
+/// inclusive, and a block hash is mutually exclusive with `fromBlock` and `toBlock`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
     pub block_option: FilterBlockOption,
-    /// A filter set for matching contract addresses in log queries.
+    /// Contract addresses to match.
     ///
-    /// This field determines which contract addresses the filter applies to. It supports:
-    /// - A single address to match logs from that address only.
-    /// - Multiple addresses to match logs from any of them.
-    ///
-    /// ## Notes:
-    /// - An empty array (`[]`) may result in no logs being returned.
-    /// - Some RPC providers handle empty arrays differently than `None`.
-    /// - Large address lists may affect performance or hit provider limits.
+    /// Multiple addresses are ORed. An empty set is a wildcard and is omitted during
+    /// serialization.
     pub address: FilterSet<Address>,
-    /// Topics (maximum of 4)
+    /// Topic filters, with at most four positions.
+    ///
+    /// Values within a position use OR semantics; populated positions use AND semantics. An empty
+    /// position is a wildcard and serializes as `null` when followed by a populated position.
     pub topics: [Topic; 4],
 }
 
@@ -576,14 +583,19 @@ impl Filter {
         self
     }
 
-    /// Given the event signature in string form, it hashes it and adds it to the topics to monitor
+    /// Hashes a canonical event signature and sets it as topic 0.
+    ///
+    /// Pass the complete signature, for example `Transfer(address,address,uint256)`, rather than
+    /// only the event name. The exact UTF-8 bytes are hashed with Keccak-256.
     #[must_use]
     pub fn event(self, event_name: &str) -> Self {
         let hash = keccak256(event_name.as_bytes());
         self.event_signature(hash)
     }
 
-    /// Hashes all event signatures and sets them as array to event_signature(topic0)
+    /// Hashes canonical event signatures and sets them as alternatives for topic 0.
+    ///
+    /// Each item must include the event name and canonical parameter types.
     #[must_use]
     pub fn events(self, events: impl IntoIterator<Item = impl AsRef<[u8]>>) -> Self {
         let events = events.into_iter().map(|e| keccak256(e.as_ref())).collect::<Vec<_>>();
@@ -677,7 +689,10 @@ impl Filter {
         self.address.matches(&address)
     }
 
-    /// Returns `true` if the block matches the filter.
+    /// Returns `true` if the block number matches the locally evaluable range.
+    ///
+    /// Numeric bounds are inclusive. Dynamic tags such as `latest`, `safe`, and `pending` are not
+    /// resolved here and therefore do not impose a numeric bound.
     pub const fn matches_block_range(&self, block_number: u64) -> bool {
         let mut res = true;
 
@@ -745,9 +760,9 @@ impl Filter {
     /// This checks [`Log<LogData>`], the raw, primitive type carrying un-parsed
     /// [`LogData`].
     ///
-    /// - For un-parsed RPC logs [`crate::Log<LogData>`], see [`Self::rpc_matches`] and
-    ///   [`Self::rpc_matches_parsed`].
-    /// - For parsed [`Log`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    /// - For un-parsed RPC logs [`crate::Log<LogData>`] see [`Self::rpc_matches`].
+    /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    /// - For parsed RPC [`crate::Log<T>`]s see [`Self::rpc_matches_parsed`].
     pub fn matches(&self, log: &Log) -> bool {
         if !self.matches_address(log.address) {
             return false;
@@ -762,9 +777,9 @@ impl Filter {
     /// This function checks [`crate::Log<LogData>`], the RPC type carrying
     /// un-parsed [`LogData`].
     ///
+    /// - For un-parsed [`Log<LogData>`] see [`Self::matches`].
     /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
-    /// - For parsed [`crate::Log<T>`]s (e.g. those returned by a contract), see
-    ///   [`Self::rpc_matches`].
+    /// - For parsed RPC [`crate::Log<T>`]s see [`Self::rpc_matches_parsed`].
     pub fn rpc_matches(&self, log: &crate::Log) -> bool {
         self.matches_log_block(log) && self.matches(&log.inner)
     }
@@ -1191,16 +1206,18 @@ where
 }
 
 /// Response of the `eth_getFilterChanges` RPC.
+///
+/// `T` is the transaction response type and `L` is the log response type.
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
-pub enum FilterChanges<T = Transaction> {
+pub enum FilterChanges<T = Transaction, L = RpcLog> {
     /// Empty result.
     #[cfg_attr(feature = "serde", serde(with = "empty_array"))]
     #[default]
     Empty,
     /// New logs.
-    Logs(Vec<RpcLog>),
+    Logs(Vec<L>),
     /// New hashes (block or transactions).
     Hashes(Vec<B256>),
     /// New transactions.
@@ -1225,7 +1242,7 @@ impl From<Vec<Transaction>> for FilterChanges {
     }
 }
 
-impl<T> FilterChanges<T> {
+impl<T, L> FilterChanges<T, L> {
     /// Get the hashes if present.
     pub fn as_hashes(&self) -> Option<&[B256]> {
         if let Self::Hashes(hashes) = self {
@@ -1236,7 +1253,7 @@ impl<T> FilterChanges<T> {
     }
 
     /// Get the logs if present.
-    pub fn as_logs(&self) -> Option<&[RpcLog]> {
+    pub fn as_logs(&self) -> Option<&[L]> {
         if let Self::Logs(logs) = self {
             Some(logs)
         } else {
@@ -1287,9 +1304,10 @@ mod empty_array {
 }
 
 #[cfg(feature = "serde")]
-impl<'de, T> serde::Deserialize<'de> for FilterChanges<T>
+impl<'de, T, L> serde::Deserialize<'de> for FilterChanges<T, L>
 where
     T: serde::Deserialize<'de>,
+    L: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -1297,13 +1315,13 @@ where
     {
         #[derive(serde::Deserialize)]
         #[serde(untagged)]
-        enum Changes<T = Transaction> {
+        enum Changes<T, L> {
             Hashes(Vec<B256>),
-            Logs(Vec<RpcLog>),
+            Logs(Vec<L>),
             Transactions(Vec<T>),
         }
 
-        let changes = Changes::deserialize(deserializer)?;
+        let changes = Changes::<T, L>::deserialize(deserializer)?;
         let changes = match changes {
             Changes::Logs(vals) => {
                 if vals.is_empty() {
@@ -1589,13 +1607,9 @@ where
             }
 
             // Current block exhausted or none set, try next block
-            match self.blocks_iter.next() {
-                Some(block) => {
-                    self.current_block = Some(block.into_iter());
-                    self.current_logs = None;
-                }
-                None => return None,
-            }
+            let block = self.blocks_iter.next()?;
+            self.current_block = Some(block.into_iter());
+            self.current_logs = None;
         }
     }
 }
@@ -1611,6 +1625,39 @@ mod tests {
     #[cfg(feature = "serde")]
     fn serialize<T: serde::Serialize>(t: &T) -> serde_json::Value {
         serde_json::to_value(t).expect("Failed to serialize value")
+    }
+
+    #[test]
+    fn filter_changes_defaults_to_rpc_log() {
+        fn assert_default_log_type(_: FilterChanges<u64, RpcLog>) {}
+        fn transaction_changes<T>(transactions: Vec<T>) -> FilterChanges<T> {
+            FilterChanges::Transactions(transactions)
+        }
+
+        let logs: FilterChanges<u64> = FilterChanges::Logs(Vec::new());
+        assert_default_log_type(logs);
+
+        let transactions = transaction_changes(vec![1]);
+        assert_eq!(transactions.as_transactions(), Some([1].as_slice()));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn filter_changes_supports_custom_logs() {
+        #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        struct CustomLog {
+            value: u64,
+        }
+
+        let changes = FilterChanges::<Transaction, CustomLog>::Logs(vec![CustomLog { value: 42 }]);
+        assert_eq!(changes.as_logs(), Some([CustomLog { value: 42 }].as_slice()));
+
+        let value = serde_json::to_value(&changes).unwrap();
+        assert_eq!(value, json!([{ "value": 42 }]));
+        assert_eq!(
+            serde_json::from_value::<FilterChanges<Transaction, CustomLog>>(value).unwrap(),
+            changes
+        );
     }
 
     #[test]

@@ -77,13 +77,23 @@ impl LocalSigner<SigningKey> {
         self.credential.as_nonzero_scalar()
     }
 
-    /// Serialize this [`LocalSigner`]'s [`SigningKey`] as a [`B256`] byte array.
+    /// Serializes this [`LocalSigner`]'s [`SigningKey`] as a [`B256`] byte array.
+    ///
+    /// # Security
+    ///
+    /// The returned bytes are unencrypted private-key material. Do not log or disclose them, and
+    /// clear copies as soon as practical.
     #[inline]
     pub fn to_bytes(&self) -> B256 {
         B256::new(<[u8; 32]>::from(self.to_field_bytes()))
     }
 
-    /// Serialize this [`LocalSigner`]'s [`SigningKey`] as a [`FieldBytes`] byte array.
+    /// Serializes this [`LocalSigner`]'s [`SigningKey`] as a [`FieldBytes`] byte array.
+    ///
+    /// # Security
+    ///
+    /// The returned bytes are unencrypted private-key material. Do not log or disclose them, and
+    /// clear copies as soon as practical.
     #[inline]
     pub fn to_field_bytes(&self) -> FieldBytes {
         self.credential.to_bytes()

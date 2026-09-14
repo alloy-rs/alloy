@@ -27,7 +27,8 @@ const DEFAULT_AVG_COST: u64 = 20u64;
 /// A Transport Layer that is responsible for retrying requests based on the
 /// error type. See [`TransportError`].
 ///
-/// TransportError: crate::error::TransportError
+/// A retry re-sends the complete [`RequestPacket`], including every member of
+/// a batch. See [`RetryBackoffService`] for replay-safety details.
 #[derive(Debug, Clone)]
 pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
     /// The maximum number of retries for rate limit errors.
@@ -44,6 +45,11 @@ pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
 
 impl RetryBackoffLayer {
     /// Creates a new retry layer with the given parameters and the default [RateLimitRetryPolicy].
+    ///
+    /// `max_rate_limit_retries` is the number of attempts after the initial
+    /// request. `initial_backoff` is a fixed base component in milliseconds unless the retry
+    /// policy supplies a hint; a compute-budget queue offset can add to the actual delay. It is not
+    /// an exponential base.
     pub const fn new(
         max_rate_limit_retries: u32,
         initial_backoff: u64,
@@ -190,6 +196,17 @@ impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
 
 /// A Tower Service used by the RetryBackoffLayer that is responsible for retrying requests based
 /// on the error type. See [TransportError] and [RateLimitRetryPolicy].
+///
+/// # Replay safety
+///
+/// Each retry sends the complete [`RequestPacket`] again with the same IDs.
+/// When the policy retries a batch response, successful members are replayed
+/// along with the failed member. Only the first error in response order decides
+/// whether a batch is retried; later retryable errors are ignored when an
+/// earlier error is not retryable. The remote server may also have processed a
+/// request whose response was lost. Use this service only for operations that
+/// are safe to execute more than once, or route non-idempotent methods around
+/// this layer.
 #[derive(Debug, Clone)]
 pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
@@ -211,6 +228,25 @@ pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
 impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
     const fn initial_backoff(&self) -> Duration {
         Duration::from_millis(self.initial_backoff)
+    }
+}
+
+/// Drop guard that releases the queued-request count even if the retry future is cancelled.
+#[derive(Debug)]
+struct QueuedRequest {
+    requests_enqueued: Arc<AtomicU32>,
+}
+
+impl QueuedRequest {
+    fn new(requests_enqueued: Arc<AtomicU32>) -> (Self, u64) {
+        let ahead_in_queue = requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
+        (Self { requests_enqueued }, ahead_in_queue)
+    }
+}
+
+impl Drop for QueuedRequest {
+    fn drop(&mut self) {
+        self.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -237,7 +273,8 @@ where
         let this = self.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
         Box::pin(async move {
-            let ahead_in_queue = this.requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
+            let (_queued_request, ahead_in_queue) =
+                QueuedRequest::new(this.requests_enqueued.clone());
             let mut rate_limit_retry_number: u32 = 0;
             loop {
                 let err;
@@ -248,7 +285,6 @@ where
                         if let Some(e) = res.as_error() {
                             err = TransportError::ErrorResp(e.clone())
                         } else {
-                            this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                             return Ok(res);
                         }
                     }
@@ -259,7 +295,6 @@ where
                 if should_retry {
                     rate_limit_retry_number += 1;
                     if rate_limit_retry_number > this.max_rate_limit_retries {
-                        this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                         return Err(TransportErrorKind::custom_str(&format!(
                             "Max retries exceeded {err}"
                         )));
@@ -279,8 +314,9 @@ where
                         current_queued_reqs,
                         ahead_in_queue,
                     );
-                    let total_backoff = next_backoff
-                        + std::time::Duration::from_secs(seconds_to_wait_for_compute_budget);
+                    let total_backoff = next_backoff.saturating_add(
+                        std::time::Duration::from_secs(seconds_to_wait_for_compute_budget),
+                    );
 
                     trace!(
                         total_backoff_millis = total_backoff.as_millis(),
@@ -292,7 +328,6 @@ where
 
                     sleep(total_backoff).await;
                 } else {
-                    this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                     return Err(err);
                 }
             }
@@ -328,6 +363,26 @@ fn compute_unit_offset_in_secs(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn request_queue_count_decrements_when_future_is_dropped() {
+        let pending_service =
+            tower::service_fn(|_| -> TransportFut<'static> { Box::pin(std::future::pending()) });
+        let mut service = RetryBackoffLayer::new(1, 1, 1).layer(pending_service);
+        let requests_enqueued = service.requests_enqueued.clone();
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        let mut future = service.call(request);
+        assert!(futures::poll!(&mut future).is_pending());
+        assert_eq!(requests_enqueued.load(Ordering::SeqCst), 1);
+
+        drop(future);
+        assert_eq!(requests_enqueued.load(Ordering::SeqCst), 0);
+    }
 
     #[test]
     fn test_compute_units_per_second() {

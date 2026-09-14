@@ -49,7 +49,15 @@ impl PubSubFrontend {
         }
     }
 
-    /// Unsubscribe from a subscription.
+    /// Queue an unsubscribe instruction for a local subscription ID.
+    ///
+    /// A successful return means the instruction was sent to the pubsub
+    /// service. It does not wait for the server's `eth_unsubscribe` response.
+    /// Dropping a [`RawSubscription`] does not call this automatically. This is
+    /// best effort: during reconnection it can race with a replacement
+    /// subscription response, so success does not confirm server-side teardown.
+    ///
+    /// [`RawSubscription`]: crate::RawSubscription
     pub fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.tx
             .send(PubSubInstruction::Unsubscribe(id))

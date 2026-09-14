@@ -194,7 +194,7 @@ where
                     }
 
                     if block.get("miner").is_none_or(|v| v.is_null())
-                        || block.get("beneficiary").is_none_or(|v| v.is_null())
+                        && block.get("beneficiary").is_none_or(|v| v.is_null())
                     {
                         block["miner"] = Value::String(format!("{}", Address::ZERO));
                     }
@@ -497,6 +497,24 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
 mod tests {
     use super::*;
     use crate::{Provider, ProviderBuilder};
+    use alloy_rpc_types_eth::Block;
+
+    #[tokio::test]
+    async fn pending_block_preserves_non_null_miner() {
+        let miner = Address::with_last_byte(1);
+        let pending_block_response: Block = Block::default();
+        let mut pending_block = serde_json::to_value(pending_block_response).unwrap();
+        pending_block["miner"] = Value::String(miner.to_string());
+        pending_block.as_object_mut().unwrap().remove("beneficiary");
+
+        let asserter = alloy_transport::mock::Asserter::new();
+        asserter.push_success(&pending_block);
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+        let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap().unwrap();
+
+        assert_eq!(block.header.beneficiary, miner);
+    }
 
     // <https://github.com/alloy-rs/alloy/issues/2117>
     #[tokio::test]

@@ -5,7 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0](https://github.com/alloy-rs/alloy/releases/tag/v2.0.0) - 2026-04-13
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Bug Fixes
+
+- [consensus] Bound sealed block RLP decoding ([#4155](https://github.com/alloy-rs/alloy/issues/4155))
+- [consensus] Reject invalid EIP-658 status values ([#4157](https://github.com/alloy-rs/alloy/issues/4157))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Features
+
+- [consensus] Add EIP-8070 blob clearing helpers ([#4121](https://github.com/alloy-rs/alloy/issues/4121))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Bug Fixes
+
+- [consensus] Default missing receipt type to legacy
+- Fail in `Signed<T>` `fallback_decode` ([#4090](https://github.com/alloy-rs/alloy/issues/4090))
+- [consensus] Reject string withdrawals in block RLP ([#4058](https://github.com/alloy-rs/alloy/issues/4058))
+- [tx-macros] Preserve fallback decode cursor ([#4059](https://github.com/alloy-rs/alloy/issues/4059))
+- [ci] Satisfy zepter secp256k1 propagation ([#3993](https://github.com/alloy-rs/alloy/issues/3993))
+- [consensus] Correct recovered transaction docs ([#3984](https://github.com/alloy-rs/alloy/issues/3984))
+
+### Features
+
+- [consensus] Add block gas limit validation ([#4072](https://github.com/alloy-rs/alloy/issues/4072))
+- [consensus] Add generic indexed value helper ([#4005](https://github.com/alloy-rs/alloy/issues/4005))
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+- Release 2.2.0
+- Release 2.1.1
+- Release 2.1.0
+- Release 2.0.5
+
+### Testing
+
+- [consensus] Add fallback decode regression coverage ([#4091](https://github.com/alloy-rs/alloy/issues/4091))
+
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Miscellaneous Tasks
+
+- Release 2.0.4
+
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
 
 ### Features
 
@@ -16,8 +71,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.0.3
+- Release 2.0.2
+- Release 2.0.1
+- Release 2.0.0
 - Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
 - Release 1.8.2
+
+### Performance
+
+- [consensus] Avoid clones in ReceiptWithBloom::into_logs ([#3894](https://github.com/alloy-rs/alloy/issues/3894))
 
 ## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
 

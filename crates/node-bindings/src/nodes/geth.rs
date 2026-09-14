@@ -9,11 +9,11 @@ use alloy_primitives::Address;
 use k256::ecdsa::SigningKey;
 use std::{
     ffi::OsString,
-    fs::{create_dir, File},
+    fs::{create_dir_all, File},
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStderr, Command, Stdio},
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tempfile::tempdir;
 use url::Url;
@@ -144,15 +144,17 @@ impl GethInstance {
 
     /// Takes the stderr contained in the child process.
     ///
-    /// This leaves a `None` in its place, so calling methods that require a stderr to be present
-    /// will fail if called after this.
+    /// Stderr is available only when [`Geth::keep_stderr`] was set. This leaves `None` in its
+    /// place, so later calls that require stderr return [`NodeError::NoStderr`].
     pub fn stderr(&mut self) -> Result<ChildStderr, NodeError> {
         self.pid.stderr.take().ok_or(NodeError::NoStderr)
     }
 
-    /// Blocks until geth adds the specified peer, using 20s as the timeout.
+    /// Blocks until geth adds the specified peer, using a 20-second deadline checked between
+    /// complete stderr lines. A live process that emits no newline can block past the deadline.
     ///
-    /// Requires the stderr to be present in the `GethInstance`.
+    /// Requires [`Geth::keep_stderr`] to have been set and [`Self::stderr`] not to have taken the
+    /// handle.
     pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeError> {
         let mut stderr = self.pid.stderr.as_mut().ok_or(NodeError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
@@ -181,21 +183,23 @@ impl Drop for GethInstance {
 
 /// Builder for launching `geth`.
 ///
-/// # Panics
-///
-/// If `spawn` is called without `geth` being available in the user's $PATH
+/// The default mode is an isolated development chain. [`Geth::p2p_port`] and
+/// [`Geth::disable_discovery`] switch to non-dev mode; [`Geth::dev`] and [`Geth::block_time`]
+/// switch back to dev mode. [`Geth::spawn`] panics on any startup failure; use
+/// [`Geth::try_spawn`] to handle errors.
 ///
 /// # Example
 ///
 /// ```no_run
 /// use alloy_node_bindings::Geth;
 ///
-/// let port = 8545u16;
-/// let url = format!("http://localhost:{}", port).to_string();
-///
-/// let geth = Geth::new().port(port).block_time(5000u64).spawn();
+/// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
+/// let geth = Geth::new().block_time(1).try_spawn()?;
+/// println!("Geth is listening at {}", geth.endpoint());
 ///
 /// drop(geth); // this will kill the instance
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug, Default)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
@@ -210,6 +214,7 @@ pub struct Geth {
     chain_id: Option<u64>,
     insecure_unlock: bool,
     keep_err: bool,
+    timeout: Option<u64>,
     genesis: Option<Genesis>,
     mode: NodeMode,
     clique_private_key: Option<SigningKey>,
@@ -217,7 +222,7 @@ pub struct Geth {
 }
 
 impl Geth {
-    /// Creates an empty Geth builder.
+    /// Creates a Geth builder in dev mode.
     pub fn new() -> Self {
         Self::default()
     }
@@ -308,7 +313,7 @@ impl Geth {
         self
     }
 
-    /// Sets the block-time which will be used when the `geth-cli` instance is launched.
+    /// Sets the dev-chain block interval in seconds.
     ///
     /// This will put the geth instance in `dev` mode, discarding any previously set options that
     /// cannot be used in dev mode.
@@ -386,9 +391,19 @@ impl Geth {
         self
     }
 
+    /// Sets the startup timeout in milliseconds.
+    ///
+    /// Defaults to [`NODE_STARTUP_TIMEOUT`]. The deadline is checked between complete stderr
+    /// lines, so a live process that emits no newline can block past the deadline.
+    pub const fn timeout(mut self, timeout: u64) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
     /// Keep the handle to geth's stderr in order to read from it.
     ///
-    /// Caution: if the stderr handle isn't used, this can end up blocking.
+    /// This is required by [`GethInstance::stderr`] and [`GethInstance::wait_to_add_peer`].
+    /// Caution: if the stderr handle is not continuously consumed, the child process can block.
     pub const fn keep_stderr(mut self) -> Self {
         self.keep_err = true;
         self
@@ -442,7 +457,14 @@ impl Geth {
         self.try_spawn().unwrap()
     }
 
-    /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
+    /// Consumes the builder, spawns `geth`, and waits for its HTTP and active networking services
+    /// to report ready.
+    ///
+    /// Returns an error if the process cannot be started, reports a fatal startup error, or does
+    /// not become ready before the configured [`Self::timeout`] (defaulting to
+    /// [`NODE_STARTUP_TIMEOUT`]) is observed. The deadline is checked
+    /// between complete stderr lines; a live process that emits no newline can block this call
+    /// past the deadline.
     pub fn try_spawn(mut self) -> Result<GethInstance, NodeError> {
         let bin_path = self
             .program
@@ -574,7 +596,7 @@ impl Geth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 
@@ -617,6 +639,7 @@ impl Geth {
 
         let stderr = child.stderr.take().ok_or(NodeError::NoStderr)?;
 
+        let timeout = self.timeout.map(Duration::from_millis).unwrap_or(NODE_STARTUP_TIMEOUT);
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
 
@@ -626,7 +649,7 @@ impl Geth {
         let mut ports_started = false;
 
         loop {
-            if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
+            if start.elapsed() >= timeout {
                 let _ = child.kill();
                 return Err(NodeError::Timeout);
             }
@@ -710,6 +733,27 @@ impl Geth {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn respects_startup_timeout() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let program = dir.path().join("geth");
+        // Emit a progress line after the default deadline, before announcing HTTP readiness.
+        std::fs::write(
+            &program,
+            "#!/bin/sh\nsleep 11\necho 'Initializing dev chain' >&2\necho 'HTTP server started endpoint=127.0.0.1:8545 auth=false' >&2\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(matches!(Geth::at(&program).timeout(0).try_spawn(), Err(NodeError::Timeout)));
+        let geth = Geth::at(&program).timeout(30_000).try_spawn().unwrap();
+        assert_eq!(geth.port(), 8545);
+        assert!(geth.p2p_port().is_none());
+    }
 
     #[test]
     fn can_set_host() {

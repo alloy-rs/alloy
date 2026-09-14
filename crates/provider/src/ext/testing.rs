@@ -38,7 +38,7 @@ where
         method: &'static str,
         request: TestingBuildBlockRequestV1,
     ) -> TransportResult<R> {
-        self.client().request(method, (request,)).await
+        self.client().request(method, request.into_params()).await
     }
 
     async fn build_block_v1(

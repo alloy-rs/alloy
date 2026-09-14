@@ -14,6 +14,8 @@ mod cancun;
 pub use cancun::*;
 mod prague;
 pub use prague::*;
+mod bogota;
+pub use bogota::*;
 mod sidecar;
 pub use sidecar::*;
 
@@ -47,6 +49,8 @@ pub use testing::*;
 pub use alloy_eips::eip4844::BlobAndProofV1;
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobAndProofV2;
+#[doc(inline)]
+pub use alloy_eips::eip4844::BlobCellsAndProofsV1;
 
 /// The list of all supported Engine capabilities available over the engine endpoint.
 ///

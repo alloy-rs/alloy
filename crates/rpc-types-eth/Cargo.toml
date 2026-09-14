@@ -97,5 +97,14 @@ arbitrary = [
 	"alloy-consensus-any/arbitrary",
 	"alloy-sol-types/arbitrary"
 ]
-k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
-serde-bincode-compat = ["serde", "dep:serde_with", "alloy-eips/serde-bincode-compat"]
+k256 = [
+    "alloy-consensus/k256",
+    "alloy-eips/k256",
+    "alloy-primitives/k256",
+]
+serde-bincode-compat = [
+    "serde",
+    "dep:serde_with",
+    "alloy-eips/serde-bincode-compat",
+    "alloy-consensus/serde-bincode-compat",
+]

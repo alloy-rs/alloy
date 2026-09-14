@@ -8,14 +8,14 @@ use alloy_primitives::hex;
 use std::fmt;
 use thiserror::Error;
 
+/// A Ledger derivation-path preset.
 #[derive(Clone, Debug)]
-/// Ledger wallet type
 pub enum DerivationType {
-    /// Ledger Live-generated HD path
+    /// Ledger Live path `m/44'/60'/<account>'/0/0`.
     LedgerLive(usize),
-    /// Legacy generated HD Path
+    /// Legacy path `m/44'/60'/0'/<index>`.
     Legacy(usize),
-    /// Any other path
+    /// A custom derivation path.
     Other(String),
 }
 
@@ -44,6 +44,9 @@ pub enum LedgerError {
     /// [`semver`] error.
     #[error(transparent)]
     SemVerError(#[from] semver::Error),
+    /// Invalid derivation path.
+    #[error("invalid derivation path")]
+    InvalidDerivationPath(#[from] std::num::ParseIntError),
     /// Signature Error
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),

@@ -254,11 +254,15 @@ impl<N: Network> CallBatchProviderInner<N> {
     ///
     /// Ref: <https://github.com/wevm/viem/blob/ba8319f71503af8033fd3c77cfb64c7eb235c6a9/src/actions/public/call.ts#L295>
     fn should_batch_call(&self, params: &crate::EthCallParams<N>) -> bool {
-        // TODO: block ID is not yet implemented
+        // If a specific block ID is requested (not "latest"), skip batching
+        // as multicall only works reliably on the latest block.
         if params.block().is_some_and(|block| block != BlockId::latest()) {
             return false;
         }
         if params.overrides.as_ref().is_some_and(|overrides| !overrides.is_empty()) {
+            return false;
+        }
+        if params.block_overrides().is_some_and(|overrides| !overrides.is_empty()) {
             return false;
         }
         let tx = params.data();
@@ -531,8 +535,9 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
+    use alloy_network::{Ethereum, TransactionBuilder};
     use alloy_primitives::{address, hex};
-    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_rpc_types_eth::{BlockOverrides, TransactionRequest};
     use alloy_transport::mock::Asserter;
 
     // https://etherscan.io/address/0xcA11bde05977b3631167028862bE2a173976CA11#code
@@ -596,6 +601,17 @@ mod tests {
         assert!(block_number_err.contains("response count mismatch"), "{block_number_err}");
         assert!(chain_id_err.contains("response count mismatch"), "{chain_id_err}");
         assert!(asserter.read_q().is_empty(), "only 1 request should've been made");
+    }
+
+    #[test]
+    fn should_not_batch_calls_with_block_overrides() {
+        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        let inner = CallBatchProviderInner::<Ethereum> { tx };
+        let params =
+            crate::EthCallParams::new(TransactionRequest::default().with_to(COUNTER_ADDRESS))
+                .with_block_overrides(BlockOverrides::default().with_number(U256::from(1)));
+
+        assert!(!inner.should_batch_call(&params));
     }
 
     #[tokio::test]

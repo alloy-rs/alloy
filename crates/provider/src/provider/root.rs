@@ -17,6 +17,14 @@ use alloy_pubsub::{PubSubFrontend, Subscription};
 
 /// The root provider manages the RPC client and the heartbeat. It is at the
 /// base of every provider stack.
+///
+/// Cloning a root provider is cheap: clones share the client and heartbeat. Some deferred APIs,
+/// including default call builders, filter pollers, block or log watch builders, and subscription
+/// request builders, keep only a weak client handle. Keep at least one provider clone alive until
+/// those builders are awaited or their streams are consumed, or they may report that the backend
+/// was dropped or end early. A [`PendingTransactionBuilder`](crate::PendingTransactionBuilder)
+/// instead owns a root-provider clone. Layers can also retain additional state; for example,
+/// batched calls keep their batching backend alive.
 pub struct RootProvider<N: Network = Ethereum> {
     /// The inner state of the root provider.
     pub(crate) inner: Arc<RootProviderInner<N>>,
@@ -42,7 +50,7 @@ pub fn builder<N: Network>() -> ProviderBuilder<Identity, Identity, N> {
 
 impl<N: Network> RootProvider<N> {
     /// Creates a new HTTP root provider from the given URL.
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http(url: url::Url) -> Self {
         Self::new(RpcClient::new_http(url))
     }

@@ -16,13 +16,49 @@ pub const EMPTY_REQUESTS_HASH: B256 =
 ///
 /// The container only holds the `requests` as defined by their respective EIPs. The first byte of
 /// each element is the `request_type` and the remaining bytes are the `request_data`.
+/// Construction and mutable access accept short entries and duplicate type bytes. `requests_hash`
+/// filters entries shorter than type plus data and sorts by type, but does not deduplicate them.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Deref, DerefMut, From, IntoIterator)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Requests(Vec<Bytes>);
 
+#[cfg(feature = "ssz")]
+impl ssz::Encode for Requests {
+    fn is_ssz_fixed_len() -> bool {
+        <Vec<Bytes> as ssz::Encode>::is_ssz_fixed_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        <Vec<Bytes> as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        self.0.ssz_bytes_len()
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        self.0.ssz_append(buf);
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for Requests {
+    fn is_ssz_fixed_len() -> bool {
+        <Vec<Bytes> as ssz::Decode>::is_ssz_fixed_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        <Vec<Bytes> as ssz::Decode>::ssz_fixed_len()
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        <Vec<Bytes> as ssz::Decode>::from_ssz_bytes(bytes).map(Self)
+    }
+}
+
 impl Requests {
-    /// Create a new [`Requests`] container from an iterator of items convertible to [`Bytes`].
+    /// Creates a raw container without validating request shape or type uniqueness.
     pub fn from_requests<T: Into<Bytes>>(requests: impl IntoIterator<Item = T>) -> Self {
         Self(requests.into_iter().map(Into::into).collect())
     }
@@ -31,7 +67,7 @@ impl Requests {
         Self(Vec::with_capacity(capacity))
     }
 
-    /// Construct a new [`Requests`] container.
+    /// Constructs a raw container without validating request shape or type uniqueness.
     ///
     /// This function assumes that the request type byte is already included as the
     /// first byte in the provided `Bytes` blob.

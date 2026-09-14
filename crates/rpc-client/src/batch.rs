@@ -28,8 +28,16 @@ pub(crate) type ChannelMap = HashMap<Id, Channel>;
 
 /// A batch JSON-RPC request, used to bundle requests into a single transport
 /// call.
+///
+/// Calls are serialized when they are added. Sending the batch is still lazy:
+/// [`Self::send`] returns a future, and the transport is not called until that
+/// future is polled. Await the batch before awaiting its [`Waiter`]s.
+///
+/// Responses are matched to waiters by JSON-RPC ID, not response order.
+/// Missing IDs produce a per-waiter error; responses with unknown IDs are
+/// ignored.
 #[derive(Debug)]
-#[must_use = "A BatchRequest does nothing unless sent via `send_batch` and `.await`"]
+#[must_use = "a BatchRequest does nothing unless it is awaited or `send()` is awaited"]
 pub struct BatchRequest<'a> {
     /// The transport via which the batch will be sent.
     transport: ClientRef<'a>,
@@ -42,7 +50,10 @@ pub struct BatchRequest<'a> {
 }
 
 /// Awaits a single response for a request that has been included in a batch.
-#[must_use = "A Waiter does nothing unless the corresponding BatchRequest is sent via `send_batch` and `.await`, AND the Waiter is awaited."]
+///
+/// Await the corresponding [`BatchRequest`] first so transport-level failures
+/// are observed and the response channels are populated.
+#[must_use = "a Waiter requires its BatchRequest to be sent and the Waiter to be awaited"]
 #[pin_project]
 #[derive(Debug)]
 pub struct Waiter<Resp, Output = Resp, Map = fn(Resp) -> Output> {
@@ -144,6 +155,9 @@ impl<'a> BatchRequest<'a> {
 
     /// Add a call to the batch.
     ///
+    /// Unlike [`RpcCall`](crate::RpcCall), this serializes the parameters
+    /// immediately so calls with different parameter types can share a batch.
+    ///
     /// ### Errors
     ///
     /// If the request cannot be serialized, this will return an error.
@@ -156,7 +170,9 @@ impl<'a> BatchRequest<'a> {
         self.push(request)
     }
 
-    /// Send the batch future via its connection.
+    /// Return a future that sends the batch when polled.
+    ///
+    /// This method alone does not dispatch anything; await the returned future.
     pub fn send(self) -> BatchFuture {
         BatchFuture::Prepared {
             transport: self.transport.transport.clone(),

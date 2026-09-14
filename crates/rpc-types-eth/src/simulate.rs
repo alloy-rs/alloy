@@ -122,6 +122,8 @@ pub struct SimCallResult {
 ///
 /// This struct configures how simulations are executed, including whether to trace token transfers,
 /// validate transaction sequences, and whether to return full transaction objects.
+/// The RPC accepts at most [`MAX_SIMULATE_BLOCKS`] blocks; this type and its builder methods do not
+/// enforce that limit.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(

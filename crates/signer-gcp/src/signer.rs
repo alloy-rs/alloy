@@ -42,7 +42,10 @@ impl GcpKeyRingRef {
     }
 }
 
-/// Identifies a specific key version in the key ring.
+/// Identifies a fixed key version in the key ring.
+///
+/// A specifier does not follow primary-key rotation; construct a new signer with the new version
+/// when rotating keys.
 #[derive(Debug)]
 pub struct KeySpecifier(String);
 
@@ -60,22 +63,22 @@ impl KeySpecifier {
 ///
 /// The GCP Signer passes signing requests to the cloud service. GCP KMS keys belong to a key ring,
 /// which is identified by a project ID, location, and key ring name. The key ring contains keys,
-/// which are identified by a key ID and version.
+/// which are identified by a key ID and version. The selected key must use purpose
+/// `ASYMMETRIC_SIGN` and algorithm `EC_SIGN_SECP256K1_SHA256`.
 ///
-/// Because the public key is unknown, we retrieve it on instantiation of the signer. This means
-/// that the new function is `async` and must be called within some runtime.
-///
-/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
-/// will always return an error.
+/// [`Self::new`] retrieves and caches the public key and derived Ethereum address. Signing performs
+/// network I/O and must be awaited; this type does not implement [`alloy_signer::SignerSync`].
 ///
 /// # Examples
 ///
 /// ```no_run
 /// use alloy_signer::Signer;
-/// use alloy_signer_gcp::{GcpKeyRingRef, GcpSigner, KeySpecifier};
-/// use gcloud_sdk::{
-///     google::cloud::kms::v1::key_management_service_client::KeyManagementServiceClient,
-///     GoogleApi,
+/// use alloy_signer_gcp::{
+///     gcloud_sdk::{
+///         google::cloud::kms::v1::key_management_service_client::KeyManagementServiceClient,
+///         GoogleApi,
+///     },
+///     GcpKeyRingRef, GcpSigner, KeySpecifier,
 /// };
 ///
 /// # async fn test() {
@@ -93,15 +96,13 @@ impl KeySpecifier {
 /// .await
 /// .expect("Failed to create GCP KMS Client");
 ///
-/// let key_name = "...";
+/// let key_name = std::env::var("GOOGLE_KEY_NAME").expect("GOOGLE_KEY_NAME");
 /// let key_version = 1;
-/// let key_specifier = KeySpecifier::new(keyring, key_name, key_version);
-/// let chain_id = Some(1);
-/// let signer = GcpSigner::new(client, key_specifier, chain_id).await.unwrap();
+/// let key_specifier = KeySpecifier::new(keyring, &key_name, key_version);
+/// let signer = GcpSigner::new(client, key_specifier, None).await.unwrap();
 ///
-/// let message = vec![0, 1, 2, 3];
-///
-/// let sig = signer.sign_message(&message).await.unwrap();
+/// let message = b"hello from Alloy";
+/// let sig = signer.sign_message(message).await.unwrap();
 /// assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
 /// # }
 /// ```
@@ -194,9 +195,16 @@ impl Signer for GcpSigner {
 alloy_network::impl_into_wallet!(GcpSigner);
 
 impl GcpSigner {
-    /// Instantiate a new signer from an existing `Client`, keyring reference, key ID, and version.
+    /// Instantiate a new signer from a configured GCP KMS client and fixed key-version specifier.
     ///
-    /// Retrieves the public key from GCP and calculates the Ethereum address.
+    /// This makes a `GetPublicKey` request, then caches the verifying key and derived Ethereum
+    /// address. The client identity therefore needs
+    /// `cloudkms.cryptoKeyVersions.viewPublicKey`; signing additionally needs
+    /// `cloudkms.cryptoKeyVersions.useToSign`.
+    ///
+    /// `chain_id` affects transaction signing only. `Some(id)` fills an unset transaction chain ID
+    /// and rejects a conflicting one before signing. It does not affect hash, message, or
+    /// typed-data signing; `None` disables this signer-side check.
     #[instrument(skip(client), err)]
     pub async fn new(
         client: Client,
@@ -211,12 +219,19 @@ impl GcpSigner {
         Ok(Self { client, key_name, chain_id, pubkey, address })
     }
 
-    /// Fetch the pubkey associated with this signer's key.
+    /// Return the public key cached by [`Self::new`].
+    ///
+    /// This method does not make a GCP KMS request.
     pub async fn get_pubkey(&self) -> Result<VerifyingKey, GcpSignerError> {
         Ok(self.pubkey)
     }
 
-    /// Sign a digest with this signer's key
+    /// Sign a precomputed 32-byte digest with this signer's key.
+    ///
+    /// The digest is passed to KMS unchanged and is not hashed or prefixed again. GCP permits an
+    /// equal-length non-SHA digest, such as Keccak-256, in the SHA-256 digest field. The returned
+    /// `(r, s)` signature is low-s normalized and has no recovery parity. Use [`Signer::sign_hash`]
+    /// when an Alloy [`Signature`] with y-parity is required.
     pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, GcpSignerError> {
         request_sign_digest(&self.client, &self.key_name, digest).await.and_then(decode_signature)
     }
@@ -224,8 +239,8 @@ impl GcpSigner {
     /// Sign a digest with this signer's key and recover a `Signature` with the
     /// correct y-parity for the given public key.
     ///
-    /// The digest is expected to already include any EIP-155 chain ID encoding
-    /// via the transaction's signature hash.
+    /// This does not apply EIP-155 itself. Transaction signing supplies a signature hash that
+    /// already reflects the transaction's chain ID.
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, GcpSignerError> {
         let sig = self.sign_digest(digest).await?;
@@ -246,7 +261,7 @@ async fn request_get_pubkey(
     });
     request
         .metadata_mut()
-        .insert("x-goog-request-params", format!("name={}", &kms_key_name).parse().unwrap());
+        .insert("x-goog-request-params", format!("name={}", kms_key_name).parse().unwrap());
     client.get().get_public_key(request).await.map(|r| r.into_inner()).map_err(Into::into)
 }
 

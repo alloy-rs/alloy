@@ -14,32 +14,37 @@ use crate::{TurnkeyClient, TurnkeyClientError, TurnkeyP256ApiKey};
 /// Turnkey signer implementation for Alloy.
 ///
 /// The Turnkey Signer passes signing requests to the Turnkey secure key management infrastructure.
-/// This implementation uses Turnkey's sign_raw_payload API with HASH_FUNCTION_NO_OP for simplicity.
+/// It uses `sign_raw_payload` with `HASH_FUNCTION_NO_OP`, so [`Signer::sign_hash`] sends the
+/// supplied 32-byte prehash without hashing it again.
 ///
-/// The signer is initialized with a user-provided address that corresponds to a key in your Turnkey
-/// organization. This follows the Turnkey team's recommendation for an MVP implementation.
+/// The user-provided address selects a Turnkey-managed Ethereum key. Construction does not contact
+/// Turnkey or verify that the address belongs to the organization; [`Signer::address`] returns the
+/// supplied value. Organization, address, API-key authorization, and policy errors surface on the
+/// first signing request.
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
-/// will always return an error.
+/// Signing performs network I/O and must be awaited; this type does not implement
+/// [`alloy_signer::SignerSync`].
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use alloy_primitives::Address;
 /// use alloy_signer::Signer;
-/// use alloy_signer_turnkey::{TurnkeyClient, TurnkeyP256ApiKey, TurnkeySigner};
+/// use alloy_signer_turnkey::TurnkeySigner;
 ///
 /// # async fn test() {
-/// let api_key =
-///     TurnkeyP256ApiKey::from_strings("private_key_hex", None).expect("api key creation failed");
-/// let client = TurnkeyClient::builder().api_key(api_key).build().expect("client builder failed");
-/// let org_id = "your-org-id".to_string();
-/// let address = alloy_primitives::address!("0x1234567890123456789012345678901234567890");
-/// let chain_id = Some(1);
-/// let signer = TurnkeySigner::new(client, org_id, address, chain_id);
+/// let api_private_key =
+///     std::env::var("TURNKEY_API_PRIVATE_KEY").expect("TURNKEY_API_PRIVATE_KEY");
+/// let organization_id =
+///     std::env::var("TURNKEY_ORGANIZATION_ID").expect("TURNKEY_ORGANIZATION_ID");
+/// let address = std::env::var("TURNKEY_ADDRESS")
+///     .expect("TURNKEY_ADDRESS")
+///     .parse()
+///     .expect("valid TURNKEY_ADDRESS");
+/// let signer =
+///     TurnkeySigner::from_api_key(&api_private_key, organization_id, address, None).unwrap();
 ///
-/// let message = vec![0, 1, 2, 3];
-/// let sig = signer.sign_message(&message).await.unwrap();
+/// let message = b"hello from Alloy";
+/// let sig = signer.sign_message(message).await.unwrap();
 /// assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
 /// # }
 /// ```
@@ -97,6 +102,11 @@ impl alloy_network::TxSigner<Signature> for TurnkeySigner {
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for TurnkeySigner {
+    /// Sign a precomputed 32-byte digest.
+    ///
+    /// The digest is sent to Turnkey with `HASH_FUNCTION_NO_OP` and is not hashed or prefixed
+    /// again. [`Signer::sign_message`] and the EIP-712 helpers compute their respective signing
+    /// hashes before calling this method.
     #[instrument(err)]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         let response = self
@@ -160,6 +170,14 @@ alloy_network::impl_into_wallet!(TurnkeySigner);
 
 impl TurnkeySigner {
     /// Instantiate a new signer from an existing client, organization ID, and address.
+    ///
+    /// Construction performs no network request and does not verify that `address` belongs to the
+    /// organization. The address is sent to Turnkey as `sign_with` and is also returned by
+    /// [`Signer::address`].
+    ///
+    /// `chain_id` affects transaction signing only. `Some(id)` fills an unset transaction chain ID
+    /// and rejects a conflicting one before signing. It does not affect hash, message, or
+    /// typed-data signing; `None` disables this signer-side check.
     pub const fn new(
         client: TurnkeyClient,
         organization_id: String,
@@ -169,10 +187,15 @@ impl TurnkeySigner {
         Self { client, organization_id, address, chain_id }
     }
 
-    /// Instantiate a new signer from API credentials, organization ID, and address.
+    /// Instantiate a new signer from a P-256 API key, organization ID, and Ethereum address.
     ///
-    /// This is a convenience constructor that builds the Turnkey client from
-    /// an API private key string.
+    /// `api_private_key` must be the hex-encoded P-256 key used to authenticate and stamp Turnkey
+    /// API requests. It is not the secp256k1 key that signs Ethereum payloads. This constructor
+    /// uses the default Turnkey client settings; use [`Self::new`] with
+    /// [`TurnkeyClient::builder`] for custom endpoint, retry, or timeout configuration.
+    ///
+    /// Construction performs no Turnkey request. See [`Self::new`] for address trust and `chain_id`
+    /// semantics.
     pub fn from_api_key(
         api_private_key: &str,
         organization_id: String,

@@ -6,12 +6,12 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[cfg(feature = "reqwest")]
+#[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
 pub use reqwest;
-#[cfg(feature = "reqwest")]
+#[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
 mod reqwest_transport;
 
-#[cfg(feature = "reqwest")]
+#[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
 #[doc(inline)]
 pub use reqwest_transport::*;
 
@@ -36,6 +36,29 @@ use alloy_transport::utils::guess_local_url;
 use core::str::FromStr;
 use std::marker::PhantomData;
 use url::Url;
+
+#[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
+fn json_rpc_error_response(body: &[u8]) -> Option<alloy_json_rpc::ResponsePacket> {
+    let response = serde_json::from_slice::<alloy_json_rpc::ResponsePacket>(body).ok()?;
+    response.is_error().then_some(response)
+}
+
+#[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
+fn http_error_response(
+    status: u16,
+    body: &[u8],
+    retry_after: Option<std::time::Duration>,
+) -> alloy_transport::TransportResult<alloy_json_rpc::ResponsePacket> {
+    if let Some(response) = json_rpc_error_response(body) {
+        return Ok(response);
+    }
+
+    Err(alloy_transport::TransportErrorKind::http_error_with_retry_after(
+        status,
+        String::from_utf8_lossy(body).into_owned(),
+        retry_after,
+    ))
+}
 
 /// Connection details for an HTTP transport.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -117,5 +140,56 @@ impl<T> Http<T> {
     /// Get a reference to the URL.
     pub fn url(&self) -> &str {
         self.url.as_ref()
+    }
+}
+
+#[cfg(all(test, any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper"))))]
+mod tests {
+    use alloy_transport::TransportError;
+    use std::time::Duration;
+
+    const JSON_RPC_ERROR: &[u8] = br#"{
+        "jsonrpc": "2.0",
+        "id": 1766,
+        "error": {
+            "code": -32000,
+            "message": "filter not found"
+        }
+    }"#;
+
+    #[test]
+    fn parses_json_rpc_errors_from_http_error_body() {
+        let response =
+            super::json_rpc_error_response(JSON_RPC_ERROR).expect("valid JSON-RPC error response");
+
+        assert!(response.is_error());
+        assert_eq!(response.first_error_code(), Some(-32000));
+        assert_eq!(response.first_error_message(), Some("filter not found"));
+    }
+
+    #[test]
+    fn ignores_non_json_rpc_error_body() {
+        assert!(super::json_rpc_error_response(b"too many requests").is_none());
+    }
+
+    #[test]
+    fn json_rpc_error_body_takes_precedence_over_retry_after() {
+        let response =
+            super::http_error_response(429, JSON_RPC_ERROR, Some(Duration::from_secs(52)))
+                .expect("valid JSON-RPC error response");
+
+        assert!(response.is_error());
+        assert_eq!(response.first_error_code(), Some(-32000));
+    }
+
+    #[test]
+    fn non_json_rpc_body_carries_retry_after() {
+        let error =
+            super::http_error_response(429, b"too many requests", Some(Duration::from_secs(52)))
+                .unwrap_err();
+
+        let TransportError::Transport(error) = error else { panic!("expected transport error") };
+        assert_eq!(error.retry_after(), Some(Duration::from_secs(52)));
+        assert_eq!(error.as_http_error().unwrap().status, 429);
     }
 }

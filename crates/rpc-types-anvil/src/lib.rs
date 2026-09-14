@@ -159,7 +159,7 @@ pub enum MineOptions {
     /// The options for mining
     Options {
         /// The timestamp the block should be mined with
-        #[serde(with = "alloy_serde::quantity::opt")]
+        #[serde(default, with = "alloy_serde::quantity::opt")]
         timestamp: Option<u64>,
         /// If `blocks` is given, it will mine exactly blocks number of blocks, regardless of any
         /// other blocks mined or reverted during it's operation
@@ -246,6 +246,22 @@ mod tests {
             deserialized,
             MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
         );
+    }
+
+    #[test]
+    fn test_serde_deserialize_options_without_timestamp() {
+        let data = r#"{"blocks": 5}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(deserialized, MineOptions::Options { timestamp: None, blocks: Some(5) });
+
+        let data = r#"{}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(deserialized, MineOptions::default());
+
+        // Unknown keys are ignored, matching maps with a `timestamp` key.
+        let data = r#"{"foo": 1}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(deserialized, MineOptions::default());
     }
 
     #[test]

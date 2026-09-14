@@ -33,12 +33,15 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Gas used by this transaction alone.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
-    /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
-    /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
-    /// that's actually paid by users can only be determined post-execution
+    /// The price paid post-execution by the transaction, in wei per gas (base fee plus priority
+    /// fee). Both fee fields in EIP-1559 transactions are maximums; the amount actually paid can
+    /// only be determined post-execution.
+    ///
+    /// Deserialization also accepts the legacy `gasPrice` name and defaults to zero if neither
+    /// name is present.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub effective_gas_price: u128,
-    /// Blob gas used by the eip-4844 transaction
+    /// Blob gas used by the EIP-4844 transaction, in blob gas units.
     ///
     /// This is None for non eip-4844 transactions
     #[cfg_attr(
@@ -50,7 +53,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
         )
     )]
     pub blob_gas_used: Option<u64>,
-    /// The price paid by the eip-4844 transaction per blob gas.
+    /// The price paid by the EIP-4844 transaction, in wei per blob gas.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -185,6 +188,8 @@ impl<T> TransactionReceipt<T> {
     }
 
     /// Calculates the address that will be created by the transaction, if any.
+    ///
+    /// `nonce` is the sender nonce used by the contract-creation transaction.
     ///
     /// Returns `None` if the transaction is not a contract creation (the `to` field is set).
     pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {
@@ -440,5 +445,17 @@ mod test {
         let proper_receipt = r#"{"blockHash":"0x0fe66313f8b3f8d88d19ac13b05de0f6e0ef7fcb3293db0869062493ff98f9db","blockNumber":"0x4d34901","contractAddress":null,"cumulativeGasUsed":"0x157e6","from":"0x7ee0d8c9a1374e3d5ce33d48cd09578251af708f","gasUsed":"0x157e6","effectiveGasPrice":"0x2e90edd00","logs":[{"address":"0x03396fe4e58a0778679e2731564f064fa5256c6e","topics":["0x4736edcab43476194077e25fadaf13bbfb18c7db442202d616b41fd1d549dc9c","0x0000000000000000000000000000000000000000000000000e3762762ff00800","0x0000000000000000000000000000000000000000000000000000000067179cea"],"data":"0x","blockNumber":"0x4d34901","transactionHash":"0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837","transactionIndex":"0x0","blockHash":"0x0fe66313f8b3f8d88d19ac13b05de0f6e0ef7fcb3293db0869062493ff98f9db","logIndex":"0x0","removed":false}],"logsBloom":"0x00000400000000000000000000000000000400010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000080000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000010000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000004000000000000000000000000000000000000000000040000000000000000000000000000000000000000010000000000000000000000000000000","status":"0x1","to":"0x03396fe4e58a0778679e2731564f064fa5256c6e","transactionHash":"0x968c2d0a7b38bfd7f57684298b5b4cda08b591e9f59b60e865a6eb8b531ef837","transactionIndex":"0x0","type":"0x0"}"#;
         let proper_receipt: TransactionReceipt = serde_json::from_str(proper_receipt).unwrap();
         assert_eq!(proper_receipt.effective_gas_price, 12500000000);
+    }
+
+    #[test]
+    fn no_type_deser() {
+        // Receipt from a Geth-derived chain whose `marshalReceipt` never sets the `type` field.
+        let json = r#"{"blockHash":"0x18cf669d61484fafd3fd01ca88c0b6706332f444f90de28d04fe84c6a922c5d2","blockNumber":"0x6abbdf1","contractAddress":"0xd937e6195ddf60b91de26a27c59492bbb48690fa","cumulativeGasUsed":"0xc3b68","from":"0xeff507ead35c808439741f5d1b228918c00a4329","gasUsed":"0xc3b68","logs":[],"logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","status":"0x1","to":null,"transactionHash":"0x13c2e2de4e886256727ac69efd52d066fae21c37d4e458f009e47a033d09e252","transactionIndex":"0x0"}"#;
+
+        let receipt: TransactionReceipt = serde_json::from_str(json).unwrap();
+
+        assert_eq!(receipt.transaction_type(), TxType::Legacy);
+        assert_eq!(receipt.gas_used, 0xc3b68);
+        assert!(receipt.status());
     }
 }

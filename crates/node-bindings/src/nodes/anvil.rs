@@ -130,24 +130,22 @@ impl Drop for AnvilInstance {
 
 /// Builder for launching `anvil`.
 ///
-/// # Panics
-///
-/// If `spawn` is called without `anvil` being available in the user's $PATH
+/// [`Anvil::spawn`] panics on any startup failure; use [`Anvil::try_spawn`] to handle errors.
 ///
 /// # Example
 ///
 /// ```no_run
 /// use alloy_node_bindings::Anvil;
 ///
-/// let port = 8545u16;
-/// let url = format!("http://localhost:{}", port).to_string();
-///
+/// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
 /// let anvil = Anvil::new()
-///     .port(port)
 ///     .mnemonic("abstract vacuum mammal awkward pudding scene penalty purchase dinner depart evoke puzzle")
-///     .spawn();
+///     .try_spawn()?;
+/// println!("Anvil is listening at {}", anvil.endpoint());
 ///
 /// drop(anvil); // this will kill the instance
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug, Default)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
@@ -170,8 +168,10 @@ pub struct Anvil {
 }
 
 impl Anvil {
-    /// Creates an empty Anvil builder.
-    /// The default port and the mnemonic are chosen randomly.
+    /// Creates an Anvil builder.
+    ///
+    /// Unless configured, port zero is passed so the OS chooses an available port, while account
+    /// and mnemonic defaults are left to Anvil.
     ///
     /// # Example
     ///
@@ -191,12 +191,15 @@ impl Anvil {
     ///
     /// # Example
     ///
-    /// ```
-    /// # use alloy_node_bindings::Anvil;
-    /// fn a() {
-    ///  let anvil = Anvil::at("~/.foundry/bin/anvil").spawn();
+    /// Paths are passed directly to [`Command`], so shell expansions such as `~` are not performed.
     ///
-    ///  println!("Anvil running at `{}`", anvil.endpoint());
+    /// ```no_run
+    /// # use alloy_node_bindings::Anvil;
+    /// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
+    /// let anvil = Anvil::at("/path/to/anvil").try_spawn()?;
+    ///
+    /// println!("Anvil running at `{}`", anvil.endpoint());
+    /// # Ok(())
     /// # }
     /// ```
     pub fn at(path: impl Into<PathBuf>) -> Self {
@@ -219,6 +222,9 @@ impl Anvil {
     }
 
     /// Sets the port which will be used when the `anvil` instance is launched.
+    ///
+    /// Port zero asks the OS to choose an available port. Read [`AnvilInstance::port`] or
+    /// [`AnvilInstance::endpoint`] after spawning to obtain the selected value.
     pub fn port<T: Into<u16>>(mut self, port: T) -> Self {
         self.port = Some(port.into());
         self
@@ -398,7 +404,11 @@ impl Anvil {
         self.try_spawn().unwrap()
     }
 
-    /// Consumes the builder and spawns `anvil`. If spawning fails, returns an error.
+    /// Consumes the builder, spawns `anvil`, and waits for it to report its listening address.
+    ///
+    /// Returns an error if the process cannot be started or does not become ready before the
+    /// configured [`Self::timeout`] is observed. The deadline is checked between complete stdout
+    /// lines; a live process that emits no newline can block this call past the deadline.
     pub fn try_spawn(self) -> Result<AnvilInstance, NodeError> {
         let mut cmd = self.program.as_ref().map_or_else(|| Command::new("anvil"), Command::new);
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());

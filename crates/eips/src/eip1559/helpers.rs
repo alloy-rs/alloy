@@ -95,8 +95,24 @@ pub fn calc_next_block_base_fee(
     base_fee: u64,
     base_fee_params: BaseFeeParams,
 ) -> u64 {
+    let elasticity = base_fee_params.elasticity_multiplier;
+    let max_change_denominator = base_fee_params.max_change_denominator;
+
+    // Without these checks, `gas_limit / elasticity` or the EIP-1559 update term can divide by
+    // zero (e.g. elasticity or denominator set to zero from misconfiguration / malformed
+    // Holocene header data, or `gas_limit < elasticity` on chains that do not enforce a minimum
+    // gas limit). Nethermind returns the parent base fee unchanged in these cases; see
+    // `DefaultBaseFeeCalculator` in Nethermind.Core.
+    if elasticity == 0 || max_change_denominator == 0 {
+        return base_fee;
+    }
+
     // Calculate the target gas by dividing the gas limit by the elasticity multiplier.
-    let gas_target = gas_limit / base_fee_params.elasticity_multiplier as u64;
+    let gas_target = (gas_limit as u128 / elasticity) as u64;
+
+    if gas_target == 0 {
+        return base_fee;
+    }
 
     match gas_used.cmp(&gas_target) {
         // If the gas used in the current block is equal to the gas target, the base fee remains the
@@ -130,9 +146,29 @@ pub fn calc_next_block_base_fee(
 /// Calculate the gas limit for the next block based on parent and desired gas limits.
 /// Ref: <https://github.com/ethereum/go-ethereum/blob/88cbfab332c96edfbe99d161d9df6a40721bd786/core/block_validator.go#L166>
 pub fn calculate_block_gas_limit(parent_gas_limit: u64, desired_gas_limit: u64) -> u64 {
-    let delta = (parent_gas_limit / GAS_LIMIT_BOUND_DIVISOR).saturating_sub(1);
-    let min_gas_limit = parent_gas_limit - delta;
-    let max_gas_limit = parent_gas_limit + delta;
+    calculate_block_gas_limit_with_bound_divisor(
+        parent_gas_limit,
+        desired_gas_limit,
+        GAS_LIMIT_BOUND_DIVISOR,
+    )
+}
+
+/// Calculate the gas limit for the next block based on parent and desired gas limits and a custom
+/// gas limit bound divisor.
+///
+/// # Panics
+///
+/// Panics if `gas_limit_bound_divisor` is zero.
+pub fn calculate_block_gas_limit_with_bound_divisor(
+    parent_gas_limit: u64,
+    desired_gas_limit: u64,
+    gas_limit_bound_divisor: u64,
+) -> u64 {
+    assert!(gas_limit_bound_divisor != 0, "gas limit bound divisor must be non-zero");
+
+    let delta = (parent_gas_limit / gas_limit_bound_divisor).saturating_sub(1);
+    let min_gas_limit = parent_gas_limit.saturating_sub(delta);
+    let max_gas_limit = parent_gas_limit.saturating_add(delta);
     desired_gas_limit.clamp(min_gas_limit, max_gas_limit)
 }
 
@@ -144,6 +180,28 @@ mod tests {
     #[test]
     fn min_protocol_sanity() {
         assert_eq!(MIN_PROTOCOL_BASE_FEE_U256.to::<u64>(), MIN_PROTOCOL_BASE_FEE);
+    }
+
+    #[test]
+    fn calculate_block_gas_limit_bounds_desired_limit() {
+        let parent_gas_limit = 30_000_000;
+        let min_gas_limit = 29_970_705;
+        let max_gas_limit = 30_029_295;
+
+        assert_eq!(calculate_block_gas_limit(parent_gas_limit, 20_000_000), min_gas_limit);
+        assert_eq!(calculate_block_gas_limit(parent_gas_limit, 30_000_000), 30_000_000);
+        assert_eq!(calculate_block_gas_limit(parent_gas_limit, 40_000_000), max_gas_limit);
+    }
+
+    #[test]
+    fn calculate_block_gas_limit_uses_custom_bound_divisor() {
+        assert_eq!(calculate_block_gas_limit_with_bound_divisor(1_000, 2_000, 10), 1_099);
+    }
+
+    #[test]
+    #[should_panic(expected = "gas limit bound divisor must be non-zero")]
+    fn calculate_block_gas_limit_rejects_zero_bound_divisor() {
+        calculate_block_gas_limit_with_bound_divisor(1_000, 2_000, 0);
     }
 
     #[test]
@@ -304,5 +362,27 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_zero_elasticity() {
+        let p = BaseFeeParams::new(8, 0);
+        assert_eq!(calc_next_block_base_fee(1, 30_000_000, 1_000_000_000, p), 1_000_000_000);
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_zero_denominator() {
+        let p = BaseFeeParams::new(0, 2);
+        assert_eq!(
+            calc_next_block_base_fee(15_000_000, 30_000_000, 1_000_000_000, p),
+            1_000_000_000
+        );
+    }
+
+    #[test]
+    fn next_base_fee_no_panic_gas_limit_below_elasticity() {
+        let p = BaseFeeParams::ethereum();
+        // gas_target = 1 / 2 = 0; gas_used > 0 used to hit a divide-by-zero in the increase path.
+        assert_eq!(calc_next_block_base_fee(1, 1, 1_000_000_000, p), 1_000_000_000);
     }
 }

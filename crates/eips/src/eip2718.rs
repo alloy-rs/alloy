@@ -410,7 +410,11 @@ impl<T: Typed2718> Typed2718 for alloy_serde::WithOtherFields<T> {
     }
 }
 
-/// Generic wrapper with encoded Bytes, such as transaction data.
+/// A value paired with bytes presumed to be its exact EIP-2718 encoding.
+///
+/// [`Self::new`] does not verify that the value and bytes correspond. Mapping and transforming
+/// preserve the bytes unchanged and are correct only for encoding-preserving conversions. Prefer
+/// [`Self::from_2718_encodable`] when constructing this wrapper from a value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WithEncoded<T>(Bytes, pub T);
 
@@ -421,7 +425,7 @@ impl<T> From<(Bytes, T)> for WithEncoded<T> {
 }
 
 impl<T> WithEncoded<T> {
-    /// Wraps the value with the bytes.
+    /// Wraps the value with caller-supplied bytes without verifying that they correspond.
     pub const fn new(bytes: Bytes, value: T) -> Self {
         Self(bytes, value)
     }
@@ -446,7 +450,7 @@ impl<T> WithEncoded<T> {
         self.1
     }
 
-    /// Transform the value
+    /// Transforms the value while retaining the encoded bytes unchanged.
     pub fn transform<F: From<T>>(self) -> WithEncoded<F> {
         WithEncoded(self.0, self.1.into())
     }
@@ -456,7 +460,7 @@ impl<T> WithEncoded<T> {
         (self.0, self.1)
     }
 
-    /// Maps the inner value to a new value using the given function.
+    /// Maps the inner value while retaining the encoded bytes unchanged.
     pub fn map<U, F: FnOnce(T) -> U>(self, op: F) -> WithEncoded<U> {
         WithEncoded(self.0, op(self.1))
     }
@@ -476,7 +480,7 @@ impl<T: Encodable2718> WithEncoded<T> {
 }
 
 impl<T> WithEncoded<Option<T>> {
-    /// returns `None` if the inner value is `None`, otherwise returns `Some(WithEncoded<T>)`.
+    /// Returns `None` if the inner value is `None`; otherwise retains the encoded bytes unchanged.
     pub fn transpose(self) -> Option<WithEncoded<T>> {
         self.1.map(|v| WithEncoded(self.0, v))
     }

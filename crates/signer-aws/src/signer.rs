@@ -17,33 +17,29 @@ use std::fmt;
 
 /// Amazon Web Services Key Management Service (AWS KMS) Ethereum signer.
 ///
-/// The AWS Signer passes signing requests to the cloud service. AWS KMS keys are identified by a
-/// UUID, the `key_id`.
+/// Signing requests are sent to AWS KMS. The key must be an asymmetric `ECC_SECG_P256K1` key with
+/// `SIGN_VERIFY` usage. `key_id` may be a key ID, key ARN, alias name, or alias ARN.
 ///
-/// Because the public key is unknown, we retrieve it on instantiation of the signer. This means
-/// that the new function is `async` and must be called within some runtime.
+/// [`Self::new`] retrieves and caches the public key and derived Ethereum address. Signing performs
+/// network I/O and must be awaited; this type does not implement [`alloy_signer::SignerSync`].
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
-/// will always return an error.
+/// Constructing a signer requires `kms:GetPublicKey`; signing requires `kms:Sign`.
 ///
 /// # Examples
 ///
 /// ```no_run
 /// use alloy_signer::Signer;
-/// use alloy_signer_aws::AwsSigner;
-/// use aws_config::BehaviorVersion;
+/// use alloy_signer_aws::{aws_config, aws_sdk_kms, AwsSigner};
 ///
 /// # async fn test() {
-/// let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+/// let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
 /// let client = aws_sdk_kms::Client::new(&config);
 ///
-/// let key_id = "...".to_string();
-/// let chain_id = Some(1);
-/// let signer = AwsSigner::new(client, key_id, chain_id).await.unwrap();
+/// let key_id = std::env::var("AWS_KMS_KEY_ID").expect("AWS_KMS_KEY_ID");
+/// let signer = AwsSigner::new(client, key_id, None).await.unwrap();
 ///
-/// let message = vec![0, 1, 2, 3];
-///
-/// let sig = signer.sign_message(&message).await.unwrap();
+/// let message = b"hello from Alloy";
+/// let sig = signer.sign_message(message).await.unwrap();
 /// assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
 /// # }
 /// ```
@@ -143,7 +139,14 @@ alloy_network::impl_into_wallet!(AwsSigner);
 impl AwsSigner {
     /// Instantiate a new signer from an existing `Client` and key ID.
     ///
-    /// Retrieves the public key from AWS and calculates the Ethereum address.
+    /// `key_id` may be a key ID, key ARN, alias name, or alias ARN. This makes a
+    /// `GetPublicKey` request, then caches the verifying key and derived Ethereum address.
+    /// Prefer a stable key ID or ARN: retargeting an alias does not update the cached key or
+    /// address, so signatures from the new target will fail parity recovery.
+    ///
+    /// `chain_id` affects transaction signing only. `Some(id)` fills an unset transaction chain ID
+    /// and rejects a conflicting one before signing. It does not affect hash, message, or
+    /// typed-data signing; `None` disables this signer-side check.
     #[instrument(skip(kms), err)]
     pub async fn new(
         kms: Client,
@@ -157,17 +160,26 @@ impl AwsSigner {
         Ok(Self { kms, chain_id, key_id, pubkey, address })
     }
 
-    /// Fetch the pubkey associated with a key ID.
+    /// Fetch the public key associated with a key ID.
+    ///
+    /// This makes a `GetPublicKey` request but does not change this signer's cached key or address.
     pub async fn get_pubkey_for_key(&self, key_id: String) -> Result<VerifyingKey, AwsSignerError> {
         request_get_pubkey(&self.kms, key_id).await.and_then(decode_pubkey)
     }
 
-    /// Fetch the pubkey associated with this signer's key ID.
+    /// Fetch the public key currently associated with this signer's key ID.
+    ///
+    /// This makes a `GetPublicKey` request but does not replace the key and address cached by
+    /// [`Self::new`].
     pub async fn get_pubkey(&self) -> Result<VerifyingKey, AwsSignerError> {
         self.get_pubkey_for_key(self.key_id.clone()).await
     }
 
-    /// Sign a digest with the key associated with a key ID.
+    /// Sign a precomputed 32-byte digest with the key associated with a key ID.
+    ///
+    /// The digest is sent to KMS as [`MessageType::Digest`] and is not hashed or prefixed again.
+    /// The returned `(r, s)` signature is low-s normalized and has no recovery parity. Use
+    /// [`Signer::sign_hash`] when an Alloy [`Signature`] with y-parity is required.
     pub async fn sign_digest_with_key(
         &self,
         key_id: String,
@@ -176,12 +188,17 @@ impl AwsSigner {
         request_sign_digest(&self.kms, key_id, digest).await.and_then(decode_signature)
     }
 
-    /// Sign a digest with this signer's key
+    /// Sign a precomputed 32-byte digest with this signer's key.
+    ///
+    /// See [`Self::sign_digest_with_key`] for prehash and return-value semantics.
     pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, AwsSignerError> {
         self.sign_digest_with_key(self.key_id.clone(), digest).await
     }
 
-    /// Sign a digest with this signer's key and applies EIP-155.
+    /// Sign a digest with this signer's key and recover the correct y-parity.
+    ///
+    /// This does not apply EIP-155 itself. Transaction signing supplies a signature hash that
+    /// already reflects the transaction's chain ID.
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;

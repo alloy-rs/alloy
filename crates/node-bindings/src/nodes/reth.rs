@@ -1,4 +1,4 @@
-//! Utilities for launching a Reth dev-mode instance.
+//! Utilities for configuring and launching a Reth node.
 
 use crate::{
     utils::{extract_endpoint, GracefulShutdown},
@@ -8,7 +8,7 @@ use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
     ffi::OsString,
-    fs::create_dir,
+    fs::create_dir_all,
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
@@ -115,15 +115,15 @@ impl RethInstance {
         self.data_dir.as_ref()
     }
 
-    /// Returns the genesis configuration used to configure this instance
+    /// Returns the genesis configuration supplied with [`Reth::genesis`], if any.
     pub const fn genesis(&self) -> Option<&Genesis> {
         self.genesis.as_ref()
     }
 
     /// Takes the stdout contained in the child process.
     ///
-    /// This leaves a `None` in its place, so calling methods that require a stdout to be present
-    /// will fail if called after this.
+    /// Stdout is available only when [`Reth::keep_stdout`] was set. This leaves `None` in its
+    /// place, so a second call returns [`NodeError::NoStdout`].
     pub fn stdout(&mut self) -> Result<ChildStdout, NodeError> {
         self.pid.stdout.take().ok_or(NodeError::NoStdout)
     }
@@ -137,21 +137,21 @@ impl Drop for RethInstance {
 
 /// Builder for launching `reth`.
 ///
-/// # Panics
-///
-/// If `spawn` is called without `reth` being available in the user's $PATH
+/// [`Reth::new`] configures a regular node. Call [`Reth::dev`] for an isolated development chain.
+/// [`Reth::spawn`] panics on any startup failure; use [`Reth::try_spawn`] to handle errors.
 ///
 /// # Example
 ///
 /// ```no_run
 /// use alloy_node_bindings::Reth;
 ///
-/// let port = 8545u16;
-/// let url = format!("http://localhost:{}", port).to_string();
-///
-/// let reth = Reth::new().instance(1).block_time("12sec").spawn();
+/// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
+/// let reth = Reth::new().dev().block_time("12s").try_spawn()?;
+/// println!("Reth is listening at {}", reth.endpoint());
 ///
 /// drop(reth); // this will kill the instance
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
@@ -182,11 +182,11 @@ impl Default for Reth {
 }
 
 impl Reth {
-    /// Creates an empty Reth builder.
+    /// Creates a Reth builder in regular (non-dev) mode.
     ///
-    /// The instance number is set to a random number between 1 and 200 by default to reduce the
-    /// odds of port conflicts. This can be changed with [`Reth::instance`]. Set to 0 to use the
-    /// default ports. 200 is the maximum number of instances that can be run set by Reth.
+    /// The instance number is chosen from `1..=199` to reduce the odds of port conflicts. Change it
+    /// with [`Reth::instance`], or set it to zero to use Reth's base default ports. Reth permits
+    /// instance numbers up to 200.
     pub fn new() -> Self {
         Self {
             dev: false,
@@ -213,12 +213,13 @@ impl Reth {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
     /// use alloy_node_bindings::Reth;
-    /// # fn a() {
-    /// let reth = Reth::at("../reth/target/release/reth").spawn();
+    /// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
+    /// let reth = Reth::at("/path/to/reth").dev().try_spawn()?;
     ///
     /// println!("Reth running at `{}`", reth.endpoint());
+    /// # Ok(())
     /// # }
     /// ```
     pub fn at(path: impl Into<PathBuf>) -> Self {
@@ -280,9 +281,10 @@ impl Reth {
         self
     }
 
-    /// Sets the block time for the Reth instance.
-    /// Parses strings using <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
-    /// This is only used if `dev` mode is enabled.
+    /// Sets the block time for a dev-mode Reth instance.
+    ///
+    /// Reth parses this with `humantime` syntax, such as `"12s"`. The setting is ignored unless
+    /// [`Self::dev`] is also enabled.
     pub fn block_time(mut self, block_time: &str) -> Self {
         self.block_time = Some(block_time.to_string());
         self
@@ -295,7 +297,9 @@ impl Reth {
     }
 
     /// Sets the chain name or path to a chain spec for the Reth instance.
-    /// Passed through to `reth --chain <name-or-path>`.
+    ///
+    /// Passed through to `reth node --chain <name-or-path>`. To launch Reth with a custom genesis,
+    /// write the genesis or chain specification to disk and pass that path here.
     pub fn chain_or_path(mut self, chain_or_path: &str) -> Self {
         self.chain_or_path = Some(chain_or_path.to_string());
         self
@@ -307,8 +311,9 @@ impl Reth {
         self
     }
 
-    /// Sets the instance number for the Reth instance. Set to 0 to use the default ports.
-    /// By default, a random number between 1 and 200 is used.
+    /// Sets the Reth instance number. Set to zero to use the base default ports.
+    ///
+    /// By default, a random number in `1..=199` is used; Reth permits values up to 200.
     pub const fn instance(mut self, instance: u16) -> Self {
         self.instance = instance;
         self
@@ -329,12 +334,12 @@ impl Reth {
         self
     }
 
-    /// Sets the `genesis.json` for the Reth instance.
+    /// Stores the genesis configuration on the returned [`RethInstance`].
     ///
-    /// If this is set, reth will be initialized with `reth init` and the `--datadir` option will be
-    /// set to the same value as `data_dir`.
-    ///
-    /// This is destructive and will overwrite any existing data in the data directory.
+    /// The spawned node can be inspected through [`RethInstance::genesis`] to recover the genesis
+    /// value that was supplied to the builder. To launch Reth with a custom genesis or chain
+    /// specification, write that specification to disk and pass the path with
+    /// [`Reth::chain_or_path`].
     pub fn genesis(mut self, genesis: Genesis) -> Self {
         self.genesis = Some(genesis);
         self
@@ -380,7 +385,12 @@ impl Reth {
         self.try_spawn().unwrap()
     }
 
-    /// Consumes the builder and spawns `reth`. If spawning fails, returns an error.
+    /// Consumes the builder, spawns `reth`, and waits for its services to report ready.
+    ///
+    /// Returns an error if the process cannot be started, reports a fatal startup error, or does
+    /// not become ready before [`NODE_STARTUP_TIMEOUT`] is observed. The deadline is checked
+    /// between complete stdout lines; a live process that emits no newline can block this call
+    /// past the deadline.
     pub fn try_spawn(self) -> Result<RethInstance, NodeError> {
         let bin_path = self
             .program
@@ -466,7 +476,7 @@ impl Reth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+                create_dir_all(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 

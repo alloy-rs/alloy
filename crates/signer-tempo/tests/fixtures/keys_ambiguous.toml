@@ -1,0 +1,18 @@
+# Two unexpired secp256k1 entries with the same wallet_address — must
+# trigger Ambiguous on find_by_from.
+
+[[keys]]
+wallet_type = "passkey"
+wallet_address = "0x000000000000000000000000000000000000dddd"
+chain_id = 4217
+key_type = "secp256k1"
+key_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+key = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+
+[[keys]]
+wallet_type = "passkey"
+wallet_address = "0x000000000000000000000000000000000000dddd"
+chain_id = 4217
+key_type = "secp256k1"
+key_address = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
+key = "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a"

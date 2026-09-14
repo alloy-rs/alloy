@@ -5,14 +5,16 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{Decodable7594, Encodable7594},
+    eip7594::{BlobSidecarEncoding, Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
-use alloy_rlp::{Decodable, Encodable, Header};
+use alloy_rlp::{Decodable, Encodable, Header, EMPTY_LIST_CODE};
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
+#[cfg(feature = "kzg")]
+use crate::eip4844::{AsAlloy, AsCkzg};
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
@@ -30,7 +32,13 @@ pub struct IndexedBlobHash {
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// For a well-formed sidecar, all three vectors have equal lengths and describe the same blob at
+/// each index. Public fields and [`Self::new`] do not enforce this invariant. With the `kzg`
+/// feature, prefer `try_from_blobs_with_settings` or call `validate` before use. Consuming
+/// iteration uses `zip`, so malformed unequal vectors are truncated to the shortest vector.
+///
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -91,23 +99,22 @@ impl BlobTransactionSidecar {
     ) -> Result<crate::eip7594::BlobTransactionSidecarEip7594, c_kzg::Error> {
         use crate::eip7594::CELLS_PER_EXT_BLOB;
 
+        if let [blob] = self.blobs.as_slice() {
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+            let cell_proofs = c_kzg::KzgProof::boxed_slice_as_alloy(kzg_proofs).into();
+            return Ok(crate::eip7594::BlobTransactionSidecarEip7594::new(
+                self.blobs,
+                self.commitments,
+                cell_proofs,
+            ));
+        }
+
         let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
 
         for blob in self.blobs.iter() {
-            // SAFETY: Blob and c_kzg::Blob have the same memory layout
-            let blob_kzg = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-
             // Compute cells and their KZG proofs for this blob
-            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob_kzg)?;
-
-            // SAFETY: same size
-            unsafe {
-                for kzg_proof in kzg_proofs.iter() {
-                    cell_proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
-                        kzg_proof.to_bytes(),
-                    ));
-                }
-            }
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+            cell_proofs.extend_from_slice(c_kzg::KzgProof::slice_as_alloy(kzg_proofs.as_ref()));
         }
 
         Ok(crate::eip7594::BlobTransactionSidecarEip7594::new(
@@ -234,9 +241,17 @@ impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
 }
 
 impl BlobTransactionSidecar {
-    /// Constructs a new [BlobTransactionSidecar] from a set of blobs, commitments, and proofs.
+    /// Constructs a sidecar without validating vector lengths, commitments, or proofs.
     pub const fn new(blobs: Vec<Blob>, commitments: Vec<Bytes48>, proofs: Vec<Bytes48>) -> Self {
         Self { blobs, commitments, proofs }
+    }
+
+    /// Shrinks the sidecar vectors to fit their current contents.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.blobs.shrink_to_fit();
+        self.commitments.shrink_to_fit();
+        self.proofs.shrink_to_fit();
     }
 
     /// Creates a new instance from the given KZG types.
@@ -246,19 +261,10 @@ impl BlobTransactionSidecar {
         commitments: Vec<c_kzg::Bytes48>,
         proofs: Vec<c_kzg::Bytes48>,
     ) -> Self {
-        // transmutes the vec of items, see also [core::mem::transmute](https://doc.rust-lang.org/std/mem/fn.transmute.html)
-        unsafe fn transmute_vec<U, T>(input: Vec<T>) -> Vec<U> {
-            let mut v = core::mem::ManuallyDrop::new(input);
-            Vec::from_raw_parts(v.as_mut_ptr() as *mut U, v.len(), v.capacity())
-        }
-
-        // SAFETY: all types have the same size and alignment
-        unsafe {
-            let blobs = transmute_vec::<Blob, c_kzg::Blob>(blobs);
-            let commitments = transmute_vec::<Bytes48, c_kzg::Bytes48>(commitments);
-            let proofs = transmute_vec::<Bytes48, c_kzg::Bytes48>(proofs);
-            Self { blobs, commitments, proofs }
-        }
+        let blobs = Blob::vec_from_ckzg(blobs);
+        let commitments = Bytes48::vec_from_ckzg(commitments);
+        let proofs = Bytes48::vec_from_ckzg(proofs);
+        Self { blobs, commitments, proofs }
     }
 
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
@@ -304,18 +310,13 @@ impl BlobTransactionSidecar {
             }
         }
 
-        // SAFETY: ALL types have the same size
-        let res = unsafe {
-            proof_settings.verify_blob_kzg_proof_batch(
-                // blobs
-                core::mem::transmute::<&[Blob], &[c_kzg::Blob]>(self.blobs.as_slice()),
-                // commitments
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.commitments.as_slice()),
-                // proofs
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.proofs.as_slice()),
+        let res = proof_settings
+            .verify_blob_kzg_proof_batch(
+                Blob::slice_as_ckzg(self.blobs.as_slice()),
+                Bytes48::slice_as_ckzg(self.commitments.as_slice()),
+                Bytes48::slice_as_ckzg(self.proofs.as_slice()),
             )
-        }
-        .map_err(BlobTransactionValidationError::KZGError)?;
+            .map_err(BlobTransactionValidationError::KZGError)?;
 
         res.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
@@ -394,17 +395,12 @@ impl BlobTransactionSidecar {
         let mut commitments = Vec::with_capacity(blobs.len());
         let mut proofs = Vec::with_capacity(blobs.len());
         for blob in &blobs {
-            // SAFETY: same size
-            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let blob = blob.as_ckzg();
             let commitment = settings.blob_to_kzg_commitment(blob)?;
             let proof = settings.compute_blob_kzg_proof(blob, &commitment.to_bytes())?;
 
-            // SAFETY: same size
-            unsafe {
-                commitments
-                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
-                proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(proof.to_bytes()));
-            }
+            commitments.push(Bytes48::from_ckzg(commitment.to_bytes()));
+            proofs.push(Bytes48::from_ckzg(proof.to_bytes()));
         }
 
         Ok(Self::new(blobs, commitments, proofs))
@@ -491,7 +487,7 @@ impl BlobTransactionSidecar {
 }
 
 impl Encodable for BlobTransactionSidecar {
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+    /// Encodes the sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -502,7 +498,7 @@ impl Encodable for BlobTransactionSidecar {
 }
 
 impl Decodable for BlobTransactionSidecar {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }
@@ -515,6 +511,23 @@ impl Encodable7594 for BlobTransactionSidecar {
 
     fn encode_7594(&self, out: &mut dyn BufMut) {
         self.rlp_encode_fields(out);
+    }
+
+    fn encode_7594_len_with(&self, encoding: BlobSidecarEncoding) -> usize {
+        let blobs_len = match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.length(),
+            BlobSidecarEncoding::WithoutBlobs => 1,
+        };
+        blobs_len + self.commitments.length() + self.proofs.length()
+    }
+
+    fn encode_7594_with(&self, encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.encode(out),
+            BlobSidecarEncoding::WithoutBlobs => out.put_u8(EMPTY_LIST_CODE),
+        }
+        self.commitments.encode(out);
+        self.proofs.encode(out);
     }
 }
 

@@ -4,7 +4,10 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchHeaders};
+use super::{
+    DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom,
+    WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchHeaders, WatchLogsFrom,
+};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -171,16 +174,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// ```no_run
     /// # use alloy_provider::Provider;
-    /// # use alloy_eips::BlockId;
-    /// # use alloy_rpc_types_eth::state::StateOverride;
-    /// # use alloy_transport::BoxTransport;
-    /// # async fn example<P: Provider>(
-    /// #    provider: P,
-    /// #    my_overrides: StateOverride
-    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<P: Provider>(provider: P) -> Result<(), Box<dyn std::error::Error>> {
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
-    /// let output = provider.call(tx).await?;
+    /// let output = provider.call(tx).latest().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -499,14 +496,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
     }
 
-    /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
+    /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
     /// Returns the  block access list raw, or `None` if the block is not found.
-    async fn get_block_access_list_raw(
-        &self,
-        number: BlockNumberOrTag,
-    ) -> TransportResult<Option<Bytes>> {
-        self.client().request("eth_getBlockAccessListRaw", (number,)).await
+    async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListRaw", (block,)).await
     }
 
     /// Gets a block header by its [`BlockId`].
@@ -755,6 +749,232 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
+    ///
+    /// This stream continues polling after catching up and continues yielding new blocks
+    /// indefinitely.
+    ///
+    /// This stream _does not_ handle reorgs. Instead, each item yielded from the stream
+    /// is strictly ordered in terms of block number, regardless of the blocks parent.
+    ///
+    /// For example (height, hash, parent):
+    ///
+    /// You should expect blocks in order by number with no gaps and with disjoint parents:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(3,3B,2B)]
+    ///
+    /// And you should not expect receiving two blocks with the same number:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(2,2B,1A)]
+    ///
+    /// Each yielded future contains one block request.
+    ///
+    /// If a block request returns `NullResp`, the yielded future retries the same block until it
+    /// succeeds.
+    ///
+    /// Other errors are surfaced to the caller. Configure retries on the underlying client
+    /// transport (for example with `RetryBackoffLayer`) for transport-level retry behavior.
+    ///
+    /// This can be buffered by the caller, for example with
+    /// [`StreamExt::buffered`](futures::StreamExt::buffered).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::RetryBackoffLayer,
+    /// #     mock::{Asserter, MockTransport},
+    /// # };
+    /// # use futures::StreamExt;
+    ///
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// provider
+    ///     .watch_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .into_stream()
+    ///     // Keep many RPC request futures in flight at the same time.
+    ///     .buffered(4)
+    ///     // Process many resolved blocks concurrently.
+    ///     .for_each_concurrent(Some(4), |block| async move {
+    ///         match block {
+    ///             Ok(block) => {
+    ///                 let _ = block;
+    ///             }
+    ///             Err(err) => eprintln!("block request failed: {err}"),
+    ///         }
+    ///     })
+    ///     .await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
+        WatchBlocksFrom::new(self.weak_client(), start_block)
+    }
+
+    /// Stream canonical block events from a historical block.
+    ///
+    /// This wraps [`watch_blocks_from`](Self::watch_blocks_from) and performs canonical chain
+    /// reconciliation, yielding [`CanonicalEvent`](crate::provider::CanonicalEvent) values.
+    ///
+    /// On a reorg the stream emits
+    /// [`CanonicalEvent::Removed`](crate::provider::CanonicalEvent::Removed)
+    /// for each rolled-back block (newest first), then
+    /// [`CanonicalEvent::Added`](crate::provider::CanonicalEvent::Added) for the new chain segment.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_provider::CanonicalEvent;
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::RetryBackoffLayer,
+    /// #     mock::{Asserter, MockTransport},
+    /// # };
+    /// # use futures::StreamExt;
+    ///
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// let mut stream = provider
+    ///     .watch_canonical_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .rpc_concurrency(4)
+    ///     .max_reorg_depth(64)
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event {
+    ///         Ok(CanonicalEvent::Added(block)) => {
+    ///             let _ = block;
+    ///         }
+    ///         Ok(CanonicalEvent::Removed(block)) => {
+    ///             let _ = block;
+    ///         }
+    ///         Err(err) => eprintln!("canonical stream failed: {err}"),
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
+        self.watch_blocks_from(start_block).canonical()
+    }
+
+    /// Stream block log batches from a historical block.
+    ///
+    /// This follows block numbers from `start_block` and yields one future per block height. Each
+    /// future fetches the block and a one-block log range concurrently, using the range logs when
+    /// they match the fetched block hash and falling back to a block-hash log query when the range
+    /// result is empty or ambiguous.
+    ///
+    /// This stream does not perform canonical reconciliation after a batch has been emitted. Use
+    /// [`watch_canonical_logs_from`](Self::watch_canonical_logs_from) if the caller needs removed
+    /// events when already-emitted blocks are rolled back by a later reorg.
+    ///
+    /// The filter's block option is replaced internally for each exact block; use `start_block` and
+    /// [`block_tag`](crate::provider::WatchLogsFrom::block_tag) to configure range progress.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .into_stream()
+    ///     .buffered(4);
+    ///
+    /// while let Some(batch) = stream.next().await {
+    ///     let block_logs = batch?;
+    ///     for log in block_logs.logs {
+    ///         let _ = log;
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom<N> {
+        WatchLogsFrom::new(self.weak_client(), start_block, filter.clone())
+    }
+
+    /// Stream canonical block log events from a historical block.
+    ///
+    /// This follows canonical blocks from `start_block` and emits block-scoped log batches.
+    /// Removed events use retained logs when a block is rolled back by a reorg. The filter's block
+    /// option is replaced internally for each exact block; use `start_block` and
+    /// [`block_tag`](crate::provider::WatchCanonicalLogsFrom::block_tag) to configure range
+    /// progress.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{CanonicalEvent, Provider, ProviderBuilder};
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_canonical_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .rpc_concurrency(4)
+    ///     .max_reorg_depth(64)
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event {
+    ///         Ok(CanonicalEvent::Added(block_logs)) => {
+    ///             for log in block_logs.logs {
+    ///                 let _ = log;
+    ///             }
+    ///         }
+    ///         Ok(CanonicalEvent::Removed(block_logs)) => {
+    ///             for log in block_logs.logs {
+    ///                 let _ = log;
+    ///             }
+    ///         }
+    ///         Err(err) => eprintln!("canonical log stream failed: {err}"),
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_canonical_logs_from(
+        &self,
+        start_block: u64,
+        filter: &Filter,
+    ) -> WatchCanonicalLogsFrom<N> {
+        self.watch_logs_from(start_block, filter).canonical()
     }
 
     /// Watch for new pending transaction bodies by polling the provider with
@@ -1120,22 +1340,29 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
     }
 
-    /// Broadcasts a transaction to the network.
+    /// Runs any configured transaction fillers and broadcasts a transaction to the network.
+    ///
+    /// The resulting [`SendableTx`] determines submission. An envelope is submitted with
+    /// `eth_sendRawTransaction`; a request builder uses `eth_sendTransaction`, so the node must be
+    /// able to sign for its `from` account. A [`WalletFiller`](crate::fillers::WalletFiller)
+    /// normally transforms a builder into a locally signed envelope, and custom fillers may do the
+    /// same.
     ///
     /// Returns a [`PendingTransactionBuilder`] which can be used to configure
-    /// how and when to await the transaction's confirmation.
+    /// how and when to await the transaction's confirmation. The default is one confirmation with
+    /// no timeout. [`PendingTransactionBuilder::watch`] waits and returns the transaction hash;
+    /// [`PendingTransactionBuilder::get_receipt`] waits and then fetches the receipt.
     ///
     /// # Examples
     ///
-    /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
+    /// See [`PendingTransactionBuilder`] for more examples.
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
-    /// let tx_hash = provider.send_transaction(tx)
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// let receipt = provider.send_transaction(tx)
     ///     .await?
     ///     .with_required_confirmations(2)
-    ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
-    ///     .watch()
+    ///     .get_receipt()
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -1849,7 +2076,7 @@ mod tests {
         assert_eq!(0, num);
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn subscribe_blocks_http() {
         let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.block_time(1));
@@ -1864,15 +2091,15 @@ mod tests {
     }
 
     // Ensures we can connect to a websocket using `wss`.
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
+        for url in ["wss://ethereum.reth.rs/ws"] {
             let _ = ProviderBuilder::<_, _, Ethereum>::default().connect(url).await.unwrap();
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
@@ -1895,7 +2122,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn subscribe_full_blocks() {
         use futures::StreamExt;
@@ -1922,7 +2149,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     async fn subscribe_blocks_ws_remote() {
         use futures::stream::StreamExt;
 
