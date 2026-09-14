@@ -27,7 +27,7 @@ workspace = true
 alloy-eip2124.workspace = true
 alloy-eip2930.workspace = true
 alloy-eip7702.workspace = true
-alloy-eip8141 = { workspace = true, optional = true }
+alloy-eip8141.workspace = true
 alloy-eip7928 = { workspace = true, features = ["rlp"] }
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
@@ -86,7 +86,7 @@ std = [
 	"alloy-eip2124/std",
 	"alloy-eip2930/std",
 	"alloy-eip7702/std",
-	"alloy-eip8141?/std",
+	"alloy-eip8141/std",
 	"alloy-eip7928/std",
 	"derive_more/std",
 	"sha2?/std",
@@ -102,14 +102,13 @@ serde = [
 	"c-kzg?/serde",
 	"alloy-eip2930/serde",
 	"alloy-eip7702/serde",
-	"alloy-eip8141?/serde",
+	"alloy-eip8141/serde",
 	"alloy-eip7928/serde",
 	"alloy-eip2124/serde",
 	"either/serde",
 	"rand/serde",
 ]
 serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
-eip8141 = ["dep:alloy-eip8141"]
 kzg = ["kzg-sidecar", "sha2", "dep:c-kzg"]
 kzg-sidecar = ["sha2"]
 k256 = [
@@ -128,7 +127,7 @@ arbitrary = [
 	"alloy-eip2930/arbitrary",
 	"alloy-eip7702/arbitrary",
 	"alloy-eip7702/k256",
-	"alloy-eip8141?/arbitrary",
+	"alloy-eip8141/arbitrary",
 	"alloy-eip7928/arbitrary",
 	"c-kzg?/arbitrary"
 ]
@@ -138,5 +137,5 @@ borsh = [
 	"alloy-eip2930/borsh",
 	"alloy-eip7702/borsh",
 	"alloy-eip7928/borsh",
-	"alloy-eip8141?/borsh",
+	"alloy-eip8141/borsh",
 ]
