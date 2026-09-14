@@ -51,6 +51,13 @@ pub mod eip7691;
 
 pub mod eip7702;
 
+/// [EIP-8141] frame transaction constants and types.
+///
+/// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
+#[cfg(feature = "eip8141")]
+#[cfg_attr(docsrs, doc(cfg(feature = "eip8141")))]
+pub mod eip8141;
+
 pub mod eip7840;
 
 pub mod eip7892;
