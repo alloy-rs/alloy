@@ -131,4 +131,3 @@ borsh = [
 	"alloy-primitives/borsh",
 	"alloy-eips/borsh",
 ]
-eip8141 = ["alloy-eips/eip8141"]

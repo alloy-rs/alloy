@@ -21,10 +21,7 @@ pub use eip7702::TxEip7702;
 /// This deliberately does not extend Alloy's general transaction-envelope enums.
 ///
 /// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
-#[cfg(feature = "eip8141")]
-#[cfg_attr(docsrs, doc(cfg(feature = "eip8141")))]
 pub mod eip8141;
-#[cfg(feature = "eip8141")]
 pub use eip8141::TxEip8141;
 
 mod envelope;
