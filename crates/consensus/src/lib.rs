@@ -47,6 +47,9 @@ pub mod proofs;
 pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
+#[cfg(feature = "eip8141")]
+#[cfg_attr(docsrs, doc(cfg(feature = "eip8141")))]
+pub use transaction::TxEip8141;
 pub use transaction::{
     EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction,
     TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
