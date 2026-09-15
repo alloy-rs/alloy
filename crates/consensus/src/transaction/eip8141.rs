@@ -121,7 +121,7 @@ impl TxEip8141 {
         let mut execution = 0u64;
         let mut state = 0u64;
         let mut expiry_verifiers = 0u8;
-        signature_checks(&self.signatures, self.sender)?;
+        self.signature_checks()?;
         for (index, frame) in self.frames.iter().enumerate() {
             if frame.has_reserved_flags() {
                 return Err("reserved EIP-8141 frame flag is set");
@@ -249,25 +249,25 @@ impl TxEip8141 {
     fn rlp_encoded_length(&self) -> usize {
         Header { list: true, payload_length: self.payload_length() }.length_with_payload()
     }
-}
 
-fn signature_checks(signatures: &[FrameSignature], sender: Address) -> Result<(), &'static str> {
-    for signature in signatures {
-        signature.validate_structure_with_sender(sender).map_err(|err| match err {
-            Eip8141Error::UnexpectedSigner => {
-                "arbitrary signatures must not contain signer metadata"
-            }
-            Eip8141Error::InvalidSignatureLength { .. } => "invalid frame signature length",
-            Eip8141Error::InvalidParity(_) | Eip8141Error::InvalidSignatureScalar => {
-                "frame signature is not canonical"
-            }
-            Eip8141Error::P256SignerMismatch { .. } => {
-                "P-256 public key does not match resolved signer"
-            }
-            _ => "invalid frame signature entry",
-        })?;
+    fn signature_checks(&self) -> Result<(), &'static str> {
+        for signature in &self.signatures {
+            signature.validate_structure_with_sender(self.sender).map_err(|err| match err {
+                Eip8141Error::UnexpectedSigner => {
+                    "arbitrary signatures must not contain signer metadata"
+                }
+                Eip8141Error::InvalidSignatureLength { .. } => "invalid frame signature length",
+                Eip8141Error::InvalidParity(_) | Eip8141Error::InvalidSignatureScalar => {
+                    "frame signature is not canonical"
+                }
+                Eip8141Error::P256SignerMismatch { .. } => {
+                    "P-256 public key does not match resolved signer"
+                }
+                _ => "invalid frame signature entry",
+            })?;
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 impl Typed2718 for TxEip8141 {
