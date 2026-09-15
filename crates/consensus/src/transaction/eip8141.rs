@@ -509,9 +509,172 @@ mod tests {
     };
 
     use alloy_primitives::hex;
+    use arbitrary::{Arbitrary, Unstructured};
+    use rand::{rngs::StdRng, RngCore, SeedableRng};
 
     fn valid_tx() -> TxEip8141 {
         TxEip8141 { chain_id: 1, frames: vec![Frame::default()], ..Default::default() }
+    }
+
+    fn arbitrary_tx(seed: u64) -> TxEip8141 {
+        let mut bytes = [0u8; 16 * 1024];
+        StdRng::seed_from_u64(seed).fill_bytes(&mut bytes);
+        TxEip8141::arbitrary(&mut Unstructured::new(&bytes)).unwrap()
+    }
+
+    /// Exercise wire representations even when the transaction is not structurally valid.
+    fn populated_tx() -> TxEip8141 {
+        let targets =
+            [FrameAddress::Empty, Address::ZERO.into(), Address::repeat_byte(0x22).into()];
+        let modes = [FrameMode::Default, FrameMode::Verify, FrameMode::Sender];
+        let lengths = [0, 1, 55, 56, 255, 256];
+        TxEip8141 {
+            chain_id: u64::MAX,
+            nonce: u64::MAX,
+            sender: Address::repeat_byte(0x11),
+            frames: (0..MAX_FRAMES)
+                .map(|index| Frame {
+                    mode: modes[index % modes.len()],
+                    flags: (index % 8) as u8,
+                    target: targets[index % targets.len()],
+                    limits: FrameLimits { execution: u64::MAX, state: u64::MAX },
+                    value: U256::MAX,
+                    data: vec![index as u8; lengths[index % lengths.len()]].into(),
+                })
+                .collect(),
+            signatures: [
+                SignatureScheme::Arbitrary,
+                SignatureScheme::Secp256k1,
+                SignatureScheme::P256,
+            ]
+            .into_iter()
+            .flat_map(|scheme| {
+                targets.into_iter().flat_map(move |signer| {
+                    [
+                        SignatureMessage::TransactionHash,
+                        SignatureMessage::Explicit(B256::repeat_byte(0x33)),
+                    ]
+                    .into_iter()
+                    .map(move |msg| FrameSignature {
+                        scheme,
+                        signer,
+                        msg,
+                        signature: vec![0x80; scheme.signature_length().unwrap_or(256)].into(),
+                    })
+                })
+            })
+            .collect(),
+            fees: TransactionFees {
+                max_priority_fee_per_gas: U256::from(1) << 128,
+                max_fee_per_gas: U256::MAX,
+                max_fee_per_blob_gas: U256::MAX,
+            },
+            blob_versioned_hashes: vec![B256::repeat_byte(VERSIONED_HASH_VERSION_KZG); 6],
+        }
+    }
+
+    fn roundtrip_transactions() -> impl Iterator<Item = TxEip8141> {
+        [TxEip8141::default(), populated_tx()].into_iter().chain((0..512).map(arbitrary_tx))
+    }
+
+    #[test]
+    fn arbitrary_rlp_roundtrip() {
+        for (case, tx) in roundtrip_transactions().enumerate() {
+            let mut encoded = alloy_rlp::encode(&tx);
+            assert_eq!(tx.length(), encoded.len(), "case {case}");
+            let decoded: TxEip8141 = alloy_rlp::decode_exact(&encoded).unwrap();
+            assert_eq!(decoded, tx, "case {case}");
+            assert_eq!(alloy_rlp::encode(&decoded), encoded, "case {case}");
+
+            // The streaming decoder must consume exactly one transaction.
+            encoded.extend_from_slice(&[0x80, 0xc0]);
+            let mut buf = encoded.as_slice();
+            assert_eq!(TxEip8141::decode(&mut buf).unwrap(), tx, "case {case}");
+            assert_eq!(buf, &[0x80, 0xc0], "case {case}");
+            assert!(alloy_rlp::decode_exact::<TxEip8141>(&encoded).is_err(), "case {case}");
+        }
+    }
+
+    #[test]
+    fn arbitrary_2718_and_network_roundtrip() {
+        for (case, tx) in roundtrip_transactions().enumerate() {
+            let mut encoded = tx.encoded_2718();
+            assert_eq!(tx.encode_2718_len(), encoded.len(), "case {case}");
+            let decoded = TxEip8141::decode_2718_exact(&encoded).unwrap();
+            assert_eq!(decoded, tx, "case {case}");
+            assert_eq!(decoded.encoded_2718(), encoded, "case {case}");
+            assert_eq!(tx.tx_hash(), keccak256(&encoded), "case {case}");
+            assert_eq!(decoded.signature_hash(), tx.signature_hash(), "case {case}");
+
+            encoded.extend_from_slice(&[0x80, 0xc0]);
+            let mut buf = encoded.as_slice();
+            assert_eq!(TxEip8141::decode_2718(&mut buf).unwrap(), tx, "case {case}");
+            assert_eq!(buf, &[0x80, 0xc0], "case {case}");
+            assert!(TxEip8141::decode_2718_exact(&encoded).is_err(), "case {case}");
+
+            let mut network = Vec::new();
+            tx.network_encode(&mut network);
+            assert_eq!(tx.network_len(), network.len(), "case {case}");
+            let mut buf = network.as_slice();
+            assert_eq!(TxEip8141::network_decode(&mut buf).unwrap(), tx, "case {case}");
+            assert!(buf.is_empty(), "case {case}");
+            network.extend_from_slice(&[0x80, 0xc0]);
+            let mut buf = network.as_slice();
+            assert_eq!(TxEip8141::network_decode(&mut buf).unwrap(), tx, "case {case}");
+            assert_eq!(buf, &[0x80, 0xc0], "case {case}");
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn arbitrary_serde_roundtrip() {
+        for (case, tx) in roundtrip_transactions().enumerate() {
+            let json = serde_json::to_string(&tx).unwrap();
+            let decoded: TxEip8141 = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, tx, "case {case}");
+            assert_eq!(serde_json::to_string(&decoded).unwrap(), json, "case {case}");
+            // JSON must preserve the exact transaction and signing commitments.
+            assert_eq!(decoded.encoded_2718(), tx.encoded_2718(), "case {case}");
+            assert_eq!(decoded.tx_hash(), tx.tx_hash(), "case {case}");
+            assert_eq!(decoded.signature_hash(), tx.signature_hash(), "case {case}");
+
+            let value = serde_json::to_value(&tx).unwrap();
+            assert_eq!(serde_json::from_value::<TxEip8141>(value).unwrap(), tx, "case {case}");
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_preserves_nested_quantities_and_optional_bytes() {
+        let tx = populated_tx();
+        let json = serde_json::to_value(&tx).unwrap();
+        assert_eq!(json["chainId"], "0xffffffffffffffff");
+        assert_eq!(json["nonce"], "0xffffffffffffffff");
+        assert_eq!(json["frames"][0]["limits"]["execution"], "0xffffffffffffffff");
+        assert_eq!(json["frames"][0]["limits"]["state"], "0xffffffffffffffff");
+        assert_eq!(
+            json["frames"][0]["value"],
+            "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        );
+        assert_eq!(json["fees"]["maxPriorityFeePerGas"], "0x100000000000000000000000000000000");
+        assert_eq!(
+            json["fees"]["maxFeePerGas"],
+            "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        );
+        assert_eq!(
+            json["fees"]["maxFeePerBlobGas"],
+            "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        );
+        assert_eq!(json["frames"][0]["target"], "0x");
+        assert_eq!(json["frames"][1]["target"], "0x0000000000000000000000000000000000000000");
+        assert_eq!(json["signatures"][0]["signer"], "0x");
+        assert_eq!(json["signatures"][2]["signer"], "0x0000000000000000000000000000000000000000");
+        assert_eq!(json["signatures"][0]["msg"], "0x");
+        assert_eq!(
+            json["signatures"][1]["msg"],
+            "0x3333333333333333333333333333333333333333333333333333333333333333"
+        );
+        assert_eq!(serde_json::from_value::<TxEip8141>(json).unwrap(), tx);
     }
 
     #[test]
