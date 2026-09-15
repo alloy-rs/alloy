@@ -22,7 +22,7 @@ pub use eip7702::TxEip7702;
 ///
 /// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
 pub mod eip8141;
-pub use eip8141::TxEip8141;
+pub use eip8141::{TxEip8141, TxEip8141ValidationError};
 
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
