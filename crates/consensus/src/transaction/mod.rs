@@ -16,6 +16,14 @@ pub use eip2930::TxEip2930;
 mod eip7702;
 pub use eip7702::TxEip7702;
 
+/// Standalone [EIP-8141] frame transaction type.
+///
+/// This deliberately does not extend Alloy's general transaction-envelope enums.
+///
+/// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
+pub mod eip8141;
+pub use eip8141::{TxEip8141, TxEip8141ValidationError};
+
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;

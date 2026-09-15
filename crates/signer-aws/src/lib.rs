@@ -9,6 +9,8 @@
 #[macro_use]
 extern crate tracing;
 
+use aws_smithy_types as _;
+
 mod signer;
 pub use signer::{AwsSigner, AwsSignerError};
 
