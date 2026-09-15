@@ -20,6 +20,7 @@ use super::Transaction;
 
 static EMPTY_INPUT: Bytes = Bytes::new();
 
+/// RLP signing-preimage view that blanks a transaction-hash signature to avoid self-reference.
 struct SigningSignature<'a>(&'a FrameSignature);
 
 impl Encodable for SigningSignature<'_> {
@@ -53,6 +54,7 @@ impl SigningSignature<'_> {
     }
 }
 
+/// RLP list view of transformed signing entries, including the corresponding list-header length.
 struct SigningSignatures<'a>(&'a [FrameSignature]);
 
 impl Encodable for SigningSignatures<'_> {
