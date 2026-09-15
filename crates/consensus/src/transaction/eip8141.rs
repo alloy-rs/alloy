@@ -13,7 +13,7 @@ use alloy_eips::{
             FRAME_TX_TOTAL_COST_FLOOR_PER_TOKEN, FRAME_TX_TYPE, MAX_FRAMES, TX_VALUE_COST,
         },
         ApprovalScope, Eip8141Error, Frame, FrameLimits, FrameMode, FrameSignature,
-        TransactionFees,
+        SigningFrameSignatures, TransactionFees,
     },
     Typed2718,
 };
@@ -152,7 +152,7 @@ impl TxEip8141 {
 
     /// Hash used by frame signatures.
     pub fn signature_hash(&self) -> B256 {
-        let signatures = SigningSignatures(&self.signatures);
+        let signatures = SigningFrameSignatures::new(&self.signatures);
         let payload_length = self.chain_id.length()
             + self.nonce.length()
             + self.sender.length()
@@ -516,58 +516,6 @@ const fn validate_execution_gas(execution: u64) -> Result<(), TxEip8141Validatio
         return Err(TxEip8141ValidationError::ExecutionGasLimit(execution));
     }
     Ok(())
-}
-
-/// RLP signing-preimage view that blanks a transaction-hash signature to avoid self-reference.
-struct SigningSignature<'a>(&'a FrameSignature);
-
-impl SigningSignature<'_> {
-    fn payload_length(&self) -> usize {
-        self.0.scheme.length()
-            + self.0.signer.length()
-            + self.0.msg.length()
-            + if self.0.signs_transaction_hash() {
-                EMPTY_INPUT.length()
-            } else {
-                self.0.signature.length()
-            }
-    }
-}
-
-impl Encodable for SigningSignature<'_> {
-    fn encode(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.payload_length() }.encode(out);
-        self.0.scheme.encode(out);
-        self.0.signer.encode(out);
-        self.0.msg.encode(out);
-        if self.0.signs_transaction_hash() {
-            EMPTY_INPUT.encode(out);
-        } else {
-            self.0.signature.encode(out);
-        }
-    }
-
-    fn length(&self) -> usize {
-        Header { list: true, payload_length: self.payload_length() }.length_with_payload()
-    }
-}
-
-/// RLP list view of transformed signing entries, including the corresponding list-header length.
-struct SigningSignatures<'a>(&'a [FrameSignature]);
-
-impl Encodable for SigningSignatures<'_> {
-    fn encode(&self, out: &mut dyn BufMut) {
-        let payload_length = self.0.iter().map(|s| SigningSignature(s).length()).sum();
-        Header { list: true, payload_length }.encode(out);
-        for signature in self.0 {
-            SigningSignature(signature).encode(out);
-        }
-    }
-
-    fn length(&self) -> usize {
-        let payload_length = self.0.iter().map(|s| SigningSignature(s).length()).sum();
-        Header { list: true, payload_length }.length_with_payload()
-    }
 }
 
 #[cfg(test)]

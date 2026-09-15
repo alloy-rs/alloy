@@ -173,3 +173,7 @@ ci_info = "0.14.14"
 similar-asserts = "1.5"
 tempfile = "3.20"
 tower-http = "0.6.1"
+
+[patch.crates-io]
+# Temporary until the signing RLP views in alloy-rs/eips#130 are released.
+alloy-eip8141 = { git = "https://github.com/alloy-rs/eips", rev = "dfce049c10d0ce4409d2855f86f013b25214628e" }
