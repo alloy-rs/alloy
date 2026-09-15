@@ -92,78 +92,12 @@ impl TxEip8141 {
     /// execution gas cap. It does not verify signatures cryptographically, execute frames, or
     /// check chain state, block capacity, base fees, or blob sidecars.
     pub fn validate(&self) -> Result<(), TxEip8141ValidationError> {
-        use TxEip8141ValidationError as Error;
-
-        if self.frames.is_empty() || self.frames.len() > MAX_FRAMES {
-            return Err(Error::FrameCount(self.frames.len()));
-        }
-        if self.fees.max_priority_fee_per_gas > self.fees.max_fee_per_gas {
-            return Err(Error::PriorityFeeAboveMaxFee);
-        }
-        if self.blob_versioned_hashes.is_empty() && !self.fees.max_fee_per_blob_gas.is_zero() {
-            return Err(Error::BlobFeeWithoutBlobs);
-        }
-        if self.blob_versioned_hashes.len() as u64 > MAX_BLOBS_PER_TX_FUSAKA {
-            return Err(Error::BlobCount(self.blob_versioned_hashes.len()));
-        }
-        for (index, hash) in self.blob_versioned_hashes.iter().enumerate() {
-            if hash[0] != VERSIONED_HASH_VERSION_KZG {
-                return Err(Error::BlobVersion { index, version: hash[0] });
-            }
-        }
-        for (index, signature) in self.signatures.iter().enumerate() {
-            if signature.explicit_message().is_some_and(|msg| msg.is_zero()) {
-                return Err(Error::Signature { index, source: Eip8141Error::ZeroMessage });
-            }
-            signature
-                .validate_structure_with_sender(self.sender)
-                .map_err(|source| Error::Signature { index, source })?;
-        }
-
-        let mut frame_gas = 0u64;
-        let mut expiry_verifier = false;
-        let mut previous_atomic = false;
-        for (index, frame) in self.frames.iter().enumerate() {
-            if frame.has_reserved_flags() {
-                return Err(Error::ReservedFlags { index, flags: frame.flags });
-            }
-            if !frame.value.is_zero() && frame.mode != FrameMode::Sender {
-                return Err(Error::ValueOutsideSenderFrame { index });
-            }
-            if matches!(
-                frame.allowed_scope(),
-                ApprovalScope::Execution | ApprovalScope::ExecutionAndPayment
-            ) && frame.resolved_target(self.sender) != self.sender
-            {
-                return Err(Error::ExecutionApprovalTarget { index });
-            }
-            let atomic = frame.is_atomic_batch();
-            if atomic
-                && (frame.mode == FrameMode::Verify
-                    || self.frames.get(index + 1).is_none_or(|next| next.mode == FrameMode::Verify))
-            {
-                return Err(Error::AtomicBatch { index });
-            }
-            if (atomic || previous_atomic) && frame.allowed_scope() != ApprovalScope::None {
-                return Err(Error::ApprovalInAtomicBatch { index });
-            }
-            previous_atomic = atomic;
-            if frame.is_expiry_verifier() {
-                if expiry_verifier || !frame.has_valid_expiry_verifier_fields() {
-                    return Err(Error::ExpiryVerifier { index });
-                }
-                expiry_verifier = true;
-            }
-            frame_gas = frame_gas
-                .checked_add(frame.limits.execution)
-                .and_then(|gas| gas.checked_add(frame.limits.state))
-                .ok_or(Error::FrameGasOverflow)?;
-        }
-        let execution = self.gas_limits().execution;
-        if execution > MAX_TX_GAS_LIMIT_OSAKA {
-            return Err(Error::ExecutionGasLimit(execution));
-        }
-        Ok(())
+        validate_frame_count(self.frames.len())?;
+        validate_fees(&self.fees)?;
+        validate_blobs(&self.blob_versioned_hashes, self.fees.max_fee_per_blob_gas)?;
+        validate_signatures(&self.signatures, self.sender)?;
+        validate_frames(&self.frames, self.sender)?;
+        validate_execution_gas(self.gas_limits().execution)
     }
 
     /// Returns the execution and state gas reservations of the transaction.
@@ -445,6 +379,145 @@ pub enum TxEip8141ValidationError {
 
 static EMPTY_INPUT: Bytes = Bytes::new();
 
+const fn validate_frame_count(count: usize) -> Result<(), TxEip8141ValidationError> {
+    if count == 0 || count > MAX_FRAMES {
+        return Err(TxEip8141ValidationError::FrameCount(count));
+    }
+    Ok(())
+}
+
+fn validate_fees(fees: &TransactionFees) -> Result<(), TxEip8141ValidationError> {
+    if fees.max_priority_fee_per_gas > fees.max_fee_per_gas {
+        return Err(TxEip8141ValidationError::PriorityFeeAboveMaxFee);
+    }
+    Ok(())
+}
+
+fn validate_blobs(
+    hashes: &[B256],
+    max_fee_per_blob_gas: U256,
+) -> Result<(), TxEip8141ValidationError> {
+    use TxEip8141ValidationError as Error;
+
+    if hashes.is_empty() && !max_fee_per_blob_gas.is_zero() {
+        return Err(Error::BlobFeeWithoutBlobs);
+    }
+    if hashes.len() as u64 > MAX_BLOBS_PER_TX_FUSAKA {
+        return Err(Error::BlobCount(hashes.len()));
+    }
+    for (index, hash) in hashes.iter().enumerate() {
+        if hash[0] != VERSIONED_HASH_VERSION_KZG {
+            return Err(Error::BlobVersion { index, version: hash[0] });
+        }
+    }
+    Ok(())
+}
+
+fn validate_signatures(
+    signatures: &[FrameSignature],
+    sender: Address,
+) -> Result<(), TxEip8141ValidationError> {
+    for (index, signature) in signatures.iter().enumerate() {
+        if signature.explicit_message().is_some_and(|msg| msg.is_zero()) {
+            return Err(TxEip8141ValidationError::Signature {
+                index,
+                source: Eip8141Error::ZeroMessage,
+            });
+        }
+        signature
+            .validate_structure_with_sender(sender)
+            .map_err(|source| TxEip8141ValidationError::Signature { index, source })?;
+    }
+    Ok(())
+}
+
+/// Checks frame fields and the rules that depend on surrounding frames.
+fn validate_frames(frames: &[Frame], sender: Address) -> Result<(), TxEip8141ValidationError> {
+    let mut frame_gas = 0;
+    let mut seen_expiry_verifier = false;
+    let mut previous_atomic = false;
+    for (index, frame) in frames.iter().enumerate() {
+        validate_frame_fields(frame, sender, index)?;
+        validate_atomic_batch(frame, frames.get(index + 1), previous_atomic, index)?;
+        validate_expiry_verifier(frame, seen_expiry_verifier, index)?;
+        frame_gas = checked_frame_gas(frame_gas, frame.limits)?;
+        previous_atomic = frame.is_atomic_batch();
+        seen_expiry_verifier |= frame.is_expiry_verifier();
+    }
+    Ok(())
+}
+
+fn validate_frame_fields(
+    frame: &Frame,
+    sender: Address,
+    index: usize,
+) -> Result<(), TxEip8141ValidationError> {
+    use TxEip8141ValidationError as Error;
+
+    if frame.has_reserved_flags() {
+        return Err(Error::ReservedFlags { index, flags: frame.flags });
+    }
+    if !frame.value.is_zero() && frame.mode != FrameMode::Sender {
+        return Err(Error::ValueOutsideSenderFrame { index });
+    }
+    if matches!(
+        frame.allowed_scope(),
+        ApprovalScope::Execution | ApprovalScope::ExecutionAndPayment
+    ) && frame.resolved_target(sender) != sender
+    {
+        return Err(Error::ExecutionApprovalTarget { index });
+    }
+    Ok(())
+}
+
+fn validate_atomic_batch(
+    frame: &Frame,
+    next: Option<&Frame>,
+    previous_atomic: bool,
+    index: usize,
+) -> Result<(), TxEip8141ValidationError> {
+    use TxEip8141ValidationError as Error;
+
+    let atomic = frame.is_atomic_batch();
+    if atomic
+        && (frame.mode == FrameMode::Verify
+            || next.is_none_or(|next| next.mode == FrameMode::Verify))
+    {
+        return Err(Error::AtomicBatch { index });
+    }
+    if (atomic || previous_atomic) && frame.allowed_scope() != ApprovalScope::None {
+        return Err(Error::ApprovalInAtomicBatch { index });
+    }
+    Ok(())
+}
+
+fn validate_expiry_verifier(
+    frame: &Frame,
+    seen_expiry_verifier: bool,
+    index: usize,
+) -> Result<(), TxEip8141ValidationError> {
+    if frame.is_expiry_verifier()
+        && (seen_expiry_verifier || !frame.has_valid_expiry_verifier_fields())
+    {
+        return Err(TxEip8141ValidationError::ExpiryVerifier { index });
+    }
+    Ok(())
+}
+
+fn checked_frame_gas(total: u64, limits: FrameLimits) -> Result<u64, TxEip8141ValidationError> {
+    total
+        .checked_add(limits.execution)
+        .and_then(|gas| gas.checked_add(limits.state))
+        .ok_or(TxEip8141ValidationError::FrameGasOverflow)
+}
+
+const fn validate_execution_gas(execution: u64) -> Result<(), TxEip8141ValidationError> {
+    if execution > MAX_TX_GAS_LIMIT_OSAKA {
+        return Err(TxEip8141ValidationError::ExecutionGasLimit(execution));
+    }
+    Ok(())
+}
+
 /// RLP signing-preimage view that blanks a transaction-hash signature to avoid self-reference.
 struct SigningSignature<'a>(&'a FrameSignature);
 
@@ -687,19 +760,19 @@ mod tests {
 
     #[test]
     fn validates_arbitrary_signatures_without_signers() {
-        let mut tx = valid_tx();
-        tx.signatures.push(FrameSignature::default());
-        assert_eq!(tx.validate(), Ok(()));
+        assert_eq!(validate_signatures(&[FrameSignature::default()], Address::ZERO), Ok(()));
     }
 
     #[test]
     fn rejects_arbitrary_signature_with_signer() {
-        let mut tx = valid_tx();
-        tx.signatures.push(FrameSignature { signer: Address::ZERO.into(), ..Default::default() });
+        let signatures = [
+            FrameSignature::default(),
+            FrameSignature { signer: Address::ZERO.into(), ..Default::default() },
+        ];
         assert_eq!(
-            tx.validate(),
+            validate_signatures(&signatures, Address::ZERO),
             Err(TxEip8141ValidationError::Signature {
-                index: 0,
+                index: 1,
                 source: Eip8141Error::UnexpectedSigner
             })
         );
@@ -707,14 +780,13 @@ mod tests {
 
     #[test]
     fn rejects_noncanonical_secp256k1_signature() {
-        let mut tx = valid_tx();
-        tx.signatures.push(FrameSignature {
+        let signature = FrameSignature {
             scheme: SignatureScheme::Secp256k1,
             signature: Bytes::from(vec![0; 65]),
             ..Default::default()
-        });
+        };
         assert_eq!(
-            tx.validate(),
+            validate_signatures(&[signature], Address::ZERO),
             Err(TxEip8141ValidationError::Signature {
                 index: 0,
                 source: Eip8141Error::InvalidSignatureScalar
@@ -894,48 +966,125 @@ mod tests {
 
     #[test]
     fn validates_frame_counts() {
-        let mut tx = valid_tx();
-        for count in [0, MAX_FRAMES, MAX_FRAMES + 1] {
-            tx.frames = vec![Frame::default(); count];
-            let expected = if count == MAX_FRAMES {
+        for count in [0, 1, MAX_FRAMES, MAX_FRAMES + 1] {
+            let expected = if count == 1 || count == MAX_FRAMES {
                 Ok(())
             } else {
                 Err(TxEip8141ValidationError::FrameCount(count))
             };
-            assert_eq!(tx.validate(), expected);
+            assert_eq!(validate_frame_count(count), expected);
         }
     }
 
     #[test]
-    fn validates_frame_flags_targets_and_value() {
-        use TxEip8141ValidationError as Error;
-        let mut tx = valid_tx();
-        tx.frames[0].flags = 8;
-        assert_eq!(tx.validate(), Err(Error::ReservedFlags { index: 0, flags: 8 }));
-        tx.frames[0].flags = 0;
-        tx.frames[0].value = U256::from(1);
-        for mode in [FrameMode::Default, FrameMode::Verify] {
-            tx.frames[0].mode = mode;
-            assert_eq!(tx.validate(), Err(Error::ValueOutsideSenderFrame { index: 0 }));
+    fn validates_fee_ordering() {
+        for (priority, max, expected) in [
+            (U256::ZERO, U256::ZERO, Ok(())),
+            (U256::ZERO, U256::from(1), Ok(())),
+            (U256::from(1), U256::from(1), Ok(())),
+            (U256::MAX, U256::MAX, Ok(())),
+            (U256::from(1), U256::ZERO, Err(TxEip8141ValidationError::PriorityFeeAboveMaxFee)),
+        ] {
+            let fees = TransactionFees {
+                max_priority_fee_per_gas: priority,
+                max_fee_per_gas: max,
+                ..Default::default()
+            };
+            assert_eq!(validate_fees(&fees), expected);
         }
-        tx.frames[0].mode = FrameMode::Sender;
-        assert_eq!(tx.validate(), Ok(()));
-        tx.frames[0].value = U256::ZERO;
+    }
+
+    #[test]
+    fn validates_reserved_frame_flags() {
+        use TxEip8141ValidationError as Error;
+        for flags in 0..=u8::MAX {
+            let frame = Frame { flags, ..Default::default() };
+            let expected =
+                if flags < 8 { Ok(()) } else { Err(Error::ReservedFlags { index: 3, flags }) };
+            assert_eq!(validate_frame_fields(&frame, Address::ZERO, 3), expected);
+        }
+    }
+
+    #[test]
+    fn validates_frame_value() {
+        use TxEip8141ValidationError as Error;
+        for mode in [FrameMode::Default, FrameMode::Verify, FrameMode::Sender] {
+            let mut frame = Frame { mode, ..Default::default() };
+            assert_eq!(validate_frame_fields(&frame, Address::ZERO, 2), Ok(()));
+            frame.value = U256::from(1);
+            let expected = if mode == FrameMode::Sender {
+                Ok(())
+            } else {
+                Err(Error::ValueOutsideSenderFrame { index: 2 })
+            };
+            assert_eq!(validate_frame_fields(&frame, Address::ZERO, 2), expected);
+        }
+    }
+
+    #[test]
+    fn validates_execution_approval_target() {
+        use TxEip8141ValidationError as Error;
+        let sender = Address::repeat_byte(2);
+        let mut frame = Frame::default();
         for scope in [ApprovalScope::Execution, ApprovalScope::ExecutionAndPayment] {
-            tx.frames[0].flags = scope as u8;
-            for target in [FrameAddress::default(), tx.sender.into()] {
-                tx.frames[0].target = target;
-                assert_eq!(tx.validate(), Ok(()));
+            frame.flags = scope as u8;
+            for target in [FrameAddress::default(), sender.into()] {
+                frame.target = target;
+                assert_eq!(validate_frame_fields(&frame, sender, 1), Ok(()));
             }
-            tx.frames[0].target = Address::repeat_byte(1).into();
-            assert_eq!(tx.validate(), Err(Error::ExecutionApprovalTarget { index: 0 }));
+            for target in [Address::ZERO, Address::repeat_byte(1)] {
+                frame.target = target.into();
+                assert_eq!(
+                    validate_frame_fields(&frame, sender, 1),
+                    Err(Error::ExecutionApprovalTarget { index: 1 })
+                );
+            }
         }
         // Payment approval may target a paymaster, and VERIFY does not require an approval scope.
-        tx.frames[0].flags = ApprovalScope::Payment as u8;
-        assert_eq!(tx.validate(), Ok(()));
-        tx.frames[0].mode = FrameMode::Verify;
-        tx.frames[0].flags = 0;
-        assert_eq!(tx.validate(), Ok(()));
+        frame.flags = ApprovalScope::Payment as u8;
+        assert_eq!(validate_frame_fields(&frame, sender, 1), Ok(()));
+        frame.mode = FrameMode::Verify;
+        frame.flags = 0;
+        assert_eq!(validate_frame_fields(&frame, sender, 1), Ok(()));
+    }
+
+    #[test]
+    fn validates_atomic_batch_context() {
+        use TxEip8141ValidationError as Error;
+        let next = Frame::default();
+        let verify = Frame { mode: FrameMode::Verify, ..Default::default() };
+        let mut frame = Frame { flags: 4, ..Default::default() };
+        assert_eq!(validate_atomic_batch(&frame, Some(&next), false, 2), Ok(()));
+        for next in [None, Some(&verify)] {
+            assert_eq!(
+                validate_atomic_batch(&frame, next, false, 2),
+                Err(Error::AtomicBatch { index: 2 })
+            );
+        }
+        frame.mode = FrameMode::Verify;
+        assert_eq!(
+            validate_atomic_batch(&frame, Some(&next), false, 2),
+            Err(Error::AtomicBatch { index: 2 })
+        );
+        frame.mode = FrameMode::Default;
+        for scope in
+            [ApprovalScope::Execution, ApprovalScope::Payment, ApprovalScope::ExecutionAndPayment]
+        {
+            frame.flags = 4 | scope as u8;
+            assert_eq!(
+                validate_atomic_batch(&frame, Some(&next), false, 2),
+                Err(Error::ApprovalInAtomicBatch { index: 2 })
+            );
+            // The unflagged terminator is still part of the preceding batch.
+            frame.flags = scope as u8;
+            assert_eq!(
+                validate_atomic_batch(&frame, None, true, 2),
+                Err(Error::ApprovalInAtomicBatch { index: 2 })
+            );
+            assert_eq!(validate_atomic_batch(&frame, None, false, 2), Ok(()));
+        }
+        frame.flags = 0;
+        assert_eq!(validate_atomic_batch(&frame, None, true, 2), Ok(()));
     }
 
     #[test]
@@ -966,45 +1115,133 @@ mod tests {
     #[test]
     fn validates_expiry_verifiers() {
         use TxEip8141ValidationError as Error;
-        let mut tx = valid_tx();
         let expiry = Frame {
             mode: FrameMode::Verify,
             target: EXPIRY_VERIFIER.into(),
             data: Bytes::from(1_000u64.to_be_bytes().to_vec()),
             ..Default::default()
         };
-        tx.frames[0] = expiry.clone();
-        assert_eq!(tx.validate(), Ok(()));
-        tx.frames[0].flags = 1;
-        assert_eq!(tx.validate(), Err(Error::ExpiryVerifier { index: 0 }));
-        tx.frames[0] = expiry.clone();
-        tx.frames[0].limits.state = 1;
-        assert_eq!(tx.validate(), Err(Error::ExpiryVerifier { index: 0 }));
+        assert_eq!(validate_expiry_verifier(&expiry, false, 3), Ok(()));
+        assert_eq!(
+            validate_expiry_verifier(&expiry, true, 3),
+            Err(Error::ExpiryVerifier { index: 3 })
+        );
+        assert_eq!(validate_expiry_verifier(&Frame::default(), true, 3), Ok(()));
+        let mut frame = expiry.clone();
+        frame.flags = 1;
+        assert_eq!(
+            validate_expiry_verifier(&frame, false, 3),
+            Err(Error::ExpiryVerifier { index: 3 })
+        );
+        frame = expiry.clone();
+        frame.limits.state = 1;
+        assert_eq!(
+            validate_expiry_verifier(&frame, false, 3),
+            Err(Error::ExpiryVerifier { index: 3 })
+        );
         for len in [0, 7, 9] {
-            tx.frames[0] = expiry.clone();
-            tx.frames[0].data = vec![0; len].into();
-            assert_eq!(tx.validate(), Err(Error::ExpiryVerifier { index: 0 }));
+            frame = expiry.clone();
+            frame.data = vec![0; len].into();
+            assert_eq!(
+                validate_expiry_verifier(&frame, false, 3),
+                Err(Error::ExpiryVerifier { index: 3 })
+            );
         }
-        tx.frames = vec![expiry.clone(), expiry];
-        assert_eq!(tx.validate(), Err(Error::ExpiryVerifier { index: 1 }));
+        let frames = [expiry.clone(), Frame::default(), expiry];
+        assert_eq!(
+            validate_frames(&frames, Address::ZERO),
+            Err(Error::ExpiryVerifier { index: 2 })
+        );
     }
 
     #[test]
     fn validates_blob_fields() {
         use TxEip8141ValidationError as Error;
-        let mut tx = valid_tx();
-        tx.fees.max_fee_per_blob_gas = U256::from(1);
-        assert_eq!(tx.validate(), Err(Error::BlobFeeWithoutBlobs));
-        tx.blob_versioned_hashes = vec![B256::repeat_byte(VERSIONED_HASH_VERSION_KZG); 6];
-        assert_eq!(tx.validate(), Ok(()));
+        assert_eq!(validate_blobs(&[], U256::ZERO), Ok(()));
+        assert_eq!(validate_blobs(&[], U256::from(1)), Err(Error::BlobFeeWithoutBlobs));
+        let mut hashes = vec![B256::repeat_byte(VERSIONED_HASH_VERSION_KZG); 6];
+        assert_eq!(validate_blobs(&hashes, U256::from(1)), Ok(()));
         // The blob base fee is checked by the execution client at block inclusion.
-        tx.fees.max_fee_per_blob_gas = U256::ZERO;
+        assert_eq!(validate_blobs(&hashes, U256::ZERO), Ok(()));
+        hashes.push(B256::repeat_byte(VERSIONED_HASH_VERSION_KZG));
+        assert_eq!(validate_blobs(&hashes, U256::ZERO), Err(Error::BlobCount(7)));
+        hashes.pop();
+        hashes[1] = B256::ZERO;
+        assert_eq!(
+            validate_blobs(&hashes, U256::ZERO),
+            Err(Error::BlobVersion { index: 1, version: 0 })
+        );
+    }
+
+    #[test]
+    fn validates_frame_gas_sum() {
+        use TxEip8141ValidationError as Error;
+        assert_eq!(checked_frame_gas(10, FrameLimits { execution: 20, state: 30 }), Ok(60));
+        assert_eq!(
+            checked_frame_gas(0, FrameLimits { execution: 0, state: u64::MAX }),
+            Ok(u64::MAX)
+        );
+        assert_eq!(
+            checked_frame_gas(0, FrameLimits { execution: 1, state: u64::MAX }),
+            Err(Error::FrameGasOverflow)
+        );
+        assert_eq!(
+            checked_frame_gas(u64::MAX, FrameLimits { execution: 1, state: 0 }),
+            Err(Error::FrameGasOverflow)
+        );
+    }
+
+    #[test]
+    fn validates_execution_gas_cap() {
+        assert_eq!(validate_execution_gas(0), Ok(()));
+        assert_eq!(validate_execution_gas(MAX_TX_GAS_LIMIT_OSAKA), Ok(()));
+        assert_eq!(
+            validate_execution_gas(MAX_TX_GAS_LIMIT_OSAKA + 1),
+            Err(TxEip8141ValidationError::ExecutionGasLimit(MAX_TX_GAS_LIMIT_OSAKA + 1))
+        );
+    }
+
+    #[test]
+    fn validation_reports_first_failure() {
+        use TxEip8141ValidationError as Error;
+        let mut tx = TxEip8141 {
+            fees: TransactionFees { max_priority_fee_per_gas: U256::from(1), ..Default::default() },
+            blob_versioned_hashes: vec![B256::ZERO],
+            signatures: vec![FrameSignature {
+                msg: SignatureMessage::Explicit(B256::ZERO),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert_eq!(tx.validate(), Err(Error::FrameCount(0)));
+        tx.frames = vec![
+            Frame {
+                flags: 8,
+                limits: FrameLimits { execution: 1, state: u64::MAX },
+                ..Default::default()
+            },
+            Frame { flags: 16, ..Default::default() },
+        ];
+        assert_eq!(tx.validate(), Err(Error::PriorityFeeAboveMaxFee));
+        tx.fees = TransactionFees::default();
+        assert_eq!(tx.validate(), Err(Error::BlobVersion { index: 0, version: 0 }));
+        tx.blob_versioned_hashes.clear();
+        assert_eq!(
+            tx.validate(),
+            Err(Error::Signature { index: 0, source: Eip8141Error::ZeroMessage })
+        );
+        tx.signatures.clear();
+        assert_eq!(tx.validate(), Err(Error::ReservedFlags { index: 0, flags: 8 }));
+        tx.frames[0].flags = 0;
+        // An overflowing frame is reported before a malformed later frame.
+        assert_eq!(tx.validate(), Err(Error::FrameGasOverflow));
+        tx.frames[0].limits = FrameLimits { execution: MAX_TX_GAS_LIMIT_OSAKA, state: 0 };
+        assert_eq!(tx.validate(), Err(Error::ReservedFlags { index: 1, flags: 16 }));
+        tx.frames[1].flags = 0;
+        // The execution cap is checked after all frame fields and budgets.
+        assert_eq!(tx.validate(), Err(Error::ExecutionGasLimit(MAX_TX_GAS_LIMIT_OSAKA + 12_950)));
+        tx.frames[0].limits.execution = 0;
         assert_eq!(tx.validate(), Ok(()));
-        tx.blob_versioned_hashes.push(B256::repeat_byte(VERSIONED_HASH_VERSION_KZG));
-        assert_eq!(tx.validate(), Err(Error::BlobCount(7)));
-        tx.blob_versioned_hashes.pop();
-        tx.blob_versioned_hashes[1] = B256::ZERO;
-        assert_eq!(tx.validate(), Err(Error::BlobVersion { index: 1, version: 0 }));
     }
 
     #[test]
