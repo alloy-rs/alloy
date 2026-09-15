@@ -67,5 +67,3 @@ license-files = [{ path = "LICENSE", hash = 0x001c7e6c }]
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# Temporary until the alloy-eip8141 signing RLP views are released.
-allow-git = ["https://github.com/alloy-rs/eips"]

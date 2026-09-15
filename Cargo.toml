@@ -90,7 +90,7 @@ alloy-eip2124 = { version = "0.2.0", default-features = false }
 alloy-eip2930 = { version = "0.2.3", default-features = false }
 alloy-eip7702 = { version = "0.6.3", default-features = false }
 alloy-eip7928 = { version = "0.4", default-features = false }
-alloy-eip8141 = { version = "0.1.0", default-features = false }
+alloy-eip8141 = { version = "0.1.1", default-features = false }
 
 # hardforks
 alloy-hardforks = "0.2.0"
@@ -173,7 +173,3 @@ ci_info = "0.14.14"
 similar-asserts = "1.5"
 tempfile = "3.20"
 tower-http = "0.6.1"
-
-[patch.crates-io]
-# Temporary until the signing RLP views in alloy-rs/eips#130 are released.
-alloy-eip8141 = { git = "https://github.com/alloy-rs/eips", rev = "dfce049c10d0ce4409d2855f86f013b25214628e" }
