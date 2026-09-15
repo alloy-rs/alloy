@@ -3,6 +3,7 @@
 use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
+    eip7623::tokens_in_calldata,
     eip7825::MAX_TX_GAS_LIMIT_OSAKA,
     eip8141::{
         constants::{
@@ -70,11 +71,6 @@ impl Encodable for SigningSignatures<'_> {
         let payload_length = self.0.iter().map(|s| SigningSignature(s).length()).sum();
         Header { list: true, payload_length }.length_with_payload()
     }
-}
-
-/// Counts frame calldata tokens: zero bytes cost one token and other bytes cost four.
-pub fn count_frame_data_tokens(data: &[u8]) -> u64 {
-    data.iter().fold(0, |n, byte| n.saturating_add(if *byte == 0 { 1 } else { 4 }))
 }
 
 /// An EIP-8141 frame transaction.
@@ -169,7 +165,12 @@ impl TxEip8141 {
         let data = self
             .frames
             .iter()
-            .fold(0u64, |n, frame| n.saturating_add(count_frame_data_tokens(&frame.data)));
+            .fold(0u64, |n, frame| n.saturating_add(tokens_in_calldata(&frame.data)));
+        let data = self.signatures.iter().fold(data, |n, signature| {
+            n.saturating_add(tokens_in_calldata(signature.signer.as_bytes()))
+                .saturating_add(tokens_in_calldata(signature.msg.as_bytes()))
+                .saturating_add(tokens_in_calldata(&signature.signature))
+        });
         let signature_gas = self
             .signatures
             .iter()
