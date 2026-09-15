@@ -407,13 +407,45 @@ impl Transaction for TxEip8141 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_eips::eip2718::{Decodable2718, Encodable2718};
+    use alloy_eips::{
+        eip2718::{Decodable2718, Encodable2718},
+        eip8141::SignatureScheme,
+    };
+
+    fn valid_tx() -> TxEip8141 {
+        TxEip8141 { frames: vec![Frame::default()], ..Default::default() }
+    }
 
     #[test]
     fn roundtrips_canonical_encoding() {
-        let tx = TxEip8141 { frames: vec![Frame::default()], ..Default::default() };
+        let tx = valid_tx();
         let encoded = tx.encoded_2718();
         assert_eq!(TxEip8141::decode_2718_exact(&encoded).unwrap(), tx);
         assert_ne!(tx.tx_hash(), B256::ZERO);
+    }
+
+    #[test]
+    fn validates_arbitrary_signatures_without_signers() {
+        let mut tx = valid_tx();
+        tx.signatures.push(FrameSignature::default());
+        assert_eq!(tx.validate(), Ok(()));
+    }
+
+    #[test]
+    fn rejects_arbitrary_signature_with_signer() {
+        let mut tx = valid_tx();
+        tx.signatures.push(FrameSignature { signer: Address::ZERO.into(), ..Default::default() });
+        assert_eq!(tx.validate(), Err("arbitrary signatures must not contain signer metadata"));
+    }
+
+    #[test]
+    fn rejects_noncanonical_secp256k1_signature() {
+        let mut tx = valid_tx();
+        tx.signatures.push(FrameSignature {
+            scheme: SignatureScheme::Secp256k1,
+            signature: Bytes::from(vec![0; 65]),
+            ..Default::default()
+        });
+        assert_eq!(tx.validate(), Err("frame signature is not canonical"));
     }
 }
