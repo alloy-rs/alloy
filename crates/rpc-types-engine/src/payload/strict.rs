@@ -91,7 +91,10 @@ impl<'de, M: MapAccess<'de>> MapAccess<'de> for StructFields<M> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ExecutionPayloadV3, ExecutionPayloadV4};
+    use crate::{
+        ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadEnvelopeV5,
+        ExecutionPayloadEnvelopeV6, ExecutionPayloadV3, ExecutionPayloadV4,
+    };
     use alloc::{
         collections::BTreeMap,
         string::{String, ToString},
@@ -104,11 +107,18 @@ mod tests {
     use serde_json::{json, Value};
 
     fn payload() -> ExecutionPayloadV4 {
+        let mut payload_inner =
+            ExecutionPayloadV3::from_block_unchecked(B256::ZERO, &Block::<TxEnvelope>::default());
+        payload_inner.payload_inner.payload_inner.transactions =
+            vec![Bytes::from_static(&[0x02, 0x01])];
+        payload_inner.payload_inner.withdrawals = vec![alloy_eips::eip4895::Withdrawal {
+            index: 1,
+            validator_index: 2,
+            address: alloy_primitives::Address::with_last_byte(3),
+            amount: 4,
+        }];
         ExecutionPayloadV4 {
-            payload_inner: ExecutionPayloadV3::from_block_unchecked(
-                B256::ZERO,
-                &Block::<TxEnvelope>::default(),
-            ),
+            payload_inner,
             block_access_list: Bytes::from_static(&[0xc0]),
             slot_number: 7,
         }
@@ -122,8 +132,20 @@ mod tests {
         assert_eq!(&serde_json::from_value::<T>(original.clone()).unwrap(), payload);
 
         for &field in unknown_fields {
-            for value in [json!("0x"), json!("0xc0"), json!(0), json!(false), json!([]), json!({})]
-            {
+            for value in [
+                json!("0x"),
+                json!("0xc0"),
+                json!("null"),
+                json!(0),
+                json!(-1),
+                json!(1.5),
+                json!(false),
+                json!(true),
+                json!([]),
+                json!([null]),
+                json!({}),
+                json!({"nested": [null, {"value": true}]}),
+            ] {
                 let mut input = original.clone();
                 input[field] = value;
                 let error = serde_json::from_value::<T>(input.clone()).unwrap_err();
@@ -144,7 +166,9 @@ mod tests {
             let mut input = original.clone();
             input.as_object_mut().unwrap().remove(field);
             assert!(serde_json::from_value::<T>(input.clone()).is_err(), "missing {field}");
+            assert!(serde_json::from_str::<T>(&input.to_string()).is_err(), "missing {field}");
             input[field] = Value::Null;
+            assert!(serde_json::from_str::<T>(&input.to_string()).is_err(), "null {field}");
             assert!(serde_json::from_value::<T>(input).is_err(), "null {field}");
         }
     }
@@ -221,5 +245,192 @@ mod tests {
     fn nested_and_flattened_payloads() {
         assert_nested(payload().payload_inner);
         assert_nested(payload());
+    }
+
+    fn assert_json<T: DeserializeOwned + Debug + PartialEq>(input: &str, expected: &T) {
+        assert_eq!(&serde_json::from_str::<T>(input).unwrap(), expected);
+        assert_eq!(&serde_json::from_slice::<T>(input.as_bytes()).unwrap(), expected);
+        #[cfg(feature = "std")]
+        assert_eq!(&serde_json::from_reader::<_, T>(input.as_bytes()).unwrap(), expected);
+    }
+
+    fn assert_field_order<T: Serialize + DeserializeOwned + Debug + PartialEq>(payload: T) {
+        let original = serde_json::to_value(&payload).unwrap();
+        let fields: Vec<_> = original
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(key, value)| format!("{}:{value}", serde_json::to_string(key).unwrap()))
+            .collect();
+
+        for index in 0..=fields.len() {
+            let mut fields = fields.clone();
+            fields.insert(index, r#""unknown":null,"another":null"#.into());
+            let input = format!("{{{}}}", fields.join(","));
+            assert_json(&input, &payload);
+
+            for extra in [
+                r#""unknown":null,"another":false"#,
+                r#""unknown":false,"another":null"#,
+                r#""unknown":null,"unknown":{}"#,
+                r#""unknown":[],"unknown":null"#,
+            ] {
+                fields[index] = extra.into();
+                let input = format!("{{{}}}", fields.join(","));
+                let error = serde_json::from_str::<T>(&input).unwrap_err();
+                assert!(error.to_string().contains("unknown field"), "{error}");
+            }
+        }
+    }
+
+    #[test]
+    fn unknown_fields_at_any_position() {
+        assert_field_order(payload().payload_inner);
+        assert_field_order(payload());
+    }
+
+    fn assert_duplicate_fields<T: Serialize + DeserializeOwned + Debug>(payload: T) {
+        let original = serde_json::to_value(payload).unwrap();
+        let serialized = original.to_string();
+        let fields = &serialized[1..serialized.len() - 1];
+        // Construct JSON directly because Value would discard duplicate keys.
+        for (field, value) in original.as_object().unwrap() {
+            let input = format!(r#"{{{fields},"{field}":{value},"unknown":null}}"#);
+            let error = serde_json::from_str::<T>(&input).unwrap_err();
+            assert!(error.to_string().contains(&format!("duplicate field `{field}`")), "{error}");
+        }
+    }
+
+    #[test]
+    fn duplicate_known_fields_are_rejected() {
+        assert_duplicate_fields(payload().payload_inner);
+        assert_duplicate_fields(payload());
+    }
+
+    fn assert_escaped_fields<T: Serialize + DeserializeOwned + Debug + PartialEq>(payload: T) {
+        let original = serde_json::to_string(&payload).unwrap();
+        let escaped = original.replace("parentHash", r"parent\u0048ash");
+        assert_json(&escaped, &payload);
+
+        let fields = &escaped[1..escaped.len() - 1];
+        assert_json(&format!(r#"{{{fields},"un\u006bnown":null}}"#), &payload);
+        let error =
+            serde_json::from_str::<T>(&format!(r#"{{{fields},"un\u006bnown":true}}"#)).unwrap_err();
+        assert!(error.to_string().contains("unknown field `unknown`"), "{error}");
+        let error = serde_json::from_str::<T>(&format!(
+            r#"{{{fields},"parentHash":{}}}"#,
+            serde_json::to_value(&payload).unwrap()["parentHash"]
+        ))
+        .unwrap_err();
+        assert!(error.to_string().contains("duplicate field `parentHash`"), "{error}");
+    }
+
+    #[test]
+    fn escaped_field_names() {
+        assert_escaped_fields(payload().payload_inner);
+        assert_escaped_fields(payload());
+    }
+
+    fn assert_envelope<T: Serialize + DeserializeOwned + Debug + PartialEq>(envelope: T) {
+        let mut input = serde_json::to_value(&envelope).unwrap();
+        // The payload's strictness must not apply to the enclosing response's fields.
+        input["unknown"] = json!({"metadata": true});
+        input["executionPayload"]["unknown"] = Value::Null;
+        assert_json(&input.to_string(), &envelope);
+        input["executionPayload"]["unknown"] = json!(true);
+        assert!(serde_json::from_value::<T>(input.clone()).is_err());
+        assert!(serde_json::from_str::<T>(&input.to_string()).is_err());
+    }
+
+    #[test]
+    fn execution_payload_envelopes_v3_through_v6() {
+        let v3 = ExecutionPayloadEnvelopeV3 {
+            execution_payload: payload().payload_inner,
+            block_value: alloy_primitives::U256::from(42),
+            blobs_bundle: Default::default(),
+            should_override_builder: true,
+        };
+        let v4 = ExecutionPayloadEnvelopeV4 {
+            envelope_inner: v3.clone(),
+            execution_requests: Default::default(),
+        };
+        let v5 = ExecutionPayloadEnvelopeV5 {
+            execution_payload: v3.execution_payload.clone(),
+            block_value: v3.block_value,
+            blobs_bundle: Default::default(),
+            should_override_builder: true,
+            execution_requests: Default::default(),
+        };
+        let v6 = ExecutionPayloadEnvelopeV6 {
+            execution_payload: payload(),
+            block_value: v3.block_value,
+            blobs_bundle: Default::default(),
+            should_override_builder: true,
+            execution_requests: Default::default(),
+        };
+        assert_envelope(v3);
+        assert_envelope(v4);
+        assert_envelope(v5);
+        assert_envelope(v6);
+    }
+
+    fn assert_flattened_siblings<T: Serialize + DeserializeOwned + Debug + PartialEq>(payload: T) {
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct Extension {
+            metadata: Value,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct PayloadFirst<T> {
+            #[serde(flatten)]
+            payload: T,
+            #[serde(flatten)]
+            extension: Extension,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct PayloadLast<T> {
+            #[serde(flatten)]
+            extension: Extension,
+            #[serde(flatten)]
+            payload: T,
+        }
+
+        #[derive(Debug, Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct StrictOuter<T> {
+            #[serde(flatten)]
+            payload: T,
+            metadata: Value,
+        }
+
+        let original = serde_json::to_string(&payload).unwrap();
+        let fields = &original[1..original.len() - 1];
+        for metadata in [json!(null), json!(true), json!({"nested": [1, 2]})] {
+            for input in [
+                format!(r#"{{"metadata":{metadata},{fields}}}"#),
+                format!(r#"{{{fields},"metadata":{metadata}}}"#),
+            ] {
+                let first = serde_json::from_str::<PayloadFirst<T>>(&input).unwrap();
+                let last = serde_json::from_str::<PayloadLast<T>>(&input).unwrap();
+                assert_eq!(first.payload, payload);
+                assert_eq!(last.payload, payload);
+                assert_eq!(first.extension, last.extension);
+                assert_eq!(first.extension.metadata, metadata);
+                let outer = serde_json::from_str::<StrictOuter<T>>(&input).unwrap();
+                assert_eq!(outer.payload, payload);
+                assert_eq!(outer.metadata, metadata);
+                let mut input: Value = serde_json::from_str(&input).unwrap();
+                input["unknown"] = json!(true);
+                let error = serde_json::from_value::<StrictOuter<T>>(input).unwrap_err();
+                assert!(error.to_string().contains("unknown field"), "{error}");
+            }
+        }
+    }
+
+    #[test]
+    fn flattened_siblings_and_strict_outer() {
+        assert_flattened_siblings(payload().payload_inner);
+        assert_flattened_siblings(payload());
     }
 }
