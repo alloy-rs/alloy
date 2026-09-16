@@ -1053,7 +1053,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{PooledTransaction, Recovered, SignableTransaction, SignerRecoverable},
+        transaction::{PooledTransaction, Recovered, SignableTransaction},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
