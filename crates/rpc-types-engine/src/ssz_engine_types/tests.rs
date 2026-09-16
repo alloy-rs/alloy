@@ -307,6 +307,11 @@ fn every_payload_status_roundtrips() {
 }
 
 #[test]
+fn payload_status_kind_rejects_trailing_bytes() {
+    assert!(PayloadStatusKind::from_ssz_bytes(&[0, 0]).is_err());
+}
+
+#[test]
 fn payload_status_preserves_absent_invalid_validation_error() {
     let mut bytes = Vec::new();
     let mut encoder = ssz::SszEncoder::container(&mut bytes, 9);
