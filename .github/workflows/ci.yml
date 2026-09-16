@@ -43,7 +43,7 @@ jobs:
             flags: "--all-features"
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -84,7 +84,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -105,7 +105,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -148,7 +148,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -185,7 +185,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -213,7 +213,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -240,7 +240,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -254,7 +254,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -277,7 +277,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -300,7 +300,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -319,7 +319,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -344,7 +344,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@e080a269a3d37e571ad64e94f72536b48eb9921c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@1d24cba4cc91d718c9dada1c397baf11dc188fc1 # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
