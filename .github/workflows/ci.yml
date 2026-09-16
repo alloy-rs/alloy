@@ -404,6 +404,7 @@ jobs:
       - clippy
       - docs
       - fmt
+      - feature-propagation
       - deny
       - codeql
     steps:
