@@ -324,11 +324,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Zepter
-        uses: tempoxyz/gh-actions/actions/cargo-install@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
         with:
-          tool: zepter
-          version: 1.88.1
-          locked: true
+          tool: zepter@1.88.1
+          checksum: true
+          fallback: cargo-binstall
       - name: run zepter
         run: |
           zepter --version
