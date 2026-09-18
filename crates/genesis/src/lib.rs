@@ -223,10 +223,6 @@ impl Genesis {
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct GenesisAccount {
-    /// Raw chain-specific bytes, encoded as a fifth RLP string in the account trie leaf.
-    #[cfg(feature = "account-ext")]
-    #[serde(default, skip_serializing_if = "alloy_trie::AccountExtension::is_empty")]
-    pub extension: AccountExtension,
     /// The nonce of the account at genesis.
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
     pub nonce: Option<u64>,
@@ -250,6 +246,10 @@ pub struct GenesisAccount {
         deserialize_with = "deserialize_private_key"
     )]
     pub private_key: Option<B256>,
+    /// Raw chain-specific bytes, encoded as a fifth RLP string in the account trie leaf.
+    #[cfg(feature = "account-ext")]
+    #[serde(default, skip_serializing_if = "alloy_trie::AccountExtension::is_empty")]
+    pub extension: AccountExtension,
 }
 
 impl GenesisAccount {
