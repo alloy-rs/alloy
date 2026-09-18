@@ -4,7 +4,7 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
-use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
+use alloy_json_rpc::{PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -134,8 +134,8 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // TODO: ideally we can send this with an unused id
-            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
+            let req_id = self.in_flights.next_unsubscribe_request_id();
+            let req = Request::new("eth_unsubscribe", req_id, [server_id]);
             let brv = req.serialize().expect("no ser error").take_request();
 
             self.dispatch_request(brv)?;
@@ -323,7 +323,9 @@ fn reconnect_retry_interval(base_interval: Duration, retry_count: u32) -> Durati
 mod tests {
     use super::*;
     use crate::ConnectionInterface;
-    use alloy_json_rpc::Request;
+    use alloy_json_rpc::{Id, Request, SubId};
+    use alloy_primitives::U256;
+    use serde_json::Value;
     use std::{
         sync::{
             atomic::{AtomicUsize, Ordering},
@@ -474,6 +476,40 @@ mod tests {
                 .expect("request should be dispatched after reconnect")
                 .expect("new backend should receive the request");
         assert_eq!(dispatched.get(), expected);
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_uses_non_colliding_request_id() {
+        let (handle, mut interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect::default(),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+
+        let sub_req =
+            Request::new("eth_subscribe", Id::Number(7), ("newHeads",)).serialize().unwrap();
+        let local_id = sub_req.params_hash();
+        service.subs.upsert(sub_req, SubId::Number(U256::from(1u64)), 16);
+
+        // Simulate an existing in-flight request with the high-watermark ID.
+        let req = Request::new("eth_blockNumber", Id::Number(u64::MAX), ()).serialize().unwrap();
+        let (in_flight, _rx) = InFlight::new(req, 16);
+        service.in_flights.insert(in_flight);
+
+        service.service_unsubscribe(local_id).unwrap();
+
+        let dispatched = timeout(Duration::from_secs(1), interface.recv_from_frontend())
+            .await
+            .expect("unsubscribe request should be dispatched")
+            .expect("backend should receive unsubscribe request");
+
+        let value: Value = serde_json::from_str(dispatched.get()).unwrap();
+        assert_eq!(value["method"], "eth_unsubscribe");
+        assert_eq!(value["id"], serde_json::json!(u64::MAX - 1));
     }
 
     #[tokio::test]
