@@ -2824,7 +2824,7 @@ mod tests {
             .with_input(Bytes::from_str("ffffffffffffff").unwrap());
 
         let err = provider.send_transaction(tx).await.unwrap_err().to_string();
-        assert!(err.contains("missing properties: [(\"NonceManager\", [\"from\"])]"));
+        assert!(err.contains("missing properties: from (NonceManager)"));
     }
 
     #[tokio::test]

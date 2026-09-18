@@ -369,10 +369,12 @@ where
     /// filler stack is [`FillerControlFlow::Missing`].
     fn ensure_not_missing(&self, tx: &N::TransactionRequest) -> TransportResult<()> {
         if let FillerControlFlow::Missing(missing) = self.filler.status(tx) {
-            // TODO: improve this.
-            // blocked by #431
-            let message = format!("missing properties: {missing:?}");
-            return Err(RpcError::local_usage_str(&message));
+            let missing = missing
+                .iter()
+                .map(|(filler, properties)| format!("{} ({filler})", properties.join(", ")))
+                .collect::<Vec<_>>()
+                .join("; ");
+            return Err(RpcError::local_usage_str(&format!("missing properties: {missing}")));
         }
         Ok(())
     }
