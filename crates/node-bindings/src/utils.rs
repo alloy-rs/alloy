@@ -37,7 +37,13 @@ impl GracefulShutdown {
             }
         }
 
-        child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
+        if child.try_wait().ok().flatten().is_some() {
+            return;
+        }
+
+        if let Err(err) = child.kill() {
+            eprintln!("alloy-node-bindings: failed to kill {process_name} process: {err}");
+        }
         let _ = child.wait();
     }
 }
@@ -199,6 +205,18 @@ mod tests {
             .arg("trap '' TERM; while :; do :; done")
             .spawn()
             .unwrap();
+
+        GracefulShutdown::shutdown(&mut child, 0, "sh");
+
+        assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn graceful_shutdown_returns_if_child_has_already_exited() {
+        let mut child = std::process::Command::new("sh").arg("-c").arg("exit 0").spawn().unwrap();
+
+        std::thread::sleep(Duration::from_millis(100));
 
         GracefulShutdown::shutdown(&mut child, 0, "sh");
 
