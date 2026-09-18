@@ -1,6 +1,6 @@
 use crate::{managers::ActiveSubscription, RawSubscription};
 use alloy_json_rpc::{EthNotification, SerializedRequest, SubId};
-use alloy_primitives::B256;
+use alloy_primitives::{map::HashSet, B256};
 use bimap::BiBTreeMap;
 
 #[derive(Debug, Default)]
@@ -9,6 +9,9 @@ pub(crate) struct SubscriptionManager {
     local_to_sub: BiBTreeMap<B256, ActiveSubscription>,
     /// Tracks the CURRENT server id for a subscription.
     local_to_server: BiBTreeMap<B256, SubId>,
+    /// Tracks subscriptions that were explicitly cancelled while a subscribe
+    /// response might still be in-flight.
+    cancelled: HashSet<B256>,
 }
 
 impl SubscriptionManager {
@@ -45,16 +48,20 @@ impl SubscriptionManager {
         request: SerializedRequest,
         server_id: SubId,
         channel_size: usize,
-    ) -> RawSubscription {
+    ) -> Option<RawSubscription> {
         let local_id = request.params_hash();
+
+        if self.cancelled.contains(&local_id) {
+            return None;
+        }
 
         // If we already know a subscription with the exact params,
         // we can just update the server_id and get a new listener.
         if self.local_to_sub.contains_left(&local_id) {
             self.change_server_id(local_id, server_id);
-            self.get_subscription(local_id).expect("checked existence")
+            self.get_subscription(local_id)
         } else {
-            self.insert(request, server_id, channel_size)
+            Some(self.insert(request, server_id, channel_size))
         }
     }
 
@@ -80,8 +87,17 @@ impl SubscriptionManager {
 
     /// Remove a subscription by its local_id.
     pub(crate) fn remove_sub(&mut self, local_id: B256) {
+        self.cancelled.insert(local_id);
         let _ = self.local_to_sub.remove_by_left(&local_id);
         let _ = self.local_to_server.remove_by_left(&local_id);
+    }
+
+    /// Clear an explicit cancellation marker for this local_id.
+    ///
+    /// This should be called before issuing a new subscribe request with the
+    /// same params hash.
+    pub(crate) fn clear_cancelled(&mut self, local_id: B256) {
+        self.cancelled.remove(&local_id);
     }
 
     /// Notify the subscription channel of a new value, if the sub is known,
@@ -98,5 +114,43 @@ impl SubscriptionManager {
     /// Get a receiver for a subscription.
     pub(crate) fn get_subscription(&self, local_id: B256) -> Option<RawSubscription> {
         self.local_to_sub.get_by_left(&local_id).map(ActiveSubscription::subscribe)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_json_rpc::{Id, Request};
+
+    fn subscribe_request(id: u64) -> SerializedRequest {
+        Request::new("eth_subscribe", Id::Number(id), ["newHeads"])
+            .serialize()
+            .expect("serializable subscribe request")
+    }
+
+    #[test]
+    fn cancelled_subscription_rejects_late_upsert_until_cleared() {
+        let mut manager = SubscriptionManager::default();
+        let req = subscribe_request(1);
+        let local_id = req.params_hash();
+
+        let inserted = manager.upsert(req.clone(), SubId::String("0x1".to_string()), 16);
+        assert!(inserted.is_some());
+        assert!(manager.get_subscription(local_id).is_some());
+
+        manager.remove_sub(local_id);
+        assert!(manager.get_subscription(local_id).is_none());
+
+        // Simulate a late subscribe response arriving after explicit cancel.
+        let late = manager.upsert(req.clone(), SubId::String("0x2".to_string()), 16);
+        assert!(late.is_none());
+        assert!(manager.get_subscription(local_id).is_none());
+
+        // A fresh subscribe attempt with the same params should work once the
+        // tombstone is cleared.
+        manager.clear_cancelled(local_id);
+        let fresh = manager.upsert(req, SubId::String("0x3".to_string()), 16);
+        assert!(fresh.is_some());
+        assert!(manager.get_subscription(local_id).is_some());
     }
 }
