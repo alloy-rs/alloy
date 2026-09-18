@@ -1513,6 +1513,65 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_fillTransaction", (tx,)).await
     }
 
+    /// Runs the provider's configured transaction fillers and returns the signed transaction
+    /// envelope, without broadcasting it.
+    ///
+    /// The transaction is filled and signed with the
+    /// [`TxFiller`](crate::fillers::TxFiller)s configured on the provider, such as
+    /// [`GasFiller`](crate::fillers::GasFiller), [`NonceFiller`](crate::fillers::NonceFiller)
+    /// and [`WalletFiller`](crate::fillers::WalletFiller). This is the local counterpart of
+    /// [`fill_transaction`](Self::fill_transaction) and
+    /// [`sign_transaction`](Self::sign_transaction), which rely on the node's
+    /// `eth_fillTransaction` and `eth_signTransaction` methods. Use it to prepare a transaction
+    /// ahead of sending it, so that its hash can be persisted first.
+    ///
+    /// The default implementation returns a [`local usage error`](RpcError::local_usage_str).
+    /// Providers configured with fillers, such as
+    /// [`FillProvider`](crate::fillers::FillProvider), override it. Since the result must be a
+    /// signed envelope, a signing filler such as [`WalletFiller`](crate::fillers::WalletFiller)
+    /// is required; otherwise an error is returned.
+    ///
+    /// # Notes
+    ///
+    /// - The returned envelope should be broadcast with
+    ///   [`send_tx_envelope`](Self::send_tx_envelope). Do not send the original request again: it
+    ///   has not been filled, so it may be filled and signed differently, e.g. with a new nonce.
+    /// - Like [`FillProvider::fill`](crate::fillers::FillProvider::fill), this runs the fillers
+    ///   before returning, so a nonce-managing filler may reserve a nonce even if this method
+    ///   returns an error or the transaction is never broadcast. Reusing the provider after a
+    ///   failed call can leave a nonce gap.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_network::Ethereum;
+    /// # async fn example(
+    /// #     provider: impl alloy_provider::Provider<Ethereum>,
+    /// #     tx: alloy_rpc_types_eth::TransactionRequest,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Fill and sign locally, without broadcasting.
+    /// let envelope = provider.fill_and_sign_transaction(tx).await?;
+    ///
+    /// // The hash is known before the transaction is sent.
+    /// let hash = envelope.tx_hash();
+    /// println!("prepared {hash}");
+    ///
+    /// // Broadcast the exact envelope later.
+    /// provider.send_tx_envelope(envelope).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        let _ = tx;
+        Err(RpcError::local_usage_str(
+            "this provider cannot fill and sign transactions locally: it has no transaction \
+             fillers. Configure fillers, e.g. with `ProviderBuilder::wallet`.",
+        ))
+    }
+
     /// Subscribe to a stream of new block headers.
     ///
     /// # Errors
@@ -2960,5 +3019,27 @@ mod tests {
         assert!(filled_tx.to().is_some(), "filled transaction should have to address");
         assert!(filled_tx.gas_limit() > 0, "filled transaction should have gas limit");
         assert!(filled_tx.max_fee_per_gas() > 0, "filled transaction should have max fee per gas");
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let tx = TransactionRequest::default()
+            .with_from(provider.default_signer_address())
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        // Fill and sign locally, before broadcasting, so the hash can be persisted.
+        let envelope = provider.fill_and_sign_transaction(tx).await.unwrap();
+        let hash = *envelope.tx_hash();
+
+        // Broadcasting the prepared envelope must produce exactly that hash.
+        let pending = provider.send_tx_envelope(envelope).await.unwrap();
+        assert_eq!(*pending.tx_hash(), hash);
+
+        let receipt = pending.get_receipt().await.unwrap();
+        assert_eq!(receipt.transaction_hash, hash);
+        assert!(receipt.status());
     }
 }

@@ -1,6 +1,8 @@
+use alloy_consensus::{transaction::SignerRecoverable, Transaction};
 use alloy_primitives::{bytes, Address, U256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types_eth::TransactionRequest;
+use alloy_signer_local::PrivateKeySigner;
 use alloy_transport::mock::Asserter;
 
 #[tokio::test]
@@ -41,4 +43,111 @@ async fn mocked_default_provider() {
     asserter.push_success(&assert_bal);
     let response = provider.get_balance(Address::default()).await.unwrap();
     assert_eq!(response, assert_bal);
+}
+
+/// A fully populated legacy transaction, so that filling and signing need no RPC calls.
+fn populated_tx(from: Address) -> TransactionRequest {
+    TransactionRequest {
+        from: Some(from),
+        nonce: Some(0),
+        to: Some(Address::with_last_byte(9).into()),
+        value: Some(U256::from(100)),
+        gas: Some(21_000),
+        gas_price: Some(20_000_000_000),
+        chain_id: Some(1),
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn fill_and_sign_transaction_locally() {
+    let signer = PrivateKeySigner::random();
+    let address = signer.address();
+    let provider = ProviderBuilder::new()
+        .disable_recommended_fillers()
+        .wallet(signer)
+        .connect_mocked_client(Asserter::new());
+
+    let envelope = provider
+        .fill_and_sign_transaction(populated_tx(address))
+        .await
+        .expect("should fill and sign without any RPC call");
+
+    assert_eq!(envelope.recover_signer().unwrap(), address);
+    assert_eq!(envelope.nonce(), 0);
+}
+
+#[tokio::test]
+async fn fill_and_sign_transaction_through_dyn_provider() {
+    let signer = PrivateKeySigner::random();
+    let address = signer.address();
+    let provider = ProviderBuilder::new()
+        .disable_recommended_fillers()
+        .wallet(signer)
+        .connect_mocked_client(Asserter::new())
+        .erased();
+
+    let envelope = provider
+        .fill_and_sign_transaction(populated_tx(address))
+        .await
+        .expect("dyn provider should forward fill_and_sign_transaction");
+
+    assert_eq!(envelope.recover_signer().unwrap(), address);
+}
+
+#[tokio::test]
+async fn fill_and_sign_transaction_without_fillers_errors() {
+    let provider =
+        ProviderBuilder::new().disable_recommended_fillers().connect_mocked_client(Asserter::new());
+
+    let err = provider.fill_and_sign_transaction(populated_tx(Address::ZERO)).await.unwrap_err();
+
+    assert!(err.is_local_usage_error(), "{err}");
+    assert!(err.to_string().contains("no transaction fillers"), "{err}");
+}
+
+#[tokio::test]
+async fn fill_and_sign_transaction_without_signing_filler_errors() {
+    let provider = ProviderBuilder::new()
+        .disable_recommended_fillers()
+        .with_cached_nonce_management()
+        .connect_mocked_client(Asserter::new());
+
+    let err = provider.fill_and_sign_transaction(populated_tx(Address::ZERO)).await.unwrap_err();
+
+    assert!(err.is_local_usage_error(), "{err}");
+    assert!(err.to_string().contains("no filler produced a signed transaction"), "{err}");
+}
+
+#[tokio::test]
+async fn fill_and_sign_transaction_reports_missing_properties() {
+    let provider = ProviderBuilder::new()
+        .disable_recommended_fillers()
+        .with_cached_nonce_management()
+        .connect_mocked_client(Asserter::new());
+
+    let err = provider.fill_and_sign_transaction(TransactionRequest::default()).await.unwrap_err();
+
+    assert!(err.is_local_usage_error(), "{err}");
+    assert!(err.to_string().contains("missing properties"), "{err}");
+}
+
+#[tokio::test]
+async fn fill_and_sign_transaction_any_network() {
+    use alloy_network::{AnyNetwork, AnyTxEnvelope};
+    use alloy_provider::Identity;
+    use alloy_serde::WithOtherFields;
+
+    let signer = PrivateKeySigner::random();
+    let address = signer.address();
+    let provider = ProviderBuilder::<Identity, Identity, AnyNetwork>::default()
+        .wallet(signer)
+        .connect_mocked_client(Asserter::new());
+
+    let envelope = provider
+        .fill_and_sign_transaction(WithOtherFields::new(populated_tx(address)))
+        .await
+        .expect("AnyNetwork should fill and sign Ethereum transactions locally");
+
+    assert!(matches!(envelope, AnyTxEnvelope::Ethereum(_)));
 }

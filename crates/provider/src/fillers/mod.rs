@@ -365,6 +365,18 @@ where
         Ok(tx)
     }
 
+    /// Returns an error if the fillers are missing required properties of `tx`, i.e. if the
+    /// filler stack is [`FillerControlFlow::Missing`].
+    fn ensure_not_missing(&self, tx: &N::TransactionRequest) -> TransportResult<()> {
+        if let FillerControlFlow::Missing(missing) = self.filler.status(tx) {
+            // TODO: improve this.
+            // blocked by #431
+            let message = format!("missing properties: {missing:?}");
+            return Err(RpcError::local_usage_str(&message));
+        }
+        Ok(())
+    }
+
     /// Fills the transaction request, using the configured fillers
     ///
     /// # Example
@@ -744,12 +756,7 @@ where
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
-            if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
-                // TODO: improve this.
-                // blocked by #431
-                let message = format!("missing properties: {missing:?}");
-                return Err(RpcError::local_usage_str(&message));
-            }
+            self.ensure_not_missing(builder)?;
         }
 
         // Errors in tx building happen further down the stack.
@@ -763,10 +770,7 @@ where
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
-            if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
-                let message = format!("missing properties: {missing:?}");
-                return Err(RpcError::local_usage_str(&message));
-            }
+            self.ensure_not_missing(builder)?;
         }
 
         // Errors in tx building happen further down the stack.
@@ -777,6 +781,23 @@ where
         let tx = self.fill(tx).await?;
         let tx = tx.try_into_request().map_err(TransportError::local_usage)?;
         self.inner.sign_transaction(tx).await
+    }
+
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        match self.fill(tx).await? {
+            SendableTx::Envelope(tx) => Ok(tx),
+            SendableTx::Builder(tx) => {
+                // Prefer the specific "missing properties" error over the generic one below.
+                self.ensure_not_missing(&tx)?;
+                Err(RpcError::local_usage_str(
+                    "no filler produced a signed transaction envelope; add a signing filler \
+                     such as `WalletFiller` to the provider",
+                ))
+            }
+        }
     }
 
     #[cfg(feature = "pubsub")]
