@@ -465,20 +465,22 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessList`, the only block access list method specified in
+    /// [execution-apis]. Returns the block access list, or `None` if the block is not found.
+    ///
+    /// [execution-apis]: https://github.com/ethereum/execution-apis/blob/main/src/eth/block.yaml
     async fn get_block_access_list(
         &self,
         block: BlockId,
     ) -> TransportResult<Option<BlockAccessList>> {
-        match block {
-            BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
-            BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
-        }
+        self.client().request("eth_getBlockAccessList", (block,)).await
     }
 
     /// Gets the EIP-7928 block access list by [`BlockHash`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListByBlockHash`, which is not part of execution-apis. Use
+    /// [`Provider::get_block_access_list`] for the specified method. Returns the block access
+    /// list, or `None` if the block is not found.
     async fn get_block_access_list_by_hash(
         &self,
         hash: BlockHash,
@@ -488,7 +490,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListByBlockNumber`, which is not part of execution-apis. Use
+    /// [`Provider::get_block_access_list`] for the specified method. Returns the block access
+    /// list, or `None` if the block is not found.
     async fn get_block_access_list_by_number(
         &self,
         number: BlockNumberOrTag,
@@ -496,9 +500,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
     }
 
-    /// Gets the EIP-7928 block access list by [`BlockId`].
+    /// Gets the RLP encoded EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the  block access list raw, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListRaw`, which is not part of execution-apis. Returns the
+    /// encoded block access list, or `None` if the block is not found.
     async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
         self.client().request("eth_getBlockAccessListRaw", (block,)).await
     }
@@ -1878,6 +1883,7 @@ mod tests {
     use super::*;
     use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_consensus::{Transaction, TxEnvelope};
+    use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
     use alloy_network::{
         AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
     };
@@ -1887,8 +1893,16 @@ mod tests {
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
-    use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
-    use std::{io::Read, str::FromStr, time::Duration};
+    use alloy_transport::{
+        layers::{RetryBackoffLayer, RetryPolicy},
+        TransportFut,
+    };
+    use std::{
+        io::Read,
+        str::FromStr,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     // For layer transport tests
     use alloy_consensus::transaction::SignerRecoverable;
@@ -2960,5 +2974,32 @@ mod tests {
         assert!(filled_tx.to().is_some(), "filled transaction should have to address");
         assert!(filled_tx.gas_limit() > 0, "filled transaction should have gas limit");
         assert!(filled_tx.max_fee_per_gas() > 0, "filled transaction should have max fee per gas");
+    }
+
+    #[tokio::test]
+    async fn get_block_access_list_calls_specified_method() {
+        let method = Arc::new(Mutex::new(None));
+        let service = {
+            let method = method.clone();
+            tower::service_fn(move |request: RequestPacket| {
+                let method = method.clone();
+                Box::pin(async move {
+                    let RequestPacket::Single(request) = request else {
+                        panic!("block access lists are requested one block at a time");
+                    };
+                    *method.lock().unwrap() = Some(request.method().to_string());
+                    Ok(ResponsePacket::Single(Response {
+                        id: request.id().clone(),
+                        payload: ResponsePayload::Success(
+                            RawValue::from_string("null".to_string()).unwrap(),
+                        ),
+                    }))
+                }) as TransportFut<'static>
+            })
+        };
+        let provider = RootProvider::<Ethereum>::new(RpcClient::new(service, true));
+
+        assert_eq!(provider.get_block_access_list(BlockId::latest()).await.unwrap(), None);
+        assert_eq!(method.lock().unwrap().as_deref(), Some("eth_getBlockAccessList"));
     }
 }
