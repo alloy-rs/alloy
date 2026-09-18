@@ -1519,8 +1519,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Runs the provider's configured transaction [`TxFiller`](crate::fillers::TxFiller)s and
-    /// signs locally, returning the signed envelope without broadcasting it, so that it can be
-    /// persisted before it is sent.
+    /// signs locally, returning the signed envelope without broadcasting it.
     ///
     /// This is the local counterpart of [`fill_transaction`](Self::fill_transaction) and
     /// [`sign_transaction`](Self::sign_transaction), which rely on the node to fill and sign.
@@ -1548,10 +1547,6 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # ) -> Result<(), Box<dyn std::error::Error>> {
     /// // Fill and sign locally, without broadcasting.
     /// let envelope = provider.fill_and_sign_transaction(tx).await?;
-    ///
-    /// // The signed transaction is available before it is sent; persist it, or its hash.
-    /// let hash = envelope.tx_hash();
-    /// println!("prepared {hash}");
     ///
     /// // Broadcast the exact envelope later.
     /// provider.send_tx_envelope(envelope).await?;
