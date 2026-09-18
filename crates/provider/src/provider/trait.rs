@@ -1518,33 +1518,25 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_fillTransaction", (tx,)).await
     }
 
-    /// Runs the provider's configured transaction fillers and returns the signed transaction
-    /// envelope, without broadcasting it.
+    /// Runs the provider's configured transaction [`TxFiller`](crate::fillers::TxFiller)s and
+    /// signs locally, returning the signed envelope without broadcasting it, so that its hash
+    /// can be persisted first.
     ///
-    /// The transaction is filled and signed with the
-    /// [`TxFiller`](crate::fillers::TxFiller)s configured on the provider, such as
-    /// [`GasFiller`](crate::fillers::GasFiller), [`NonceFiller`](crate::fillers::NonceFiller)
-    /// and [`WalletFiller`](crate::fillers::WalletFiller). This is the local counterpart of
-    /// [`fill_transaction`](Self::fill_transaction) and
-    /// [`sign_transaction`](Self::sign_transaction), which rely on the node's
-    /// `eth_fillTransaction` and `eth_signTransaction` methods. Use it to prepare a transaction
-    /// ahead of sending it, so that its hash can be persisted first.
+    /// This is the local counterpart of [`fill_transaction`](Self::fill_transaction) and
+    /// [`sign_transaction`](Self::sign_transaction), which rely on the node to fill and sign.
     ///
-    /// The default implementation returns a [`local usage error`](RpcError::local_usage_str).
-    /// Providers configured with fillers, such as
-    /// [`FillProvider`](crate::fillers::FillProvider), override it. Since the result must be a
-    /// signed envelope, a signing filler such as [`WalletFiller`](crate::fillers::WalletFiller)
-    /// is required; otherwise an error is returned.
+    /// The default implementation returns a [`local usage error`](RpcError::local_usage_str);
+    /// providers configured with fillers, such as
+    /// [`FillProvider`](crate::fillers::FillProvider), override it. The fillers must include a
+    /// signing filler such as [`WalletFiller`](crate::fillers::WalletFiller), since the result
+    /// must be a signed envelope.
     ///
     /// # Notes
     ///
-    /// - The returned envelope should be broadcast with
-    ///   [`send_tx_envelope`](Self::send_tx_envelope). Do not send the original request again: it
-    ///   has not been filled, so it may be filled and signed differently, e.g. with a new nonce.
-    /// - Like [`FillProvider::fill`](crate::fillers::FillProvider::fill), this runs the fillers
-    ///   before returning, so a nonce-managing filler may reserve a nonce even if this method
-    ///   returns an error or the transaction is never broadcast. Reusing the provider after a
-    ///   failed call can leave a nonce gap.
+    /// - Broadcast the returned envelope with [`send_tx_envelope`](Self::send_tx_envelope).
+    ///   Re-sending the original request may fill and sign it differently, e.g. with a new nonce.
+    /// - Like [`FillProvider::fill`](crate::fillers::FillProvider::fill), this may reserve a nonce
+    ///   even if it returns an error or the transaction is never broadcast.
     ///
     /// # Examples
     ///
