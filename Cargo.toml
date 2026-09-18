@@ -173,3 +173,6 @@ ci_info = "0.14.14"
 similar-asserts = "1.5"
 tempfile = "3.20"
 tower-http = "0.6.1"
+
+[patch.crates-io]
+alloy-trie = { git = "https://github.com/alloy-rs/trie", rev = "30d6e84aa756ac70d61b7b7ccb7dba5924a88cb8" }

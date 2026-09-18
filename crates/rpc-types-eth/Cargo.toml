@@ -23,6 +23,7 @@ rustdoc-args = [
 workspace = true
 
 [dependencies]
+alloy-trie = { workspace = true, optional = true }
 alloy-eips.workspace = true
 alloy-consensus.workspace = true
 alloy-consensus-any.workspace = true
@@ -45,6 +46,7 @@ arbitrary = { version = "1.3", features = ["derive"], optional = true }
 alloy-sol-types.workspace = true
 
 [dev-dependencies]
+rmp-serde = "1.3"
 alloy-primitives = { workspace = true, features = [
     "rand",
     "rlp",
@@ -61,8 +63,10 @@ assert_matches.workspace = true
 bincode = { workspace = true, features = ["serde"] }
 
 [features]
+account-ext = ["dep:alloy-trie", "alloy-trie/account-ext", "alloy-trie/serde"]
 default = ["std", "serde"]
 std = [
+	"alloy-trie?/std",
 	"alloy-primitives/std",
 	"alloy-consensus/std",
 	"alloy-eips/std",
@@ -77,6 +81,7 @@ std = [
 	"thiserror/std"
 ]
 serde = [
+	"alloy-trie?/serde",
 	"dep:serde",
 	"dep:serde_json",
 	"dep:alloy-serde",
@@ -88,6 +93,7 @@ serde = [
 	"alloy-network-primitives/serde"
 ]
 arbitrary = [
+	"alloy-trie?/arbitrary",
 	"std",
 	"dep:arbitrary",
 	"alloy-consensus/arbitrary",
