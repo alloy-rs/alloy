@@ -1,6 +1,6 @@
 use crate::{u256_numeric_string, ConsideredByBuildersAt, SealedByBuildersAt};
 
-use alloy_primitives::U256;
+use alloy_primitives::{TxHash, B256, U256};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Response for `flashbots_getBundleStatsV2` represents stats for a single bundle
@@ -127,12 +127,232 @@ pub struct UserStats {
     pub last_1d_gas_simulated: U256,
 }
 
+/// Request for builder-specific `*_getBundleStats` endpoints, e.g. Titan's
+/// `titan_getBundleStats` or Bombora's `bombora_getBundleStats`.
+///
+/// Note: Quasar's `quasar_getBundleStats` expects the parameter key in snake case
+/// (`bundle_hash`), which is accepted when deserializing but not produced when serializing.
+///
+/// See also:
+/// - Titan: <https://docs.titanbuilder.xyz/bundle-tracing>
+/// - Bombora: <https://bombora.build/docs/bombora-getBundleStats>
+/// - Quasar: <https://docs.quasar.win/bundle-tracing>
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetBundleStatsRequest {
+    /// The bundle hash of the bundle as returned by `eth_sendBundle`.
+    #[serde(alias = "bundle_hash")]
+    pub bundle_hash: B256,
+}
+
+/// Response for builder-specific `*_getBundleStats` endpoints.
+///
+/// This covers the shared response format of:
+/// - Titan: `titan_getBundleStats` <https://docs.titanbuilder.xyz/bundle-tracing>
+/// - Bombora: `bombora_getBundleStats` <https://bombora.build/docs/bombora-getBundleStats>
+/// - Quasar: `quasar_getBundleStats` <https://docs.quasar.win/bundle-tracing>
+///
+/// Fields that are only reported by some builders are optional.
+///
+/// Note: this is distinct from the (deprecated) Flashbots `flashbots_getBundleStatsV2`
+/// response, see [`BundleStats`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BuilderBundleStats {
+    /// Status of the bundle.
+    pub status: BuilderBundleStatus,
+    /// The builder payment observed on the bundle's entry simulation, in wei.
+    ///
+    /// Empty or absent when the bundle failed simulation.
+    #[serde(default, with = "opt_u256_numeric_string", skip_serializing_if = "Option::is_none")]
+    pub builder_payment: Option<U256>,
+    /// The builder payment observed when the bundle was used in a build attempt, in wei.
+    ///
+    /// Populated when the bundle reached [`BuilderBundleStatus::IncludedInBlock`] or
+    /// [`BuilderBundleStatus::Submitted`]. Not reported by Quasar.
+    #[serde(default, with = "opt_u256_numeric_string", skip_serializing_if = "Option::is_none")]
+    pub builder_payment_when_included: Option<U256>,
+    /// Human readable reason when the bundle failed simulation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// PropAMM interaction status of the bundle. Only reported by Bombora.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pamm_status: Option<BundlePammStatus>,
+    /// Hash of the transaction that caused the simulation failure. Only reported by Quasar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reverting_hash: Option<TxHash>,
+    /// Unix timestamp when the builder received the bundle. Only reported by Quasar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub received_at: Option<u64>,
+    /// Unix timestamp when the bundle was simulated. Only reported by Quasar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulated_at: Option<u64>,
+    /// Unix timestamp when a block containing the bundle was submitted to a relay. Only
+    /// reported by Quasar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submitted_at: Option<u64>,
+    /// The block number the bundle was included in. Only reported by Quasar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_number: Option<u64>,
+    /// The block number the bundle targeted. Only reported by Quasar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_block: Option<u64>,
+    /// The bundle's `minTimestamp`. Only reported by Quasar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_timestamp: Option<u64>,
+    /// The bundle's `maxTimestamp`. Only reported by Quasar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_timestamp: Option<u64>,
+}
+
+/// Status of a bundle as reported by builder `*_getBundleStats` endpoints, see
+/// [`BuilderBundleStats`].
+///
+/// Statuses are serialized in PascalCase (e.g. `SimulationPass`) as reported by Titan and
+/// Bombora; Quasar's camelCase variants (e.g. `simulationPass`) are accepted when
+/// deserializing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BuilderBundleStatus {
+    /// The builder has no record of the bundle.
+    #[serde(alias = "notFound")]
+    NotFound,
+    /// The bundle is pending processing.
+    #[serde(alias = "pending")]
+    Pending,
+    /// The bundle was received but arrived too late to enter the bundle pool for its target
+    /// block.
+    #[serde(alias = "received")]
+    Received,
+    /// The bundle failed validation, e.g. invalid RLP, block number, nonce or chain id.
+    #[serde(alias = "invalid")]
+    Invalid,
+    /// The bundle failed the top-of-block simulation, e.g. a non-whitelisted transaction
+    /// reverted or the builder payment was not positive.
+    #[serde(alias = "simulationFail")]
+    SimulationFail,
+    /// The bundle simulated successfully but was not selected for a block, e.g. because it
+    /// arrived too late or the builder payment was insufficient.
+    #[serde(alias = "simulationPass")]
+    SimulationPass,
+    /// The bundle was selected for a block by at least one sorting algorithm, but that block
+    /// was not submitted to a relay.
+    #[serde(alias = "includedInBlock")]
+    IncludedInBlock,
+    /// The bundle was included in at least one block that was submitted to a relay. This does
+    /// not guarantee the block won the slot.
+    #[serde(alias = "submitted")]
+    Submitted,
+}
+
+/// PropAMM interaction status of a bundle as reported by Bombora's `bombora_getBundleStats`.
+///
+/// <https://bombora.build/docs/bombora-getBundleStats>
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BundlePammStatus {
+    /// The bundle swapped through a PropAMM pool.
+    SwappedThroughPamm,
+    /// The bundle was matched with a maker quote.
+    MatchedWithQuote,
+}
+
+/// Serde helpers for optional wei amounts encoded as numeric strings, where an empty string
+/// denotes absence.
+mod opt_u256_numeric_string {
+    use crate::u256_numeric_string;
+    use alloy_primitives::U256;
+    use serde::{de, Deserialize, Deserializer, Serializer};
+
+    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Option<U256>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Option::<serde_json::Value>::deserialize(deserializer)? {
+            None | Some(serde_json::Value::Null) => Ok(None),
+            Some(serde_json::Value::String(s)) if s.is_empty() => Ok(None),
+            Some(val) => u256_numeric_string::deserialize(val).map(Some).map_err(de::Error::custom),
+        }
+    }
+
+    pub(crate) fn serialize<S>(val: &Option<U256>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match val {
+            Some(val) => u256_numeric_string::serialize(val, serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use similar_asserts::assert_eq;
 
     use crate::SealedByBuildersAt;
+
+    #[test]
+    fn can_deserialize_builder_bundle_stats() {
+        // Bombora style: <https://bombora.build/docs/bombora-getBundleStats>
+        let s = r#"{
+            "status": "IncludedInBlock",
+            "builderPayment": "13618000000000",
+            "builderPaymentWhenIncluded": "13618000000000",
+            "error": "",
+            "pammStatus": null
+        }"#;
+        let stats = serde_json::from_str::<BuilderBundleStats>(s).unwrap();
+        assert_eq!(stats.status, BuilderBundleStatus::IncludedInBlock);
+        assert_eq!(stats.builder_payment, Some(U256::from(13618000000000u64)));
+        assert_eq!(stats.builder_payment_when_included, Some(U256::from(13618000000000u64)));
+        assert!(stats.pamm_status.is_none());
+
+        // failed simulation reports an empty builder payment
+        let s = r#"{
+            "status": "SimulationFail",
+            "builderPayment": "",
+            "error": "BundleRevert. Reverting Hash: 0x1111111111111111111111111111111111111111111111111111111111111111",
+            "pammStatus": "matchedWithQuote"
+        }"#;
+        let stats = serde_json::from_str::<BuilderBundleStats>(s).unwrap();
+        assert_eq!(stats.status, BuilderBundleStatus::SimulationFail);
+        assert_eq!(stats.builder_payment, None);
+        assert_eq!(stats.pamm_status, Some(BundlePammStatus::MatchedWithQuote));
+
+        // Quasar style: <https://docs.quasar.win/bundle-tracing>
+        let s = r#"{
+            "status": "submitted",
+            "builderPayment": "12934799399930",
+            "error": null,
+            "revertingHash": null,
+            "receivedAt": 1753977388,
+            "simulatedAt": 1753977388,
+            "submittedAt": 1753977409,
+            "blockNumber": 23040121,
+            "targetBlock": 23040121,
+            "minTimestamp": null,
+            "maxTimestamp": null
+        }"#;
+        let stats = serde_json::from_str::<BuilderBundleStats>(s).unwrap();
+        assert_eq!(stats.status, BuilderBundleStatus::Submitted);
+        assert_eq!(stats.builder_payment, Some(U256::from(12934799399930u64)));
+        assert_eq!(stats.received_at, Some(1753977388));
+        assert_eq!(stats.submitted_at, Some(1753977409));
+        assert_eq!(stats.block_number, Some(23040121));
+        assert_eq!(stats.target_block, Some(23040121));
+        assert_eq!(stats.min_timestamp, None);
+    }
+
+    #[test]
+    fn can_deserialize_get_bundle_stats_request() {
+        let camel = r#"{"bundleHash": "0x1111111111111111111111111111111111111111111111111111111111111111"}"#;
+        let snake = r#"{"bundle_hash": "0x1111111111111111111111111111111111111111111111111111111111111111"}"#;
+        let a = serde_json::from_str::<GetBundleStatsRequest>(camel).unwrap();
+        let b = serde_json::from_str::<GetBundleStatsRequest>(snake).unwrap();
+        assert_eq!(a, b);
+        assert!(serde_json::to_string(&a).unwrap().contains("bundleHash"));
+    }
 
     #[test]
     fn can_serialize_deserialize_bundle_stats() {

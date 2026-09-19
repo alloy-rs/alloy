@@ -23,6 +23,10 @@ pub use mev_calls::*;
 
 pub mod mevshare;
 
+// types for the PropAMM taker APIs exposed by block builders
+mod pamm;
+pub use pamm::*;
+
 // types for stats endpoint like flashbots_getUserStats and flashbots_getBundleStats
 mod stats;
 pub use stats::*;
