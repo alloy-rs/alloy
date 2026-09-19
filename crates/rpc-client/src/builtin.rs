@@ -1,6 +1,6 @@
 use alloy_json_rpc::RpcError;
 use alloy_transport::{BoxTransport, TransportConnect, TransportError, TransportErrorKind};
-use std::{str::FromStr, time::Duration};
+use std::str::FromStr;
 
 #[cfg(any(feature = "ws-base", feature = "ipc"))]
 use alloy_pubsub::PubSubConnect;
@@ -67,7 +67,7 @@ impl BuiltInConnectionString {
     /// Parse a connection string and connect with custom configuration.
     ///
     /// This method allows for fine-grained control over connection settings
-    /// such as authentication, retry behavior, and transport-specific options.
+    /// such as authentication and transport-specific options.
     ///
     /// # Examples
     ///
@@ -76,13 +76,9 @@ impl BuiltInConnectionString {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_rpc_client::{BuiltInConnectionString, ConnectionConfig};
     /// use alloy_transport::Authorization;
-    /// use std::time::Duration;
     ///
     /// // Configure connection with custom settings
-    /// let config = ConnectionConfig::new()
-    ///     .with_auth(Authorization::bearer("my-token"))
-    ///     .with_max_retries(3)
-    ///     .with_retry_interval(Duration::from_secs(2));
+    /// let config = ConnectionConfig::new().with_auth(Authorization::bearer("my-token"));
     ///
     /// // Connect to WebSocket endpoint with configuration
     /// let transport = BuiltInConnectionString::connect_with("ws://localhost:8545", config).await?;
@@ -169,14 +165,6 @@ impl BuiltInConnectionString {
                 #[cfg(not(target_family = "wasm"))]
                 if let Some(ws_config) = config.ws_config {
                     ws_connect = ws_connect.with_config(ws_config);
-                }
-
-                // Apply retry configuration
-                if let Some(max_retries) = config.max_retries {
-                    ws_connect = ws_connect.with_max_retries(max_retries);
-                }
-                if let Some(retry_interval) = config.retry_interval {
-                    ws_connect = ws_connect.with_retry_interval(retry_interval);
                 }
 
                 ws_connect.into_service().await.map(alloy_transport::Transport::boxed)
@@ -285,18 +273,12 @@ impl FromStr for BuiltInConnectionString {
 /// Configuration for connecting to built-in transports.
 ///
 /// Provides a flexible way to configure various aspects of the connection,
-/// including authentication, retry behavior, and transport-specific settings.
+/// including authentication and transport-specific settings.
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct ConnectionConfig {
     /// Authorization header for authenticated connections.
     pub auth: Option<alloy_transport::Authorization>,
-    /// Maximum number of connection retries.
-    pub max_retries: Option<u32>,
-    /// Base interval between connection retries.
-    ///
-    /// WebSocket reconnect retries use capped exponential backoff from this base interval.
-    pub retry_interval: Option<Duration>,
     /// WebSocket-specific configuration.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
@@ -307,8 +289,6 @@ impl ConnectionConfig {
     pub const fn new() -> Self {
         Self {
             auth: None,
-            max_retries: None,
-            retry_interval: None,
             #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
             ws_config: None,
         }
@@ -317,20 +297,6 @@ impl ConnectionConfig {
     /// Set the authorization header.
     pub fn with_auth(mut self, auth: alloy_transport::Authorization) -> Self {
         self.auth = Some(auth);
-        self
-    }
-
-    /// Set the maximum number of retries.
-    pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
-        self.max_retries = Some(max_retries);
-        self
-    }
-
-    /// Set the base retry interval.
-    ///
-    /// WebSocket reconnect retries use capped exponential backoff from this base interval.
-    pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
-        self.retry_interval = Some(retry_interval);
         self
     }
 
@@ -474,7 +440,6 @@ mod test {
         // Verify connect() uses default config (maintaining backward compatibility)
         let default_config = ConnectionConfig::default();
         assert!(default_config.auth.is_none());
-        assert!(default_config.max_retries.is_none());
 
         // connect() -> connect_boxed() -> connect_boxed_with(default) ensures compatibility
     }

@@ -84,15 +84,28 @@ server ID changes across reconnections.
 
 ### Reconnection, replay, and cancellation
 
-After a retryable established-backend failure, the service attempts reconnection under its
-configured retry policy; non-retryable failures terminate it immediately. Following a successful
-reconnect, it re-sends every
-request still awaiting a response and re-creates active subscriptions. If the
-server processed a request but its response was lost, that request may execute
-more than once. Do not rely on at-most-once execution for non-idempotent methods.
+After a connection failure, the service preserves completed responses and returns
+unresolved ordinary requests to the caller with a transport error. It does not
+replay ordinary requests. The caller owns read retries and must decide which
+methods are safe to retry. The service restores active subscriptions and pending
+subscription requests that are still live.
 
-Dropping a request future stops waiting locally, but does not cancel a request
-already accepted by the service. Likewise, dropping a [`RawSubscription`] or
+Dropping a request future cancels its pending service entry. Use
+[`with_request_deadline`] to attach a monotonic deadline to a future's requests;
+the service processes cancellation and expiration during both reconnect attempts
+and backoff. Expired reads do not stop active subscriptions. Cancellation cannot
+undo work already received by the remote server. [`PartialBatchError`] retains
+completed per-ID responses when other batch items fail.
+
+Transient reconnect failures use [`RecoveryBackoff`]: the delay ceiling starts
+at 100 ms, doubles to a 500 ms cap, and each delay samples between half and all
+of its ceiling. Reconnects continue until recovery, a permanent failure, or closure
+of all frontends. The former retry-count and retry-interval builder settings
+have been removed. Native WebSocket handshake statuses 408, 429, 500, 502, 503,
+and 504 retain their HTTP type and permit reconnection; authentication failures
+terminate it.
+
+Likewise, dropping a [`RawSubscription`] or
 [`Subscription`] only drops that receiver; it does not send
 `eth_unsubscribe`. Call [`PubSubFrontend::unsubscribe`] with the local ID when
 the server-side subscription is no longer needed. `unsubscribe` only queues

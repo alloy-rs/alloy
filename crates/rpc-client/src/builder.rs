@@ -144,7 +144,7 @@ impl<L> ClientBuilder<L> {
     /// [`RpcClient`].
     ///
     /// This method allows for fine-grained control over connection settings
-    /// such as authentication, retry behavior, and transport-specific options.
+    /// such as authentication and transport-specific options.
     ///
     /// # Examples
     ///
@@ -152,12 +152,8 @@ impl<L> ClientBuilder<L> {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_rpc_client::{ClientBuilder, ConnectionConfig};
     /// use alloy_transport::Authorization;
-    /// use std::time::Duration;
     ///
-    /// let config = ConnectionConfig::new()
-    ///     .with_auth(Authorization::bearer("my-token"))
-    ///     .with_max_retries(3)
-    ///     .with_retry_interval(Duration::from_secs(2));
+    /// let config = ConnectionConfig::new().with_auth(Authorization::bearer("my-token"));
     ///
     /// let client =
     ///     ClientBuilder::default().connect_with_config("ws://localhost:8545", config).await?;
