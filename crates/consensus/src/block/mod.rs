@@ -230,7 +230,10 @@ where
 /// A response to `GetBlockBodies`, containing bodies if any bodies were found.
 ///
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
-#[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
+///
+/// Note: `Decodable` is implemented manually rather than derived, so that the transaction list is
+/// pre-sized, see [`decode_transactions`].
+#[derive(Debug, Clone, PartialEq, Eq, RlpEncodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[rlp(trailing(no_gaps))]
@@ -333,18 +336,108 @@ impl<T: Typed2718, H> BlockBody<T, H> {
     }
 }
 
+/// Number of transactions [`decode_transactions`] decodes before it first estimates how many more
+/// are coming.
+///
+/// Large enough to smooth out the size of an individual transaction, small enough that the `Vec`
+/// is still tiny if the estimate turns out to be wrong.
+const TX_CAPACITY_SAMPLE_SIZE: usize = 16;
+
+/// Upper bound on the transaction capacity [`decode_transactions`] reserves, expressed as a
+/// multiple of the remaining encoded bytes.
+///
+/// Without a bound, a list of very small items would let a peer make us reserve
+/// `item_count * size_of::<T>()` bytes. Capping the reservation relative to the encoded size keeps
+/// the memory amplification in the same ballpark as a legitimate block of the same wire size.
+const MAX_TX_PREALLOC_RATIO: usize = 8;
+
+/// Decodes an RLP list of transactions, pre-sizing the returned [`Vec`].
+///
+/// This is equivalent to `Vec::<T>::decode`, including the errors it returns, but avoids the
+/// repeated reallocation that growing a `Vec` from empty incurs for blocks that carry thousands
+/// of transactions: with no capacity hint, a 10k transaction block runs through the whole doubling
+/// sequence and memmoves megabytes of `T` on the way.
+///
+/// Instead, once the vector is full, the average encoded transaction size of everything decoded so
+/// far is used to extrapolate how many transactions are left, and that many are reserved in one
+/// go. A wrong estimate is harmless: too low and the next exhausted capacity re-estimates from a
+/// larger and therefore better sample, too high and the reservation is capped relative to the
+/// number of bytes that are actually left.
+///
+/// # Examples
+///
+/// ```
+/// use alloy_consensus::{decode_transactions, TxEnvelope};
+///
+/// # fn main() -> Result<(), alloy_rlp::Error> {
+/// let encoded = alloy_rlp::encode(&Vec::<TxEnvelope>::new());
+/// let txs: Vec<TxEnvelope> = decode_transactions(&mut encoded.as_slice())?;
+/// assert!(txs.is_empty());
+/// # Ok(())
+/// # }
+/// ```
+pub fn decode_transactions<T: Decodable>(buf: &mut &[u8]) -> alloy_rlp::Result<Vec<T>> {
+    let mut payload = alloy_rlp::Header::decode_bytes(buf, true)?;
+    let payload_length = payload.len();
+
+    let mut transactions = Vec::new();
+    while !payload.is_empty() {
+        if transactions.len() >= TX_CAPACITY_SAMPLE_SIZE
+            && transactions.len() == transactions.capacity()
+        {
+            // Average encoded size of the transactions decoded so far, at least 1 byte.
+            let average = (payload_length - payload.len()) / transactions.len();
+            let estimate = payload.len() / average.max(1) + 1;
+            // Never reserve more than `MAX_TX_PREALLOC_RATIO` times the bytes that are left.
+            let max = MAX_TX_PREALLOC_RATIO.saturating_mul(payload.len())
+                / core::mem::size_of::<T>().max(1);
+            transactions.reserve(estimate.min(max));
+        }
+
+        transactions.push(T::decode(&mut payload)?);
+    }
+
+    Ok(transactions)
+}
+
 /// We need to implement RLP traits manually because we currently don't have a way to flatten
 /// [`BlockBody`] into [`Block`].
 mod block_rlp {
     use super::*;
 
+    /// Newtype around the transaction list whose [`Decodable`] implementation pre-sizes the
+    /// `Vec`, see [`decode_transactions`].
+    struct RlpTransactions<T>(Vec<T>);
+
+    impl<T: Decodable> Decodable for RlpTransactions<T> {
+        #[inline]
+        fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+            decode_transactions(buf).map(Self)
+        }
+    }
+
     #[derive(RlpDecodable)]
     #[rlp(trailing(no_gaps))]
     struct Helper<T, H> {
         header: H,
-        transactions: Vec<T>,
+        transactions: RlpTransactions<T>,
         ommers: Vec<H>,
         withdrawals: Option<Withdrawals>,
+    }
+
+    #[derive(RlpDecodable)]
+    #[rlp(trailing(no_gaps))]
+    struct BodyHelper<T, H> {
+        transactions: RlpTransactions<T>,
+        ommers: Vec<H>,
+        withdrawals: Option<Withdrawals>,
+    }
+
+    impl<T: Decodable, H: Decodable> Decodable for BlockBody<T, H> {
+        fn decode(b: &mut &[u8]) -> alloy_rlp::Result<Self> {
+            let BodyHelper { transactions, ommers, withdrawals } = BodyHelper::decode(b)?;
+            Ok(Self { transactions: transactions.0, ommers, withdrawals })
+        }
     }
 
     #[derive(RlpEncodable)]
@@ -389,7 +482,10 @@ mod block_rlp {
     impl<T: Decodable, H: Decodable> Decodable for Block<T, H> {
         fn decode(b: &mut &[u8]) -> alloy_rlp::Result<Self> {
             let Helper { header, transactions, ommers, withdrawals } = Helper::decode(b)?;
-            Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })
+            Ok(Self {
+                header,
+                body: BlockBody { transactions: transactions.0, ommers, withdrawals },
+            })
         }
     }
 
@@ -414,7 +510,7 @@ mod block_rlp {
             let header_hash = keccak256(header_rlp);
 
             // Decode remaining body fields
-            let transactions = Vec::<T>::decode(&mut payload)?;
+            let transactions = decode_transactions::<T>(&mut payload)?;
             let ommers = Vec::<H>::decode(&mut payload)?;
             let withdrawals =
                 if payload.is_empty() { None } else { Some(Decodable::decode(&mut payload)?) };
@@ -613,6 +709,127 @@ mod tests {
         let present_string = block_rlp_with_body_fields(&[0xc0, 0xc0, 0x80]);
         assert!(Block::<TxEnvelope>::decode(&mut present_string.as_slice()).is_err());
         assert!(Block::<TxEnvelope>::decode_sealed(&mut present_string.as_slice()).is_err());
+    }
+
+    /// Builds `count` distinct, well formed transaction envelopes.
+    fn test_transactions(count: usize) -> Vec<TxEnvelope> {
+        use crate::SignableTransaction;
+        use alloy_primitives::{Address, Signature, TxKind, U256};
+
+        (0..count as u64)
+            .map(|nonce| {
+                let tx = TxLegacy {
+                    nonce,
+                    gas_price: 100,
+                    gas_limit: 21_000,
+                    to: TxKind::Call(Address::with_last_byte(nonce as u8)),
+                    value: U256::from(nonce),
+                    input: Default::default(),
+                    chain_id: Some(1),
+                };
+                let sig = Signature::new(U256::from(1), U256::from(2), false);
+                tx.into_signed(sig).into()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn decode_transactions_matches_vec_decode() {
+        for count in [0usize, 1, 2, 8, 9, 64, 2048] {
+            let transactions = test_transactions(count);
+            let encoded = alloy_rlp::encode(&transactions);
+
+            let mut buf = encoded.as_slice();
+            let decoded = decode_transactions::<TxEnvelope>(&mut buf).unwrap();
+            assert_eq!(decoded, transactions);
+            assert!(buf.is_empty());
+
+            // Identical to what the generic `Vec<T>` decoding produces.
+            let mut buf = encoded.as_slice();
+            assert_eq!(decoded, Vec::<TxEnvelope>::decode(&mut buf).unwrap());
+            assert!(buf.is_empty());
+        }
+    }
+
+    #[test]
+    fn decode_large_block_round_trips() {
+        let transactions = test_transactions(2048);
+        let block = Block {
+            header: Header { number: 42, gas_limit: 30_000_000, ..Default::default() },
+            body: BlockBody { transactions, ommers: vec![], withdrawals: None },
+        };
+        let expected_hash = block.header.hash_slow();
+        let encoded = alloy_rlp::encode(&block);
+
+        let mut buf = encoded.as_slice();
+        let decoded = Block::<TxEnvelope>::decode(&mut buf).unwrap();
+        assert_eq!(decoded, block);
+        assert!(buf.is_empty());
+
+        let mut buf = encoded.as_slice();
+        let sealed = Block::<TxEnvelope>::decode_sealed(&mut buf).unwrap();
+        assert_eq!(sealed.hash(), expected_hash);
+        assert_eq!(sealed.body.transactions.len(), 2048);
+        assert!(buf.is_empty());
+
+        let body_encoded = alloy_rlp::encode(&block.body);
+        let mut buf = body_encoded.as_slice();
+        assert_eq!(BlockBody::<TxEnvelope>::decode(&mut buf).unwrap(), block.body);
+        assert!(buf.is_empty());
+    }
+
+    /// Wraps `payload` in an RLP list header.
+    fn rlp_list(payload: &[u8]) -> Vec<u8> {
+        let header = alloy_rlp::Header { list: true, payload_length: payload.len() };
+        let mut out = Vec::with_capacity(header.length_with_payload());
+        header.encode(&mut out);
+        out.extend_from_slice(payload);
+        out
+    }
+
+    #[test]
+    fn decode_transactions_rejects_malformed_input() {
+        // Not a list.
+        assert!(decode_transactions::<TxEnvelope>(&mut [0x80u8].as_slice()).is_err());
+
+        // A list whose declared payload length exceeds the buffer.
+        assert!(decode_transactions::<TxEnvelope>(&mut [0xc4u8, 0x01].as_slice()).is_err());
+
+        // Garbage inside the list payload, both inside and past the sample window.
+        for count in [0usize, 1, 32] {
+            let mut payload = alloy_rlp::encode(test_transactions(count));
+            payload.push(0xff);
+            let encoded = rlp_list(&payload);
+            assert!(decode_transactions::<TxEnvelope>(&mut encoded.as_slice()).is_err());
+            // The generic `Vec<T>` decoding rejects it as well.
+            assert!(Vec::<TxEnvelope>::decode(&mut encoded.as_slice()).is_err());
+        }
+
+        // A truncated final transaction.
+        let payload = alloy_rlp::encode(test_transactions(32));
+        let truncated = rlp_list(&payload[..payload.len() - 1]);
+        assert!(decode_transactions::<TxEnvelope>(&mut truncated.as_slice()).is_err());
+    }
+
+    #[test]
+    fn decode_transactions_clamps_pre_allocation() {
+        /// A type that is large in memory but encodes to a single byte, i.e. the worst case for
+        /// extrapolating an element count from the encoded size.
+        #[derive(Debug, PartialEq, Eq)]
+        struct Big([u8; 1024]);
+
+        impl Decodable for Big {
+            fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+                u8::decode(buf).map(|b| Self([b; 1024]))
+            }
+        }
+
+        // 4096 single byte items would extrapolate to a 4 MiB reservation from a 4 KiB payload;
+        // the clamp keeps it proportional to the encoded size while still decoding correctly.
+        let encoded = rlp_list(&[0x01u8; 4096]);
+        let decoded = decode_transactions::<Big>(&mut encoded.as_slice()).unwrap();
+        assert_eq!(decoded.len(), 4096);
+        assert!(decoded.iter().all(|b| b.0 == [0x01; 1024]));
     }
 }
 
