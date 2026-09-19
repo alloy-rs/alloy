@@ -7,6 +7,8 @@ use tokio::sync::oneshot;
 pub enum PubSubInstruction {
     /// Send a request.
     Request(InFlight),
+    /// Send a batch of requests as a single JSON-RPC batch.
+    BatchRequest(Vec<InFlight>),
     /// Get the subscription ID for a local ID.
     GetSub(B256, oneshot::Sender<Option<RawSubscription>>),
     /// Unsubscribe from a subscription.
@@ -17,6 +19,7 @@ impl fmt::Debug for PubSubInstruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Request(arg0) => f.debug_tuple("Request").field(arg0).finish(),
+            Self::BatchRequest(arg0) => f.debug_tuple("BatchRequest").field(arg0).finish(),
             Self::GetSub(arg0, _) => f.debug_tuple("GetSub").field(arg0).finish(),
             Self::Unsubscribe(arg0) => f.debug_tuple("Unsubscribe").field(arg0).finish(),
         }
