@@ -125,7 +125,7 @@ impl MockChain {
                 true
             }
 
-            fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
+            fn backoff_hint(&self, _error: &TransportError, _num_retries: u32) -> Option<Duration> {
                 None
             }
         }
