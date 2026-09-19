@@ -351,6 +351,27 @@ const TX_CAPACITY_SAMPLE_SIZE: usize = 16;
 /// the memory amplification in the same ballpark as a legitimate block of the same wire size.
 const MAX_TX_PREALLOC_RATIO: usize = 8;
 
+/// Absolute upper bound on a single reservation made by [`decode_transactions`], as a number of
+/// bytes worth of `T`.
+///
+/// This is what bounds the memory a peer can make us commit for data we have not validated yet.
+/// A reservation is only made when the vector is exactly full, and [`Vec::reserve`] grows to at
+/// least twice the current capacity, so after any step the capacity is at most
+/// `2 * len + MAX_TX_PREALLOC_BYTES / size_of::<T>()`, i.e.
+///
+/// ```text
+/// bytes reserved <= 2 * decoded_len * size_of::<T>() + MAX_TX_PREALLOC_BYTES
+/// ```
+///
+/// The reserved memory therefore only grows as the amount of successfully decoded data grows.
+/// Without this bound, a message consisting of a handful of tiny but valid transactions followed
+/// by garbage would extrapolate to a reservation of up to [`MAX_TX_PREALLOC_RATIO`] times the
+/// remaining wire bytes, and only then fail on the next element.
+///
+/// Because each reservation still at least doubles the vector, large lists reach their final
+/// capacity in a logarithmic number of steps.
+const MAX_TX_PREALLOC_BYTES: usize = 2 * 1024 * 1024;
+
 /// Decodes an RLP list of transactions, pre-sizing the returned [`Vec`].
 ///
 /// This is equivalent to `Vec::<T>::decode`, including the errors it returns, but avoids the
@@ -363,6 +384,9 @@ const MAX_TX_PREALLOC_RATIO: usize = 8;
 /// go. A wrong estimate is harmless: too low and the next exhausted capacity re-estimates from a
 /// larger and therefore better sample, too high and the reservation is capped relative to the
 /// number of bytes that are actually left.
+///
+/// Every reservation is additionally capped at [`MAX_TX_PREALLOC_BYTES`], which bounds the memory
+/// committed for data that has not been validated yet; see that constant for the exact invariant.
 ///
 /// # Examples
 ///
@@ -377,27 +401,43 @@ const MAX_TX_PREALLOC_RATIO: usize = 8;
 /// # }
 /// ```
 pub fn decode_transactions<T: Decodable>(buf: &mut &[u8]) -> alloy_rlp::Result<Vec<T>> {
+    let mut transactions = Vec::new();
+    decode_transactions_into(buf, &mut transactions)?;
+    Ok(transactions)
+}
+
+/// Decodes an RLP list of transactions, appending them to `transactions`.
+///
+/// This is the body of [`decode_transactions`], split out so that tests can inspect the capacity
+/// of the vector after a decode that failed part way through.
+fn decode_transactions_into<T: Decodable>(
+    buf: &mut &[u8],
+    transactions: &mut Vec<T>,
+) -> alloy_rlp::Result<()> {
     let mut payload = alloy_rlp::Header::decode_bytes(buf, true)?;
     let payload_length = payload.len();
+    let start_len = transactions.len();
+    let elem_size = core::mem::size_of::<T>().max(1);
 
-    let mut transactions = Vec::new();
     while !payload.is_empty() {
-        if transactions.len() >= TX_CAPACITY_SAMPLE_SIZE
-            && transactions.len() == transactions.capacity()
-        {
+        let decoded = transactions.len() - start_len;
+        if decoded >= TX_CAPACITY_SAMPLE_SIZE && transactions.len() == transactions.capacity() {
             // Average encoded size of the transactions decoded so far, at least 1 byte.
-            let average = (payload_length - payload.len()) / transactions.len();
+            let average = (payload_length - payload.len()) / decoded;
             let estimate = payload.len() / average.max(1) + 1;
-            // Never reserve more than `MAX_TX_PREALLOC_RATIO` times the bytes that are left.
-            let max = MAX_TX_PREALLOC_RATIO.saturating_mul(payload.len())
-                / core::mem::size_of::<T>().max(1);
-            transactions.reserve(estimate.min(max));
+            // Never reserve more than `MAX_TX_PREALLOC_RATIO` times the bytes that are left, nor
+            // more than `MAX_TX_PREALLOC_BYTES` worth of `T` in a single step. The latter also
+            // means `additional` can never be large enough for `reserve` to overflow the capacity
+            // and panic, so there is no need for `try_reserve` here.
+            let ratio_cap = MAX_TX_PREALLOC_RATIO.saturating_mul(payload.len()) / elem_size;
+            let absolute_cap = MAX_TX_PREALLOC_BYTES / elem_size;
+            transactions.reserve(estimate.min(ratio_cap).min(absolute_cap));
         }
 
         transactions.push(T::decode(&mut payload)?);
     }
 
-    Ok(transactions)
+    Ok(())
 }
 
 /// We need to implement RLP traits manually because we currently don't have a way to flatten
@@ -733,6 +773,30 @@ mod tests {
             .collect()
     }
 
+    /// Builds `count` transaction envelopes carrying `input_len` bytes of calldata each.
+    fn large_test_transactions(count: usize, input_len: usize) -> Vec<TxEnvelope> {
+        use crate::{SignableTransaction, TxEip1559};
+        use alloy_primitives::{Address, Signature, TxKind, U256};
+
+        (0..count as u64)
+            .map(|nonce| {
+                let tx = TxEip1559 {
+                    chain_id: 1,
+                    nonce,
+                    gas_limit: 21_000,
+                    max_fee_per_gas: 100,
+                    max_priority_fee_per_gas: 1,
+                    to: TxKind::Call(Address::with_last_byte(nonce as u8)),
+                    value: U256::from(nonce),
+                    access_list: Default::default(),
+                    input: alloc::vec![0xab; input_len].into(),
+                };
+                let sig = Signature::new(U256::from(1), U256::from(2), false);
+                tx.into_signed(sig).into()
+            })
+            .collect()
+    }
+
     #[test]
     fn decode_transactions_matches_vec_decode() {
         for count in [0usize, 1, 2, 8, 9, 64, 2048] {
@@ -811,25 +875,103 @@ mod tests {
         assert!(decode_transactions::<TxEnvelope>(&mut truncated.as_slice()).is_err());
     }
 
+    /// A type that is large in memory but encodes to a single byte, i.e. the worst case for
+    /// extrapolating an element count from the encoded size. `size_of` is a round number so the
+    /// capacity arithmetic in the tests below is exact.
+    #[derive(Debug, PartialEq, Eq)]
+    struct Big([u8; 1024]);
+
+    impl Decodable for Big {
+        fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+            u8::decode(buf).map(|b| Self([b; 1024]))
+        }
+    }
+
+    /// The number of `T` a single reservation is allowed to add.
+    fn absolute_cap<T>() -> usize {
+        MAX_TX_PREALLOC_BYTES / core::mem::size_of::<T>().max(1)
+    }
+
+    /// The capacity invariant that bounds how much memory an unvalidated payload can commit.
+    #[track_caller]
+    fn assert_capacity_bounded<T>(transactions: &Vec<T>) {
+        let bound = 2 * transactions.len() + absolute_cap::<T>() + TX_CAPACITY_SAMPLE_SIZE;
+        assert!(
+            transactions.capacity() <= bound,
+            "capacity {} exceeds 2 * len {} + cap {}",
+            transactions.capacity(),
+            transactions.len(),
+            absolute_cap::<T>(),
+        );
+    }
+
     #[test]
     fn decode_transactions_clamps_pre_allocation() {
-        /// A type that is large in memory but encodes to a single byte, i.e. the worst case for
-        /// extrapolating an element count from the encoded size.
-        #[derive(Debug, PartialEq, Eq)]
-        struct Big([u8; 1024]);
-
-        impl Decodable for Big {
-            fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-                u8::decode(buf).map(|b| Self([b; 1024]))
-            }
-        }
-
         // 4096 single byte items would extrapolate to a 4 MiB reservation from a 4 KiB payload;
         // the clamp keeps it proportional to the encoded size while still decoding correctly.
         let encoded = rlp_list(&[0x01u8; 4096]);
         let decoded = decode_transactions::<Big>(&mut encoded.as_slice()).unwrap();
         assert_eq!(decoded.len(), 4096);
         assert!(decoded.iter().all(|b| b.0 == [0x01; 1024]));
+        assert_capacity_bounded(&decoded);
+    }
+
+    #[test]
+    fn decode_transactions_bounds_memory_on_valid_prefix_then_garbage() {
+        const GARBAGE: usize = 4 * 1024 * 1024;
+
+        // A sample window worth of well formed transactions, then megabytes of garbage. The
+        // estimate derived from the prefix is wildly optimistic, but the per-step cap means we
+        // commit at most `MAX_TX_PREALLOC_BYTES` before finding out.
+        let mut payload = Vec::new();
+        for tx in test_transactions(TX_CAPACITY_SAMPLE_SIZE) {
+            tx.encode(&mut payload);
+        }
+        payload.resize(payload.len() + GARBAGE, 0xff);
+        let encoded = rlp_list(&payload);
+
+        let mut transactions = Vec::<TxEnvelope>::new();
+        assert!(decode_transactions_into(&mut encoded.as_slice(), &mut transactions).is_err());
+        assert_eq!(transactions.len(), TX_CAPACITY_SAMPLE_SIZE);
+        assert_capacity_bounded(&transactions);
+        assert!(
+            transactions.capacity() * core::mem::size_of::<TxEnvelope>()
+                <= MAX_TX_PREALLOC_BYTES + 2 * transactions.len() * size_of::<TxEnvelope>(),
+        );
+
+        // Same shape with a type whose size makes the arithmetic exact: a one byte element means
+        // the unbounded estimate would be one element per garbage byte.
+        let mut payload = alloc::vec![0x01u8; TX_CAPACITY_SAMPLE_SIZE];
+        payload.resize(payload.len() + GARBAGE, 0xff);
+        let encoded = rlp_list(&payload);
+
+        let mut items = Vec::<Big>::new();
+        assert!(decode_transactions_into(&mut encoded.as_slice(), &mut items).is_err());
+        assert_eq!(items.len(), TX_CAPACITY_SAMPLE_SIZE);
+        assert_capacity_bounded(&items);
+        assert!(items.capacity() <= TX_CAPACITY_SAMPLE_SIZE + absolute_cap::<Big>());
+    }
+
+    #[test]
+    fn decode_transactions_handles_small_prefix_then_large_transactions() {
+        let mut transactions = test_transactions(TX_CAPACITY_SAMPLE_SIZE);
+        transactions.extend(large_test_transactions(2_000, 4_096));
+        let encoded = alloy_rlp::encode(&transactions);
+
+        let decoded = decode_transactions::<TxEnvelope>(&mut encoded.as_slice()).unwrap();
+        assert_eq!(decoded, transactions);
+        assert_capacity_bounded(&decoded);
+    }
+
+    #[test]
+    fn decode_transactions_handles_large_prefix_then_small_transactions() {
+        let mut transactions = large_test_transactions(TX_CAPACITY_SAMPLE_SIZE, 4_096);
+        transactions.extend(test_transactions(8_000));
+        let encoded = alloy_rlp::encode(&transactions);
+
+        let decoded = decode_transactions::<TxEnvelope>(&mut encoded.as_slice()).unwrap();
+        assert_eq!(decoded, transactions);
+        assert_capacity_bounded(&decoded);
     }
 }
 

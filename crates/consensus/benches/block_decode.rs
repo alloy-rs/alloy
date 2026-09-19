@@ -13,6 +13,8 @@
 //! * `heuristic_<k>` - `Vec::with_capacity(payload_len / k)` without any extra pass.
 //! * `sampling_<s>` - decode `s` items, extrapolate the average encoded size, then `reserve`.
 //! * `progressive_<s>` - like `sampling_<s>`, but re-estimates whenever the capacity is exhausted.
+//! * `progressive_<s>_cap<n>k` - the same, with every single reservation capped at `n` KiB worth of
+//!   `TxEnvelope`. This is what `alloy_consensus::decode_transactions` does.
 //!
 //! Run the benchmarks with:
 //!
@@ -50,6 +52,11 @@ const ALL_WORKLOADS: [Workload; 4] =
 /// reservation by the encoded size keeps the memory amplification in the same ballpark as a
 /// legitimate block of the same wire size.
 const MAX_PREALLOC_RATIO: usize = 8;
+
+/// Absolute cap on a single reservation, in bytes worth of `TxEnvelope`. This is what bounds the
+/// memory an unvalidated payload can commit: because `Vec::reserve` at least doubles, the
+/// capacity after any step stays below `2 * len + MAX_PREALLOC_BYTES / size_of::<TxEnvelope>()`.
+const MAX_PREALLOC_BYTES: usize = 2 * 1024 * 1024;
 
 // -------------------------------------------------------------------------------------------
 // Fixtures
@@ -220,8 +227,9 @@ enum Strategy {
     /// Decode `samples` items, extrapolate, then `reserve` the estimated remainder once.
     Sampling { samples: usize },
     /// Like `Sampling`, but re-estimates every time the capacity is exhausted, so that a bad
-    /// early estimate corrects itself.
-    Progressive { samples: usize },
+    /// early estimate corrects itself. `cap_bytes` additionally caps each single reservation at
+    /// that many bytes worth of `TxEnvelope`; 0 means no absolute cap.
+    Progressive { samples: usize, cap_bytes: usize },
 }
 
 impl Strategy {
@@ -235,7 +243,10 @@ impl Strategy {
                 format!("heuristic_{bytes_per_tx}_over_{}k", threshold / 1024)
             }
             Self::Sampling { samples } => format!("sampling_{samples}"),
-            Self::Progressive { samples } => format!("progressive_{samples}"),
+            Self::Progressive { samples, cap_bytes: 0 } => format!("progressive_{samples}"),
+            Self::Progressive { samples, cap_bytes } => {
+                format!("progressive_{samples}_cap{}k", cap_bytes / 1024)
+            }
         }
     }
 }
@@ -248,8 +259,9 @@ fn strategies() -> Vec<Strategy> {
         Strategy::ExactReserveExact,
         Strategy::Sampling { samples: 8 },
         Strategy::Sampling { samples: 16 },
-        Strategy::Progressive { samples: 8 },
-        Strategy::Progressive { samples: 16 },
+        Strategy::Progressive { samples: 8, cap_bytes: 0 },
+        Strategy::Progressive { samples: 16, cap_bytes: 0 },
+        Strategy::Progressive { samples: 16, cap_bytes: MAX_PREALLOC_BYTES },
     ];
     for bytes_per_tx in [64, 100, 128, 200, 256] {
         out.push(Strategy::Heuristic { bytes_per_tx, threshold: 0 });
@@ -332,10 +344,13 @@ fn decode_txs<const TRACE: bool>(
     }
 
     while !payload.is_empty() {
-        if let Strategy::Progressive { samples } = strategy {
+        if let Strategy::Progressive { samples, cap_bytes } = strategy {
             if out.len() >= samples && out.len() == out.capacity() {
                 let average = ((payload_len - payload.len()) / out.len()).max(1);
-                let estimate = clamp_capacity(payload.len() / average + 1, payload.len());
+                let mut estimate = clamp_capacity(payload.len() / average + 1, payload.len());
+                if cap_bytes > 0 {
+                    estimate = estimate.min(cap_bytes / size_of::<TxEnvelope>().max(1));
+                }
                 let before = if TRACE { out.capacity() } else { 0 };
                 out.reserve(estimate);
                 if TRACE && out.capacity() != before {
