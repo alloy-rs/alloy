@@ -51,9 +51,7 @@ impl<T: Eq + Hash> From<T> for FilterSet<T> {
 
 impl<T: Eq + Hash> Hash for FilterSet<T> {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        for value in &self.set {
-            value.hash(state);
-        }
+        self.set.hash(state);
     }
 }
 
