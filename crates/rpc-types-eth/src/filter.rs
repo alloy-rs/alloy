@@ -56,14 +56,6 @@ impl<T: Eq + Hash> From<T> for FilterSet<T> {
     }
 }
 
-impl<T: Eq + Hash> Hash for FilterSet<T> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        for value in &self.set {
-            value.hash(state);
-        }
-    }
-}
-
 impl<T: Eq + Hash> From<HashSet<T>> for FilterSet<T> {
     fn from(src: HashSet<T>) -> Self {
         Self { set: src, ..Default::default() }
@@ -416,7 +408,7 @@ impl Default for FilterBlockOption {
 /// Addresses use OR semantics. Values within one topic position use OR semantics, while populated
 /// topic positions use AND semantics. Empty address and topic sets are wildcards. Block ranges are
 /// inclusive, and a block hash is mutually exclusive with `fromBlock` and `toBlock`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
