@@ -43,7 +43,7 @@ jobs:
             flags: "--all-features"
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -63,7 +63,7 @@ jobs:
       # Only run tests on latest stable and above
       - name: Install cargo-nextest
         if: ${{ matrix.rust != '1.94.1' }} # MSRV
-        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
         with:
           tool: nextest@0.9.140
           checksum: true
@@ -84,7 +84,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -105,7 +105,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -114,7 +114,7 @@ jobs:
           toolchain: stable
           target: wasm32-unknown-unknown
       - name: Install cargo-hack
-        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
         with:
           tool: cargo-hack@0.6.45
           checksum: true
@@ -148,7 +148,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -157,7 +157,7 @@ jobs:
           toolchain: stable
           target: wasm32-wasip1
       - name: Install cargo-hack
-        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
         with:
           tool: cargo-hack@0.6.45
           checksum: true
@@ -185,7 +185,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -193,7 +193,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install cargo-hack
-        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
         with:
           tool: cargo-hack@0.6.45
           checksum: true
@@ -213,7 +213,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -222,7 +222,7 @@ jobs:
           toolchain: stable
           targets: riscv32imac-unknown-none-elf
       - name: Install cargo-hack
-        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
         with:
           tool: cargo-hack@0.6.45
           checksum: true
@@ -240,7 +240,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -254,7 +254,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -277,7 +277,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -300,7 +300,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -319,12 +319,12 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install Zepter
-        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
         with:
           tool: zepter@1.88.1
           checksum: true
@@ -344,7 +344,7 @@ jobs:
       id-token: write
     steps:
       - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@ca2b15de1d1f6edd2276736187d7e4c2d898972c # main
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -353,7 +353,7 @@ jobs:
           toolchain: nightly
       # Trusted prebuilt tool; audit dependencies on the Aegis-protected host.
       - name: Install cargo-deny
-        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@25cce154e7fb10f99361a166468a6c56b9c31aa3 # main
+        uses: tempoxyz/gh-actions/vendor/taiki-e/install-action@68851d67c611dc0050e9f3fcd5bd47f3f899a00e # main
         with:
           tool: cargo-deny@0.20.2
           checksum: true
@@ -365,6 +365,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
+      id-token: write
       contents: read
       security-events: write
       actions: read
@@ -375,6 +376,8 @@ jobs:
           - language: actions
             build-mode: none
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -407,7 +410,11 @@ jobs:
       - feature-propagation
       - deny
       - codeql
+    permissions:
+      id-token: write
     steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@68851d67c611dc0050e9f3fcd5bd47f3f899a00e
       - name: Decide whether the needed jobs succeeded or failed
         uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # release/v1
         with:
