@@ -1053,7 +1053,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{PooledTransaction, Recovered, SignableTransaction},
+        transaction::{PooledTransaction, Recovered, SignableTransaction, SignerRecoverable},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
@@ -1086,7 +1086,7 @@ mod tests {
         use alloy_primitives::address;
 
         let raw_tx = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
-        let res = TxEnvelope::decode_2718(&mut raw_tx.as_slice()).unwrap();
+        let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
 
         assert_eq!(res.tx_type(), TxType::Eip1559);
 
@@ -1441,17 +1441,6 @@ mod tests {
         let encoded = alloy_rlp::encode(&transactions);
         let decoded = Vec::<TxEnvelope>::decode(&mut &encoded[..]).unwrap();
         assert_eq!(transactions, decoded);
-    }
-
-    #[test]
-    fn network_decode_rejects_unwrapped_typed_transaction() {
-        let tx = TxEnvelope::Eip1559(TxEip1559::default().into_signed(Signature::test_signature()));
-        let encoded = tx.encoded_2718();
-        assert_eq!(encoded.first().copied(), Some(TxType::Eip1559 as u8));
-
-        let mut input = encoded.as_slice();
-        assert!(TxEnvelope::network_decode(&mut input).is_err());
-        assert_eq!(input, encoded.as_slice());
     }
 
     #[test]
@@ -2246,7 +2235,7 @@ mod tests {
 
         // Test vector from https://etherscan.io/tx/0xce4dc6d7a7549a98ee3b071b67e970879ff51b5b95d1c340bacd80fa1e1aab31
         let raw_tx = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
-        let tx = TxEnvelope::decode_2718(&mut raw_tx.as_slice()).unwrap();
+        let tx = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
 
         // Recover using the standard method
         let from_standard = tx.recover_signer().unwrap();
@@ -2308,7 +2297,7 @@ mod tests {
 
         // EIP-1559 tx
         let raw_eip1559 = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
-        let tx_eip1559 = TxEnvelope::decode_2718(&mut raw_eip1559.as_slice()).unwrap();
+        let tx_eip1559 = TxEnvelope::decode(&mut raw_eip1559.as_slice()).unwrap();
 
         // Use a single buffer for both recoveries
         let mut buf = alloc::vec::Vec::new();

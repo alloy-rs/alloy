@@ -1889,8 +1889,8 @@ mod tests {
     use super::*;
     use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_consensus::{Transaction, TxEnvelope};
-    use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
     use alloy_eips::eip2718::Decodable2718;
+    use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
     use alloy_network::{
         AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
     };

@@ -367,57 +367,47 @@ impl Encodable for TxLegacy {
 }
 
 impl Decodable for TxLegacy {
+    /// Decodes an unsigned legacy transaction or an EIP-155 signing payload.
+    ///
+    /// For backwards compatibility, the two fields after `chain_id` are decoded as `U256` and
+    /// discarded without requiring the zero values specified by EIP-155. This also accepts signed
+    /// legacy transaction RLP when `v` fits in `ChainId`, but stores `v` directly as `chain_id`
+    /// rather than deriving the chain ID from it. Use
+    /// [`RlpEcdsaDecodableTx::rlp_decode_signed`] to decode signed transactions correctly.
+    ///
+    /// The outer header is not required to be a list. Fields are read from the entire remaining
+    /// buffer, with the consumed length checked against the header only afterwards. In particular,
+    /// any bytes after the first six fields trigger an attempt to read three more fields, even if
+    /// those bytes are outside the declared payload.
+    ///
+    /// Successful decoding does not establish a canonical signing payload. Requiring a list header
+    /// or zero sentinel fields would reject previously accepted inputs and is a breaking change.
     fn decode(data: &mut &[u8]) -> Result<Self> {
-        let mut payload = Header::decode_bytes(data, true)?;
-        let mut transaction = Self::rlp_decode_fields(&mut payload)?;
+        let header = Header::decode(data)?;
+        let remaining_len = data.len();
 
-        // If the payload has more fields, they must be the EIP-155 chain ID and zero sentinels.
-        if !payload.is_empty() {
-            transaction.chain_id = Some(Decodable::decode(&mut payload)?);
-            let r: U256 = Decodable::decode(&mut payload)?;
-            let s: U256 = Decodable::decode(&mut payload)?;
-            if !r.is_zero() || !s.is_zero() {
-                return Err(alloy_rlp::Error::Custom("non-zero EIP-155 signing sentinel"));
-            }
+        let transaction_payload_len = header.payload_length;
+
+        if transaction_payload_len > remaining_len {
+            return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        if !payload.is_empty() {
+        let mut transaction = Self::rlp_decode_fields(data)?;
+
+        // Preserve the permissive nine-field form: the seventh field is taken as chain_id, and
+        // the last two fields need not be zero. Enforcing EIP-155 sentinels would be breaking.
+        if !data.is_empty() {
+            transaction.chain_id = Some(Decodable::decode(data)?);
+            let _: U256 = Decodable::decode(data)?; // r
+            let _: U256 = Decodable::decode(data)?; // s
+        }
+
+        let decoded = remaining_len - data.len();
+        if decoded != transaction_payload_len {
             return Err(alloy_rlp::Error::UnexpectedLength);
         }
 
         Ok(transaction)
-    }
-}
-
-#[cfg(test)]
-mod rlp_tests {
-    use super::TxLegacy;
-    use alloy_rlp::{Decodable, Header};
-
-    #[test]
-    fn unsigned_decode_is_canonical_and_bounded() {
-        let tx = TxLegacy { chain_id: Some(1), ..Default::default() };
-        let encoded = alloy_rlp::encode(&tx);
-
-        let mut with_suffix = encoded.to_vec();
-        with_suffix.push(0x01);
-        let mut input = with_suffix.as_slice();
-        assert_eq!(TxLegacy::decode(&mut input).unwrap(), tx);
-        assert_eq!(input, &[0x01]);
-
-        let mut payload = encoded.as_ref();
-        let header = Header::decode(&mut payload).unwrap();
-        let mut string_wrapped = Vec::with_capacity(encoded.len());
-        Header { list: false, payload_length: header.payload_length }.encode(&mut string_wrapped);
-        string_wrapped.extend_from_slice(payload);
-        assert!(TxLegacy::decode(&mut string_wrapped.as_slice()).is_err());
-
-        assert_eq!(&encoded[encoded.len() - 2..], &[0x80, 0x80]);
-        for sentinel in [encoded.len() - 2, encoded.len() - 1] {
-            let mut nonzero = encoded.to_vec();
-            nonzero[sentinel] = 0x01;
-            assert!(TxLegacy::decode(&mut nonzero.as_slice()).is_err());
-        }
     }
 }
 

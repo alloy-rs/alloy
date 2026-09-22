@@ -38,6 +38,54 @@ where
     assert_eq!(&reencoded[..], &data[..consumed], "{name}: encode(decode(bytes)) != bytes");
 }
 
+fn assert_legacy_compatibility(data: &[u8]) {
+    let mut input = data;
+    let Ok(decoded) = TxLegacy::decode(&mut input) else {
+        return;
+    };
+
+    let mut canonical = Vec::new();
+    decoded.encode(&mut canonical);
+    let mut canonical_input = canonical.as_slice();
+    let canonical_decoded = TxLegacy::decode(&mut canonical_input)
+        .expect("TxLegacy canonical re-encoding must decode");
+    assert!(canonical_input.is_empty(), "TxLegacy canonical re-encoding left a suffix");
+
+    let mut second = Vec::new();
+    canonical_decoded.encode(&mut second);
+    assert_eq!(second, canonical, "TxLegacy compatibility canonicalization is not stable");
+}
+
+fn assert_typed_network_compatibility<T>(data: &[u8], name: &str)
+where
+    T: Decodable + Encodable,
+{
+    let mut input = data;
+    let Ok(decoded) = T::decode(&mut input) else {
+        return;
+    };
+
+    let consumed = data.len() - input.len();
+    let mut canonical = Vec::new();
+    decoded.encode(&mut canonical);
+    if canonical == data[..consumed] {
+        return;
+    }
+
+    assert!(
+        data.first().is_some_and(|ty| (1..=0x7f).contains(ty)),
+        "{name}: undocumented non-canonical network encoding"
+    );
+    let mut canonical_input = canonical.as_slice();
+    let canonical_decoded = T::decode(&mut canonical_input)
+        .expect("canonical typed network re-encoding must decode");
+    assert!(canonical_input.is_empty(), "{name}: canonical network encoding left a suffix");
+
+    let mut second = Vec::new();
+    canonical_decoded.encode(&mut second);
+    assert_eq!(second, canonical, "{name}: network canonicalization is not stable");
+}
+
 fn assert_sealed_block_roundtrip(data: &[u8]) {
     let mut input = data;
     let Ok(sealed) = Block::<BasicTxEnvelope>::decode_sealed(&mut input) else {
@@ -112,6 +160,23 @@ where
     let consumed = data.len() - input.len();
     let mut reencoded = Vec::with_capacity(consumed);
     decoded.network_encode(&mut reencoded);
+
+    // `network_decode` intentionally accepts a bare typed EIP-2718 envelope for backwards
+    // compatibility. It canonicalizes that form by adding the RLP string wrapper.
+    if reencoded != data[..consumed]
+        && data.first().is_some_and(|ty| (1..=0x7f).contains(ty))
+    {
+        let mut canonical_input = reencoded.as_slice();
+        let canonical = T::network_decode(&mut canonical_input)
+            .expect("canonical network re-encoding must decode");
+        assert!(canonical_input.is_empty(), "canonical network re-encoding left a suffix");
+
+        let mut second = Vec::new();
+        canonical.network_encode(&mut second);
+        assert_eq!(second, reencoded, "{name}: network canonicalization is not stable");
+        return;
+    }
+
     assert_eq!(
         &reencoded[..],
         &data[..consumed],
@@ -146,7 +211,7 @@ fn assert_fallback_error_preserves_cursor(data: &[u8]) {
 }
 
 fn assert_tx_envelope_roundtrips(data: &[u8]) {
-    assert_roundtrip::<BasicTxEnvelope>(data, "BasicTxEnvelope");
+    assert_typed_network_compatibility::<BasicTxEnvelope>(data, "BasicTxEnvelope");
     assert_2718_roundtrip::<TxEnvelope>(data, "TxEnvelope");
 }
 
@@ -159,13 +224,16 @@ fn raw_roundtrip_properties(data: &[u8]) {
     assert_roundtrip::<Header>(data, "Header");
     assert_roundtrip::<BlockBody<BasicTxEnvelope>>(data, "BlockBody<BasicTxEnvelope>");
     assert_roundtrip::<Block<BasicTxEnvelope>>(data, "Block<BasicTxEnvelope>");
-    assert_roundtrip::<TxLegacy>(data, "TxLegacy");
+    assert_legacy_compatibility(data);
     assert_roundtrip::<TxEip2930>(data, "TxEip2930");
     assert_roundtrip::<TxEip1559>(data, "TxEip1559");
     assert_roundtrip::<TxEip4844>(data, "TxEip4844");
     assert_roundtrip::<TxEip7702>(data, "TxEip7702");
-    assert_roundtrip::<PooledTransaction>(data, "PooledTransaction");
-    assert_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
+    assert_typed_network_compatibility::<PooledTransaction>(data, "PooledTransaction");
+    assert_typed_network_compatibility::<VariantPooledTransaction>(
+        data,
+        "VariantPooledTransaction",
+    );
     assert_2718_roundtrip::<PooledTransaction>(data, "PooledTransaction");
     assert_2718_roundtrip::<VariantPooledTransaction>(data, "VariantPooledTransaction");
     assert_2718_network_roundtrip::<PooledTransaction>(data, "PooledTransaction");
