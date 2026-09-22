@@ -22,10 +22,16 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     async fn debug_get_raw_block(&self, block: BlockId) -> TransportResult<Bytes>;
 
     /// Returns an EIP-2718 binary-encoded transaction.
-    async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes>;
+    ///
+    /// A successful `null` response becomes `None`. Geth may return `"0x"` for a missing
+    /// transaction, which is preserved as `Some(Bytes::new())`. RPC errors are not normalized.
+    async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Option<Bytes>>;
 
     /// Returns an array of EIP-2718 binary-encoded receipts.
-    async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Vec<Bytes>>;
+    ///
+    /// A successful `null` response becomes `None`; an empty array becomes `Some(vec![])`.
+    /// Missing-block behavior varies by node and block selector. RPC errors are propagated.
+    async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Option<Vec<Bytes>>>;
 
     /// Returns an array of recent bad blocks that the client has seen on the network.
     async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<BadBlock>>;
@@ -392,11 +398,11 @@ where
         self.client().request("debug_getRawBlock", (block,)).await
     }
 
-    async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes> {
+    async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Option<Bytes>> {
         self.client().request("debug_getRawTransaction", (hash,)).await
     }
 
-    async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Vec<Bytes>> {
+    async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Option<Vec<Bytes>>> {
         self.client().request("debug_getRawReceipts", (block,)).await
     }
 
@@ -615,6 +621,54 @@ mod test {
     use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
+
+    #[tokio::test]
+    async fn raw_debug_results_preserve_absence_and_empty_values() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for (wire, expected) in [
+            (serde_json::Value::Null, None),
+            (serde_json::json!("0x"), Some(Bytes::new())),
+            (serde_json::json!("0x1234"), Some(Bytes::from_static(&[0x12, 0x34]))),
+        ] {
+            asserter.push_success(&wire);
+            assert_eq!(provider.debug_get_raw_transaction(TxHash::ZERO).await.unwrap(), expected);
+        }
+        for (wire, expected) in [
+            (serde_json::Value::Null, None),
+            (serde_json::json!([]), Some(vec![])),
+            (serde_json::json!(["0x1234"]), Some(vec![Bytes::from_static(&[0x12, 0x34])])),
+        ] {
+            asserter.push_success(&wire);
+            assert_eq!(provider.debug_get_raw_receipts(BlockId::latest()).await.unwrap(), expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn raw_debug_results_preserve_rpc_errors() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for code in [-32601, -32000, -32001, 4444] {
+            for _ in 0..3 {
+                asserter.push_failure(alloy_json_rpc::ErrorPayload {
+                    code,
+                    message: "lookup failed".into(),
+                    data: None,
+                });
+            }
+            let errors = [
+                provider.debug_get_raw_transaction(TxHash::ZERO).await.unwrap_err(),
+                provider.debug_get_raw_receipts(BlockId::latest()).await.unwrap_err(),
+                provider
+                    .debug_trace_transaction(TxHash::ZERO, Default::default())
+                    .await
+                    .unwrap_err(),
+            ];
+            for error in errors {
+                assert_eq!(error.as_error_resp().unwrap().code, code);
+            }
+        }
+    }
 
     #[tokio::test]
     async fn test_debug_trace_transaction() {
