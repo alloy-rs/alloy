@@ -2,7 +2,10 @@
 //!
 //! See also <https://flashbots.github.io/relay-specs/>
 
-use crate::{requests::ExecutionRequestsV4, BlsPublicKey, BlsSignature};
+use crate::{
+    requests::{ExecutionRequestsV4, ExecutionRequestsV5},
+    BlsPublicKey, BlsSignature,
+};
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, BlobsBundleV2, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
@@ -211,8 +214,8 @@ pub struct SignedBidSubmissionV6 {
     pub execution_payload: ExecutionPayloadV4,
     /// The Amsterdam block bundle for this bid.
     pub blobs_bundle: BlobsBundleV2,
-    /// The Pectra execution requests for this bid.
-    pub execution_requests: ExecutionRequestsV4,
+    /// The Amsterdam execution requests for this bid.
+    pub execution_requests: ExecutionRequestsV5,
     /// The signature associated with the submission.
     pub signature: BlsSignature,
 }
@@ -846,7 +849,7 @@ mod tests {
                 proofs: bid_submission_v4.blobs_bundle.proofs.clone(),
                 blobs: bid_submission_v4.blobs_bundle.blobs.clone(),
             },
-            execution_requests: bid_submission_v4.execution_requests.clone(),
+            execution_requests: bid_submission_v4.execution_requests.clone().into(),
             signature: bid_submission_v4.signature,
         }
     }
@@ -859,6 +862,63 @@ mod tests {
 
         assert_eq!(bid, deserialized);
         assert_eq!(json, serde_json::to_value(deserialized).unwrap());
+    }
+
+    fn amsterdam_bid_submission_with_builder_requests() -> SignedBidSubmissionV6 {
+        let bid = amsterdam_bid_submission_v6();
+
+        SignedBidSubmissionV6 {
+            execution_requests: ExecutionRequestsV5 {
+                builder_deposits: vec![alloy_eips::eip8282::BuilderDepositRequest {
+                    pubkey: alloy_primitives::FixedBytes::repeat_byte(0x11),
+                    withdrawal_credentials: alloy_primitives::B256::repeat_byte(0x22),
+                    amount: 91_000_000_000,
+                    signature: alloy_primitives::FixedBytes::repeat_byte(0x33),
+                }],
+                builder_exits: vec![alloy_eips::eip8282::BuilderExitRequest {
+                    source_address: Address::repeat_byte(0x44),
+                    pubkey: alloy_primitives::FixedBytes::repeat_byte(0x55),
+                }],
+                ..bid.execution_requests
+            },
+            ..bid
+        }
+    }
+
+    #[test]
+    fn amsterdam_bid_submission_builder_requests_roundtrip() {
+        let bid = amsterdam_bid_submission_with_builder_requests();
+        let json = serde_json::to_value(&bid).unwrap();
+        let deserialized = serde_json::from_value::<SignedBidSubmissionV6>(json.clone()).unwrap();
+
+        assert_eq!(bid, deserialized);
+        assert_eq!(json, serde_json::to_value(deserialized).unwrap());
+    }
+
+    /// A pre-EIP-8282 body, which omits the two builder request keys entirely, still decodes.
+    #[test]
+    fn amsterdam_bid_submission_accepts_body_without_builder_requests() {
+        let bid = amsterdam_bid_submission_v6();
+        let mut json = serde_json::to_value(&bid).unwrap();
+
+        let requests = json["execution_requests"].as_object_mut().unwrap();
+        assert!(requests.remove("builder_deposits").is_some());
+        assert!(requests.remove("builder_exits").is_some());
+
+        let decoded = serde_json::from_value::<SignedBidSubmissionV6>(json).unwrap();
+        assert!(decoded.execution_requests.builder_deposits.is_empty());
+        assert!(decoded.execution_requests.builder_exits.is_empty());
+        assert_eq!(decoded, bid);
+    }
+
+    #[cfg(feature = "ssz")]
+    #[test]
+    fn amsterdam_bid_submission_requests_roundtrip() {
+        let bid = amsterdam_bid_submission_with_builder_requests();
+
+        let requests = bid.execution_requests.to_requests();
+        let recovered = ExecutionRequestsV5::try_from(&requests).unwrap();
+        assert_eq!(recovered, bid.execution_requests);
     }
 
     #[cfg(feature = "ssz")]
