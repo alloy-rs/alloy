@@ -237,20 +237,20 @@ mod ssz_requests_conversions {
         }
     }
 
-    /// Errors possible converting a [Requests] to [ExecutionRequestsV4]
+    /// Errors possible converting a [Requests] to [ExecutionRequestsV4] or [ExecutionRequestsV5]
     #[derive(Debug, thiserror::Error)]
     pub enum TryFromRequestsError {
         /// One of the Bytes is empty.
         #[error("empty bytes in requests body")]
         EmptyRequest,
-        /// Bytes prefix is not a known EIP-7685 request_type in Electra.
+        /// Bytes prefix is not a known EIP-7685 request_type for the target version.
         #[error("unknown request_type prefix: {0}")]
         UnknownRequestType(u8),
         /// Remaining bytes could not be decoded as SSZ requests_data.
         #[error("ssz decode error for request_type {0}: {1:?}")]
         SszDecodeError(u8, DecodeError),
-        /// Requests of request_type exceeds Electra size limits
-        #[error("requests_data payload for request_type {0} exceeds Electra size limit {1}")]
+        /// Requests of request_type exceeds the size limit for that type
+        #[error("requests_data payload for request_type {0} exceeds size limit {1}")]
         RequestPayloadSizeExceeded(u8, usize),
     }
 
