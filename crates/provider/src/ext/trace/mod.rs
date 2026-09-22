@@ -184,49 +184,6 @@ mod test {
     use alloy_transport::mock::Asserter;
 
     #[tokio::test]
-    async fn trace_replay_preserves_transaction_hash() {
-        let asserter = Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        let hash = TxHash::with_last_byte(1);
-        let replay = serde_json::json!({
-            "output": "0x1234", "trace": [], "stateDiff": null, "vmTrace": null,
-            "transactionHash": hash
-        });
-        asserter.push_success(&replay);
-        let result = provider.trace_replay_transaction(hash).await.unwrap().unwrap();
-        assert_eq!(result.transaction_hash, Some(hash));
-        assert_eq!(serde_json::to_value(result).unwrap(), replay);
-
-        // Block replays retain the required hash and existing response type.
-        asserter.push_success(&serde_json::json!([replay]));
-        let results = provider.trace_replay_block_transactions(BlockId::latest()).await.unwrap();
-        assert_eq!(results[0].transaction_hash, hash);
-    }
-
-    #[tokio::test]
-    async fn trace_replay_handles_absence_and_legacy_nodes() {
-        let asserter = Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        asserter.push_success(&serde_json::Value::Null);
-        assert!(provider.trace_replay_transaction(TxHash::ZERO).await.unwrap().is_none());
-        let replay =
-            serde_json::json!({"output": "0x", "trace": [], "stateDiff": null, "vmTrace": null});
-        asserter.push_success(&replay);
-        let result = provider.trace_replay_transaction(TxHash::ZERO).await.unwrap().unwrap();
-        assert!(result.transaction_hash.is_none());
-        assert_eq!(serde_json::to_value(result.full_trace).unwrap(), replay);
-        for code in [-32601, -32001, 4444] {
-            asserter.push_failure(alloy_json_rpc::ErrorPayload {
-                code,
-                message: "lookup failed".into(),
-                data: None,
-            });
-            let error = provider.trace_replay_transaction(TxHash::ZERO).await.unwrap_err();
-            assert_eq!(error.as_error_resp().unwrap().code, code);
-        }
-    }
-
-    #[tokio::test]
     async fn trace_block() {
         let provider = ProviderBuilder::new().connect_anvil();
         let traces = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
@@ -564,5 +521,48 @@ mod test {
             .await;
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn trace_replay_preserves_transaction_hash() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let hash = TxHash::with_last_byte(1);
+        let replay = serde_json::json!({
+            "output": "0x1234", "trace": [], "stateDiff": null, "vmTrace": null,
+            "transactionHash": hash
+        });
+        asserter.push_success(&replay);
+        let result = provider.trace_replay_transaction(hash).await.unwrap().unwrap();
+        assert_eq!(result.transaction_hash, Some(hash));
+        assert_eq!(serde_json::to_value(result).unwrap(), replay);
+
+        // Block replays retain the required hash and existing response type.
+        asserter.push_success(&serde_json::json!([replay]));
+        let results = provider.trace_replay_block_transactions(BlockId::latest()).await.unwrap();
+        assert_eq!(results[0].transaction_hash, hash);
+    }
+
+    #[tokio::test]
+    async fn trace_replay_handles_absence_and_legacy_nodes() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        asserter.push_success(&serde_json::Value::Null);
+        assert!(provider.trace_replay_transaction(TxHash::ZERO).await.unwrap().is_none());
+        let replay =
+            serde_json::json!({"output": "0x", "trace": [], "stateDiff": null, "vmTrace": null});
+        asserter.push_success(&replay);
+        let result = provider.trace_replay_transaction(TxHash::ZERO).await.unwrap().unwrap();
+        assert!(result.transaction_hash.is_none());
+        assert_eq!(serde_json::to_value(result.full_trace).unwrap(), replay);
+        for code in [-32601, -32001, 4444] {
+            asserter.push_failure(alloy_json_rpc::ErrorPayload {
+                code,
+                message: "lookup failed".into(),
+                data: None,
+            });
+            let error = provider.trace_replay_transaction(TxHash::ZERO).await.unwrap_err();
+            assert_eq!(error.as_error_resp().unwrap().code, code);
+        }
     }
 }
