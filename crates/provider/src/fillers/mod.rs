@@ -702,7 +702,7 @@ where
         self.inner.get_uncle(tag, idx).await
     }
 
-    async fn get_uncle_count(&self, tag: BlockId) -> TransportResult<Option<u64>> {
+    async fn get_uncle_count(&self, tag: BlockId) -> TransportResult<u64> {
         self.inner.get_uncle_count(tag).await
     }
 

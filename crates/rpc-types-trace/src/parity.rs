@@ -56,19 +56,16 @@ impl TraceResults {
     }
 }
 
-/// A `FullTrace` with an additional transaction hash.
-///
-/// The hash is required by default. Use `TraceResultsWithTransactionHash<Option<TxHash>>` when
-/// decoding individual replays from nodes that may omit `transactionHash`.
+/// A `FullTrace` with an additional transaction hash
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TraceResultsWithTransactionHash<T = B256> {
+pub struct TraceResultsWithTransactionHash {
     /// The recorded trace.
     #[serde(flatten)]
     pub full_trace: TraceResults,
     /// Hash of the traced transaction.
     #[doc(alias = "tx_hash")]
-    pub transaction_hash: T,
+    pub transaction_hash: B256,
 }
 
 /// A changed value
@@ -1126,37 +1123,5 @@ mod tests {
         }"#;
         let err = serde_json::from_str::<TraceOutput>(missing_address).unwrap_err().to_string();
         assert!(err.contains("address"), "{err}");
-    }
-
-    #[test]
-    fn replay_transaction_hash_compatibility() {
-        let mut replay = serde_json::json!({
-            "output": "0x", "trace": [], "stateDiff": null, "vmTrace": null
-        });
-        let legacy: TraceResultsWithTransactionHash<Option<TxHash>> =
-            serde_json::from_value(replay.clone()).unwrap();
-        assert!(legacy.transaction_hash.is_none());
-        assert!(serde_json::from_value::<TraceResultsWithTransactionHash>(replay.clone()).is_err());
-
-        replay["transactionHash"] = serde_json::Value::Null;
-        let null_hash: TraceResultsWithTransactionHash<Option<TxHash>> =
-            serde_json::from_value(replay.clone()).unwrap();
-        assert!(null_hash.transaction_hash.is_none());
-        assert!(serde_json::from_value::<TraceResultsWithTransactionHash>(replay.clone()).is_err());
-
-        let hash = TxHash::with_last_byte(1);
-        replay["transactionHash"] = serde_json::json!(hash);
-        let individual: TraceResultsWithTransactionHash<Option<TxHash>> =
-            serde_json::from_value(replay.clone()).unwrap();
-        let block: TraceResultsWithTransactionHash =
-            serde_json::from_value(replay.clone()).unwrap();
-        assert_eq!(individual.transaction_hash, Some(hash));
-        assert_eq!(block.transaction_hash, hash);
-        assert_eq!(serde_json::to_value(individual).unwrap(), replay);
-        assert_eq!(serde_json::to_value(block).unwrap(), replay);
-
-        replay["transactionHash"] = serde_json::json!("0x1234");
-        assert!(serde_json::from_value::<TraceResultsWithTransactionHash<Option<TxHash>>>(replay)
-            .is_err());
     }
 }
