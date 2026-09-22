@@ -50,11 +50,11 @@ where
         request: TraceCallList<'a, N>,
     ) -> TraceBuilder<TraceCallList<'a, N>, Vec<TraceResults>>;
 
-    /// Parity trace transaction.
+    /// Parity trace transaction. Returns `None` if the transaction does not exist.
     async fn trace_transaction(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
+    ) -> TransportResult<Option<Vec<LocalizedTransactionTrace>>>;
 
     /// Traces of the transaction on the given positions
     ///
@@ -62,11 +62,12 @@ where
     ///
     /// This function accepts single index and build list with it under the hood because
     /// trace_get method accepts list of indices but limits this list to len == 1.
+    /// Returns `None` if the transaction or trace does not exist.
     async fn trace_get(
         &self,
         hash: TxHash,
         index: usize,
-    ) -> TransportResult<LocalizedTransactionTrace>;
+    ) -> TransportResult<Option<LocalizedTransactionTrace>>;
 
     /// Trace the given raw transaction.
     fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<&'a [u8], TraceResults>;
@@ -77,25 +78,28 @@ where
         tracer: &TraceFilter,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
-    /// Trace all transactions in the given block.
+    /// Trace all transactions in the given block. Returns `None` if the block does not exist.
     ///
     /// # Note
     ///
     /// Not all nodes support this call.
-    async fn trace_block(&self, block: BlockId) -> TransportResult<Vec<LocalizedTransactionTrace>>;
+    async fn trace_block(
+        &self,
+        block: BlockId,
+    ) -> TransportResult<Option<Vec<LocalizedTransactionTrace>>>;
 
-    /// Replays a transaction.
+    /// Replays a transaction. Returns `None` if the transaction does not exist.
     ///
     /// Default trace type is [`TraceType::Trace`].
-    fn trace_replay_transaction(&self, hash: TxHash) -> TraceBuilder<TxHash, TraceResults>;
+    fn trace_replay_transaction(&self, hash: TxHash) -> TraceBuilder<TxHash, Option<TraceResults>>;
 
-    /// Replays all transactions in the given block.
+    /// Replays all transactions in the given block. Returns `None` if the block does not exist.
     ///
     /// Default trace type is [`TraceType::Trace`].
     fn trace_replay_block_transactions(
         &self,
         block: BlockId,
-    ) -> TraceBuilder<BlockId, Vec<TraceResultsWithTransactionHash>>;
+    ) -> TraceBuilder<BlockId, Option<Vec<TraceResultsWithTransactionHash>>>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -122,7 +126,7 @@ where
     async fn trace_transaction(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
+    ) -> TransportResult<Option<Vec<LocalizedTransactionTrace>>> {
         self.client().request("trace_transaction", (hash,)).await
     }
 
@@ -130,7 +134,7 @@ where
         &self,
         hash: TxHash,
         index: usize,
-    ) -> TransportResult<LocalizedTransactionTrace> {
+    ) -> TransportResult<Option<LocalizedTransactionTrace>> {
         // We are using `[index]` because API accepts a list, but only supports a single index
         self.client().request("trace_get", (hash, (Index::from(index),))).await
     }
@@ -146,18 +150,21 @@ where
         self.client().request("trace_filter", (tracer,)).await
     }
 
-    async fn trace_block(&self, block: BlockId) -> TransportResult<Vec<LocalizedTransactionTrace>> {
+    async fn trace_block(
+        &self,
+        block: BlockId,
+    ) -> TransportResult<Option<Vec<LocalizedTransactionTrace>>> {
         self.client().request("trace_block", (block,)).await
     }
 
-    fn trace_replay_transaction(&self, hash: TxHash) -> TraceBuilder<TxHash, TraceResults> {
+    fn trace_replay_transaction(&self, hash: TxHash) -> TraceBuilder<TxHash, Option<TraceResults>> {
         TraceBuilder::new_rpc(self.client().request("trace_replayTransaction", hash))
     }
 
     fn trace_replay_block_transactions(
         &self,
         block: BlockId,
-    ) -> TraceBuilder<BlockId, Vec<TraceResultsWithTransactionHash>> {
+    ) -> TraceBuilder<BlockId, Option<Vec<TraceResultsWithTransactionHash>>> {
         TraceBuilder::new_rpc(self.client().request("trace_replayBlockTransactions", block))
     }
 }
@@ -172,11 +179,80 @@ mod test {
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_signer_local::PrivateKeySigner;
+    use alloy_transport::mock::Asserter;
+
+    #[tokio::test]
+    async fn trace_lookups_accept_null() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for _ in 0..5 {
+            asserter.push_success(&serde_json::Value::Null);
+        }
+
+        assert!(provider.trace_transaction(TxHash::ZERO).await.unwrap().is_none());
+        assert!(provider.trace_get(TxHash::ZERO, 0).await.unwrap().is_none());
+        assert!(provider.trace_block(BlockId::latest()).await.unwrap().is_none());
+        assert!(provider.trace_replay_transaction(TxHash::ZERO).await.unwrap().is_none());
+        assert!(provider
+            .trace_replay_block_transactions(BlockId::latest())
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn trace_lookups_preserve_empty_results() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for _ in 0..3 {
+            asserter.push_success(&serde_json::json!([]));
+        }
+
+        assert_eq!(provider.trace_transaction(TxHash::ZERO).await.unwrap(), Some(vec![]));
+        assert_eq!(provider.trace_block(BlockId::latest()).await.unwrap(), Some(vec![]));
+        assert_eq!(
+            provider.trace_replay_block_transactions(BlockId::latest()).await.unwrap(),
+            Some(vec![])
+        );
+
+        let replay = serde_json::json!({
+            "output": "0x", "trace": [], "stateDiff": null, "vmTrace": null
+        });
+        asserter.push_success(&replay);
+        let result = provider.trace_replay_transaction(TxHash::ZERO).await.unwrap().unwrap();
+        assert_eq!(serde_json::to_value(result).unwrap(), replay);
+    }
+
+    #[tokio::test]
+    async fn trace_lookups_preserve_rpc_errors() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for code in [-32601, -32001, 4444] {
+            for _ in 0..5 {
+                asserter.push_failure(alloy_json_rpc::ErrorPayload {
+                    code,
+                    message: "lookup failed".into(),
+                    data: None,
+                });
+            }
+            let errors = [
+                provider.trace_transaction(TxHash::ZERO).await.unwrap_err(),
+                provider.trace_get(TxHash::ZERO, 0).await.unwrap_err(),
+                provider.trace_block(BlockId::latest()).await.unwrap_err(),
+                provider.trace_replay_transaction(TxHash::ZERO).await.unwrap_err(),
+                provider.trace_replay_block_transactions(BlockId::latest()).await.unwrap_err(),
+            ];
+            for error in errors {
+                assert_eq!(error.as_error_resp().unwrap().code, code);
+            }
+        }
+    }
 
     #[tokio::test]
     async fn trace_block() {
         let provider = ProviderBuilder::new().connect_anvil();
-        let traces = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
+        let traces =
+            provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap().unwrap();
         assert_eq!(traces.len(), 0);
     }
 
