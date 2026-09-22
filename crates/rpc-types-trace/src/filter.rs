@@ -24,7 +24,7 @@ pub struct TraceFilter {
     /// To address
     #[serde(default)]
     pub to_address: Vec<Address>,
-    /// How to apply `from_address` and `to_address` filters.
+    /// How to apply `from_address` and `to_address` filters. Defaults to intersection.
     #[serde(default)]
     pub mode: TraceFilterMode,
     /// Output offset
@@ -93,9 +93,9 @@ impl TraceFilter {
 #[serde(rename_all = "camelCase")]
 pub enum TraceFilterMode {
     /// Return traces for transactions with matching `from` OR `to` addresses.
-    #[default]
     Union,
     /// Only return traces for transactions with matching `from` _and_ `to` addresses.
+    #[default]
     Intersection,
 }
 
@@ -218,6 +218,77 @@ mod tests {
         let filter: TraceFilter = serde_json::from_str(s).unwrap();
         assert_eq!(filter.from_block, Some(3));
         assert_eq!(filter.to_block, Some(5));
+    }
+
+    #[test]
+    fn default_filter_intersects_address_lists() {
+        let from = Address::with_last_byte(1);
+        let to = Address::with_last_byte(2);
+        let other = Address::with_last_byte(3);
+        let filter: TraceFilter = serde_json::from_value(json!({
+            "fromAddress": [from, other],
+            "toAddress": [to, other],
+        }))
+        .unwrap();
+        assert_eq!(filter.mode, TraceFilterMode::Intersection);
+        assert_eq!(TraceFilter::default().mode, TraceFilterMode::Intersection);
+
+        for (sender, recipient, expected) in [
+            (from, to, true),
+            (other, other, true),
+            (from, from, false),
+            (to, to, false),
+            (to, from, false),
+        ] {
+            let trace = TransactionTrace {
+                action: Action::Call(CallAction {
+                    from: sender,
+                    to: recipient,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            assert_eq!(filter.matcher().matches(&trace), expected);
+        }
+    }
+
+    #[test]
+    fn filter_mode_is_explicit_and_validated() {
+        let from = Address::with_last_byte(1);
+        let to = Address::with_last_byte(2);
+        let trace = TransactionTrace {
+            action: Action::Call(CallAction { from, to: from, ..Default::default() }),
+            ..Default::default()
+        };
+        for (mode, expected) in [("union", true), ("intersection", false)] {
+            let filter: TraceFilter = serde_json::from_value(json!({
+                "fromAddress": [from], "toAddress": [to], "mode": mode,
+            }))
+            .unwrap();
+            assert_eq!(filter.matcher().matches(&trace), expected);
+        }
+        assert!(serde_json::from_value::<TraceFilter>(json!({ "mode": "unknown" })).is_err());
+    }
+
+    #[test]
+    fn default_filter_empty_lists_are_unconstrained() {
+        let from = Address::with_last_byte(1);
+        let to = Address::with_last_byte(2);
+        let trace = TransactionTrace {
+            action: Action::Call(CallAction { from, to, ..Default::default() }),
+            ..Default::default()
+        };
+        for (filter, expected) in [
+            (json!({}), true),
+            (json!({ "fromAddress": [], "toAddress": [] }), true),
+            (json!({ "fromAddress": [], "toAddress": [to] }), true),
+            (json!({ "fromAddress": [from], "toAddress": [] }), true),
+            (json!({ "fromAddress": [], "toAddress": [from] }), false),
+            (json!({ "fromAddress": [to], "toAddress": [] }), false),
+        ] {
+            let filter: TraceFilter = serde_json::from_value(filter).unwrap();
+            assert_eq!(filter.matcher().matches(&trace), expected);
+        }
     }
 
     #[test]
