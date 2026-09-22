@@ -56,17 +56,19 @@ where
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
-    /// Traces of the transaction on the given positions
+    /// Returns the transaction trace at the given `traceAddress` path.
     ///
-    /// # Note
+    /// An empty path selects the root, `[0]` selects its first child, and `[0, 1]` selects that
+    /// child's second child. A successful `null` response becomes `None`.
     ///
-    /// This function accepts single index and build list with it under the hood because
-    /// trace_get method accepts list of indices but limits this list to len == 1.
+    /// Older nodes may interpret a single index as a flat position instead of a tree path.
+    /// For a flat index, fetch [`Self::trace_transaction`] and index the returned traces locally.
+    /// Nodes that return RPC errors for missing transactions or paths retain those errors.
     async fn trace_get(
         &self,
         hash: TxHash,
-        index: usize,
-    ) -> TransportResult<LocalizedTransactionTrace>;
+        indices: &[usize],
+    ) -> TransportResult<Option<LocalizedTransactionTrace>>;
 
     /// Trace the given raw transaction.
     fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<&'a [u8], TraceResults>;
@@ -135,10 +137,10 @@ where
     async fn trace_get(
         &self,
         hash: TxHash,
-        index: usize,
-    ) -> TransportResult<LocalizedTransactionTrace> {
-        // We are using `[index]` because API accepts a list, but only supports a single index
-        self.client().request("trace_get", (hash, (Index::from(index),))).await
+        indices: &[usize],
+    ) -> TransportResult<Option<LocalizedTransactionTrace>> {
+        let indices: Vec<Index> = indices.iter().copied().map(Index::from).collect();
+        self.client().request("trace_get", (hash, indices)).await
     }
 
     fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<&'a [u8], TraceResults> {
@@ -521,6 +523,78 @@ mod test {
             .await;
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn trace_get_serializes_tree_paths() {
+        use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
+        use alloy_network::Ethereum;
+        use alloy_rpc_client::RpcClient;
+        use alloy_transport::TransportFut;
+
+        for path in [vec![], vec![0], vec![0, 1], vec![6, 0], vec![16]] {
+            let expected_path = path.clone();
+            let service = tower::service_fn(move |request: RequestPacket| {
+                let expected_path = expected_path.clone();
+                Box::pin(async move {
+                    let RequestPacket::Single(request) = request else {
+                        panic!("expected a single trace_get request");
+                    };
+                    assert_eq!(request.method(), "trace_get");
+                    let params: serde_json::Value =
+                        serde_json::from_str(request.params().unwrap().get()).unwrap();
+                    let wire_path: Vec<_> =
+                        expected_path.iter().map(|index| format!("0x{index:x}")).collect();
+                    assert_eq!(params, serde_json::json!([TxHash::ZERO, wire_path]));
+
+                    let trace = serde_json::json!({
+                        "type": "call",
+                        "action": {
+                            "from": alloy_primitives::Address::ZERO,
+                            "to": alloy_primitives::Address::ZERO,
+                            "callType": "call", "gas": "0x0", "input": "0x", "value": "0x0"
+                        },
+                        "result": {"gasUsed": "0x0", "output": "0x"},
+                        "subtraces": 0,
+                        "traceAddress": expected_path
+                    });
+                    Ok(ResponsePacket::Single(Response {
+                        id: request.id().clone(),
+                        payload: ResponsePayload::Success(
+                            serde_json::value::to_raw_value(&trace).unwrap(),
+                        ),
+                    }))
+                }) as TransportFut<'static>
+            });
+            let provider = crate::RootProvider::<Ethereum>::new(RpcClient::new(service, true));
+            let trace = provider.trace_get(TxHash::ZERO, &path).await.unwrap().unwrap();
+            assert_eq!(trace.trace.trace_address, path);
+        }
+    }
+
+    #[tokio::test]
+    async fn trace_get_missing_tree_paths() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for path in [vec![], vec![0], vec![6, 0]] {
+            asserter.push_success(&serde_json::Value::Null);
+            assert!(provider.trace_get(TxHash::ZERO, &path).await.unwrap().is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn trace_get_preserves_rpc_errors() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for code in [-32601, -32001, 4444] {
+            asserter.push_failure(alloy_json_rpc::ErrorPayload {
+                code,
+                message: "lookup failed".into(),
+                data: None,
+            });
+            let error = provider.trace_get(TxHash::ZERO, &[0, 1]).await.unwrap_err();
+            assert_eq!(error.as_error_resp().unwrap().code, code);
+        }
     }
 
     #[tokio::test]
