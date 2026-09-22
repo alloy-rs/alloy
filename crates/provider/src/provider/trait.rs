@@ -2677,44 +2677,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn uncle_count_preserves_null_zero_and_nonzero() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        for block in [BlockId::hash(B256::ZERO), BlockId::number(123)] {
-            for (wire, expected) in [
-                (serde_json::Value::Null, None),
-                (serde_json::json!("0x0"), Some(0)),
-                (serde_json::json!("0x2"), Some(2)),
-            ] {
-                asserter.push_success(&wire);
-                assert_eq!(provider.get_uncle_count(block).await.unwrap(), expected);
-                asserter.push_success(&wire);
-                assert_eq!(
-                    provider.clone().erased().get_uncle_count(block).await.unwrap(),
-                    expected
-                );
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn uncle_count_preserves_rpc_errors() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone()).erased();
-        for block in [BlockId::hash(B256::ZERO), BlockId::number(123)] {
-            for code in [-32601, -32001, 4444] {
-                asserter.push_failure(alloy_json_rpc::ErrorPayload {
-                    code,
-                    message: "lookup failed".into(),
-                    data: None,
-                });
-                let error = provider.get_uncle_count(block).await.unwrap_err();
-                assert_eq!(error.as_error_resp().unwrap().code, code);
-            }
-        }
-    }
-
-    #[tokio::test]
     #[cfg(any(
         feature = "reqwest-default-tls",
         feature = "reqwest-rustls-tls",
@@ -3047,5 +3009,43 @@ mod tests {
 
         assert_eq!(provider.get_block_access_list(BlockId::latest()).await.unwrap(), None);
         assert_eq!(method.lock().unwrap().as_deref(), Some("eth_getBlockAccessList"));
+    }
+
+    #[tokio::test]
+    async fn uncle_count_preserves_null_zero_and_nonzero() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for block in [BlockId::hash(B256::ZERO), BlockId::number(123)] {
+            for (wire, expected) in [
+                (serde_json::Value::Null, None),
+                (serde_json::json!("0x0"), Some(0)),
+                (serde_json::json!("0x2"), Some(2)),
+            ] {
+                asserter.push_success(&wire);
+                assert_eq!(provider.get_uncle_count(block).await.unwrap(), expected);
+                asserter.push_success(&wire);
+                assert_eq!(
+                    provider.clone().erased().get_uncle_count(block).await.unwrap(),
+                    expected
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn uncle_count_preserves_rpc_errors() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone()).erased();
+        for block in [BlockId::hash(B256::ZERO), BlockId::number(123)] {
+            for code in [-32601, -32001, 4444] {
+                asserter.push_failure(alloy_json_rpc::ErrorPayload {
+                    code,
+                    message: "lookup failed".into(),
+                    data: None,
+                });
+                let error = provider.get_uncle_count(block).await.unwrap_err();
+                assert_eq!(error.as_error_resp().unwrap().code, code);
+            }
+        }
     }
 }
