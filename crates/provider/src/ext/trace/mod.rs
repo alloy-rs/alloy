@@ -189,46 +189,6 @@ mod test {
     use alloy_transport::mock::Asserter;
 
     #[tokio::test]
-    async fn trace_collections_distinguish_null_and_empty() {
-        let asserter = Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        for (wire, expected) in
-            [(serde_json::Value::Null, None), (serde_json::json!([]), Some(vec![]))]
-        {
-            for _ in 0..3 {
-                asserter.push_success(&wire);
-            }
-            assert_eq!(provider.trace_transaction(TxHash::ZERO).await.unwrap(), expected);
-            assert_eq!(provider.trace_block(BlockId::latest()).await.unwrap(), expected);
-            let replay = provider.trace_replay_block_transactions(BlockId::latest()).await.unwrap();
-            assert_eq!(replay.map(|traces| traces.len()), expected.map(|traces| traces.len()));
-        }
-    }
-
-    #[tokio::test]
-    async fn trace_collections_preserve_errors() {
-        let asserter = Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        for code in [-32601, -32001, 4444] {
-            for _ in 0..3 {
-                asserter.push_failure(alloy_json_rpc::ErrorPayload {
-                    code,
-                    message: "lookup failed".into(),
-                    data: None,
-                });
-            }
-            let errors = [
-                provider.trace_transaction(TxHash::ZERO).await.unwrap_err(),
-                provider.trace_block(BlockId::latest()).await.unwrap_err(),
-                provider.trace_replay_block_transactions(BlockId::latest()).await.unwrap_err(),
-            ];
-            for error in errors {
-                assert_eq!(error.as_error_resp().unwrap().code, code);
-            }
-        }
-    }
-
-    #[tokio::test]
     async fn trace_block() {
         let provider = ProviderBuilder::new().connect_anvil();
         let traces =
@@ -563,5 +523,45 @@ mod test {
             .await;
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn trace_collections_distinguish_null_and_empty() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for (wire, expected) in
+            [(serde_json::Value::Null, None), (serde_json::json!([]), Some(vec![]))]
+        {
+            for _ in 0..3 {
+                asserter.push_success(&wire);
+            }
+            assert_eq!(provider.trace_transaction(TxHash::ZERO).await.unwrap(), expected);
+            assert_eq!(provider.trace_block(BlockId::latest()).await.unwrap(), expected);
+            let replay = provider.trace_replay_block_transactions(BlockId::latest()).await.unwrap();
+            assert_eq!(replay.map(|traces| traces.len()), expected.map(|traces| traces.len()));
+        }
+    }
+
+    #[tokio::test]
+    async fn trace_collections_preserve_errors() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for code in [-32601, -32001, 4444] {
+            for _ in 0..3 {
+                asserter.push_failure(alloy_json_rpc::ErrorPayload {
+                    code,
+                    message: "lookup failed".into(),
+                    data: None,
+                });
+            }
+            let errors = [
+                provider.trace_transaction(TxHash::ZERO).await.unwrap_err(),
+                provider.trace_block(BlockId::latest()).await.unwrap_err(),
+                provider.trace_replay_block_transactions(BlockId::latest()).await.unwrap_err(),
+            ];
+            for error in errors {
+                assert_eq!(error.as_error_resp().unwrap().code, code);
+            }
+        }
     }
 }
