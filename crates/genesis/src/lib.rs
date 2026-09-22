@@ -19,8 +19,6 @@ use alloy_eips::{
 };
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, OtherFields};
-#[cfg(feature = "account-ext")]
-pub use alloy_trie::AccountExtension;
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
 use core::str::FromStr;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
@@ -249,7 +247,7 @@ pub struct GenesisAccount {
     /// Raw chain-specific bytes, encoded as a fifth RLP string in the account trie leaf.
     #[cfg(feature = "account-ext")]
     #[serde(default, skip_serializing_if = "alloy_trie::AccountExtension::is_empty")]
-    pub extension: AccountExtension,
+    pub extension: alloy_trie::AccountExtension,
 }
 
 impl GenesisAccount {

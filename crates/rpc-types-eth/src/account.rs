@@ -6,8 +6,6 @@ use alloy_primitives::{
 
 // re-export account type for `eth_getAccount`
 pub use alloy_consensus::TrieAccount as Account;
-#[cfg(feature = "account-ext")]
-use alloy_trie::AccountExtension;
 
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -25,9 +23,9 @@ pub struct AccountInfo {
     #[cfg(feature = "account-ext")]
     #[cfg_attr(
         feature = "serde",
-        serde(default, skip_serializing_if = "AccountExtension::is_empty")
+        serde(default, skip_serializing_if = "alloy_trie::AccountExtension::is_empty")
     )]
-    pub extension: AccountExtension,
+    pub extension: alloy_trie::AccountExtension,
 }
 
 impl AccountInfo {
