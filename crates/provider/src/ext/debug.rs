@@ -623,54 +623,6 @@ mod test {
     use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
-    async fn raw_debug_results_preserve_absence_and_empty_values() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        for (wire, expected) in [
-            (serde_json::Value::Null, None),
-            (serde_json::json!("0x"), Some(Bytes::new())),
-            (serde_json::json!("0x1234"), Some(Bytes::from_static(&[0x12, 0x34]))),
-        ] {
-            asserter.push_success(&wire);
-            assert_eq!(provider.debug_get_raw_transaction(TxHash::ZERO).await.unwrap(), expected);
-        }
-        for (wire, expected) in [
-            (serde_json::Value::Null, None),
-            (serde_json::json!([]), Some(vec![])),
-            (serde_json::json!(["0x1234"]), Some(vec![Bytes::from_static(&[0x12, 0x34])])),
-        ] {
-            asserter.push_success(&wire);
-            assert_eq!(provider.debug_get_raw_receipts(BlockId::latest()).await.unwrap(), expected);
-        }
-    }
-
-    #[tokio::test]
-    async fn raw_debug_results_preserve_rpc_errors() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        for code in [-32601, -32000, -32001, 4444] {
-            for _ in 0..3 {
-                asserter.push_failure(alloy_json_rpc::ErrorPayload {
-                    code,
-                    message: "lookup failed".into(),
-                    data: None,
-                });
-            }
-            let errors = [
-                provider.debug_get_raw_transaction(TxHash::ZERO).await.unwrap_err(),
-                provider.debug_get_raw_receipts(BlockId::latest()).await.unwrap_err(),
-                provider
-                    .debug_trace_transaction(TxHash::ZERO, Default::default())
-                    .await
-                    .unwrap_err(),
-            ];
-            for error in errors {
-                assert_eq!(error.as_error_resp().unwrap().code, code);
-            }
-        }
-    }
-
-    #[tokio::test]
     async fn test_debug_trace_transaction() {
         async_ci_only(|| async move {
             let provider = ProviderBuilder::new().connect_anvil_with_wallet();
@@ -887,5 +839,53 @@ mod test {
             .await;
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn raw_debug_results_preserve_absence_and_empty_values() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for (wire, expected) in [
+            (serde_json::Value::Null, None),
+            (serde_json::json!("0x"), Some(Bytes::new())),
+            (serde_json::json!("0x1234"), Some(Bytes::from_static(&[0x12, 0x34]))),
+        ] {
+            asserter.push_success(&wire);
+            assert_eq!(provider.debug_get_raw_transaction(TxHash::ZERO).await.unwrap(), expected);
+        }
+        for (wire, expected) in [
+            (serde_json::Value::Null, None),
+            (serde_json::json!([]), Some(vec![])),
+            (serde_json::json!(["0x1234"]), Some(vec![Bytes::from_static(&[0x12, 0x34])])),
+        ] {
+            asserter.push_success(&wire);
+            assert_eq!(provider.debug_get_raw_receipts(BlockId::latest()).await.unwrap(), expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn raw_debug_results_preserve_rpc_errors() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for code in [-32601, -32000, -32001, 4444] {
+            for _ in 0..3 {
+                asserter.push_failure(alloy_json_rpc::ErrorPayload {
+                    code,
+                    message: "lookup failed".into(),
+                    data: None,
+                });
+            }
+            let errors = [
+                provider.debug_get_raw_transaction(TxHash::ZERO).await.unwrap_err(),
+                provider.debug_get_raw_receipts(BlockId::latest()).await.unwrap_err(),
+                provider
+                    .debug_trace_transaction(TxHash::ZERO, Default::default())
+                    .await
+                    .unwrap_err(),
+            ];
+            for error in errors {
+                assert_eq!(error.as_error_resp().unwrap().code, code);
+            }
+        }
     }
 }

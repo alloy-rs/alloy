@@ -1919,53 +1919,6 @@ mod tests {
         time::Duration,
     };
 
-    #[tokio::test]
-    async fn raw_transaction_results_preserve_absence_and_empty_values() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        for (wire, expected) in [
-            (serde_json::Value::Null, None),
-            (serde_json::json!("0x"), Some(Bytes::new())),
-            (serde_json::json!("0x1234"), Some(Bytes::from_static(&[0x12, 0x34]))),
-        ] {
-            for _ in 0..3 {
-                asserter.push_success(&wire);
-            }
-            assert_eq!(provider.get_raw_transaction_by_hash(TxHash::ZERO).await.unwrap(), expected);
-            assert_eq!(
-                provider.get_raw_transaction_by_block_hash_and_index(B256::ZERO, 0).await.unwrap(),
-                expected
-            );
-            assert_eq!(
-                provider
-                    .get_raw_transaction_by_block_number_and_index(BlockNumberOrTag::Latest, 0)
-                    .await
-                    .unwrap(),
-                expected
-            );
-        }
-        for _ in 0..3 {
-            asserter.push_failure(alloy_json_rpc::ErrorPayload {
-                code: -32000,
-                message: "transaction indexing is in progress".into(),
-                data: None,
-            });
-        }
-        let errors = [
-            provider.get_raw_transaction_by_hash(TxHash::ZERO).await.unwrap_err(),
-            provider.get_raw_transaction_by_block_hash_and_index(B256::ZERO, 0).await.unwrap_err(),
-            provider
-                .get_raw_transaction_by_block_number_and_index(BlockNumberOrTag::Latest, 0)
-                .await
-                .unwrap_err(),
-        ];
-        for error in errors {
-            let error = error.as_error_resp().unwrap();
-            assert_eq!(error.code, -32000);
-            assert_eq!(error.message, "transaction indexing is in progress");
-        }
-    }
-
     // For layer transport tests
     use alloy_consensus::transaction::SignerRecoverable;
     #[cfg(feature = "hyper")]
@@ -3063,5 +3016,52 @@ mod tests {
 
         assert_eq!(provider.get_block_access_list(BlockId::latest()).await.unwrap(), None);
         assert_eq!(method.lock().unwrap().as_deref(), Some("eth_getBlockAccessList"));
+    }
+
+    #[tokio::test]
+    async fn raw_transaction_results_preserve_absence_and_empty_values() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for (wire, expected) in [
+            (serde_json::Value::Null, None),
+            (serde_json::json!("0x"), Some(Bytes::new())),
+            (serde_json::json!("0x1234"), Some(Bytes::from_static(&[0x12, 0x34]))),
+        ] {
+            for _ in 0..3 {
+                asserter.push_success(&wire);
+            }
+            assert_eq!(provider.get_raw_transaction_by_hash(TxHash::ZERO).await.unwrap(), expected);
+            assert_eq!(
+                provider.get_raw_transaction_by_block_hash_and_index(B256::ZERO, 0).await.unwrap(),
+                expected
+            );
+            assert_eq!(
+                provider
+                    .get_raw_transaction_by_block_number_and_index(BlockNumberOrTag::Latest, 0)
+                    .await
+                    .unwrap(),
+                expected
+            );
+        }
+        for _ in 0..3 {
+            asserter.push_failure(alloy_json_rpc::ErrorPayload {
+                code: -32000,
+                message: "transaction indexing is in progress".into(),
+                data: None,
+            });
+        }
+        let errors = [
+            provider.get_raw_transaction_by_hash(TxHash::ZERO).await.unwrap_err(),
+            provider.get_raw_transaction_by_block_hash_and_index(B256::ZERO, 0).await.unwrap_err(),
+            provider
+                .get_raw_transaction_by_block_number_and_index(BlockNumberOrTag::Latest, 0)
+                .await
+                .unwrap_err(),
+        ];
+        for error in errors {
+            let error = error.as_error_resp().unwrap();
+            assert_eq!(error.code, -32000);
+            assert_eq!(error.message, "transaction indexing is in progress");
+        }
     }
 }
