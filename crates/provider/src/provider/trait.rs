@@ -1524,6 +1524,50 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_fillTransaction", (tx,)).await
     }
 
+    /// Fills the transaction request using the configured
+    /// [`TxFiller`](crate::fillers::TxFiller)s and signs it locally, returning the signed
+    /// envelope without broadcasting it.
+    ///
+    /// Unlike [`fill_transaction`](Self::fill_transaction) and
+    /// [`sign_transaction`](Self::sign_transaction), this does not rely on the node's
+    /// `eth_fillTransaction` and `eth_signTransaction` endpoints, which regular nodes do not
+    /// support. The returned envelope can be broadcast later with
+    /// [`send_tx_envelope`](Self::send_tx_envelope).
+    ///
+    /// The default implementation returns an error, since a bare provider has no fillers.
+    /// [`FillProvider`](crate::fillers::FillProvider) overrides it and requires a signing filler
+    /// such as [`WalletFiller`](crate::fillers::WalletFiller) to be configured, for example via
+    /// [`ProviderBuilder::wallet`](crate::ProviderBuilder::wallet).
+    ///
+    /// # Note
+    ///
+    /// Depending on the configured fillers this can have side effects, such as reserving a nonce,
+    /// even if the returned envelope is never broadcast.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(
+    /// #     provider: impl alloy_provider::Provider,
+    /// #     tx: alloy_rpc_types_eth::TransactionRequest,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// let envelope = provider.fill_and_sign_transaction(tx).await?;
+    ///
+    /// // broadcast the exact same transaction later
+    /// provider.send_tx_envelope(envelope).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        let _ = tx;
+        Err(RpcError::local_usage_str(
+            "no fillers configured, cannot fill and sign transaction locally",
+        ))
+    }
+
     /// Subscribe to a stream of new block headers.
     ///
     /// # Errors
@@ -3007,5 +3051,71 @@ mod tests {
 
         assert_eq!(provider.get_block_access_list(BlockId::latest()).await.unwrap(), None);
         assert_eq!(method.lock().unwrap().as_deref(), Some("eth_getBlockAccessList"));
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let from = provider.default_signer_address();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let envelope = provider.fill_and_sign_transaction(tx).await.unwrap();
+
+        // the recommended fillers and the wallet filler populated the request before signing
+        assert_eq!(envelope.recover_signer().unwrap(), from);
+        assert_eq!(envelope.nonce(), 0);
+        assert_eq!(envelope.chain_id(), Some(31337));
+        assert!(envelope.gas_limit() > 0);
+        assert!(envelope.max_fee_per_gas() > 0);
+
+        // broadcasting the prepared envelope yields the same hash
+        let hash = *envelope.tx_hash();
+        let pending = provider.send_tx_envelope(envelope).await.unwrap();
+        assert_eq!(*pending.tx_hash(), hash);
+
+        let receipt = pending.get_receipt().await.unwrap();
+        assert_eq!(receipt.transaction_hash, hash);
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction_sequential_nonces() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        // the cached nonce manager hands out consecutive nonces without broadcasting
+        let first = provider.fill_and_sign_transaction(tx.clone()).await.unwrap();
+        let second = provider.fill_and_sign_transaction(tx).await.unwrap();
+        assert_eq!(first.nonce(), 0);
+        assert_eq!(second.nonce(), 1);
+
+        let receipt = provider.send_tx_envelope(first).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
+        let receipt = provider.send_tx_envelope(second).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction_dyn_provider() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let from = provider.default_signer_address();
+        let provider = provider.erased();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let envelope = provider.fill_and_sign_transaction(tx).await.unwrap();
+        assert_eq!(envelope.recover_signer().unwrap(), from);
+
+        let receipt =
+            provider.send_tx_envelope(envelope).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
     }
 }

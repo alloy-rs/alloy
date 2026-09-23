@@ -779,6 +779,24 @@ where
         self.inner.sign_transaction(tx).await
     }
 
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        match self.fill(tx).await? {
+            SendableTx::Envelope(envelope) => Ok(envelope),
+            SendableTx::Builder(tx) => {
+                if let FillerControlFlow::Missing(missing) = self.filler.status(&tx) {
+                    let message = format!("missing properties: {missing:?}");
+                    return Err(RpcError::local_usage_str(&message));
+                }
+                Err(RpcError::local_usage_str(
+                    "no wallet configured, fillers did not produce a signed transaction",
+                ))
+            }
+        }
+    }
+
     #[cfg(feature = "pubsub")]
     fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
         self.inner.subscribe_blocks()
