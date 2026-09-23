@@ -8,7 +8,9 @@ use async_trait::async_trait;
 use std::fmt;
 use trezor_client::{
     client::{InteractionType, Trezor},
-    protos, TrezorMessage, TrezorResponse,
+    protos,
+    transport::ProtoMessage,
+    TrezorMessage,
 };
 
 #[cfg(feature = "eip712")]
@@ -17,8 +19,6 @@ use crate::eip712::TrezorTypedData;
 use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
-#[cfg(feature = "eip712")]
-use trezor_client::transport::ProtoMessage;
 
 // We require firmware that supports EIP-1559 transaction signing.
 const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
@@ -220,25 +220,38 @@ impl TrezorSigner {
         Ok(client)
     }
 
-    /// Drives a device call to completion, acknowledging button prompts and answering passphrase
-    /// prompts with the configured passphrase or a request to enter it on the device.
-    fn handle_interaction<T, R: TrezorMessage>(
+    /// Drives a device call to completion without logging the outgoing passphrase acknowledgement.
+    /// `Trezor::call` traces every request with `Debug`, including plaintext `PassphraseAck`s.
+    fn call_with_interaction<S: TrezorMessage, R: TrezorMessage>(
         &self,
-        response: TrezorResponse<'_, T, R>,
-    ) -> Result<T, TrezorError> {
-        match response {
-            TrezorResponse::Ok(value) => Ok(value),
-            TrezorResponse::Failure(failure) => {
-                Err(trezor_client::Error::FailureResponse(failure).into())
-            }
-            TrezorResponse::ButtonRequest(request) => self.handle_interaction(request.ack()?),
-            TrezorResponse::PinMatrixRequest(_) => {
-                Err(trezor_client::Error::UnexpectedInteractionRequest(InteractionType::PinMatrix)
-                    .into())
-            }
-            TrezorResponse::PassphraseRequest(request) => {
-                let ack = self.passphrase_ack(&request.message);
-                self.handle_interaction(request.client.call(ack, request.result_handler)?)
+        client: &mut Trezor,
+        request: S,
+    ) -> Result<R, TrezorError> {
+        use protos::MessageType;
+
+        let mut response = client.call_raw(request)?;
+        loop {
+            response = match response.message_type() {
+                ty if ty == R::MESSAGE_TYPE => return decode_message(response),
+                MessageType::MessageType_ButtonRequest => {
+                    let _: protos::ButtonRequest = decode_message(response)?;
+                    client.call_raw(protos::ButtonAck::new())?
+                }
+                MessageType::MessageType_PassphraseRequest => {
+                    let request: protos::PassphraseRequest = decode_message(response)?;
+                    client.call_raw(self.passphrase_ack(&request))?
+                }
+                MessageType::MessageType_Failure => {
+                    let failure: protos::Failure = decode_message(response)?;
+                    return Err(trezor_client::Error::FailureResponse(failure).into());
+                }
+                MessageType::MessageType_PinMatrixRequest => {
+                    return Err(trezor_client::Error::UnexpectedInteractionRequest(
+                        InteractionType::PinMatrix,
+                    )
+                    .into());
+                }
+                ty => return Err(trezor_client::Error::UnexpectedMessageType(ty).into()),
             }
         }
     }
@@ -272,11 +285,8 @@ impl TrezorSigner {
         let mut client = self.get_client()?;
         let mut req = protos::EthereumGetAddress::new();
         req.address_n = Self::convert_path(derivation);
-        let address = self.handle_interaction(
-            client
-                .call(req, Box::new(|_, m: protos::EthereumAddress| Ok(m.address().to_string())))?,
-        )?;
-        Ok(address.parse()?)
+        let address: protos::EthereumAddress = self.call_with_interaction(&mut client, req)?;
+        Ok(address.address().parse()?)
     }
 
     /// Signs a legacy or EIP-1559 transaction and requires confirmation on the Trezor.
@@ -334,16 +344,13 @@ impl TrezorSigner {
         request: S,
         mut data: Vec<u8>,
     ) -> Result<Signature, TrezorError> {
-        let mut response = self.handle_interaction(
-            client.call(request, Box::new(|_, m: protos::EthereumTxRequest| Ok(m)))?,
-        )?;
+        let mut response: protos::EthereumTxRequest =
+            self.call_with_interaction(client, request)?;
         while response.data_length() > 0 {
             let chunk_len = (response.data_length() as usize).min(data.len());
             let mut ack = protos::EthereumTxAck::new();
             ack.set_data_chunk(data.drain(..chunk_len).collect());
-            response = self.handle_interaction(
-                client.call(ack, Box::new(|_, m: protos::EthereumTxRequest| Ok(m)))?,
-            )?;
+            response = self.call_with_interaction(client, ack)?;
         }
         signature_from_tx_request(&response)
     }
@@ -354,11 +361,9 @@ impl TrezorSigner {
         let mut req = protos::EthereumSignMessage::new();
         req.address_n = Self::convert_path(&self.derivation);
         req.set_message(message.to_vec());
-        let signature = self.handle_interaction(client.call(
-            req,
-            Box::new(|_, m: protos::EthereumMessageSignature| Ok(m.signature().to_vec())),
-        )?)?;
-        Ok(Signature::from_raw(&signature)?)
+        let signature: protos::EthereumMessageSignature =
+            self.call_with_interaction(&mut client, req)?;
+        Ok(Signature::from_raw(signature.signature())?)
     }
 
     /// Firmware major version 1 (Trezor Model One) cannot display typed data and only signs the
@@ -416,11 +421,9 @@ impl TrezorSigner {
         if let Some(message_hash) = message_hash {
             req.set_message_hash(message_hash.to_vec());
         }
-        let signature = self.handle_interaction(client.call(
-            req,
-            Box::new(|_, m: protos::EthereumTypedDataSignature| Ok(m.signature().to_vec())),
-        )?)?;
-        Ok(Signature::from_raw(&signature)?)
+        let signature: protos::EthereumTypedDataSignature =
+            self.call_with_interaction(&mut client, req)?;
+        Ok(Signature::from_raw(signature.signature())?)
     }
 
     /// Runs the interactive `EthereumSignTypedData` flow, answering the device's struct and value
@@ -428,7 +431,7 @@ impl TrezorSigner {
     ///
     /// `trezor_client` has no wrapper for this multi-message workflow, so the raw messages are
     /// exchanged here, including the button and passphrase prompts that
-    /// [`Self::handle_interaction`] covers for single-message calls.
+    /// [`Self::call_with_interaction`] covers for single-message calls.
     #[cfg(feature = "eip712")]
     #[instrument(skip_all, fields(primary_type = data.primary_type()), ret)]
     async fn sign_typed_data_flow(&self, data: &TrezorTypedData) -> Result<Signature, TrezorError> {
@@ -651,7 +654,6 @@ fn signature_from_tx_request(
 }
 
 /// Parses a raw device response into the expected protobuf message.
-#[cfg(feature = "eip712")]
 fn decode_message<M: TrezorMessage>(response: ProtoMessage) -> Result<M, TrezorError> {
     response.into_message().map_err(|err| trezor_client::Error::Protobuf(err).into())
 }
