@@ -8,6 +8,15 @@ use async_trait::async_trait;
 use std::fmt;
 use trezor_client::client::Trezor;
 
+#[cfg(feature = "eip712")]
+use crate::eip712::TrezorTypedData;
+#[cfg(feature = "eip712")]
+use alloy_dyn_abi::TypedData;
+#[cfg(feature = "eip712")]
+use alloy_sol_types::{Eip712Domain, SolStruct};
+#[cfg(feature = "eip712")]
+use trezor_client::{protos, transport::ProtoMessage, TrezorMessage};
+
 // We require firmware that supports EIP-1559 transaction signing.
 const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
 const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
@@ -21,9 +30,15 @@ const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 /// underlying USB operations are blocking. Raw digest signing is unsupported, while
 /// [`Signer::sign_message`] performs EIP-191 personal-message signing and requires confirmation on
 /// the device.
+///
+/// With the `eip712` feature, [`Signer::sign_typed_data`] and [`Signer::sign_dynamic_typed_data`]
+/// sign EIP-712 typed data. Firmware major version 2 (Trezor Model T and Safe devices) reviews the
+/// typed data on the device, while firmware major version 1 (Trezor Model One) cannot display
+/// typed data and only signs the precomputed domain separator and message hashes.
 pub struct TrezorSigner {
     derivation: DerivationType,
     session_id: Vec<u8>,
+    firmware_version: semver::Version,
     pub(crate) chain_id: Option<ChainId>,
     pub(crate) address: Address,
 }
@@ -33,6 +48,7 @@ impl fmt::Debug for TrezorSigner {
         f.debug_struct("TrezorSigner")
             .field("derivation", &self.derivation)
             .field("session_id", &hex::encode(&self.session_id))
+            .field("firmware_version", &self.firmware_version)
             .field("address", &self.address)
             .finish()
     }
@@ -51,6 +67,22 @@ impl Signer for TrezorSigner {
     #[inline]
     async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
         self.sign_message_inner(message).await.map_err(alloy_signer::Error::other)
+    }
+
+    #[cfg(feature = "eip712")]
+    #[inline]
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
+        &self,
+        payload: &T,
+        domain: &Eip712Domain,
+    ) -> Result<Signature> {
+        self.sign_typed_data_inner(payload, domain).await.map_err(alloy_signer::Error::other)
+    }
+
+    #[cfg(feature = "eip712")]
+    #[inline]
+    async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Signature> {
+        self.sign_dynamic_typed_data_inner(payload).await.map_err(alloy_signer::Error::other)
     }
 
     #[inline]
@@ -102,16 +134,17 @@ impl TrezorSigner {
     ) -> Result<Self, TrezorError> {
         let mut signer = Self {
             derivation: derivation.clone(),
+            session_id: vec![],
+            firmware_version: semver::Version::new(0, 0, 0),
             chain_id,
             address: Address::ZERO,
-            session_id: vec![],
         };
         signer.initiate_session()?;
         signer.address = signer.get_address_with_path(&derivation).await?;
         Ok(signer)
     }
 
-    fn check_version(version: semver::Version) -> Result<(), TrezorError> {
+    fn check_version(version: &semver::Version) -> Result<(), TrezorError> {
         let min_version = match version.major {
             1 => FIRMWARE_1_MIN_VERSION,
             2 => FIRMWARE_2_MIN_VERSION,
@@ -122,7 +155,7 @@ impl TrezorSigner {
 
         let req = semver::VersionReq::parse(min_version)?;
         // Enforce firmware version is greater than "min_version"
-        if !req.matches(&version) {
+        if !req.matches(version) {
             return Err(TrezorError::UnsupportedFirmwareVersion(min_version.to_string()));
         }
 
@@ -139,9 +172,10 @@ impl TrezorSigner {
             features.minor_version() as u64,
             features.patch_version() as u64,
         );
-        Self::check_version(version)?;
+        Self::check_version(&version)?;
 
         self.session_id = features.session_id().to_vec();
+        self.firmware_version = version;
 
         Ok(())
     }
@@ -214,6 +248,134 @@ impl TrezorSigner {
         let apath = Self::convert_path(&self.derivation);
         let signature = client.ethereum_sign_message(message.into(), apath)?;
         signature_from_trezor(signature)
+    }
+
+    /// Firmware major version 1 (Trezor Model One) cannot display typed data and only signs the
+    /// EIP-712 domain separator and message hashes.
+    #[cfg(feature = "eip712")]
+    const fn signs_typed_hash_only(&self) -> bool {
+        self.firmware_version.major == 1
+    }
+
+    /// Signs a [`SolStruct`] as EIP-712 typed data and requires confirmation on the Trezor.
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data_inner<T: SolStruct>(
+        &self,
+        payload: &T,
+        domain: &Eip712Domain,
+    ) -> Result<Signature, TrezorError> {
+        if self.signs_typed_hash_only() {
+            return self
+                .sign_typed_hash(domain.separator(), Some(payload.eip712_hash_struct()))
+                .await;
+        }
+        self.sign_typed_data_flow(&TrezorTypedData::from_struct(payload, domain)?).await
+    }
+
+    /// Signs dynamic [`TypedData`] and requires confirmation on the Trezor.
+    #[cfg(feature = "eip712")]
+    async fn sign_dynamic_typed_data_inner(
+        &self,
+        payload: &TypedData,
+    ) -> Result<Signature, TrezorError> {
+        if self.signs_typed_hash_only() {
+            // Matches `TypedData::eip712_signing_hash`, which omits the message hash when the
+            // domain itself is the primary type.
+            let message_hash = (payload.primary_type != Eip712Domain::NAME)
+                .then(|| payload.hash_struct())
+                .transpose()?;
+            return self.sign_typed_hash(payload.domain.separator(), message_hash).await;
+        }
+        self.sign_typed_data_flow(&TrezorTypedData::from_typed_data(payload)?).await
+    }
+
+    /// Signs precomputed EIP-712 hashes with `EthereumSignTypedHash`, the only typed-data
+    /// operation firmware major version 1 supports.
+    #[cfg(feature = "eip712")]
+    #[instrument(ret)]
+    async fn sign_typed_hash(
+        &self,
+        domain_separator: B256,
+        message_hash: Option<B256>,
+    ) -> Result<Signature, TrezorError> {
+        let mut client = self.get_client()?;
+        let mut req = protos::EthereumSignTypedHash::new();
+        req.address_n = Self::convert_path(&self.derivation);
+        req.set_domain_separator_hash(domain_separator.to_vec());
+        if let Some(message_hash) = message_hash {
+            req.set_message_hash(message_hash.to_vec());
+        }
+        let signature = trezor_client::client::handle_interaction(client.call(
+            req,
+            Box::new(|_, m: protos::EthereumTypedDataSignature| Ok(m.signature().to_vec())),
+        )?)?;
+        Ok(Signature::from_raw(&signature)?)
+    }
+
+    /// Runs the interactive `EthereumSignTypedData` flow, answering the device's struct and value
+    /// requests until it returns the signature.
+    ///
+    /// `trezor_client` has no wrapper for this multi-message workflow, so the raw messages are
+    /// exchanged here, including the button and passphrase prompts that [`Trezor::call`] would
+    /// normally handle.
+    #[cfg(feature = "eip712")]
+    #[instrument(skip_all, fields(primary_type = data.primary_type()), ret)]
+    async fn sign_typed_data_flow(&self, data: &TrezorTypedData) -> Result<Signature, TrezorError> {
+        use protos::MessageType;
+
+        let mut client = self.get_client()?;
+        let mut req = protos::EthereumSignTypedData::new();
+        req.address_n = Self::convert_path(&self.derivation);
+        req.set_primary_type(data.primary_type().to_string());
+        req.set_metamask_v4_compat(true);
+
+        let mut response = client.call_raw(req)?;
+        loop {
+            response = match response.message_type() {
+                MessageType::MessageType_EthereumTypedDataStructRequest => {
+                    let request: protos::EthereumTypedDataStructRequest = decode_message(response)?;
+                    let mut ack = protos::EthereumTypedDataStructAck::new();
+                    ack.members =
+                        cancel_on_error(&mut client, data.struct_members(request.name()))?;
+                    client.call_raw(ack)?
+                }
+                MessageType::MessageType_EthereumTypedDataValueRequest => {
+                    let request: protos::EthereumTypedDataValueRequest = decode_message(response)?;
+                    let mut ack = protos::EthereumTypedDataValueAck::new();
+                    ack.set_value(cancel_on_error(
+                        &mut client,
+                        data.encode_value(&request.member_path),
+                    )?);
+                    client.call_raw(ack)?
+                }
+                MessageType::MessageType_EthereumTypedDataSignature => {
+                    let signature: protos::EthereumTypedDataSignature = decode_message(response)?;
+                    return Ok(Signature::from_raw(signature.signature())?);
+                }
+                MessageType::MessageType_ButtonRequest => {
+                    client.call_raw(protos::ButtonAck::new())?
+                }
+                MessageType::MessageType_PassphraseRequest => {
+                    let request: protos::PassphraseRequest = decode_message(response)?;
+                    let mut ack = protos::PassphraseAck::new();
+                    if !request._on_device() {
+                        ack.set_on_device(true);
+                    }
+                    client.call_raw(ack)?
+                }
+                MessageType::MessageType_Failure => {
+                    let failure: protos::Failure = decode_message(response)?;
+                    return Err(trezor_client::Error::FailureResponse(failure).into());
+                }
+                MessageType::MessageType_PinMatrixRequest => {
+                    return Err(trezor_client::Error::UnexpectedInteractionRequest(
+                        trezor_client::client::InteractionType::PinMatrix,
+                    )
+                    .into());
+                }
+                ty => return Err(trezor_client::Error::UnexpectedMessageType(ty).into()),
+            };
+        }
     }
 
     // helper which converts a derivation path to [u32]
@@ -358,6 +520,25 @@ fn signature_from_trezor(x: trezor_client::client::Signature) -> Result<Signatur
     Ok(Signature::new(r, s, v))
 }
 
+/// Parses a raw device response into the expected protobuf message.
+#[cfg(feature = "eip712")]
+fn decode_message<M: TrezorMessage>(response: ProtoMessage) -> Result<M, TrezorError> {
+    response.into_message().map_err(|err| trezor_client::Error::Protobuf(err).into())
+}
+
+/// Aborts the device workflow before surfacing a host-side encoding error, so the device does not
+/// stay blocked waiting for an acknowledgement.
+#[cfg(feature = "eip712")]
+fn cancel_on_error<T>(
+    client: &mut Trezor,
+    result: Result<T, TrezorError>,
+) -> Result<T, TrezorError> {
+    if result.is_err() {
+        let _ = client.call_raw(protos::Cancel::new());
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,6 +571,34 @@ mod tests {
         let sig = trezor.sign_message(message.as_bytes()).await.unwrap();
         let addr = trezor.get_address().await.unwrap();
         assert_eq!(sig.recover_address_from_msg(message).unwrap(), addr);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    #[cfg(feature = "eip712")]
+    async fn test_sign_typed_data() {
+        use alloy_sol_types::{eip712_domain, sol};
+
+        sol! {
+            #[derive(serde::Serialize)]
+            struct Message {
+                string text;
+                uint256 nonce;
+            }
+        }
+
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
+        let domain = eip712_domain! { name: "Alloy", version: "1", chain_id: 1, };
+        let message = Message { text: "hello".into(), nonce: U256::from(1) };
+
+        let sig = trezor.sign_typed_data(&message, &domain).await.unwrap();
+        let hash = message.eip712_signing_hash(&domain);
+        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), trezor.address());
+
+        let typed_data = TypedData::from_struct(&message, Some(domain));
+        let sig = trezor.sign_dynamic_typed_data(&typed_data).await.unwrap();
+        let hash = typed_data.eip712_signing_hash().unwrap();
+        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), trezor.address());
     }
 
     #[tokio::test]

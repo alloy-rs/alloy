@@ -56,6 +56,14 @@ pub enum TrezorError {
     /// Could not retrieve device features.
     #[error("could not retrieve device features")]
     Features,
+    /// EIP-712 type resolution or message coercion failed.
+    #[cfg(feature = "eip712")]
+    #[error(transparent)]
+    DynAbi(#[from] alloy_dyn_abi::Error),
+    /// EIP-712 typed data that cannot be encoded for the Trezor typed-data flow.
+    #[cfg(feature = "eip712")]
+    #[error("unsupported EIP-712 typed data: {0}")]
+    UnsupportedTypedData(String),
 }
 
 impl From<TrezorError> for alloy_signer::Error {
