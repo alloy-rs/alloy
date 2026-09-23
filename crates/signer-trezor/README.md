@@ -9,6 +9,11 @@ device for each request, so device operations should not be run concurrently. Un
 complete signing prompts on it. Construction requires firmware 1.11.1 or newer for firmware major
 version 1, or 2.5.1 or newer for firmware major version 2.
 
+When passphrase protection is enabled, `TrezorSigner::new` lets you enter the passphrase on the
+device, while `TrezorSigner::new_with_passphrase` sends a passphrase from the host to open a hidden
+wallet without a device prompt. An empty host passphrase selects the standard wallet. Devices
+configured to always enter the passphrase on the device ignore the host passphrase.
+
 Although the public signing API is asynchronous, the underlying USB calls are blocking and can
 block an executor thread. Address queries do not request on-device display confirmation.
 

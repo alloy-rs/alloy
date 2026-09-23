@@ -6,7 +6,10 @@ use alloy_primitives::{
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use std::fmt;
-use trezor_client::client::Trezor;
+use trezor_client::{
+    client::{InteractionType, Trezor},
+    protos, TrezorMessage, TrezorResponse,
+};
 
 #[cfg(feature = "eip712")]
 use crate::eip712::TrezorTypedData;
@@ -15,7 +18,7 @@ use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 #[cfg(feature = "eip712")]
-use trezor_client::{protos, transport::ProtoMessage, TrezorMessage};
+use trezor_client::transport::ProtoMessage;
 
 // We require firmware that supports EIP-1559 transaction signing.
 const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
@@ -35,10 +38,15 @@ const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 /// sign EIP-712 typed data. Firmware major version 2 (Trezor Model T and Safe devices) reviews the
 /// typed data on the device, while firmware major version 1 (Trezor Model One) cannot display
 /// typed data and only signs the precomputed domain separator and message hashes.
+///
+/// Devices with passphrase protection prompt for the passphrase on the device unless the signer
+/// was created with [`TrezorSigner::new_with_passphrase`], which answers those prompts from the
+/// host to open a hidden wallet.
 pub struct TrezorSigner {
     derivation: DerivationType,
     session_id: Vec<u8>,
     firmware_version: semver::Version,
+    passphrase: Option<String>,
     pub(crate) chain_id: Option<ChainId>,
     pub(crate) address: Address,
 }
@@ -49,6 +57,7 @@ impl fmt::Debug for TrezorSigner {
             .field("derivation", &self.derivation)
             .field("session_id", &hex::encode(&self.session_id))
             .field("firmware_version", &self.firmware_version)
+            .field("passphrase", &self.passphrase.as_ref().map(|_| "<redacted>"))
             .field("address", &self.address)
             .finish()
     }
@@ -127,15 +136,40 @@ impl TrezorSigner {
     /// version 1.11.1 or newer, and major version 2 requires 2.5.1 or newer. `chain_id` applies
     /// only to transaction signing: it fills a missing transaction chain ID and rejects a
     /// different one.
-    #[instrument(ret)]
+    ///
+    /// If passphrase protection is enabled, the device asks for the passphrase on its own screen.
+    /// Use [`Self::new_with_passphrase`] to provide it from the host instead.
     pub async fn new(
         derivation: DerivationType,
         chain_id: Option<ChainId>,
+    ) -> Result<Self, TrezorError> {
+        Self::connect(derivation, chain_id, None).await
+    }
+
+    /// Connects like [`Self::new`], but answers the device's passphrase prompts with `passphrase`
+    /// to open the corresponding hidden wallet.
+    ///
+    /// An empty passphrase selects the standard wallet without a device prompt. The passphrase is
+    /// ignored by devices configured to always enter it on the device.
+    pub async fn new_with_passphrase(
+        derivation: DerivationType,
+        chain_id: Option<ChainId>,
+        passphrase: impl Into<String>,
+    ) -> Result<Self, TrezorError> {
+        Self::connect(derivation, chain_id, Some(passphrase.into())).await
+    }
+
+    #[instrument(skip(passphrase), ret)]
+    async fn connect(
+        derivation: DerivationType,
+        chain_id: Option<ChainId>,
+        passphrase: Option<String>,
     ) -> Result<Self, TrezorError> {
         let mut signer = Self {
             derivation: derivation.clone(),
             session_id: vec![],
             firmware_version: semver::Version::new(0, 0, 0),
+            passphrase,
             chain_id,
             address: Address::ZERO,
         };
@@ -186,6 +220,41 @@ impl TrezorSigner {
         Ok(client)
     }
 
+    /// Drives a device call to completion, acknowledging button prompts and answering passphrase
+    /// prompts with the configured passphrase or a request to enter it on the device.
+    fn handle_interaction<T, R: TrezorMessage>(
+        &self,
+        response: TrezorResponse<'_, T, R>,
+    ) -> Result<T, TrezorError> {
+        match response {
+            TrezorResponse::Ok(value) => Ok(value),
+            TrezorResponse::Failure(failure) => {
+                Err(trezor_client::Error::FailureResponse(failure).into())
+            }
+            TrezorResponse::ButtonRequest(request) => self.handle_interaction(request.ack()?),
+            TrezorResponse::PinMatrixRequest(_) => {
+                Err(trezor_client::Error::UnexpectedInteractionRequest(InteractionType::PinMatrix)
+                    .into())
+            }
+            TrezorResponse::PassphraseRequest(request) => {
+                let ack = self.passphrase_ack(&request.message);
+                self.handle_interaction(request.client.call(ack, request.result_handler)?)
+            }
+        }
+    }
+
+    /// Answers a passphrase prompt with the configured passphrase, or asks the device to collect
+    /// it on its own screen like [`trezor_client::client::handle_interaction`] does.
+    fn passphrase_ack(&self, request: &protos::PassphraseRequest) -> protos::PassphraseAck {
+        let mut ack = protos::PassphraseAck::new();
+        match &self.passphrase {
+            Some(passphrase) => ack.set_passphrase(passphrase.clone()),
+            None if !request._on_device() => ack.set_on_device(true),
+            None => {}
+        }
+        ack
+    }
+
     /// Re-queries the address for this signer's derivation path.
     ///
     /// This does not request on-device display confirmation. [`Signer::address`] returns the
@@ -201,8 +270,13 @@ impl TrezorSigner {
         derivation: &DerivationType,
     ) -> Result<Address, TrezorError> {
         let mut client = self.get_client()?;
-        let address_str = client.ethereum_get_address(Self::convert_path(derivation))?;
-        Ok(address_str.parse()?)
+        let mut req = protos::EthereumGetAddress::new();
+        req.address_n = Self::convert_path(derivation);
+        let address = self.handle_interaction(
+            client
+                .call(req, Box::new(|_, m: protos::EthereumAddress| Ok(m.address().to_string())))?,
+        )?;
+        Ok(address.parse()?)
     }
 
     /// Signs a legacy or EIP-1559 transaction and requires confirmation on the Trezor.
@@ -213,41 +287,78 @@ impl TrezorSigner {
     ) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
         let path = Self::convert_path(&self.derivation);
-        let request = build_sign_request(tx)?;
 
-        let signature = match request {
-            TrezorSignRequest::Legacy(req) => client.ethereum_sign_tx(
-                path,
-                req.nonce,
-                req.gas_price,
-                req.gas_limit,
-                req.to,
-                req.value,
-                req.data,
-                req.chain_id,
-            ),
-            TrezorSignRequest::Eip1559(req) => client.ethereum_sign_eip1559_tx(
-                path,
-                req.nonce,
-                req.gas_limit,
-                req.to,
-                req.value,
-                req.data,
-                req.chain_id,
-                req.max_gas_fee,
-                req.max_priority_fee,
-                req.access_list,
-            ),
-        }?;
-        signature_from_trezor(signature)
+        match build_sign_request(tx)? {
+            TrezorSignRequest::Legacy(req) => {
+                let mut msg = protos::EthereumSignTx::new();
+                msg.address_n = path;
+                msg.set_nonce(req.nonce);
+                msg.set_gas_price(req.gas_price);
+                msg.set_gas_limit(req.gas_limit);
+                msg.set_to(req.to);
+                msg.set_value(req.value);
+                if let Some(chain_id) = req.chain_id {
+                    msg.set_chain_id(chain_id);
+                }
+                let mut data = req.data;
+                msg.set_data_length(data.len() as u32);
+                msg.set_data_initial_chunk(initial_chunk(&mut data));
+                self.sign_tx_messages(&mut client, msg, data)
+            }
+            TrezorSignRequest::Eip1559(req) => {
+                let mut msg = protos::EthereumSignTxEIP1559::new();
+                msg.address_n = path;
+                msg.set_nonce(req.nonce);
+                msg.set_max_gas_fee(req.max_gas_fee);
+                msg.set_max_priority_fee(req.max_priority_fee);
+                msg.set_gas_limit(req.gas_limit);
+                msg.set_to(req.to);
+                msg.set_value(req.value);
+                if let Some(chain_id) = req.chain_id {
+                    msg.set_chain_id(chain_id);
+                }
+                msg.access_list = req.access_list;
+                let mut data = req.data;
+                msg.set_data_length(data.len() as u32);
+                msg.set_data_initial_chunk(initial_chunk(&mut data));
+                self.sign_tx_messages(&mut client, msg, data)
+            }
+        }
+    }
+
+    /// Sends a transaction signing request and the remaining calldata chunks the device asks for,
+    /// and returns the signature from the final `EthereumTxRequest`.
+    fn sign_tx_messages<S: TrezorMessage>(
+        &self,
+        client: &mut Trezor,
+        request: S,
+        mut data: Vec<u8>,
+    ) -> Result<Signature, TrezorError> {
+        let mut response = self.handle_interaction(
+            client.call(request, Box::new(|_, m: protos::EthereumTxRequest| Ok(m)))?,
+        )?;
+        while response.data_length() > 0 {
+            let chunk_len = (response.data_length() as usize).min(data.len());
+            let mut ack = protos::EthereumTxAck::new();
+            ack.set_data_chunk(data.drain(..chunk_len).collect());
+            response = self.handle_interaction(
+                client.call(ack, Box::new(|_, m: protos::EthereumTxRequest| Ok(m)))?,
+            )?;
+        }
+        signature_from_tx_request(&response)
     }
 
     #[instrument(skip(message), fields(message=hex::encode(message)), ret)]
     async fn sign_message_inner(&self, message: &[u8]) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
-        let apath = Self::convert_path(&self.derivation);
-        let signature = client.ethereum_sign_message(message.into(), apath)?;
-        signature_from_trezor(signature)
+        let mut req = protos::EthereumSignMessage::new();
+        req.address_n = Self::convert_path(&self.derivation);
+        req.set_message(message.to_vec());
+        let signature = self.handle_interaction(client.call(
+            req,
+            Box::new(|_, m: protos::EthereumMessageSignature| Ok(m.signature().to_vec())),
+        )?)?;
+        Ok(Signature::from_raw(&signature)?)
     }
 
     /// Firmware major version 1 (Trezor Model One) cannot display typed data and only signs the
@@ -305,7 +416,7 @@ impl TrezorSigner {
         if let Some(message_hash) = message_hash {
             req.set_message_hash(message_hash.to_vec());
         }
-        let signature = trezor_client::client::handle_interaction(client.call(
+        let signature = self.handle_interaction(client.call(
             req,
             Box::new(|_, m: protos::EthereumTypedDataSignature| Ok(m.signature().to_vec())),
         )?)?;
@@ -316,8 +427,8 @@ impl TrezorSigner {
     /// requests until it returns the signature.
     ///
     /// `trezor_client` has no wrapper for this multi-message workflow, so the raw messages are
-    /// exchanged here, including the button and passphrase prompts that [`Trezor::call`] would
-    /// normally handle.
+    /// exchanged here, including the button and passphrase prompts that
+    /// [`Self::handle_interaction`] covers for single-message calls.
     #[cfg(feature = "eip712")]
     #[instrument(skip_all, fields(primary_type = data.primary_type()), ret)]
     async fn sign_typed_data_flow(&self, data: &TrezorTypedData) -> Result<Signature, TrezorError> {
@@ -357,11 +468,7 @@ impl TrezorSigner {
                 }
                 MessageType::MessageType_PassphraseRequest => {
                     let request: protos::PassphraseRequest = decode_message(response)?;
-                    let mut ack = protos::PassphraseAck::new();
-                    if !request._on_device() {
-                        ack.set_on_device(true);
-                    }
-                    client.call_raw(ack)?
+                    client.call_raw(self.passphrase_ack(&request))?
                 }
                 MessageType::MessageType_Failure => {
                     let failure: protos::Failure = decode_message(response)?;
@@ -410,7 +517,7 @@ pub(crate) struct LegacyRequest {
 }
 
 /// Parameters for a Trezor EIP-1559 transaction signing request.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Eip1559Request {
     nonce: Vec<u8>,
     gas_limit: Vec<u8>,
@@ -420,11 +527,11 @@ pub(crate) struct Eip1559Request {
     chain_id: Option<u64>,
     max_gas_fee: Vec<u8>,
     max_priority_fee: Vec<u8>,
-    access_list: Vec<trezor_client::client::AccessListItem>,
+    access_list: Vec<protos::ethereum_sign_tx_eip1559::EthereumAccessList>,
 }
 
 /// The dispatch payload for a Trezor signing call.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum TrezorSignRequest {
     Legacy(LegacyRequest),
     Eip1559(Eip1559Request),
@@ -459,9 +566,10 @@ pub(crate) fn build_sign_request(
             .access_list()
             .map(|al| {
                 al.0.iter()
-                    .map(|item| trezor_client::client::AccessListItem {
-                        address: address_to_trezor(&item.address),
+                    .map(|item| protos::ethereum_sign_tx_eip1559::EthereumAccessList {
+                        address: Some(address_to_trezor(&item.address)),
                         storage_keys: item.storage_keys.iter().map(|key| key.to_vec()).collect(),
+                        ..Default::default()
                     })
                     .collect()
             })
@@ -512,12 +620,34 @@ fn address_to_trezor(x: &Address) -> String {
     format!("{x:?}")
 }
 
+/// Splits off the calldata that is sent with the initial signing request; the device asks for the
+/// rest in chunks.
+fn initial_chunk(data: &mut Vec<u8>) -> Vec<u8> {
+    data.drain(..data.len().min(1024)).collect()
+}
+
 fn signature_from_trezor(x: trezor_client::client::Signature) -> Result<Signature, TrezorError> {
     let r = U256::from_be_bytes(x.r);
     let s = U256::from_be_bytes(x.s);
     let v =
         normalize_v(x.v).ok_or(TrezorError::SignatureError(SignatureError::InvalidParity(x.v)))?;
     Ok(Signature::new(r, s, v))
+}
+
+/// Parses the signature the device returns with its final `EthereumTxRequest`. For legacy
+/// transactions the device returns the EIP-155 recovery ID, or a bare parity for chain IDs that
+/// would overflow it, both of which [`normalize_v`] accepts.
+fn signature_from_tx_request(
+    response: &protos::EthereumTxRequest,
+) -> Result<Signature, TrezorError> {
+    let malformed = || trezor_client::Error::MalformedSignature;
+    let r = response.signature_r().try_into().map_err(|_| malformed())?;
+    let s = response.signature_s().try_into().map_err(|_| malformed())?;
+    signature_from_trezor(trezor_client::client::Signature {
+        r,
+        s,
+        v: response.signature_v() as u64,
+    })
 }
 
 /// Parses a raw device response into the expected protobuf message.
@@ -561,6 +691,17 @@ mod tests {
             trezor.get_address_with_path(&DerivationType::TrezorLive(0)).await.unwrap(),
             address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
         );
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_new_with_passphrase() {
+        let standard = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
+        let hidden =
+            TrezorSigner::new_with_passphrase(DerivationType::TrezorLive(0), Some(1), "hidden")
+                .await
+                .unwrap();
+        assert_ne!(standard.address(), hidden.address());
     }
 
     #[tokio::test]
