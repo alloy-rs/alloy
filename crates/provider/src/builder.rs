@@ -316,7 +316,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         self,
         estimator: Eip1559Estimator,
     ) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
-        self.filler(GasFiller { estimator, legacy: false })
+        self.filler(GasFiller::new(estimator))
     }
 
     /// Add legacy gas estimation to the stack being built.

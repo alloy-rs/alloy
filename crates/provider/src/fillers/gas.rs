@@ -84,6 +84,11 @@ pub struct GasFiller {
 }
 
 impl GasFiller {
+    /// Creates a [`GasFiller`] that uses the given [`Eip1559Estimator`].
+    pub const fn new(estimator: Eip1559Estimator) -> Self {
+        Self { estimator, legacy: false }
+    }
+
     /// Creates a [`GasFiller`] that always populates the legacy `gas_price` field instead of the
     /// EIP-1559 `max_fee_per_gas` and `max_priority_fee_per_gas` fields.
     ///
