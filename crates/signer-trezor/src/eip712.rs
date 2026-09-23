@@ -55,7 +55,20 @@ impl TrezorTypedData {
     ) -> Result<Self, TrezorError> {
         // The domain type is derived from the populated fields, matching how alloy computes the
         // domain separator, and takes precedence over an `EIP712Domain` definition in the types.
-        resolver.ingest_string(domain.encode_type())?;
+        // A message may only reference `EIP712Domain` as a member type if that definition is the
+        // same, since the device hashes and displays the values under the definition it is sent.
+        let domain_type = domain.encode_type();
+        if primary_type != Eip712Domain::NAME
+            && resolver.linearize(&primary_type)?.iter().any(|def| {
+                def.type_name() == Eip712Domain::NAME && def.eip712_encode_type() != domain_type
+            })
+        {
+            return Err(TrezorError::UnsupportedTypedData(
+                "the message references an `EIP712Domain` type that differs from the signing domain"
+                    .to_string(),
+            ));
+        }
+        resolver.ingest_string(domain_type)?;
         Ok(Self { resolver, primary_type, domain: domain_value(domain), message })
     }
 
@@ -415,6 +428,32 @@ mod tests {
         assert_eq!(from_struct.encode_value(&[1, 3, 0, 1]).unwrap(), 2u16.to_be_bytes());
         // Array elements that are structs are expanded by the device, never requested as a whole.
         assert!(from_struct.encode_value(&[1, 3, 0]).is_err());
+    }
+
+    #[test]
+    fn rejects_conflicting_domain_type_in_message() {
+        let wrapper = |domain: &str| -> TypedData {
+            serde_json::from_str(&format!(
+                r#"{{
+                    "types": {{
+                        "EIP712Domain": [{{"name": "name", "type": "string"}}],
+                        "Wrapper": [{{"name": "inner", "type": "EIP712Domain"}}]
+                    }},
+                    "primaryType": "Wrapper",
+                    "domain": {domain},
+                    "message": {{"inner": {{"name": "spoofed"}}}}
+                }}"#
+            ))
+            .unwrap()
+        };
+
+        let data = TrezorTypedData::from_typed_data(&wrapper(r#"{"name": "Ether Mail"}"#)).unwrap();
+        assert_eq!(data.encode_value(&[1, 0, 0]).unwrap(), b"spoofed");
+
+        assert!(matches!(
+            TrezorTypedData::from_typed_data(&wrapper(r#"{"name": "Ether Mail", "chainId": 1}"#)),
+            Err(TrezorError::UnsupportedTypedData(_))
+        ));
     }
 
     #[test]
