@@ -5,7 +5,14 @@ use core::{
     fmt,
     ops::{Deref, DerefMut},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{
+    de::DeserializeOwned,
+    ser::{
+        SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,
+        SerializeTupleStruct, SerializeTupleVariant,
+    },
+    Deserialize, Serialize, Serializer,
+};
 use serde_json::Value;
 
 #[cfg(any(test, feature = "arbitrary"))]
@@ -254,19 +261,296 @@ where
             other: OtherFields,
         }
 
-        let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
+        let mut helper: WithOtherFieldsHelper<T> =
+            WithOtherFieldsHelper::deserialize(deserializer)?;
         // remove all fields present in the inner struct from the other fields, this is to avoid
         // duplicate fields in the catch all other fields because serde flatten does not exclude
         // already deserialized fields when deserializing the other fields.
-        if let Value::Object(map) =
-            serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
-        {
-            for key in map.keys() {
-                helper.other.remove(key);
-            }
-        }
+        helper
+            .inner
+            .serialize(KnownFields { other: &mut helper.other, pending_key: None })
+            .map_err(serde::de::Error::custom)?;
 
         Ok(Self { inner: helper.inner, other: helper.other })
+    }
+}
+
+// Only the keys of the serialized inner object are needed here. In particular, serializing a
+// receipt's logs into a Value would duplicate the entire (potentially large) log tree.
+struct KnownFields<'a> {
+    other: &'a mut OtherFields,
+    pending_key: Option<String>,
+}
+
+// Use serde_json's map-key rules, including integer keys and errors for unsupported keys.
+struct SingleKey<'a, T: ?Sized>(&'a T);
+
+impl<T: Serialize + ?Sized> Serialize for SingleKey<'_, T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry(self.0, &())?;
+        map.end()
+    }
+}
+
+impl KnownFields<'_> {
+    fn remove_key<T: Serialize + ?Sized>(&mut self, key: &T) -> serde_json::Result<()> {
+        let Value::Object(map) = serde_json::to_value(SingleKey(key))? else { unreachable!() };
+        if let Some(key) = map.keys().next() {
+            self.other.remove(key);
+        }
+        Ok(())
+    }
+}
+
+impl<'a> Serializer for KnownFields<'a> {
+    type Ok = ();
+    type Error = serde_json::Error;
+    type SerializeSeq = IgnoreValues;
+    type SerializeTuple = IgnoreValues;
+    type SerializeTupleStruct = IgnoreValues;
+    type SerializeTupleVariant = IgnoreValues;
+    type SerializeMap = Self;
+    type SerializeStruct = Self;
+    type SerializeStructVariant = IgnoreValues;
+
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Ok(self)
+    }
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        Ok(self)
+    }
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        Ok(IgnoreValues)
+    }
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        Ok(IgnoreValues)
+    }
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        Ok(IgnoreValues)
+    }
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        self.other.remove(variant);
+        Ok(IgnoreValues)
+    }
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        self.other.remove(variant);
+        Ok(IgnoreValues)
+    }
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant: &'static str,
+        _value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        self.other.remove(variant);
+        Ok(())
+    }
+    fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_bool(self, _value: bool) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_i8(self, _value: i8) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_i16(self, _value: i16) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_i32(self, _value: i32) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_i64(self, _value: i64) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_i128(self, _value: i128) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_u8(self, _value: u8) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_u16(self, _value: u16) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_u32(self, _value: u32) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_u64(self, _value: u64) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_u128(self, _value: u128) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_f32(self, _value: f32) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_f64(self, _value: f64) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_char(self, _value: char) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_str(self, _value: &str) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_bytes(self, _value: &[u8]) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _index: u32,
+        _variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeMap for KnownFields<'_> {
+    type Ok = ();
+    type Error = serde_json::Error;
+
+    fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<(), Self::Error> {
+        let Value::Object(map) = serde_json::to_value(SingleKey(key))? else { unreachable!() };
+        self.pending_key = map.into_iter().next().map(|(key, _)| key);
+        Ok(())
+    }
+
+    fn serialize_value<T: Serialize + ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        if let Some(key) = self.pending_key.take() {
+            self.other.remove(&key);
+        }
+        Ok(())
+    }
+
+    fn serialize_entry<K: Serialize + ?Sized, V: Serialize + ?Sized>(
+        &mut self,
+        key: &K,
+        _value: &V,
+    ) -> Result<(), Self::Error> {
+        self.remove_key(key)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeStruct for KnownFields<'_> {
+    type Ok = ();
+    type Error = serde_json::Error;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        key: &'static str,
+        _value: &T,
+    ) -> Result<(), Self::Error> {
+        self.other.remove(key);
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+struct IgnoreValues;
+
+impl SerializeSeq for IgnoreValues {
+    type Ok = ();
+    type Error = serde_json::Error;
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeTuple for IgnoreValues {
+    type Ok = ();
+    type Error = serde_json::Error;
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeTupleStruct for IgnoreValues {
+    type Ok = ();
+    type Error = serde_json::Error;
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeTupleVariant for IgnoreValues {
+    type Ok = ();
+    type Error = serde_json::Error;
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl SerializeStructVariant for IgnoreValues {
+    type Ok = ();
+    type Error = serde_json::Error;
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        _key: &'static str,
+        _value: &T,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
     }
 }
 
@@ -274,6 +558,7 @@ where
 mod tests {
     use super::*;
     use alloc::string::ToString;
+    use core::sync::atomic::{AtomicUsize, Ordering};
     use rand::Rng;
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -306,6 +591,46 @@ mod tests {
             with_other.other,
             OtherFields::new(BTreeMap::from_iter([("b".to_string(), serde_json::json!(2))]))
         );
+    }
+
+    #[test]
+    fn test_deserialize_only_serializes_inner_keys() {
+        static LOG_SERIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
+
+        fn serialize_logs<S: Serializer>(logs: &Value, serializer: S) -> Result<S::Ok, S::Error> {
+            LOG_SERIALIZATIONS.fetch_add(1, Ordering::Relaxed);
+            logs.serialize(serializer)
+        }
+
+        #[derive(Serialize, Deserialize)]
+        struct Base {
+            #[serde(rename = "knownField")]
+            known_field: u64,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        struct Receipt {
+            #[serde(flatten)]
+            base: Base,
+            #[serde(serialize_with = "serialize_logs")]
+            logs: Value,
+        }
+
+        let receipt: WithOtherFields<Receipt> = serde_json::from_str(
+            r#"{"knownField":1,"logs":[{"data":[1,2,3]}],"extra":1,"extra":2}"#,
+        )
+        .unwrap();
+
+        assert_eq!(LOG_SERIALIZATIONS.load(Ordering::Relaxed), 0);
+        assert_eq!(receipt.inner.base.known_field, 1);
+        assert_eq!(receipt.inner.logs, json!([{"data": [1, 2, 3]}]));
+        assert_eq!(receipt.other.len(), 1);
+        assert_eq!(receipt.other.get("extra"), Some(&json!(2)));
+
+        let duplicate = serde_json::from_str::<WithOtherFields<Receipt>>(
+            r#"{"knownField":1,"knownField":2,"logs":[]}"#,
+        );
+        assert!(duplicate.err().unwrap().to_string().contains("duplicate field `knownField`"));
     }
 
     #[test]
