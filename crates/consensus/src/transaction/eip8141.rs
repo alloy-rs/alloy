@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 use alloy_eips::{
+    eip8250::{nonce_calldata, validate_nonce_keys, MAX_NONCE_KEYS},
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip4844::VERSIONED_HASH_VERSION_KZG,
     eip7594::MAX_BLOBS_PER_TX_FUSAKA,
@@ -18,7 +19,7 @@ use alloy_eips::{
     Typed2718,
 };
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Sealable, TxKind, B256, U256};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
 use super::Transaction;
 
@@ -45,7 +46,7 @@ use super::Transaction;
 /// ```
 ///
 /// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
@@ -58,6 +59,10 @@ pub struct TxEip8141 {
     /// Sender nonce.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub nonce: u64,
+    /// EIP-8250 nonce domains. `None` retains the pre-fork wire encoding.
+    #[cfg_attr(any(test, feature = "arbitrary"), arbitrary(with = arbitrary_nonce_keys))]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub nonce_keys: Option<Vec<U256>>,
     /// Intended transaction sender.
     pub sender: Address,
     /// Ordered frames to execute.
@@ -70,7 +75,48 @@ pub struct TxEip8141 {
     pub blob_versioned_hashes: Vec<B256>,
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+fn arbitrary_nonce_keys(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<Option<Vec<U256>>> {
+    if !u.arbitrary::<bool>()? {
+        return Ok(None);
+    }
+    let count = u.int_in_range(1..=MAX_NONCE_KEYS)?;
+    let mut keys = (0..count).map(|_| u.arbitrary()).collect::<arbitrary::Result<Vec<U256>>>()?;
+    keys.sort_unstable();
+    keys.dedup();
+    if keys.len() > 1 && keys[0].is_zero() {
+        keys.remove(0);
+    }
+    Ok(Some(keys))
+}
+
 impl TxEip8141 {
+    fn rlp_payload_length(&self) -> usize {
+        self.chain_id.length()
+            + self.nonce_keys.as_ref().map_or(0, Encodable::length)
+            + self.nonce.length()
+            + self.sender.length()
+            + self.frames.length()
+            + self.signatures.length()
+            + self.fees.length()
+            + self.blob_versioned_hashes.length()
+    }
+
+    fn encode_rlp_fields(&self, out: &mut dyn BufMut) {
+        self.chain_id.encode(out);
+        if let Some(keys) = &self.nonce_keys {
+            keys.encode(out);
+        }
+        self.nonce.encode(out);
+        self.sender.encode(out);
+        self.frames.encode(out);
+        self.signatures.encode(out);
+        self.fees.encode(out);
+        self.blob_versioned_hashes.encode(out);
+    }
+
     /// EIP-2718 transaction type byte.
     pub const fn tx_type() -> u8 {
         FRAME_TX_TYPE
@@ -79,6 +125,7 @@ impl TxEip8141 {
     /// Calculates a heuristic for the in-memory size of the transaction.
     pub fn size(&self) -> usize {
         size_of::<Self>()
+            + self.nonce_keys.as_ref().map_or(0, |keys| keys.capacity() * size_of::<U256>())
             + self.frames.capacity() * size_of::<Frame>()
             + self.frames.iter().map(|frame| frame.data.len()).sum::<usize>()
             + self.signatures.capacity() * size_of::<FrameSignature>()
@@ -92,6 +139,9 @@ impl TxEip8141 {
     /// execution gas cap. It does not verify signatures cryptographically, execute frames, or
     /// check chain state, block capacity, base fees, or blob sidecars.
     pub fn validate(&self) -> Result<(), TxEip8141ValidationError> {
+        if let Some(keys) = &self.nonce_keys {
+            validate_nonce_keys(keys).map_err(TxEip8141ValidationError::NonceKeys)?;
+        }
         validate_frame_count(self.frames.len())?;
         validate_fees(&self.fees)?;
         validate_blobs(&self.blob_versioned_hashes, self.fees.max_fee_per_blob_gas)?;
@@ -119,7 +169,8 @@ impl TxEip8141 {
         for signature in &self.signatures {
             fixed = fixed.saturating_add(signature.verification_gas());
         }
-        let data = self.frames.iter().map(|frame| frame.data.as_ref()).chain(
+        let nonce_data = self.nonce_keys.as_deref().map(|keys| nonce_calldata(keys, self.nonce));
+        let data = nonce_data.iter().map(Vec::as_slice).chain(self.frames.iter().map(|frame| frame.data.as_ref())).chain(
             self.signatures.iter().flat_map(|signature| {
                 [
                     signature.signer.as_bytes(),
@@ -154,6 +205,7 @@ impl TxEip8141 {
     pub fn signature_hash(&self) -> B256 {
         let signatures = SigningFrameSignatures::new(&self.signatures);
         let payload_length = self.chain_id.length()
+            + self.nonce_keys.as_ref().map_or(0, Encodable::length)
             + self.nonce.length()
             + self.sender.length()
             + self.frames.length()
@@ -165,6 +217,9 @@ impl TxEip8141 {
         out.put_u8(FRAME_TX_TYPE);
         header.encode(&mut out);
         self.chain_id.encode(&mut out);
+        if let Some(keys) = &self.nonce_keys {
+            keys.encode(&mut out);
+        }
         self.nonce.encode(&mut out);
         self.sender.encode(&mut out);
         self.frames.encode(&mut out);
@@ -222,6 +277,51 @@ impl Decodable2718 for TxEip8141 {
 
     fn fallback_decode(_: &mut &[u8]) -> Eip2718Result<Self> {
         Err(Eip2718Error::UnexpectedType(FRAME_TX_TYPE))
+    }
+}
+
+impl Encodable for TxEip8141 {
+    fn encode(&self, out: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.rlp_payload_length() }.encode(out);
+        self.encode_rlp_fields(out);
+    }
+
+    fn length(&self) -> usize {
+        Header { list: true, payload_length: self.rlp_payload_length() }.length_with_payload()
+    }
+}
+
+impl Decodable for TxEip8141 {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+
+        let remaining = buf.len();
+        let chain_id = Decodable::decode(buf)?;
+        let nonce_keys = if buf.first().is_some_and(|byte| *byte >= 0xc0) {
+            let keys = Vec::<U256>::decode(buf)?;
+            validate_nonce_keys(&keys).map_err(alloy_rlp::Error::Custom)?;
+            Some(keys)
+        } else {
+            None
+        };
+        let tx = Self {
+            chain_id,
+            nonce: Decodable::decode(buf)?,
+            nonce_keys,
+            sender: Decodable::decode(buf)?,
+            frames: Decodable::decode(buf)?,
+            signatures: Decodable::decode(buf)?,
+            fees: Decodable::decode(buf)?,
+            blob_versioned_hashes: Decodable::decode(buf)?,
+        };
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+        Ok(tx)
     }
 }
 
@@ -303,6 +403,9 @@ impl Transaction for TxEip8141 {
 /// A structural validation error in an EIP-8141 transaction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum TxEip8141ValidationError {
+    /// The EIP-8250 nonce key set is not canonical.
+    #[error("invalid EIP-8250 nonce keys: {0}")]
+    NonceKeys(&'static str),
     /// The number of frames is outside the permitted range.
     #[error("expected between 1 and {MAX_FRAMES} frames, got {0}")]
     FrameCount(usize),

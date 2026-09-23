@@ -65,4 +65,7 @@ pub mod eip7928;
 
 pub mod eip8141;
 
+/// EIP-8250 keyed nonce primitives for frame transactions.
+pub mod eip8250;
+
 pub mod eip8282;
