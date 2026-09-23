@@ -772,16 +772,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn errors_instead_of_underflow_when_backfilling_genesis_parent() {
+    async fn rejects_block_with_unexpected_number() {
         let chain = MockChain::new();
         {
             let mut state = chain.state.write().unwrap();
-            state.head = 2;
-            // Intentionally inconsistent mock state to force a malformed backfill path:
-            // request #1 -> block number 0 (hash=1), request #2 -> another block number 0
-            // with a non-matching parent hash. This drives reconciliation to `height == 0`.
+            state.head = 1;
+            // Respond to a request for block 1 with a block whose header says 0.
             state.blocks.insert(1, block(0, 1, 0));
-            state.blocks.insert(2, block(0, 2, 9));
         }
 
         let provider = chain.provider();
@@ -794,14 +791,9 @@ mod tests {
             .max_reorg_depth(8)
             .into_stream();
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        match first {
-            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 0),
-            other => panic!("expected Added(0), got {other:?}"),
-        }
-
         let err =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap_err();
-        assert!(format!("{err}").contains("genesis block"));
+        assert!(format!("{err}").contains("unexpected number"));
+        assert!(timeout(Duration::from_secs(1), stream.next()).await.unwrap().is_none());
     }
 }

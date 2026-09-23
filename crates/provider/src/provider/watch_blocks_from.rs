@@ -1,11 +1,12 @@
 use super::WatchCanonicalBlocksFrom;
+use alloy_consensus::BlockHeader;
 use alloy_eips::BlockNumberOrTag;
 use alloy_json_rpc::{RpcError, RpcRecv};
 use alloy_network::{BlockResponse, Network};
 use alloy_network_primitives::{BlockTransactionsKind, HeaderResponse};
 use alloy_primitives::U64;
 use alloy_rpc_client::{RpcCall, RpcClientInner, WeakClient};
-use alloy_transport::{TransportError, TransportResult};
+use alloy_transport::{TransportError, TransportErrorKind, TransportResult};
 use futures::{ready, Stream};
 use pin_project::pin_project;
 use std::{
@@ -64,6 +65,7 @@ impl PollIntervalDelay {
 pub struct BlockFut<T>
 where
     T: BlockResponse + RpcRecv,
+    T::Header: BlockHeader,
 {
     client: Option<Arc<RpcClientInner>>,
     block_number: u64,
@@ -78,6 +80,7 @@ where
 enum BlockFutState<T>
 where
     T: BlockResponse + RpcRecv,
+    T::Header: BlockHeader,
 {
     /// Polling an `eth_getBlockByNumber` request for the target height.
     Request {
@@ -95,6 +98,7 @@ where
 impl<T> BlockFut<T>
 where
     T: BlockResponse + RpcRecv,
+    T::Header: BlockHeader,
 {
     pub(super) fn new(
         client: Arc<RpcClientInner>,
@@ -135,6 +139,7 @@ where
 impl<T> Future for BlockFut<T>
 where
     T: BlockResponse + RpcRecv,
+    T::Header: BlockHeader,
 {
     type Output = TransportResult<T>;
 
@@ -145,6 +150,12 @@ where
             match this.state.as_mut().project() {
                 BlockFutStateProj::Request { call } => match ready!(call.poll(cx)) {
                     Ok(Some(mut block)) => {
+                        if block.header().number() != *this.block_number {
+                            this.state.set(BlockFutState::Complete);
+                            return Poll::Ready(Err(TransportErrorKind::custom_str(
+                                "eth_getBlockByNumber returned a block with an unexpected number",
+                            )));
+                        }
                         if this.kind.is_hashes() && block.transactions().is_empty() {
                             block.transactions_mut().convert_to_hashes();
                         }

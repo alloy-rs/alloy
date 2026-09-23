@@ -400,16 +400,7 @@ impl<N: Network> Future for BlockLogsFut<N> {
                 } => {
                     if block.is_none() {
                         if let Poll::Ready(result) = block_fut.poll(cx) {
-                            *block = Some(result.and_then(|block| {
-                                let block_number = block.header().number();
-                                if block_number != *this.block_number {
-                                    Err(TransportErrorKind::custom_str(
-                                        "eth_getBlockByNumber returned a block with an unexpected number",
-                                    ))
-                                } else {
-                                    Ok(block)
-                                }
-                            }));
+                            *block = Some(result);
                         }
                     }
 
