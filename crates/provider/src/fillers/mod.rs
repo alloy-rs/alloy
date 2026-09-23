@@ -365,20 +365,6 @@ where
         Ok(tx)
     }
 
-    /// Returns an error if the fillers are missing required properties of `tx`, i.e. if the
-    /// filler stack is [`FillerControlFlow::Missing`].
-    fn ensure_not_missing(&self, tx: &N::TransactionRequest) -> TransportResult<()> {
-        if let FillerControlFlow::Missing(missing) = self.filler.status(tx) {
-            let missing = missing
-                .iter()
-                .map(|(filler, properties)| format!("{} ({filler})", properties.join(", ")))
-                .collect::<Vec<_>>()
-                .join("; ");
-            return Err(RpcError::local_usage_str(&format!("missing properties: {missing}")));
-        }
-        Ok(())
-    }
-
     /// Fills the transaction request, using the configured fillers
     ///
     /// # Example
@@ -758,7 +744,12 @@ where
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
-            self.ensure_not_missing(builder)?;
+            if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
+                // TODO: improve this.
+                // blocked by #431
+                let message = format!("missing properties: {missing:?}");
+                return Err(RpcError::local_usage_str(&message));
+            }
         }
 
         // Errors in tx building happen further down the stack.
@@ -772,7 +763,10 @@ where
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
-            self.ensure_not_missing(builder)?;
+            if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
+                let message = format!("missing properties: {missing:?}");
+                return Err(RpcError::local_usage_str(&message));
+            }
         }
 
         // Errors in tx building happen further down the stack.
@@ -790,13 +784,14 @@ where
         tx: N::TransactionRequest,
     ) -> TransportResult<N::TxEnvelope> {
         match self.fill(tx).await? {
-            SendableTx::Envelope(tx) => Ok(tx),
+            SendableTx::Envelope(envelope) => Ok(envelope),
             SendableTx::Builder(tx) => {
-                // Prefer the specific "missing properties" error over the generic one below.
-                self.ensure_not_missing(&tx)?;
+                if let FillerControlFlow::Missing(missing) = self.filler.status(&tx) {
+                    let message = format!("missing properties: {missing:?}");
+                    return Err(RpcError::local_usage_str(&message));
+                }
                 Err(RpcError::local_usage_str(
-                    "no filler produced a signed transaction envelope; add a signing filler \
-                     such as `WalletFiller` to the provider",
+                    "no wallet configured, fillers did not produce a signed transaction",
                 ))
             }
         }
