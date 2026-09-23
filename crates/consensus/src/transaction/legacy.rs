@@ -367,6 +367,21 @@ impl Encodable for TxLegacy {
 }
 
 impl Decodable for TxLegacy {
+    /// Decodes an unsigned legacy transaction or an EIP-155 signing payload.
+    ///
+    /// For backwards compatibility, the two fields after `chain_id` are decoded as `U256` and
+    /// discarded without requiring the zero values specified by EIP-155. This also accepts signed
+    /// legacy transaction RLP when `v` fits in `ChainId`, but stores `v` directly as `chain_id`
+    /// rather than deriving the chain ID from it. Use
+    /// [`RlpEcdsaDecodableTx::rlp_decode_signed`] to decode signed transactions correctly.
+    ///
+    /// The outer header is not required to be a list. Fields are read from the entire remaining
+    /// buffer, with the consumed length checked against the header only afterwards. In particular,
+    /// any bytes after the first six fields trigger an attempt to read three more fields, even if
+    /// those bytes are outside the declared payload.
+    ///
+    /// Successful decoding does not establish a canonical signing payload. Requiring a list header
+    /// or zero sentinel fields would reject previously accepted inputs and is a breaking change.
     fn decode(data: &mut &[u8]) -> Result<Self> {
         let header = Header::decode(data)?;
         let remaining_len = data.len();
@@ -379,7 +394,8 @@ impl Decodable for TxLegacy {
 
         let mut transaction = Self::rlp_decode_fields(data)?;
 
-        // If we still have data, it should be an eip-155 encoded chain_id
+        // Preserve the permissive nine-field form: the seventh field is taken as chain_id, and
+        // the last two fields need not be zero. Enforcing EIP-155 sentinels would be breaking.
         if !data.is_empty() {
             transaction.chain_id = Some(Decodable::decode(data)?);
             let _: U256 = Decodable::decode(data)?; // r

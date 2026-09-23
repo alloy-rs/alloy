@@ -258,6 +258,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Note
     ///
     /// Not all client implementations support state overrides for `eth_estimateGas`.
+    ///
+    /// On networks with [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), the node must estimate
+    /// one transaction limit covering intrinsic costs, regular (execution) gas, and state gas,
+    /// including temporary charges before state refills. Alloy forwards this request; it does not
+    /// add state gas locally. Use a node implementing the target fork's rules. A receipt's charged
+    /// gas or a trace's net consumption is not a substitute for this estimate.
     fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockNumberOrTag::Pending.into())
