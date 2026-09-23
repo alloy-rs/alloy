@@ -56,6 +56,9 @@ pub enum TrezorError {
     /// Could not retrieve device features.
     #[error("could not retrieve device features")]
     Features,
+    /// Invalid derivation path.
+    #[error("invalid derivation path: {0}")]
+    InvalidDerivationPath(String),
 }
 
 impl From<TrezorError> for alloy_signer::Error {

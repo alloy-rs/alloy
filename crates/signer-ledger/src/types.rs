@@ -45,8 +45,8 @@ pub enum LedgerError {
     #[error(transparent)]
     SemVerError(#[from] semver::Error),
     /// Invalid derivation path.
-    #[error("invalid derivation path")]
-    InvalidDerivationPath(#[from] std::num::ParseIntError),
+    #[error("invalid derivation path: {0}")]
+    InvalidDerivationPath(String),
     /// Signature Error
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),
