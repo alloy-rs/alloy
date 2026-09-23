@@ -9,6 +9,11 @@ device for each request, so device operations should not be run concurrently. Un
 complete signing prompts on it. Construction requires firmware 1.11.1 or newer for firmware major
 version 1, or 2.5.1 or newer for firmware major version 2.
 
+When passphrase protection is enabled, `TrezorSigner::new` lets you enter the passphrase on the
+device, while `TrezorSigner::new_with_passphrase` sends a passphrase from the host to open a hidden
+wallet without a device prompt. An empty host passphrase selects the standard wallet. Devices
+configured to always enter the passphrase on the device ignore the host passphrase.
+
 Although the public signing API is asynchronous, the underlying USB calls are blocking and can
 block an executor thread. Address queries do not request on-device display confirmation.
 
@@ -16,10 +21,14 @@ block an executor thread. Address queries do not request on-device display confi
 
 - EIP-191 personal messages through `Signer::sign_message`.
 - Legacy and EIP-1559 transactions, including EIP-1559 access lists, through `TxSigner`.
+- EIP-712 typed data through `Signer::sign_typed_data` and `Signer::sign_dynamic_typed_data` with
+  the `eip712` feature. Firmware major version 2 (Trezor Model T and Safe devices) reviews the
+  typed data field by field on the device. Firmware major version 1 (Trezor Model One) cannot
+  display typed data and only signs the precomputed domain separator and message hashes.
 
-Raw digest and EIP-712 typed-data signing are not supported. EIP-2930, EIP-4844, EIP-7702, and
-other transaction types return an unsupported-transaction error. Passing a 32-byte digest to
-`sign_message` signs those bytes as an EIP-191 message; it does not sign the digest directly.
+Raw digest signing is not supported. EIP-2930, EIP-4844, EIP-7702, and other transaction types
+return an unsupported-transaction error. Passing a 32-byte digest to `sign_message` signs those
+bytes as an EIP-191 message; it does not sign the digest directly.
 
 ## Chain IDs
 

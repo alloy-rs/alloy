@@ -37,6 +37,20 @@ semver.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
+# eip712
+alloy-sol-types = { workspace = true, optional = true }
+alloy-dyn-abi = { workspace = true, optional = true }
+
 [dev-dependencies]
 alloy-rpc-types-eth = { workspace = true, features = ["std", "serde"] }
+serde.workspace = true
+serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+eip712 = [
+    "alloy-signer/eip712",
+    "dep:alloy-sol-types",
+    "dep:alloy-dyn-abi",
+    "alloy-dyn-abi?/eip712",
+]

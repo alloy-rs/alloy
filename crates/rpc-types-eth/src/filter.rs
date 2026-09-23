@@ -22,7 +22,7 @@ use itertools::{
 /// position is serialized as `null`; trailing empty positions are omitted. The [`Filter`]
 /// deserializer normalizes `null`, an empty array, or a topic array containing `null` to this
 /// wildcard representation.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(from = "HashSet<T>"))]
 pub struct FilterSet<T: Eq + Hash> {
@@ -31,6 +31,13 @@ pub struct FilterSet<T: Eq + Hash> {
     #[cfg(feature = "std")]
     #[cfg_attr(feature = "serde", serde(skip, default))]
     bloom_filter: std::sync::OnceLock<BloomFilter>,
+}
+
+impl<T: Eq + Hash> PartialEq for FilterSet<T> {
+    fn eq(&self, other: &Self) -> bool {
+        // Ignore the lazily initialized `bloom_filter` cache
+        self.set == other.set
+    }
 }
 
 impl<T: Eq + Hash> Default for FilterSet<T> {
@@ -46,14 +53,6 @@ impl<T: Eq + Hash> Default for FilterSet<T> {
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
         Self { set: core::iter::once(src).collect(), ..Default::default() }
-    }
-}
-
-impl<T: Eq + Hash> Hash for FilterSet<T> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        for value in &self.set {
-            value.hash(state);
-        }
     }
 }
 
@@ -409,7 +408,7 @@ impl Default for FilterBlockOption {
 /// Addresses use OR semantics. Values within one topic position use OR semantics, while populated
 /// topic positions use AND semantics. Empty address and topic sets are wildcards. Block ranges are
 /// inclusive, and a block hash is mutually exclusive with `fromBlock` and `toBlock`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
@@ -2238,6 +2237,17 @@ mod tests {
 
         topic = topic.extend(U256::from(456));
         assert_eq!(topic.set.len(), 5);
+    }
+
+    #[test]
+    fn test_filter_eq_ignores_bloom_cache() {
+        let filter = Filter::new().address(Address::with_last_byte(1));
+        let clone = filter.clone();
+
+        // Initializes the address bloom cache of `filter` only
+        let _ = filter.matches_bloom(Bloom::ZERO);
+
+        assert_eq!(filter, clone);
     }
 
     #[test]

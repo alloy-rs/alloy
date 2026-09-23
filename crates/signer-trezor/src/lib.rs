@@ -9,6 +9,9 @@
 #[macro_use]
 extern crate tracing;
 
+#[cfg(feature = "eip712")]
+mod eip712;
+
 mod signer;
 pub use signer::TrezorSigner;
 

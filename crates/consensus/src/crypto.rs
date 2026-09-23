@@ -529,6 +529,52 @@ mod tests {
         use alloc::sync::Arc;
         use alloy_primitives::{Address, Signature, B256};
 
+        /// Synthetic (r=123, s=456) vector used by `test_crypto_backend_basic_functionality`.
+        ///
+        /// Deviation: the original mock returned `return_address` for every call. That dummy
+        /// (`0x1111…`) is process-global via `OnceLock` and broke other signer-recovery tests
+        /// under `cargo test --all-features`. Dummy addresses are now used only for this
+        /// vector; every other signature falls through to secp256k1/k256.
+        fn is_backend_test_signature(sig: &[u8]) -> bool {
+            let mut expected = [0u8; 64];
+            expected[31] = 123;
+            expected[62] = 0x01;
+            expected[63] = 0xc8; // 456
+            sig.len() >= 64 && sig[..64] == expected
+        }
+
+        fn builtin_recover(sig: &[u8; 65], msg: &[u8; 32]) -> Result<Address, RecoveryError> {
+            #[cfg(feature = "secp256k1")]
+            let result = super::super::impl_secp256k1::recover_signer_unchecked(sig, msg);
+            #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+            let result = super::super::impl_k256::recover_signer_unchecked(sig, msg);
+            #[cfg(not(any(feature = "secp256k1", feature = "k256")))]
+            let result = {
+                let _ = (sig, msg);
+                Err::<Address, RecoveryError>(RecoveryError::new())
+            };
+            result.map_err(|_| RecoveryError::new())
+        }
+
+        fn builtin_verify(
+            pubkey: &[u8; 65],
+            sig: &[u8; 64],
+            msg: &[u8; 32],
+        ) -> Result<Address, RecoveryError> {
+            #[cfg(feature = "secp256k1")]
+            let result =
+                super::super::impl_secp256k1::verify_and_compute_signer_unchecked(pubkey, sig, msg);
+            #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+            let result =
+                super::super::impl_k256::verify_and_compute_signer_unchecked(pubkey, sig, msg);
+            #[cfg(not(any(feature = "secp256k1", feature = "k256")))]
+            let result = {
+                let _ = (pubkey, sig, msg);
+                Err::<Address, RecoveryError>(RecoveryError::new())
+            };
+            result.map_err(|_| RecoveryError::new())
+        }
+
         /// Mock crypto provider for testing
         struct MockCryptoProvider {
             should_fail: bool,
@@ -543,8 +589,10 @@ mod tests {
             ) -> Result<Address, RecoveryError> {
                 if self.should_fail {
                     Err(RecoveryError::new())
-                } else {
+                } else if is_backend_test_signature(_sig) {
                     Ok(self.return_address)
+                } else {
+                    builtin_recover(_sig, _msg)
                 }
             }
 
@@ -556,8 +604,10 @@ mod tests {
             ) -> Result<Address, RecoveryError> {
                 if self.should_fail {
                     Err(RecoveryError::new())
-                } else {
+                } else if is_backend_test_signature(_sig) {
                     Ok(self.return_address)
+                } else {
+                    builtin_verify(_pubkey, _sig, _msg)
                 }
             }
         }

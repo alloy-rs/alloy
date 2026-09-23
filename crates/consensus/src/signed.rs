@@ -543,6 +543,13 @@ where
     T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
 {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        // Legacy transactions are untagged: `encode_2718` never emits a `0x00` type byte, so a
+        // literal `0x00` prefix must be rejected rather than decoded as legacy, which would not
+        // round-trip. Untagged legacy transactions are handled by `fallback_decode`.
+        if ty == 0 {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+
         let decoded = T::rlp_decode_signed(buf)?;
 
         if decoded.ty() != ty {
