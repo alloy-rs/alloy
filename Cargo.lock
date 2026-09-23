@@ -920,12 +920,16 @@ name = "alloy-signer-trezor"
 version = "2.5.0"
 dependencies = [
  "alloy-consensus",
+ "alloy-dyn-abi",
  "alloy-network",
  "alloy-primitives",
  "alloy-rpc-types-eth",
  "alloy-signer",
+ "alloy-sol-types",
  "async-trait",
  "semver 1.0.28",
+ "serde",
+ "serde_json",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
