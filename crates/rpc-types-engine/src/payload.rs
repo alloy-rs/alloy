@@ -2191,26 +2191,28 @@ impl BlobsBundleV2 {
         self,
         mut f: impl FnMut(usize, &Blob, &Bytes48, &[Bytes48]) -> bool,
     ) -> Result<(Self, Self), alloy_consensus::error::ValueError<Self>> {
-        let mut bundle = self.ensure_valid_lengths()?;
-        let len = bundle.blobs.len();
+        let Self { blobs, commitments, proofs } = self.ensure_valid_lengths()?;
         let mut matching = Self::empty();
         let mut non_matching = Self::empty();
+        let mut matches = Vec::with_capacity(blobs.len());
+        let mut commitments = commitments.into_iter();
 
-        for index in 0..len {
-            let partition = if f(
-                index,
-                &bundle.blobs[0],
-                &bundle.commitments[0],
-                &bundle.proofs[..CELLS_PER_EXT_BLOB],
-            ) {
-                &mut matching
-            } else {
-                &mut non_matching
-            };
-            // The checked lengths guarantee one commitment and proof group for each blob.
-            partition.blobs.extend(bundle.blobs.drain(..1));
-            partition.commitments.extend(bundle.commitments.drain(..1));
-            partition.proofs.extend(bundle.proofs.drain(..CELLS_PER_EXT_BLOB));
+        for (index, blob) in blobs.into_iter().enumerate() {
+            // The checked lengths guarantee a commitment and proof group for each blob.
+            let commitment = commitments.next().expect("validated commitment length");
+            let start = index * CELLS_PER_EXT_BLOB;
+            let cell_proofs = &proofs[start..start + CELLS_PER_EXT_BLOB];
+            let is_matching = f(index, &blob, &commitment, cell_proofs);
+            matches.push(is_matching);
+            let partition = if is_matching { &mut matching } else { &mut non_matching };
+            partition.blobs.push(blob);
+            partition.commitments.push(commitment);
+        }
+
+        for (index, proof) in proofs.into_iter().enumerate() {
+            let partition =
+                if matches[index / CELLS_PER_EXT_BLOB] { &mut matching } else { &mut non_matching };
+            partition.proofs.push(proof);
         }
 
         Ok((matching, non_matching))
