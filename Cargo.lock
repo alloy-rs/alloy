@@ -288,6 +288,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "alloy-serde",
+ "alloy-sol-types",
  "arbitrary",
  "auto_impl",
  "borsh",

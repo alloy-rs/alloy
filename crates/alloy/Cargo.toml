@@ -320,7 +320,7 @@ trie = ["dep:alloy-trie"]
 dyn-abi = ["alloy-core/dyn-abi"]
 json-abi = ["alloy-core/json-abi"]
 json = ["alloy-core/json"]
-sol-types = ["alloy-core/sol-types"]
+sol-types = ["alloy-core/sol-types", "alloy-eips?/sol-types"]
 
 asm-keccak = ["alloy-core/asm-keccak"]
 native-keccak = ["alloy-core/native-keccak"]
