@@ -1334,10 +1334,11 @@ pub struct BlobCellMask {
 }
 
 impl BlobCellMask {
-    /// Creates a mask from the Engine API 16-byte, big-endian bitarray.
+    /// Creates a mask from the Engine API 16-byte, little-endian bitarray.
+    /// Cell `i` is selected by bit `i % 8` of byte `i / 8`.
     #[inline]
     pub fn new(indices_bitarray: B128) -> Self {
-        Self { value: u128::from(indices_bitarray) }
+        Self { value: u128::from_le_bytes(indices_bitarray.0) }
     }
 
     /// Creates a mask from the raw bit representation.
@@ -1961,7 +1962,8 @@ mod tests {
     #[test]
     fn blob_cell_mask_selects_indices() {
         let selected = (1u128 << 0) | (1u128 << 7);
-        let mask = BlobCellMask::new(B128::from(selected));
+        let mask =
+            BlobCellMask::new(B128::new([0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
 
         assert_eq!(mask.bits(), selected);
         assert_eq!(mask.count(), 2);
@@ -2070,5 +2072,16 @@ mod tests {
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(matches, vec![(0, cells_and_proofs)]);
+    }
+
+    #[test]
+    fn blob_cell_mask_decodes_wire_indices() {
+        for index in 0..CELLS_PER_EXT_BLOB {
+            let mut bytes = [0; 16];
+            bytes[index / 8] = 1 << (index % 8);
+            let mask = BlobCellMask::new(B128::new(bytes));
+
+            assert_eq!(mask.selected_indices().collect::<Vec<_>>(), vec![index]);
+        }
     }
 }
