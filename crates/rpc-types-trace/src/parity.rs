@@ -700,6 +700,19 @@ pub struct VmTrace {
     pub ops: Vec<VmInstruction>,
 }
 
+impl VmTrace {
+    /// Iterates over storage writes in this call or create frame.
+    ///
+    /// Yields the program counter, storage key, and written value. Writes in subordinate traces
+    /// are not included; call this method on each subordinate trace separately.
+    pub fn storage_writes(&self) -> impl Iterator<Item = (usize, U256, U256)> + '_ {
+        self.ops.iter().filter_map(|op| {
+            let store = op.ex.as_ref()?.store.as_ref()?;
+            Some((op.pc, store.key, store.val))
+        })
+    }
+}
+
 /// A record of a single VM instruction, opcode level.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -760,6 +773,41 @@ mod tests {
     use serde_json::{json, Value};
     use similar_asserts::assert_eq;
     use std::str::FromStr;
+
+    #[test]
+    fn vm_trace_storage_writes() {
+        let write = |pc, key, val| VmInstruction {
+            cost: 0,
+            ex: Some(VmExecutedOperation {
+                used: 0,
+                push: Vec::new(),
+                mem: None,
+                store: Some(StorageDelta { key: U256::from(key), val: U256::from(val) }),
+            }),
+            pc,
+            sub: None,
+            op: None,
+            idx: None,
+        };
+        let mut no_store = write(2, 0, 0);
+        no_store.ex.as_mut().unwrap().store = None;
+        let mut parent = write(5, 9, 44);
+        parent.sub = Some(VmTrace { code: Bytes::new(), ops: vec![write(4, 8, 43)] });
+        let trace = VmTrace {
+            code: Bytes::new(),
+            ops: vec![
+                VmInstruction { ex: None, ..write(1, 0, 0) },
+                no_store,
+                write(3, 7, 42),
+                parent,
+            ],
+        };
+
+        assert_eq!(
+            trace.storage_writes().collect::<Vec<_>>(),
+            vec![(3, U256::from(7), U256::from(42)), (5, U256::from(9), U256::from(44))]
+        );
+    }
 
     #[test]
     fn test_transaction_trace() {
