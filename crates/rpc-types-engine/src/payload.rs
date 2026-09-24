@@ -2163,6 +2163,59 @@ impl BlobsBundleV2 {
             .collect()
     }
 
+    /// Retains blobs for which `f` returns `true`, keeping their commitments and cell proofs.
+    ///
+    /// The predicate receives each blob's index, blob, commitment, and cell proofs in order.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original bundle if its blob, commitment, and cell proof lengths do not match.
+    pub fn try_retain_blobs(
+        mut self,
+        mut f: impl FnMut(usize, &Blob, &Bytes48, &[Bytes48]) -> bool,
+    ) -> Result<Self, alloy_consensus::error::ValueError<Self>> {
+        let len = self.blobs.len();
+        if self.commitments.len() != len
+            || len.checked_mul(CELLS_PER_EXT_BLOB) != Some(self.proofs.len())
+        {
+            return Err(alloy_consensus::error::ValueError::new_static(self, "length mismatch"));
+        }
+
+        let keep = (0..len)
+            .map(|index| {
+                f(
+                    index,
+                    &self.blobs[index],
+                    &self.commitments[index],
+                    &self.proofs[index * CELLS_PER_EXT_BLOB..(index + 1) * CELLS_PER_EXT_BLOB],
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let mut index = 0;
+        self.blobs.retain(|_| {
+            let retain = keep[index];
+            index += 1;
+            retain
+        });
+
+        let mut index = 0;
+        self.commitments.retain(|_| {
+            let retain = keep[index];
+            index += 1;
+            retain
+        });
+
+        let mut index = 0;
+        self.proofs.retain(|_| {
+            let retain = keep[index / CELLS_PER_EXT_BLOB];
+            index += 1;
+            retain
+        });
+
+        Ok(self)
+    }
+
     /// Take `len` blob data from the bundle.
     ///
     /// Note this will take `len * CELLS_PER_EXT_BLOB` proofs.
@@ -4230,6 +4283,57 @@ mod tests {
     fn convert_empty_bundle() {
         let bundle = BlobsBundleV1::default();
         let _sidecar = bundle.try_into_sidecar().unwrap();
+    }
+
+    #[test]
+    fn retain_v2_bundle_blobs() {
+        let mut blobs = vec![Blob::default(); 3];
+        for (index, blob) in blobs.iter_mut().enumerate() {
+            blob[0] = index as u8;
+        }
+        let bundle = BlobsBundleV2 {
+            blobs,
+            commitments: (0..3).map(|index| Bytes48::new([index; 48])).collect(),
+            proofs: (0..3)
+                .flat_map(|index| vec![Bytes48::new([index; 48]); CELLS_PER_EXT_BLOB])
+                .collect(),
+        };
+
+        let retained = bundle
+            .try_retain_blobs(|index, blob, commitment, proofs| {
+                assert_eq!(blob[0], index as u8);
+                assert_eq!(*commitment, Bytes48::new([index as u8; 48]));
+                assert!(proofs.iter().all(|proof| proof == commitment));
+                index != 1
+            })
+            .unwrap();
+
+        assert_eq!(retained.blobs.len(), 2);
+        assert_eq!(retained.blobs[0][0], 0);
+        assert_eq!(retained.blobs[1][0], 2);
+        assert_eq!(retained.commitments, vec![Bytes48::new([0; 48]), Bytes48::new([2; 48])]);
+        assert_eq!(retained.proofs.len(), 2 * CELLS_PER_EXT_BLOB);
+        assert!(retained.proofs[..CELLS_PER_EXT_BLOB]
+            .iter()
+            .all(|proof| *proof == Bytes48::new([0; 48])));
+        assert!(retained.proofs[CELLS_PER_EXT_BLOB..]
+            .iter()
+            .all(|proof| *proof == Bytes48::new([2; 48])));
+    }
+
+    #[test]
+    fn retain_v2_bundle_blobs_rejects_mismatched_lengths() {
+        let bundle = BlobsBundleV2 {
+            blobs: vec![Blob::default()],
+            commitments: Vec::new(),
+            proofs: Vec::new(),
+        };
+        let error = bundle.clone().try_retain_blobs(|_, _, _, _| unreachable!()).unwrap_err();
+        assert_eq!(error.value(), &bundle);
+
+        let bundle = BlobsBundleV2 { commitments: vec![Bytes48::default()], ..bundle };
+        let error = bundle.clone().try_retain_blobs(|_, _, _, _| unreachable!()).unwrap_err();
+        assert_eq!(error.value(), &bundle);
     }
 
     #[test]
