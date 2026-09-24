@@ -2207,6 +2207,7 @@ impl BlobsBundleV2 {
             } else {
                 &mut non_matching
             };
+            // The checked lengths guarantee one commitment and proof group for each blob.
             partition.blobs.extend(bundle.blobs.drain(..1));
             partition.commitments.extend(bundle.commitments.drain(..1));
             partition.proofs.extend(bundle.proofs.drain(..CELLS_PER_EXT_BLOB));
