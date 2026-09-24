@@ -127,6 +127,7 @@ arbitrary = [
 	"dep:arbitrary",
 	"alloy-primitives/arbitrary",
 	"alloy-serde?/arbitrary",
+	"alloy-sol-types?/arbitrary",
 	"alloy-eip2124/arbitrary",
 	"alloy-eip2930/arbitrary",
 	"alloy-eip7702/arbitrary",
