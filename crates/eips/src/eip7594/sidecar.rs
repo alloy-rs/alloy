@@ -580,30 +580,36 @@ impl BlobTransactionSidecarEip7594 {
         Self { blobs, commitments, cell_proofs }
     }
 
-    /// Splits this sidecar into one-blob sidecars without validating the proofs.
+    /// Splits this sidecar into chunks of at most `chunk_size` blobs without validating proofs.
+    ///
+    /// Each chunk retains its blobs, commitments, and cell proofs in their original order.
     ///
     /// # Errors
     ///
-    /// Returns the original sidecar if its blob, commitment, and cell proof lengths do not match.
-    pub fn try_into_single_blob_sidecars(mut self) -> Result<Vec<Self>, Self> {
+    /// Returns the original sidecar if `chunk_size` is zero or its blob, commitment, and cell proof
+    /// lengths do not match.
+    pub fn try_into_chunks(mut self, chunk_size: usize) -> Result<Vec<Self>, Self> {
         let len = self.blobs.len();
-        if self.commitments.len() != len
+        if chunk_size == 0
+            || self.commitments.len() != len
             || len.checked_mul(CELLS_PER_EXT_BLOB) != Some(self.cell_proofs.len())
         {
             return Err(self);
         }
 
-        let mut sidecars = Vec::with_capacity(len);
-        for index in (0..len).rev() {
-            // The checked lengths make each suffix one blob and one full proof group.
-            sidecars.push(Self::new(
-                self.blobs.split_off(index),
-                self.commitments.split_off(index),
-                self.cell_proofs.split_off(index * CELLS_PER_EXT_BLOB),
+        let chunk_count = len.div_ceil(chunk_size);
+        let mut chunks = Vec::with_capacity(chunk_count);
+        for chunk_index in (0..chunk_count).rev() {
+            let start = chunk_index * chunk_size;
+            // The checked lengths keep each chunk's blobs, commitments, and proofs aligned.
+            chunks.push(Self::new(
+                self.blobs.split_off(start),
+                self.commitments.split_off(start),
+                self.cell_proofs.split_off(start * CELLS_PER_EXT_BLOB),
             ));
         }
-        sidecars.reverse();
-        Ok(sidecars)
+        chunks.reverse();
+        Ok(chunks)
     }
 
     /// Recovers a sidecar from a common set of EIP-7594 cells for every blob.
@@ -1558,7 +1564,37 @@ mod tests {
     };
 
     #[test]
-    fn split_into_single_blob_sidecars() {
+    fn sidecar_chunks_preserve_order() {
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            (0..5).map(Blob::repeat_byte).collect(),
+            (0..5).map(Bytes48::repeat_byte).collect(),
+            (0..5)
+                .flat_map(|index| {
+                    core::iter::repeat_n(Bytes48::repeat_byte(index), CELLS_PER_EXT_BLOB)
+                })
+                .collect(),
+        );
+
+        let chunks = sidecar.try_into_chunks(2).unwrap();
+        assert_eq!(chunks.iter().map(|chunk| chunk.blobs.len()).collect::<Vec<_>>(), [2, 2, 1]);
+        for (chunk_index, chunk) in chunks.iter().enumerate() {
+            assert_eq!(chunk.commitments.len(), chunk.blobs.len());
+            assert_eq!(chunk.cell_proofs.len(), chunk.blobs.len() * CELLS_PER_EXT_BLOB);
+            for (blob_index, blob) in chunk.blobs.iter().enumerate() {
+                let expected = (chunk_index * 2 + blob_index) as u8;
+                assert_eq!(blob[0], expected);
+                assert_eq!(blob[BYTES_PER_BLOB - 1], expected);
+                assert_eq!(chunk.commitments[blob_index], Bytes48::repeat_byte(expected));
+                assert!(chunk.cell_proofs
+                    [blob_index * CELLS_PER_EXT_BLOB..(blob_index + 1) * CELLS_PER_EXT_BLOB]
+                    .iter()
+                    .all(|proof| *proof == Bytes48::repeat_byte(expected)));
+            }
+        }
+    }
+
+    #[test]
+    fn sidecar_chunks_handle_size_one_and_edges() {
         let sidecar = BlobTransactionSidecarEip7594::new(
             (0..3).map(Blob::repeat_byte).collect(),
             (0..3).map(Bytes48::repeat_byte).collect(),
@@ -1569,34 +1605,26 @@ mod tests {
                 .collect(),
         );
 
-        let sidecars = sidecar.try_into_single_blob_sidecars().unwrap();
-        assert_eq!(sidecars.len(), 3);
-        for (index, sidecar) in sidecars.iter().enumerate() {
-            assert_eq!(sidecar.blobs.len(), 1);
-            assert_eq!(sidecar.blobs[0][0], index as u8);
-            assert_eq!(sidecar.blobs[0][BYTES_PER_BLOB - 1], index as u8);
-            assert_eq!(sidecar.commitments, vec![Bytes48::repeat_byte(index as u8)]);
-            assert_eq!(sidecar.cell_proofs.len(), CELLS_PER_EXT_BLOB);
-            assert!(sidecar
-                .cell_proofs
-                .iter()
-                .all(|proof| *proof == Bytes48::repeat_byte(index as u8)));
-        }
-        assert!(BlobTransactionSidecarEip7594::default()
-            .try_into_single_blob_sidecars()
-            .unwrap()
-            .is_empty());
+        let chunks = sidecar.clone().try_into_chunks(1).unwrap();
+        assert_eq!(chunks.len(), 3);
+        assert!(chunks.iter().all(|chunk| chunk.blobs.len() == 1));
+        assert_eq!(sidecar.clone().try_into_chunks(3).unwrap(), vec![sidecar.clone()]);
+        assert_eq!(sidecar.clone().try_into_chunks(4).unwrap(), vec![sidecar]);
+        assert!(BlobTransactionSidecarEip7594::default().try_into_chunks(1).unwrap().is_empty());
     }
 
     #[test]
-    fn split_into_single_blob_sidecars_rejects_mismatched_lengths() {
+    fn sidecar_chunks_reject_invalid_size_and_lengths() {
+        let sidecar = BlobTransactionSidecarEip7594::default();
+        assert_eq!(sidecar.clone().try_into_chunks(0).unwrap_err(), sidecar);
+
         let sidecar =
             BlobTransactionSidecarEip7594::new(Vec::new(), vec![Bytes48::ZERO], Vec::new());
-        assert_eq!(sidecar.clone().try_into_single_blob_sidecars().unwrap_err(), sidecar);
+        assert_eq!(sidecar.clone().try_into_chunks(1).unwrap_err(), sidecar);
 
         let sidecar =
             BlobTransactionSidecarEip7594::new(Vec::new(), Vec::new(), vec![Bytes48::ZERO]);
-        assert_eq!(sidecar.clone().try_into_single_blob_sidecars().unwrap_err(), sidecar);
+        assert_eq!(sidecar.clone().try_into_chunks(1).unwrap_err(), sidecar);
     }
 
     #[test]
