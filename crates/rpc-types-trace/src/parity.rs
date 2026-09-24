@@ -701,10 +701,13 @@ pub struct VmTrace {
 }
 
 impl VmTrace {
-    /// Iterates over storage writes in this call or create frame.
+    /// Iterates over storage writes recorded by this trace's instructions.
     ///
-    /// Yields the program counter, storage key, and written value. Writes in subordinate traces
-    /// are not included; call this method on each subordinate trace separately.
+    /// Each item is `(program_counter, storage_key, written_value)`. Instructions without an
+    /// execution record or a storage write are skipped.
+    ///
+    /// This only visits [`Self::ops`]. To include writes in a [`VmInstruction::sub`] trace, call
+    /// this method on that trace separately.
     pub fn storage_writes(&self) -> impl Iterator<Item = (usize, U256, U256)> + '_ {
         self.ops.iter().filter_map(|op| {
             let store = op.ex.as_ref()?.store.as_ref()?;
