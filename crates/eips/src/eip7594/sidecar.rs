@@ -580,6 +580,32 @@ impl BlobTransactionSidecarEip7594 {
         Self { blobs, commitments, cell_proofs }
     }
 
+    /// Splits this sidecar into one-blob sidecars without validating the proofs.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original sidecar if its blob, commitment, and cell proof lengths do not match.
+    pub fn try_into_single_blob_sidecars(mut self) -> Result<Vec<Self>, Self> {
+        let len = self.blobs.len();
+        if self.commitments.len() != len
+            || len.checked_mul(CELLS_PER_EXT_BLOB) != Some(self.cell_proofs.len())
+        {
+            return Err(self);
+        }
+
+        let mut sidecars = Vec::with_capacity(len);
+        for index in (0..len).rev() {
+            // The checked lengths make each suffix one blob and one full proof group.
+            sidecars.push(Self::new(
+                self.blobs.split_off(index),
+                self.commitments.split_off(index),
+                self.cell_proofs.split_off(index * CELLS_PER_EXT_BLOB),
+            ));
+        }
+        sidecars.reverse();
+        Ok(sidecars)
+    }
+
     /// Recovers a sidecar from a common set of EIP-7594 cells for every blob.
     ///
     /// `cell_mask` identifies the cells supplied for each commitment. `cells` must be flattened in
@@ -1530,6 +1556,48 @@ mod tests {
         builder::{SidecarBuilder, SimpleCoder},
         env_settings::EnvKzgSettings,
     };
+
+    #[test]
+    fn split_into_single_blob_sidecars() {
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            (0..3).map(Blob::repeat_byte).collect(),
+            (0..3).map(Bytes48::repeat_byte).collect(),
+            (0..3)
+                .flat_map(|index| {
+                    core::iter::repeat_n(Bytes48::repeat_byte(index), CELLS_PER_EXT_BLOB)
+                })
+                .collect(),
+        );
+
+        let sidecars = sidecar.try_into_single_blob_sidecars().unwrap();
+        assert_eq!(sidecars.len(), 3);
+        for (index, sidecar) in sidecars.iter().enumerate() {
+            assert_eq!(sidecar.blobs.len(), 1);
+            assert_eq!(sidecar.blobs[0][0], index as u8);
+            assert_eq!(sidecar.blobs[0][BYTES_PER_BLOB - 1], index as u8);
+            assert_eq!(sidecar.commitments, vec![Bytes48::repeat_byte(index as u8)]);
+            assert_eq!(sidecar.cell_proofs.len(), CELLS_PER_EXT_BLOB);
+            assert!(sidecar
+                .cell_proofs
+                .iter()
+                .all(|proof| *proof == Bytes48::repeat_byte(index as u8)));
+        }
+        assert!(BlobTransactionSidecarEip7594::default()
+            .try_into_single_blob_sidecars()
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn split_into_single_blob_sidecars_rejects_mismatched_lengths() {
+        let sidecar =
+            BlobTransactionSidecarEip7594::new(Vec::new(), vec![Bytes48::ZERO], Vec::new());
+        assert_eq!(sidecar.clone().try_into_single_blob_sidecars().unwrap_err(), sidecar);
+
+        let sidecar =
+            BlobTransactionSidecarEip7594::new(Vec::new(), Vec::new(), vec![Bytes48::ZERO]);
+        assert_eq!(sidecar.clone().try_into_single_blob_sidecars().unwrap_err(), sidecar);
+    }
 
     #[test]
     fn clear_eip7594_blobs_preserves_metadata() {
