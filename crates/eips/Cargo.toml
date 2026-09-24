@@ -32,6 +32,7 @@ alloy-eip8141.workspace = true
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
+alloy-sol-types = { workspace = true, optional = true }
 either.workspace = true
 
 # serde
@@ -80,6 +81,7 @@ default = ["std", "kzg-sidecar"]
 std = [
 	"alloy-primitives/std",
 	"alloy-rlp/std",
+	"alloy-sol-types?/std",
 	"serde?/std",
 	"c-kzg?/std",
 	"alloy-serde?/std",
@@ -108,6 +110,8 @@ serde = [
 	"either/serde",
 	"rand/serde",
 ]
+# Solidity event types and deposit log encoding.
+sol-types = ["dep:alloy-sol-types"]
 serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
 kzg = ["kzg-sidecar", "sha2", "dep:c-kzg"]
 kzg-sidecar = ["sha2"]
