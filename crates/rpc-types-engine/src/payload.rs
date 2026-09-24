@@ -2163,6 +2163,22 @@ impl BlobsBundleV2 {
             .collect()
     }
 
+    /// Ensures the bundle has one commitment and [`CELLS_PER_EXT_BLOB`] proofs per blob.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original bundle if its lengths do not match.
+    pub fn ensure_valid_lengths(self) -> Result<Self, alloy_consensus::error::ValueError<Self>> {
+        let len = self.blobs.len();
+        if self.commitments.len() != len
+            || len.checked_mul(CELLS_PER_EXT_BLOB) != Some(self.proofs.len())
+        {
+            return Err(alloy_consensus::error::ValueError::new_static(self, "length mismatch"));
+        }
+
+        Ok(self)
+    }
+
     /// Retains blobs for which `f` returns `true`, keeping their commitments and cell proofs.
     ///
     /// The predicate receives each blob's index, blob, commitment, and cell proofs in order.
@@ -2171,49 +2187,45 @@ impl BlobsBundleV2 {
     ///
     /// Returns the original bundle if its blob, commitment, and cell proof lengths do not match.
     pub fn try_retain_blobs(
-        mut self,
+        self,
         mut f: impl FnMut(usize, &Blob, &Bytes48, &[Bytes48]) -> bool,
     ) -> Result<Self, alloy_consensus::error::ValueError<Self>> {
-        let len = self.blobs.len();
-        if self.commitments.len() != len
-            || len.checked_mul(CELLS_PER_EXT_BLOB) != Some(self.proofs.len())
-        {
-            return Err(alloy_consensus::error::ValueError::new_static(self, "length mismatch"));
-        }
+        let mut bundle = self.ensure_valid_lengths()?;
+        let len = bundle.blobs.len();
 
         let keep = (0..len)
             .map(|index| {
                 f(
                     index,
-                    &self.blobs[index],
-                    &self.commitments[index],
-                    &self.proofs[index * CELLS_PER_EXT_BLOB..(index + 1) * CELLS_PER_EXT_BLOB],
+                    &bundle.blobs[index],
+                    &bundle.commitments[index],
+                    &bundle.proofs[index * CELLS_PER_EXT_BLOB..(index + 1) * CELLS_PER_EXT_BLOB],
                 )
             })
             .collect::<Vec<_>>();
 
         let mut index = 0;
-        self.blobs.retain(|_| {
+        bundle.blobs.retain(|_| {
             let retain = keep[index];
             index += 1;
             retain
         });
 
         let mut index = 0;
-        self.commitments.retain(|_| {
+        bundle.commitments.retain(|_| {
             let retain = keep[index];
             index += 1;
             retain
         });
 
         let mut index = 0;
-        self.proofs.retain(|_| {
+        bundle.proofs.retain(|_| {
             let retain = keep[index / CELLS_PER_EXT_BLOB];
             index += 1;
             retain
         });
 
-        Ok(self)
+        Ok(bundle)
     }
 
     /// Take `len` blob data from the bundle.
@@ -4297,7 +4309,9 @@ mod tests {
             proofs: (0..3)
                 .flat_map(|index| vec![Bytes48::new([index; 48]); CELLS_PER_EXT_BLOB])
                 .collect(),
-        };
+        }
+        .ensure_valid_lengths()
+        .unwrap();
 
         let retained = bundle
             .try_retain_blobs(|index, blob, commitment, proofs| {
@@ -4328,10 +4342,12 @@ mod tests {
             commitments: Vec::new(),
             proofs: Vec::new(),
         };
+        assert_eq!(bundle.clone().ensure_valid_lengths().unwrap_err().value(), &bundle);
         let error = bundle.clone().try_retain_blobs(|_, _, _, _| unreachable!()).unwrap_err();
         assert_eq!(error.value(), &bundle);
 
         let bundle = BlobsBundleV2 { commitments: vec![Bytes48::default()], ..bundle };
+        assert_eq!(bundle.clone().ensure_valid_lengths().unwrap_err().value(), &bundle);
         let error = bundle.clone().try_retain_blobs(|_, _, _, _| unreachable!()).unwrap_err();
         assert_eq!(error.value(), &bundle);
     }
