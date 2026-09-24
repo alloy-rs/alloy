@@ -2179,53 +2179,40 @@ impl BlobsBundleV2 {
         Ok(self)
     }
 
-    /// Retains blobs for which `f` returns `true`, keeping their commitments and cell proofs.
+    /// Partitions blobs by `f`, keeping each blob with its commitment and cell proofs.
     ///
-    /// The predicate receives each blob's index, blob, commitment, and cell proofs in order.
+    /// Returns the matching bundle first and the non-matching bundle second, preserving order
+    /// within each. The predicate receives each blob's index, blob, commitment, and cell proofs.
     ///
     /// # Errors
     ///
     /// Returns the original bundle if its blob, commitment, and cell proof lengths do not match.
-    pub fn try_retain_blobs(
+    pub fn try_partition_blobs(
         self,
         mut f: impl FnMut(usize, &Blob, &Bytes48, &[Bytes48]) -> bool,
-    ) -> Result<Self, alloy_consensus::error::ValueError<Self>> {
+    ) -> Result<(Self, Self), alloy_consensus::error::ValueError<Self>> {
         let mut bundle = self.ensure_valid_lengths()?;
         let len = bundle.blobs.len();
+        let mut matching = Self::empty();
+        let mut non_matching = Self::empty();
 
-        let keep = (0..len)
-            .map(|index| {
-                f(
-                    index,
-                    &bundle.blobs[index],
-                    &bundle.commitments[index],
-                    &bundle.proofs[index * CELLS_PER_EXT_BLOB..(index + 1) * CELLS_PER_EXT_BLOB],
-                )
-            })
-            .collect::<Vec<_>>();
+        for index in 0..len {
+            let partition = if f(
+                index,
+                &bundle.blobs[0],
+                &bundle.commitments[0],
+                &bundle.proofs[..CELLS_PER_EXT_BLOB],
+            ) {
+                &mut matching
+            } else {
+                &mut non_matching
+            };
+            partition.blobs.extend(bundle.blobs.drain(..1));
+            partition.commitments.extend(bundle.commitments.drain(..1));
+            partition.proofs.extend(bundle.proofs.drain(..CELLS_PER_EXT_BLOB));
+        }
 
-        let mut index = 0;
-        bundle.blobs.retain(|_| {
-            let retain = keep[index];
-            index += 1;
-            retain
-        });
-
-        let mut index = 0;
-        bundle.commitments.retain(|_| {
-            let retain = keep[index];
-            index += 1;
-            retain
-        });
-
-        let mut index = 0;
-        bundle.proofs.retain(|_| {
-            let retain = keep[index / CELLS_PER_EXT_BLOB];
-            index += 1;
-            retain
-        });
-
-        Ok(bundle)
+        Ok((matching, non_matching))
     }
 
     /// Take `len` blob data from the bundle.
@@ -4297,24 +4284,26 @@ mod tests {
         let _sidecar = bundle.try_into_sidecar().unwrap();
     }
 
-    #[test]
-    fn retain_v2_bundle_blobs() {
+    fn indexed_v2_bundle() -> BlobsBundleV2 {
         let mut blobs = vec![Blob::default(); 3];
         for (index, blob) in blobs.iter_mut().enumerate() {
             blob[0] = index as u8;
         }
-        let bundle = BlobsBundleV2 {
+        BlobsBundleV2 {
             blobs,
             commitments: (0..3).map(|index| Bytes48::new([index; 48])).collect(),
             proofs: (0..3)
                 .flat_map(|index| vec![Bytes48::new([index; 48]); CELLS_PER_EXT_BLOB])
                 .collect(),
         }
-        .ensure_valid_lengths()
-        .unwrap();
+    }
 
-        let retained = bundle
-            .try_retain_blobs(|index, blob, commitment, proofs| {
+    #[test]
+    fn partition_v2_bundle_blobs() {
+        let bundle = indexed_v2_bundle().ensure_valid_lengths().unwrap();
+
+        let (matching, non_matching) = bundle
+            .try_partition_blobs(|index, blob, commitment, proofs| {
                 assert_eq!(blob[0], index as u8);
                 assert_eq!(*commitment, Bytes48::new([index as u8; 48]));
                 assert!(proofs.iter().all(|proof| proof == commitment));
@@ -4322,33 +4311,38 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(retained.blobs.len(), 2);
-        assert_eq!(retained.blobs[0][0], 0);
-        assert_eq!(retained.blobs[1][0], 2);
-        assert_eq!(retained.commitments, vec![Bytes48::new([0; 48]), Bytes48::new([2; 48])]);
-        assert_eq!(retained.proofs.len(), 2 * CELLS_PER_EXT_BLOB);
-        assert!(retained.proofs[..CELLS_PER_EXT_BLOB]
+        assert_eq!(matching.blobs.len(), 2);
+        assert_eq!(matching.blobs[0][0], 0);
+        assert_eq!(matching.blobs[1][0], 2);
+        assert_eq!(matching.commitments, vec![Bytes48::new([0; 48]), Bytes48::new([2; 48])]);
+        assert_eq!(matching.proofs.len(), 2 * CELLS_PER_EXT_BLOB);
+        assert!(matching.proofs[..CELLS_PER_EXT_BLOB]
             .iter()
             .all(|proof| *proof == Bytes48::new([0; 48])));
-        assert!(retained.proofs[CELLS_PER_EXT_BLOB..]
+        assert!(matching.proofs[CELLS_PER_EXT_BLOB..]
             .iter()
             .all(|proof| *proof == Bytes48::new([2; 48])));
+
+        assert_eq!(non_matching.blobs.len(), 1);
+        assert_eq!(non_matching.blobs[0][0], 1);
+        assert_eq!(non_matching.commitments, vec![Bytes48::new([1; 48])]);
+        assert_eq!(non_matching.proofs, vec![Bytes48::new([1; 48]); CELLS_PER_EXT_BLOB]);
     }
 
     #[test]
-    fn retain_v2_bundle_blobs_rejects_mismatched_lengths() {
+    fn partition_v2_bundle_blobs_rejects_mismatched_lengths() {
         let bundle = BlobsBundleV2 {
             blobs: vec![Blob::default()],
             commitments: Vec::new(),
             proofs: Vec::new(),
         };
         assert_eq!(bundle.clone().ensure_valid_lengths().unwrap_err().value(), &bundle);
-        let error = bundle.clone().try_retain_blobs(|_, _, _, _| unreachable!()).unwrap_err();
+        let error = bundle.clone().try_partition_blobs(|_, _, _, _| unreachable!()).unwrap_err();
         assert_eq!(error.value(), &bundle);
 
         let bundle = BlobsBundleV2 { commitments: vec![Bytes48::default()], ..bundle };
         assert_eq!(bundle.clone().ensure_valid_lengths().unwrap_err().value(), &bundle);
-        let error = bundle.clone().try_retain_blobs(|_, _, _, _| unreachable!()).unwrap_err();
+        let error = bundle.clone().try_partition_blobs(|_, _, _, _| unreachable!()).unwrap_err();
         assert_eq!(error.value(), &bundle);
     }
 
