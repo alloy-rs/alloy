@@ -2167,8 +2167,8 @@ impl BlobsBundleV2 {
     ///
     /// # Errors
     ///
-    /// Returns the original bundle if its lengths do not match.
-    pub fn ensure_valid_lengths(self) -> Result<Self, alloy_consensus::error::ValueError<Self>> {
+    /// Returns a reference to the bundle if its lengths do not match.
+    pub fn ensure_valid_lengths(&self) -> Result<(), alloy_consensus::error::ValueError<&Self>> {
         let len = self.blobs.len();
         if self.commitments.len() != len
             || len.checked_mul(CELLS_PER_EXT_BLOB) != Some(self.proofs.len())
@@ -2176,7 +2176,7 @@ impl BlobsBundleV2 {
             return Err(alloy_consensus::error::ValueError::new_static(self, "length mismatch"));
         }
 
-        Ok(self)
+        Ok(())
     }
 
     /// Partitions blobs by `f`, keeping each blob with its commitment and cell proofs.
@@ -2191,7 +2191,10 @@ impl BlobsBundleV2 {
         self,
         mut f: impl FnMut(usize, &Blob, &Bytes48, &[Bytes48]) -> bool,
     ) -> Result<(Self, Self), alloy_consensus::error::ValueError<Self>> {
-        let Self { blobs, commitments, proofs } = self.ensure_valid_lengths()?;
+        if self.ensure_valid_lengths().is_err() {
+            return Err(alloy_consensus::error::ValueError::new_static(self, "length mismatch"));
+        }
+        let Self { blobs, commitments, proofs } = self;
         let mut matching = Self::empty();
         let mut non_matching = Self::empty();
         let mut matches = Vec::with_capacity(blobs.len());
@@ -4303,7 +4306,8 @@ mod tests {
 
     #[test]
     fn partition_v2_bundle_blobs() {
-        let bundle = indexed_v2_bundle().ensure_valid_lengths().unwrap();
+        let bundle = indexed_v2_bundle();
+        bundle.ensure_valid_lengths().unwrap();
 
         let (matching, non_matching) = bundle
             .try_partition_blobs(|index, blob, commitment, proofs| {
@@ -4339,12 +4343,12 @@ mod tests {
             commitments: Vec::new(),
             proofs: Vec::new(),
         };
-        assert_eq!(bundle.clone().ensure_valid_lengths().unwrap_err().value(), &bundle);
+        assert_eq!(bundle.ensure_valid_lengths().unwrap_err().into_value(), &bundle);
         let error = bundle.clone().try_partition_blobs(|_, _, _, _| unreachable!()).unwrap_err();
         assert_eq!(error.value(), &bundle);
 
         let bundle = BlobsBundleV2 { commitments: vec![Bytes48::default()], ..bundle };
-        assert_eq!(bundle.clone().ensure_valid_lengths().unwrap_err().value(), &bundle);
+        assert_eq!(bundle.ensure_valid_lengths().unwrap_err().into_value(), &bundle);
         let error = bundle.clone().try_partition_blobs(|_, _, _, _| unreachable!()).unwrap_err();
         assert_eq!(error.value(), &bundle);
     }
