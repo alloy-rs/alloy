@@ -1337,7 +1337,7 @@ impl BlobCellMask {
     /// Creates a mask from the Engine API 16-byte, little-endian bitarray.
     /// Cell `i` is selected by bit `i % 8` of byte `i / 8`.
     #[inline]
-    pub fn new(indices_bitarray: B128) -> Self {
+    pub const fn new(indices_bitarray: B128) -> Self {
         Self { value: u128::from_le_bytes(indices_bitarray.0) }
     }
 
