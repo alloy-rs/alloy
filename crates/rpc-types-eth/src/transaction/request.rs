@@ -146,10 +146,24 @@ pub struct TransactionRequest {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
     /// Ordered frames for EIP-8141 frame transactions.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "super::frame_serde::frames"
+        )
+    )]
     pub frames: Option<Vec<Frame>>,
     /// Signature entries for EIP-8141 frame transactions.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "super::frame_serde::signatures"
+        )
+    )]
     pub signatures: Option<Vec<FrameSignature>>,
     /// Full-width frame fees. Each explicit top-level fee overrides its corresponding value.
     /// Conversions omit top-level fees that cannot fit in `u128`, preserving them here instead.
