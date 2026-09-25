@@ -688,7 +688,7 @@ fn witness_response_roundtrips_for_valid_payload() {
         codes: vec![Bytes::from_static(&[4, 5])],
         headers: vec![Bytes::from_static(&[6])],
     };
-    let public_keys = vec![FixedBytes::repeat_byte(7), FixedBytes::repeat_byte(8)];
+    let public_keys = vec![[7; 65], [8; 65]];
     let response = PayloadStatusWithWitness::new(
         witness_status(PayloadStatusKind::Valid),
         Some(witness.clone()),
@@ -712,7 +712,7 @@ fn witness_response_omits_witness_and_keys_for_non_valid_status() {
         let response = PayloadStatusWithWitness::new(
             witness_status(status),
             Some(ExecutionWitness::default()),
-            vec![FixedBytes::ZERO],
+            vec![[0; 65]],
         );
         assert!(response.witness.is_none());
         assert!(response.public_keys.is_empty());
@@ -727,7 +727,7 @@ fn witness_response_omits_witness_and_keys_for_non_valid_status() {
             PayloadStatusWithWitness {
                 payload_status: witness_status(status),
                 witness: Optional::none(),
-                public_keys: vec![FixedBytes::ZERO],
+                public_keys: vec![[0; 65]],
             },
         ] {
             assert!(PayloadStatusWithWitness::from_ssz_bytes(&response.as_ssz_bytes()).is_err());

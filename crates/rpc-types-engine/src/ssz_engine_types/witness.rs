@@ -36,7 +36,7 @@ pub struct PayloadStatusWithWitness {
     /// These are untrusted inputs: stateless validators must verify each key against the
     /// corresponding transaction's signature and recovery ID.
     #[ssz(with = "public_keys")]
-    pub public_keys: Vec<FixedBytes<65>>,
+    pub public_keys: Vec<UncompressedPublicKey>,
 }
 
 impl PayloadStatusWithWitness {
@@ -44,7 +44,7 @@ impl PayloadStatusWithWitness {
     pub fn new(
         payload_status: PayloadStatus,
         witness: Option<ExecutionWitness>,
-        public_keys: Vec<FixedBytes<65>>,
+        public_keys: Vec<UncompressedPublicKey>,
     ) -> Self {
         if payload_status.status != PayloadStatusKind::Valid {
             return Self { payload_status, witness: Optional::none(), public_keys: Vec::new() };
@@ -64,7 +64,7 @@ impl ssz::Decode for PayloadStatusWithWitness {
             payload_status: PayloadStatus,
             witness: Optional<ExecutionWitness>,
             #[ssz(with = "public_keys")]
-            public_keys: Vec<FixedBytes<65>>,
+            public_keys: Vec<UncompressedPublicKey>,
         }
         let Fields { payload_status, witness, public_keys } = Fields::from_ssz_bytes(bytes)?;
         if payload_status.status != PayloadStatusKind::Valid

@@ -20,13 +20,14 @@ use crate::{
     PayloadAttributes as LegacyPayloadAttributes, PayloadId, PayloadStatus as LegacyPayloadStatus,
     PayloadStatusEnum,
 };
+use alloy_consensus::crypto::UncompressedPublicKey;
 use alloy_eips::{
     eip4844::{Blob, BlobAndProofV1, BlobAndProofV2, BlobCellsAndProofsV1, Bytes48},
     eip4895::Withdrawal,
     eip7594::Cell,
     eip7685::Requests,
 };
-use alloy_primitives::{Address, Bytes, FixedBytes, B128, B256, U256};
+use alloy_primitives::{Address, Bytes, B128, B256, U256};
 
 use alloc::{
     boxed::Box,
