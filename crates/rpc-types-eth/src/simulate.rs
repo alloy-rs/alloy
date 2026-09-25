@@ -93,6 +93,12 @@ pub struct SimulatedBlock<B = Block> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimCallResult {
+    /// Fee payer for a frame transaction.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub payer: Option<Address>,
+    /// Per-frame execution results in transaction order.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub frame_results: Option<Vec<FrameCallResult>>,
     /// The raw bytes returned by the transaction.
     pub return_data: Bytes,
     /// Logs generated during the execution of the transaction.
@@ -115,6 +121,31 @@ pub struct SimCallResult {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub status: bool,
     /// Error in case the call failed
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub error: Option<SimulateError>,
+}
+
+/// Execution result of one frame in `eth_simulateV1`.
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct FrameCallResult {
+    /// Frame success, failure, or skipped status.
+    pub status: FrameStatus,
+    /// Total gas consumed by the frame.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub gas_used: u64,
+    /// Execution gas consumed by the frame.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub execution_gas_used: u64,
+    /// State gas consumed by the frame.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub state_gas_used: u64,
+    /// Surviving logs emitted by the frame.
+    pub logs: Vec<Log>,
+    /// Frame output or revert bytes.
+    pub return_data: Bytes,
+    /// Execution error for a failed frame.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub error: Option<SimulateError>,
 }

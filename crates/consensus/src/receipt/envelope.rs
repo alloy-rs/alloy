@@ -136,19 +136,15 @@ where
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
-        struct GasUsed {
-            #[serde(with = "alloy_serde::quantity")]
-            execution: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            state: u64,
-        }
-
-        #[derive(serde::Serialize)]
-        #[serde(rename_all = "camelCase")]
         struct FrameReceipt<'a, T> {
             #[serde(with = "alloy_serde::quantity")]
             status: u8,
-            gas_used: GasUsed,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_used: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            execution_gas_used: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            state_gas_used: u64,
             logs: &'a [T],
         }
 
@@ -171,10 +167,9 @@ where
             .iter()
             .map(|receipt| FrameReceipt {
                 status: receipt.status.into(),
-                gas_used: GasUsed {
-                    execution: receipt.gas_used.execution,
-                    state: receipt.gas_used.state,
-                },
+                gas_used: receipt.gas_used.execution.saturating_add(receipt.gas_used.state),
+                execution_gas_used: receipt.gas_used.execution,
+                state_gas_used: receipt.gas_used.state,
                 logs: &receipt.logs,
             })
             .collect();
@@ -209,19 +204,15 @@ impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for Receip
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct GasUsed {
-            #[serde(with = "alloy_serde::quantity")]
-            execution: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            state: u64,
-        }
-
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
         struct FrameReceipt<T> {
             #[serde(with = "alloy_serde::quantity")]
             status: u8,
-            gas_used: GasUsed,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_used: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            execution_gas_used: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            state_gas_used: u64,
             logs: Vec<T>,
         }
 
@@ -250,11 +241,16 @@ impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for Receip
                     let status = FrameStatus::try_from_u8(receipt.status).ok_or_else(|| {
                         serde::de::Error::custom("invalid EIP-8141 frame receipt status")
                     })?;
+                    if receipt.gas_used
+                        != receipt.execution_gas_used.saturating_add(receipt.state_gas_used)
+                    {
+                        return Err(serde::de::Error::custom("inconsistent frame gas used"));
+                    }
                     Ok(alloy_eips::eip8141::FrameReceipt {
                         status,
                         gas_used: alloy_eips::eip8141::FrameGasUsed {
-                            execution: receipt.gas_used.execution,
-                            state: receipt.gas_used.state,
+                            execution: receipt.execution_gas_used,
+                            state: receipt.state_gas_used,
                         },
                         logs: receipt.logs,
                     })
@@ -1016,6 +1012,9 @@ mod test {
         assert_eq!(json["type"], "0x6");
         assert_eq!(json["status"], "0x1");
         assert_eq!(json["cumulativeGasUsed"], "0x2a");
+        assert_eq!(json["frameReceipts"][0]["gasUsed"], "0x16");
+        assert_eq!(json["frameReceipts"][0]["executionGasUsed"], "0x15");
+        assert_eq!(json["frameReceipts"][0]["stateGasUsed"], "0x1");
         assert!(json.get("payload").is_none());
 
         let decoded: ReceiptEnvelope<Log> = serde_json::from_value(json).unwrap();

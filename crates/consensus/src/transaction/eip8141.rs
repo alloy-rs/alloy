@@ -119,11 +119,12 @@ impl serde::Serialize for TxEip8141 {
             mode: u8,
             #[serde(with = "alloy_serde::quantity")]
             flags: u8,
-            to: Option<Address>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            target: Option<Address>,
             #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
+            execution_gas: u64,
             #[serde(with = "alloy_serde::quantity")]
-            state_limit: u64,
+            state_gas: u64,
             value: U256,
             data: &'a Bytes,
         }
@@ -133,9 +134,11 @@ impl serde::Serialize for TxEip8141 {
         struct Signature<'a> {
             #[serde(with = "alloy_serde::quantity")]
             scheme: u8,
+            #[serde(skip_serializing_if = "Option::is_none")]
             signer: Option<Address>,
             msg: SignatureMessage,
-            signature: &'a Bytes,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            signature: Option<&'a Bytes>,
         }
 
         #[derive(serde::Serialize)]
@@ -145,6 +148,7 @@ impl serde::Serialize for TxEip8141 {
             chain_id: ChainId,
             #[serde(with = "alloy_serde::quantity")]
             nonce: u64,
+            #[serde(rename = "from")]
             sender: Address,
             frames: Vec<Frame<'a>>,
             signatures: Vec<Signature<'a>>,
@@ -187,9 +191,9 @@ impl serde::Serialize for TxEip8141 {
             .map(|frame| Frame {
                 mode: frame.mode.into(),
                 flags: frame.flags,
-                to: frame.target_address(),
-                gas_limit: frame.limits.execution,
-                state_limit: frame.limits.state,
+                target: frame.target_address(),
+                execution_gas: frame.limits.execution,
+                state_gas: frame.limits.state,
                 value: frame.value,
                 data: &frame.data,
             })
@@ -202,7 +206,8 @@ impl serde::Serialize for TxEip8141 {
                 scheme: signature.scheme.into(),
                 signer: signature.signer.address(),
                 msg: signature.msg,
-                signature: &signature.signature,
+                signature: (!signature.signature.is_empty() || u8::from(signature.scheme) == 0)
+                    .then_some(&signature.signature),
             })
             .collect();
 
@@ -252,14 +257,15 @@ impl<'de> serde::Deserialize<'de> for TxEip8141 {
                 for frame in frames {
                     let frame = frame.as_object_mut().ok_or("expected EIP-8141 frame object")?;
                     if frame.get("target").is_none() {
-                        let target = frame.remove("to").unwrap_or(serde_json::Value::Null);
+                        let target = serde_json::Value::Null;
                         frame.insert("target".to_owned(), target);
                     }
                     if frame.get("limits").is_none() {
-                        let execution =
-                            frame.remove("gasLimit").ok_or("missing EIP-8141 frame gas limit")?;
+                        let execution = frame
+                            .remove("executionGas")
+                            .ok_or("missing EIP-8141 frame gas limit")?;
                         let state = frame
-                            .remove("stateLimit")
+                            .remove("stateGas")
                             .ok_or("missing EIP-8141 frame state gas limit")?;
                         let mut limits = serde_json::Map::new();
                         limits.insert("execution".to_owned(), execution);
@@ -269,6 +275,25 @@ impl<'de> serde::Deserialize<'de> for TxEip8141 {
                 }
             }
 
+            if let Some(sender) = object.remove("from") {
+                object.insert("sender".to_owned(), sender);
+            }
+            if let Some(signatures) =
+                object.get_mut("signatures").and_then(serde_json::Value::as_array_mut)
+            {
+                for signature in signatures {
+                    let signature = signature.as_object_mut().ok_or("expected signature object")?;
+                    signature
+                        .entry("signer")
+                        .or_insert_with(|| serde_json::Value::String("0x".to_owned()));
+                    signature
+                        .entry("signature")
+                        .or_insert_with(|| serde_json::Value::String("0x".to_owned()));
+                    signature
+                        .entry("msg")
+                        .or_insert_with(|| serde_json::Value::String("0x".to_owned()));
+                }
+            }
             if object.get("fees").is_none() {
                 let mut fees = serde_json::Map::new();
                 for field in ["maxPriorityFeePerGas", "maxFeePerGas", "maxFeePerBlobGas"] {
@@ -1218,6 +1243,15 @@ impl TxEip8141Ref<'_> {
     /// method only rejects malformed transactions that must not reach signing, pooling, or
     /// execution.
     pub fn validate(&self) -> Result<(), &'static str> {
+        self.validate_inner(false)
+    }
+
+    /// Validates an unsigned envelope, allowing empty protocol signature placeholders.
+    pub fn validate_unsigned(&self) -> Result<(), &'static str> {
+        self.validate_inner(true)
+    }
+
+    fn validate_inner(&self, allow_placeholders: bool) -> Result<(), &'static str> {
         if self.frames.is_empty() || self.frames.len() > MAX_FRAMES {
             return Err("EIP-8141 transaction must contain between 1 and 64 frames");
         }
@@ -1236,6 +1270,12 @@ impl TxEip8141Ref<'_> {
         }
 
         for signature in self.signatures {
+            if allow_placeholders
+                && u8::from(signature.scheme) != 0
+                && signature.signature.is_empty()
+            {
+                continue;
+            }
             signature.validate_structure_with_sender(self.sender).map_err(|err| match err {
                 Eip8141Error::UnexpectedSigner => {
                     "arbitrary signatures must not contain signer metadata"
@@ -1887,14 +1927,15 @@ mod tests {
         assert_eq!(json["chainId"], "0x1");
         assert_eq!(frame["mode"], "0x1");
         assert_eq!(frame["flags"], "0x2");
-        assert_eq!(frame["to"], serde_json::Value::Null);
-        assert_eq!(frame["gasLimit"], "0x15");
-        assert_eq!(frame["stateLimit"], "0x7");
+        assert!(frame.get("target").is_none());
+        assert!(frame.get("to").is_none());
+        assert_eq!(frame["executionGas"], "0x15");
+        assert_eq!(frame["stateGas"], "0x7");
         assert!(frame.get("limits").is_none());
         assert_eq!(json["maxFeePerGas"], "0xa");
         assert!(json.get("fees").is_none());
         assert_eq!(signature["scheme"], "0x1");
-        assert_eq!(signature["signer"], serde_json::Value::Null);
+        assert!(signature.get("signer").is_none());
         assert_eq!(serde_json::from_value::<TxEip8141>(json).unwrap(), tx);
     }
 

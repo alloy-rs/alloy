@@ -1,6 +1,6 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{transaction::AccessList, Transaction, TransactionTrait};
+use crate::{transaction::AccessList, FrameRequest, Transaction, TransactionTrait};
 use alloc::{
     string::{String, ToString},
     vec,
@@ -147,9 +147,16 @@ pub struct TransactionRequest {
     pub authorization_list: Option<Vec<SignedAuthorization>>,
     /// Ordered frames for EIP-8141 frame transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub frames: Option<Vec<Frame>>,
+    pub frames: Option<Vec<FrameRequest>>,
     /// Signature entries for EIP-8141 frame transactions.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "super::frame_serde::signatures"
+        )
+    )]
     pub signatures: Option<Vec<FrameSignature>>,
     /// Full-width frame fees. Each explicit top-level fee overrides its corresponding value.
     /// Conversions omit top-level fees that cannot fit in `u128`, preserving them here instead.
@@ -158,6 +165,12 @@ pub struct TransactionRequest {
         serde(default, rename = "fees", skip_serializing_if = "Option::is_none")
     )]
     pub eip8141_fees: Option<TransactionFees>,
+}
+
+struct FrameFields {
+    fees: TransactionFees,
+    hashes: Option<Vec<B256>>,
+    frames: Vec<Frame>,
 }
 
 impl TransactionRequest {
@@ -709,10 +722,17 @@ impl TransactionRequest {
         })
     }
 
-    fn validate_8141_fields(&self) -> Result<(TransactionFees, Option<Vec<B256>>), &'static str> {
+    fn validate_8141_fields(&self, allow_placeholders: bool) -> Result<FrameFields, &'static str> {
         let sender = self.from.ok_or("sender")?;
         self.nonce.ok_or("nonce")?;
-        let frames = self.frames.as_deref().ok_or("frames")?;
+        let frames = self
+            .frames
+            .as_deref()
+            .ok_or("frames")?
+            .iter()
+            .cloned()
+            .map(Frame::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
         let signatures = self.signatures.as_deref().ok_or("signatures")?;
         let fees = self.resolved_frame_fees()?;
         let hashes: alloc::borrow::Cow<'_, [B256]> = match &self.sidecar {
@@ -730,40 +750,50 @@ impl TransactionRequest {
                 self.blob_versioned_hashes.as_deref().unwrap_or_default(),
             ),
         };
-        alloy_consensus::transaction::eip8141::TxEip8141Ref {
+        let transaction = alloy_consensus::transaction::eip8141::TxEip8141Ref {
             sender,
-            frames,
+            frames: &frames,
             signatures,
             fees: &fees,
             blob_versioned_hashes: &hashes,
+        };
+        if allow_placeholders {
+            transaction.validate_unsigned()?;
+        } else {
+            transaction.validate()?;
         }
-        .validate()?;
-        Ok((
+        Ok(FrameFields {
             fees,
-            match hashes {
+            hashes: match hashes {
                 alloc::borrow::Cow::Owned(hashes) => Some(hashes),
                 alloc::borrow::Cow::Borrowed(_) => None,
             },
-        ))
+            frames,
+        })
     }
 
     /// Builds the canonical frame transaction. Use the sidecar builder for raw submission.
     pub fn build_8141(self) -> Result<TxEip8141, ValueError<Self>> {
-        let (fees, hashes) = match self.validate_8141_fields() {
+        let FrameFields { fees, hashes, frames } = match self.validate_8141_fields(false) {
             Ok(fields) => fields,
             Err(error) => return Err(ValueError::new(self, error)),
         };
-        Ok(self.into_frame_transaction(fees, hashes))
+        Ok(self.into_frame_transaction(fees, hashes, frames))
     }
 
     // Called only after validate_8141_fields. Move the owned fields without revalidating or
     // cloning.
-    fn into_frame_transaction(self, fees: TransactionFees, hashes: Option<Vec<B256>>) -> TxEip8141 {
+    fn into_frame_transaction(
+        self,
+        fees: TransactionFees,
+        hashes: Option<Vec<B256>>,
+        frames: Vec<Frame>,
+    ) -> TxEip8141 {
         TxEip8141 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: self.nonce.unwrap_or_default(),
             sender: self.from.unwrap_or_default(),
-            frames: self.frames.unwrap_or_default(),
+            frames,
             signatures: self.signatures.unwrap_or_default(),
             fees,
             blob_versioned_hashes: hashes.or(self.blob_versioned_hashes).unwrap_or_default(),
@@ -774,14 +804,14 @@ impl TransactionRequest {
     pub fn build_8141_with_sidecar(
         mut self,
     ) -> Result<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>, ValueError<Self>> {
-        let (fees, hashes) = match self.validate_8141_fields() {
+        let FrameFields { fees, hashes, frames } = match self.validate_8141_fields(false) {
             Ok(fields) => fields,
             Err(error) => return Err(ValueError::new(self, error)),
         };
         let Some(BlobTransactionSidecarVariant::Eip7594(sidecar)) = self.sidecar.take() else {
             return Err(ValueError::new(self, "Missing EIP-7594 sidecar"));
         };
-        Ok(TxEip8141WithSidecar::new(self.into_frame_transaction(fees, hashes), sidecar))
+        Ok(TxEip8141WithSidecar::new(self.into_frame_transaction(fees, hashes, frames), sidecar))
     }
 
     /// Ensures `to` field is set to an address which is required by:
@@ -1174,7 +1204,7 @@ impl TransactionRequest {
     /// Checks frame request completeness and structure, returning the first missing or invalid
     /// field.
     pub fn complete_8141(&self) -> Result<(), Vec<&'static str>> {
-        self.validate_8141_fields().map(|_| ()).map_err(|error| vec![error])
+        self.validate_8141_fields(false).map(|_| ()).map_err(|error| vec![error])
     }
 
     /// Check if all necessary keys are present to build a legacy transaction,
@@ -1271,6 +1301,15 @@ impl TransactionRequest {
     pub fn build_typed_simulate_transaction(
         self,
     ) -> Result<alloy_consensus::EthereumTxEnvelope<TxEip4844>, ValueError<Self>> {
+        if self.preferred_type() == TxType::Eip8141 {
+            let FrameFields { fees, hashes, frames } = match self.validate_8141_fields(true) {
+                Ok(fields) => fields,
+                Err(error) => return Err(ValueError::new(self, error)),
+            };
+            return Ok(alloy_consensus::EthereumTxEnvelope::Eip8141(
+                alloy_primitives::Sealed::new(self.into_frame_transaction(fees, hashes, frames)),
+            ));
+        }
         let tx = self
             .build_consensus_tx()
             .map_err(|err| ValueError::new(err.tx, "Transaction is not buildable"))?;
@@ -1514,7 +1553,7 @@ impl From<TxEip8141> for TransactionRequest {
             chain_id: Some(chain_id),
             blob_versioned_hashes: Some(blob_versioned_hashes),
             transaction_type: Some(ty),
-            frames: Some(frames),
+            frames: Some(frames.into_iter().map(Into::into).collect()),
             signatures: Some(signatures),
             eip8141_fees: (fees.max_fee_per_gas > U256::from(u128::MAX)
                 || fees.max_priority_fee_per_gas > U256::from(u128::MAX)
@@ -1653,7 +1692,7 @@ pub(super) mod serde_bincode_compat {
     use alloc::{borrow::Cow, vec::Vec};
     use alloy_eips::{
         eip2930::AccessList,
-        eip8141::{Frame, FrameSignature},
+        eip8141::{FrameAddress, FrameMode, FrameSignature},
     };
     use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -1713,11 +1752,51 @@ pub(super) mod serde_bincode_compat {
         pub authorization_list:
             Option<Vec<alloy_eips::eip7702::serde_bincode_compat::SignedAuthorization<'a>>>,
         /// Ordered frames for EIP-8141 frame transactions.
-        pub frames: Option<Cow<'a, Vec<Frame>>>,
+        pub frames: Option<Vec<FrameRequest>>,
         /// Signature entries for EIP-8141 frame transactions.
         pub signatures: Option<Cow<'a, Vec<FrameSignature>>>,
         /// Full-width frame fees.
         pub eip8141_fees: Option<alloy_eips::eip8141::TransactionFees>,
+    }
+
+    /// Bincode-compatible frame request without omitted fields.
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct FrameRequest {
+        mode: FrameMode,
+        flags: u8,
+        target: FrameAddress,
+        execution_gas: Option<u64>,
+        state_gas: Option<u64>,
+        value: U256,
+        data: Bytes,
+    }
+
+    impl From<&crate::FrameRequest> for FrameRequest {
+        fn from(frame: &crate::FrameRequest) -> Self {
+            Self {
+                mode: frame.mode,
+                flags: frame.flags,
+                target: frame.target,
+                execution_gas: frame.execution_gas,
+                state_gas: frame.state_gas,
+                value: frame.value,
+                data: frame.data.clone(),
+            }
+        }
+    }
+
+    impl From<FrameRequest> for crate::FrameRequest {
+        fn from(frame: FrameRequest) -> Self {
+            Self {
+                mode: frame.mode,
+                flags: frame.flags,
+                target: frame.target,
+                execution_gas: frame.execution_gas,
+                state_gas: frame.state_gas,
+                value: frame.value,
+                data: frame.data,
+            }
+        }
     }
 
     impl<'a> From<&'a super::TransactionRequest> for TransactionRequest<'a> {
@@ -1743,7 +1822,7 @@ pub(super) mod serde_bincode_compat {
                     .authorization_list
                     .as_ref()
                     .map(|auths| auths.iter().map(Into::into).collect()),
-                frames: value.frames.as_ref().map(Cow::Borrowed),
+                frames: value.frames.as_ref().map(|frames| frames.iter().map(Into::into).collect()),
                 signatures: value.signatures.as_ref().map(Cow::Borrowed),
                 eip8141_fees: value.eip8141_fees,
             }
@@ -1776,7 +1855,7 @@ pub(super) mod serde_bincode_compat {
                 authorization_list: value
                     .authorization_list
                     .map(|list| list.into_iter().map(Into::into).collect()),
-                frames: value.frames.map(Cow::into_owned),
+                frames: value.frames.map(|frames| frames.into_iter().map(Into::into).collect()),
                 signatures: value.signatures.map(Cow::into_owned),
                 eip8141_fees: value.eip8141_fees,
             }
@@ -1839,6 +1918,14 @@ pub(super) mod serde_bincode_compat {
                 bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
             assert_eq!(decoded.transaction.build_8141().unwrap(), tx);
+            let mut partial = data;
+            let frame = &mut partial.transaction.frames.as_mut().unwrap()[0];
+            frame.execution_gas = None;
+            frame.state_gas = Some(0);
+            let encoded = bincode::serde::encode_to_vec(&partial, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, partial);
         }
 
         #[test]

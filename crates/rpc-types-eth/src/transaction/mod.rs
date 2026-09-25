@@ -539,7 +539,7 @@ mod tx_serde {
         pub effective_gas_price: Option<U256>,
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct TransactionSerdeHelper<T> {
         #[serde(flatten)]
@@ -551,7 +551,8 @@ mod tx_serde {
         #[serde(default, with = "alloy_serde::quantity::opt")]
         transaction_index: Option<u64>,
         /// Sender
-        from: Address,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        from: Option<Address>,
 
         #[serde(flatten)]
         gas_price: MaybeGasPrice,
@@ -561,6 +562,46 @@ mod tx_serde {
             skip_serializing_if = "Option::is_none"
         )]
         block_timestamp: Option<u64>,
+    }
+
+    impl<'de, T: serde::de::DeserializeOwned> Deserialize<'de> for TransactionSerdeHelper<T> {
+        fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Metadata {
+                from: Address,
+                block_hash: Option<BlockHash>,
+                #[serde(default, with = "alloy_serde::quantity::opt")]
+                block_number: Option<u64>,
+                #[serde(default, with = "alloy_serde::quantity::opt")]
+                transaction_index: Option<u64>,
+                #[serde(default, with = "alloy_serde::quantity::opt")]
+                block_timestamp: Option<u64>,
+                #[serde(flatten)]
+                gas_price: MaybeGasPrice,
+            }
+            let mut value = serde_json::Value::deserialize(deserializer)?;
+            let metadata: Metadata =
+                serde_json::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+            if let Some(fields) = value.as_object_mut() {
+                for field in ["blockHash", "blockNumber", "transactionIndex", "blockTimestamp"] {
+                    fields.remove(field);
+                }
+                if fields.get("type").and_then(serde_json::Value::as_str) != Some("0x6") {
+                    fields.remove("from");
+                }
+            }
+            let inner = serde_json::from_value(value).map_err(serde::de::Error::custom)?;
+            Ok(Self {
+                inner,
+                from: Some(metadata.from),
+                block_hash: metadata.block_hash,
+                block_number: metadata.block_number,
+                transaction_index: metadata.transaction_index,
+                block_timestamp: metadata.block_timestamp,
+                gas_price: metadata.gas_price,
+            })
+        }
     }
 
     impl<T: TransactionTrait> From<Transaction<T>> for TransactionSerdeHelper<T> {
@@ -583,6 +624,7 @@ mod tx_serde {
                 None
             };
 
+            let from = if inner.frame_transaction().is_some() { None } else { Some(from) };
             Self {
                 inner,
                 block_hash,
@@ -616,7 +658,10 @@ mod tx_serde {
                 .or_else(|| gas_price.effective_gas_price.map(|g| g.saturating_to()));
 
             Ok(Self {
-                inner: Recovered::new_unchecked(inner, from),
+                inner: Recovered::new_unchecked(
+                    inner,
+                    from.ok_or_else(|| serde::de::Error::missing_field("from"))?,
+                ),
                 block_hash,
                 block_number,
                 transaction_index,
@@ -706,3 +751,9 @@ mod tests {
         assert!(tx.inner.is_eip7702());
     }
 }
+
+#[cfg(feature = "serde")]
+mod frame_serde;
+
+mod frame;
+pub use frame::FrameRequest;

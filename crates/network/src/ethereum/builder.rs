@@ -245,7 +245,7 @@ mod tests {
             max_fee_per_gas: Some(2),
             max_fee_per_blob_gas: Some(0),
             transaction_type: Some(TxType::Eip8141 as u8),
-            frames: Some(vec![Frame::default()]),
+            frames: Some(vec![Frame::default().into()]),
             signatures: Some(Vec::new()),
             ..Default::default()
         };
