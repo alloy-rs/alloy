@@ -138,11 +138,14 @@ fn generic_conversion_preserves_frames_through_envelopes() {
 }
 
 #[test]
-fn completion_and_build_move_frame_storage() {
+fn completion_and_build_resolve_frame_requests() {
     let request: TransactionRequest = frame_tx().into();
-    let frames = request.frames.as_ref().unwrap().as_ptr();
+    let frame_request = &request.frames.as_ref().unwrap()[0];
+    assert_eq!(frame_request.execution_gas, Some(0));
+    assert_eq!(frame_request.state_gas, Some(0));
     request.complete_8141().unwrap();
-    assert_eq!(request.build_8141().unwrap().frames.as_ptr(), frames);
+    let built = request.build_8141().unwrap();
+    assert_eq!(built.frames, vec![Frame::default()]);
 }
 
 #[test]
