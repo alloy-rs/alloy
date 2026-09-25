@@ -580,9 +580,17 @@ mod tx_serde {
                 #[serde(flatten)]
                 gas_price: MaybeGasPrice,
             }
-            let value = serde_json::Value::deserialize(deserializer)?;
+            let mut value = serde_json::Value::deserialize(deserializer)?;
             let metadata: Metadata =
                 serde_json::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+            if let Some(fields) = value.as_object_mut() {
+                for field in ["blockHash", "blockNumber", "transactionIndex", "blockTimestamp"] {
+                    fields.remove(field);
+                }
+                if fields.get("type").and_then(serde_json::Value::as_str) != Some("0x6") {
+                    fields.remove("from");
+                }
+            }
             let inner = serde_json::from_value(value).map_err(serde::de::Error::custom)?;
             Ok(Self {
                 inner,
@@ -746,3 +754,6 @@ mod tests {
 
 #[cfg(feature = "serde")]
 mod frame_serde;
+
+mod frame;
+pub use frame::FrameRequest;

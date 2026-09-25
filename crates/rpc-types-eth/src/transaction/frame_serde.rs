@@ -1,29 +1,9 @@
 //! JSON adapters for frame transaction requests.
 
 use alloc::vec::Vec;
-use alloy_eips::eip8141::{
-    Frame, FrameAddress, FrameLimits, FrameMode, FrameSignature, SignatureMessage, SignatureScheme,
-};
-use alloy_primitives::{Bytes, U256};
+use alloy_eips::eip8141::{FrameAddress, FrameSignature, SignatureMessage, SignatureScheme};
+use alloy_primitives::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct FrameRequest {
-    mode: FrameMode,
-    #[serde(default, with = "alloy_serde::quantity")]
-    flags: u8,
-    #[serde(default, skip_serializing_if = "is_sender")]
-    target: FrameAddress,
-    #[serde(default, with = "alloy_serde::quantity")]
-    execution_gas: u64,
-    #[serde(default, with = "alloy_serde::quantity")]
-    state_gas: u64,
-    #[serde(default)]
-    value: U256,
-    #[serde(default)]
-    data: Bytes,
-}
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -39,56 +19,6 @@ struct SignatureRequest {
 
 const fn is_sender(address: &FrameAddress) -> bool {
     address.address().is_none()
-}
-
-pub(super) mod frames {
-    use super::*;
-
-    pub(crate) fn serialize<S: Serializer>(
-        value: &Option<Vec<Frame>>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        value
-            .as_ref()
-            .map(|frames| {
-                frames
-                    .iter()
-                    .map(|frame| FrameRequest {
-                        mode: frame.mode,
-                        flags: frame.flags,
-                        target: frame.target,
-                        execution_gas: frame.limits.execution,
-                        state_gas: frame.limits.state,
-                        value: frame.value,
-                        data: frame.data.clone(),
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .serialize(serializer)
-    }
-
-    pub(crate) fn deserialize<'de, D: Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Option<Vec<Frame>>, D::Error> {
-        Option::<Vec<FrameRequest>>::deserialize(deserializer).map(|frames| {
-            frames.map(|frames| {
-                frames
-                    .into_iter()
-                    .map(|frame| Frame {
-                        mode: frame.mode,
-                        flags: frame.flags,
-                        target: frame.target,
-                        limits: FrameLimits {
-                            execution: frame.execution_gas,
-                            state: frame.state_gas,
-                        },
-                        value: frame.value,
-                        data: frame.data,
-                    })
-                    .collect()
-            })
-        })
-    }
 }
 
 pub(super) mod signatures {
@@ -141,9 +71,9 @@ pub(super) mod signatures {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{Transaction, TransactionRequest};
     use alloy_consensus::{transaction::Recovered, TxEip8141, TxEnvelope};
+    use alloy_eips::eip8141::Frame;
     use alloy_primitives::Address;
     use serde_json::json;
 
@@ -156,7 +86,8 @@ mod tests {
         }))
         .unwrap();
         let frame = &request.frames.as_ref().unwrap()[0];
-        assert_eq!(frame.limits, FrameLimits { execution: 0x123, state: 0x45 });
+        assert_eq!(frame.execution_gas, Some(0x123));
+        assert_eq!(frame.state_gas, Some(0x45));
         assert!(frame.target.address().is_none());
         let signature = &request.signatures.as_ref().unwrap()[0];
         assert!(signature.signature.is_empty());
