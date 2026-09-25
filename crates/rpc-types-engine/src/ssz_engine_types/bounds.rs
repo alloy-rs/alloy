@@ -17,7 +17,7 @@ pub(crate) trait Validate {
 
 impl Validate for Vec<Bytes> {
     fn validate(&self) -> Result<(), DecodeError> {
-        check(self.len(), 1 << 20, "transactions")?;
+        check(self.len(), MAX_TXS_PER_PAYLOAD, "transactions")?;
         for transaction in self {
             check(transaction.len(), 1 << 30, "transaction")?;
         }
@@ -123,3 +123,28 @@ bounded_list!(blob_hashes, MAX_BLOBS_REQUEST);
 bounded_list!(blob_entries, MAX_BLOBS_REQUEST);
 bounded_list!(cells, 128);
 bounded_list!(proofs, 128);
+bounded_list!(public_keys, MAX_TXS_PER_PAYLOAD);
+
+macro_rules! bounded_byte_lists {
+    ($name:ident, $limit:expr, $max_bytes:expr) => {
+        pub(super) mod $name {
+            pub(crate) use super::encode;
+            pub(crate) mod decode {
+                pub(crate) use super::super::encode::{is_ssz_fixed_len, ssz_fixed_len};
+                use super::super::*;
+                pub(crate) fn from_ssz_bytes(bytes: &[u8]) -> Result<Vec<Bytes>, DecodeError> {
+                    let values = Vec::<Bytes>::from_ssz_bytes(bytes)?;
+                    check(values.len(), $limit, stringify!($name))?;
+                    for value in &values {
+                        check(value.len(), $max_bytes, stringify!($name))?;
+                    }
+                    Ok(values)
+                }
+            }
+        }
+    };
+}
+
+bounded_byte_lists!(witness_state, MAX_WITNESS_ITEMS, MAX_BYTES_PER_WITNESS_NODE);
+bounded_byte_lists!(witness_codes, MAX_WITNESS_ITEMS, MAX_BYTES_PER_CODE);
+bounded_byte_lists!(witness_headers, MAX_WITNESS_HEADERS, MAX_BYTES_PER_HEADER);
