@@ -55,7 +55,11 @@ impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
     ) -> alloy_signer::Result<Bytes> {
         // Always overrides the `from` field with the web3 signer's address.
         tx.set_from(self.address);
-        self.provider.sign_transaction(tx).await.map_err(alloy_signer::Error::other)
+        self.provider
+            .sign_transaction(tx)
+            .await
+            .map(|signed| signed.raw)
+            .map_err(alloy_signer::Error::other)
     }
 
     /// Signs a transaction request using [`Web3Signer::sign_transaction`] and decodes the raw bytes
