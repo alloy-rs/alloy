@@ -137,7 +137,8 @@ impl serde::Serialize for TxEip8141 {
             #[serde(skip_serializing_if = "Option::is_none")]
             signer: Option<Address>,
             msg: SignatureMessage,
-            signature: &'a Bytes,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            signature: Option<&'a Bytes>,
         }
 
         #[derive(serde::Serialize)]
@@ -205,7 +206,8 @@ impl serde::Serialize for TxEip8141 {
                 scheme: signature.scheme.into(),
                 signer: signature.signer.address(),
                 msg: signature.msg,
-                signature: &signature.signature,
+                signature: (!signature.signature.is_empty() || u8::from(signature.scheme) == 0)
+                    .then_some(&signature.signature),
             })
             .collect();
 
@@ -283,6 +285,12 @@ impl<'de> serde::Deserialize<'de> for TxEip8141 {
                     let signature = signature.as_object_mut().ok_or("expected signature object")?;
                     signature
                         .entry("signer")
+                        .or_insert_with(|| serde_json::Value::String("0x".to_owned()));
+                    signature
+                        .entry("signature")
+                        .or_insert_with(|| serde_json::Value::String("0x".to_owned()));
+                    signature
+                        .entry("msg")
                         .or_insert_with(|| serde_json::Value::String("0x".to_owned()));
                 }
             }
@@ -1235,6 +1243,15 @@ impl TxEip8141Ref<'_> {
     /// method only rejects malformed transactions that must not reach signing, pooling, or
     /// execution.
     pub fn validate(&self) -> Result<(), &'static str> {
+        self.validate_inner(false)
+    }
+
+    /// Validates an unsigned envelope, allowing empty protocol signature placeholders.
+    pub fn validate_unsigned(&self) -> Result<(), &'static str> {
+        self.validate_inner(true)
+    }
+
+    fn validate_inner(&self, allow_placeholders: bool) -> Result<(), &'static str> {
         if self.frames.is_empty() || self.frames.len() > MAX_FRAMES {
             return Err("EIP-8141 transaction must contain between 1 and 64 frames");
         }
@@ -1253,6 +1270,12 @@ impl TxEip8141Ref<'_> {
         }
 
         for signature in self.signatures {
+            if allow_placeholders
+                && u8::from(signature.scheme) != 0
+                && signature.signature.is_empty()
+            {
+                continue;
+            }
             signature.validate_structure_with_sender(self.sender).map_err(|err| match err {
                 Eip8141Error::UnexpectedSigner => {
                     "arbitrary signatures must not contain signer metadata"
@@ -1904,7 +1927,8 @@ mod tests {
         assert_eq!(json["chainId"], "0x1");
         assert_eq!(frame["mode"], "0x1");
         assert_eq!(frame["flags"], "0x2");
-        assert_eq!(frame["to"], serde_json::Value::Null);
+        assert!(frame.get("target").is_none());
+        assert!(frame.get("to").is_none());
         assert_eq!(frame["executionGas"], "0x15");
         assert_eq!(frame["stateGas"], "0x7");
         assert!(frame.get("limits").is_none());

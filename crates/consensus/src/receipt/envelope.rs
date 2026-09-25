@@ -1012,6 +1012,9 @@ mod test {
         assert_eq!(json["type"], "0x6");
         assert_eq!(json["status"], "0x1");
         assert_eq!(json["cumulativeGasUsed"], "0x2a");
+        assert_eq!(json["frameReceipts"][0]["gasUsed"], "0x16");
+        assert_eq!(json["frameReceipts"][0]["executionGasUsed"], "0x15");
+        assert_eq!(json["frameReceipts"][0]["stateGasUsed"], "0x1");
         assert!(json.get("payload").is_none());
 
         let decoded: ReceiptEnvelope<Log> = serde_json::from_value(json).unwrap();

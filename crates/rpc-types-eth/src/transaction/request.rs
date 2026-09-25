@@ -723,7 +723,10 @@ impl TransactionRequest {
         })
     }
 
-    fn validate_8141_fields(&self) -> Result<(TransactionFees, Option<Vec<B256>>), &'static str> {
+    fn validate_8141_fields(
+        &self,
+        allow_placeholders: bool,
+    ) -> Result<(TransactionFees, Option<Vec<B256>>), &'static str> {
         let sender = self.from.ok_or("sender")?;
         self.nonce.ok_or("nonce")?;
         let frames = self.frames.as_deref().ok_or("frames")?;
@@ -744,14 +747,18 @@ impl TransactionRequest {
                 self.blob_versioned_hashes.as_deref().unwrap_or_default(),
             ),
         };
-        alloy_consensus::transaction::eip8141::TxEip8141Ref {
+        let transaction = alloy_consensus::transaction::eip8141::TxEip8141Ref {
             sender,
             frames,
             signatures,
             fees: &fees,
             blob_versioned_hashes: &hashes,
+        };
+        if allow_placeholders {
+            transaction.validate_unsigned()?;
+        } else {
+            transaction.validate()?;
         }
-        .validate()?;
         Ok((
             fees,
             match hashes {
@@ -763,7 +770,7 @@ impl TransactionRequest {
 
     /// Builds the canonical frame transaction. Use the sidecar builder for raw submission.
     pub fn build_8141(self) -> Result<TxEip8141, ValueError<Self>> {
-        let (fees, hashes) = match self.validate_8141_fields() {
+        let (fees, hashes) = match self.validate_8141_fields(false) {
             Ok(fields) => fields,
             Err(error) => return Err(ValueError::new(self, error)),
         };
@@ -788,7 +795,7 @@ impl TransactionRequest {
     pub fn build_8141_with_sidecar(
         mut self,
     ) -> Result<TxEip8141WithSidecar<BlobTransactionSidecarEip7594>, ValueError<Self>> {
-        let (fees, hashes) = match self.validate_8141_fields() {
+        let (fees, hashes) = match self.validate_8141_fields(false) {
             Ok(fields) => fields,
             Err(error) => return Err(ValueError::new(self, error)),
         };
@@ -1188,7 +1195,7 @@ impl TransactionRequest {
     /// Checks frame request completeness and structure, returning the first missing or invalid
     /// field.
     pub fn complete_8141(&self) -> Result<(), Vec<&'static str>> {
-        self.validate_8141_fields().map(|_| ()).map_err(|error| vec![error])
+        self.validate_8141_fields(false).map(|_| ()).map_err(|error| vec![error])
     }
 
     /// Check if all necessary keys are present to build a legacy transaction,
@@ -1285,6 +1292,15 @@ impl TransactionRequest {
     pub fn build_typed_simulate_transaction(
         self,
     ) -> Result<alloy_consensus::EthereumTxEnvelope<TxEip4844>, ValueError<Self>> {
+        if self.preferred_type() == TxType::Eip8141 {
+            let (fees, hashes) = match self.validate_8141_fields(true) {
+                Ok(fields) => fields,
+                Err(error) => return Err(ValueError::new(self, error)),
+            };
+            return Ok(alloy_consensus::EthereumTxEnvelope::Eip8141(
+                alloy_primitives::Sealed::new(self.into_frame_transaction(fees, hashes)),
+            ));
+        }
         let tx = self
             .build_consensus_tx()
             .map_err(|err| ValueError::new(err.tx, "Transaction is not buildable"))?;

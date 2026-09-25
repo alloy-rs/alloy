@@ -37,7 +37,7 @@ struct SignatureRequest {
     signature: Option<Bytes>,
 }
 
-fn is_sender(address: &FrameAddress) -> bool {
+const fn is_sender(address: &FrameAddress) -> bool {
     address.address().is_none()
 }
 
@@ -166,6 +166,27 @@ mod tests {
         assert!(value["frames"][0].get("limits").is_none());
         assert!(value["signatures"][0].get("signature").is_none());
         assert!(value["signatures"][0].get("signer").is_none());
+    }
+
+    #[test]
+    fn unsigned_frame_fill_preserves_placeholders_without_weakening_signed_validation() {
+        let request: TransactionRequest = serde_json::from_value(json!({
+            "type": "0x6", "from": Address::repeat_byte(0x11), "chainId": "0x1", "nonce": "0x0",
+            "frames": [{"mode":"0x1", "executionGas":"0x123", "stateGas":"0x45"}],
+            "signatures": [{"scheme":"0x1"}],
+            "maxFeePerGas": "0x1", "maxPriorityFeePerGas": "0x0", "maxFeePerBlobGas": "0x0",
+            "blobVersionedHashes": []
+        }))
+        .unwrap();
+        assert!(request.clone().build_8141().is_err());
+        let transaction = request.build_typed_simulate_transaction().unwrap();
+        let value = serde_json::to_value(&transaction).unwrap();
+        assert_eq!(value["signatures"][0]["scheme"], "0x1");
+        assert!(value["signatures"][0].get("signature").is_none());
+        assert!(value["signatures"][0].get("signer").is_none());
+        let decoded: alloy_consensus::EthereumTxEnvelope<alloy_consensus::TxEip4844> =
+            serde_json::from_value(value).unwrap();
+        assert_eq!(decoded, transaction);
     }
 
     #[test]
