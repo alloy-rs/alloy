@@ -220,11 +220,7 @@ pub mod secp256k1 {
         signature: &Signature,
         hash: B256,
     ) -> Result<Address, RecoveryError> {
-        let mut sig: [u8; 65] = [0; 65];
-
-        sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
-        sig[64] = signature.v() as u8;
+        let sig = recoverable_signature_bytes(signature);
 
         // Try dynamic backend first when crypto-backend feature is enabled
         #[cfg(feature = "crypto-backend")]
@@ -248,6 +244,34 @@ pub mod secp256k1 {
             return Err(RecoveryError::from_source(InvalidSignatureS));
         }
         recover_signer_unchecked(signature, hash)
+    }
+
+    /// Recover the signer's uncompressed SEC1 public key (`0x04 || x || y`) from message hash,
+    /// _without ensuring that the signature has a low `s` value_.
+    ///
+    /// This always uses the compile-time selected implementation; a provider installed through the
+    /// `crypto-backend` feature only overrides address recovery and verification.
+    pub fn recover_public_key_unchecked(
+        signature: &Signature,
+        hash: B256,
+    ) -> Result<UncompressedPublicKey, RecoveryError> {
+        imp::recover_public_key_unchecked(&recoverable_signature_bytes(signature), &hash.0)
+            .map_err(|_| RecoveryError::new())
+    }
+
+    /// Recover the signer's uncompressed SEC1 public key (`0x04 || x || y`) from message hash.
+    /// This ensures that the signature S value is lower than `secp256k1n / 2`, as specified in
+    /// [EIP-2](https://eips.ethereum.org/EIPS/eip-2).
+    ///
+    /// If the S value is too large, then this will return a `RecoveryError`
+    pub fn recover_public_key(
+        signature: &Signature,
+        hash: B256,
+    ) -> Result<UncompressedPublicKey, RecoveryError> {
+        if signature.s() > SECP256K1N_HALF {
+            return Err(RecoveryError::from_source(InvalidSignatureS));
+        }
+        recover_public_key_unchecked(signature, hash)
     }
 
     /// Verify a signature against a public key and message hash, _without ensuring that the
@@ -288,6 +312,15 @@ pub mod secp256k1 {
         }
         verify_and_compute_signer_unchecked(pubkey, signature, hash)
     }
+
+    /// Serializes a signature as `r || s || y_parity` for the recovery implementations.
+    fn recoverable_signature_bytes(signature: &Signature) -> [u8; 65] {
+        let mut sig = [0; 65];
+        sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
+        sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
+        sig[64] = signature.v() as u8;
+        sig
+    }
 }
 
 #[cfg(feature = "secp256k1")]
@@ -309,11 +342,24 @@ mod impl_secp256k1 {
         sig: &[u8; 65],
         msg: &[u8; 32],
     ) -> Result<Address, Error> {
+        recover_key(sig, msg).map(public_key_to_address)
+    }
+
+    /// Recovers the uncompressed public key of the sender using secp256k1 pubkey recovery.
+    ///
+    /// This does not ensure that the `s` value in the signature is low, and _just_ wraps the
+    /// underlying secp256k1 library.
+    pub(crate) fn recover_public_key_unchecked(
+        sig: &[u8; 65],
+        msg: &[u8; 32],
+    ) -> Result<[u8; 65], Error> {
+        recover_key(sig, msg).map(|public| public.serialize_uncompressed())
+    }
+
+    fn recover_key(sig: &[u8; 65], msg: &[u8; 32]) -> Result<PublicKey, Error> {
         let sig =
             RecoverableSignature::from_compact(&sig[0..64], RecoveryId::try_from(sig[64] as i32)?)?;
-
-        let public = SECP256K1.recover_ecdsa(&Message::from_digest(*msg), &sig)?;
-        Ok(public_key_to_address(public))
+        SECP256K1.recover_ecdsa(&Message::from_digest(*msg), &sig)
     }
 
     /// Verifies a signature against a public key and returns the address.
@@ -375,6 +421,26 @@ mod impl_k256 {
         sig: &[u8; 65],
         msg: &[u8; 32],
     ) -> Result<Address, Error> {
+        recover_key(sig, msg).map(public_key_to_address)
+    }
+
+    /// Recovers the uncompressed public key of the sender using secp256k1 pubkey recovery.
+    ///
+    /// This does not ensure that the `s` value in the signature is low, and _just_ wraps the
+    /// underlying secp256k1 library.
+    pub(crate) fn recover_public_key_unchecked(
+        sig: &[u8; 65],
+        msg: &[u8; 32],
+    ) -> Result<[u8; 65], Error> {
+        let public = recover_key(sig, msg)?;
+        Ok(public
+            .to_encoded_point(/* compress = */ false)
+            .as_bytes()
+            .try_into()
+            .expect("uncompressed SEC1 public key is 65 bytes"))
+    }
+
+    fn recover_key(sig: &[u8; 65], msg: &[u8; 32]) -> Result<VerifyingKey, Error> {
         let mut signature = k256::ecdsa::Signature::from_slice(&sig[0..64])?;
         let mut recid = sig[64];
 
@@ -385,9 +451,7 @@ mod impl_k256 {
         }
         let recid = RecoveryId::from_byte(recid).expect("recovery ID is valid");
 
-        // recover key
-        let recovered_key = VerifyingKey::recover_from_prehash(&msg[..], &signature, recid)?;
-        Ok(public_key_to_address(recovered_key))
+        VerifyingKey::recover_from_prehash(&msg[..], &signature, recid)
     }
 
     /// Verifies a signature against a public key and returns the address.
@@ -521,6 +585,29 @@ mod tests {
         assert_eq!(k256_recovered, k256_signer);
 
         assert_eq!(secp256k1_recovered, k256_recovered);
+        assert_eq!(
+            impl_secp256k1::recover_public_key_unchecked(&sig, &hash).expect("secp256k1 recover"),
+            impl_k256::recover_public_key_unchecked(&sig, &hash).expect("k256 recover")
+        );
+    }
+
+    #[test]
+    #[cfg(any(feature = "secp256k1", feature = "k256"))]
+    fn recover_public_key_matches_signer() {
+        use super::{secp256k1::*, SECP256K1N_HALF};
+        use alloy_primitives::{keccak256, Address, Signature, B256, U256};
+
+        let hash = keccak256(b"hello world");
+        let signature = sign_message(B256::with_last_byte(1), hash).expect("sign message");
+        let public_key = recover_public_key(&signature, hash).expect("recover public key");
+        let signer = recover_signer(&signature, hash).expect("recover signer");
+
+        assert_eq!(public_key[0], 0x04);
+        assert_eq!(Address::from_raw_public_key(&public_key[1..]), signer);
+        assert_eq!(verify_and_compute_signer(&public_key, &signature, hash).ok(), Some(signer));
+
+        let high_s = Signature::new(signature.r(), SECP256K1N_HALF + U256::from(1), false);
+        assert!(recover_public_key(&high_s, hash).is_err());
     }
 
     #[cfg(feature = "crypto-backend")]
