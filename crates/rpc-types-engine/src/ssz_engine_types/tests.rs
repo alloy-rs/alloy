@@ -672,3 +672,86 @@ fn body_response_constructor_rejects_oversized_list() {
     )
     .is_err());
 }
+
+fn witness_status(status: PayloadStatusKind) -> PayloadStatus {
+    PayloadStatus {
+        status,
+        latest_valid_hash: Optional::none(),
+        validation_error: Optional::none(),
+    }
+}
+
+#[test]
+fn witness_response_roundtrips_for_valid_payload() {
+    let witness = ExecutionWitness {
+        state: vec![Bytes::from_static(&[1, 2, 3])],
+        codes: vec![Bytes::from_static(&[4, 5])],
+        headers: vec![Bytes::from_static(&[6])],
+    };
+    let public_keys = vec![FixedBytes::repeat_byte(7), FixedBytes::repeat_byte(8)];
+    let response = PayloadStatusWithWitness::new(
+        witness_status(PayloadStatusKind::Valid),
+        Some(witness.clone()),
+        public_keys.clone(),
+    );
+    assert_eq!(response.witness.as_ref(), Some(&witness));
+    assert_eq!(response.public_keys, public_keys);
+
+    // Three offsets, then the variable fields; public keys are concatenated without offsets.
+    let bytes = response.as_ssz_bytes();
+    let keys_offset = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+    assert_eq!(bytes.len() - keys_offset, 2 * 65);
+    assert_roundtrip(&response);
+}
+
+#[test]
+fn witness_response_omits_witness_and_keys_for_non_valid_status() {
+    for status in
+        [PayloadStatusKind::Invalid, PayloadStatusKind::Syncing, PayloadStatusKind::Accepted]
+    {
+        let response = PayloadStatusWithWitness::new(
+            witness_status(status),
+            Some(ExecutionWitness::default()),
+            vec![FixedBytes::ZERO],
+        );
+        assert!(response.witness.is_none());
+        assert!(response.public_keys.is_empty());
+        assert_roundtrip(&response);
+
+        for response in [
+            PayloadStatusWithWitness {
+                payload_status: witness_status(status),
+                witness: Optional::some(ExecutionWitness::default()),
+                public_keys: vec![],
+            },
+            PayloadStatusWithWitness {
+                payload_status: witness_status(status),
+                witness: Optional::none(),
+                public_keys: vec![FixedBytes::ZERO],
+            },
+        ] {
+            assert!(PayloadStatusWithWitness::from_ssz_bytes(&response.as_ssz_bytes()).is_err());
+        }
+    }
+}
+
+#[test]
+fn witness_bounds() {
+    let item = |len| vec![Bytes::from(vec![0; len])];
+    let empty = ExecutionWitness::default;
+    for (witness, valid) in [
+        (ExecutionWitness { state: item(MAX_BYTES_PER_WITNESS_NODE), ..empty() }, true),
+        (ExecutionWitness { state: item(MAX_BYTES_PER_WITNESS_NODE + 1), ..empty() }, false),
+        (ExecutionWitness { codes: item(MAX_BYTES_PER_CODE), ..empty() }, true),
+        (ExecutionWitness { codes: item(MAX_BYTES_PER_CODE + 1), ..empty() }, false),
+        (ExecutionWitness { headers: item(MAX_BYTES_PER_HEADER), ..empty() }, true),
+        (ExecutionWitness { headers: item(MAX_BYTES_PER_HEADER + 1), ..empty() }, false),
+        (ExecutionWitness { headers: vec![Bytes::new(); MAX_WITNESS_HEADERS], ..empty() }, true),
+        (
+            ExecutionWitness { headers: vec![Bytes::new(); MAX_WITNESS_HEADERS + 1], ..empty() },
+            false,
+        ),
+    ] {
+        assert_eq!(ExecutionWitness::from_ssz_bytes(&witness.as_ssz_bytes()).is_ok(), valid);
+    }
+}
