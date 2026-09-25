@@ -41,19 +41,15 @@ impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for AnyRec
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct GasUsed {
-            #[serde(with = "alloy_serde::quantity")]
-            execution: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            state: u64,
-        }
-
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
         struct FrameReceipt<T> {
             #[serde(with = "alloy_serde::quantity")]
             status: u8,
-            gas_used: GasUsed,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_used: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            execution_gas_used: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            state_gas_used: u64,
             logs: Vec<T>,
         }
 
@@ -78,11 +74,16 @@ impl<'de, T: serde::Deserialize<'de> + Clone> serde::Deserialize<'de> for AnyRec
                         .ok_or_else(|| {
                             serde::de::Error::custom("invalid EIP-8141 frame receipt status")
                         })?;
+                    if receipt.gas_used
+                        != receipt.execution_gas_used.saturating_add(receipt.state_gas_used)
+                    {
+                        return Err(serde::de::Error::custom("inconsistent frame gas used"));
+                    }
                     Ok(alloy_eips::eip8141::FrameReceipt {
                         status,
                         gas_used: alloy_eips::eip8141::FrameGasUsed {
-                            execution: receipt.gas_used.execution,
-                            state: receipt.gas_used.state,
+                            execution: receipt.execution_gas_used,
+                            state: receipt.state_gas_used,
                         },
                         logs: receipt.logs,
                     })
