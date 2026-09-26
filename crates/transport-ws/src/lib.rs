@@ -15,7 +15,7 @@ use std::time::Duration;
 #[cfg(not(target_family = "wasm"))]
 mod native;
 #[cfg(not(target_family = "wasm"))]
-pub use native::{WebSocketConfig, WsConnect};
+pub use native::{Connector, WebSocketConfig, WsConnect};
 
 #[cfg(target_family = "wasm")]
 mod wasm;
