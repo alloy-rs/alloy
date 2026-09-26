@@ -1085,6 +1085,7 @@ dependencies = [
  "opentelemetry-http",
  "reqwest 0.13.5",
  "serde_json",
+ "tokio",
  "tower",
  "tracing",
  "tracing-opentelemetry",

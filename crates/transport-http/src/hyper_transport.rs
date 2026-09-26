@@ -1,4 +1,4 @@
-use crate::{Http, HttpConnect};
+use crate::{body::BodyError, Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
@@ -6,7 +6,7 @@ use alloy_transport::{
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
-    body::{Bytes, Incoming},
+    body::{Body, Buf, Bytes, Incoming},
     header, Request, Response,
 };
 use hyper_util::client::legacy::Error;
@@ -130,9 +130,35 @@ where
 
         debug!(%status, "received response from server");
 
-        let body = resp.into_body().collect().await.map(|body| body.to_bytes());
+        let body = collect_body(resp.into_body(), self.settings.max_response_size()).await;
         crate::handle_response(status.as_u16(), retry_after, body)
     }
+}
+
+/// Collects the response body, failing as soon as it exceeds `max` bytes, if set.
+async fn collect_body<B: Body>(body: B, max: Option<usize>) -> Result<Bytes, BodyError<B::Error>> {
+    let Some(max) = max else {
+        return body.collect().await.map(|body| body.to_bytes()).map_err(BodyError::Read);
+    };
+    if body.size_hint().lower() > max as u64 {
+        return Err(BodyError::TooLarge(max));
+    }
+
+    let mut body = std::pin::pin!(body);
+    let mut buf = Vec::new();
+    while let Some(frame) = body.frame().await {
+        let Ok(mut data) = frame.map_err(BodyError::Read)?.into_data() else { continue };
+        if buf.len() + data.remaining() > max {
+            return Err(BodyError::TooLarge(max));
+        }
+        while data.has_remaining() {
+            let chunk = data.chunk();
+            let len = chunk.len();
+            buf.extend_from_slice(chunk);
+            data.advance(len);
+        }
+    }
+    Ok(buf.into())
 }
 
 impl TransportConnect for HttpConnect<HyperTransport> {
