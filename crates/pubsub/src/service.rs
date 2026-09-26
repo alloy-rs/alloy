@@ -123,6 +123,28 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
+    /// Service a batch request by serializing all requests into a single
+    /// JSON-RPC batch message.
+    fn service_batch_request(&mut self, in_flights: Vec<InFlight>) -> TransportResult<()> {
+        let mut json = String::from("[");
+        for (i, in_flight) in in_flights.iter().enumerate() {
+            if i > 0 {
+                json.push(',');
+            }
+            json.push_str(in_flight.request().serialized().get());
+        }
+        json.push(']');
+
+        let brv = RawValue::from_string(json).expect("request array is valid JSON");
+        self.dispatch_request(brv)?;
+
+        for in_flight in in_flights {
+            self.in_flights.insert(in_flight);
+        }
+
+        Ok(())
+    }
+
     /// Service a GetSub instruction.
     ///
     /// If the subscription exists, the waiter is sent `Some` broadcast receiver. If
@@ -149,6 +171,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         trace!(?ix, "servicing instruction");
         match ix {
             PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
+            PubSubInstruction::BatchRequest(in_flights) => self.service_batch_request(in_flights),
             PubSubInstruction::GetSub(alias, tx) => {
                 self.service_get_sub(alias, tx);
                 Ok(())
@@ -160,14 +183,23 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Handle an item from the backend.
     fn handle_item(&mut self, item: PubSubItem) -> TransportResult<()> {
         match item {
-            PubSubItem::Response(resp) => match self.in_flights.handle_response(resp) {
-                Some((server_id, in_flight)) => self.handle_sub_response(in_flight, server_id),
-                None => Ok(()),
-            },
+            PubSubItem::Response(resp) => self.handle_response(resp),
+            PubSubItem::BatchResponse(resps) => {
+                resps.into_iter().try_for_each(|resp| self.handle_response(resp))
+            }
             PubSubItem::Notification(notification) => {
                 self.subs.notify(notification);
                 Ok(())
             }
+        }
+    }
+
+    /// Handle a single response from the backend, routing it to the waiting
+    /// in-flight request.
+    fn handle_response(&mut self, resp: Response) -> TransportResult<()> {
+        match self.in_flights.handle_response(resp) {
+            Some((server_id, in_flight)) => self.handle_sub_response(in_flight, server_id),
+            None => Ok(()),
         }
     }
 
@@ -433,6 +465,87 @@ mod tests {
 
         assert_eq!(reconnect_retry_interval(base, 1), Duration::from_secs(60));
         assert_eq!(reconnect_retry_interval(base, 2), Duration::from_secs(60));
+    }
+
+    #[tokio::test]
+    async fn batch_is_dispatched_as_single_message() {
+        use alloy_json_rpc::{RequestPacket, ResponsePacket};
+
+        let (handle, mut interface) = ConnectionHandle::new();
+        let connector = MockConnect(Arc::new(Mutex::new(None)));
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+
+        let frontend = PubSubFrontend::new(tx);
+
+        let req1 = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let req2 = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
+        let expected = format!("[{},{}]", req1.serialized().get(), req2.serialized().get());
+
+        let fut = tokio::spawn(frontend.send_packet(RequestPacket::Batch(vec![req1, req2])));
+
+        // The backend must receive exactly one message, containing the JSON array.
+        let dispatched = timeout(Duration::from_secs(1), interface.recv_from_frontend())
+            .await
+            .expect("batch should be dispatched")
+            .expect("backend should receive the batch");
+        assert_eq!(dispatched.get(), expected);
+
+        // Reply out of order to exercise id-based routing.
+        let batch_response = r#"[
+            { "jsonrpc": "2.0", "id": 2, "result": "0x1" },
+            { "jsonrpc": "2.0", "id": 1, "result": "0x123" }
+        ]"#;
+        let item: PubSubItem = serde_json::from_str(batch_response).unwrap();
+        interface.send_to_frontend(item).unwrap();
+
+        let responses = timeout(Duration::from_secs(1), fut)
+            .await
+            .expect("batch should resolve")
+            .expect("task should not panic")
+            .expect("batch should succeed");
+        let ResponsePacket::Batch(responses) = responses else {
+            panic!("expected a batch response packet")
+        };
+        assert_eq!(responses.len(), 2);
+        // Responses are returned in request order, not response order.
+        assert_eq!(responses[0].id, Id::Number(1));
+        assert_eq!(responses[1].id, Id::Number(2));
+    }
+
+    #[tokio::test]
+    async fn empty_batch_resolves_without_dispatch() {
+        use alloy_json_rpc::{RequestPacket, ResponsePacket};
+
+        let (handle, mut interface) = ConnectionHandle::new();
+        let connector = MockConnect(Arc::new(Mutex::new(None)));
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+
+        let frontend = PubSubFrontend::new(tx);
+        let resp =
+            timeout(Duration::from_secs(1), frontend.send_packet(RequestPacket::Batch(vec![])))
+                .await
+                .expect("empty batch should resolve immediately")
+                .expect("empty batch should succeed");
+        assert!(matches!(resp, ResponsePacket::Batch(resps) if resps.is_empty()));
+
+        // Nothing should have been sent to the backend.
+        assert!(interface.from_frontend.try_recv().is_err());
     }
 
     #[tokio::test]
