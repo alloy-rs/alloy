@@ -1,4 +1,4 @@
-use crate::{Http, HttpConnect};
+use crate::{body::BodyError, Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
@@ -6,7 +6,7 @@ use alloy_transport::{
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
-    body::{Bytes, Incoming},
+    body::{Body, Buf, Bytes, Incoming},
     header, Request, Response,
 };
 use hyper_util::client::legacy::Error;
@@ -150,8 +150,8 @@ where
         // Unpack data from the response body. We do this regardless of
         // the status code, as we want to return the error in the body
         // if there is one.
-        let body = match resp.into_body().collect().await {
-            Ok(body) => body.to_bytes(),
+        let body = match collect_body(resp.into_body(), self.settings.max_response_size()).await {
+            Ok(body) => body,
             // A failed body read on an error response still carries retryable metadata.
             Err(err) if !status.is_success() => {
                 return Err(TransportErrorKind::http_error_with_retry_after(
@@ -160,7 +160,7 @@ where
                     retry_after,
                 ));
             }
-            Err(err) => return Err(TransportErrorKind::custom(err)),
+            Err(err) => return Err(err.into_transport_error()),
         };
 
         if tracing::enabled!(tracing::Level::TRACE) {
@@ -179,6 +179,32 @@ where
         serde_json::from_slice(&body)
             .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref())))
     }
+}
+
+/// Collects the response body, failing as soon as it exceeds `max` bytes, if set.
+async fn collect_body<B: Body>(body: B, max: Option<usize>) -> Result<Bytes, BodyError<B::Error>> {
+    let Some(max) = max else {
+        return body.collect().await.map(|body| body.to_bytes()).map_err(BodyError::Read);
+    };
+    if body.size_hint().lower() > max as u64 {
+        return Err(BodyError::TooLarge(max));
+    }
+
+    let mut body = std::pin::pin!(body);
+    let mut buf = Vec::new();
+    while let Some(frame) = body.frame().await {
+        let Ok(mut data) = frame.map_err(BodyError::Read)?.into_data() else { continue };
+        if buf.len() + data.remaining() > max {
+            return Err(BodyError::TooLarge(max));
+        }
+        while data.has_remaining() {
+            let chunk = data.chunk();
+            let len = chunk.len();
+            buf.extend_from_slice(chunk);
+            data.advance(len);
+        }
+    }
+    Ok(buf.into())
 }
 
 impl TransportConnect for HttpConnect<HyperTransport> {

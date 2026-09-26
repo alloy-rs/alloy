@@ -1,4 +1,4 @@
-use crate::{Http, HttpConnect};
+use crate::{body::BodyError, Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
@@ -32,7 +32,7 @@ impl TransportConnect for ReqwestConnect {
 impl Http<Client> {
     /// Create a new [`Http`] transport.
     pub fn new(url: Url) -> Self {
-        Self { client: Default::default(), url }
+        Self::with_client(Default::default(), url)
     }
 
     #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
@@ -59,7 +59,11 @@ impl Http<Client> {
         // Unpack data from the response body. We do this regardless of
         // the status code, as we want to return the error in the body
         // if there is one.
-        let body = match resp.bytes().await {
+        let body = match self.settings.max_response_size() {
+            None => resp.bytes().await.map_err(BodyError::Read),
+            Some(max) => read_body_limited(resp, max).await.map(Into::into),
+        };
+        let body = match body {
             Ok(body) => body,
             // A failed body read on an error response still carries retryable metadata.
             Err(err) if !status.is_success() => {
@@ -69,7 +73,7 @@ impl Http<Client> {
                     retry_after,
                 ));
             }
-            Err(err) => return Err(TransportErrorKind::custom(err)),
+            Err(err) => return Err(err.into_transport_error()),
         };
 
         if tracing::enabled!(tracing::Level::TRACE) {
@@ -87,6 +91,39 @@ impl Http<Client> {
         // is lossy and may not cover all the bytes in the body.
         serde_json::from_slice(&body)
             .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(&body)))
+    }
+}
+
+/// Reads the response body, failing as soon as it exceeds `max` bytes.
+async fn read_body_limited(
+    resp: reqwest::Response,
+    max: usize,
+) -> Result<Vec<u8>, BodyError<reqwest::Error>> {
+    if resp.content_length().is_some_and(|len| len > max as u64) {
+        return Err(BodyError::TooLarge(max));
+    }
+
+    // wasm responses can't be read incrementally, so the size is only checked after reading.
+    #[cfg(target_family = "wasm")]
+    {
+        let body = resp.bytes().await.map_err(BodyError::Read)?;
+        if body.len() > max {
+            return Err(BodyError::TooLarge(max));
+        }
+        Ok(body.into())
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let mut resp = resp;
+        let mut body = Vec::new();
+        while let Some(chunk) = resp.chunk().await.map_err(BodyError::Read)? {
+            if body.len() + chunk.len() > max {
+                return Err(BodyError::TooLarge(max));
+            }
+            body.extend_from_slice(&chunk);
+        }
+        Ok(body)
     }
 }
 
