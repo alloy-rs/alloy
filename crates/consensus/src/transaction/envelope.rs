@@ -1053,7 +1053,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{Recovered, SignableTransaction, SignerRecoverable},
+        transaction::{PooledTransaction, Recovered, SignableTransaction, SignerRecoverable},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
@@ -1067,7 +1067,7 @@ mod tests {
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
     use alloy_primitives::{hex, Address, Signature, U256};
-    use alloy_rlp::Decodable;
+    use alloy_rlp::{Decodable, Header};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]
@@ -1592,7 +1592,7 @@ mod tests {
         tagged.extend_from_slice(&envelope.encoded_2718());
         // Network framing of a typed payload: an RLP string header followed by the payload.
         let mut tagged_network = Vec::new();
-        alloy_rlp::Header { list: false, payload_length: tagged.len() }.encode(&mut tagged_network);
+        Header { list: false, payload_length: tagged.len() }.encode(&mut tagged_network);
         tagged_network.extend_from_slice(&tagged);
 
         assert!(matches!(
@@ -1618,6 +1618,19 @@ mod tests {
             <Signed<TxLegacy> as Decodable2718>::network_decode(&mut tagged_network.as_slice()),
             Err(Eip2718Error::UnexpectedType(0))
         ));
+        assert!(
+            PooledTransaction::decode_2718_exact(&tagged).is_err(),
+            "pooled envelopes must also reject a literal 0x00 type-prefix byte"
+        );
+
+        // The p2p representation wraps the direct EIP-2718 bytes in an RLP string. This used to
+        // bypass the fuzzer's `data.first() == Some(&0)` exclusion because its first byte is the
+        // RLP string header rather than the transaction type.
+        let mut pooled_network_input = tagged_network.as_slice();
+        assert!(
+            PooledTransaction::decode(&mut pooled_network_input).is_err(),
+            "pooled network envelopes must reject an RLP-wrapped 0x00-tagged legacy transaction"
+        );
     }
 
     #[cfg(feature = "serde")]
