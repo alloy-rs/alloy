@@ -4,9 +4,9 @@ use crate::parity::{
     Action, CallAction, CreateAction, CreateOutput, RewardAction, SelfdestructAction, TraceOutput,
     TransactionTrace,
 };
-use alloy_eips::{eip1898::LenientBlockNumberOrTag, BlockNumberOrTag};
+use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{map::AddressHashSet, Address};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// Trace filter.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,14 +17,14 @@ pub struct TraceFilter {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_block"
+        deserialize_with = "alloy_eips::eip1898::lenient_block_number_or_tag::opt::deserialize"
     )]
     pub from_block: Option<BlockNumberOrTag>,
     /// To block
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_block"
+        deserialize_with = "alloy_eips::eip1898::lenient_block_number_or_tag::opt::deserialize"
     )]
     pub to_block: Option<BlockNumberOrTag>,
     /// From address
@@ -95,15 +95,6 @@ impl TraceFilter {
         let to_addresses = self.to_address.iter().copied().collect();
         TraceFilterMatcher { mode: self.mode, from_addresses, to_addresses }
     }
-}
-
-/// Deserializes an optional block tag or block number, also accepting JSON numbers and decimal
-/// strings.
-fn deserialize_block<'de, D>(deserializer: D) -> Result<Option<BlockNumberOrTag>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Ok(Option::<LenientBlockNumberOrTag>::deserialize(deserializer)?.map(Into::into))
 }
 
 /// How to apply `from_address` and `to_address` filters.
