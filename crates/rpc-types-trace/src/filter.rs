@@ -4,6 +4,7 @@ use crate::parity::{
     Action, CallAction, CreateAction, CreateOutput, RewardAction, SelfdestructAction, TraceOutput,
     TransactionTrace,
 };
+use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{map::AddressHashSet, Address};
 use serde::{Deserialize, Serialize};
 
@@ -13,11 +14,19 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct TraceFilter {
     /// From block
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub from_block: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_eips::eip1898::lenient_block_number_or_tag::opt::deserialize"
+    )]
+    pub from_block: Option<BlockNumberOrTag>,
     /// To block
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub to_block: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_eips::eip1898::lenient_block_number_or_tag::opt::deserialize"
+    )]
+    pub to_block: Option<BlockNumberOrTag>,
     /// From address
     #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub from_address: Vec<Address>,
@@ -39,14 +48,14 @@ pub struct TraceFilter {
 
 impl TraceFilter {
     /// Sets the `from_block` field of the struct
-    pub const fn from_block(mut self, block: u64) -> Self {
-        self.from_block = Some(block);
+    pub fn from_block(mut self, block: impl Into<BlockNumberOrTag>) -> Self {
+        self.from_block = Some(block.into());
         self
     }
 
     /// Sets the `to_block` field of the struct
-    pub const fn to_block(mut self, block: u64) -> Self {
-        self.to_block = Some(block);
+    pub fn to_block(mut self, block: impl Into<BlockNumberOrTag>) -> Self {
+        self.to_block = Some(block.into());
         self
     }
 
@@ -216,8 +225,29 @@ mod tests {
     fn test_parse_filter() {
         let s = r#"{"fromBlock":  "0x3","toBlock":  "0x5"}"#;
         let filter: TraceFilter = serde_json::from_str(s).unwrap();
-        assert_eq!(filter.from_block, Some(3));
-        assert_eq!(filter.to_block, Some(5));
+        assert_eq!(filter.from_block, Some(3.into()));
+        assert_eq!(filter.to_block, Some(5.into()));
+    }
+
+    #[test]
+    fn parse_filter_block_tags() {
+        for (block, expected) in [
+            (json!("earliest"), BlockNumberOrTag::Earliest),
+            (json!("latest"), BlockNumberOrTag::Latest),
+            (json!("safe"), BlockNumberOrTag::Safe),
+            (json!("finalized"), BlockNumberOrTag::Finalized),
+            (json!("pending"), BlockNumberOrTag::Pending),
+            (json!("0x2a"), BlockNumberOrTag::Number(42)),
+            (json!("42"), BlockNumberOrTag::Number(42)),
+            (json!(42), BlockNumberOrTag::Number(42)),
+        ] {
+            let filter: TraceFilter =
+                serde_json::from_value(json!({ "fromBlock": block, "toBlock": block })).unwrap();
+            assert_eq!(filter.from_block, Some(expected));
+            assert_eq!(filter.to_block, Some(expected));
+            assert_eq!(serde_json::to_value(&filter).unwrap()["toBlock"], json!(expected));
+        }
+        assert!(serde_json::from_value::<TraceFilter>(json!({ "toBlock": "head" })).is_err());
     }
 
     #[test]

@@ -23,6 +23,7 @@ rustdoc-args = [
 workspace = true
 
 [dependencies]
+alloy-eips = { workspace = true, features = ["serde"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 alloy-rpc-types-eth = { workspace = true, features = ["std", "serde"] }
 alloy-serde.workspace = true

@@ -767,6 +767,7 @@ dependencies = [
 name = "alloy-rpc-types-trace"
 version = "2.5.0"
 dependencies = [
+ "alloy-eips",
  "alloy-primitives",
  "alloy-rpc-types-eth",
  "alloy-serde",
