@@ -1,11 +1,14 @@
-use alloy_network::{Ethereum, Network};
-use alloy_primitives::{BlockNumber, U64};
+use alloy_consensus::BlockHeader;
+use alloy_network::{BlockResponse, Ethereum, Network};
+use alloy_network_primitives::HeaderResponse;
+use alloy_primitives::{BlockNumber, B256, U64};
 use alloy_rpc_client::{NoParams, PollerBuilder, WeakClient};
 use alloy_transport::RpcError;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
 use std::{
+    collections::VecDeque,
     marker::PhantomData,
     num::NonZeroUsize,
     sync::{
@@ -19,6 +22,9 @@ use futures::{future::Either, FutureExt};
 
 /// The size of the block cache.
 const BLOCK_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(10).unwrap();
+
+/// Number of yielded block hashes kept to find where a reorg forked off.
+const MAX_REORG_DEPTH: usize = 64;
 
 /// Maximum number of retries for fetching a block.
 const MAX_RETRIES: usize = 3;
@@ -67,6 +73,9 @@ pub(crate) struct NewBlocks<N: Network = Ethereum> {
     next_yield: BlockNumber,
     /// LRU cache of known blocks. Only used by the polling task.
     known_blocks: LruCache<BlockNumber, N::BlockResponse>,
+    /// Numbers and hashes of the most recently yielded blocks, used to detect reorgs.
+    /// Only used by the polling task.
+    yielded: VecDeque<(BlockNumber, B256)>,
     pub(crate) paused: Arc<Paused>,
     _phantom: PhantomData<N>,
 }
@@ -77,6 +86,7 @@ impl<N: Network> NewBlocks<N> {
             client,
             next_yield: NO_BLOCK_NUMBER,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
+            yielded: VecDeque::new(),
             paused: Arc::default(),
             _phantom: PhantomData,
         }
@@ -112,8 +122,6 @@ impl<N: Network> NewBlocks<N> {
     async fn into_subscription_stream(
         self,
     ) -> Option<impl Stream<Item = N::BlockResponse> + 'static> {
-        use alloy_consensus::BlockHeader;
-
         let Some(client) = self.client.upgrade() else {
             debug!("client dropped");
             return None;
@@ -159,7 +167,33 @@ impl<N: Network> NewBlocks<N> {
         'task: loop {
             // Clear any buffered blocks.
             while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
+                // A block that doesn't build on the last yielded one means the chain reorged,
+                // possibly at the same height, which block numbers alone don't reveal. Step back
+                // and yield the new canonical blocks instead, so consumers see the reorg.
+                if let Some(&(number, hash)) = self.yielded.back() {
+                    if number + 1 == self.next_yield && hash != known_block.header().parent_hash() {
+                        debug!(number, "reorg detected, refetching block");
+                        self.yielded.pop_back();
+                        self.known_blocks.put(self.next_yield, known_block);
+                        self.next_yield = number;
+                        // If this fails, the next tip refills from `number`.
+                        if let Some(client) = self.client.upgrade() {
+                            let block = client
+                                .request("eth_getBlockByNumber", (U64::from(number), false))
+                                .await;
+                            if let Ok(Some(block)) = block {
+                                self.known_blocks.put(number, block);
+                            }
+                        }
+                        continue;
+                    }
+                }
+
                 debug!(number=self.next_yield, "yielding block");
+                if self.yielded.len() == MAX_REORG_DEPTH {
+                    self.yielded.pop_front();
+                }
+                self.yielded.push_back((self.next_yield, known_block.header().hash()));
                 self.next_yield += 1;
                 yield known_block;
             }
@@ -168,6 +202,7 @@ impl<N: Network> NewBlocks<N> {
             // Once unpaused, reset `self.next_yield` to ignore the blocks that were included while we were paused.
             if self.paused.wait().await {
                 self.next_yield = NO_BLOCK_NUMBER;
+                self.yielded.clear();
             }
 
             // Get the tip.
@@ -244,9 +279,9 @@ mod regression_tests {
         heart::{Heartbeat, PendingTransactionConfig},
         Provider, ProviderBuilder,
     };
-    use alloy_primitives::B256;
-    use alloy_rpc_types_eth::Block;
+    use alloy_rpc_types_eth::{Block, BlockTransactions};
     use alloy_transport::mock::Asserter;
+    use futures::FutureExt;
     use std::time::Duration;
 
     #[tokio::test]
@@ -272,6 +307,47 @@ mod regression_tests {
             tokio::time::timeout(Duration::from_secs(2), pending).await.unwrap().unwrap(),
             tx_hash
         );
+    }
+
+    #[tokio::test]
+    async fn heartbeat_handles_same_height_reorg() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let block = |number, hash, parent_hash, txs| {
+            let mut block: Block = Block::default();
+            block.header.hash = B256::with_last_byte(hash);
+            block.header.inner.number = number;
+            block.header.inner.parent_hash = B256::with_last_byte(parent_hash);
+            block.transactions = BlockTransactions::Hashes(txs);
+            block
+        };
+        let orphaned_tx = B256::with_last_byte(1);
+        let canonical_tx = B256::with_last_byte(2);
+
+        // Block 1 is replaced at the same height, which only shows in the parent of block 2.
+        asserter.push_success(&Some(block(0, 10, 0, vec![])));
+        asserter.push_success(&Some(block(1, 11, 10, vec![orphaned_tx])));
+        asserter.push_success(&Some(block(2, 22, 21, vec![])));
+        asserter.push_success(&Some(block(1, 21, 10, vec![canonical_tx])));
+
+        let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client());
+        let paused = new_blocks.paused.clone();
+        let numbers = futures::stream::iter([1, 2]);
+        let stream = Box::pin(new_blocks.into_block_stream(numbers));
+        let heartbeat = Heartbeat::<Ethereum, _>::new(stream, paused).spawn();
+
+        let watch = |tx_hash| {
+            let config = PendingTransactionConfig::new(tx_hash).with_required_confirmations(2);
+            heartbeat.watch_tx(config, None)
+        };
+        let orphaned = watch(orphaned_tx).await.unwrap();
+        let canonical = watch(canonical_tx).await.unwrap();
+
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(2), canonical).await.unwrap().unwrap(),
+            canonical_tx
+        );
+        assert!(orphaned.now_or_never().is_none(), "orphaned transaction was confirmed");
     }
 }
 
