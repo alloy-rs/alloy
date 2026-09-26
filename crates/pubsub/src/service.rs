@@ -4,11 +4,13 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
-use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
+use alloy_json_rpc::{
+    Id, PubSubItem, Request, RequestPacket, Response, ResponsePayload, RpcError, SubId,
+};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
-    TransportErrorKind, TransportResult,
+    TransportError, TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -123,6 +125,32 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
+    /// Service a batch of requests.
+    ///
+    /// The requests are serialized into a single JSON-RPC array and dispatched
+    /// to the backend as one message, but each request is registered with the
+    /// [`RequestManager`] individually. Responses are therefore still routed to
+    /// their waiters by JSON-RPC ID, which is required because a server may
+    /// return the batch responses in any order.
+    fn service_batch(&mut self, in_flights: Vec<InFlight>) -> TransportResult<()> {
+        // Reuse the existing `RequestPacket` batch serialization instead of
+        // hand-writing the JSON array.
+        let packet = RequestPacket::Batch(
+            in_flights.iter().map(|in_flight| in_flight.request().clone()).collect(),
+        );
+        let brv = packet.serialize().map_err(TransportError::ser_err)?;
+
+        // One backend message for the whole batch...
+        self.dispatch_request(brv)?;
+
+        // ...but keep tracking each request by its own ID.
+        for in_flight in in_flights {
+            self.in_flights.insert(in_flight);
+        }
+
+        Ok(())
+    }
+
     /// Service a GetSub instruction.
     ///
     /// If the subscription exists, the waiter is sent `Some` broadcast receiver. If
@@ -149,6 +177,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         trace!(?ix, "servicing instruction");
         match ix {
             PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
+            PubSubInstruction::Batch(in_flights) => self.service_batch(in_flights),
             PubSubInstruction::GetSub(alias, tx) => {
                 self.service_get_sub(alias, tx);
                 Ok(())

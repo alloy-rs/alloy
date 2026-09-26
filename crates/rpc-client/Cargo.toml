@@ -61,6 +61,8 @@ ci_info.workspace = true
 tempfile = "3"
 futures-util.workspace = true
 similar-asserts.workspace = true
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "time"] }
+tokio-tungstenite.workspace = true
 
 [features]
 default = ["reqwest"]

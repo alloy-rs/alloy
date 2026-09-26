@@ -23,6 +23,7 @@ rustdoc-args = [
 workspace = true
 
 [dependencies]
+alloy-json-rpc.workspace = true
 alloy-pubsub.workspace = true
 alloy-transport.workspace = true
 
