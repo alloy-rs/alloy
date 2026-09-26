@@ -413,9 +413,12 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
             CallBatchMsgKind::ChainId => {
                 self.inner.get_chain_id().await.map(|res| m3_res(true, res.abi_encode().into()))
             }
-            CallBatchMsgKind::Balance(addr) => {
-                self.inner.get_balance(addr).await.map(|res| m3_res(true, res.abi_encode().into()))
-            }
+            CallBatchMsgKind::Balance(addr) => self
+                .inner
+                .get_balance(addr)
+                .latest()
+                .await
+                .map(|res| m3_res(true, res.abi_encode().into())),
         }
     }
 
@@ -661,6 +664,27 @@ mod tests {
         assert_eq!(block_number.unwrap(), head);
         assert_eq!(chain_id.unwrap(), alloy_chains::NamedChain::AnvilHardhat as u64);
         assert_eq!(balance.unwrap(), U256::from(123));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "anvil-api")]
+    async fn ignores_inner_default_block() {
+        use crate::ext::AnvilApi;
+        let provider = ProviderBuilder::new()
+            .with_call_batching()
+            .with_default_block(1.into())
+            .connect_anvil();
+        provider.anvil_set_code(MULTICALL3_ADDRESS, MULTICALL3_DEPLOYED_CODE.into()).await.unwrap();
+        provider.anvil_set_balance(COUNTER_ADDRESS, U256::from(100)).await.unwrap();
+        provider.anvil_mine(Some(2), None).await.unwrap();
+        provider.anvil_set_balance(COUNTER_ADDRESS, U256::from(200)).await.unwrap();
+
+        // A lone request takes the single-call fallback, a joined one goes through Multicall3.
+        let single = provider.get_balance(COUNTER_ADDRESS).await.unwrap();
+        let (batched, _) =
+            tokio::join!(provider.get_balance(COUNTER_ADDRESS), provider.get_chain_id());
+        assert_eq!(single, U256::from(200));
+        assert_eq!(batched.unwrap(), U256::from(200));
     }
 
     #[tokio::test]
