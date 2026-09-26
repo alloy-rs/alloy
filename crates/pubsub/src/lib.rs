@@ -31,3 +31,20 @@ pub use sub::{
     RawSubscription, SubAnyStream, SubResultStream, Subscription, SubscriptionItem,
     SubscriptionStream,
 };
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use getrandom as _; // Enable rand's browser entropy source.
+
+mod recovery;
+pub use recovery::{with_request_timings, PartialBatchError, RecoveryBackoff, RequestTimings};
+
+// Preserve the transport's native and browser clock implementations.
+mod time {
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+    pub(crate) use tokio::time::{sleep_until, timeout_at, Instant};
+    #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+    pub(crate) use wasmtimer::{
+        std::Instant,
+        tokio::{sleep_until, timeout_at},
+    };
+}

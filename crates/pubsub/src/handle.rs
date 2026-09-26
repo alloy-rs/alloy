@@ -1,7 +1,6 @@
 use alloy_json_rpc::PubSubItem;
 use alloy_transport::{TransportError, TransportErrorKind};
 use serde_json::value::RawValue;
-use std::time::Duration;
 use tokio::sync::{
     mpsc,
     oneshot::{self, error::TryRecvError},
@@ -33,15 +32,6 @@ pub struct ConnectionHandle {
 
     /// Notify the backend of intentional shutdown.
     pub(crate) shutdown: oneshot::Sender<()>,
-
-    /// Max number of retries before failing and exiting the connection.
-    /// Default is 10.
-    pub(crate) max_retries: u32,
-    /// The base interval between retries.
-    ///
-    /// Reconnect retries use capped exponential backoff from this base interval.
-    /// Default is 3 seconds.
-    pub(crate) retry_interval: Duration,
 }
 
 impl ConnectionHandle {
@@ -52,14 +42,7 @@ impl ConnectionHandle {
         let (error_tx, error_rx) = oneshot::channel();
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
-        let handle = Self {
-            to_socket,
-            from_socket,
-            error: error_rx,
-            shutdown: shutdown_tx,
-            max_retries: 10,
-            retry_interval: Duration::from_secs(3),
-        };
+        let handle = Self { to_socket, from_socket, error: error_rx, shutdown: shutdown_tx };
         let interface = ConnectionInterface {
             from_frontend,
             to_frontend,
@@ -67,21 +50,6 @@ impl ConnectionHandle {
             shutdown: shutdown_rx,
         };
         (handle, interface)
-    }
-
-    /// Set the max number of retries before failing and exiting the connection.
-    /// Default is 10.
-    pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
-        self.max_retries = max_retries;
-        self
-    }
-
-    /// Set the base interval between retries.
-    ///
-    /// Reconnect retries use capped exponential backoff from this base interval.
-    pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
-        self.retry_interval = retry_interval;
-        self
     }
 
     /// Shutdown the backend.
@@ -130,8 +98,8 @@ impl ConnectionInterface {
     /// Close the interface, signaling a generic backend-gone error to the
     /// frontend.
     ///
-    /// The pubsub service will attempt to reconnect using the configured
-    /// retry policy. Use [`Self::close_with_transport_error`] to opt out of
+    /// The pubsub service will attempt to reconnect using capped exponential
+    /// backoff. Use [`Self::close_with_transport_error`] to opt out of
     /// the reconnect loop on deterministic, non-retryable failures.
     pub fn close_with_error(self) {
         let _ = self.error.send(TransportErrorKind::backend_gone());

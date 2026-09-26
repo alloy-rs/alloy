@@ -1,8 +1,8 @@
-use crate::{ix::PubSubInstruction, managers::InFlight, RawSubscription};
+use crate::{ix::PubSubInstruction, managers::InFlight, PartialBatchError, RawSubscription};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, SerializedRequest};
 use alloy_primitives::B256;
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut, TransportResult};
-use futures::{future::try_join_all, FutureExt, TryFutureExt};
+use futures::{future::join_all, FutureExt, TryFutureExt};
 use std::{
     future::Future,
     sync::{
@@ -76,9 +76,23 @@ impl PubSubFrontend {
         async move {
             debug!("sending request to backend");
             let (in_flight, rx) = InFlight::new(req, channel_size);
+            let deadline = in_flight.deadline;
+            let guard = CancelOnDrop {
+                tx: tx.clone(),
+                id: in_flight.request.id().clone(),
+                identity: in_flight.identity.clone(),
+            };
             tx.send(PubSubInstruction::Request(in_flight))
                 .map_err(|_| TransportErrorKind::backend_gone())?;
-            let resp = rx.await.map_err(|_| TransportErrorKind::backend_gone())?;
+            let resp = if let Some(deadline) = deadline {
+                crate::time::timeout_at(deadline, rx).await.map_err(|_| {
+                    TransportErrorKind::custom(std::io::Error::from(std::io::ErrorKind::TimedOut))
+                })?
+            } else {
+                rx.await
+            }
+            .map_err(|_| TransportErrorKind::backend_gone())?;
+            drop(guard);
             if tracing::enabled!(tracing::Level::TRACE) {
                 trace!(?resp, "retrieved response");
             } else {
@@ -95,9 +109,28 @@ impl PubSubFrontend {
     pub fn send_packet(&self, req: RequestPacket) -> TransportFut<'static> {
         match req {
             RequestPacket::Single(req) => self.send(req).map_ok(ResponsePacket::Single).boxed(),
-            RequestPacket::Batch(reqs) => try_join_all(reqs.into_iter().map(|req| self.send(req)))
-                .map_ok(ResponsePacket::Batch)
-                .boxed(),
+            RequestPacket::Batch(reqs) => {
+                let requests = reqs.into_iter().map(|req| {
+                    let id = req.id().clone();
+                    let response = self.send(req);
+                    async move { (id, response.await) }
+                });
+                let response = join_all(requests);
+                async move {
+                    let results = response.await;
+                    if results.iter().any(|(_, result)| result.is_err()) {
+                        Err(TransportErrorKind::custom(PartialBatchError(results)))
+                    } else {
+                        Ok(ResponsePacket::Batch(
+                            results
+                                .into_iter()
+                                .map(|(_, result)| result.expect("checked above"))
+                                .collect(),
+                        ))
+                    }
+                }
+                .boxed()
+            }
         }
     }
 
@@ -134,5 +167,18 @@ impl tower::Service<RequestPacket> for PubSubFrontend {
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         self.send_packet(req)
+    }
+}
+
+/// Drop cancellation uses the attempt identity as well as the RPC ID, so a
+/// delayed cancellation can never remove a newer retry with that same ID.
+struct CancelOnDrop {
+    tx: mpsc::UnboundedSender<PubSubInstruction>,
+    id: alloy_json_rpc::Id,
+    identity: Arc<()>,
+}
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        let _ = self.tx.send(PubSubInstruction::Cancel(self.id.clone(), self.identity.clone()));
     }
 }

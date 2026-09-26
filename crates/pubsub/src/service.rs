@@ -2,7 +2,8 @@ use crate::{
     handle::ConnectionHandle,
     ix::PubSubInstruction,
     managers::{InFlight, RequestManager, SubscriptionManager},
-    PubSubConnect, PubSubFrontend, RawSubscription,
+    time::{sleep_until, Instant},
+    PubSubConnect, PubSubFrontend, RawSubscription, RecoveryBackoff,
 };
 use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
 use alloy_primitives::B256;
@@ -10,17 +11,27 @@ use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
     TransportErrorKind, TransportResult,
 };
+#[cfg(not(target_family = "wasm"))]
+use futures::future::BoxFuture;
+#[cfg(target_family = "wasm")]
+use futures::future::LocalBoxFuture as BoxFuture;
 use serde_json::value::RawValue;
-use std::time::Duration;
+use std::{future::pending, sync::Arc};
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::tokio::sleep;
+#[cfg(test)]
+use tokio::time::{sleep, Duration};
 
-#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
-use tokio::time::sleep;
+enum ConnectionState {
+    Connected,
+    Waiting(Instant),
+    Connecting(BoxFuture<'static, TransportResult<ConnectionHandle>>),
+}
 
-const MAX_RECONNECT_RETRY_INTERVAL: Duration = Duration::from_secs(30);
+enum ReconnectEvent {
+    Start,
+    Complete(TransportResult<ConnectionHandle>),
+}
 
 /// The service contains the backend handle, a subscription manager, and the
 /// configuration details required to reconnect.
@@ -30,7 +41,7 @@ pub(crate) struct PubSubService<T> {
     pub(crate) handle: ConnectionHandle,
 
     /// The configuration details required to reconnect.
-    pub(crate) connector: T,
+    pub(crate) connector: Arc<T>,
 
     /// The inbound requests.
     pub(crate) reqs: mpsc::UnboundedReceiver<PubSubInstruction>,
@@ -50,7 +61,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         let (tx, reqs) = mpsc::unbounded_channel();
         let this = Self {
             handle,
-            connector,
+            connector: Arc::new(connector),
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: Default::default(),
@@ -59,19 +70,9 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(PubSubFrontend::new(tx))
     }
 
-    /// Reconnect by dropping the backend and creating a new one.
-    async fn get_new_backend(&mut self) -> TransportResult<ConnectionHandle> {
-        let mut handle = self.connector.try_reconnect().await?;
-        std::mem::swap(&mut self.handle, &mut handle);
-        Ok(handle)
-    }
-
-    /// Reconnect the backend, re-issue pending requests, and re-start active
-    /// subscriptions.
-    async fn reconnect(&mut self) -> TransportResult<()> {
-        debug!("Reconnecting pubsub service backend");
-
-        let mut old_handle = self.get_new_backend().await?;
+    /// Install a new backend and restore live subscriptions.
+    fn install_backend(&mut self, mut old_handle: ConnectionHandle) -> TransportResult<()> {
+        std::mem::swap(&mut self.handle, &mut old_handle);
 
         debug!("Draining old backend to_handle");
 
@@ -82,7 +83,9 @@ impl<T: PubSubConnect> PubSubService<T> {
 
         old_handle.shutdown();
 
-        // Re-issue pending requests.
+        self.in_flights.expire();
+
+        // Re-issue pending subscription requests.
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
         for (_, in_flight) in self.in_flights.iter() {
             let msg = in_flight.request.serialized().to_owned();
@@ -98,7 +101,8 @@ impl<T: PubSubConnect> PubSubService<T> {
         // Dispatch all subscription requests.
         for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
-            let (in_flight, _) = InFlight::new(req.clone(), sub.tx.receiver_count());
+            let (mut in_flight, _) = InFlight::new(req.clone(), sub.tx.receiver_count());
+            in_flight.subscription_replay = true;
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
@@ -115,12 +119,12 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service a request.
     fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
-        let brv = in_flight.request();
-
-        self.dispatch_request(brv.serialized().to_owned())?;
+        if !in_flight.is_live() {
+            return Ok(());
+        }
+        let brv = in_flight.request().serialized().to_owned();
         self.in_flights.insert(in_flight);
-
-        Ok(())
+        self.dispatch_request(brv)
     }
 
     /// Service a GetSub instruction.
@@ -149,6 +153,10 @@ impl<T: PubSubConnect> PubSubService<T> {
         trace!(?ix, "servicing instruction");
         match ix {
             PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
+            PubSubInstruction::Cancel(id, identity) => {
+                self.in_flights.cancel(&id, &identity);
+                Ok(())
+            }
             PubSubInstruction::GetSub(alias, tx) => {
                 self.service_get_sub(alias, tx);
                 Ok(())
@@ -193,130 +201,157 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
-    /// Attempt to reconnect with retries.
-    ///
-    /// Aborts immediately when a reconnect attempt returns a
-    /// [`TransportErrorKind::NonRetryable`] error so deterministic backend
-    /// failures (auth/protocol violations, malformed handshake, etc.) do not
-    /// burn the full retry budget.
-    async fn reconnect_with_retries(&mut self) -> TransportResult<()> {
-        let mut retry_count = 0;
-        let max_retries = self.handle.max_retries;
-        let interval = self.handle.retry_interval;
-        loop {
-            match self.reconnect().await {
-                Ok(()) => break Ok(()),
-                Err(e) => {
-                    if matches!(&e, RpcError::Transport(k) if k.is_non_retryable()) {
-                        error!("Reconnect aborted (non-retryable), shutting down: {e}");
-                        break Err(e);
-                    }
-                    retry_count += 1;
-                    if retry_count >= max_retries {
-                        error!("Reconnect failed after {max_retries} attempts, shutting down: {e}");
-                        break Err(e);
-                    }
-                    let retry_interval = reconnect_retry_interval(interval, retry_count);
-                    warn!(
-                        "Reconnection attempt {retry_count}/{max_retries} failed: {e}. \
-                         Retrying in {retry_interval:?}...",
-                    );
-                    sleep(retry_interval).await;
+    fn disconnect(&mut self) -> TransportResult<()> {
+        // Process every completed item before failing unresolved reads.
+        while let Ok(item) = self.handle.from_socket.try_recv() {
+            self.handle_item(item)?;
+        }
+        self.in_flights.disconnect();
+        Ok(())
+    }
+
+    fn disconnected_instruction(&mut self, ix: PubSubInstruction) {
+        match ix {
+            PubSubInstruction::Request(request) if request.is_subscription() => {
+                if request.is_live() {
+                    self.in_flights.insert(request);
                 }
+            }
+            PubSubInstruction::Request(request) => {
+                let _ = request.tx.send(Err(TransportErrorKind::custom(std::io::Error::from(
+                    std::io::ErrorKind::NotConnected,
+                ))));
+            }
+            PubSubInstruction::Cancel(id, identity) => self.in_flights.cancel(&id, &identity),
+            PubSubInstruction::GetSub(id, tx) => self.service_get_sub(id, tx),
+            PubSubInstruction::Unsubscribe(id) => {
+                self.subs.remove_sub(id);
             }
         }
     }
 
-    /// Spawn the service.
+    fn fail_requests(&mut self, error: &alloy_transport::TransportError) {
+        let detail = error.to_string();
+        self.in_flights.fail_all(&detail);
+        self.reqs.close();
+        while let Ok(instruction) = self.reqs.try_recv() {
+            if let PubSubInstruction::Request(request) = instruction {
+                let _ = request.tx.send(Err(TransportErrorKind::non_retryable_str(&detail)));
+            }
+        }
+    }
+
+    /// Process cancellation, expiry, and provider closure even during a slow
+    /// reconnect or its backoff. Only the provider retries read requests.
     pub(crate) fn spawn(mut self) {
-        let fut = async move {
-            let result: TransportResult<()> = loop {
-                // We bias the loop so that we always handle new messages before
-                // reconnecting, and always reconnect before dispatching new
-                // requests.
+        async move {
+            let mut state = ConnectionState::Connected;
+            let mut backoff = RecoveryBackoff::default();
+            loop {
+                self.in_flights.expire();
+                let deadline = self.in_flights.next_deadline();
+                let connected = matches!(state, ConnectionState::Connected);
                 tokio::select! {
                     biased;
-
-                    item_opt = self.handle.from_socket.recv() => {
-                        if let Some(item) = item_opt {
-                            if let Err(e) = self.handle_item(item) {
-                                break Err(e)
+                    request = self.reqs.recv() => {
+                        let Some(request) = request else { break; };
+                        if connected {
+                            if let Err(error) = self.service_ix(request) {
+                                if !error.as_transport_err().is_some_and(TransportErrorKind::is_backend_gone) { break; }
+                                if self.disconnect().is_err() { break; }
+                                state = ConnectionState::Waiting(Instant::now() + backoff.next_delay());
                             }
                         } else {
-                            // The backend dropped its `to_frontend` sender.
-                            // It may have also signaled a typed error via the
-                            // `error` oneshot; drain it before reconnecting
-                            // so a non-retryable error short-circuits the loop.
-                            if let Ok(err) = self.handle.error.try_recv() {
-                                if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
-                                    error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
-                                    break Err(err)
-                                }
-                                error!(%err, "Pubsub service backend error.");
-                            }
-                            if let Err(e) = self.reconnect_with_retries().await {
-                                break Err(e)
-                            }
+                            self.disconnected_instruction(request);
                         }
                     }
-
-                    res = &mut self.handle.error => {
-                        // The backend signaled a terminal error. The carried
-                        // `TransportError` indicates whether it is recoverable.
-                        // If the sender was dropped without a value, fall back
-                        // to a generic backend-gone error.
-                        let err = res.unwrap_or_else(|_| TransportErrorKind::backend_gone());
-                        if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
-                            error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
-                            break Err(err)
-                        }
-                        error!(%err, "Pubsub service backend error.");
-                        if let Err(e) = self.reconnect_with_retries().await {
-                            break Err(e)
+                    () = async {
+                        if let Some(deadline) = deadline { sleep_until(deadline).await; }
+                        else { pending::<()>().await; }
+                    } => { self.in_flights.expire(); }
+                    item = self.handle.from_socket.recv(), if connected => {
+                        if let Some(item) = item {
+                            if self.handle_item(item).is_err() { break; }
+                            backoff = RecoveryBackoff::default();
+                        } else {
+                            if let Ok(error @ RpcError::Transport(TransportErrorKind::NonRetryable(_))) = self.handle.error.try_recv() {
+                                self.fail_requests(&error);
+                                break;
+                            }
+                            if self.disconnect().is_err() { break; }
+                            state = ConnectionState::Waiting(Instant::now() + backoff.next_delay());
                         }
                     }
-
-                    req_opt = self.reqs.recv() => {
-                        if let Some(req) = req_opt {
-                            if let Err(err) = self.service_ix(req) {
-                                if err
-                                    .as_transport_err()
-                                    .is_some_and(TransportErrorKind::is_backend_gone)
-                                {
-                                    if let Err(e) = self.reconnect_with_retries().await {
-                                        break Err(e)
-                                    }
+                    error = &mut self.handle.error, if connected => {
+                        if let Ok(error @ RpcError::Transport(TransportErrorKind::NonRetryable(_))) = error {
+                            self.fail_requests(&error);
+                            break;
+                        }
+                        if self.disconnect().is_err() { break; }
+                        state = ConnectionState::Waiting(Instant::now() + backoff.next_delay());
+                    }
+                    event = async {
+                        match &mut state {
+                            ConnectionState::Connected => pending().await,
+                            ConnectionState::Waiting(at) => { sleep_until(*at).await; ReconnectEvent::Start }
+                            ConnectionState::Connecting(attempt) => ReconnectEvent::Complete(attempt.await),
+                        }
+                    }, if !connected => {
+                        match event {
+                            ReconnectEvent::Start => {
+                                let connector = self.connector.clone();
+                                state = ConnectionState::Connecting(Box::pin(async move { connector.try_reconnect().await }));
+                            }
+                            ReconnectEvent::Complete(Ok(handle)) => {
+                                if self.install_backend(handle).is_err() {
+                                    if self.disconnect().is_err() { break; }
+                                    state = ConnectionState::Waiting(Instant::now() + backoff.next_delay());
                                 } else {
-                                    break Err(err)
+                                    // A socket handshake alone does not prove recovery.
+                                    // Reset backoff only after receiving a response or notification.
+                                    state = ConnectionState::Connected;
                                 }
                             }
-                        } else {
-                            info!("Pubsub service request channel closed. Shutting down.");
-                           break Ok(())
+                            ReconnectEvent::Complete(Err(error)) => {
+                                if !transient_connect_error(&error) { self.fail_requests(&error); break; }
+                                state = ConnectionState::Waiting(Instant::now() + backoff.next_delay());
+                            }
                         }
                     }
                 }
-            };
-
-            if let Err(err) = result {
-                error!(%err, "pubsub service reconnection error");
             }
-        };
-        fut.spawn_task();
+            self.handle.shutdown();
+        }.spawn_task();
     }
 }
 
-/// Returns the capped exponential backoff interval for a reconnect retry.
-///
-/// The configured retry interval is used as the base delay. Retry counts are 1-based, so the first
-/// failed attempt waits for the base interval, the second waits for twice the base interval, and so
-/// on. The delay is capped at [`MAX_RECONNECT_RETRY_INTERVAL`], unless the configured base interval
-/// is already higher, in which case the configured base interval is preserved.
-fn reconnect_retry_interval(base_interval: Duration, retry_count: u32) -> Duration {
-    let backoff_multiplier = 1u32.checked_shl(retry_count.saturating_sub(1)).unwrap_or(u32::MAX);
-    let max_interval = base_interval.max(MAX_RECONNECT_RETRY_INTERVAL);
-
-    base_interval.saturating_mul(backoff_multiplier).min(max_interval)
+fn transient_connect_error(error: &alloy_transport::TransportError) -> bool {
+    if let RpcError::Transport(TransportErrorKind::HttpError(error)) = error {
+        return matches!(error.status, 408 | 429 | 500 | 502 | 503 | 504);
+    }
+    if let RpcError::Transport(TransportErrorKind::BackendGone) = error {
+        return true;
+    }
+    if let RpcError::Transport(TransportErrorKind::Custom(error)) = error {
+        let mut source: Option<&(dyn std::error::Error + 'static)> = Some(error.as_ref());
+        while let Some(error) = source {
+            if let Some(error) = error.downcast_ref::<std::io::Error>() {
+                return matches!(
+                    error.kind(),
+                    std::io::ErrorKind::NotFound
+                        | std::io::ErrorKind::ConnectionRefused
+                        | std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::ConnectionAborted
+                        | std::io::ErrorKind::BrokenPipe
+                        | std::io::ErrorKind::NotConnected
+                        | std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::UnexpectedEof
+                );
+            }
+            source = error.source();
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -409,32 +444,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn reconnect_retry_interval_uses_capped_exponential_backoff() {
-        let base = Duration::from_secs(1);
-
-        assert_eq!(reconnect_retry_interval(base, 1), Duration::from_secs(1));
-        assert_eq!(reconnect_retry_interval(base, 2), Duration::from_secs(2));
-        assert_eq!(reconnect_retry_interval(base, 3), Duration::from_secs(4));
-        assert_eq!(reconnect_retry_interval(base, 6), Duration::from_secs(30));
-    }
-
-    #[test]
-    fn reconnect_retry_interval_uses_configured_base_interval() {
-        let base = Duration::from_millis(1);
-
-        assert_eq!(reconnect_retry_interval(base, 1), Duration::from_millis(1));
-        assert_eq!(reconnect_retry_interval(base, 2), Duration::from_millis(2));
-    }
-
-    #[test]
-    fn reconnect_retry_interval_does_not_shorten_base_above_cap() {
-        let base = Duration::from_secs(60);
-
-        assert_eq!(reconnect_retry_interval(base, 1), Duration::from_secs(60));
-        assert_eq!(reconnect_retry_interval(base, 2), Duration::from_secs(60));
-    }
-
     #[tokio::test]
     async fn reconnects_after_request_dispatch_hits_backend_gone() {
         let (dead_handle, dead_interface) = ConnectionHandle::new();
@@ -447,7 +456,7 @@ mod tests {
         let (tx, reqs) = mpsc::unbounded_channel();
         let service = PubSubService {
             handle: dead_handle,
-            connector,
+            connector: Arc::new(connector),
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: RequestManager::default(),
@@ -461,9 +470,11 @@ mod tests {
         timeout(Duration::from_secs(1), rx)
             .await
             .expect("failed request should resolve promptly")
-            .expect_err("raced request should be dropped when the backend is gone");
+            .expect("manager must return the connection failure")
+            .expect_err("raced request should fail when the backend is gone");
 
-        let second = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
+        let second =
+            Request::new("eth_subscribe", Id::Number(2), ("newHeads",)).serialize().unwrap();
         let expected = second.serialized().get().to_owned();
         let (in_flight, _rx) = InFlight::new(second, 16);
         tx.send(PubSubInstruction::Request(in_flight)).unwrap();
@@ -488,7 +499,7 @@ mod tests {
         let (tx, reqs) = mpsc::unbounded_channel();
         let service = PubSubService {
             handle: dead_handle,
-            connector,
+            connector: Arc::new(connector),
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: RequestManager::default(),
@@ -502,9 +513,11 @@ mod tests {
         timeout(Duration::from_secs(1), rx)
             .await
             .expect("non-retryable reconnect should resolve promptly")
+            .expect("manager must return the connection failure")
             .expect_err("request should fail when backend is gone and reconnect aborts");
+        tx.closed().await;
 
-        // Exactly one attempt, not `max_retries`.
+        // A permanent failure must stop after one attempt.
         assert_eq!(counter.load(Ordering::SeqCst), 1);
     }
 
@@ -525,7 +538,7 @@ mod tests {
         let (_tx, reqs) = mpsc::unbounded_channel();
         let service = PubSubService {
             handle: live_handle,
-            connector,
+            connector: Arc::new(connector),
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: RequestManager::default(),
@@ -560,7 +573,7 @@ mod tests {
         let (tx, reqs) = mpsc::unbounded_channel();
         let service = PubSubService {
             handle: live_handle,
-            connector,
+            connector: Arc::new(connector),
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: RequestManager::default(),
@@ -572,7 +585,7 @@ mod tests {
 
         // After reconnect, a freshly dispatched request must reach the new
         // backend.
-        let req = Request::new("eth_chainId", Id::Number(1), ()).serialize().unwrap();
+        let req = Request::new("eth_subscribe", Id::Number(1), ("newHeads",)).serialize().unwrap();
         let expected = req.serialized().get().to_owned();
         let (in_flight, _rx) = InFlight::new(req, 16);
         tx.send(PubSubInstruction::Request(in_flight)).unwrap();
@@ -589,5 +602,146 @@ mod tests {
             1,
             "default close_with_error should trigger exactly one reconnect"
         );
+    }
+}
+
+#[cfg(test)]
+mod recovery_regressions {
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    use tokio::time::timeout;
+
+    #[derive(Debug)]
+    struct NextConnection(std::sync::Mutex<Option<ConnectionHandle>>);
+    impl PubSubConnect for NextConnection {
+        fn is_local(&self) -> bool {
+            true
+        }
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            self.0.lock().unwrap().take().ok_or_else(TransportErrorKind::backend_gone)
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct Refused(Arc<AtomicUsize>);
+
+    impl PubSubConnect for Refused {
+        fn is_local(&self) -> bool {
+            true
+        }
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(TransportErrorKind::custom(std::io::Error::from(
+                std::io::ErrorKind::ConnectionRefused,
+            )))
+        }
+    }
+
+    #[tokio::test]
+    async fn dropping_frontend_stops_reconnect_work() {
+        let (handle, interface) = ConnectionHandle::new();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
+            handle,
+            connector: Arc::new(Refused(calls.clone())),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        service.spawn();
+        interface.close_with_error();
+        timeout(Duration::from_secs(1), async {
+            while calls.load(Ordering::SeqCst) == 0 {
+                sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(tx);
+        sleep(Duration::from_millis(50)).await;
+        let stopped = calls.load(Ordering::SeqCst);
+        sleep(Duration::from_secs(4)).await;
+        assert_eq!(calls.load(Ordering::SeqCst), stopped, "closed provider kept reconnecting");
+    }
+
+    #[tokio::test]
+    async fn cancelled_request_does_not_replay_after_reconnect() {
+        let (handle, interface) = ConnectionHandle::new();
+        let (new_handle, mut new_interface) = ConnectionHandle::new();
+        let connector = NextConnection(std::sync::Mutex::new(Some(new_handle)));
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: Arc::new(connector),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        let request =
+            Request::new("eth_call", Id::Number(91), ("exact", "0x123")).serialize().unwrap();
+        let (pending, rx) = InFlight::new(request, 16);
+        service.in_flights.insert(pending);
+        drop(rx);
+        drop(interface);
+        let new_handle = service.connector.try_reconnect().await.unwrap();
+        service.install_backend(new_handle).unwrap();
+        assert!(
+            timeout(Duration::from_millis(100), new_interface.recv_from_frontend()).await.is_err(),
+            "cancelled request was replayed"
+        );
+        assert_eq!(service.in_flights.len(), 0);
+        drop(tx);
+    }
+}
+
+#[cfg(test)]
+mod unstable_connection_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[derive(Debug)]
+    struct ClosesImmediately(Arc<AtomicUsize>);
+    impl PubSubConnect for ClosesImmediately {
+        fn is_local(&self) -> bool {
+            true
+        }
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            let (handle, interface) = ConnectionHandle::new();
+            interface.close_with_error();
+            Ok(handle)
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn socket_handshakes_without_responses_do_not_reset_backoff() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let (handle, interface) = ConnectionHandle::new();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        PubSubService {
+            handle,
+            connector: Arc::new(ClosesImmediately(calls.clone())),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        }
+        .spawn();
+        interface.close_with_error();
+        // Step time so each reconnect receives a polling turn.
+        for _ in 0..600 {
+            sleep(Duration::from_millis(10)).await;
+        }
+        let attempts = calls.load(Ordering::SeqCst);
+        assert!(
+            (12..=27).contains(&attempts),
+            "reconnect attempts did not use bounded backoff: {attempts}"
+        );
+        drop(tx);
+        sleep(Duration::from_secs(1)).await;
+        assert_eq!(calls.load(Ordering::SeqCst), attempts);
     }
 }
