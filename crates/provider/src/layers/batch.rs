@@ -404,7 +404,9 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         let m3_res =
             |success, return_data| IMulticall3::Result { success, returnData: return_data };
         match msg {
-            CallBatchMsgKind::Call(tx) => self.inner.call(tx).await.map(|res| m3_res(true, res)),
+            CallBatchMsgKind::Call(tx) => {
+                self.inner.call(tx).latest().await.map(|res| m3_res(true, res))
+            }
             CallBatchMsgKind::BlockNumber => {
                 self.inner.get_block_number().await.map(|res| m3_res(true, res.abi_encode().into()))
             }
@@ -428,7 +430,9 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
             .with_to(self.m3a)
             .with_input(IMulticall3::aggregate3Call { calls }.abi_encode());
 
-        let bytes = self.inner.call(tx).await?;
+        // Only calls targeting the latest block are batched (see `should_batch_call`), so pin the
+        // aggregate call to it instead of inheriting the `pending` default of `Provider::call`.
+        let bytes = self.inner.call(tx).latest().await?;
         if bytes.is_empty() {
             return Err(TransportErrorKind::custom_str(&format!(
                 "Multicall3 not deployed at {}",
@@ -649,11 +653,12 @@ mod tests {
         assert!(e.unwrap_err().to_string().contains("Multicall3 not deployed"));
 
         provider.anvil_set_code(MULTICALL3_ADDRESS, MULTICALL3_DEPLOYED_CODE.into()).await.unwrap();
+        let head = provider.get_block_number().await.unwrap();
 
         let (counter, block_number_raw, block_number, chain_id, balance) = do_calls().await;
         assert_eq!(counter.unwrap(), 0u64.abi_encode());
-        assert_eq!(block_number_raw.unwrap(), 1u64.abi_encode());
-        assert_eq!(block_number.unwrap(), 1);
+        assert_eq!(block_number_raw.unwrap(), head.abi_encode());
+        assert_eq!(block_number.unwrap(), head);
         assert_eq!(chain_id.unwrap(), alloy_chains::NamedChain::AnvilHardhat as u64);
         assert_eq!(balance.unwrap(), U256::from(123));
     }
