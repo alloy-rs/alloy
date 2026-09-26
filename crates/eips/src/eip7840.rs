@@ -174,6 +174,8 @@ mod serde_impl {
         target_blob_count: u64,
         #[serde(skip)]
         min_blob_fee: Option<u128>,
+        max_blobs_per_tx: Option<u64>,
+        blob_base_cost: Option<u64>,
     }
 
     impl From<BlobParams> for SerdeHelper {
@@ -183,8 +185,8 @@ mod serde_impl {
                 max_blob_count,
                 update_fraction,
                 min_blob_fee,
-                max_blobs_per_tx: _,
-                blob_base_cost: _,
+                max_blobs_per_tx,
+                blob_base_cost,
             } = params;
 
             Self {
@@ -193,22 +195,82 @@ mod serde_impl {
                 update_fraction,
                 min_blob_fee: (min_blob_fee != eip4844::BLOB_TX_MIN_BLOB_GASPRICE)
                     .then_some(min_blob_fee),
+                // Always serialize both fields: skipping defaults breaks positional formats such
+                // as bincode. Options retain the defaults when reading legacy JSON.
+                max_blobs_per_tx: Some(max_blobs_per_tx),
+                blob_base_cost: Some(blob_base_cost),
             }
         }
     }
 
     impl From<SerdeHelper> for BlobParams {
         fn from(helper: SerdeHelper) -> Self {
-            let SerdeHelper { target_blob_count, max_blob_count, update_fraction, min_blob_fee } =
-                helper;
+            let SerdeHelper {
+                target_blob_count,
+                max_blob_count,
+                update_fraction,
+                min_blob_fee,
+                max_blobs_per_tx,
+                blob_base_cost,
+            } = helper;
 
             Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
                 min_blob_fee: min_blob_fee.unwrap_or(eip4844::BLOB_TX_MIN_BLOB_GASPRICE),
-                max_blobs_per_tx: max_blob_count,
-                blob_base_cost: 0,
+                max_blobs_per_tx: max_blobs_per_tx.unwrap_or(max_blob_count),
+                blob_base_cost: blob_base_cost.unwrap_or(0),
+            }
+        }
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blob_params_serde_roundtrip_preserves_extended_fields() {
+        for params in [
+            BlobParams::cancun(),
+            BlobParams::prague(),
+            BlobParams::osaka(),
+            BlobParams::bpo1(),
+            BlobParams::bpo2(),
+            BlobParams::osaka().with_max_blobs_per_tx(3),
+            BlobParams::osaka().with_max_blobs_per_tx(0).with_blob_base_cost(0),
+            BlobParams::prague().with_blob_base_cost(42),
+        ] {
+            let serialized = serde_json::to_value(params).unwrap();
+            assert_eq!(serialized["maxBlobsPerTx"], params.max_blobs_per_tx);
+            assert_eq!(serialized["blobBaseCost"], params.blob_base_cost);
+
+            let deserialized = serde_json::from_value::<BlobParams>(serialized).unwrap();
+            assert_eq!(deserialized, params);
+        }
+    }
+
+    #[test]
+    fn blob_params_serde_keeps_legacy_defaults() {
+        for max in [6, 9, 21] {
+            for (fields, max_blobs_per_tx, blob_base_cost) in [
+                (serde_json::json!({}), max, 0),
+                (serde_json::json!({"maxBlobsPerTx": 0}), 0, 0),
+                (serde_json::json!({"blobBaseCost": 8192}), max, BLOB_BASE_COST),
+                (serde_json::json!({"maxBlobsPerTx": null, "blobBaseCost": null}), max, 0),
+            ] {
+                let mut value = serde_json::json!({
+                    "baseFeeUpdateFraction": 5007716,
+                    "max": max,
+                    "target": 3,
+                });
+                value.as_object_mut().unwrap().extend(fields.as_object().unwrap().clone());
+
+                let params = serde_json::from_value::<BlobParams>(value).unwrap();
+                assert_eq!(params.max_blobs_per_tx, max_blobs_per_tx);
+                assert_eq!(params.blob_base_cost, blob_base_cost);
+                assert_eq!(params.min_blob_fee, eip4844::BLOB_TX_MIN_BLOB_GASPRICE);
             }
         }
     }

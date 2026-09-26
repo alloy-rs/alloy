@@ -272,9 +272,9 @@ mod tests {
         "#;
 
         let fork_config = serde_json::from_str::<EthForkConfig>(raw).unwrap();
-        assert_eq!(
-            serde_json::to_string(&fork_config).unwrap(),
-            raw.chars().filter(|c| !c.is_whitespace()).collect::<String>()
-        );
+        let mut expected: serde_json::Value = serde_json::from_str(raw).unwrap();
+        expected["blobSchedule"]["maxBlobsPerTx"] = 9.into();
+        expected["blobSchedule"]["blobBaseCost"] = 0.into();
+        assert_eq!(serde_json::to_value(&fork_config).unwrap(), expected);
     }
 }
