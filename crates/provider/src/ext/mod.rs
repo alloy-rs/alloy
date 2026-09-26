@@ -65,8 +65,9 @@ mod mev;
 
 #[cfg(feature = "mev-api")]
 pub use mev::{
-    sign_flashbots_payload, verify_flashbots_signature, FlashbotsSignatureError, MevApi,
-    MevBuilder, FLASHBOTS_SIGNATURE_HEADER,
+    priority_update_registry_domain, sign_flashbots_payload, verify_flashbots_signature,
+    FlashbotsSignatureError, MevApi, MevBuilder, PrioUpdateRegistry, SignedUpdate, UpdateState,
+    FLASHBOTS_SIGNATURE_HEADER, PRIORITY_UPDATE_REGISTRY_ADDRESS,
 };
 
 /// Reth related apis.
