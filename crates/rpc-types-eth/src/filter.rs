@@ -40,6 +40,16 @@ impl<T: Eq + Hash> PartialEq for FilterSet<T> {
     }
 }
 
+/// Hashes the values in sorted order, so equal sets hash equally regardless of their iteration
+/// order.
+impl<T: Eq + Hash + Ord> Hash for FilterSet<T> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        let mut values = self.set.iter().collect::<Vec<_>>();
+        values.sort_unstable();
+        values.hash(state);
+    }
+}
+
 impl<T: Eq + Hash> Default for FilterSet<T> {
     fn default() -> Self {
         Self {
@@ -408,7 +418,7 @@ impl Default for FilterBlockOption {
 /// Addresses use OR semantics. Values within one topic position use OR semantics, while populated
 /// topic positions use AND semantics. Empty address and topic sets are wildcards. Block ranges are
 /// inclusive, and a block hash is mutually exclusive with `fromBlock` and `toBlock`.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
@@ -1616,7 +1626,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{bloom, LogData};
+    use alloy_primitives::{bloom, map::DefaultHashBuilder, LogData};
+    use core::hash::BuildHasher;
     #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -2248,6 +2259,20 @@ mod tests {
         let _ = filter.matches_bloom(Bloom::ZERO);
 
         assert_eq!(filter, clone);
+    }
+
+    #[test]
+    fn test_filter_hash_ignores_set_order() {
+        let addresses = (0..64).map(Address::with_last_byte).collect::<Vec<_>>();
+        let mut reversed = HashSet::with_capacity_and_hasher(1024, Default::default());
+        reversed.extend(addresses.iter().rev().copied());
+
+        let filter = Filter::new().address(addresses);
+        let other = Filter { address: reversed.into(), ..filter.clone() };
+        assert_eq!(filter, other);
+
+        let state = DefaultHashBuilder::default();
+        assert_eq!(state.hash_one(&filter), state.hash_one(&other));
     }
 
     #[test]
