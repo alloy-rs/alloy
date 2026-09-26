@@ -138,25 +138,25 @@ impl<P: Provider<N>, E: SolEvent, N: Network> Event<P, E, N> {
 
     /// Sets event_signature(topic0) (the event name for non-anonymous events)
     pub fn event_signature<TO: Into<Topic>>(mut self, topic: TO) -> Self {
-        self.filter.topics[0] = topic.into();
+        self.filter.topics[0] = Some(topic.into());
         self
     }
 
     /// Sets the 1st indexed topic
     pub fn topic1<TO: Into<Topic>>(mut self, topic: TO) -> Self {
-        self.filter.topics[1] = topic.into();
+        self.filter.topics[1] = Some(topic.into());
         self
     }
 
     /// Sets the 2nd indexed topic
     pub fn topic2<TO: Into<Topic>>(mut self, topic: TO) -> Self {
-        self.filter.topics[2] = topic.into();
+        self.filter.topics[2] = Some(topic.into());
         self
     }
 
     /// Sets the 3rd indexed topic
     pub fn topic3<TO: Into<Topic>>(mut self, topic: TO) -> Self {
-        self.filter.topics[3] = topic.into();
+        self.filter.topics[3] = Some(topic.into());
         self
     }
 
