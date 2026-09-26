@@ -19,13 +19,13 @@ pub struct TraceFilter {
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub to_block: Option<u64>,
     /// From address
-    #[serde(default)]
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub from_address: Vec<Address>,
     /// To address
-    #[serde(default)]
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub to_address: Vec<Address>,
     /// How to apply `from_address` and `to_address` filters. Defaults to intersection.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub mode: TraceFilterMode,
     /// Output offset
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -271,6 +271,59 @@ mod tests {
     }
 
     #[test]
+    fn null_members_are_omitted() {
+        let omitted = TraceFilter::default().from_block(2).to_block(5);
+        let filter: TraceFilter = serde_json::from_value(json!({
+            "fromBlock": "0x2",
+            "toBlock": "0x5",
+            "fromAddress": null,
+            "toAddress": null,
+            "mode": null,
+            "after": null,
+            "count": null,
+        }))
+        .unwrap();
+        assert_eq!(filter, omitted);
+
+        for member in ["fromBlock", "toBlock", "fromAddress", "toAddress", "mode", "after", "count"]
+        {
+            let filter: TraceFilter = serde_json::from_value(json!({ member: null })).unwrap();
+            assert_eq!(filter, TraceFilter::default(), "{member}");
+        }
+    }
+
+    #[test]
+    fn invalid_members_are_rejected() {
+        for filter in [
+            json!({ "mode": "unknown" }),
+            json!({ "mode": 1 }),
+            json!({ "fromAddress": Address::ZERO }),
+            json!({ "toAddress": [null] }),
+            json!({ "unknown": null }),
+            json!({ "fromAddress": null, "unknown": null }),
+        ] {
+            assert!(serde_json::from_value::<TraceFilter>(filter.clone()).is_err(), "{filter}");
+        }
+    }
+
+    #[test]
+    fn null_mode_intersects_address_lists() {
+        let from = Address::with_last_byte(1);
+        let to = Address::with_last_byte(2);
+        let filter: TraceFilter = serde_json::from_value(json!({
+            "fromAddress": [from], "toAddress": [to], "mode": null,
+        }))
+        .unwrap();
+        assert_eq!(filter.mode, TraceFilterMode::Intersection);
+
+        let trace = TransactionTrace {
+            action: Action::Call(CallAction { from, to: from, ..Default::default() }),
+            ..Default::default()
+        };
+        assert!(!filter.matcher().matches(&trace));
+    }
+
+    #[test]
     fn default_filter_empty_lists_are_unconstrained() {
         let from = Address::with_last_byte(1);
         let to = Address::with_last_byte(2);
@@ -285,6 +338,11 @@ mod tests {
             (json!({ "fromAddress": [from], "toAddress": [] }), true),
             (json!({ "fromAddress": [], "toAddress": [from] }), false),
             (json!({ "fromAddress": [to], "toAddress": [] }), false),
+            (json!({ "fromAddress": null, "toAddress": null }), true),
+            (json!({ "fromAddress": null, "toAddress": [to] }), true),
+            (json!({ "fromAddress": [from], "toAddress": null }), true),
+            (json!({ "fromAddress": null, "toAddress": [from] }), false),
+            (json!({ "fromAddress": [to], "toAddress": null }), false),
         ] {
             let filter: TraceFilter = serde_json::from_value(filter).unwrap();
             assert_eq!(filter.matcher().matches(&trace), expected);
