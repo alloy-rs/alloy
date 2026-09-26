@@ -19,13 +19,13 @@ pub struct TraceFilter {
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub to_block: Option<u64>,
     /// From address
-    #[serde(default)]
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub from_address: Vec<Address>,
     /// To address
-    #[serde(default)]
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub to_address: Vec<Address>,
     /// How to apply `from_address` and `to_address` filters. Defaults to intersection.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub mode: TraceFilterMode,
     /// Output offset
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -285,6 +285,10 @@ mod tests {
             (json!({ "fromAddress": [from], "toAddress": [] }), true),
             (json!({ "fromAddress": [], "toAddress": [from] }), false),
             (json!({ "fromAddress": [to], "toAddress": [] }), false),
+            (json!({ "fromAddress": null, "toAddress": null, "mode": null }), true),
+            (json!({ "fromAddress": null, "toAddress": [to] }), true),
+            (json!({ "fromAddress": [from], "toAddress": null }), true),
+            (json!({ "fromAddress": null, "toAddress": [from] }), false),
         ] {
             let filter: TraceFilter = serde_json::from_value(filter).unwrap();
             assert_eq!(filter.matcher().matches(&trace), expected);
