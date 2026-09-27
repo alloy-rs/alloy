@@ -14,11 +14,8 @@ use alloy_primitives::{Bytes, Signature, B256};
 ///
 /// # Note:
 ///
-/// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
-/// Therefore we must ensure that encoding returns the precise byte-array that
-/// was decoded, preserving the presence or absence of the `TransactionType`
-/// flag.
+/// Represents untagged legacy transactions and typed [EIP-2718] variants. Binary decoding rejects
+/// a literal `0x00` type prefix; legacy transactions use the untagged fallback encoding.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub type TxEnvelope = EthereumTxEnvelope<TxEip4844Variant>;
@@ -468,11 +465,8 @@ impl TryFrom<EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransa
 ///
 /// # Note:
 ///
-/// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
-/// Therefore we must ensure that encoding returns the precise byte-array that
-/// was decoded, preserving the presence or absence of the `TransactionType`
-/// flag.
+/// Represents untagged legacy transactions and typed [EIP-2718] variants. Binary decoding rejects
+/// a literal `0x00` type prefix; legacy transactions use the untagged fallback encoding.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, TransactionEnvelope)]
@@ -1064,6 +1058,7 @@ mod tests {
     };
     use alloc::vec::Vec;
     use alloy_eips::{
+        eip2718::{Decodable2718, Eip2718Error},
         eip2930::{AccessList, AccessListItem},
         eip4844::BlobTransactionSidecar,
         eip7594::BlobTransactionSidecarVariant,
@@ -1542,6 +1537,87 @@ mod tests {
             eip1559_envelope,
             "a genuine type-tagged EIP-1559 transaction must still decode correctly"
         );
+    }
+
+    #[test]
+    fn legacy_tx_roundtrips_untagged_on_all_decode_paths() {
+        let legacy = TxLegacy {
+            chain_id: None,
+            nonce: 2,
+            gas_limit: 1_000_000,
+            gas_price: 10_000_000_000,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            ..Default::default()
+        }
+        .into_signed(Signature::test_signature().with_parity(true));
+        let envelope: TxEnvelope = legacy.clone().into();
+
+        let encoded = envelope.encoded_2718();
+        assert!(encoded[0] >= 0xc0, "sanity: legacy txs are encoded as a bare RLP list");
+        // The network encoding of a legacy tx is the bare list as well, without a string header.
+        let mut network = Vec::new();
+        envelope.network_encode(&mut network);
+        assert_eq!(network, encoded);
+
+        assert_eq!(TxEnvelope::decode_2718_exact(&encoded).unwrap(), envelope);
+        assert_eq!(TxEnvelope::network_decode(&mut encoded.as_slice()).unwrap(), envelope);
+        assert_eq!(TxEnvelope::decode(&mut encoded.as_slice()).unwrap(), envelope);
+        assert_eq!(Signed::<TxLegacy>::decode_2718_exact(&encoded).unwrap(), legacy);
+        assert_eq!(
+            <Signed<TxLegacy> as Decodable2718>::network_decode(&mut encoded.as_slice()).unwrap(),
+            legacy
+        );
+    }
+
+    #[test]
+    fn tagged_legacy_tx_is_rejected_on_all_decode_paths() {
+        // Per EIP-2718, legacy transactions are untagged and `0x00` is not an assigned
+        // `TransactionType`. `encode_2718` never emits a `0x00` prefix, so accepting one on
+        // decode would re-encode the transaction differently from the bytes that were decoded.
+        // geth, erigon, nethermind and besu all reject the type byte at decode.
+        let legacy = TxLegacy {
+            chain_id: None,
+            nonce: 2,
+            gas_limit: 1_000_000,
+            gas_price: 10_000_000_000,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            ..Default::default()
+        }
+        .into_signed(Signature::test_signature().with_parity(true));
+        let envelope: TxEnvelope = legacy.into();
+
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&envelope.encoded_2718());
+        // Network framing of a typed payload: an RLP string header followed by the payload.
+        let mut tagged_network = Vec::new();
+        alloy_rlp::Header { list: false, payload_length: tagged.len() }.encode(&mut tagged_network);
+        tagged_network.extend_from_slice(&tagged);
+
+        assert!(matches!(
+            TxEnvelope::decode_2718_exact(&tagged),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            TxEnvelope::decode_2718(&mut tagged.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            TxEnvelope::network_decode(&mut tagged_network.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(TxEnvelope::decode(&mut tagged_network.as_slice()).is_err());
+
+        // The guard lives in `Signed<T>`, so the same holds for the bare signed transaction.
+        assert!(matches!(
+            Signed::<TxLegacy>::decode_2718_exact(&tagged),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            <Signed<TxLegacy> as Decodable2718>::network_decode(&mut tagged_network.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
     }
 
     #[cfg(feature = "serde")]

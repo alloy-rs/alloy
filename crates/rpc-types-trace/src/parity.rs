@@ -611,10 +611,11 @@ pub struct LocalizedTransactionTrace {
     ///
     /// Note: this deviates from <https://openethereum.github.io/JSONRPC-trace-module#trace_transaction> which always returns a block number
     pub block_number: Option<u64>,
-    /// Hash of the transaction
+    /// Hash of the transaction, or `None` for non-transaction traces such as rewards.
     #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<TxHash>,
-    /// Transaction index within the block, None if pending.
+    /// Transaction index within the block, or `None` if pending or not associated with a
+    /// transaction.
     #[doc(alias = "tx_position", alias = "transaction_index", alias = "tx_index")]
     pub transaction_position: Option<u64>,
 }
@@ -680,12 +681,8 @@ impl Serialize for LocalizedTransactionTrace {
         s.serialize_field("subtraces", &subtraces)?;
         s.serialize_field("traceAddress", &trace_address)?;
 
-        if let Some(transaction_hash) = &self.transaction_hash {
-            s.serialize_field("transactionHash", transaction_hash)?;
-        }
-        if let Some(transaction_position) = &self.transaction_position {
-            s.serialize_field("transactionPosition", transaction_position)?;
-        }
+        s.serialize_field("transactionHash", &self.transaction_hash)?;
+        s.serialize_field("transactionPosition", &self.transaction_position)?;
 
         s.serialize_field("type", &action.kind())?;
 
@@ -701,6 +698,22 @@ pub struct VmTrace {
     pub code: Bytes,
     /// All executed instructions.
     pub ops: Vec<VmInstruction>,
+}
+
+impl VmTrace {
+    /// Iterates over storage writes recorded by this trace's instructions.
+    ///
+    /// Each item is `(program_counter, storage_key, written_value)`. Instructions without an
+    /// execution record or a storage write are skipped.
+    ///
+    /// This only visits [`Self::ops`]. To include writes in a [`VmInstruction::sub`] trace, call
+    /// this method on that trace separately.
+    pub fn storage_writes(&self) -> impl Iterator<Item = (usize, U256, U256)> + '_ {
+        self.ops.iter().filter_map(|op| {
+            let store = op.ex.as_ref()?.store.as_ref()?;
+            Some((op.pc, store.key, store.val))
+        })
+    }
 }
 
 /// A record of a single VM instruction, opcode level.
@@ -765,6 +778,41 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
+    fn vm_trace_storage_writes() {
+        let write = |pc, key, val| VmInstruction {
+            cost: 0,
+            ex: Some(VmExecutedOperation {
+                used: 0,
+                push: Vec::new(),
+                mem: None,
+                store: Some(StorageDelta { key: U256::from(key), val: U256::from(val) }),
+            }),
+            pc,
+            sub: None,
+            op: None,
+            idx: None,
+        };
+        let mut no_store = write(2, 0, 0);
+        no_store.ex.as_mut().unwrap().store = None;
+        let mut parent = write(5, 9, 44);
+        parent.sub = Some(VmTrace { code: Bytes::new(), ops: vec![write(4, 8, 43)] });
+        let trace = VmTrace {
+            code: Bytes::new(),
+            ops: vec![
+                VmInstruction { ex: None, ..write(1, 0, 0) },
+                no_store,
+                write(3, 7, 42),
+                parent,
+            ],
+        };
+
+        assert_eq!(
+            trace.storage_writes().collect::<Vec<_>>(),
+            vec![(3, U256::from(7), U256::from(42)), (5, U256::from(9), U256::from(44))]
+        );
+    }
+
+    #[test]
     fn test_transaction_trace() {
         let s = r#"{
             "action": {
@@ -818,6 +866,24 @@ mod tests {
         let input = input.replace("suicide", "selfdestruct");
         let val = serde_json::from_str::<TransactionTrace>(&input).unwrap();
         assert!(val.action.is_selfdestruct());
+    }
+
+    #[test]
+    fn reward_trace_serializes_null_transaction_fields() {
+        for reward_type in [RewardType::Block, RewardType::Uncle] {
+            let trace = RewardAction {
+                author: Address::with_last_byte(1),
+                reward_type,
+                value: U256::from(2),
+            }
+            .into_localized_trace(BlockNumHash::new(35, B256::with_last_byte(2)));
+            let value = serde_json::to_value(&trace).unwrap();
+            assert_eq!(value.get("transactionHash"), Some(&Value::Null));
+            assert_eq!(value.get("transactionPosition"), Some(&Value::Null));
+            assert_eq!(value["type"], "reward");
+            assert_eq!(value["blockNumber"], 35);
+            assert_eq!(serde_json::from_value::<LocalizedTransactionTrace>(value).unwrap(), trace);
+        }
     }
 
     #[derive(Debug)]

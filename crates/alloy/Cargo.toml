@@ -320,7 +320,7 @@ trie = ["dep:alloy-trie"]
 dyn-abi = ["alloy-core/dyn-abi"]
 json-abi = ["alloy-core/json-abi"]
 json = ["alloy-core/json"]
-sol-types = ["alloy-core/sol-types"]
+sol-types = ["alloy-core/sol-types", "alloy-eips?/sol-types"]
 
 asm-keccak = ["alloy-core/asm-keccak"]
 native-keccak = ["alloy-core/native-keccak"]
@@ -367,9 +367,8 @@ eip712 = [
     "alloy-signer-gcp?/eip712",
     "alloy-signer-ledger?/eip712",
     "alloy-signer-local?/eip712",
+    "alloy-signer-trezor?/eip712",
     "alloy-signer-turnkey?/eip712",
-    # TODO: https://github.com/alloy-rs/alloy/issues/201
-    # "alloy-signer-trezor?/eip712",
 ]
 more-tuple-impls = ["alloy-core/more-tuple-impls", "alloy-provider/more-tuple-impls"]
 

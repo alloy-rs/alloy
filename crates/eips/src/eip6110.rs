@@ -4,6 +4,13 @@
 
 use alloy_primitives::{address, Address, FixedBytes, B256};
 
+#[cfg(feature = "sol-types")]
+use alloc::vec::Vec;
+#[cfg(feature = "sol-types")]
+use alloy_primitives::Log;
+#[cfg(feature = "sol-types")]
+use alloy_sol_types::SolEvent;
+
 /// Mainnet deposit contract address.
 pub const MAINNET_DEPOSIT_CONTRACT_ADDRESS: Address =
     address!("0x00000000219ab540356cbb839cbe05303d7705fa");
@@ -32,6 +39,56 @@ pub struct DepositRequest {
     /// Deposit index
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::displayfromstr"))]
     pub index: u64,
+}
+
+#[cfg(feature = "sol-types")]
+alloy_sol_types::sol! {
+    /// Event emitted by the deposit contract when accepting a validator deposit.
+    event DepositEvent(
+        bytes pubkey,
+        bytes withdrawal_credentials,
+        bytes amount,
+        bytes signature,
+        bytes index
+    );
+}
+
+/// Appends a decoded deposit event in EIP-6110 request encoding.
+///
+/// The event fields are concatenated in order, preserving the little-endian amount and index
+/// emitted by the deposit contract. The EIP-7685 request type byte is not included.
+/// Field lengths are assumed to have been validated by the deposit contract.
+#[cfg(feature = "sol-types")]
+pub fn accumulate_deposit_from_log(log: &Log<DepositEvent>, out: &mut Vec<u8>) {
+    out.reserve(48 + 32 + 8 + 96 + 8);
+    out.extend_from_slice(&log.pubkey);
+    out.extend_from_slice(&log.withdrawal_credentials);
+    out.extend_from_slice(&log.amount);
+    out.extend_from_slice(&log.signature);
+    out.extend_from_slice(&log.index);
+}
+
+/// Decodes deposit events from `address` and appends their EIP-6110 request bytes to `out`.
+///
+/// Logs from other addresses or with a different first topic are ignored. Matching events are
+/// appended in input order, without an EIP-7685 request type byte. Callers can flatten receipt
+/// logs to accumulate all deposits in a block.
+///
+/// Returns an error if a matching event cannot be ABI-decoded. Deposits appended before the
+/// failing log remain in `out`.
+#[cfg(feature = "sol-types")]
+pub fn accumulate_deposits_from_logs<'a>(
+    address: Address,
+    logs: impl IntoIterator<Item = &'a Log>,
+    out: &mut Vec<u8>,
+) -> Result<(), alloy_sol_types::Error> {
+    for log in logs {
+        if log.address != address || log.topics().first() != Some(&DepositEvent::SIGNATURE_HASH) {
+            continue;
+        }
+        accumulate_deposit_from_log(&DepositEvent::decode_log(log)?, out);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -70,5 +127,78 @@ mod tests {
 
         // Check if the serialized JSON matches the expected JSON structure
         assert_eq!(serialized_json, json_data);
+    }
+}
+
+#[cfg(all(test, feature = "sol-types"))]
+mod log_tests {
+    use super::*;
+    use alloc::vec;
+    use alloy_primitives::{b256, Bytes};
+
+    fn deposit(index: u64) -> Log<DepositEvent> {
+        Log {
+            address: MAINNET_DEPOSIT_CONTRACT_ADDRESS,
+            data: DepositEvent {
+                pubkey: vec![0x11; 48].into(),
+                withdrawal_credentials: vec![0x22; 32].into(),
+                amount: 32_000_000_000u64.to_le_bytes().into(),
+                signature: vec![0x33; 96].into(),
+                index: index.to_le_bytes().into(),
+            },
+        }
+    }
+
+    #[test]
+    fn deposit_request_encoding() {
+        assert_eq!(
+            DepositEvent::SIGNATURE_HASH,
+            b256!("649bbc62d0e31342afea4e5cd82d4049e7e1ee912fc0889aa790803be39038c5")
+        );
+        let mut out = vec![DEPOSIT_REQUEST_TYPE];
+        accumulate_deposit_from_log(&deposit(0x0102030405060708), &mut out);
+        let mut expected = vec![DEPOSIT_REQUEST_TYPE];
+        expected.extend_from_slice(&[0x11; 48]);
+        expected.extend_from_slice(&[0x22; 32]);
+        expected.extend_from_slice(&[0x00, 0x40, 0x59, 0x73, 0x07, 0x00, 0x00, 0x00]);
+        expected.extend_from_slice(&[0x33; 96]);
+        expected.extend_from_slice(&[8, 7, 6, 5, 4, 3, 2, 1]);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn filters_logs_and_preserves_order() {
+        let address = Address::with_last_byte(0x42);
+        let mut first = DepositEvent::encode_log(&deposit(7));
+        first.address = address;
+        let mut second = DepositEvent::encode_log(&deposit(8));
+        second.address = address;
+        let wrong_address = DepositEvent::encode_log(&deposit(9));
+        let wrong_topic = Log::new_unchecked(address, vec![B256::ZERO], Bytes::new());
+        let no_topics = Log::new_unchecked(address, vec![], Bytes::new());
+        let logs = [wrong_address, first, wrong_topic, no_topics, second];
+        let mut out = vec![0xff];
+        accumulate_deposits_from_logs(address, &logs, &mut out).unwrap();
+        let mut expected = vec![0xff];
+        accumulate_deposit_from_log(&deposit(7), &mut expected);
+        accumulate_deposit_from_log(&deposit(8), &mut expected);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn rejects_malformed_matching_log() {
+        let address = MAINNET_DEPOSIT_CONTRACT_ADDRESS;
+        let mut malformed =
+            Log::new_unchecked(Address::ZERO, vec![DepositEvent::SIGNATURE_HASH], Bytes::new());
+        let mut out = Vec::new();
+        accumulate_deposits_from_logs(address, [&malformed], &mut out).unwrap();
+        assert!(out.is_empty());
+
+        malformed.address = address;
+        let valid = DepositEvent::encode_log(&deposit(7));
+        assert!(accumulate_deposits_from_logs(address, [&valid, &malformed], &mut out).is_err());
+        let mut expected = Vec::new();
+        accumulate_deposit_from_log(&deposit(7), &mut expected);
+        assert_eq!(out, expected);
     }
 }

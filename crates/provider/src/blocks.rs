@@ -166,7 +166,9 @@ impl<N: Network> NewBlocks<N> {
 
             // If we're paused, wait until we're unpaused.
             // Once unpaused, reset `self.next_yield` to ignore the blocks that were included while we were paused.
-            let unpaused = self.paused.wait().await;
+            if self.paused.wait().await {
+                self.next_yield = NO_BLOCK_NUMBER;
+            }
 
             // Get the tip.
             let Some(block_number) = numbers_stream.next().await else {
@@ -174,8 +176,11 @@ impl<N: Network> NewBlocks<N> {
                 break 'task;
             };
             trace!(%block_number, "got block number");
-            if self.next_yield == NO_BLOCK_NUMBER || unpaused {
-                assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
+            if block_number == NO_BLOCK_NUMBER {
+                warn!("ignoring invalid block number");
+                continue 'task;
+            }
+            if self.next_yield == NO_BLOCK_NUMBER {
                 // this stream can be initialized after the first tx was sent,
                 // to avoid the edge case where the tx is mined immediately, we should apply an
                 // offset to the initial fetch so that we fetch tip - 1
@@ -229,6 +234,44 @@ impl<N: Network> NewBlocks<N> {
             }
         }
         }
+    }
+}
+
+#[cfg(test)]
+mod regression_tests {
+    use super::*;
+    use crate::{
+        heart::{Heartbeat, PendingTransactionConfig},
+        Provider, ProviderBuilder,
+    };
+    use alloy_primitives::B256;
+    use alloy_rpc_types_eth::Block;
+    use alloy_transport::mock::Asserter;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn heartbeat_continues_after_invalid_block_number() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        for number in 0..=2 {
+            let mut block: Block = Block::default();
+            block.header.inner.number = number;
+            asserter.push_success(&Some(block));
+        }
+
+        let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client());
+        let paused = new_blocks.paused.clone();
+        let numbers = futures::stream::iter([NO_BLOCK_NUMBER, 1, NO_BLOCK_NUMBER, 2]);
+        let stream = Box::pin(new_blocks.into_block_stream(numbers));
+        let heartbeat = Heartbeat::<Ethereum, _>::new(stream, paused).spawn();
+
+        let tx_hash = B256::with_last_byte(1);
+        let config = PendingTransactionConfig::new(tx_hash).with_required_confirmations(2);
+        let pending = heartbeat.watch_tx(config, Some(1)).await.unwrap();
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(2), pending).await.unwrap().unwrap(),
+            tx_hash
+        );
     }
 }
 

@@ -24,7 +24,8 @@ pub struct Receipt<T = Log> {
     /// This is the `statusCode`
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub status: Eip658Value,
-    /// Gas used
+    /// Cumulative gas used in the block up to and including this transaction.
+    /// See [`TxReceipt::cumulative_gas_used`].
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub cumulative_gas_used: u64,
     /// Log send from contracts.

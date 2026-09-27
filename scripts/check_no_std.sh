@@ -14,7 +14,7 @@ crates=(
     alloy-rpc-types-engine
 )
 
-cmd=(cargo +stable hack check --no-default-features --target "$target")
+cmd=(cargo +stable hack check --locked --no-default-features --target "$target")
 for crate in "${crates[@]}"; do
     cmd+=(-p "$crate")
 done

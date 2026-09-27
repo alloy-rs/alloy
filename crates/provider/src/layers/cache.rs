@@ -28,6 +28,11 @@ use std::{io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync:
 /// Persistence is opt-in. Obtain a [`SharedCache`] with [`CacheLayer::cache`] before applying the
 /// layer, retain that handle, and use [`SharedCache::load_cache`] or [`SharedCache::save_cache`].
 /// There is no automatic persistence or invalidation.
+///
+/// Entries are keyed by the request (method, params and block) only, not by chain or endpoint.
+/// Clones of a [`CacheLayer`] and its [`SharedCache`] share the same storage, so use one cache
+/// per chain: layering the same cache onto providers for different chains, or loading a cache
+/// file saved on another chain, serves responses from the wrong chain.
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
     /// In-memory LRU cache, mapping requests to responses.
@@ -577,6 +582,9 @@ impl SharedCache {
     ///
     /// Existing keys may be replaced, and entries beyond the configured capacity are evicted
     /// according to the LRU policy. If the file does not exist, this returns without error.
+    ///
+    /// Entries are not tagged with a chain, so only load a file saved from a cache for the same
+    /// chain.
     pub fn load_cache(&self, path: PathBuf) -> TransportResult<()> {
         if !path.exists() {
             return Ok(());

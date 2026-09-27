@@ -307,6 +307,21 @@ pub mod lenient_block_number_or_tag {
         LenientBlockNumberOrTag::deserialize(deserializer).map(Into::into)
     }
 
+    /// Serde functions for leniently deserializing an optional [`BlockNumberOrTag`].
+    pub mod opt {
+        use super::{BlockNumberOrTag, LenientBlockNumberOrTag};
+        use serde::{Deserialize, Deserializer};
+
+        /// Deserializes `null` as [`None`] and any value accepted by
+        /// [`deserialize`](super::deserialize) as [`Some`].
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<BlockNumberOrTag>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Ok(Option::<LenientBlockNumberOrTag>::deserialize(deserializer)?.map(Into::into))
+        }
+    }
+
     impl<'de> Deserialize<'de> for LenientBlockNumberOrTag {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
@@ -1828,6 +1843,31 @@ mod tests {
         assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": "invalid"}"#).is_err());
         assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": null}"#).is_err());
         assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": {}}"#).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_lenient_block_number_or_tag_opt() {
+        #[derive(Debug, serde::Deserialize, PartialEq)]
+        struct TestLenientOptStruct {
+            #[serde(
+                default,
+                deserialize_with = "super::lenient_block_number_or_tag::opt::deserialize"
+            )]
+            block: Option<BlockNumberOrTag>,
+        }
+
+        for (raw, expected) in [
+            (r#"{"block": 123}"#, Some(BlockNumberOrTag::Number(123))),
+            (r#"{"block": "123"}"#, Some(BlockNumberOrTag::Number(123))),
+            (r#"{"block": "latest"}"#, Some(BlockNumberOrTag::Latest)),
+            (r#"{"block": null}"#, None),
+            ("{}", None),
+        ] {
+            let lenient_struct: TestLenientOptStruct = serde_json::from_str(raw).unwrap();
+            assert_eq!(lenient_struct.block, expected);
+        }
+        assert!(serde_json::from_str::<TestLenientOptStruct>(r#"{"block": "invalid"}"#).is_err());
     }
 
     #[test]

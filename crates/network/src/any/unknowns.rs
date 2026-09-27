@@ -93,7 +93,9 @@ pub struct DeserMemo {
 }
 
 /// A typed transaction of an unknown Network
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+///
+/// Equality compares the transaction type and fields, ignoring the deserialization cache.
+#[derive(Debug, Clone, Eq, serde::Serialize, serde::Deserialize)]
 #[doc(alias = "UnknownTypedTx")]
 pub struct UnknownTypedTransaction {
     #[serde(rename = "type")]
@@ -107,6 +109,12 @@ pub struct UnknownTypedTransaction {
     /// Memoization for deserialization.
     #[serde(skip, default)]
     pub memo: DeserMemo,
+}
+
+impl PartialEq for UnknownTypedTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty && self.fields == other.fields
+    }
 }
 
 impl alloy_consensus::Transaction for UnknownTypedTransaction {
@@ -378,6 +386,56 @@ mod tests {
     use crate::{AnyRpcTransaction, AnyTxEnvelope};
 
     use super::*;
+
+    #[test]
+    fn equality_ignores_deserialization_cache() {
+        let tx: UnknownTypedTransaction = serde_json::from_value(serde_json::json!({
+            "type": "0x7e",
+            "input": "0x1234",
+            "accessList": [],
+            "blobVersionedHashes": [],
+            "authorizationList": [],
+        }))
+        .unwrap();
+        let cold = tx.clone();
+
+        assert_eq!(tx.input().as_ref(), &[0x12, 0x34]);
+        assert_eq!(tx, cold);
+        assert!(tx.access_list().is_some());
+        assert_eq!(tx, cold);
+        assert!(tx.blob_versioned_hashes().is_some());
+        assert_eq!(tx, cold);
+        assert!(tx.authorization_list().is_some());
+        assert_eq!(tx, cold);
+
+        let decoded: UnknownTypedTransaction =
+            serde_json::from_str(&serde_json::to_string(&tx).unwrap()).unwrap();
+        assert_eq!(tx, decoded);
+        assert_eq!(
+            crate::AnyTypedTransaction::Unknown(tx.clone()),
+            crate::AnyTypedTransaction::Unknown(cold.clone()),
+        );
+        assert_eq!(
+            AnyTxEnvelope::Unknown(UnknownTxEnvelope { hash: B256::ZERO, inner: tx }),
+            AnyTxEnvelope::Unknown(UnknownTxEnvelope { hash: B256::ZERO, inner: cold }),
+        );
+    }
+
+    #[test]
+    fn equality_compares_type_and_fields() {
+        let tx = UnknownTypedTransaction {
+            ty: AnyTxType(0x7e),
+            fields: Default::default(),
+            memo: Default::default(),
+        };
+        let mut different_type = tx.clone();
+        different_type.ty = AnyTxType(0x7f);
+        assert_ne!(tx, different_type);
+
+        let mut different_fields = tx.clone();
+        different_fields.fields.insert("nonce".into(), serde_json::json!("0x1"));
+        assert_ne!(tx, different_fields);
+    }
 
     #[test]
     fn test_serde_anytype() {

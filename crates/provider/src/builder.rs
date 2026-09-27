@@ -316,7 +316,15 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         self,
         estimator: Eip1559Estimator,
     ) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
-        self.filler(GasFiller { estimator })
+        self.filler(GasFiller::new(estimator))
+    }
+
+    /// Add legacy gas estimation to the stack being built.
+    ///
+    /// The filler always populates `gas_price` instead of the EIP-1559 fee fields, see
+    /// [`GasFiller::legacy`] for more information.
+    pub fn with_legacy_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
+        self.filler(GasFiller::legacy())
     }
 
     /// Add nonce management to the stack being built.
@@ -418,6 +426,9 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Set a default [`BlockId`] for `eth_call` and `eth_estimateGas`.
     ///
+    /// When combined with [`with_call_batching`](Self::with_call_batching), this must be added
+    /// first, otherwise the batching layer bypasses the default.
+    ///
     /// [`BlockId`]: alloy_eips::BlockId
     pub fn with_default_block(
         self,
@@ -487,7 +498,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Finish the layer stack by providing a connection string with custom configuration.
     ///
     /// This method allows for fine-grained control over connection settings
-    /// such as authentication and transport-specific options.
+    /// such as authentication, retry behavior, and transport-specific options.
     /// The transport type is extracted from the connection string and configured
     /// using the provided [`ConnectionConfig`].
     ///
@@ -497,8 +508,12 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_provider::{ConnectionConfig, ProviderBuilder};
     /// use alloy_transport::Authorization;
+    /// use std::time::Duration;
     ///
-    /// let config = ConnectionConfig::new().with_auth(Authorization::bearer("my-token"));
+    /// let config = ConnectionConfig::new()
+    ///     .with_auth(Authorization::bearer("my-token"))
+    ///     .with_max_retries(3)
+    ///     .with_retry_interval(Duration::from_secs(2));
     ///
     /// let provider =
     ///     ProviderBuilder::new().connect_with_config("ws://localhost:8545", config).await?;

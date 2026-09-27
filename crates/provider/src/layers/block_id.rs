@@ -74,13 +74,11 @@ impl<P: Provider<N>, N: Network> Provider<N> for BlockIdProvider<P, N> {
     }
 
     fn call(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
-        EthCall::call(self.weak_client(), tx).block(self.block_id)
+        self.inner.call(tx).block(self.block_id)
     }
 
     fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
-        EthCall::gas_estimate(self.weak_client(), tx)
-            .block(self.block_id)
-            .map_resp(crate::utils::convert_u64)
+        self.inner.estimate_gas(tx).block(self.block_id)
     }
 
     fn simulate<'req>(

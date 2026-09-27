@@ -258,6 +258,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Note
     ///
     /// Not all client implementations support state overrides for `eth_estimateGas`.
+    ///
+    /// On networks with [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), the node must estimate
+    /// one transaction limit covering intrinsic costs, regular (execution) gas, and state gas,
+    /// including temporary charges before state refills. Alloy forwards this request; it does not
+    /// add state gas locally. Use a node implementing the target fork's rules. A receipt's charged
+    /// gas or a trace's net consumption is not a substitute for this estimate.
     fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockNumberOrTag::Pending.into())
@@ -465,20 +471,22 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessList`, the only block access list method specified in
+    /// [execution-apis]. Returns the block access list, or `None` if the block is not found.
+    ///
+    /// [execution-apis]: https://github.com/ethereum/execution-apis/blob/main/src/eth/block.yaml
     async fn get_block_access_list(
         &self,
         block: BlockId,
     ) -> TransportResult<Option<BlockAccessList>> {
-        match block {
-            BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
-            BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
-        }
+        self.client().request("eth_getBlockAccessList", (block,)).await
     }
 
     /// Gets the EIP-7928 block access list by [`BlockHash`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListByBlockHash`, which is not part of execution-apis. Use
+    /// [`Provider::get_block_access_list`] for the specified method. Returns the block access
+    /// list, or `None` if the block is not found.
     async fn get_block_access_list_by_hash(
         &self,
         hash: BlockHash,
@@ -488,7 +496,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListByBlockNumber`, which is not part of execution-apis. Use
+    /// [`Provider::get_block_access_list`] for the specified method. Returns the block access
+    /// list, or `None` if the block is not found.
     async fn get_block_access_list_by_number(
         &self,
         number: BlockNumberOrTag,
@@ -496,9 +506,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
     }
 
-    /// Gets the EIP-7928 block access list by [`BlockId`].
+    /// Gets the RLP encoded EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the  block access list raw, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListRaw`, which is not part of execution-apis. Returns the
+    /// encoded block access list, or `None` if the block is not found.
     async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
         self.client().request("eth_getBlockAccessListRaw", (block,)).await
     }
@@ -1513,6 +1524,50 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_fillTransaction", (tx,)).await
     }
 
+    /// Fills the transaction request using the configured
+    /// [`TxFiller`](crate::fillers::TxFiller)s and signs it locally, returning the signed
+    /// envelope without broadcasting it.
+    ///
+    /// Unlike [`fill_transaction`](Self::fill_transaction) and
+    /// [`sign_transaction`](Self::sign_transaction), this does not rely on the node's
+    /// `eth_fillTransaction` and `eth_signTransaction` endpoints, which regular nodes do not
+    /// support. The returned envelope can be broadcast later with
+    /// [`send_tx_envelope`](Self::send_tx_envelope).
+    ///
+    /// The default implementation returns an error, since a bare provider has no fillers.
+    /// [`FillProvider`](crate::fillers::FillProvider) overrides it and requires a signing filler
+    /// such as [`WalletFiller`](crate::fillers::WalletFiller) to be configured, for example via
+    /// [`ProviderBuilder::wallet`](crate::ProviderBuilder::wallet).
+    ///
+    /// # Note
+    ///
+    /// Depending on the configured fillers this can have side effects, such as reserving a nonce,
+    /// even if the returned envelope is never broadcast.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(
+    /// #     provider: impl alloy_provider::Provider,
+    /// #     tx: alloy_rpc_types_eth::TransactionRequest,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// let envelope = provider.fill_and_sign_transaction(tx).await?;
+    ///
+    /// // broadcast the exact same transaction later
+    /// provider.send_tx_envelope(envelope).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        let _ = tx;
+        Err(RpcError::local_usage_str(
+            "no fillers configured, cannot fill and sign transaction locally",
+        ))
+    }
+
     /// Subscribe to a stream of new block headers.
     ///
     /// # Errors
@@ -1878,6 +1933,7 @@ mod tests {
     use super::*;
     use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_consensus::{Transaction, TxEnvelope};
+    use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
     use alloy_network::{
         AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
     };
@@ -1887,8 +1943,16 @@ mod tests {
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
-    use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
-    use std::{io::Read, str::FromStr, time::Duration};
+    use alloy_transport::{
+        layers::{RetryBackoffLayer, RetryPolicy},
+        TransportFut,
+    };
+    use std::{
+        io::Read,
+        str::FromStr,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     // For layer transport tests
     use alloy_consensus::transaction::SignerRecoverable;
@@ -2960,5 +3024,98 @@ mod tests {
         assert!(filled_tx.to().is_some(), "filled transaction should have to address");
         assert!(filled_tx.gas_limit() > 0, "filled transaction should have gas limit");
         assert!(filled_tx.max_fee_per_gas() > 0, "filled transaction should have max fee per gas");
+    }
+
+    #[tokio::test]
+    async fn get_block_access_list_calls_specified_method() {
+        let method = Arc::new(Mutex::new(None));
+        let service = {
+            let method = method.clone();
+            tower::service_fn(move |request: RequestPacket| {
+                let method = method.clone();
+                Box::pin(async move {
+                    let RequestPacket::Single(request) = request else {
+                        panic!("block access lists are requested one block at a time");
+                    };
+                    *method.lock().unwrap() = Some(request.method().to_string());
+                    Ok(ResponsePacket::Single(Response {
+                        id: request.id().clone(),
+                        payload: ResponsePayload::Success(
+                            RawValue::from_string("null".to_string()).unwrap(),
+                        ),
+                    }))
+                }) as TransportFut<'static>
+            })
+        };
+        let provider = RootProvider::<Ethereum>::new(RpcClient::new(service, true));
+
+        assert_eq!(provider.get_block_access_list(BlockId::latest()).await.unwrap(), None);
+        assert_eq!(method.lock().unwrap().as_deref(), Some("eth_getBlockAccessList"));
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let from = provider.default_signer_address();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let envelope = provider.fill_and_sign_transaction(tx).await.unwrap();
+
+        // the recommended fillers and the wallet filler populated the request before signing
+        assert_eq!(envelope.recover_signer().unwrap(), from);
+        assert_eq!(envelope.nonce(), 0);
+        assert_eq!(envelope.chain_id(), Some(31337));
+        assert!(envelope.gas_limit() > 0);
+        assert!(envelope.max_fee_per_gas() > 0);
+
+        // broadcasting the prepared envelope yields the same hash
+        let hash = *envelope.tx_hash();
+        let pending = provider.send_tx_envelope(envelope).await.unwrap();
+        assert_eq!(*pending.tx_hash(), hash);
+
+        let receipt = pending.get_receipt().await.unwrap();
+        assert_eq!(receipt.transaction_hash, hash);
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction_sequential_nonces() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        // the cached nonce manager hands out consecutive nonces without broadcasting
+        let first = provider.fill_and_sign_transaction(tx.clone()).await.unwrap();
+        let second = provider.fill_and_sign_transaction(tx).await.unwrap();
+        assert_eq!(first.nonce(), 0);
+        assert_eq!(second.nonce(), 1);
+
+        let receipt = provider.send_tx_envelope(first).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
+        let receipt = provider.send_tx_envelope(second).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction_dyn_provider() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let from = provider.default_signer_address();
+        let provider = provider.erased();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let envelope = provider.fill_and_sign_transaction(tx).await.unwrap();
+        assert_eq!(envelope.recover_signer().unwrap(), from);
+
+        let receipt =
+            provider.send_tx_envelope(envelope).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
     }
 }

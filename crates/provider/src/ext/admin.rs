@@ -90,7 +90,9 @@ mod test {
     async fn node_info() {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
-                let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+                // Fresh Geth databases can take more than 10s to initialize on Windows CI.
+                let geth =
+                    Geth::new().disable_discovery().data_dir(temp_dir).timeout(60_000).spawn();
                 let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
                 let node_info = provider.node_info().await.unwrap();
                 assert!(node_info.enode.starts_with("enode://"));
@@ -105,13 +107,19 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-1", |temp_dir_1| async move {
                 run_with_tempdir("geth-test-2", |temp_dir_2| async move {
-                    let geth1 =
-                        Geth::new().disable_discovery().keep_stderr().data_dir(&temp_dir_1).spawn();
+                    // Allow both fresh databases to finish initializing on Windows CI.
+                    let geth1 = Geth::new()
+                        .disable_discovery()
+                        .keep_stderr()
+                        .data_dir(&temp_dir_1)
+                        .timeout(60_000)
+                        .spawn();
                     let mut geth2 = Geth::new()
                         .disable_discovery()
                         .keep_stderr()
                         .port(0u16)
                         .data_dir(&temp_dir_2)
+                        .timeout(60_000)
                         .spawn();
 
                     let provider1 = ProviderBuilder::new().connect_http(geth1.endpoint_url());
