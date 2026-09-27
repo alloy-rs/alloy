@@ -83,6 +83,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         old_handle.shutdown();
 
         // Re-issue pending requests.
+        self.in_flights.remove_cancelled();
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
         for (_, in_flight) in self.in_flights.iter() {
             let msg = in_flight.request.serialized().to_owned();
