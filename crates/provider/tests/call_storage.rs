@@ -161,7 +161,7 @@ fn request() -> TransactionRequest {
         .with_gas_price(987_654)
 }
 
-fn block() -> BlockId {
+const fn block() -> BlockId {
     BlockId::hash_canonical(B256::repeat_byte(0x42))
 }
 
