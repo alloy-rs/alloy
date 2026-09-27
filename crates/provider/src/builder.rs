@@ -426,6 +426,9 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Set a default [`BlockId`] for `eth_call` and `eth_estimateGas`.
     ///
+    /// When combined with [`with_call_batching`](Self::with_call_batching), this must be added
+    /// first, otherwise the batching layer bypasses the default.
+    ///
     /// [`BlockId`]: alloy_eips::BlockId
     pub fn with_default_block(
         self,
