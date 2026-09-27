@@ -12,10 +12,10 @@ use tokio_tungstenite::{
 
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
-pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+pub use tokio_tungstenite::{tungstenite::protocol::WebSocketConfig, Connector};
 
 /// Simple connection details for a websocket connection.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WsConnect {
     /// The URL to connect to.
     url: String,
@@ -34,6 +34,22 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
+    /// An optional custom TLS connector.
+    connector: Option<Connector>,
+}
+
+impl std::fmt::Debug for WsConnect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WsConnect")
+            .field("url", &self.url)
+            .field("auth", &self.auth)
+            .field("config", &self.config)
+            .field("max_retries", &self.max_retries)
+            .field("retry_interval", &self.retry_interval)
+            .field("keepalive_interval", &self.keepalive_interval)
+            .field("connector", &self.connector.as_ref().map(|_| "Connector"))
+            .finish()
+    }
 }
 
 impl WsConnect {
@@ -52,6 +68,7 @@ impl WsConnect {
             max_retries: 10,
             retry_interval: Duration::from_secs(3),
             keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
+            connector: None,
         }
     }
 
@@ -75,6 +92,18 @@ impl WsConnect {
         self
     }
 
+    /// Sets the custom TLS connector.
+    pub fn with_connector(mut self, connector: Connector) -> Self {
+        self.connector = Some(connector);
+        self
+    }
+
+    /// Sets the optional custom TLS connector.
+    pub fn with_connector_opt(mut self, connector: Option<Connector>) -> Self {
+        self.connector = connector;
+        self
+    }
+
     /// Get the URL string of the connection.
     pub fn url(&self) -> &str {
         &self.url
@@ -88,6 +117,11 @@ impl WsConnect {
     /// Get the websocket config.
     pub const fn config(&self) -> Option<&WebSocketConfig> {
         self.config.as_ref()
+    }
+
+    /// Get the custom TLS connector.
+    pub const fn connector(&self) -> Option<&Connector> {
+        self.connector.as_ref()
     }
 
     /// Sets the max number of retries before failing and exiting the connection.
@@ -144,6 +178,19 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
+        // `connect_async_tls_with_config` only exists when tokio-tungstenite is built with a
+        // TLS backend. Without one there is no TLS to configure, so fall back to the plain
+        // connect and keep `--no-default-features` building.
+        #[cfg(any(feature = "rustls-tls", feature = "native-tls"))]
+        let (socket, _) = tokio_tungstenite::connect_async_tls_with_config(
+            req,
+            self.config,
+            false,
+            self.connector.clone(),
+        )
+        .await
+        .map_err(TransportErrorKind::custom)?;
+        #[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
         let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
             .await
             .map_err(TransportErrorKind::custom)?;
@@ -328,5 +375,17 @@ mod tests {
     fn no_auth_for_localhost_username() {
         let ws = WsConnect::new("ws://localhost:8545");
         assert!(ws.auth().is_none());
+    }
+
+    #[test]
+    fn custom_connector_configuration() {
+        let ws = WsConnect::new("wss://example.com/rpc");
+        assert!(ws.connector().is_none());
+
+        let ws_with_conn = ws.with_connector(Connector::Plain);
+        assert!(matches!(ws_with_conn.connector(), Some(Connector::Plain)));
+
+        let ws_opt_none = ws_with_conn.with_connector_opt(None);
+        assert!(ws_opt_none.connector().is_none());
     }
 }
