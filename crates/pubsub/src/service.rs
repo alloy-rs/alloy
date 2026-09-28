@@ -487,6 +487,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cancelled_queued_request_is_not_dispatched_after_reconnect() {
+        let (handle, _interface) = ConnectionHandle::new();
+        let (replacement, mut replacement_interface) = ConnectionHandle::new();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let frontend = PubSubFrontend::new(tx);
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        let request = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let mut request = Box::pin(frontend.send(request));
+        assert!(futures::poll!(&mut request).is_pending());
+        // While reconnecting, the service leaves new instructions in its queue.
+        // The caller can stop waiting before the service resumes that queue.
+        drop(request);
+        service.reconnect().await.unwrap();
+        let instruction = service.reqs.try_recv().unwrap();
+        service.service_ix(instruction).unwrap();
+        assert!(matches!(
+            replacement_interface.from_frontend.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+        assert_eq!(service.in_flights.len(), 0);
+    }
+
+    #[tokio::test]
     async fn reconnect_preserves_pending_subscription_without_response_receiver() {
         let (handle, _interface) = ConnectionHandle::new();
         let (replacement, mut replacement_interface) = ConnectionHandle::new();
