@@ -174,14 +174,19 @@ impl<N: Network> NewBlocks<N> {
                     if number + 1 == self.next_yield && hash != known_block.header().parent_hash() {
                         debug!(number, "reorg detected, refetching block");
                         self.yielded.pop_back();
-                        self.known_blocks.put(self.next_yield, known_block);
                         self.next_yield = number;
                         // If this fails, the next tip refills from `number`.
                         if let Some(client) = self.client.upgrade() {
-                            let block = client
+                            let block: Result<Option<N::BlockResponse>, _> = client
                                 .request("eth_getBlockByNumber", (U64::from(number), false))
                                 .await;
                             if let Ok(Some(block)) = block {
+                                // Keep the child only if it builds on the refetched block,
+                                // otherwise it's from a fork the node has left and the next
+                                // tip refetches it.
+                                if block.header().hash() == known_block.header().parent_hash() {
+                                    self.known_blocks.put(number + 1, known_block);
+                                }
                                 self.known_blocks.put(number, block);
                             }
                         }
@@ -348,6 +353,38 @@ mod regression_tests {
             canonical_tx
         );
         assert!(orphaned.now_or_never().is_none(), "orphaned transaction was confirmed");
+    }
+
+    #[tokio::test]
+    async fn new_blocks_drops_stale_child_on_reorg() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let block = |number, hash, parent_hash| {
+            let mut block: Block = Block::default();
+            block.header.hash = B256::with_last_byte(hash);
+            block.header.inner.number = number;
+            block.header.inner.parent_hash = B256::with_last_byte(parent_hash);
+            block
+        };
+
+        // Block 2 is from a fork the node has left, so refetching block 1 returns the block that
+        // was already yielded. This used to put block 2 back and loop on block 1 forever.
+        asserter.push_success(&Some(block(0, 10, 0)));
+        asserter.push_success(&Some(block(1, 11, 10)));
+        asserter.push_success(&Some(block(2, 22, 21)));
+        for _ in 0..3 {
+            asserter.push_success(&Some(block(1, 11, 10)));
+        }
+
+        let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client());
+        let numbers = futures::stream::iter([1, 2]);
+        let yielded: Vec<_> = new_blocks
+            .into_block_stream(numbers)
+            .map(|block| (block.header.number, block.header.hash))
+            .collect()
+            .await;
+        let hash = B256::with_last_byte;
+        assert_eq!(yielded, [(0, hash(10)), (1, hash(11)), (1, hash(11))]);
     }
 }
 
