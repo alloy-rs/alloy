@@ -1,6 +1,6 @@
 version: 3
 rules:
-  # Keep the reviewed immutable deny pin; tempoxyz/ci has no release tags.
+  # Keep the reviewed immutable deny workflow pin.
   - ignore: true
     conditions:
-      - expr: ActionName == "tempoxyz/ci/.github/workflows/deny.yml" && ActionVersion == "e8b0b7e43db282a365ea7019f5e1657381bccc51"
+      - expr: ActionName == "tempoxyz/gh-actions/.github/workflows/rust-deny.yml" && ActionVersion == "a8467566cf2204e895d40f6baf19435c8bc7f921"
