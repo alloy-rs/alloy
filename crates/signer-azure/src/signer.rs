@@ -215,6 +215,9 @@ impl AzureSigner {
     /// `https://my-hsm.managedhsm.azure.net/keys/my-key/<version>`. The version segment is
     /// optional; see [`Self::new`] for how the key version is pinned. Without it, the address
     /// changes when the key is rotated.
+    ///
+    /// Requests are sent to the host in `key_id`, so it must come from trusted configuration, like
+    /// an RPC URL. Any host is accepted to support sovereign clouds and private endpoints.
     pub async fn from_key_id(
         key_id: &str,
         credential: Arc<dyn TokenCredential>,
