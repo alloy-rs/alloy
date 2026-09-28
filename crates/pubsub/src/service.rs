@@ -116,6 +116,10 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service a request.
     fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
+        // A caller may have stopped waiting while reconnect blocked this queue.
+        if !in_flight.is_subscription() && in_flight.tx.is_closed() {
+            return Ok(());
+        }
         let brv = in_flight.request();
 
         self.dispatch_request(brv.serialized().to_owned())?;
