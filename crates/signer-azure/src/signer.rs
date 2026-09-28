@@ -2,7 +2,11 @@ use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
-use azure_core::credentials::TokenCredential;
+use azure_core::{
+    credentials::TokenCredential,
+    error::{ErrorKind, ErrorResponse},
+    json::from_json,
+};
 use azure_security_keyvault_keys::{
     models::{
         CurveName, Key, KeyClientGetKeyOptions, KeyClientSignOptions, KeyOperationResult, KeyType,
@@ -77,6 +81,19 @@ pub enum AzureSignerError {
     /// Thrown when the Azure SDK returns an error.
     #[error(transparent)]
     Azure(#[from] azure_core::Error),
+    /// Thrown when a Key Vault request fails, e.g. because the caller is not authorized.
+    #[error(
+        "Azure Key Vault {operation} request for key `{key_name}` failed: {}",
+        service_message(source)
+    )]
+    Request {
+        /// The failed operation.
+        operation: &'static str,
+        /// The name of the key.
+        key_name: String,
+        /// The Azure SDK error.
+        source: azure_core::Error,
+    },
     /// [`ecdsa`] error.
     #[error(transparent)]
     K256(#[from] ecdsa::Error),
@@ -177,7 +194,7 @@ impl AzureSigner {
     /// `chain_id` affects transaction signing only. `Some(id)` fills an unset transaction chain ID
     /// and rejects a conflicting one before signing. It does not affect hash, message, or
     /// typed-data signing; `None` disables this signer-side check.
-    #[instrument(skip(client), err)]
+    #[instrument(skip(client), err(level = "debug"))]
     pub async fn new(
         client: KeyClient,
         key_name: String,
@@ -196,7 +213,8 @@ impl AzureSigner {
     ///
     /// `key_id` is a key identifier such as `https://my-vault.vault.azure.net/keys/my-key` or
     /// `https://my-hsm.managedhsm.azure.net/keys/my-key/<version>`. The version segment is
-    /// optional; see [`Self::new`] for how the key version is pinned.
+    /// optional; see [`Self::new`] for how the key version is pinned. Without it, the address
+    /// changes when the key is rotated.
     pub async fn from_key_id(
         key_id: &str,
         credential: Arc<dyn TokenCredential>,
@@ -247,7 +265,7 @@ impl AzureSigner {
     ///
     /// This does not apply EIP-155 itself. Transaction signing supplies a signature hash that
     /// already reflects the transaction's chain ID.
-    #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
+    #[instrument(err(level = "debug"), skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AzureSignerError> {
         let sig = self.sign_digest(digest).await?;
         // Ethereum signatures cannot encode x-reduced recovery IDs.
@@ -259,17 +277,21 @@ impl AzureSigner {
     }
 }
 
-#[instrument(skip(client), err)]
+#[instrument(skip(client), err(level = "debug"))]
 async fn request_get_pubkey(
     client: &KeyClient,
     key_name: &str,
     key_version: Option<String>,
 ) -> Result<Key, AzureSignerError> {
     let options = KeyClientGetKeyOptions { key_version, ..Default::default() };
-    client.get_key(key_name, Some(options)).await?.into_model().map_err(Into::into)
+    let resp = client
+        .get_key(key_name, Some(options))
+        .await
+        .map_err(|source| request_error("get key", key_name, source))?;
+    resp.into_model().map_err(Into::into)
 }
 
-#[instrument(skip(client, digest), fields(digest = %hex::encode(digest)), err)]
+#[instrument(skip(client, digest), fields(digest = %hex::encode(digest)), err(level = "debug"))]
 async fn request_sign_digest(
     client: &KeyClient,
     key_name: &str,
@@ -282,9 +304,43 @@ async fn request_sign_digest(
     };
     let options =
         KeyClientSignOptions { key_version: Some(key_version.to_string()), ..Default::default() };
-    let resp = client.sign(key_name, parameters.try_into()?, Some(options)).await?.into_model()?;
+    let resp = client
+        .sign(key_name, parameters.try_into()?, Some(options))
+        .await
+        .map_err(|source| request_error("sign", key_name, source))?
+        .into_model()?;
     resolve_key_version(Some(key_version), &resp)?;
     Ok(resp)
+}
+
+/// Wraps a failed Key Vault request with the operation and key name.
+fn request_error(
+    operation: &'static str,
+    key_name: &str,
+    source: azure_core::Error,
+) -> AzureSignerError {
+    AzureSignerError::Request { operation, key_name: key_name.to_string(), source }
+}
+
+/// Formats an Azure SDK error as `status (code): message` using the service's error response.
+///
+/// The Azure SDK falls back to the raw response body when the error message contains JSON escape
+/// sequences, which Key Vault messages do.
+fn service_message(err: &azure_core::Error) -> String {
+    let ErrorKind::HttpResponse { status, error_code, raw_response: Some(raw) } = err.kind() else {
+        return err.to_string();
+    };
+    let detail = from_json::<_, ErrorResponse>(raw.body()).ok().and_then(|resp| resp.error);
+    let code = detail
+        .as_ref()
+        .and_then(|detail| detail.inner_error.as_ref()?.code.as_deref())
+        .or(error_code.as_deref());
+    let message = detail.as_ref().and_then(|detail| detail.message.as_deref());
+    match (code, message) {
+        (Some(code), Some(message)) => format!("{status} ({code}): {}", message.trim()),
+        (None, Some(message)) => format!("{status}: {}", message.trim()),
+        _ => err.to_string(),
+    }
 }
 
 /// Resolve the key version of a Key Vault response, checking it against `expected` if given.
@@ -366,6 +422,12 @@ mod tests {
     const KEY_NAME: &str = "eth-key";
     const KEY_VERSION: &str = "0123456789abcdef";
     const SCOPE: &str = "https://vault.azure.net/.default";
+    /// A Key Vault RBAC error response, whose message contains JSON escape sequences.
+    const FORBIDDEN_BODY: &str = concat!(
+        r#"{"error":{"code":"Forbidden","message":"Caller is not authorized to perform action "#,
+        r#"on resource.\r\nAction: 'Microsoft.KeyVault/vaults/keys/sign/action'\r\n","#,
+        r#""innererror":{"code":"ForbiddenByRbac"}}}"#
+    );
     const CHALLENGE: &str = concat!(
         r#"Bearer authorization="https://login.microsoftonline.com/tenant", "#,
         r#"resource="https://vault.azure.net""#
@@ -439,6 +501,8 @@ mod tests {
         high_s: bool,
         /// Overrides the key version reported in sign responses.
         sign_version: Option<&'static str>,
+        /// Rejects sign requests as unauthorized when set.
+        forbid_sign: bool,
         requests: Mutex<Vec<String>>,
     }
 
@@ -448,6 +512,7 @@ mod tests {
                 versions: Mutex::new(vec![(KEY_VERSION.to_string(), key)]),
                 high_s: false,
                 sign_version: None,
+                forbid_sign: false,
                 requests: Mutex::default(),
             }
         }
@@ -498,6 +563,13 @@ mod tests {
             }
             let line = format!("{} {}", request.method(), request.url().path());
             self.requests.lock().unwrap().push(line);
+            if self.forbid_sign && request.url().path().ends_with("/sign") {
+                return Ok(AsyncRawResponse::from_bytes(
+                    StatusCode::Forbidden,
+                    Headers::new(),
+                    FORBIDDEN_BODY,
+                ));
+            }
             let body = serde_json::to_vec(&self.respond(request)).unwrap();
             Ok(AsyncRawResponse::from_bytes(StatusCode::Ok, Headers::new(), body))
         }
@@ -695,8 +767,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn mock_vault_reports_request_errors() {
+        let vault = Arc::new(MockVault { forbid_sign: true, ..MockVault::new(signing_key(4)) });
+        let signer = mock_signer(vault, &kid(KEY_VERSION)).await;
+
+        let err = signer.sign_hash(&B256::ZERO).await.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Azure Key Vault sign request for key `eth-key` failed: 403 (ForbiddenByRbac): Caller \
+             is not authorized to perform action on resource.\r\nAction: \
+             'Microsoft.KeyVault/vaults/keys/sign/action'"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires AZURE_KEY_VAULT_KEY_ID and an Azure CLI login"]
     async fn sign_message() {
-        let Ok(key_id) = std::env::var("AZURE_KEY_VAULT_KEY_ID") else { return };
+        let key_id = std::env::var("AZURE_KEY_VAULT_KEY_ID").expect("AZURE_KEY_VAULT_KEY_ID");
         let credential = DeveloperToolsCredential::new(None).unwrap();
         let signer = AzureSigner::from_key_id(&key_id, credential, None, Some(1)).await.unwrap();
 
