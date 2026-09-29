@@ -336,12 +336,13 @@ jobs:
           git diff --exit-code -- Cargo.lock
 
   deny:
-    uses: tempoxyz/ci/.github/workflows/deny.yml@e8b0b7e43db282a365ea7019f5e1657381bccc51
+    uses: tempoxyz/gh-actions/.github/workflows/rust-deny.yml@d5402286a7abdfb7232173b3228d56473feb8a66 # 2026-09-29T02-04-45Z-d5402286
     permissions:
       contents: read
       id-token: write
     with:
-      deny-flags: --locked --all-features
+      rust-toolchain: nightly
+      flags: --locked --all-features
 
   codeql:
     name: Analyze (${{ matrix.language }})
