@@ -336,7 +336,7 @@ jobs:
           git diff --exit-code -- Cargo.lock
 
   deny:
-    uses: tempoxyz/gh-actions/.github/workflows/rust-deny.yml@d5402286a7abdfb7232173b3228d56473feb8a66
+    uses: tempoxyz/gh-actions/.github/workflows/rust-deny.yml@d5402286a7abdfb7232173b3228d56473feb8a66 # 2026-09-29T02-04-45Z-d5402286
     permissions:
       contents: read
       id-token: write
