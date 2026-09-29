@@ -29,6 +29,30 @@ pub struct AccountInfo {
 }
 
 impl AccountInfo {
+    /// Creates account information with an empty extension.
+    ///
+    /// The extension carries chain-specific data and only exists with the `account-ext` feature.
+    /// Use `with_extension` to attach one.
+    pub const fn new(balance: U256, nonce: u64, code: Bytes) -> Self {
+        Self {
+            balance,
+            nonce,
+            code,
+            #[cfg(feature = "account-ext")]
+            extension: alloy_trie::AccountExtension::new(),
+        }
+    }
+
+    /// Returns this account information with the given chain-specific extension.
+    ///
+    /// This replaces the extension, which [`Self::new`] leaves empty.
+    #[inline]
+    #[cfg(feature = "account-ext")]
+    pub fn with_extension(mut self, extension: impl Into<alloy_trie::AccountExtension>) -> Self {
+        self.extension = extension.into();
+        self
+    }
+
     /// Returns true if the code hash is the Keccak256 hash of the empty string `""`.
     #[inline]
     pub fn is_empty_code_hash(&self) -> bool {
@@ -334,5 +358,26 @@ mod tests {
             let decoded: AccountInfo = rmp_serde::from_slice(&bytes).unwrap();
             assert_eq!(decoded, info);
         }
+    }
+
+    #[test]
+    fn account_info_new() {
+        let code = Bytes::from_static(&[0x60, 0x00]);
+        let info = AccountInfo::new(U256::from(1), 2, code.clone());
+        assert_eq!(info.balance, U256::from(1));
+        assert_eq!(info.nonce, 2);
+        assert_eq!(info.code, code);
+        assert!(AccountInfo::new(U256::ZERO, 0, Bytes::new()).is_empty());
+    }
+
+    #[cfg(feature = "account-ext")]
+    #[test]
+    fn account_info_with_extension() {
+        let extension = alloy_trie::AccountExtension::copy_from_slice(&[0x82, 0xaa]);
+        let info = AccountInfo::new(U256::ZERO, 0, Bytes::new()).with_extension(extension.clone());
+        assert_eq!(info.extension, extension);
+        assert!(!info.is_empty());
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(serde_json::from_value::<AccountInfo>(json).unwrap(), info);
     }
 }
