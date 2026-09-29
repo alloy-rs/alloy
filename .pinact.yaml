@@ -3,4 +3,4 @@ rules:
   # Keep the reviewed immutable deny workflow pin.
   - ignore: true
     conditions:
-      - expr: ActionName == "tempoxyz/gh-actions/.github/workflows/rust-deny.yml" && ActionVersion == "a8467566cf2204e895d40f6baf19435c8bc7f921"
+      - expr: ActionName == "tempoxyz/gh-actions/.github/workflows/rust-deny.yml" && ActionVersion == "d5402286a7abdfb7232173b3228d56473feb8a66"
