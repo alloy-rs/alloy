@@ -1,6 +1,6 @@
 use alloy_node_bindings::Anvil;
 use alloy_provider::{Provider, ProviderBuilder};
-use alloy_rpc_client::RpcClient;
+use alloy_rpc_client::{ConnectionConfig, RpcClient};
 use alloy_transport::layers::RetryBackoffLayer;
 use alloy_transport_ws::WsConnect;
 
@@ -30,6 +30,23 @@ async fn ws_retry_pubsub() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let rpc_client = RpcClient::builder().layer(retry_layer).ws(ws).await?;
+
+    let provider = ProviderBuilder::new().disable_recommended_fillers().connect_client(rpc_client);
+
+    let _ = provider.subscribe_blocks().await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn ws_retry_pubsub_connect_with_config() -> Result<(), Box<dyn std::error::Error>> {
+    let anvil = Anvil::new().spawn();
+    let retry_layer = RetryBackoffLayer::new(1, 50, 1600);
+
+    let rpc_client = RpcClient::builder()
+        .layer(retry_layer)
+        .connect_with_config(&anvil.ws_endpoint(), ConnectionConfig::new())
+        .await?;
 
     let provider = ProviderBuilder::new().disable_recommended_fillers().connect_client(rpc_client);
 
