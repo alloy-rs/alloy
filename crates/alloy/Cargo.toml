@@ -52,6 +52,7 @@ alloy-serde = { workspace = true, optional = true }
 # signer
 alloy-signer = { workspace = true, optional = true }
 alloy-signer-aws = { workspace = true, optional = true }
+alloy-signer-azure = { workspace = true, optional = true }
 alloy-signer-gcp = { workspace = true, optional = true }
 alloy-signer-ledger = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
@@ -278,6 +279,7 @@ rpc-types-txpool = [
 # signers
 signers = ["dep:alloy-signer"]
 signer-aws = ["signers", "dep:alloy-signer-aws"]
+signer-azure = ["signers", "dep:alloy-signer-azure"]
 signer-gcp = ["signers", "dep:alloy-signer-gcp"]
 signer-ledger = ["signers", "dep:alloy-signer-ledger"]
 signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
@@ -364,6 +366,7 @@ eip712 = [
     "alloy-core/eip712",
     "alloy-signer?/eip712",
     "alloy-signer-aws?/eip712",
+    "alloy-signer-azure?/eip712",
     "alloy-signer-gcp?/eip712",
     "alloy-signer-ledger?/eip712",
     "alloy-signer-local?/eip712",
