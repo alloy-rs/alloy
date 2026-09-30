@@ -213,8 +213,9 @@ impl AzureSigner {
     ///
     /// `key_id` is a key identifier such as `https://my-vault.vault.azure.net/keys/my-key` or
     /// `https://my-hsm.managedhsm.azure.net/keys/my-key/<version>`. The version segment is
-    /// optional; see [`Self::new`] for how the key version is pinned. Without it, the address
-    /// changes when the key is rotated.
+    /// optional; see [`Self::new`] for how the key version is pinned. Without it, a signer
+    /// constructed after a key rotation resolves to the new version and therefore a different
+    /// address.
     ///
     /// Requests are sent to the host in `key_id`, so it must come from trusted configuration, like
     /// an RPC URL. Any host is accepted to support sovereign clouds and private endpoints.
@@ -337,6 +338,7 @@ fn service_message(err: &azure_core::Error) -> String {
     let code = detail
         .as_ref()
         .and_then(|detail| detail.inner_error.as_ref()?.code.as_deref())
+        .or_else(|| detail.as_ref()?.code.as_deref())
         .or(error_code.as_deref());
     let message = detail.as_ref().and_then(|detail| detail.message.as_deref());
     match (code, message) {
@@ -410,7 +412,8 @@ mod tests {
         credentials::{AccessToken, TokenRequestOptions},
         http::{
             headers::{Headers, AUTHORIZATION, WWW_AUTHENTICATE},
-            AsyncRawResponse, Body, ClientOptions, HttpClient, Request, StatusCode, Transport,
+            AsyncRawResponse, Body, ClientOptions, HttpClient, RawResponse, Request, StatusCode,
+            Transport,
         },
         time::{Duration, OffsetDateTime},
         Bytes,
@@ -681,6 +684,34 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn service_message_prefers_service_error_codes() {
+        let error = |body: &'static str| {
+            azure_core::Error::with_message(
+                ErrorKind::HttpResponse {
+                    status: StatusCode::Forbidden,
+                    error_code: Some("403".to_string()),
+                    raw_response: Some(Box::new(RawResponse::from_bytes(
+                        StatusCode::Forbidden,
+                        Headers::new(),
+                        body,
+                    ))),
+                },
+                "403: raw body",
+            )
+        };
+        assert_eq!(
+            service_message(&error(FORBIDDEN_BODY)),
+            "403 (ForbiddenByRbac): Caller is not authorized to perform action on resource.\r\n\
+             Action: 'Microsoft.KeyVault/vaults/keys/sign/action'"
+        );
+        assert_eq!(
+            service_message(&error(r#"{"error":{"code":"Forbidden","message":"Denied\r\n"}}"#)),
+            "403 (Forbidden): Denied"
+        );
+        assert_eq!(service_message(&error("not json")), "403: raw body");
+    }
+
     #[tokio::test]
     async fn from_key_id_rejects_non_key_identifiers() {
         for key_id in ["not a url", "https://mock.vault.azure.net/secrets/eth-key"] {
@@ -725,10 +756,16 @@ mod tests {
         assert_eq!(sig.recover_address_from_prehash(&digest).unwrap(), signer.address());
         assert_eq!(signer.get_pubkey().await.unwrap(), *signing_key(5).verifying_key());
 
-        // A new signer for the same unversioned key identifier pins the rotated version.
-        let rotated = mock_signer(vault, &kid("")).await;
+        // A new signer for the same unversioned key identifier pins the rotated version, while an
+        // explicit version still resolves the old key.
+        let rotated = mock_signer(vault.clone(), &kid("")).await;
         assert_eq!(rotated.key_version(), "fedcba9876543210");
         assert_ne!(rotated.address(), signer.address());
+
+        let pinned = mock_signer(vault.clone(), &kid(KEY_VERSION)).await;
+        assert_eq!(pinned.key_version(), KEY_VERSION);
+        assert_eq!(pinned.address(), signer.address());
+        assert!(vault.requests().contains(&format!("GET /keys/{KEY_NAME}/{KEY_VERSION}")));
     }
 
     #[tokio::test]

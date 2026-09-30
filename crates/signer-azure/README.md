@@ -8,8 +8,8 @@ Managed HSM. Constructing a signer requires the `keys/get` permission; signing r
 can derive the signer's address but cannot sign.
 
 The key version is pinned when the signer is constructed. A key identifier without a version
-resolves to the latest version at that time, so the address changes after the key is rotated;
-include the version to keep a stable address.
+resolves to the latest version at that time, so a signer constructed after a key rotation uses the
+new key and has a different address; include the version to keep a stable address.
 
 This crate uses the Azure SDK's default HTTP client (reqwest with rustls, on tokio) and re-exports
 `azure_core`, `azure_identity`, and `azure_security_keyvault_keys` to construct compatible
