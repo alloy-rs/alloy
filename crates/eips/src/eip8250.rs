@@ -61,8 +61,11 @@ mod tests {
             assert!(validate_nonce_keys(&keys).is_ok());
         }
         for keys in [
-            vec![], vec![U256::ZERO, U256::from(1)], vec![U256::from(1), U256::from(1)],
-            vec![U256::from(2), U256::from(1)], vec![U256::from(1), U256::ZERO],
+            vec![],
+            vec![U256::ZERO, U256::from(1)],
+            vec![U256::from(1), U256::from(1)],
+            vec![U256::from(2), U256::from(1)],
+            vec![U256::from(1), U256::ZERO],
             (1..=17).map(U256::from).collect(),
         ] {
             assert!(validate_nonce_keys(&keys).is_err());

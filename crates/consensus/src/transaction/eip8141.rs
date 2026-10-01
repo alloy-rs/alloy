@@ -2,7 +2,6 @@
 
 use alloc::vec::Vec;
 use alloy_eips::{
-    eip8250::{nonce_calldata, validate_nonce_keys, MAX_NONCE_KEYS},
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip4844::VERSIONED_HASH_VERSION_KZG,
     eip7594::MAX_BLOBS_PER_TX_FUSAKA,
@@ -16,6 +15,7 @@ use alloy_eips::{
         ApprovalScope, Eip8141Error, Frame, FrameLimits, FrameMode, FrameSignature,
         SigningFrameSignatures, TransactionFees,
     },
+    eip8250::{nonce_calldata, validate_nonce_keys, MAX_NONCE_KEYS},
     Typed2718,
 };
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Sealable, TxKind, B256, U256};
@@ -170,15 +170,17 @@ impl TxEip8141 {
             fixed = fixed.saturating_add(signature.verification_gas());
         }
         let nonce_data = self.nonce_keys.as_deref().map(|keys| nonce_calldata(keys, self.nonce));
-        let data = nonce_data.iter().map(Vec::as_slice).chain(self.frames.iter().map(|frame| frame.data.as_ref())).chain(
-            self.signatures.iter().flat_map(|signature| {
+        let data = nonce_data
+            .iter()
+            .map(Vec::as_slice)
+            .chain(self.frames.iter().map(|frame| frame.data.as_ref()))
+            .chain(self.signatures.iter().flat_map(|signature| {
                 [
                     signature.signer.as_bytes(),
                     signature.msg.as_bytes(),
                     signature.signature.as_ref(),
                 ]
-            }),
-        );
+            }));
         let (tokens, bytes) = data.fold((0u64, 0u64), |(tokens, bytes), data| {
             (
                 tokens.saturating_add(tokens_in_calldata(data)),
@@ -657,8 +659,11 @@ mod tests {
     #[test]
     fn keyed_nonce_decoder_rejects_noncanonical_sets() {
         for keys in [
-            vec![], vec![U256::ZERO, U256::from(1)], vec![U256::from(2), U256::from(1)],
-            vec![U256::from(1); 2], (1..=17).map(U256::from).collect(),
+            vec![],
+            vec![U256::ZERO, U256::from(1)],
+            vec![U256::from(2), U256::from(1)],
+            vec![U256::from(1); 2],
+            (1..=17).map(U256::from).collect(),
         ] {
             let tx = TxEip8141 { nonce_keys: Some(keys), ..valid_tx() };
             assert!(TxEip8141::decode(&mut alloy_rlp::encode(tx).as_slice()).is_err());
