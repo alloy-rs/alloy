@@ -120,6 +120,10 @@ impl NetworkTransactionBuilder<AnyNetwork> for WithOtherFields<TransactionReques
         self.deref().can_build()
     }
 
+    fn should_fill_gas(&self) -> bool {
+        self.deref().should_fill_gas()
+    }
+
     fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
         self.deref().complete_type(ty.try_into().map_err(|_| vec!["unsupported_transaction_type"])?)
     }
