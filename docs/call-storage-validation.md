@@ -32,7 +32,7 @@ and block overrides, borrowed non-Send mappers, original preparation/reply
 errors, dropping unpolled futures, Ready/Waiter/RpcCall replies, and a successful
 request after cancellation. It does not contact an external RPC service.
 
-## Validation
+## Original validation
 
 Use the committed lockfile and `nightly-2026-08-25`:
 
@@ -54,3 +54,23 @@ and lock fingerprint was
 `48b9679d451818cd72aa34df987cf795dadba14f66f4cd9fc64f7a6e44c4830a` throughout.
 The requested-byte reduction applies to the pending boxed-reply workload above;
 no whole-application throughput or RSS claim follows from it.
+
+## Independent PR validation (October 1)
+
+Merged upstream `b487ee23f3199ae8890b38b122fb7f663cd5f4f9` without adding
+pubsub changes. The standalone provider/contract all-feature suite passes
+311 tests (21 skipped), including all eight storage regressions. Formatting,
+whitespace, and strict all-target/all-feature Clippy pass. Validation used
+`nightly-2026-08-25`, two build jobs, and two test threads.
+
+The Clippy command additionally enables `alloy-consensus/arbitrary`: current
+upstream imports `MAX_NONCE_KEYS` unconditionally but only uses it with that
+feature or in tests. This matches the feature enabled by upstream's workspace
+all-feature Clippy run; no warning is suppressed and no consensus code is changed.
+
+```sh
+cargo +nightly-2026-08-25 clippy --locked -p alloy-provider -p alloy-contract --all-features --features alloy-consensus/arbitrary --all-targets -- -D warnings
+```
+
+Both this PR and the cancellation PR target upstream `main` independently.
+Their diffs share no files, and this PR's lockfile matches upstream exactly.
