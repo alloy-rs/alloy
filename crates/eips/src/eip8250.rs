@@ -68,4 +68,32 @@ mod tests {
             assert!(validate_nonce_keys(&keys).is_err());
         }
     }
+
+    #[test]
+    fn nonce_storage_and_key_hash_vectors() {
+        assert_eq!(
+            nonce_slot(address!("1000000000000000000000000000000000000001"), U256::from(1)),
+            U256::from_be_bytes(
+                alloy_primitives::b256!(
+                    "37ec0b1050d5648531786bee10ede961dc48178860178bce6a4d18fd11678018"
+                )
+                .0
+            )
+        );
+        assert_eq!(
+            nonce_keys_hash(&[U256::from(1)]),
+            alloy_primitives::b256!(
+                "cc69885fda6bcc1a4ace058b4a62bf5e179ea78fd58a1ccd71c22cc9b688792f"
+            )
+        );
+    }
+
+    #[test]
+    fn canonical_nonce_calldata() {
+        assert_eq!(nonce_calldata(&[U256::ZERO], 0), [0xc1, 0x80, 0x80]);
+        assert_eq!(
+            nonce_calldata(&[U256::from(1), U256::from(128)], 128),
+            [0xc3, 0x01, 0x81, 0x80, 0x81, 0x80]
+        );
+    }
 }
