@@ -1,4 +1,4 @@
-use crate::{BoxedFut, ProviderCall};
+use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
@@ -56,14 +56,13 @@ where
 {
     Preparing {
         caller: Arc<dyn Caller<N, Resp>>,
-        // Initialization storage releases on the first poll, before a reply waits.
-        params: Box<EthCallParams<N>>,
+        params: EthCallParams<N>,
         method: &'static str,
         map: Map,
     },
     Running {
         map: Map,
-        fut: BoxedFut<Resp>,
+        fut: ProviderCall<EthCallParams<N>, Resp>,
     },
     Polling,
 }
@@ -110,22 +109,8 @@ where
             unreachable!("bad state")
         };
 
-        let fut = if method.eq("eth_call") {
-            caller.call(*params)
-        } else {
-            caller.estimate_gas(*params)
-        }?;
-
-        // Keep only the active reply variant. Boxing ProviderCall itself would
-        // retain its large RpcCall storage even for an already boxed batch reply.
-        let fut: BoxedFut<Resp> = match fut {
-            ProviderCall::RpcCall(call) => Box::pin(call),
-            ProviderCall::Waiter(waiter) => Box::pin(waiter),
-            ProviderCall::BoxedFuture(fut) => fut,
-            ProviderCall::Ready(output) => {
-                Box::pin(std::future::ready(output.expect("output taken twice")))
-            }
-        };
+        let fut =
+            if method.eq("eth_call") { caller.call(params) } else { caller.estimate_gas(params) }?;
 
         self.inner = EthCallFutInner::Running { map, fut };
 
@@ -437,7 +422,7 @@ where
         EthCallFut {
             inner: EthCallFutInner::Preparing {
                 caller: self.caller,
-                params: Box::new(self.params),
+                params: self.params,
                 method: self.method,
                 map: self.map,
             },
