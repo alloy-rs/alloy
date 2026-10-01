@@ -640,6 +640,31 @@ mod tests {
         TxEip8141 { chain_id: 1, frames: vec![Frame::default()], ..Default::default() }
     }
 
+    #[test]
+    fn keyed_nonce_encoding_preserves_legacy_transactions() {
+        let legacy = valid_tx();
+        let legacy_encoded = alloy_rlp::encode(&legacy);
+        assert_eq!(TxEip8141::decode(&mut legacy_encoded.as_slice()).unwrap(), legacy);
+
+        let mut keyed = legacy.clone();
+        keyed.nonce = 128;
+        keyed.nonce_keys = Some(vec![U256::from(1), U256::MAX]);
+        let keyed_encoded = alloy_rlp::encode(&keyed);
+        assert_eq!(TxEip8141::decode(&mut keyed_encoded.as_slice()).unwrap(), keyed);
+        assert_ne!(keyed.signature_hash(), legacy.signature_hash());
+    }
+
+    #[test]
+    fn keyed_nonce_decoder_rejects_noncanonical_sets() {
+        for keys in [
+            vec![], vec![U256::ZERO, U256::from(1)], vec![U256::from(2), U256::from(1)],
+            vec![U256::from(1); 2], (1..=17).map(U256::from).collect(),
+        ] {
+            let tx = TxEip8141 { nonce_keys: Some(keys), ..valid_tx() };
+            assert!(TxEip8141::decode(&mut alloy_rlp::encode(tx).as_slice()).is_err());
+        }
+    }
+
     fn arbitrary_tx(seed: u64) -> TxEip8141 {
         let mut bytes = [0u8; 16 * 1024];
         StdRng::seed_from_u64(seed).fill_bytes(&mut bytes);
@@ -655,6 +680,7 @@ mod tests {
         TxEip8141 {
             chain_id: u64::MAX,
             nonce: u64::MAX,
+            nonce_keys: None,
             sender: Address::repeat_byte(0x11),
             frames: (0..MAX_FRAMES)
                 .map(|index| Frame {
