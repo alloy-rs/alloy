@@ -273,7 +273,7 @@ pub enum SendUserOperation {
 /// Response to sending a user operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct SendUserOperationResponse {
     /// The hash of the user operation.
     pub user_op_hash: Bytes,
@@ -321,4 +321,21 @@ pub struct UserOperationGasEstimation {
     pub paymaster_verification_gas: U256,
     /// The gas limit for the call.
     pub call_gas_limit: U256,
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+    use alloy_primitives::bytes;
+
+    #[test]
+    fn send_user_operation_response_is_a_hash() {
+        let s = r#""0x123456789012345678901234567890123456789012345678901234567890abcd""#;
+        let resp: SendUserOperationResponse = serde_json::from_str(s).unwrap();
+        assert_eq!(
+            resp.user_op_hash,
+            bytes!("123456789012345678901234567890123456789012345678901234567890abcd")
+        );
+        assert_eq!(serde_json::to_string(&resp).unwrap(), s);
+    }
 }
