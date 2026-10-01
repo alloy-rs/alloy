@@ -118,10 +118,26 @@ impl TransactionTrait for AnyTypedTransaction {
     }
 
     #[inline]
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        match self {
+            Self::Ethereum(inner) => inner.max_fee_per_gas_u256(),
+            Self::Unknown(inner) => inner.max_fee_per_gas_u256(),
+        }
+    }
+
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_priority_fee_per_gas(),
             Self::Unknown(inner) => inner.max_priority_fee_per_gas(),
+        }
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.max_priority_fee_per_gas_u256(),
+            Self::Unknown(inner) => inner.max_priority_fee_per_gas_u256(),
         }
     }
 
@@ -134,14 +150,43 @@ impl TransactionTrait for AnyTypedTransaction {
     }
 
     #[inline]
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.max_fee_per_blob_gas_u256(),
+            Self::Unknown(inner) => inner.max_fee_per_blob_gas_u256(),
+        }
+    }
+
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas().or_else(|| self.gas_price()).unwrap_or_default()
+    }
+
+    #[inline]
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.max_priority_fee_per_gas_u256()
+            .or_else(|| self.gas_price().map(U256::from))
+            .unwrap_or_default()
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match self {
             Self::Ethereum(inner) => inner.effective_gas_price(base_fee),
             Self::Unknown(inner) => inner.effective_gas_price(base_fee),
+        }
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        match self {
+            Self::Ethereum(inner) => inner.effective_gas_price_u256(base_fee),
+            Self::Unknown(inner) => inner.effective_gas_price_u256(base_fee),
+        }
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.effective_tip_per_gas_u256(base_fee),
+            Self::Unknown(inner) => inner.effective_tip_per_gas_u256(base_fee),
         }
     }
 
@@ -541,10 +586,26 @@ impl TransactionTrait for AnyTxEnvelope {
     }
 
     #[inline]
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        match self {
+            Self::Ethereum(inner) => inner.max_fee_per_gas_u256(),
+            Self::Unknown(inner) => inner.max_fee_per_gas_u256(),
+        }
+    }
+
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_priority_fee_per_gas(),
             Self::Unknown(inner) => inner.max_priority_fee_per_gas(),
+        }
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.max_priority_fee_per_gas_u256(),
+            Self::Unknown(inner) => inner.max_priority_fee_per_gas_u256(),
         }
     }
 
@@ -557,14 +618,43 @@ impl TransactionTrait for AnyTxEnvelope {
     }
 
     #[inline]
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.max_fee_per_blob_gas_u256(),
+            Self::Unknown(inner) => inner.max_fee_per_blob_gas_u256(),
+        }
+    }
+
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas().or_else(|| self.gas_price()).unwrap_or_default()
+    }
+
+    #[inline]
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.max_priority_fee_per_gas_u256()
+            .or_else(|| self.gas_price().map(U256::from))
+            .unwrap_or_default()
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match self {
             Self::Ethereum(inner) => inner.effective_gas_price(base_fee),
             Self::Unknown(inner) => inner.effective_gas_price(base_fee),
+        }
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        match self {
+            Self::Ethereum(inner) => inner.effective_gas_price_u256(base_fee),
+            Self::Unknown(inner) => inner.effective_gas_price_u256(base_fee),
+        }
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.effective_tip_per_gas_u256(base_fee),
+            Self::Unknown(inner) => inner.effective_tip_per_gas_u256(base_fee),
         }
     }
 

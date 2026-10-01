@@ -2298,4 +2298,25 @@ mod tests {
         // Verify that the buffer was properly reused (no allocation needed between calls)
         assert!(!buf.is_empty());
     }
+
+    #[test]
+    fn u256_fee_accessors_match_u128_for_eip1559() {
+        let tx = TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559 { max_fee_per_gas: 100, max_priority_fee_per_gas: 10, ..Default::default() },
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        assert_eq!(tx.effective_gas_price_u256(None), U256::from(tx.effective_gas_price(None)));
+        // Base fees leaving the full tip, a partial tip, and no room for the base fee at all.
+        for base_fee in [80, 95, 101] {
+            assert_eq!(
+                tx.effective_gas_price_u256(Some(base_fee)),
+                U256::from(tx.effective_gas_price(Some(base_fee)))
+            );
+            assert_eq!(
+                tx.effective_tip_per_gas_u256(base_fee),
+                tx.effective_tip_per_gas(base_fee).map(U256::from)
+            );
+        }
+    }
 }
