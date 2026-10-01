@@ -623,6 +623,150 @@ const fn validate_execution_gas(execution: u64) -> Result<(), TxEip8141Validatio
     Ok(())
 }
 
+/// Bincode-compatible [`TxEip8141`] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(super) mod serde_bincode_compat {
+    use alloc::borrow::Cow;
+    use alloy_eips::eip8141::{Frame, FrameSignature, TransactionFees};
+    use alloy_primitives::{Address, ChainId, B256, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::TxEip8141`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{serde_bincode_compat, TxEip8141};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::transaction::TxEip8141")]
+    ///     transaction: TxEip8141,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct TxEip8141<'a> {
+        chain_id: ChainId,
+        nonce: u64,
+        nonce_keys: Option<Cow<'a, [U256]>>,
+        sender: Address,
+        frames: Cow<'a, [Frame]>,
+        signatures: Cow<'a, [FrameSignature]>,
+        fees: TransactionFees,
+        blob_versioned_hashes: Cow<'a, [B256]>,
+    }
+
+    impl<'a> From<&'a super::TxEip8141> for TxEip8141<'a> {
+        fn from(value: &'a super::TxEip8141) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                nonce: value.nonce,
+                nonce_keys: value.nonce_keys.as_deref().map(Cow::Borrowed),
+                sender: value.sender,
+                frames: Cow::Borrowed(&value.frames),
+                signatures: Cow::Borrowed(&value.signatures),
+                fees: value.fees,
+                blob_versioned_hashes: Cow::Borrowed(&value.blob_versioned_hashes),
+            }
+        }
+    }
+
+    impl<'a> From<TxEip8141<'a>> for super::TxEip8141 {
+        fn from(value: TxEip8141<'a>) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                nonce: value.nonce,
+                nonce_keys: value.nonce_keys.map(Cow::into_owned),
+                sender: value.sender,
+                frames: value.frames.into_owned(),
+                signatures: value.signatures.into_owned(),
+                fees: value.fees,
+                blob_versioned_hashes: value.blob_versioned_hashes.into_owned(),
+            }
+        }
+    }
+
+    impl SerializeAs<super::TxEip8141> for TxEip8141<'_> {
+        fn serialize_as<S>(source: &super::TxEip8141, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            TxEip8141::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::TxEip8141> for TxEip8141<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::TxEip8141, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            TxEip8141::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use alloy_eips::eip8141::{
+            Frame, FrameAddress, FrameSignature, SignatureMessage, SignatureScheme,
+        };
+        use alloy_primitives::{Address, B256, U256};
+        use arbitrary::Arbitrary;
+        use bincode::config;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        use super::super::{serde_bincode_compat, TxEip8141};
+
+        #[test]
+        fn test_tx_eip8141_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::TxEip8141")]
+                transaction: TxEip8141,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut transaction =
+                TxEip8141::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+
+            // Cover both forms of the optional frame fields regardless of the random input.
+            transaction.frames.extend([
+                Frame { target: FrameAddress::Empty, ..Default::default() },
+                Frame { target: Address::repeat_byte(0x11).into(), ..Default::default() },
+            ]);
+            transaction.signatures.extend([
+                FrameSignature {
+                    scheme: SignatureScheme::Secp256k1,
+                    msg: SignatureMessage::TransactionHash,
+                    ..Default::default()
+                },
+                FrameSignature {
+                    scheme: SignatureScheme::P256,
+                    signer: Address::repeat_byte(0x22).into(),
+                    msg: SignatureMessage::Explicit(B256::repeat_byte(0x33)),
+                    ..Default::default()
+                },
+            ]);
+
+            for nonce_keys in [None, Some(vec![U256::from(1), U256::MAX])] {
+                let data = Data { transaction: TxEip8141 { nonce_keys, ..transaction.clone() } };
+
+                let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+                let (decoded, _) =
+                    bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy())
+                        .unwrap();
+                assert_eq!(decoded, data);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
