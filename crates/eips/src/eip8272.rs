@@ -2,14 +2,7 @@
 //!
 //! [EIP-8272]: https://eips.ethereum.org/EIPS/eip-8272
 //!
-//! # Provisional runtime
-//!
-//! EIP-8272 currently leaves `RECENT_ROOT_CODE` as `TBD`. [`RECENT_ROOT_CODE`] and
-//! [`RECENT_ROOT_CODE_HASH`] therefore pin a provisional 345-byte two-operation runtime,
-//! not a normative EIP bytecode. Its write path follows the pending
-//! [`ethereum/sys-asm#53`] candidate; the complete validator runtime remains provisional.
-//!
-//! [`ethereum/sys-asm#53`]: https://github.com/ethereum/sys-asm/pull/53
+//! <https://github.com/ethereum/sys-asm/pull/53>
 
 use alloy_primitives::{address, b256, bytes, Address, Bytes, B256};
 
