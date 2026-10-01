@@ -2,7 +2,7 @@ use crate::{
     transaction::{
         RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction, TxHashRef, TxHashable,
     },
-    Transaction,
+    Transaction, TxEip8141,
 };
 use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result},
@@ -423,6 +423,11 @@ impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.tx.authorization_list()
     }
+
+    #[inline]
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        self.tx.frame_transaction()
+    }
 }
 
 impl<T: Transaction> Transaction for Sealed<T> {
@@ -536,6 +541,11 @@ impl<T: Transaction> Transaction for Sealed<T> {
     #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner().authorization_list()
+    }
+
+    #[inline]
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        self.inner().frame_transaction()
     }
 }
 

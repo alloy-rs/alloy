@@ -1,6 +1,6 @@
 //! Extended transaction types
 
-use crate::{EthereumTxEnvelope, Transaction};
+use crate::{EthereumTxEnvelope, Transaction, TxEip8141};
 use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result, IsTyped2718},
     eip2930::AccessList,
@@ -211,6 +211,10 @@ where
 
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         delegate!(self => tx.authorization_list())
+    }
+
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        delegate!(self => tx.frame_transaction())
     }
 }
 

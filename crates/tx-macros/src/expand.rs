@@ -485,6 +485,11 @@ impl Expander {
                 fn authorization_list(&self) -> Option<&[#alloy_eips::eip7702::SignedAuthorization]> {
                     match self { #(Self::#variant_names(tx) => tx.authorization_list(),)* }
                 }
+
+                #[inline]
+                fn frame_transaction(&self) -> Option<&#alloy_consensus::TxEip8141> {
+                    match self { #(Self::#variant_names(tx) => tx.frame_transaction(),)* }
+                }
             }
         }
     }

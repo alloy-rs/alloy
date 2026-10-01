@@ -1,8 +1,8 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
 use alloy_consensus::{
     error::ValueError, transaction::Either, SignableTransaction, Signed,
-    Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope,
-    TxLegacy, Typed2718, TypedTransaction,
+    Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEip8141,
+    TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
@@ -250,6 +250,14 @@ impl TransactionTrait for AnyTypedTransaction {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
             Self::Unknown(inner) => inner.authorization_list(),
+        }
+    }
+
+    #[inline]
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        match self {
+            Self::Ethereum(inner) => inner.frame_transaction(),
+            Self::Unknown(inner) => inner.frame_transaction(),
         }
     }
 }
@@ -718,6 +726,14 @@ impl TransactionTrait for AnyTxEnvelope {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
             Self::Unknown(inner) => inner.authorization_list(),
+        }
+    }
+
+    #[inline]
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        match self {
+            Self::Ethereum(inner) => inner.frame_transaction(),
+            Self::Unknown(inner) => inner.frame_transaction(),
         }
     }
 }

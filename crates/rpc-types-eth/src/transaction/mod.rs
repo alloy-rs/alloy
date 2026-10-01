@@ -2,7 +2,7 @@
 
 use alloy_consensus::{
     EthereumTxEnvelope, EthereumTypedTransaction, Signed, TxEip1559, TxEip2930, TxEip4844,
-    TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718,
+    TxEip4844Variant, TxEip7702, TxEip8141, TxEnvelope, TxLegacy, Typed2718,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_network_primitives::TransactionResponse;
@@ -464,6 +464,10 @@ impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
 
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        self.inner.frame_transaction()
     }
 }
 

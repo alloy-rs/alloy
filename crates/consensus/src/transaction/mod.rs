@@ -289,6 +289,15 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     fn authorization_count(&self) -> Option<u64> {
         self.authorization_list().map(|auths| auths.len() as u64)
     }
+
+    /// Returns the [EIP-8141](https://eips.ethereum.org/EIPS/eip-8141) frame transaction if this
+    /// is one.
+    ///
+    /// Wrappers and envelopes forward this to the transaction they contain, so the frames and
+    /// the full-width fields stay reachable through them.
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        None
+    }
 }
 
 /// A typed transaction envelope.
@@ -471,6 +480,11 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+
+    #[inline]
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        self.inner.frame_transaction()
     }
 }
 
@@ -679,6 +693,13 @@ where
         match self {
             Self::Left(tx) => tx.authorization_count(),
             Self::Right(tx) => tx.authorization_count(),
+        }
+    }
+
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        match self {
+            Self::Left(tx) => tx.frame_transaction(),
+            Self::Right(tx) => tx.frame_transaction(),
         }
     }
 }

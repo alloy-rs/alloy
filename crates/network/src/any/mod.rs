@@ -4,7 +4,8 @@ mod either;
 pub mod error;
 
 use alloy_consensus::{
-    Sealed, Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
+    Sealed, Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEip8141, TxEnvelope,
+    TxLegacy,
 };
 use alloy_eips::{eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
@@ -551,6 +552,10 @@ impl alloy_consensus::Transaction for AnyRpcTransaction {
 
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        self.inner.frame_transaction()
     }
 }
 

@@ -429,6 +429,10 @@ impl Transaction for TxEip8141 {
     fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
         None
     }
+
+    fn frame_transaction(&self) -> Option<&Self> {
+        Some(self)
+    }
 }
 
 /// A structural validation error in an EIP-8141 transaction.
@@ -1018,6 +1022,8 @@ mod tests {
         assert_full_values(&tx, fees);
         assert_full_values(&tx.clone().seal_slow(), fees);
         assert_full_values(&FrameEnvelope::Frame(tx.clone()), fees);
+        assert_eq!(tx.clone().seal_slow().frame_transaction(), Some(&tx));
+        assert_eq!(FrameEnvelope::Frame(tx.clone()).frame_transaction(), Some(&tx));
 
         // Without blob hashes there is no blob fee, as for the `u128` accessor.
         let tx = TxEip8141 { blob_versioned_hashes: vec![], ..tx };
