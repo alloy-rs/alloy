@@ -309,7 +309,7 @@ impl<T: Transaction, H> BlockBody<T, H> {
     /// Returns an iterator over all blob versioned hashes from the block body.
     #[inline]
     pub fn blob_versioned_hashes_iter(&self) -> impl Iterator<Item = &B256> + '_ {
-        self.eip4844_transactions_iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
+        self.transactions.iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
     }
 }
 
@@ -324,6 +324,12 @@ impl<T: Typed2718, H> BlockBody<T, H> {
     #[inline]
     pub fn has_eip7702_transactions(&self) -> bool {
         self.transactions.iter().any(|tx| tx.is_eip7702())
+    }
+
+    /// Returns whether or not the block body contains any EIP-8141 transactions.
+    #[inline]
+    pub fn has_eip8141_transactions(&self) -> bool {
+        self.transactions.iter().any(|tx| tx.is_eip8141())
     }
 
     /// Returns an iterator over all blob transactions of the block.
@@ -456,7 +462,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Signed, TxEnvelope, TxLegacy};
+    use crate::{transaction::Either, Signed, TxEip4844, TxEip8141, TxEnvelope, TxLegacy};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
@@ -613,6 +619,31 @@ mod tests {
         let present_string = block_rlp_with_body_fields(&[0xc0, 0xc0, 0x80]);
         assert!(Block::<TxEnvelope>::decode(&mut present_string.as_slice()).is_err());
         assert!(Block::<TxEnvelope>::decode_sealed(&mut present_string.as_slice()).is_err());
+    }
+
+    #[test]
+    fn blob_versioned_hashes_iter_includes_frame_transactions() {
+        let blob_hash = B256::with_last_byte(1);
+        let frame_hash = B256::with_last_byte(2);
+        let body = BlockBody::<Either<TxEip4844, TxEip8141>> {
+            transactions: vec![
+                Either::Left(TxEip4844 {
+                    blob_versioned_hashes: vec![blob_hash],
+                    ..Default::default()
+                }),
+                Either::Right(TxEip8141 {
+                    blob_versioned_hashes: vec![frame_hash],
+                    ..Default::default()
+                }),
+            ],
+            ommers: vec![],
+            withdrawals: None,
+        };
+
+        assert_eq!(
+            body.blob_versioned_hashes_iter().collect::<Vec<_>>(),
+            [&blob_hash, &frame_hash]
+        );
     }
 }
 
