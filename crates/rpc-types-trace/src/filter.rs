@@ -5,6 +5,7 @@ use crate::parity::{
     TransactionTrace,
 };
 use alloy_primitives::{map::AddressHashSet, Address, BlockHash};
+use alloy_rpc_types_eth::FilterBlockOption;
 use serde::{Deserialize, Serialize};
 
 /// Trace filter.
@@ -127,6 +128,18 @@ pub enum TraceFilterBlockOption {
     },
     /// Exactly the block with this hash.
     AtBlockHash(BlockHash),
+}
+
+impl From<TraceFilterBlockOption> for FilterBlockOption {
+    fn from(option: TraceFilterBlockOption) -> Self {
+        match option {
+            TraceFilterBlockOption::Range { from_block, to_block } => Self::Range {
+                from_block: from_block.map(Into::into),
+                to_block: to_block.map(Into::into),
+            },
+            TraceFilterBlockOption::AtBlockHash(hash) => Self::AtBlockHash(hash),
+        }
+    }
 }
 
 /// Error returned by [`TraceFilter::block_option`] when `block_hash` is combined with
@@ -417,6 +430,22 @@ mod tests {
             let filter: TraceFilter = serde_json::from_value(filter).unwrap();
             assert_eq!(filter.block_option(), Ok(expected));
         }
+    }
+
+    #[test]
+    fn block_option_converts_to_filter_block_option() {
+        let hash = B256::with_last_byte(0xab);
+        assert_eq!(
+            FilterBlockOption::from(TraceFilterBlockOption::AtBlockHash(hash)),
+            FilterBlockOption::AtBlockHash(hash)
+        );
+        assert_eq!(
+            FilterBlockOption::from(TraceFilterBlockOption::Range {
+                from_block: Some(2),
+                to_block: None
+            }),
+            FilterBlockOption::Range { from_block: Some(2u64.into()), to_block: None }
+        );
     }
 
     #[test]
