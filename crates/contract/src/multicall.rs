@@ -30,6 +30,7 @@ mod tests {
     use super::*;
     use alloy_primitives::{address, b256, U256};
     use alloy_provider::{CallItem, Failure, MulticallBuilder, Provider, ProviderBuilder};
+    use alloy_rpc_types_eth::BlockId;
     use alloy_sol_types::sol;
     use DummyThatFails::DummyThatFailsInstance;
 
@@ -213,6 +214,16 @@ mod tests {
             block_hash,
             b256!("31be03d4fb9a280d1699f1004f340573cd6d717dae79095d382e876415cb26ba")
         );
+    }
+
+    #[tokio::test]
+    async fn uses_provider_default_block() {
+        let provider = ProviderBuilder::new()
+            .with_default_block(BlockId::latest())
+            .connect_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let (block_number,) = provider.multicall().get_block_number().aggregate().await.unwrap();
+        assert_eq!(block_number, U256::from(provider.get_block_number().await.unwrap()));
     }
 
     sol! {
