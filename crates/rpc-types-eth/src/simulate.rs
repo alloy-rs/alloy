@@ -6,7 +6,7 @@ use crate::{
 };
 use alloc::{string::String, vec::Vec};
 use alloy_eips::eip8141::FrameStatus;
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Bytes, U256};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
@@ -159,122 +159,6 @@ pub struct FrameCallResult {
     pub error: Option<SimulateError>,
 }
 
-/// Recognized shape of an [EIP-8141] validation prefix.
-///
-/// An optional expiry verifier frame may precede each shape and is not represented in this value.
-///
-/// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub enum FrameSimulationPrefixShape {
-    /// The sender verifies and approves both execution and payment.
-    SelfVerify,
-    /// A deployment frame precedes sender verification and approval.
-    DeploySelfVerify,
-    /// The sender approves execution before a separate payer approves payment.
-    OnlyVerifyPay,
-    /// A deployment frame precedes separate sender and payer approvals.
-    DeployOnlyVerifyPay,
-}
-
-impl FrameSimulationPrefixShape {
-    /// Classifies a validation prefix from its layout.
-    ///
-    /// `prefix_end` is the number of frames in the validation prefix, `deploy_index` the position
-    /// of its deployment frame and `expiry_index` the position of its leading expiry verifier
-    /// frame, if any. The expiry verifier is not part of the shape and is subtracted from the
-    /// prefix length. Returns `None` if the remaining frames match none of the known shapes.
-    pub const fn from_validation_prefix(
-        prefix_end: usize,
-        deploy_index: Option<usize>,
-        expiry_index: Option<usize>,
-    ) -> Option<Self> {
-        let leading_expiry_frame = if expiry_index.is_some() { 1 } else { 0 };
-        match (deploy_index.is_some(), prefix_end.saturating_sub(leading_expiry_frame)) {
-            (false, 1) => Some(Self::SelfVerify),
-            (true, 2) => Some(Self::DeploySelfVerify),
-            (false, 2) => Some(Self::OnlyVerifyPay),
-            (true, 3) => Some(Self::DeployOnlyVerifyPay),
-            _ => None,
-        }
-    }
-}
-
-/// Gas usage and outcome of a single frame in a [`FrameSimulationResult`].
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct FrameSimulationFrameResult {
-    /// Execution gas consumed by the frame.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub execution_gas: u64,
-    /// State gas consumed by the frame.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub state_gas: u64,
-    /// Whether the frame succeeded, failed or was skipped.
-    pub status: FrameStatus,
-}
-
-/// Result of simulating an [EIP-8141] frame transaction.
-///
-/// `valid` reports whether the transaction's validation prefix passed against the selected state.
-/// It does not assert pool admission: nonce ordering and other pool-local policy remain outside the
-/// simulation. When the prefix is valid, the optional execution fields describe a separate,
-/// non-committing execution of the complete transaction.
-///
-/// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct FrameSimulationResult {
-    /// Whether the validation prefix passed.
-    pub valid: bool,
-    /// Maximum transaction cost the payer has to cover.
-    pub max_cost: U256,
-    /// Recognized shape of the validation prefix, `None` if it is structurally invalid.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub prefix_shape: Option<FrameSimulationPrefixShape>,
-    /// Account that approved payment of the maximum transaction cost.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub payer: Option<Address>,
-    /// Reason the validation prefix was not accepted.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub violation: Option<String>,
-    /// Gas used by the complete transaction for fee accounting.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub gas_used: Option<u64>,
-    /// Results of the frames reached during the complete execution.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub frames: Option<Vec<FrameSimulationFrameResult>>,
-}
-
-impl FrameSimulationResult {
-    /// Creates the result for a transaction whose validation prefix was not accepted.
-    pub fn invalid(
-        max_cost: U256,
-        prefix_shape: Option<FrameSimulationPrefixShape>,
-        violation: impl Into<String>,
-    ) -> Self {
-        Self {
-            valid: false,
-            max_cost,
-            prefix_shape,
-            payer: None,
-            violation: Some(violation.into()),
-            gas_used: None,
-            frames: None,
-        }
-    }
-}
-
 /// Simulation options for executing multiple blocks and transactions.
 ///
 /// This struct configures how simulations are executed, including whether to trace token transfers,
@@ -416,70 +300,6 @@ mod tests {
         });
         let err: SimulateError = serde_json::from_value(error_json).unwrap();
         assert_eq!(err.data, Some(bytes!("cabedea8")));
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn frame_simulation_result_serde() {
-        let result = FrameSimulationResult {
-            valid: true,
-            max_cost: U256::from(123),
-            prefix_shape: Some(FrameSimulationPrefixShape::OnlyVerifyPay),
-            payer: Some(Address::repeat_byte(0x11)),
-            violation: None,
-            gas_used: Some(456),
-            frames: Some(vec![FrameSimulationFrameResult {
-                execution_gas: 5,
-                state_gas: 7,
-                status: FrameStatus::Failure,
-            }]),
-        };
-        let value = serde_json::to_value(&result).unwrap();
-        assert_eq!(
-            value,
-            json!({
-                "valid": true,
-                "maxCost": "0x7b",
-                "prefixShape": "onlyVerifyPay",
-                "payer": "0x1111111111111111111111111111111111111111",
-                "gasUsed": "0x1c8",
-                "frames": [{
-                    "executionGas": "0x5",
-                    "stateGas": "0x7",
-                    "status": "0x0",
-                }],
-            })
-        );
-        assert_eq!(serde_json::from_value::<FrameSimulationResult>(value).unwrap(), result);
-
-        let invalid = FrameSimulationResult::invalid(U256::from(123), None, "nonce mismatch");
-        let value = serde_json::to_value(&invalid).unwrap();
-        assert_eq!(
-            value,
-            json!({"valid": false, "maxCost": "0x7b", "violation": "nonce mismatch"})
-        );
-        assert_eq!(serde_json::from_value::<FrameSimulationResult>(value).unwrap(), invalid);
-    }
-
-    #[test]
-    fn frame_simulation_prefix_shape_ignores_expiry_frame() {
-        assert_eq!(
-            FrameSimulationPrefixShape::from_validation_prefix(1, None, None),
-            Some(FrameSimulationPrefixShape::SelfVerify)
-        );
-        assert_eq!(
-            FrameSimulationPrefixShape::from_validation_prefix(3, Some(1), Some(0)),
-            Some(FrameSimulationPrefixShape::DeploySelfVerify)
-        );
-        assert_eq!(
-            FrameSimulationPrefixShape::from_validation_prefix(2, None, None),
-            Some(FrameSimulationPrefixShape::OnlyVerifyPay)
-        );
-        assert_eq!(
-            FrameSimulationPrefixShape::from_validation_prefix(4, Some(1), Some(0)),
-            Some(FrameSimulationPrefixShape::DeployOnlyVerifyPay)
-        );
-        assert_eq!(FrameSimulationPrefixShape::from_validation_prefix(4, None, None), None);
     }
 
     #[test]
