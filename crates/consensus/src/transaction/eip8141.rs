@@ -15,7 +15,7 @@ use alloy_eips::{
         ApprovalScope, Eip8141Error, Frame, FrameLimits, FrameMode, FrameSignature,
         SigningFrameSignatures, TransactionFees,
     },
-    eip8250::{nonce_calldata, validate_nonce_keys, MAX_NONCE_KEYS},
+    eip8250::{nonce_calldata, validate_nonce_keys},
     Typed2718,
 };
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Sealable, TxKind, B256, U256};
@@ -82,7 +82,7 @@ fn arbitrary_nonce_keys(
     if !u.arbitrary::<bool>()? {
         return Ok(None);
     }
-    let count = u.int_in_range(1..=MAX_NONCE_KEYS)?;
+    let count = u.int_in_range(1..=alloy_eips::eip8250::MAX_NONCE_KEYS)?;
     let mut keys = (0..count).map(|_| u.arbitrary()).collect::<arbitrary::Result<Vec<U256>>>()?;
     keys.sort_unstable();
     keys.dedup();
