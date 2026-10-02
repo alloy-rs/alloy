@@ -15,13 +15,16 @@ use alloy_eips::{
         ApprovalScope, Eip8141Error, Frame, FrameLimits, FrameMode, FrameSignature,
         SigningFrameSignatures, TransactionFees,
     },
-    eip8250::{nonce_calldata, validate_nonce_keys, MAX_NONCE_KEYS},
+    eip8250::{nonce_calldata, validate_nonce_keys},
     Typed2718,
 };
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Sealable, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
 use super::Transaction;
+
+#[cfg(any(test, feature = "arbitrary"))]
+use alloy_eips::eip8250::MAX_NONCE_KEYS;
 
 /// A standalone [EIP-8141] frame transaction.
 ///
