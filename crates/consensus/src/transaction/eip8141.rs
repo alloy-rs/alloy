@@ -23,9 +23,6 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
 use super::Transaction;
 
-#[cfg(any(test, feature = "arbitrary"))]
-use alloy_eips::eip8250::MAX_NONCE_KEYS;
-
 /// A standalone [EIP-8141] frame transaction.
 ///
 /// Signatures are carried in the transaction itself. RLP encodes the payload, while
@@ -85,7 +82,7 @@ fn arbitrary_nonce_keys(
     if !u.arbitrary::<bool>()? {
         return Ok(None);
     }
-    let count = u.int_in_range(1..=MAX_NONCE_KEYS)?;
+    let count = u.int_in_range(1..=alloy_eips::eip8250::MAX_NONCE_KEYS)?;
     let mut keys = (0..count).map(|_| u.arbitrary()).collect::<arbitrary::Result<Vec<U256>>>()?;
     keys.sort_unstable();
     keys.dedup();
