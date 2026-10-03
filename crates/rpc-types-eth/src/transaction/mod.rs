@@ -22,6 +22,9 @@ pub use alloy_eips::{
 mod error;
 pub use error::ConversionError;
 
+mod frame;
+pub use frame::FrameRequest;
+
 mod receipt;
 pub use receipt::TransactionReceipt;
 
