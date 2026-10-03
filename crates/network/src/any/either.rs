@@ -1,8 +1,8 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
 use alloy_consensus::{
     error::ValueError, transaction::Either, SignableTransaction, Signed,
-    Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope,
-    TxLegacy, Typed2718, TypedTransaction,
+    Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEip8141,
+    TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
@@ -118,10 +118,26 @@ impl TransactionTrait for AnyTypedTransaction {
     }
 
     #[inline]
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        match self {
+            Self::Ethereum(inner) => inner.max_fee_per_gas_u256(),
+            Self::Unknown(inner) => inner.max_fee_per_gas_u256(),
+        }
+    }
+
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_priority_fee_per_gas(),
             Self::Unknown(inner) => inner.max_priority_fee_per_gas(),
+        }
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.max_priority_fee_per_gas_u256(),
+            Self::Unknown(inner) => inner.max_priority_fee_per_gas_u256(),
         }
     }
 
@@ -134,14 +150,43 @@ impl TransactionTrait for AnyTypedTransaction {
     }
 
     #[inline]
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.max_fee_per_blob_gas_u256(),
+            Self::Unknown(inner) => inner.max_fee_per_blob_gas_u256(),
+        }
+    }
+
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas().or_else(|| self.gas_price()).unwrap_or_default()
+    }
+
+    #[inline]
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.max_priority_fee_per_gas_u256()
+            .or_else(|| self.gas_price().map(U256::from))
+            .unwrap_or_default()
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match self {
             Self::Ethereum(inner) => inner.effective_gas_price(base_fee),
             Self::Unknown(inner) => inner.effective_gas_price(base_fee),
+        }
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        match self {
+            Self::Ethereum(inner) => inner.effective_gas_price_u256(base_fee),
+            Self::Unknown(inner) => inner.effective_gas_price_u256(base_fee),
+        }
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.effective_tip_per_gas_u256(base_fee),
+            Self::Unknown(inner) => inner.effective_tip_per_gas_u256(base_fee),
         }
     }
 
@@ -205,6 +250,14 @@ impl TransactionTrait for AnyTypedTransaction {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
             Self::Unknown(inner) => inner.authorization_list(),
+        }
+    }
+
+    #[inline]
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        match self {
+            Self::Ethereum(inner) => inner.frame_transaction(),
+            Self::Unknown(inner) => inner.frame_transaction(),
         }
     }
 }
@@ -541,10 +594,26 @@ impl TransactionTrait for AnyTxEnvelope {
     }
 
     #[inline]
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        match self {
+            Self::Ethereum(inner) => inner.max_fee_per_gas_u256(),
+            Self::Unknown(inner) => inner.max_fee_per_gas_u256(),
+        }
+    }
+
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_priority_fee_per_gas(),
             Self::Unknown(inner) => inner.max_priority_fee_per_gas(),
+        }
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.max_priority_fee_per_gas_u256(),
+            Self::Unknown(inner) => inner.max_priority_fee_per_gas_u256(),
         }
     }
 
@@ -557,14 +626,43 @@ impl TransactionTrait for AnyTxEnvelope {
     }
 
     #[inline]
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.max_fee_per_blob_gas_u256(),
+            Self::Unknown(inner) => inner.max_fee_per_blob_gas_u256(),
+        }
+    }
+
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas().or_else(|| self.gas_price()).unwrap_or_default()
+    }
+
+    #[inline]
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.max_priority_fee_per_gas_u256()
+            .or_else(|| self.gas_price().map(U256::from))
+            .unwrap_or_default()
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match self {
             Self::Ethereum(inner) => inner.effective_gas_price(base_fee),
             Self::Unknown(inner) => inner.effective_gas_price(base_fee),
+        }
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        match self {
+            Self::Ethereum(inner) => inner.effective_gas_price_u256(base_fee),
+            Self::Unknown(inner) => inner.effective_gas_price_u256(base_fee),
+        }
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        match self {
+            Self::Ethereum(inner) => inner.effective_tip_per_gas_u256(base_fee),
+            Self::Unknown(inner) => inner.effective_tip_per_gas_u256(base_fee),
         }
     }
 
@@ -628,6 +726,14 @@ impl TransactionTrait for AnyTxEnvelope {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
             Self::Unknown(inner) => inner.authorization_list(),
+        }
+    }
+
+    #[inline]
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        match self {
+            Self::Ethereum(inner) => inner.frame_transaction(),
+            Self::Unknown(inner) => inner.frame_transaction(),
         }
     }
 }

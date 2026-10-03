@@ -4,7 +4,8 @@ mod either;
 pub mod error;
 
 use alloy_consensus::{
-    Sealed, Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
+    Sealed, Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEip8141, TxEnvelope,
+    TxLegacy,
 };
 use alloy_eips::{eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
@@ -481,20 +482,44 @@ impl alloy_consensus::Transaction for AnyRpcTransaction {
         alloy_consensus::Transaction::max_fee_per_gas(&self.inner)
     }
 
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.inner.max_fee_per_gas_u256()
+    }
+
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.inner.max_priority_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.inner.max_priority_fee_per_gas_u256()
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.inner.max_fee_per_blob_gas()
     }
 
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.inner.max_fee_per_blob_gas_u256()
+    }
+
     fn priority_fee_or_price(&self) -> u128 {
         self.inner.priority_fee_or_price()
     }
 
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.inner.priority_fee_or_price_u256()
+    }
+
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         self.inner.effective_gas_price(base_fee)
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        self.inner.effective_gas_price_u256(base_fee)
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        self.inner.effective_tip_per_gas_u256(base_fee)
     }
 
     fn is_dynamic_fee(&self) -> bool {
@@ -527,6 +552,10 @@ impl alloy_consensus::Transaction for AnyRpcTransaction {
 
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        self.inner.frame_transaction()
     }
 }
 

@@ -397,8 +397,18 @@ impl Expander {
                 }
 
                 #[inline]
+                fn max_fee_per_gas_u256(&self) -> #alloy_primitives::U256 {
+                    match self { #(Self::#variant_names(tx) => tx.max_fee_per_gas_u256(),)* }
+                }
+
+                #[inline]
                 fn max_priority_fee_per_gas(&self) -> Option<u128> {
                     match self { #(Self::#variant_names(tx) => tx.max_priority_fee_per_gas(),)* }
+                }
+
+                #[inline]
+                fn max_priority_fee_per_gas_u256(&self) -> Option<#alloy_primitives::U256> {
+                    match self { #(Self::#variant_names(tx) => tx.max_priority_fee_per_gas_u256(),)* }
                 }
 
                 #[inline]
@@ -407,13 +417,33 @@ impl Expander {
                 }
 
                 #[inline]
+                fn max_fee_per_blob_gas_u256(&self) -> Option<#alloy_primitives::U256> {
+                    match self { #(Self::#variant_names(tx) => tx.max_fee_per_blob_gas_u256(),)* }
+                }
+
+                #[inline]
                 fn priority_fee_or_price(&self) -> u128 {
                     match self { #(Self::#variant_names(tx) => tx.priority_fee_or_price(),)* }
                 }
 
                 #[inline]
+                fn priority_fee_or_price_u256(&self) -> #alloy_primitives::U256 {
+                    match self { #(Self::#variant_names(tx) => tx.priority_fee_or_price_u256(),)* }
+                }
+
+                #[inline]
                 fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
                     match self { #(Self::#variant_names(tx) => tx.effective_gas_price(base_fee),)* }
+                }
+
+                #[inline]
+                fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> #alloy_primitives::U256 {
+                    match self { #(Self::#variant_names(tx) => tx.effective_gas_price_u256(base_fee),)* }
+                }
+
+                #[inline]
+                fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<#alloy_primitives::U256> {
+                    match self { #(Self::#variant_names(tx) => tx.effective_tip_per_gas_u256(base_fee),)* }
                 }
 
                 #[inline]
@@ -454,6 +484,11 @@ impl Expander {
                 #[inline]
                 fn authorization_list(&self) -> Option<&[#alloy_eips::eip7702::SignedAuthorization]> {
                     match self { #(Self::#variant_names(tx) => tx.authorization_list(),)* }
+                }
+
+                #[inline]
+                fn frame_transaction(&self) -> Option<&#alloy_consensus::TxEip8141> {
+                    match self { #(Self::#variant_names(tx) => tx.frame_transaction(),)* }
                 }
             }
         }

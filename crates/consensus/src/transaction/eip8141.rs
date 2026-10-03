@@ -31,8 +31,9 @@ use super::Transaction;
 ///
 /// The [`Transaction`] implementation represents the transaction as a call to [`Self::sender`],
 /// with zero value and empty input. Individual call targets, values, and inputs belong to the
-/// frames. Fee accessors saturate at [`u128::MAX`]. This type is not a variant of
-/// [`super::TxEnvelope`] or [`super::TypedTransaction`].
+/// frames. The `u128` fee accessors saturate at [`u128::MAX`]; their `_u256` counterparts return
+/// the full values. This type is not a variant of [`super::TxEnvelope`] or
+/// [`super::TypedTransaction`].
 ///
 /// ```
 /// use alloy_consensus::TxEip8141;
@@ -348,8 +349,16 @@ impl Transaction for TxEip8141 {
         self.fees.max_fee_per_gas.saturating_to()
     }
 
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        self.fees.max_fee_per_gas
+    }
+
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         Some(self.fees.max_priority_fee_per_gas.saturating_to())
+    }
+
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        Some(self.fees.max_priority_fee_per_gas)
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
@@ -357,8 +366,16 @@ impl Transaction for TxEip8141 {
             .then(|| self.fees.max_fee_per_blob_gas.saturating_to())
     }
 
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        (!self.blob_versioned_hashes.is_empty()).then_some(self.fees.max_fee_per_blob_gas)
+    }
+
     fn priority_fee_or_price(&self) -> u128 {
         self.fees.max_priority_fee_per_gas.saturating_to()
+    }
+
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        self.fees.max_priority_fee_per_gas
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
@@ -367,6 +384,18 @@ impl Transaction for TxEip8141 {
             self.priority_fee_or_price(),
             base_fee,
         )
+    }
+
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        let max_fee = self.fees.max_fee_per_gas;
+        base_fee.map_or(max_fee, |base_fee| {
+            max_fee.min(U256::from(base_fee).saturating_add(self.fees.max_priority_fee_per_gas))
+        })
+    }
+
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        let fee = self.fees.max_fee_per_gas.checked_sub(U256::from(base_fee))?;
+        Some(fee.min(self.fees.max_priority_fee_per_gas))
     }
 
     fn is_dynamic_fee(&self) -> bool {
@@ -399,6 +428,10 @@ impl Transaction for TxEip8141 {
 
     fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
         None
+    }
+
+    fn frame_transaction(&self) -> Option<&Self> {
+        Some(self)
     }
 }
 
@@ -770,6 +803,7 @@ pub(super) mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TransactionEnvelope;
     use alloy_eips::{
         eip2718::{Decodable2718, Encodable2718},
         eip8141::{
@@ -1093,6 +1127,51 @@ mod tests {
         assert_eq!(tx.effective_gas_price(Some(95)), 100);
         tx.fees.max_priority_fee_per_gas = U256::from(101);
         assert_eq!(tx.validate(), Err(TxEip8141ValidationError::PriorityFeeAboveMaxFee));
+    }
+
+    #[test]
+    fn u256_fee_accessors_return_full_values() {
+        #[derive(Clone, Debug, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = FrameTxType)]
+        enum FrameEnvelope {
+            #[envelope(ty = 6)]
+            Frame(TxEip8141),
+        }
+
+        #[track_caller]
+        fn assert_full_values(tx: &impl Transaction, fees: TransactionFees) {
+            assert_eq!(tx.max_fee_per_gas(), u128::MAX);
+            assert_eq!(tx.max_fee_per_gas_u256(), fees.max_fee_per_gas);
+            assert_eq!(tx.max_priority_fee_per_gas_u256(), Some(fees.max_priority_fee_per_gas));
+            assert_eq!(tx.max_fee_per_blob_gas_u256(), Some(fees.max_fee_per_blob_gas));
+            assert_eq!(tx.priority_fee_or_price_u256(), fees.max_priority_fee_per_gas);
+            assert_eq!(tx.effective_gas_price_u256(None), fees.max_fee_per_gas);
+            assert_eq!(
+                tx.effective_gas_price_u256(Some(7)),
+                fees.max_priority_fee_per_gas + U256::from(7)
+            );
+            assert_eq!(tx.effective_tip_per_gas_u256(7), Some(fees.max_priority_fee_per_gas));
+        }
+
+        let fees = TransactionFees {
+            max_priority_fee_per_gas: U256::from(1) << 128,
+            max_fee_per_gas: U256::from(1) << 200,
+            max_fee_per_blob_gas: U256::from(1) << 130,
+        };
+        let tx = TxEip8141 {
+            fees,
+            blob_versioned_hashes: vec![B256::repeat_byte(VERSIONED_HASH_VERSION_KZG)],
+            ..valid_tx()
+        };
+        assert_full_values(&tx, fees);
+        assert_full_values(&tx.clone().seal_slow(), fees);
+        assert_full_values(&FrameEnvelope::Frame(tx.clone()), fees);
+        assert_eq!(tx.clone().seal_slow().frame_transaction(), Some(&tx));
+        assert_eq!(FrameEnvelope::Frame(tx.clone()).frame_transaction(), Some(&tx));
+
+        // Without blob hashes there is no blob fee, as for the `u128` accessor.
+        let tx = TxEip8141 { blob_versioned_hashes: vec![], ..tx };
+        assert_eq!(tx.max_fee_per_blob_gas_u256(), None);
     }
 
     #[test]
