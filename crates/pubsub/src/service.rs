@@ -180,6 +180,12 @@ impl<T: PubSubConnect> PubSubService<T> {
         let request = in_flight.request;
         let id = request.id().clone();
 
+        // Nobody waits for the response and the subscription is gone, e.g. it was unsubscribed
+        // while being re-issued after a reconnect. Don't re-create it without a consumer.
+        if in_flight.tx.is_closed() && !self.subs.contains(&request.params_hash()) {
+            return Ok(());
+        }
+
         let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
 
         // Serialized B256 is always a valid serialized U256 too.
