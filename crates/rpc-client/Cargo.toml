@@ -54,7 +54,7 @@ wasmtimer.workspace = true
 [dev-dependencies]
 alloy-primitives.workspace = true
 alloy-node-bindings.workspace = true
-alloy-transport-ipc = { workspace = true, features = ["mock"] }
+alloy-transport-ipc.workspace = true
 alloy-transport-ws = { workspace = true, features = ["aws-lc-rs"] }
 
 ci_info.workspace = true
