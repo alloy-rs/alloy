@@ -46,15 +46,22 @@ impl Paused {
 
     /// Waits until the paused state is changed to `false`.
     ///
-    /// Returns `true` if the method actually waited for the paused state to become unpaused,
-    /// or `false` if it was already unpaused when called.
+    /// Returns `true` if the method observed a paused state, or `false` if it was already
+    /// unpaused on the first check.
     async fn wait(&self) -> bool {
-        if !self.is_paused() {
-            return false;
+        let mut waited = false;
+        loop {
+            // Create the future before checking the state so an unpause cannot be missed.
+            // `notify_waiters` also notifies futures that have not been polled yet.
+            let notified = self.notify.notified();
+            if !self.is_paused() {
+                return waited;
+            }
+
+            waited = true;
+            notified.await;
+            // The state may have been paused again before this task resumed.
         }
-        self.notify.notified().await;
-        debug_assert!(!self.is_paused());
-        true
     }
 }
 
@@ -247,7 +254,47 @@ mod regression_tests {
     use alloy_primitives::B256;
     use alloy_rpc_types_eth::Block;
     use alloy_transport::mock::Asserter;
-    use std::time::Duration;
+    use futures::poll;
+    use std::{pin::pin, task::Poll, time::Duration};
+
+    #[tokio::test]
+    async fn paused_wait_returns_immediately_when_unpaused() {
+        let paused = Paused::default();
+        let mut wait = pin!(paused.wait());
+        assert_eq!(poll!(&mut wait), Poll::Ready(false));
+    }
+
+    #[tokio::test]
+    async fn paused_wait_wakes_all_waiters() {
+        let paused = Paused::default();
+        paused.set_paused(true);
+        let mut first = pin!(paused.wait());
+        let mut second = pin!(paused.wait());
+        assert!(poll!(&mut first).is_pending());
+        assert!(poll!(&mut second).is_pending());
+
+        paused.set_paused(false);
+        assert_eq!(poll!(&mut first), Poll::Ready(true));
+        assert_eq!(poll!(&mut second), Poll::Ready(true));
+    }
+
+    #[tokio::test]
+    async fn paused_wait_rechecks_state_after_notification() {
+        let paused = Paused::default();
+        paused.set_paused(true);
+        let mut wait = pin!(paused.wait());
+        assert!(poll!(&mut wait).is_pending());
+
+        for _ in 0..3 {
+            // Pause again before the notified waiter gets a chance to resume.
+            paused.set_paused(false);
+            paused.set_paused(true);
+            assert!(poll!(&mut wait).is_pending());
+        }
+
+        paused.set_paused(false);
+        assert_eq!(poll!(&mut wait), Poll::Ready(true));
+    }
 
     #[tokio::test]
     async fn heartbeat_continues_after_invalid_block_number() {
