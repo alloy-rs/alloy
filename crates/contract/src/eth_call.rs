@@ -157,7 +157,7 @@ where
     N: Network,
 {
     fn from(inner: alloy_provider::EthCall<N, Bytes>) -> Self {
-        Self { inner, decoder: &RAW_CODER }
+        Self::new_raw(inner)
     }
 }
 
@@ -202,13 +202,9 @@ where
     ) -> std::task::Poll<Self::Output> {
         let this = self.get_mut();
         let pin = std::pin::pin!(&mut this.inner);
-        match pin.poll(cx) {
-            std::task::Poll::Ready(Ok(data)) => {
-                std::task::Poll::Ready(this.decoder.abi_decode_output(data))
-            }
-            std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(e.into())),
-            std::task::Poll::Pending => std::task::Poll::Pending,
-        }
+        pin.poll(cx).map(|res| {
+            res.map_err(Into::into).and_then(|data| this.decoder.abi_decode_output(data))
+        })
     }
 }
 
