@@ -762,6 +762,13 @@ pub mod serde_bincode_compat {
                     blob_base_cost: 0,
                 },
             );
+            blob_schedule.insert("osaka".to_string(), BlobParams::osaka());
+            blob_schedule.insert("bpo1".to_string(), BlobParams::bpo1());
+            blob_schedule.insert("bpo2".to_string(), BlobParams::bpo2());
+            blob_schedule.insert(
+                "custom".to_string(),
+                BlobParams::osaka().with_max_blobs_per_tx(0).with_blob_base_cost(42),
+            );
 
             // Create a test config with mixed Some/None values to test serialization
             let config = ChainConfig {
@@ -807,8 +814,9 @@ pub mod serde_bincode_compat {
             let data = Data { config };
 
             let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _) =
+            let (decoded, consumed) =
                 bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(consumed, encoded.len());
             assert_eq!(decoded, data);
         }
 
@@ -1263,6 +1271,30 @@ mod tests {
         let s = r#"{}"#;
         let genesis: Genesis = serde_json::from_str(s).unwrap();
         assert_eq!(genesis.config.chain_id, 1);
+    }
+
+    #[test]
+    fn blob_schedule_serde_preserves_fork_defaults() {
+        let config: ChainConfig = serde_json::from_value(json!({
+            "bpo1Time": 1,
+            "bpo2Time": 2,
+            "blobSchedule": {
+                "cancun": {"target": 3, "max": 6, "baseFeeUpdateFraction": 3338477},
+                "prague": {"target": 6, "max": 9, "baseFeeUpdateFraction": 5007716},
+                "osaka": {"target": 6, "max": 9, "baseFeeUpdateFraction": 5007716},
+                "bpo1": {"target": 10, "max": 15, "baseFeeUpdateFraction": 8346193},
+                "bpo2": {"target": 14, "max": 21, "baseFeeUpdateFraction": 11684671}
+            }
+        }))
+        .unwrap();
+        let expected = BlobScheduleBlobParams::default()
+            .with_scheduled([(1, BlobParams::bpo1()), (2, BlobParams::bpo2())]);
+        assert_eq!(config.blob_schedule_blob_params(), expected);
+
+        let encoded = serde_json::to_string(&config).unwrap();
+        let decoded: ChainConfig = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, config);
+        assert_eq!(decoded.blob_schedule_blob_params(), expected);
     }
 
     #[test]
