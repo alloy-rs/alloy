@@ -200,8 +200,12 @@ impl StructLog {
 /// Tracing response objects
 ///
 /// Note: This deserializes untagged, so it's possible that a custom javascript tracer response
-/// matches another variant, for example a js tracer that returns `{}` would be deserialized as
-/// [GethTrace::NoopTracer]
+/// matches another variant.
+///
+/// An empty object `{}` is ambiguous: it is the response of the `noopTracer` and also of the
+/// `4byteTracer` for a transaction without calls. It deserializes as
+/// [`GethTrace::FourByteTracer`] with an empty map, which [`GethTrace::try_into_noop_frame`]
+/// also accepts.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GethTrace {
@@ -266,11 +270,30 @@ geth_trace_frames! {
     FourByteTracer(FourByteFrame) => is_four_byte, try_into_four_byte_frame;
     PreStateTracer(PreStateFrame) => is_pre_state, try_into_pre_state_frame;
     StateGasTracer(StateGasTrace) => is_state_gas, try_into_state_gas_trace;
-    NoopTracer(NoopFrame) => is_noop, try_into_noop_frame;
     MuxTracer(MuxFrame) => is_mux, try_into_mux_frame;
 }
 
 impl GethTrace {
+    /// Returns true if this is a [`GethTrace::NoopTracer`].
+    ///
+    /// A deserialized `noopTracer` response is an empty [`GethTrace::FourByteTracer`], see
+    /// [`GethTrace::try_into_noop_frame`].
+    pub const fn is_noop(&self) -> bool {
+        matches!(self, Self::NoopTracer(_))
+    }
+
+    /// Try to convert the inner tracer to [`NoopFrame`].
+    ///
+    /// Also accepts an empty [`GethTrace::FourByteTracer`], which is what the `noopTracer`
+    /// response `{}` deserializes to.
+    pub fn try_into_noop_frame(self) -> Result<NoopFrame, UnexpectedTracerError> {
+        match self {
+            Self::NoopTracer(inner) => Ok(inner),
+            Self::FourByteTracer(frame) if frame.0.is_empty() => Ok(NoopFrame::default()),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
     /// Returns true if this is a JS trace
     pub const fn is_js(&self) -> bool {
         matches!(self, Self::JS(_))
@@ -282,6 +305,12 @@ impl GethTrace {
             Self::JS(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
+    }
+}
+
+impl From<NoopFrame> for GethTrace {
+    fn from(value: NoopFrame) -> Self {
+        Self::NoopTracer(value)
     }
 }
 
