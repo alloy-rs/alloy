@@ -83,6 +83,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         old_handle.shutdown();
 
         // Re-issue pending requests.
+        self.in_flights.remove_cancelled();
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
         for (_, in_flight) in self.in_flights.iter() {
             let msg = in_flight.request.serialized().to_owned();
@@ -115,6 +116,10 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service a request.
     fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
+        // A caller may have stopped waiting while reconnect blocked this queue.
+        if !in_flight.is_subscription() && in_flight.tx.is_closed() {
+            return Ok(());
+        }
         let brv = in_flight.request();
 
         self.dispatch_request(brv.serialized().to_owned())?;
@@ -433,6 +438,116 @@ mod tests {
 
         assert_eq!(reconnect_retry_interval(base, 1), Duration::from_secs(60));
         assert_eq!(reconnect_retry_interval(base, 2), Duration::from_secs(60));
+    }
+
+    #[tokio::test]
+    async fn reconnect_does_not_replay_dropped_request_futures() {
+        let (handle, mut interface) = ConnectionHandle::new();
+        let (replacement, mut replacement_interface) = ConnectionHandle::new();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let frontend = PubSubFrontend::new(tx);
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+
+        let cancelled = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let mut cancelled = Box::pin(frontend.send(cancelled));
+        assert!(futures::poll!(&mut cancelled).is_pending());
+        let instruction = service.reqs.try_recv().unwrap();
+        service.service_ix(instruction).unwrap();
+        interface.from_frontend.try_recv().unwrap();
+
+        let live = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
+        let expected = live.serialized().get().to_owned();
+        let mut live = Box::pin(frontend.send(live));
+        assert!(futures::poll!(&mut live).is_pending());
+        let instruction = service.reqs.try_recv().unwrap();
+        service.service_ix(instruction).unwrap();
+        assert_eq!(interface.from_frontend.try_recv().unwrap().get(), expected);
+
+        drop(cancelled);
+        service.reconnect().await.unwrap();
+
+        assert_eq!(replacement_interface.from_frontend.try_recv().unwrap().get(), expected);
+        assert!(matches!(
+            replacement_interface.from_frontend.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+        assert_eq!(service.in_flights.len(), 1);
+
+        service
+            .handle_item(
+                serde_json::from_str(r#"{"jsonrpc":"2.0","id":2,"result":"0x1"}"#).unwrap(),
+            )
+            .unwrap();
+        let response = live.await.unwrap();
+        assert_eq!(response.id, Id::Number(2));
+        assert_eq!(response.payload.as_success().unwrap().get(), r#""0x1""#);
+        assert_eq!(service.in_flights.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn cancelled_queued_request_is_not_dispatched_after_reconnect() {
+        let (handle, _interface) = ConnectionHandle::new();
+        let (replacement, mut replacement_interface) = ConnectionHandle::new();
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let frontend = PubSubFrontend::new(tx);
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        let request = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let mut request = Box::pin(frontend.send(request));
+        assert!(futures::poll!(&mut request).is_pending());
+        // While reconnecting, the service leaves new instructions in its queue.
+        // The caller can stop waiting before the service resumes that queue.
+        drop(request);
+        service.reconnect().await.unwrap();
+        let instruction = service.reqs.try_recv().unwrap();
+        service.service_ix(instruction).unwrap();
+        assert!(matches!(
+            replacement_interface.from_frontend.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+        assert_eq!(service.in_flights.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn reconnect_preserves_pending_subscription_without_response_receiver() {
+        let (handle, _interface) = ConnectionHandle::new();
+        let (replacement, mut replacement_interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        let request =
+            Request::new("eth_subscribe", Id::Number(3), ["newHeads"]).serialize().unwrap();
+        let expected = request.serialized().get().to_owned();
+        // Internal resubscription requests have no oneshot receiver: delivery
+        // uses the subscription's broadcast channel instead.
+        let (pending, response) = InFlight::new(request, 16);
+        drop(response);
+        service.in_flights.insert(pending);
+
+        service.reconnect().await.unwrap();
+
+        assert_eq!(replacement_interface.from_frontend.try_recv().unwrap().get(), expected);
+        assert!(matches!(
+            replacement_interface.from_frontend.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+        assert_eq!(service.in_flights.len(), 1);
     }
 
     #[tokio::test]
