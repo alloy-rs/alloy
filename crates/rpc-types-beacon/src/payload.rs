@@ -16,7 +16,7 @@ use alloy_rpc_types_engine::{
     ExecutionPayloadV4,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_with::{serde_as, DeserializeAs, DisplayFromStr, SerializeAs};
+use serde_with::{serde_as, DisplayFromStr};
 use std::borrow::Cow;
 
 /// Response object of GET `/eth/v1/builder/header/{slot}/{parent_hash}/{pubkey}`
@@ -62,7 +62,6 @@ pub struct ExecutionPayloadHeaderMessage {
 /// proposer to the block. with its signature.
 ///
 /// See <https://ethereum.github.io/builder-specs/#/Builder/submitBlindedBlockV2>.
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BeaconBlockData {
     /// The message of the signed beacon block
@@ -72,7 +71,6 @@ pub struct BeaconBlockData {
 }
 
 /// Block Body Message
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BeaconBlockMessage {
     /// Slot number
@@ -88,7 +86,6 @@ pub struct BeaconBlockMessage {
 }
 
 /// Execution payload body
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BeaconBlockBody {
     /// Execution payload
@@ -159,10 +156,10 @@ struct BeaconPayloadAttributes {
     parent_beacon_block_root: Option<B256>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde_as(as = "Option<DisplayFromStr>")]
-    pub slot_number: Option<u64>,
+    slot_number: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde_as(as = "Option<DisplayFromStr>")]
-    pub target_gas_limit: Option<u64>,
+    target_gas_limit: Option<u64>,
 }
 
 /// A helper module for serializing and deserializing the payload attributes for the beacon API.
@@ -317,7 +314,7 @@ impl<'a> From<&'a ExecutionPayloadV1> for BeaconExecutionPayloadV1<'a> {
 pub mod beacon_payload_v1 {
     use super::*;
 
-    /// Serialize the payload attributes for the beacon API.
+    /// Serialize the execution payload for the beacon API.
     pub fn serialize<S>(
         payload_attributes: &ExecutionPayloadV1,
         serializer: S,
@@ -328,7 +325,7 @@ pub mod beacon_payload_v1 {
         BeaconExecutionPayloadV1::from(payload_attributes).serialize(serializer)
     }
 
-    /// Deserialize the payload attributes for the beacon API.
+    /// Deserialize the execution payload for the beacon API.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<ExecutionPayloadV1, D::Error>
     where
         D: Deserializer<'de>,
@@ -371,7 +368,7 @@ impl<'a> From<&'a ExecutionPayloadV2> for BeaconExecutionPayloadV2<'a> {
 pub mod beacon_payload_v2 {
     use super::*;
 
-    /// Serialize the payload attributes for the beacon API.
+    /// Serialize the execution payload for the beacon API.
     pub fn serialize<S>(
         payload_attributes: &ExecutionPayloadV2,
         serializer: S,
@@ -382,7 +379,7 @@ pub mod beacon_payload_v2 {
         BeaconExecutionPayloadV2::from(payload_attributes).serialize(serializer)
     }
 
-    /// Deserialize the payload attributes for the beacon API.
+    /// Deserialize the execution payload for the beacon API.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<ExecutionPayloadV2, D::Error>
     where
         D: Deserializer<'de>,
@@ -426,7 +423,7 @@ impl<'a> From<&'a ExecutionPayloadV3> for BeaconExecutionPayloadV3<'a> {
 pub mod beacon_payload_v3 {
     use super::*;
 
-    /// Serialize the payload attributes for the beacon API.
+    /// Serialize the execution payload for the beacon API.
     pub fn serialize<S>(
         payload_attributes: &ExecutionPayloadV3,
         serializer: S,
@@ -437,7 +434,7 @@ pub mod beacon_payload_v3 {
         BeaconExecutionPayloadV3::from(payload_attributes).serialize(serializer)
     }
 
-    /// Deserialize the payload attributes for the beacon API.
+    /// Deserialize the execution payload for the beacon API.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<ExecutionPayloadV3, D::Error>
     where
         D: Deserializer<'de>,
@@ -489,7 +486,7 @@ impl<'a> From<&'a ExecutionPayloadV4> for BeaconExecutionPayloadV4<'a> {
 pub mod beacon_payload_v4 {
     use super::*;
 
-    /// Serialize the payload attributes for the beacon API.
+    /// Serialize the execution payload for the beacon API.
     pub fn serialize<S>(
         payload_attributes: &ExecutionPayloadV4,
         serializer: S,
@@ -500,7 +497,7 @@ pub mod beacon_payload_v4 {
         BeaconExecutionPayloadV4::from(payload_attributes).serialize(serializer)
     }
 
-    /// Deserialize the payload attributes for the beacon API.
+    /// Deserialize the execution payload for the beacon API.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<ExecutionPayloadV4, D::Error>
     where
         D: Deserializer<'de>,
@@ -510,41 +507,19 @@ pub mod beacon_payload_v4 {
 }
 
 /// Represents all possible payload versions.
-#[derive(Debug, Serialize)]
+///
+/// Variants are declared newest first, so that deserialization tries them in that order.
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 enum BeaconExecutionPayload<'a> {
-    /// V1 payload
-    V1(BeaconExecutionPayloadV1<'a>),
-    /// V2 payload
-    V2(BeaconExecutionPayloadV2<'a>),
-    /// V3 payload
-    V3(BeaconExecutionPayloadV3<'a>),
     /// V4 payload (Amsterdam)
     V4(BeaconExecutionPayloadV4<'a>),
-}
-
-// Deserializes untagged ExecutionPayload by trying each variant in falling order
-impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[serde_as]
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum BeaconExecutionPayloadDesc<'a> {
-            V4(BeaconExecutionPayloadV4<'a>),
-            V3(BeaconExecutionPayloadV3<'a>),
-            V2(BeaconExecutionPayloadV2<'a>),
-            V1(BeaconExecutionPayloadV1<'a>),
-        }
-        match BeaconExecutionPayloadDesc::deserialize(deserializer)? {
-            BeaconExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
-            BeaconExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
-            BeaconExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
-            BeaconExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
-        }
-    }
+    /// V3 payload
+    V3(BeaconExecutionPayloadV3<'a>),
+    /// V2 payload
+    V2(BeaconExecutionPayloadV2<'a>),
+    /// V1 payload
+    V1(BeaconExecutionPayloadV1<'a>),
 }
 
 impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
@@ -577,30 +552,12 @@ impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
     }
 }
 
-impl SerializeAs<ExecutionPayload> for BeaconExecutionPayload<'_> {
-    fn serialize_as<S>(source: &ExecutionPayload, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        beacon_payload::serialize(source, serializer)
-    }
-}
-
-impl<'de> DeserializeAs<'de, ExecutionPayload> for BeaconExecutionPayload<'de> {
-    fn deserialize_as<D>(deserializer: D) -> Result<ExecutionPayload, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        beacon_payload::deserialize(deserializer)
-    }
-}
-
-/// Module providing serialization and deserialization support for the beacon API payload
-/// attributes.
+/// Module providing serialization and deserialization support for the beacon API execution
+/// payload.
 pub mod beacon_payload {
     use super::*;
 
-    /// Serialize the payload attributes for the beacon API.
+    /// Serialize the execution payload for the beacon API.
     pub fn serialize<S>(
         payload_attributes: &ExecutionPayload,
         serializer: S,
@@ -611,7 +568,7 @@ pub mod beacon_payload {
         BeaconExecutionPayload::from(payload_attributes).serialize(serializer)
     }
 
-    /// Deserialize the payload attributes for the beacon API.
+    /// Deserialize the execution payload for the beacon API.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<ExecutionPayload, D::Error>
     where
         D: Deserializer<'de>,
