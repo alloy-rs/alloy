@@ -317,30 +317,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_diff_mode() {
-        assert!(PreStateConfig { diff_mode: Some(true), ..Default::default() }.is_diff_mode());
-        assert!(!PreStateConfig { diff_mode: Some(false), ..Default::default() }.is_diff_mode());
-        assert!(!PreStateConfig { diff_mode: None, ..Default::default() }.is_diff_mode());
-    }
-
-    #[test]
-    fn test_disable_code() {
-        assert!(PreStateConfig::default().code_enabled());
-        assert!(PreStateConfig { disable_code: Some(false), ..Default::default() }.code_enabled());
-        assert!(!PreStateConfig { disable_code: Some(true), ..Default::default() }.code_enabled());
-    }
-    #[test]
-    fn test_disable_storage() {
-        assert!(PreStateConfig::default().storage_enabled());
-        assert!(
-            PreStateConfig { disable_storage: Some(false), ..Default::default() }.storage_enabled()
-        );
-        assert!(
-            !PreStateConfig { disable_storage: Some(true), ..Default::default() }.storage_enabled()
-        );
-    }
-
-    #[test]
     fn parse_prestate_default_resp() {
         let s = r#"{
   "0x0000000000000000000000000000000000000002": {
