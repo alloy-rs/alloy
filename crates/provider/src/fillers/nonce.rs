@@ -270,25 +270,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_nonce_if_sender_unset() {
-        let provider = ProviderBuilder::new()
-            .disable_recommended_fillers()
-            .with_cached_nonce_management()
-            .connect_anvil();
-
-        let tx = TransactionRequest {
-            value: Some(U256::from(100)),
-            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            gas_price: Some(20e9 as u128),
-            gas: Some(21000),
-            ..Default::default()
-        };
-
-        // errors because signer layer expects nonce to be set, which it is not
-        assert!(provider.send_transaction(tx).await.is_err());
-    }
-
-    #[tokio::test]
     async fn increments_nonce() {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()

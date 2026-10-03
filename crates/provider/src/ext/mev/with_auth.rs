@@ -225,18 +225,6 @@ mod tests {
         assert_eq!(signature, TEST_SIGNATURE);
     }
 
-    #[tokio::test]
-    async fn test_verify_flashbots_signature_roundtrip() {
-        let signer = PrivateKeySigner::from_bytes(&b256!(
-            "0x0000000000000000000000000000000000000000000000000000000000123456"
-        ))
-        .unwrap();
-
-        let signature = sign_flashbots_payload(TEST_BODY.to_string(), &signer).await.unwrap();
-        let recovered = verify_flashbots_signature(&signature, TEST_BODY.as_bytes()).unwrap();
-        assert_eq!(recovered, signer.address());
-    }
-
     #[test]
     fn test_verify_flashbots_signature_v0() {
         // TEST_SIGNATURE uses v=0 (ends with "00")

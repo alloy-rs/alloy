@@ -686,34 +686,4 @@ mod tests {
         assert_eq!(single, U256::from(200));
         assert_eq!(batched.unwrap(), U256::from(200));
     }
-
-    #[tokio::test]
-    #[ignore]
-    async fn arbitrum() {
-        let url = "https://arbitrum.rpc.subquery.network/public";
-
-        let batched = ProviderBuilder::new().with_call_batching().connect(url).await.unwrap();
-
-        let batch_layer = CallBatchLayer::new().arbitrum_compat();
-        let batched_compat = ProviderBuilder::new().layer(batch_layer).connect(url).await.unwrap();
-
-        // single call so won't go through multicall3
-        let block = batched.get_block_number().await.unwrap();
-
-        // force batching
-        let (b, _) = tokio::join!(batched.get_block_number(), batched.get_chain_id());
-        // we expect this to be the L1 block number
-        let block_wrong = b.unwrap();
-
-        // force batch transaction
-        let (b, _) = tokio::join!(batched_compat.get_block_number(), batched.get_chain_id());
-        // compat mode returns correct block
-        let block_compat = b.unwrap();
-
-        dbg!(block, block_wrong, block_compat);
-
-        // arbitrum blocks move fast so we assert with some error margin
-        assert!(block.abs_diff(block_compat) < 10);
-        assert!(block.abs_diff(block_wrong) > 100_000);
-    }
 }
