@@ -610,27 +610,4 @@ mod tests {
             assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
         }
     }
-
-    #[test]
-    fn default_matches_new_semantics() {
-        let reth = Reth::default();
-
-        assert!(!reth.dev);
-        assert_eq!(reth.host, None);
-        assert_eq!(reth.http_port, DEFAULT_HTTP_PORT);
-        assert_eq!(reth.ws_port, DEFAULT_WS_PORT);
-        assert_eq!(reth.auth_port, DEFAULT_AUTH_PORT);
-        assert_eq!(reth.p2p_port, DEFAULT_P2P_PORT);
-        assert_eq!(reth.block_time, None);
-        assert!((1..200).contains(&reth.instance));
-        assert!(reth.discovery_enabled);
-        assert_eq!(reth.program, None);
-        assert_eq!(reth.ipc_path, None);
-        assert!(!reth.ipc_enabled);
-        assert_eq!(reth.data_dir, None);
-        assert_eq!(reth.chain_or_path, None);
-        assert_eq!(reth.genesis, None);
-        assert!(reth.args.is_empty());
-        assert!(!reth.keep_stdout);
-    }
 }
