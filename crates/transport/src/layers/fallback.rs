@@ -506,6 +506,12 @@ impl TransportMetrics {
             return 0.0;
         }
 
+        // Rank a transport whose recent requests all failed below an untried one, regardless of
+        // the latency of older successes.
+        if !self.successes.contains(&true) {
+            return -1.0;
+        }
+
         // Normalize latency score (1.0 for 0ms, approaches 0.0 as latency increases)
         let latency_score = self.avg_latency().map_or(0.0, |avg_latency| 1.0 / (1.0 + avg_latency));
 
