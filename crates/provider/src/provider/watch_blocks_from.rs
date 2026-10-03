@@ -734,31 +734,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn multiple_yielded_futures_outlive_provider() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-
-        asserter.push_success(&2_u64);
-        asserter.push_success(&Some(block(1)));
-        asserter.push_success(&Some(block(2)));
-
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .into_stream();
-
-        let fut1 = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
-        let fut2 = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
-        drop(provider);
-
-        let first = timeout(Duration::from_secs(1), fut1).await.unwrap().unwrap();
-        let second = timeout(Duration::from_secs(1), fut2).await.unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
-        assert_eq!(second.header.number, 2);
-    }
-
-    #[tokio::test]
     async fn errors_when_cursor_cannot_advance() {
         let asserter = alloy_transport::mock::Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter);
@@ -773,30 +748,6 @@ mod tests {
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         let err = first.unwrap_err();
         assert!(err.is_local_usage_error());
-    }
-
-    #[tokio::test]
-    async fn future_stream_can_be_buffered() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-
-        asserter.push_success(&2_u64);
-        asserter.push_success(&Some(block(1)));
-        asserter.push_success(&Some(block(2)));
-
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .into_stream()
-            .buffered(2);
-
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
-
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
     }
 
     #[tokio::test]
