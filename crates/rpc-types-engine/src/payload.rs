@@ -3311,7 +3311,12 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 };
 
                 let Some(withdrawals) = withdrawals else {
-                    return if blob_gas_used.is_none() && excess_blob_gas.is_none() {
+                    // reject V3 and V4 fields without V2 fields
+                    return if blob_gas_used.is_none()
+                        && excess_blob_gas.is_none()
+                        && block_access_list.is_none()
+                        && slot_number.is_none()
+                    {
                         Ok(ExecutionPayload::V1(v1))
                     } else {
                         Err(serde::de::Error::custom("invalid enum variant"))
