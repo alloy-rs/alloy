@@ -4435,9 +4435,19 @@ mod tests {
         assert!(deserialized.is_err());
     }
 
+    /// SSZ decoding blobs needs more than the default test thread stack in debug builds.
+    #[cfg(feature = "ssz")]
+    fn ssz_decode_blobsbundlev2(encoded: Vec<u8>) -> Result<BlobsBundleV2, ssz::DecodeError> {
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || <BlobsBundleV2 as ssz::Decode>::from_ssz_bytes(&encoded))
+            .unwrap()
+            .join()
+            .unwrap()
+    }
+
     #[test]
     #[cfg(feature = "ssz")]
-    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_roundtrip() {
         let commitments = vec![Bytes48::default(), Bytes48::default()];
         let num_blobs = commitments.len();
@@ -4449,14 +4459,13 @@ mod tests {
         };
 
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
-        let decoded: BlobsBundleV2 = ssz::Decode::from_ssz_bytes(&encoded).unwrap();
+        let decoded = ssz_decode_blobsbundlev2(encoded).unwrap();
 
         assert_eq!(decoded, blobs_bundle_v2);
     }
 
     #[test]
     #[cfg(feature = "ssz")]
-    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_invalid_proofs_length() {
         let commitments = vec![Bytes48::default()];
 
@@ -4469,13 +4478,12 @@ mod tests {
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
 
         // Attempt to decode - should fail due to mismatched proofs length
-        let result: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
+        let result = ssz_decode_blobsbundlev2(encoded);
         assert!(result.is_err());
     }
 
     #[test]
     #[cfg(feature = "ssz")]
-    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_mismatched_commitments_blobs() {
         let blobs_bundle_v2 = BlobsBundleV2 {
             commitments: vec![Bytes48::default(), Bytes48::default()],
@@ -4486,7 +4494,7 @@ mod tests {
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
 
         // Attempt to decode - should fail due to wrong number of commitments
-        let result: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
+        let result = ssz_decode_blobsbundlev2(encoded);
         assert!(result.is_err());
     }
 
