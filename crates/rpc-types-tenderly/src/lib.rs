@@ -12,7 +12,7 @@ use alloy_consensus::TxType;
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{Address, Bloom, Bytes, FixedBytes, Log, I256, U256};
-use serde::{de::Error, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// Tenderly RPC estimate gas result.
 #[derive(Debug, Serialize, Deserialize)]
@@ -86,19 +86,12 @@ pub struct TenderlyDecodedArgument {
 impl TenderlyDecodedArgument {
     /// Returns the parsed type of the decoded argument.
     pub fn ty(&self) -> Option<DynSolType> {
-        let raw = self.raw_typ.as_str()?;
-        let Ok(ty) = raw.parse() else {
-            return None;
-        };
-        Some(ty)
+        parse_ty(&self.raw_typ)
     }
 
     /// Returns the parsed value of the decoded argument.
     pub fn value(&self) -> Option<DynSolValue> {
-        let Ok(val) = DecodedValue::parse_dyn_value(&self.raw_value, &self.ty()?) else {
-            return None;
-        };
-        Some(val)
+        DecodedValue::parse_dyn_value(&self.raw_value, &self.ty()?)
     }
 }
 
@@ -126,8 +119,7 @@ pub struct TenderlyFunctionInput {
 impl TenderlyFunctionInput {
     /// Returns the parsed type of the input parameter.
     pub fn ty(&self) -> Option<DynSolType> {
-        let raw = self.raw_typ.as_str()?;
-        raw.parse().ok()
+        parse_ty(&self.raw_typ)
     }
 }
 
@@ -246,11 +238,7 @@ pub struct DecodedValue {
 impl DecodedValue {
     /// Returns the parsed type of the log input.
     pub fn ty(&self) -> Option<DynSolType> {
-        let raw = self.raw_typ.as_str()?;
-        let Ok(ty) = raw.parse() else {
-            return None;
-        };
-        Some(ty)
+        parse_ty(&self.raw_typ)
     }
 
     /// Returns the parsed type of the log input.
@@ -261,86 +249,56 @@ impl DecodedValue {
 
     /// Returns the parsed value of the log input.
     pub fn value(&self) -> Option<DynSolValue> {
-        let Ok(val) = Self::parse_dyn_value(&self.raw_value, &self.ty()?) else {
-            return None;
-        };
-        Some(val)
+        Self::parse_dyn_value(&self.raw_value, &self.ty()?)
     }
 
     /// Parses a JSON value into a `DynSolValue` based on the given `DynSolType`.
-    pub(crate) fn parse_dyn_value(
-        val: &serde_json::Value,
-        ty: &DynSolType,
-    ) -> Result<DynSolValue, serde_json::error::Error> {
-        use serde_json::Error;
-
-        match ty {
-            DynSolType::Bool => {
-                val.as_bool().map(DynSolValue::Bool).ok_or_else(|| Error::custom("expected bool"))
+    pub(crate) fn parse_dyn_value(val: &serde_json::Value, ty: &DynSolType) -> Option<DynSolValue> {
+        Some(match ty {
+            DynSolType::Bool => DynSolValue::Bool(val.as_bool()?),
+            DynSolType::Uint(bits) => DynSolValue::Uint(U256::from_str(val.as_str()?).ok()?, *bits),
+            DynSolType::Int(bits) => DynSolValue::Int(I256::from_str(val.as_str()?).ok()?, *bits),
+            DynSolType::Address => DynSolValue::Address(Address::from_str(val.as_str()?).ok()?),
+            DynSolType::FixedBytes(size) => {
+                DynSolValue::FixedBytes(FixedBytes::from_str(val.as_str()?).ok()?, *size)
             }
-            DynSolType::Uint(bits) => val
-                .as_str()
-                .ok_or_else(|| Error::custom("expected string"))
-                .and_then(|a| U256::from_str(a).map_err(Error::custom))
-                .map(|u| DynSolValue::Uint(u, *bits)),
-            DynSolType::Int(bits) => val
-                .as_str()
-                .ok_or_else(|| Error::custom("expected string"))
-                .and_then(|a| I256::from_str(a).map_err(Error::custom))
-                .map(|i| DynSolValue::Int(i, *bits)),
-            DynSolType::Address => val
-                .as_str()
-                .ok_or_else(|| Error::custom("expected string"))
-                .and_then(|a| Address::from_str(a).map_err(Error::custom))
-                .map(DynSolValue::Address),
-            DynSolType::FixedBytes(size) => val
-                .as_str()
-                .ok_or_else(|| Error::custom("expected string"))
-                .and_then(|a| FixedBytes::from_str(a).map_err(Error::custom))
-                .map(|b| DynSolValue::FixedBytes(b, *size)),
-            DynSolType::Bytes => val
-                .as_str()
-                .ok_or_else(|| Error::custom("expected string"))
-                .and_then(|b| Bytes::from_str(b).map_err(Error::custom))
-                .map(|b| DynSolValue::Bytes(b.into())),
-            DynSolType::String => val
-                .as_str()
-                .ok_or_else(|| Error::custom("expected string"))
-                .map(|s| DynSolValue::String(s.to_owned())),
-            DynSolType::Array(inner) => {
-                let arr = val.as_array().ok_or_else(|| Error::custom("expected array"))?;
-                let values: Vec<DynSolValue> = arr
+            DynSolType::Bytes => DynSolValue::Bytes(Bytes::from_str(val.as_str()?).ok()?.into()),
+            DynSolType::String => DynSolValue::String(val.as_str()?.to_owned()),
+            DynSolType::Array(inner) => DynSolValue::Array(
+                val.as_array()?
                     .iter()
                     .map(|v| Self::parse_dyn_value(v, inner))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(DynSolValue::Array(values))
-            }
+                    .collect::<Option<_>>()?,
+            ),
             DynSolType::FixedArray(inner, size) => {
-                let arr = val.as_array().ok_or_else(|| Error::custom("expected array"))?;
+                let arr = val.as_array()?;
                 if arr.len() != *size {
-                    return Err(Error::custom("array size mismatch"));
+                    return None;
                 }
-                let values: Vec<DynSolValue> = arr
-                    .iter()
-                    .map(|v| Self::parse_dyn_value(v, inner))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(DynSolValue::FixedArray(values))
+                DynSolValue::FixedArray(
+                    arr.iter().map(|v| Self::parse_dyn_value(v, inner)).collect::<Option<_>>()?,
+                )
             }
             DynSolType::Tuple(types) => {
-                let arr = val.as_array().ok_or_else(|| Error::custom("expected tuple"))?;
+                let arr = val.as_array()?;
                 if arr.len() != types.len() {
-                    return Err(Error::custom("tuple length mismatch"));
+                    return None;
                 }
-                let values = arr
-                    .iter()
-                    .zip(types.iter())
-                    .map(|(v, t)| Self::parse_dyn_value(v, t))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(DynSolValue::Tuple(values))
+                DynSolValue::Tuple(
+                    arr.iter()
+                        .zip(types.iter())
+                        .map(|(v, t)| Self::parse_dyn_value(v, t))
+                        .collect::<Option<_>>()?,
+                )
             }
-            _ => Err(Error::custom("type is not supported")),
-        }
+            _ => return None,
+        })
     }
+}
+
+/// Parses a JSON type string into a [`DynSolType`].
+fn parse_ty(raw: &serde_json::Value) -> Option<DynSolType> {
+    raw.as_str()?.parse().ok()
 }
 
 /// Call trace generated by tenderly.
