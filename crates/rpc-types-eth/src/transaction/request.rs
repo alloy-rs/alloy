@@ -414,7 +414,6 @@ impl TransactionRequest {
     /// Returns an error if required fields are missing.
     /// Use `complete_legacy` to check if the request can be built.
     pub fn build_legacy(self) -> Result<TxLegacy, ValueError<Self>> {
-        // Check all required fields first
         let Some(to) = self.to else {
             return Err(ValueError::new(self, "Missing 'to' field for legacy transaction."));
         };
@@ -536,13 +535,12 @@ impl TransactionRequest {
     /// this does not require the sidecar needed for a network-submittable transaction. If
     /// `chain_id` is absent, this uses mainnet chain ID `1`.
     pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, ValueError<Self>> {
-        // First check 'to' field and type
         let Some(to) = self.to else {
             return Err(ValueError::new(self, "Missing 'to' field for Eip4844 transaction."));
         };
         let TxKind::Call(to_address) = to else {
             return Err(ValueError::new(
-                Self { to: Some(to), ..self },
+                self,
                 "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.",
             ));
         };
@@ -664,17 +662,6 @@ impl TransactionRequest {
             access_list: self.access_list.unwrap_or_default(),
             authorization_list: self.authorization_list.unwrap_or_default(),
         })
-    }
-
-    /// Ensures `to` field is set to an address which is required by:
-    /// - EIP 7702
-    /// - EIP 4844
-    const fn ensure_mandatory_to(&self) -> Result<(), ()> {
-        if !matches!(self.to, Some(TxKind::Call(_))) {
-            Err(())
-        } else {
-            Ok(())
-        }
     }
 
     fn check_reqd_fields(&self) -> Vec<&'static str> {
@@ -952,7 +939,7 @@ impl TransactionRequest {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
 
-        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
+        if matches!(self.to, Some(TxKind::Create)) {
             missing.push("to");
         }
 
@@ -1006,7 +993,7 @@ impl TransactionRequest {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
 
-        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
+        if matches!(self.to, Some(TxKind::Create)) {
             missing.push("to");
         }
 
@@ -1280,11 +1267,7 @@ impl From<TxEip4844Variant> for TransactionRequest {
     fn from(tx: TxEip4844Variant) -> Self {
         match tx {
             TxEip4844Variant::TxEip4844(tx) => tx.into(),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => {
-                let mut req: Self = tx.tx.into();
-                req.sidecar = Some(tx.sidecar);
-                req
-            }
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.into(),
         }
     }
 }
@@ -1341,93 +1324,18 @@ impl<T: TransactionTrait> From<Recovered<T>> for TransactionRequest {
 
 impl From<TxEnvelope> for TransactionRequest {
     fn from(envelope: TxEnvelope) -> Self {
-        match envelope {
-            TxEnvelope::Legacy(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-            TxEnvelope::Eip2930(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-            TxEnvelope::Eip1559(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-            TxEnvelope::Eip4844(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-            TxEnvelope::Eip7702(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-        }
+        #[cfg(feature = "k256")]
+        let from = match &envelope {
+            TxEnvelope::Legacy(tx) => tx.recover_signer().ok(),
+            TxEnvelope::Eip2930(tx) => tx.recover_signer().ok(),
+            TxEnvelope::Eip1559(tx) => tx.recover_signer().ok(),
+            TxEnvelope::Eip4844(tx) => tx.recover_signer().ok(),
+            TxEnvelope::Eip7702(tx) => tx.recover_signer().ok(),
+        };
+        let req: Self = TypedTransaction::from(envelope).into();
+        #[cfg(feature = "k256")]
+        let req = Self { from, ..req };
+        req
     }
 }
 
