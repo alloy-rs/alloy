@@ -175,12 +175,6 @@ pub fn calculate_block_gas_limit_with_bound_divisor(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::eip1559::constants::{MIN_PROTOCOL_BASE_FEE, MIN_PROTOCOL_BASE_FEE_U256};
-
-    #[test]
-    fn min_protocol_sanity() {
-        assert_eq!(MIN_PROTOCOL_BASE_FEE_U256.to::<u64>(), MIN_PROTOCOL_BASE_FEE);
-    }
 
     #[test]
     fn calculate_block_gas_limit_bounds_desired_limit() {

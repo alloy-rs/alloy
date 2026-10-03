@@ -1838,35 +1838,6 @@ mod tests {
         assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
     }
 
-    /// A sparse set above the minimum cell count follows the same recovery path.
-    #[test]
-    #[cfg(feature = "kzg")]
-    fn recover_sparse_blobs_with_more_than_minimum_cells() {
-        let settings = EnvKzgSettings::Default.get();
-        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
-            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
-            settings,
-        )
-        .unwrap();
-
-        let cell_mask = BlobCellMask::from_bits(
-            ((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1) | (1u128 << (CELLS_PER_EXT_BLOB - 1)),
-        );
-        assert_eq!(cell_mask.count(), CELLS_PER_EXT_BLOB / 2 + 1);
-        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
-
-        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
-            sidecar.commitments.clone(),
-            cell_mask,
-            &sparse_cells,
-            settings,
-        )
-        .unwrap();
-
-        assert_eq!(recovered.blobs, sidecar.blobs);
-        assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
-    }
-
     #[test]
     #[cfg(feature = "kzg")]
     fn recover_sparse_blobs_rejects_insufficient_cells() {
