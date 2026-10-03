@@ -485,21 +485,24 @@ impl<N: Network> Stream for WatchBlocksFromStream<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{super::watch_logs_test_utils::AlwaysRetryPolicy, *};
     use crate::{Provider, ProviderBuilder};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types_eth::Block;
-    use alloy_transport::{
-        layers::{RetryBackoffLayer, RetryPolicy},
-        mock::MockTransport,
-    };
-    use futures::StreamExt;
+    use alloy_transport::{layers::RetryBackoffLayer, mock::MockTransport};
+    use futures::{Stream, StreamExt};
     use tokio::time::timeout;
 
     fn block(number: u64) -> Block {
         let mut block: Block = Block::default();
         block.header.inner.number = number;
         block
+    }
+
+    async fn next_block(
+        stream: &mut (impl Stream<Item = TransportResult<Block>> + Unpin),
+    ) -> Block {
+        timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap()
     }
 
     #[tokio::test]
@@ -519,15 +522,11 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
+        assert_eq!(next_block(&mut stream).await.header.number, 2);
 
-        let third = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(third.header.number, 3);
+        assert_eq!(next_block(&mut stream).await.header.number, 3);
     }
 
     #[tokio::test]
@@ -550,9 +549,7 @@ mod tests {
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         assert!(first.is_err());
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
+        assert_eq!(next_block(&mut stream).await.header.number, 2);
     }
 
     #[tokio::test]
@@ -574,12 +571,9 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
+        assert_eq!(next_block(&mut stream).await.header.number, 2);
     }
 
     #[tokio::test]
@@ -601,26 +595,11 @@ mod tests {
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         assert!(first.is_err());
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
     }
 
     #[tokio::test]
     async fn uses_provider_retry_layer() {
-        #[derive(Clone, Debug)]
-        struct AlwaysRetryPolicy;
-
-        impl RetryPolicy for AlwaysRetryPolicy {
-            fn should_retry(&self, _error: &alloy_transport::TransportError) -> bool {
-                true
-            }
-
-            fn backoff_hint(&self, _error: &alloy_transport::TransportError) -> Option<Duration> {
-                None
-            }
-        }
-
         let asserter = alloy_transport::mock::Asserter::new();
         let retry_layer = RetryBackoffLayer::new_with_policy(3, 0, 10_000, AlwaysRetryPolicy);
         let client = RpcClient::builder()
@@ -640,8 +619,7 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
     }
 
     #[tokio::test]
@@ -660,8 +638,7 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
     }
 
     #[tokio::test]
@@ -678,8 +655,7 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 5);
+        assert_eq!(next_block(&mut stream).await.header.number, 5);
     }
 
     #[tokio::test]
@@ -696,8 +672,7 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 0);
+        assert_eq!(next_block(&mut stream).await.header.number, 0);
     }
 
     #[tokio::test]
@@ -768,11 +743,8 @@ mod tests {
             .into_stream()
             .buffered(2);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
+        assert_eq!(next_block(&mut stream).await.header.number, 2);
     }
 }
