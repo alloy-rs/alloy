@@ -1171,7 +1171,7 @@ impl From<TxLegacy> for TransactionRequest {
         let ty = tx.ty();
         let TxLegacy { chain_id, nonce, gas_price, gas_limit, to, value, input } = tx;
         Self {
-            to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
+            to: Some(to),
             gas_price: Some(gas_price),
             gas: Some(gas_limit),
             value: Some(value),
@@ -1189,7 +1189,7 @@ impl From<TxEip2930> for TransactionRequest {
         let ty = tx.ty();
         let TxEip2930 { chain_id, nonce, gas_price, gas_limit, to, value, access_list, input } = tx;
         Self {
-            to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
+            to: Some(to),
             gas_price: Some(gas_price),
             gas: Some(gas_limit),
             value: Some(value),
@@ -1218,7 +1218,7 @@ impl From<TxEip1559> for TransactionRequest {
             input,
         } = tx;
         Self {
-            to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
+            to: Some(to),
             max_fee_per_gas: Some(max_fee_per_gas),
             max_priority_fee_per_gas: Some(max_priority_fee_per_gas),
             gas: Some(gas_limit),
@@ -2367,5 +2367,60 @@ mod tests {
         let hashes = tx_request.blob_versioned_hashes.unwrap();
         assert_eq!(hashes.len(), 1);
         assert_eq!(hashes[0], expected_hash);
+    }
+}
+
+#[cfg(test)]
+mod create_conversion_tests {
+    use super::*;
+
+    const INIT_CODE: Bytes = Bytes::from_static(&[0x60, 0x80, 0x60, 0x40]);
+
+    #[test]
+    fn legacy_create_roundtrips_through_request() {
+        let tx = TxLegacy {
+            chain_id: Some(1),
+            nonce: 1,
+            gas_price: 10,
+            gas_limit: 100_000,
+            to: TxKind::Create,
+            value: U256::from(1),
+            input: INIT_CODE,
+        };
+        let request: TransactionRequest = tx.clone().into();
+        assert_eq!(request.build_legacy().unwrap(), tx);
+    }
+
+    #[test]
+    fn eip2930_create_roundtrips_through_request() {
+        let tx = TxEip2930 {
+            chain_id: 1,
+            nonce: 1,
+            gas_price: 10,
+            gas_limit: 100_000,
+            to: TxKind::Create,
+            value: U256::from(1),
+            access_list: AccessList::default(),
+            input: INIT_CODE,
+        };
+        let request: TransactionRequest = tx.clone().into();
+        assert_eq!(request.build_2930().unwrap(), tx);
+    }
+
+    #[test]
+    fn eip1559_create_roundtrips_through_request() {
+        let tx = TxEip1559 {
+            chain_id: 1,
+            nonce: 1,
+            gas_limit: 100_000,
+            max_fee_per_gas: 10,
+            max_priority_fee_per_gas: 1,
+            to: TxKind::Create,
+            value: U256::from(1),
+            access_list: AccessList::default(),
+            input: INIT_CODE,
+        };
+        let request: TransactionRequest = tx.clone().into();
+        assert_eq!(request.build_1559().unwrap(), tx);
     }
 }
