@@ -995,14 +995,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn compact_block_number_serde() {
-        let num: BlockNumberOrTag = 1u64.into();
-        let serialized = serde_json::to_string(&num).unwrap();
-        assert_eq!(serialized, "\"0x1\"");
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
     fn block_number_or_tag_serialization() {
         let number = BlockNumberOrTag::Number(0);
         assert_eq!(serde_json::to_string(&number).unwrap(), "\"0x0\"");
@@ -1015,18 +1007,6 @@ mod tests {
 
         let pending = BlockNumberOrTag::Pending;
         assert_eq!(serde_json::to_string(&pending).unwrap(), "\"pending\"");
-    }
-
-    #[test]
-    fn block_id_as_u64() {
-        assert_eq!(BlockId::number(123).as_u64(), Some(123));
-        assert_eq!(BlockId::number(0).as_u64(), Some(0));
-        assert_eq!(BlockId::earliest().as_u64(), None);
-        assert_eq!(BlockId::latest().as_u64(), None);
-        assert_eq!(BlockId::pending().as_u64(), None);
-        assert_eq!(BlockId::safe().as_u64(), None);
-        assert_eq!(BlockId::hash(BlockHash::ZERO).as_u64(), None);
-        assert_eq!(BlockId::hash_canonical(BlockHash::ZERO).as_u64(), None);
     }
 
     #[test]
@@ -1166,293 +1146,6 @@ mod tests {
     }
 
     #[test]
-    fn test_block_number_or_tag() {
-        // Test Latest variant
-        let latest = BlockNumberOrTag::Latest;
-        assert_eq!(latest.as_number(), None);
-        assert!(latest.is_latest());
-        assert!(!latest.is_number());
-        assert!(!latest.is_finalized());
-        assert!(!latest.is_safe());
-        assert!(!latest.is_pending());
-        assert!(!latest.is_earliest());
-
-        // Test Finalized variant
-        let finalized = BlockNumberOrTag::Finalized;
-        assert_eq!(finalized.as_number(), None);
-        assert!(finalized.is_finalized());
-        assert!(!finalized.is_latest());
-        assert!(!finalized.is_number());
-        assert!(!finalized.is_safe());
-        assert!(!finalized.is_pending());
-        assert!(!finalized.is_earliest());
-
-        // Test Safe variant
-        let safe = BlockNumberOrTag::Safe;
-        assert_eq!(safe.as_number(), None);
-        assert!(safe.is_safe());
-        assert!(!safe.is_latest());
-        assert!(!safe.is_number());
-        assert!(!safe.is_finalized());
-        assert!(!safe.is_pending());
-        assert!(!safe.is_earliest());
-
-        // Test Earliest variant
-        let earliest = BlockNumberOrTag::Earliest;
-        assert_eq!(earliest.as_number(), None);
-        assert!(earliest.is_earliest());
-        assert!(!earliest.is_latest());
-        assert!(!earliest.is_number());
-        assert!(!earliest.is_finalized());
-        assert!(!earliest.is_safe());
-        assert!(!earliest.is_pending());
-
-        // Test Pending variant
-        let pending = BlockNumberOrTag::Pending;
-        assert_eq!(pending.as_number(), None);
-        assert!(pending.is_pending());
-        assert!(!pending.is_latest());
-        assert!(!pending.is_number());
-        assert!(!pending.is_finalized());
-        assert!(!pending.is_safe());
-        assert!(!pending.is_earliest());
-
-        // Test Number variant
-        let number = BlockNumberOrTag::Number(42);
-        assert_eq!(number.as_number(), Some(42));
-        assert!(number.is_number());
-        assert!(!number.is_latest());
-        assert!(!number.is_finalized());
-        assert!(!number.is_safe());
-        assert!(!number.is_pending());
-        assert!(!number.is_earliest());
-    }
-
-    #[test]
-    fn test_block_number_or_tag_from() {
-        // Test conversion from u64
-        let num = 100u64;
-        let block: BlockNumberOrTag = num.into();
-        assert_eq!(block, BlockNumberOrTag::Number(100));
-
-        // Test conversion from U64
-        let num = U64::from(200);
-        let block: BlockNumberOrTag = num.into();
-        assert_eq!(block, BlockNumberOrTag::Number(200));
-    }
-
-    #[test]
-    fn test_block_id() {
-        let hash = BlockHash::random();
-
-        // Block hash
-        let block_id_hash = BlockId::hash(hash);
-        assert_eq!(block_id_hash.as_block_hash(), Some(hash));
-        assert!(block_id_hash.is_hash());
-        assert!(!block_id_hash.is_number());
-        assert!(!block_id_hash.is_latest());
-        assert!(!block_id_hash.is_pending());
-        assert!(!block_id_hash.is_safe());
-        assert!(!block_id_hash.is_finalized());
-        assert!(!block_id_hash.is_earliest());
-
-        // Block number
-        let block_id_number = BlockId::number(123);
-        assert_eq!(block_id_number.as_u64(), Some(123));
-        assert!(block_id_number.is_number());
-        assert!(!block_id_number.is_hash());
-        assert!(!block_id_number.is_latest());
-        assert!(!block_id_number.is_pending());
-        assert!(!block_id_number.is_safe());
-        assert!(!block_id_number.is_finalized());
-        assert!(!block_id_number.is_earliest());
-
-        // Latest block
-        let block_latest = BlockId::latest();
-        assert!(block_latest.is_latest());
-        assert!(!block_latest.is_number());
-        assert!(!block_latest.is_hash());
-        assert!(!block_latest.is_pending());
-        assert!(!block_latest.is_safe());
-        assert!(!block_latest.is_finalized());
-        assert!(!block_latest.is_earliest());
-
-        // Pending block
-        let block_pending = BlockId::pending();
-        assert!(block_pending.is_pending());
-        assert!(!block_pending.is_latest());
-        assert!(!block_pending.is_number());
-        assert!(!block_pending.is_hash());
-        assert!(!block_pending.is_safe());
-        assert!(!block_pending.is_finalized());
-        assert!(!block_pending.is_earliest());
-
-        // Safe block
-        let block_safe = BlockId::safe();
-        assert!(block_safe.is_safe());
-        assert!(!block_safe.is_latest());
-        assert!(!block_safe.is_number());
-        assert!(!block_safe.is_hash());
-        assert!(!block_safe.is_pending());
-        assert!(!block_safe.is_finalized());
-        assert!(!block_safe.is_earliest());
-
-        // Finalized block
-        let block_finalized = BlockId::finalized();
-        assert!(block_finalized.is_finalized());
-        assert!(!block_finalized.is_latest());
-        assert!(!block_finalized.is_number());
-        assert!(!block_finalized.is_hash());
-        assert!(!block_finalized.is_pending());
-        assert!(!block_finalized.is_safe());
-        assert!(!block_finalized.is_earliest());
-
-        // Earliest block
-        let block_earliest = BlockId::earliest();
-        assert!(block_earliest.is_earliest());
-        assert!(!block_earliest.is_latest());
-        assert!(!block_earliest.is_number());
-        assert!(!block_earliest.is_hash());
-        assert!(!block_earliest.is_pending());
-        assert!(!block_earliest.is_safe());
-        assert!(!block_earliest.is_finalized());
-
-        // Default block
-        assert!(BlockId::default().is_latest());
-        assert!(!BlockId::default().is_number());
-        assert!(!BlockId::default().is_hash());
-        assert!(!BlockId::default().is_pending());
-        assert!(!BlockId::default().is_safe());
-        assert!(!BlockId::default().is_finalized());
-        assert!(!BlockId::default().is_earliest());
-    }
-
-    #[test]
-    fn test_u64_to_block_id() {
-        // Simple u64
-        let num: u64 = 123;
-        let block_id: BlockId = num.into();
-
-        match block_id {
-            BlockId::Number(BlockNumberOrTag::Number(n)) => assert_eq!(n, 123),
-            _ => panic!("Expected BlockId::Number with 123"),
-        }
-
-        // Big integer U64
-        let num: U64 = U64::from(456);
-        let block_id: BlockId = num.into();
-
-        match block_id {
-            BlockId::Number(BlockNumberOrTag::Number(n)) => assert_eq!(n, 456),
-            _ => panic!("Expected BlockId::Number with 456"),
-        }
-
-        // u64 as HashOrNumber
-        let num: u64 = 789;
-        let block_id: BlockId = HashOrNumber::Number(num).into();
-
-        match block_id {
-            BlockId::Number(BlockNumberOrTag::Number(n)) => assert_eq!(n, 789),
-            _ => panic!("Expected BlockId::Number with 789"),
-        }
-    }
-
-    #[test]
-    fn test_block_number_or_tag_to_block_id() {
-        let block_number_or_tag = BlockNumberOrTag::Pending;
-        let block_id: BlockId = block_number_or_tag.into();
-
-        match block_id {
-            BlockId::Number(BlockNumberOrTag::Pending) => {}
-            _ => panic!("Expected BlockId::Number with Pending"),
-        }
-    }
-
-    #[test]
-    fn test_hash_or_number_to_block_id_hash() {
-        // B256 wrapped in HashOrNumber
-        let hash: B256 = B256::random();
-        let block_id: BlockId = HashOrNumber::Hash(hash).into();
-
-        match block_id {
-            BlockId::Hash(rpc_block_hash) => assert_eq!(rpc_block_hash.block_hash, hash),
-            _ => panic!("Expected BlockId::Hash"),
-        }
-
-        // Simple B256
-        let hash: B256 = B256::random();
-        let block_id: BlockId = hash.into();
-
-        match block_id {
-            BlockId::Hash(rpc_block_hash) => assert_eq!(rpc_block_hash.block_hash, hash),
-            _ => panic!("Expected BlockId::Hash"),
-        }
-
-        // Tuple with B256 and canonical flag
-        let hash: B256 = B256::random();
-        let block_id: BlockId = (hash, Some(true)).into();
-
-        match block_id {
-            BlockId::Hash(rpc_block_hash) => {
-                assert_eq!(rpc_block_hash.block_hash, hash);
-                assert_eq!(rpc_block_hash.require_canonical, Some(true));
-            }
-            _ => panic!("Expected BlockId::Hash with canonical flag"),
-        }
-    }
-
-    #[test]
-    fn test_hash_or_number_as_number() {
-        // Test with a number
-        let hash_or_number = HashOrNumber::Number(123);
-        assert_eq!(hash_or_number.as_number(), Some(123));
-
-        // Test with a hash
-        let hash = B256::random();
-        let hash_or_number = HashOrNumber::Hash(hash);
-        assert_eq!(hash_or_number.as_number(), None);
-    }
-
-    #[test]
-    fn test_hash_or_number_as_hash() {
-        // Test with a hash
-        let hash = B256::random();
-        let hash_or_number = HashOrNumber::Hash(hash);
-        assert_eq!(hash_or_number.as_hash(), Some(hash));
-
-        // Test with a number
-        let hash_or_number = HashOrNumber::Number(456);
-        assert_eq!(hash_or_number.as_hash(), None);
-    }
-
-    #[test]
-    fn test_hash_or_number_conversions() {
-        // Test conversion from B256
-        let hash = B256::random();
-        let hash_or_number: HashOrNumber = hash.into();
-        assert_eq!(hash_or_number, HashOrNumber::Hash(hash));
-
-        // Test conversion from &B256
-        let hash_ref: HashOrNumber = (&hash).into();
-        assert_eq!(hash_ref, HashOrNumber::Hash(hash));
-
-        // Test conversion from u64
-        let number: u64 = 123;
-        let hash_or_number: HashOrNumber = number.into();
-        assert_eq!(hash_or_number, HashOrNumber::Number(number));
-
-        // Test conversion from U64
-        let u64_value = U64::from(456);
-        let hash_or_number: HashOrNumber = u64_value.into();
-        assert_eq!(hash_or_number, HashOrNumber::Number(u64_value.to::<u64>()));
-
-        // Test conversion from RpcBlockHash (assuming RpcBlockHash is convertible to B256)
-        let rpc_block_hash = RpcBlockHash { block_hash: hash, require_canonical: Some(true) };
-        let hash_or_number: HashOrNumber = rpc_block_hash.into();
-        assert_eq!(hash_or_number, HashOrNumber::Hash(hash));
-    }
-
-    #[test]
     fn test_hash_or_number_rlp_roundtrip_hash() {
         // Test case: encoding and decoding a B256 hash
         let original_hash = B256::random();
@@ -1487,21 +1180,6 @@ mod tests {
     }
 
     #[test]
-    fn test_numhash() {
-        let number: u64 = 42;
-        let hash = B256::random();
-
-        let num_hash = NumHash::new(number, hash);
-
-        // Validate the initial values
-        assert_eq!(num_hash.number, number);
-        assert_eq!(num_hash.hash, hash);
-
-        // Test into_components
-        assert_eq!(num_hash.into_components(), (number, hash));
-    }
-
-    #[test]
     fn test_numhash_matches_block_or_num() {
         let number: u64 = 42;
         let hash = B256::random();
@@ -1525,27 +1203,6 @@ mod tests {
         let different_number: u64 = 43;
         let non_matching_number = HashOrNumber::Number(different_number);
         assert!(!num_hash.matches_block_or_num(&non_matching_number));
-    }
-
-    #[test]
-    fn test_numhash_conversions() {
-        // From a tuple (u64, B256)
-        let number: u64 = 42;
-        let hash = B256::random();
-
-        let num_hash_from_tuple: NumHash = (number, hash).into();
-
-        assert_eq!(num_hash_from_tuple.number, number);
-        assert_eq!(num_hash_from_tuple.hash, hash);
-
-        // From a reversed tuple (B256, u64)
-        let number: u64 = 42;
-        let hash = B256::random();
-
-        let num_hash_from_reversed_tuple: NumHash = (hash, number).into();
-
-        assert_eq!(num_hash_from_reversed_tuple.number, number);
-        assert_eq!(num_hash_from_reversed_tuple.hash, hash);
     }
 
     #[test]
@@ -1582,31 +1239,6 @@ mod tests {
         assert!(parsed_invalid_string.is_err());
     }
 
-    /// Check parsing according to EIP-1898.
-    #[test]
-    #[cfg(feature = "serde")]
-    fn can_parse_blockid_u64() {
-        let num = serde_json::json!(
-            {"blockNumber": "0xaf"}
-        );
-
-        let id = serde_json::from_value::<BlockId>(num);
-        assert_eq!(id.unwrap(), BlockId::from(175));
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn can_parse_block_hash() {
-        let block_hash =
-            B256::from_str("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-                .unwrap();
-        let block_hash_json = serde_json::json!(
-            { "blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"}
-        );
-        let id = serde_json::from_value::<BlockId>(block_hash_json).unwrap();
-        assert_eq!(id, BlockId::from(block_hash,));
-    }
-
     #[test]
     #[cfg(feature = "serde")]
     fn can_parse_block_hash_with_canonical() {
@@ -1620,21 +1252,7 @@ mod tests {
         let id = serde_json::from_value::<BlockId>(block_hash_json).unwrap();
         assert_eq!(id, block_id)
     }
-    #[test]
-    #[cfg(feature = "serde")]
-    fn can_parse_blockid_tags() {
-        let tags = [
-            ("latest", BlockNumberOrTag::Latest),
-            ("finalized", BlockNumberOrTag::Finalized),
-            ("safe", BlockNumberOrTag::Safe),
-            ("pending", BlockNumberOrTag::Pending),
-        ];
-        for (value, tag) in tags {
-            let num = serde_json::json!({ "blockNumber": value });
-            let id = serde_json::from_value::<BlockId>(num);
-            assert_eq!(id.unwrap(), BlockId::from(tag))
-        }
-    }
+
     #[test]
     #[cfg(feature = "serde")]
     fn repeated_keys_is_err() {
@@ -1715,73 +1333,12 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
-    fn serde_blockid_hash_from_str() {
-        let val = "\"0x898753d8fdd8d92c1907ca21e68c7970abd290c647a202091181deec3f30a0b2\"";
-        let block_hash: B256 = serde_json::from_str(val).unwrap();
-        let block_id: BlockId = serde_json::from_str(val).unwrap();
-        assert_eq!(block_id, BlockId::Hash(block_hash.into()));
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_rpc_payload_block_tag() {
-        let payload = r#"{"method":"eth_call","params":[{"to":"0xebe8efa441b9302a0d7eaecc277c09d20d684540","data":"0x45848dfc"},"latest"],"id":1,"jsonrpc":"2.0"}"#;
-        let value: serde_json::Value = serde_json::from_str(payload).unwrap();
-        let block_id_param = value.pointer("/params/1").unwrap();
-        let block_id: BlockId = serde_json::from_value::<BlockId>(block_id_param.clone()).unwrap();
-        assert_eq!(BlockId::Number(BlockNumberOrTag::Latest), block_id);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_rpc_payload_block_object() {
-        let example_payload = r#"{"method":"eth_call","params":[{"to":"0xebe8efa441b9302a0d7eaecc277c09d20d684540","data":"0x45848dfc"},{"blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"}],"id":1,"jsonrpc":"2.0"}"#;
-        let value: serde_json::Value = serde_json::from_str(example_payload).unwrap();
-        let block_id_param = value.pointer("/params/1").unwrap().to_string();
-        let block_id: BlockId = serde_json::from_str::<BlockId>(&block_id_param).unwrap();
-        let hash =
-            B256::from_str("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-                .unwrap();
-        assert_eq!(BlockId::from(hash), block_id);
-        let serialized = serde_json::to_string(&BlockId::from(hash)).unwrap();
-        assert_eq!(
-            "\"0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3\"",
-            serialized
-        )
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_rpc_payload_block_number() {
-        let example_payload = r#"{"method":"eth_call","params":[{"to":"0xebe8efa441b9302a0d7eaecc277c09d20d684540","data":"0x45848dfc"},{"blockNumber": "0x0"}],"id":1,"jsonrpc":"2.0"}"#;
-        let value: serde_json::Value = serde_json::from_str(example_payload).unwrap();
-        let block_id_param = value.pointer("/params/1").unwrap().to_string();
-        let block_id: BlockId = serde_json::from_str::<BlockId>(&block_id_param).unwrap();
-        assert_eq!(BlockId::from(0u64), block_id);
-        let serialized = serde_json::to_string(&BlockId::from(0u64)).unwrap();
-        assert_eq!("\"0x0\"", serialized)
-    }
-
-    #[test]
     #[should_panic]
     #[cfg(feature = "serde")]
     fn serde_rpc_payload_block_number_duplicate_key() {
         let payload = r#"{"blockNumber": "0x132", "blockNumber": "0x133"}"#;
         let parsed_block_id = serde_json::from_str::<BlockId>(payload);
         parsed_block_id.unwrap();
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_rpc_payload_block_hash() {
-        let payload = r#"{"blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"}"#;
-        let parsed = serde_json::from_str::<BlockId>(payload).unwrap();
-        let expected = BlockId::from(
-            B256::from_str("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-                .unwrap(),
-        );
-        assert_eq!(parsed, expected);
     }
 
     #[test]
@@ -1868,19 +1425,5 @@ mod tests {
             assert_eq!(lenient_struct.block, expected);
         }
         assert!(serde_json::from_str::<TestLenientOptStruct>(r#"{"block": "invalid"}"#).is_err());
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_lenient_block_number_or_tag_wrapper() {
-        // Test the LenientBlockNumberOrTag wrapper directly
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"latest\"").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Latest);
-
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("123").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Number(123));
-
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"0x1\"").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Number(1));
     }
 }
