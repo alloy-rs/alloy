@@ -93,7 +93,7 @@ alloy-serde.workspace = true
 
 itertools.workspace = true
 reqwest.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 tower.workspace = true
 tower-http = { workspace = true, features = [
     "set-header",

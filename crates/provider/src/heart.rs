@@ -34,6 +34,9 @@ use {
     tokio::time::{interval, sleep_until},
 };
 
+#[cfg(test)]
+mod heartbeat_tests;
+
 /// Errors which may occur when watching a pending transaction.
 #[derive(Debug, thiserror::Error)]
 pub enum PendingTransactionError {
