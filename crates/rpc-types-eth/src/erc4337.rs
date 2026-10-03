@@ -309,6 +309,8 @@ pub struct UserOperationReceipt {
 }
 
 /// Represents the gas estimation for a user operation.
+///
+/// See [ERC-7769](https://eips.ethereum.org/EIPS/eip-7769#eth_estimateuseroperationgas).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -316,9 +318,43 @@ pub struct UserOperationGasEstimation {
     /// The gas limit for the pre-verification.
     pub pre_verification_gas: U256,
     /// The gas limit for the verification.
-    pub verification_gas: U256,
+    pub verification_gas_limit: U256,
     /// The gas limit for the paymaster verification.
-    pub paymaster_verification_gas: U256,
+    ///
+    /// Only returned if the user operation specifies a paymaster.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster_verification_gas_limit: Option<U256>,
     /// The gas limit for the call.
     pub call_gas_limit: U256,
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_operation_gas_estimation_erc7769() {
+        let s = r#"{"preVerificationGas":"0xb0fc","verificationGasLimit":"0x10f2c","paymasterVerificationGasLimit":"0x7a12","callGasLimit":"0x3c9a"}"#;
+        let estimate: UserOperationGasEstimation = serde_json::from_str(s).unwrap();
+        assert_eq!(
+            estimate,
+            UserOperationGasEstimation {
+                pre_verification_gas: U256::from(0xb0fc),
+                verification_gas_limit: U256::from(0x10f2c),
+                paymaster_verification_gas_limit: Some(U256::from(0x7a12)),
+                call_gas_limit: U256::from(0x3c9a),
+            }
+        );
+        assert_eq!(serde_json::to_string(&estimate).unwrap(), s);
+
+        // without a paymaster the field is omitted, Rundler returns `null`
+        let s = r#"{"preVerificationGas":"0xb0fc","verificationGasLimit":"0x10f2c","callGasLimit":"0x3c9a"}"#;
+        let estimate: UserOperationGasEstimation = serde_json::from_str(s).unwrap();
+        assert_eq!(estimate.paymaster_verification_gas_limit, None);
+        assert_eq!(serde_json::to_string(&estimate).unwrap(), s);
+
+        let s = r#"{"preVerificationGas":"0xb0fc","callGasLimit":"0x3c9a","verificationGasLimit":"0x10f2c","paymasterVerificationGasLimit":null}"#;
+        let estimate: UserOperationGasEstimation = serde_json::from_str(s).unwrap();
+        assert_eq!(estimate.paymaster_verification_gas_limit, None);
+    }
 }
