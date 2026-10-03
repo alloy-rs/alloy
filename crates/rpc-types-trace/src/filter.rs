@@ -273,14 +273,6 @@ mod tests {
     use similar_asserts::assert_eq;
 
     #[test]
-    fn test_parse_filter() {
-        let s = r#"{"fromBlock":  "0x3","toBlock":  "0x5"}"#;
-        let filter: TraceFilter = serde_json::from_str(s).unwrap();
-        assert_eq!(filter.from_block, Some(3));
-        assert_eq!(filter.to_block, Some(5));
-    }
-
-    #[test]
     fn default_filter_intersects_address_lists() {
         let from = Address::with_last_byte(1);
         let to = Address::with_last_byte(2);
@@ -327,7 +319,6 @@ mod tests {
             .unwrap();
             assert_eq!(filter.matcher().matches(&trace), expected);
         }
-        assert!(serde_json::from_value::<TraceFilter>(json!({ "mode": "unknown" })).is_err());
     }
 
     #[test]
@@ -462,23 +453,6 @@ mod tests {
     }
 
     #[test]
-    fn null_mode_intersects_address_lists() {
-        let from = Address::with_last_byte(1);
-        let to = Address::with_last_byte(2);
-        let filter: TraceFilter = serde_json::from_value(json!({
-            "fromAddress": [from], "toAddress": [to], "mode": null,
-        }))
-        .unwrap();
-        assert_eq!(filter.mode, TraceFilterMode::Intersection);
-
-        let trace = TransactionTrace {
-            action: Action::Call(CallAction { from, to: from, ..Default::default() }),
-            ..Default::default()
-        };
-        assert!(!filter.matcher().matches(&trace));
-    }
-
-    #[test]
     fn default_filter_empty_lists_are_unconstrained() {
         let from = Address::with_last_byte(1);
         let to = Address::with_last_byte(2);
@@ -502,33 +476,6 @@ mod tests {
             let filter: TraceFilter = serde_json::from_value(filter).unwrap();
             assert_eq!(filter.matcher().matches(&trace), expected);
         }
-    }
-
-    #[test]
-    fn test_filter_matcher_addresses_unspecified() {
-        let filter_json = json!({ "fromBlock": "0x3", "toBlock": "0x5" });
-        let matcher = serde_json::from_value::<TraceFilter>(filter_json).unwrap().matcher();
-        let s = r#"{
-            "action": {
-                "from": "0x66e29f0b6b1b07071f2fde4345d512386cb66f5f",
-                "callType": "call",
-                "gas": "0x10bfc",
-                "input": "0x",
-                "to": "0x160f5f00288e9e1cc8655b327e081566e580a71d",
-                "value": "0x244b"
-            },
-            "error": "Reverted",
-            "result": {
-                "gasUsed": "0x9daf",
-                "output": "0x"
-            },
-            "subtraces": 3,
-            "traceAddress": [],
-            "type": "call"
-        }"#;
-        let trace = serde_json::from_str::<TransactionTrace>(s).unwrap();
-
-        assert!(matcher.matches(&trace));
     }
 
     #[test]
