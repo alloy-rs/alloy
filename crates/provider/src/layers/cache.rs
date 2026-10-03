@@ -1,6 +1,4 @@
-use crate::{
-    utils, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
-};
+use crate::{utils, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcSend};
 use alloy_network::Network;
@@ -16,7 +14,9 @@ use alloy_transport::{TransportErrorKind, TransportResult};
 use lru::LruCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::{io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc};
+use std::{
+    future::IntoFuture, io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc,
+};
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
 /// The cache is an in-memory LRU with a fixed maximum item count. Block-sensitive methods are
@@ -96,59 +96,33 @@ where
     }
 }
 
-/// Uses underlying transport client to fetch data from the RPC.
-///
-/// This is specific to RPC requests that require the `block_id` parameter.
-///
-/// Fetches from the RPC and saves the response to the cache.
-///
-/// Returns a ProviderCall::BoxedFuture
-macro_rules! rpc_call_with_block {
-    ($cache:expr, $client:expr, $req:expr) => {{
-        let client =
-            $client.upgrade().ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"));
-        let cache = $cache.clone();
-        ProviderCall::BoxedFuture(Box::pin(async move {
-            let client = client?;
-
-            let result = client.request($req.method(), $req.params()).map_params(|params| {
-                ParamsWithBlock::new(params, $req.block_id.unwrap_or(BlockId::latest()))
-            });
-
-            let res = result.await?;
-            // Insert into cache only for deterministic block identifiers. Caching tag-based or
-            // requireCanonical queries can lead to stale data.
-            if $req.should_cache() {
-                let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
-                let hash = $req.params_hash()?;
-                let _ = cache.put(hash, json_str);
-            }
-
-            Ok(res)
-        }))
-    }};
-}
-
 /// Attempts to fetch the response from the cache by using the hash of the request params.
 ///
-/// Fetches from the RPC in case of a cache miss
+/// Uses the inner provider's call on a cache miss, preserving its overrides.
 ///
 /// This helps overriding [`Provider`] methods that return `RpcWithBlock`.
 macro_rules! cache_rpc_call_with_block {
-    ($cache:expr, $client:expr, $req:expr) => {{
+    ($cache:expr, $call:expr, $req:expr) => {{
         if !$req.should_cache() {
-            return rpc_call_with_block!($cache, $client, $req);
+            return $call.into_future();
         }
 
         let hash = $req.params_hash().ok();
 
         if let Some(hash) = hash {
             if let Ok(Some(cached)) = $cache.get_deserialized(&hash) {
-                return ProviderCall::BoxedFuture(Box::pin(async move { Ok(cached) }));
+                return ProviderCall::ready(Ok(cached));
             }
         }
 
-        rpc_call_with_block!($cache, $client, $req)
+        let cache = $cache;
+        ProviderCall::BoxedFuture(Box::pin(async move {
+            let result = $call.await?;
+            let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
+            let hash = $req.params_hash()?;
+            let _ = cache.put(hash, json_str);
+            Ok(result)
+        }))
     }};
 }
 
@@ -182,15 +156,11 @@ where
             }
         }
 
-        let client = self.inner.weak_client();
+        let call = self.inner.get_block_receipts(block);
         let cache = self.cache.clone();
 
         ProviderCall::BoxedFuture(Box::pin(async move {
-            let client = client
-                .upgrade()
-                .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
-
-            let result = client.request(req.method(), req.params()).await?;
+            let result = call.await?;
 
             if should_cache {
                 if let Some(ref receipts) = result {
@@ -206,20 +176,18 @@ where
     }
 
     fn get_balance(&self, address: Address) -> RpcWithBlock<Address, U256> {
-        let client = self.inner.weak_client();
         let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
+        self.inner.get_balance(address).map_call(move |block_id, call| {
             let req = RequestType::new("eth_getBalance", address).with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
+            cache_rpc_call_with_block!(cache, call, req)
         })
     }
 
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
-        let client = self.inner.weak_client();
         let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
+        self.inner.get_code_at(address).map_call(move |block_id, call| {
             let req = RequestType::new("eth_getCode", address).with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
+            cache_rpc_call_with_block!(cache, call, req)
         })
     }
 
@@ -264,12 +232,10 @@ where
         address: Address,
         keys: Vec<StorageKey>,
     ) -> RpcWithBlock<(Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
-        let client = self.inner.weak_client();
         let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
-            let req =
-                RequestType::new("eth_getProof", (address, keys.clone())).with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
+        self.inner.get_proof(address, keys.clone()).map_call(move |block_id, call| {
+            let req = RequestType::new("eth_getProof", (address, keys)).with_block_id(block_id);
+            cache_rpc_call_with_block!(cache, call, req)
         })
     }
 
@@ -278,11 +244,10 @@ where
         address: Address,
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
-        let client = self.inner.weak_client();
         let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
+        self.inner.get_storage_at(address, key).map_call(move |block_id, call| {
             let req = RequestType::new("eth_getStorageAt", (address, key)).with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
+            cache_rpc_call_with_block!(cache, call, req)
         })
     }
 
@@ -290,12 +255,10 @@ where
         &self,
         requests: StorageValuesRequest,
     ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
-        let client = self.inner.weak_client();
         let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
-            let req = RequestType::new("eth_getStorageValues", (requests.clone(),))
-                .with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
+        self.inner.get_storage_values(requests.clone()).map_call(move |block_id, call| {
+            let req = RequestType::new("eth_getStorageValues", (requests,)).with_block_id(block_id);
+            cache_rpc_call_with_block!(cache, call, req)
         })
     }
 
@@ -312,14 +275,10 @@ where
                 return ProviderCall::BoxedFuture(Box::pin(async move { Ok(cached) }));
             }
         }
-        let client = self.inner.weak_client();
+        let call = self.inner.get_transaction_by_hash(hash);
         let cache = self.cache.clone();
         ProviderCall::BoxedFuture(Box::pin(async move {
-            let client = client
-                .upgrade()
-                .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
-            let result: Option<N::TransactionResponse> =
-                client.request(req.method(), req.params()).await?;
+            let result = call.await?;
 
             if let Some(ref tx) = result {
                 // Pending transactions can transition to an included state with additional fields
@@ -346,14 +305,10 @@ where
             }
         }
 
-        let client = self.inner.weak_client();
+        let call = self.inner.get_raw_transaction_by_hash(hash);
         let cache = self.cache.clone();
         ProviderCall::BoxedFuture(Box::pin(async move {
-            let client = client
-                .upgrade()
-                .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
-
-            let result = client.request(req.method(), req.params()).await?;
+            let result = call.await?;
 
             if let Some(ref tx) = result {
                 let json_str = serde_json::to_string(tx).map_err(TransportErrorKind::custom)?;
@@ -379,14 +334,10 @@ where
             }
         }
 
-        let client = self.inner.weak_client();
+        let call = self.inner.get_transaction_receipt(hash);
         let cache = self.cache.clone();
         ProviderCall::BoxedFuture(Box::pin(async move {
-            let client = client
-                .upgrade()
-                .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
-
-            let result = client.request(req.method(), req.params()).await?;
+            let result = call.await?;
 
             if let Some(ref receipt) = result {
                 let json_str =
@@ -403,46 +354,31 @@ where
         &self,
         address: Address,
     ) -> RpcWithBlock<Address, U64, u64, fn(U64) -> u64> {
-        let client = self.inner.weak_client();
         let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
+        self.inner.get_transaction_count(address).map_call(move |block_id, call| {
             let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
 
-            let should_cache = req.should_cache();
+            if !req.should_cache() {
+                return call.into_future();
+            }
 
-            if should_cache {
-                let params_hash = req.params_hash().ok();
+            let params_hash = req.params_hash().ok();
 
-                if let Some(hash) = params_hash {
-                    if let Ok(Some(cached)) = cache.get_deserialized::<U64>(&hash) {
-                        return ProviderCall::BoxedFuture(Box::pin(async move {
-                            Ok(utils::convert_u64(cached))
-                        }));
-                    }
+            if let Some(hash) = params_hash {
+                if let Ok(Some(cached)) = cache.get_deserialized::<U64>(&hash) {
+                    return ProviderCall::ready(Ok(utils::convert_u64(cached)));
                 }
             }
 
-            let client = client.clone();
-            let cache = cache.clone();
-
             ProviderCall::BoxedFuture(Box::pin(async move {
-                let client = client
-                    .upgrade()
-                    .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
+                let result = call.await?;
 
-                let result: U64 = client
-                    .request(req.method(), req.params())
-                    .map_params(|params| ParamsWithBlock::new(params, block_id))
-                    .await?;
+                let json_str = serde_json::to_string(&U64::from(result))
+                    .map_err(TransportErrorKind::custom)?;
+                let hash = req.params_hash()?;
+                let _ = cache.put(hash, json_str);
 
-                if should_cache {
-                    let json_str =
-                        serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
-                    let hash = req.params_hash()?;
-                    let _ = cache.put(hash, json_str);
-                }
-
-                Ok(utils::convert_u64(result))
+                Ok(result)
             }))
         })
     }
@@ -613,6 +549,167 @@ mod tests {
     use alloy_transport::mock::Asserter;
 
     #[tokio::test]
+    async fn preserves_inner_balance_override() {
+        struct BalanceProvider(RootProvider, Arc<std::sync::atomic::AtomicUsize>);
+
+        impl Provider for BalanceProvider {
+            fn root(&self) -> &RootProvider {
+                &self.0
+            }
+
+            fn get_balance(&self, _address: Address) -> RpcWithBlock<Address, U256> {
+                let calls = self.1.clone();
+                RpcWithBlock::new_provider(move |_| {
+                    calls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    ProviderCall::ready(Ok(U256::from(42)))
+                })
+            }
+        }
+
+        let asserter = Asserter::new();
+        asserter.push_success(&U256::from(7));
+        let root = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .connect_mocked_client(asserter.clone());
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let provider =
+            CacheProvider::new(BalanceProvider(root, calls.clone()), SharedCache::new(10));
+
+        assert_eq!(provider.get_balance(Address::ZERO).await.unwrap(), U256::from(42));
+        for _ in 0..2 {
+            assert_eq!(
+                provider.get_balance(Address::ZERO).number(42).await.unwrap(),
+                U256::from(42)
+            );
+        }
+        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed), 2);
+        assert_eq!(asserter.read_q().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn preserves_inner_default_block_and_explicit_overrides() {
+        let cache_layer = CacheLayer::new(10);
+        let cache = cache_layer.cache();
+        let asserter = Asserter::new();
+        let blocks = Arc::new(RwLock::new(Vec::new()));
+        let transport = tower::ServiceBuilder::new()
+            .map_request({
+                let blocks = blocks.clone();
+                move |request: alloy_json_rpc::RequestPacket| {
+                    let params = request.as_single().unwrap().params().unwrap();
+                    let (_, block): (Address, BlockId) =
+                        serde_json::from_str(params.get()).unwrap();
+                    blocks.write().push(block);
+                    request
+                }
+            })
+            .service(alloy_transport::mock::MockTransport::new(asserter.clone()));
+        let root = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .connect_client(alloy_rpc_client::RpcClient::new(transport, true));
+        let inner = crate::layers::BlockIdProvider::new(root, BlockId::number(42));
+        let provider = cache_layer.layer(inner);
+        let address = Address::ZERO;
+        let default_key = RequestType::new("eth_getBalance", address)
+            .with_block_id(BlockId::number(42))
+            .params_hash()
+            .unwrap();
+
+        asserter.push_success(&U256::from(3));
+        assert_eq!(provider.get_balance(address).await.unwrap(), U256::from(3));
+        assert_eq!(cache.get_deserialized::<U256>(&default_key).unwrap(), Some(U256::from(3)));
+        assert_eq!(provider.get_balance(address).await.unwrap(), U256::from(3));
+
+        asserter.push_success(&U256::from(4));
+        assert_eq!(provider.get_balance(address).number(43).await.unwrap(), U256::from(4));
+        assert_eq!(provider.get_balance(address).number(43).await.unwrap(), U256::from(4));
+
+        for balance in [5, 6] {
+            asserter.push_success(&U256::from(balance));
+            assert_eq!(provider.get_balance(address).latest().await.unwrap(), U256::from(balance));
+        }
+        assert!(asserter.read_q().is_empty());
+        assert_eq!(
+            *blocks.read(),
+            [BlockId::number(42), BlockId::number(43), BlockId::latest(), BlockId::latest()]
+        );
+    }
+
+    #[tokio::test]
+    async fn preserves_inner_nonce_default_block_and_cached_quantity() {
+        let cache_layer = CacheLayer::new(10);
+        let cache = cache_layer.cache();
+        let asserter = Asserter::new();
+        let root = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .connect_mocked_client(asserter.clone());
+        let inner = crate::layers::BlockIdProvider::new(root, BlockId::number(42));
+        let provider = cache_layer.layer(inner);
+        let address = Address::ZERO;
+        let key = RequestType::new("eth_getTransactionCount", address)
+            .with_block_id(BlockId::number(42))
+            .params_hash()
+            .unwrap();
+
+        asserter.push_success(&U64::from(7));
+        assert_eq!(provider.get_transaction_count(address).await.unwrap(), 7);
+        assert_eq!(cache.get(&key).as_deref(), Some("\"0x7\""));
+        assert_eq!(provider.get_transaction_count(address).await.unwrap(), 7);
+
+        asserter.push_success(&U64::from(8));
+        assert_eq!(provider.get_transaction_count(address).number(43).await.unwrap(), 8);
+        assert_eq!(provider.get_transaction_count(address).number(43).await.unwrap(), 8);
+
+        for nonce in [9, 10] {
+            asserter.push_success(&U64::from(nonce));
+            assert_eq!(provider.get_transaction_count(address).latest().await.unwrap(), nonce);
+        }
+        assert!(asserter.read_q().is_empty());
+    }
+
+    #[tokio::test]
+    async fn preserves_inner_raw_transaction_override_and_caching() {
+        struct RawTransactionProvider(RootProvider, Arc<std::sync::atomic::AtomicUsize>);
+
+        impl Provider for RawTransactionProvider {
+            fn root(&self) -> &RootProvider {
+                &self.0
+            }
+
+            fn get_raw_transaction_by_hash(
+                &self,
+                hash: TxHash,
+            ) -> ProviderCall<(TxHash,), Option<Bytes>> {
+                let calls = self.1.clone();
+                ProviderCall::BoxedFuture(Box::pin(async move {
+                    calls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    Ok((hash != B256::ZERO).then_some(bytes!("42")))
+                }))
+            }
+        }
+
+        let asserter = Asserter::new();
+        let root =
+            ProviderBuilder::new().disable_recommended_fillers().connect_mocked_client(asserter);
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let provider =
+            CacheProvider::new(RawTransactionProvider(root, calls.clone()), SharedCache::new(10));
+        let hash = B256::with_last_byte(1);
+
+        for _ in 0..2 {
+            assert_eq!(
+                provider.get_raw_transaction_by_hash(hash).await.unwrap(),
+                Some(bytes!("42"))
+            );
+        }
+        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+        for _ in 0..2 {
+            assert_eq!(provider.get_raw_transaction_by_hash(B256::ZERO).await.unwrap(), None);
+        }
+        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed), 3);
+    }
+
+    #[tokio::test]
     async fn test_get_proof() {
         run_with_tempdir("get-proof", |dir| async move {
             let cache_layer = CacheLayer::new(100);
@@ -677,8 +774,14 @@ mod tests {
                 .value(U256::ZERO)
                 .input(bytes!("deadbeef").into());
 
-            let tx_hash =
-                *provider.send_transaction(req).await.expect("failed to send tx").tx_hash();
+            let tx_hash = provider
+                .send_transaction(req)
+                .await
+                .expect("failed to send tx")
+                .get_receipt()
+                .await
+                .expect("failed to mine tx")
+                .transaction_hash;
 
             let tx = provider.get_transaction_by_hash(tx_hash).await.unwrap(); // Received from RPC.
             let tx2 = provider.get_transaction_by_hash(tx_hash).await.unwrap(); // Received from
