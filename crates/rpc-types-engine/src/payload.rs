@@ -1865,13 +1865,14 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
             blobs: Vec<alloy_consensus::Blob>,
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
+        let bundle = Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs };
 
-        if raw.proofs.len() == raw.commitments.len() && raw.proofs.len() == raw.blobs.len() {
-            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        if bundle.has_valid_lengths() {
+            Ok(bundle)
         } else {
             Err(serde::de::Error::invalid_length(
-                raw.proofs.len(),
-                &format!("{}", raw.commitments.len()).as_str(),
+                bundle.proofs.len(),
+                &format!("{}", bundle.commitments.len()).as_str(),
             ))
         }
     }
@@ -1900,6 +1901,12 @@ impl BlobsBundleV1 {
     /// payload for API compatibility reasons.
     pub fn empty() -> Self {
         Self::default()
+    }
+
+    /// Returns true if the bundle has one commitment and one proof per blob.
+    #[cfg(any(feature = "serde", feature = "kzg"))]
+    const fn has_valid_lengths(&self) -> bool {
+        self.commitments.len() == self.proofs.len() && self.commitments.len() == self.blobs.len()
     }
 
     /// Computes the versioned hashes from the KZG commitments.
@@ -1943,8 +1950,7 @@ impl BlobsBundleV1 {
     pub fn try_into_sidecar(
         self,
     ) -> Result<BlobTransactionSidecar, alloy_consensus::error::ValueError<Self>> {
-        if self.commitments.len() != self.proofs.len() || self.commitments.len() != self.blobs.len()
-        {
+        if !self.has_valid_lengths() {
             return Err(alloy_consensus::error::ValueError::new(self, "length mismatch"));
         }
 
@@ -1978,8 +1984,6 @@ impl BlobsBundleV1 {
         self,
         settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
     ) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
-        use alloy_eips::eip7594::CELLS_PER_EXT_BLOB;
-
         if let [blob] = self.blobs.as_slice() {
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
             let cell_proofs =
@@ -2063,15 +2067,14 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
             blobs: Vec<alloy_consensus::Blob>,
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
+        let bundle = Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs };
 
-        if raw.proofs.len() == raw.blobs.len() * CELLS_PER_EXT_BLOB
-            && raw.commitments.len() == raw.blobs.len()
-        {
-            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        if bundle.ensure_valid_lengths().is_ok() {
+            Ok(bundle)
         } else {
             Err(serde::de::Error::invalid_length(
-                raw.proofs.len(),
-                &format!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
+                bundle.proofs.len(),
+                &format!("{}", bundle.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
             ))
         }
     }
@@ -2092,20 +2095,19 @@ impl ssz::Decode for BlobsBundleV2 {
         }
 
         let raw = BlobsBundleRaw::from_ssz_bytes(bytes)?;
+        let bundle = Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs };
 
-        if raw.proofs.len() == raw.blobs.len() * CELLS_PER_EXT_BLOB
-            && raw.commitments.len() == raw.blobs.len()
-        {
-            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        if bundle.ensure_valid_lengths().is_ok() {
+            Ok(bundle)
         } else {
             Err(ssz::DecodeError::BytesInvalid(
                 format!(
                     "Invalid BlobsBundleV2: expected {} proofs and {} commitments for {} blobs, got {} proofs and {} commitments",
-                    raw.blobs.len() * CELLS_PER_EXT_BLOB,
-                    raw.blobs.len(),
-                    raw.blobs.len(),
-                    raw.proofs.len(),
-                    raw.commitments.len()
+                    bundle.blobs.len() * CELLS_PER_EXT_BLOB,
+                    bundle.blobs.len(),
+                    bundle.blobs.len(),
+                    bundle.proofs.len(),
+                    bundle.commitments.len()
                 )
             ))
         }
