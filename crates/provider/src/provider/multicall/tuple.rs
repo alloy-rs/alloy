@@ -79,7 +79,9 @@ pub trait CallTuple: Sealed {
     /// To be used for calls where success is ensured i.e `allow_failure` for all calls is false.
     fn decode_returns(data: &[Bytes]) -> Result<Self::SuccessReturns>;
 
-    /// Converts Returns to SuccessReturns if all results are Ok
+    /// Decode the returns from a sequence of [`MulticallResult`]s
+    ///
+    /// Each call that reverted or whose return data cannot be decoded yields a [`Failure`].
     fn decode_return_results(results: &[MulticallResult]) -> Result<Self::Returns>;
 
     /// Converts Returns to SuccessReturns if all results are Ok

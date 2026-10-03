@@ -129,7 +129,7 @@ pub trait CallInfoTrait: std::fmt::Debug {
     fn to_call(&self) -> Call;
     /// Converts the [`CallItem`] into a [`Call3`] struct for `aggregate3Call`
     fn to_call3(&self) -> Call3;
-    /// Converts the [`CallItem`] into a [`Call3Value`] struct for `aggregate3Call`
+    /// Converts the [`CallItem`] into a [`Call3Value`] struct for `aggregate3ValueCall`
     fn to_call3_value(&self) -> Call3Value;
 }
 
