@@ -125,15 +125,7 @@ where
 
     /// Converts an empty [`MulticallBuilder`] into a dynamic one
     pub fn dynamic<D: SolCall + 'static>(self) -> MulticallBuilder<Dynamic<D>, P, N> {
-        MulticallBuilder {
-            calls: self.calls,
-            provider: self.provider,
-            block: self.block,
-            state_override: self.state_override,
-            address: self.address,
-            input_kind: self.input_kind,
-            _pd: Default::default(),
-        }
+        self.retype()
     }
 }
 
@@ -240,15 +232,7 @@ where
 {
     /// Clones the underlying provider and returns a new [`MulticallBuilder`].
     pub fn with_cloned_provider(&self) -> MulticallBuilder<Empty, P, N> {
-        MulticallBuilder {
-            calls: Vec::new(),
-            provider: self.provider.clone(),
-            block: None,
-            state_override: None,
-            address: MULTICALL3_ADDRESS,
-            input_kind: TransactionInputKind::default(),
-            _pd: Default::default(),
-        }
+        MulticallBuilder::new(self.provider.clone())
     }
 }
 
@@ -302,6 +286,11 @@ where
         <T as TuplePush<D>>::Pushed: CallTuple,
     {
         self.calls.push(call.to_call3_value());
+        self.retype()
+    }
+
+    /// Moves all settings and calls into a builder with a different call tuple type.
+    fn retype<U: CallTuple>(self) -> MulticallBuilder<U, P, N> {
         MulticallBuilder {
             calls: self.calls,
             provider: self.provider,
@@ -312,6 +301,17 @@ where
             _pd: Default::default(),
         }
     }
+
+    /// Returns the calls as plain [`Call`]s, dropping `allowFailure` and `value`.
+    fn to_calls(&self) -> Vec<Call> {
+        self.calls.iter().map(|c| Call { target: c.target, callData: c.callData.clone() }).collect()
+    }
+
+    /// Returns the sum of the values of all calls.
+    fn total_value(&self) -> U256 {
+        self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x)
+    }
+
     /// Creates the [`aggregate3ValueCall`]
     fn to_aggregate3_value_call(&self) -> aggregate3ValueCall {
         aggregate3ValueCall { calls: self.calls.to_vec() }
@@ -319,22 +319,12 @@ where
 
     /// Creates the [`blockAndAggregateCall`]
     fn to_block_and_aggregate_call(&self) -> blockAndAggregateCall {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        blockAndAggregateCall { calls }
+        blockAndAggregateCall { calls: self.to_calls() }
     }
 
     /// Creates the [`tryBlockAndAggregateCall`]
     fn to_try_block_and_aggregate_call(&self, require_success: bool) -> tryBlockAndAggregateCall {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        tryBlockAndAggregateCall { requireSuccess: require_success, calls }
+        tryBlockAndAggregateCall { requireSuccess: require_success, calls: self.to_calls() }
     }
 
     /// Calls the `aggregate` function
@@ -404,14 +394,9 @@ where
         self.build_request(self.to_aggregate_call(), None)
     }
 
-    /// Creates the [`aggregate3Call`].
+    /// Creates the [`aggregateCall`].
     fn to_aggregate_call(&self) -> aggregateCall {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        aggregateCall { calls }
+        aggregateCall { calls: self.to_calls() }
     }
 
     /// Call the `tryAggregate` function
@@ -487,12 +472,7 @@ where
 
     /// Creates the [`tryAggregateCall`].
     fn to_try_aggregate_call(&self, require_success: bool) -> tryAggregateCall {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        tryAggregateCall { requireSuccess: require_success, calls }
+        tryAggregateCall { requireSuccess: require_success, calls: self.to_calls() }
     }
 
     /// Call the `aggregate3` function
@@ -539,9 +519,7 @@ where
 
     /// Sends the `aggregate3Value` function as a transaction
     pub async fn send_aggregate3_value(&self) -> Result<PendingTransactionBuilder<N>> {
-        let total_value = self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
-        let call = self.to_aggregate3_value_call();
-        self.build_and_send(call, Some(total_value)).await
+        self.build_and_send(self.to_aggregate3_value_call(), Some(self.total_value())).await
     }
 
     /// Creates the [`aggregate3Call`]
@@ -586,9 +564,8 @@ where
     /// - The [`Result::Err`] variant contains the [`Failure`] struct which holds the
     ///   index(-position) of the call and the returned data as [`Bytes`].
     pub async fn aggregate3_value(&self) -> Result<T::Returns> {
-        let total_value = self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
-        let call = aggregate3ValueCall { calls: self.calls.to_vec() };
-        let output = self.build_and_call(call, Some(total_value)).await?;
+        let call = self.to_aggregate3_value_call();
+        let output = self.build_and_call(call, Some(self.total_value())).await?;
         T::decode_return_results(&output)
     }
 
@@ -683,17 +660,24 @@ where
         Ok(pending_tx)
     }
 
+    /// Appends a call to one of the helper functions of the multicall contract itself.
+    fn add_multicall_fn<C>(self, call: C) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        C: SolCall + 'static,
+        T: TuplePush<C>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallItem::<C>::new(self.address, call.abi_encode().into());
+        self.add_call(call)
+    }
+
     /// Add a call to get the block hash from a block number
     pub fn get_block_hash(self, number: BlockNumber) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getBlockHashCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallItem::<getBlockHashCall>::new(
-            self.address,
-            getBlockHashCall { blockNumber: U256::from(number) }.abi_encode().into(),
-        );
-        self.add_call(call)
+        self.add_multicall_fn(getBlockHashCall { blockNumber: U256::from(number) })
     }
 
     /// Add a call to get the coinbase of the current block
@@ -702,11 +686,7 @@ where
         T: TuplePush<getCurrentBlockCoinbaseCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallItem::<getCurrentBlockCoinbaseCall>::new(
-            self.address,
-            getCurrentBlockCoinbaseCall {}.abi_encode().into(),
-        );
-        self.add_call(call)
+        self.add_multicall_fn(getCurrentBlockCoinbaseCall {})
     }
 
     /// Add a call to get the current block number
@@ -715,11 +695,7 @@ where
         T: TuplePush<getBlockNumberCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallItem::<getBlockNumberCall>::new(
-            self.address,
-            getBlockNumberCall {}.abi_encode().into(),
-        );
-        self.add_call(call)
+        self.add_multicall_fn(getBlockNumberCall {})
     }
 
     /// Add a call to get the current block difficulty
@@ -728,11 +704,7 @@ where
         T: TuplePush<getCurrentBlockDifficultyCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallItem::<getCurrentBlockDifficultyCall>::new(
-            self.address,
-            getCurrentBlockDifficultyCall {}.abi_encode().into(),
-        );
-        self.add_call(call)
+        self.add_multicall_fn(getCurrentBlockDifficultyCall {})
     }
 
     /// Add a call to get the current block gas limit
@@ -741,11 +713,7 @@ where
         T: TuplePush<getCurrentBlockGasLimitCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallItem::<getCurrentBlockGasLimitCall>::new(
-            self.address,
-            getCurrentBlockGasLimitCall {}.abi_encode().into(),
-        );
-        self.add_call(call)
+        self.add_multicall_fn(getCurrentBlockGasLimitCall {})
     }
 
     /// Add a call to get the current block timestamp
@@ -754,11 +722,7 @@ where
         T: TuplePush<getCurrentBlockTimestampCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallItem::<getCurrentBlockTimestampCall>::new(
-            self.address,
-            getCurrentBlockTimestampCall {}.abi_encode().into(),
-        );
-        self.add_call(call)
+        self.add_multicall_fn(getCurrentBlockTimestampCall {})
     }
 
     /// Add a call to get the chain id
@@ -767,9 +731,7 @@ where
         T: TuplePush<getChainIdCall>,
         T::Pushed: CallTuple,
     {
-        let call =
-            CallItem::<getChainIdCall>::new(self.address, getChainIdCall {}.abi_encode().into());
-        self.add_call(call)
+        self.add_multicall_fn(getChainIdCall {})
     }
 
     /// Add a call to get the base fee
@@ -778,9 +740,7 @@ where
         T: TuplePush<getBasefeeCall>,
         T::Pushed: CallTuple,
     {
-        let call =
-            CallItem::<getBasefeeCall>::new(self.address, getBasefeeCall {}.abi_encode().into());
-        self.add_call(call)
+        self.add_multicall_fn(getBasefeeCall {})
     }
 
     /// Add a call to get the eth balance of an address
@@ -789,11 +749,7 @@ where
         T: TuplePush<getEthBalanceCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallItem::<getEthBalanceCall>::new(
-            self.address,
-            getEthBalanceCall { addr: address }.abi_encode().into(),
-        );
-        self.add_call(call)
+        self.add_multicall_fn(getEthBalanceCall { addr: address })
     }
 
     /// Add a call to get the last block hash
@@ -802,26 +758,14 @@ where
         T: TuplePush<getLastBlockHashCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallItem::<getLastBlockHashCall>::new(
-            self.address,
-            getLastBlockHashCall {}.abi_encode().into(),
-        );
-        self.add_call(call)
+        self.add_multicall_fn(getLastBlockHashCall {})
     }
 
     /// Returns an [`Empty`] builder
     ///
     /// Retains previously set provider, address, block and state_override settings.
     pub fn clear(self) -> MulticallBuilder<Empty, P, N> {
-        MulticallBuilder {
-            calls: Vec::new(),
-            provider: self.provider,
-            block: self.block,
-            state_override: self.state_override,
-            address: self.address,
-            input_kind: self.input_kind,
-            _pd: Default::default(),
-        }
+        MulticallBuilder { calls: Vec::new(), ..self.retype() }
     }
 
     /// Get the number of calls in the builder
@@ -843,5 +787,62 @@ where
     /// Get the input kind for this builder
     pub const fn input_kind(&self) -> TransactionInputKind {
         self.input_kind
+    }
+}
+
+#[cfg(test)]
+mod request_tests {
+    use super::*;
+    use crate::ProviderBuilder;
+    use alloy_transport::mock::Asserter;
+
+    #[test]
+    fn requests_encode_calls_and_helpers() {
+        let provider = ProviderBuilder::new().connect_mocked_client(Asserter::new());
+        let multicall = Address::with_last_byte(1);
+        let target = Address::with_last_byte(2);
+        let input = Bytes::from_static(&[1, 2, 3]);
+        let item = CallItem::<getChainIdCall>::new(target, input.clone())
+            .with_failure_allowed()
+            .value(U256::from(7));
+
+        let builder = MulticallBuilder::new(&provider)
+            .address(multicall)
+            .add_call(item)
+            .add_call(CallItem::<getChainIdCall>::new(target, input.clone()).value(U256::from(3)))
+            .get_chain_id();
+        assert_eq!(builder.total_value(), U256::from(10));
+
+        let helper = getChainIdCall {}.abi_encode();
+        let calls = vec![
+            Call { target, callData: input.clone() },
+            Call { target, callData: input.clone() },
+            Call { target: multicall, callData: helper.clone().into() },
+        ];
+        let calls3 = vec![
+            Call3 { target, allowFailure: true, callData: input.clone() },
+            Call3 { target, allowFailure: false, callData: input },
+            Call3 { target: multicall, allowFailure: false, callData: helper.into() },
+        ];
+
+        let req = builder.to_aggregate_request();
+        assert_eq!(req.to, Some(multicall.into()));
+        assert_eq!(req.value, None);
+        assert_eq!(
+            req.input.input(),
+            Some(&aggregateCall { calls: calls.clone() }.abi_encode().into())
+        );
+        assert_eq!(
+            builder.to_try_aggregate_request(false).input.input(),
+            Some(&tryAggregateCall { requireSuccess: false, calls }.abi_encode().into())
+        );
+        assert_eq!(
+            builder.to_aggregate3_request().input.input(),
+            Some(&aggregate3Call { calls: calls3 }.abi_encode().into())
+        );
+
+        let cleared = builder.clear();
+        assert!(cleared.is_empty());
+        assert_eq!(cleared.address, multicall);
     }
 }
