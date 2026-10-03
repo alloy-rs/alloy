@@ -275,8 +275,9 @@ mod tests {
     use aws_config::BehaviorVersion;
 
     #[tokio::test]
+    #[ignore = "requires AWS_KEY_ID and AWS credentials"]
     async fn sign_message() {
-        let Ok(key_id) = std::env::var("AWS_KEY_ID") else { return };
+        let key_id = std::env::var("AWS_KEY_ID").expect("AWS_KEY_ID");
         let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
         let client = aws_sdk_kms::Client::new(&config);
 
