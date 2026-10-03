@@ -520,7 +520,13 @@ impl Reth {
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+                let _ = child.kill();
+                let status = child.wait().map_err(NodeError::WaitError)?;
+                return Err(NodeError::Fatal(format!(
+                    "reth exited before it was ready ({status})"
+                )));
+            }
 
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
@@ -632,5 +638,22 @@ mod tests {
         assert_eq!(reth.genesis, None);
         assert!(reth.args.is_empty());
         assert!(!reth.keep_stdout);
+    }
+}
+
+#[cfg(all(test, unix))]
+mod early_exit_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn early_exit_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("reth");
+        std::fs::write(&program, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let err = Reth::at(&program).try_spawn().unwrap_err();
+        assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
     }
 }

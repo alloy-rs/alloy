@@ -655,7 +655,13 @@ impl Geth {
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+                let _ = child.kill();
+                let status = child.wait().map_err(NodeError::WaitError)?;
+                return Err(NodeError::Fatal(format!(
+                    "geth exited before it was ready ({status})"
+                )));
+            }
 
             if matches!(self.mode, NodeMode::NonDev(_)) && line.contains("Started P2P networking") {
                 p2p_started = true;
@@ -773,5 +779,22 @@ mod tests {
             assert!(geth.endpoint().starts_with("http://localhost:"));
             assert!(geth.ws_endpoint().starts_with("ws://localhost:"));
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod early_exit_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn early_exit_is_reported() {
+        let dir = tempdir().unwrap();
+        let program = dir.path().join("geth");
+        std::fs::write(&program, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let err = Geth::at(&program).try_spawn().unwrap_err();
+        assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
     }
 }
