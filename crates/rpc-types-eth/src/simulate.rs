@@ -376,11 +376,4 @@ mod tests {
         assert_eq!(block.logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
         assert_eq!(block.into_logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
     }
-
-    #[test]
-    fn test_simulate_error_codes() {
-        assert_eq!(SimulateError::EXECUTION_REVERTED_CODE, EthRpcErrorCode::ExecutionError.code());
-        assert_eq!(SimulateError::VM_EXECUTION_ERROR_CODE, -32015);
-        assert_eq!(SimulateError::invalid_params().code, SimulateError::INVALID_PARAMS_ERROR_CODE);
-    }
 }

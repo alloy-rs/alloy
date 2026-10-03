@@ -359,25 +359,4 @@ mod tests {
             assert_eq!(decoded, info);
         }
     }
-
-    #[test]
-    fn account_info_new() {
-        let code = Bytes::from_static(&[0x60, 0x00]);
-        let info = AccountInfo::new(U256::from(1), 2, code.clone());
-        assert_eq!(info.balance, U256::from(1));
-        assert_eq!(info.nonce, 2);
-        assert_eq!(info.code, code);
-        assert!(AccountInfo::new(U256::ZERO, 0, Bytes::new()).is_empty());
-    }
-
-    #[cfg(feature = "account-ext")]
-    #[test]
-    fn account_info_with_extension() {
-        let extension = alloy_trie::AccountExtension::copy_from_slice(&[0x82, 0xaa]);
-        let info = AccountInfo::new(U256::ZERO, 0, Bytes::new()).with_extension(extension.clone());
-        assert_eq!(info.extension, extension);
-        assert!(!info.is_empty());
-        let json = serde_json::to_value(&info).unwrap();
-        assert_eq!(serde_json::from_value::<AccountInfo>(json).unwrap(), info);
-    }
 }

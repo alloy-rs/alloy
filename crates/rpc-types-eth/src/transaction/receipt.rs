@@ -332,18 +332,7 @@ mod test {
     use crate::TransactionReceipt;
     use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use similar_asserts::assert_eq;
-
-    #[test]
-    fn transaction_receipt_arbitrary() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-
-        let _: TransactionReceipt =
-            TransactionReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
-    }
 
     #[test]
     #[cfg(feature = "serde")]

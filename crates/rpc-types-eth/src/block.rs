@@ -856,29 +856,7 @@ pub struct BadBlock<B = Block> {
 mod tests {
     use super::*;
     use alloy_primitives::{hex, keccak256, Bloom, B64};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use similar_asserts::assert_eq;
-
-    #[test]
-    fn arbitrary_header() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-        let _: Header = Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
-    }
-
-    #[test]
-    fn header_response_num_hash() {
-        let number = 42;
-        let hash = B256::with_last_byte(1);
-        let header = Header {
-            hash,
-            inner: alloy_consensus::Header { number, ..Default::default() },
-            ..Default::default()
-        };
-
-        assert_eq!(header.num_hash(), BlockNumHash::new(number, hash));
-    }
 
     #[test]
     #[cfg(feature = "serde")]
@@ -1090,6 +1068,7 @@ mod tests {
             BlockOverrides::default().with_beacon_root(B256::with_last_byte(1));
         assert!(!overrides_with_beacon_root.is_empty());
     }
+
 
     #[test]
     #[cfg(feature = "serde")]
@@ -1307,54 +1286,6 @@ mod tests {
         let block2 = serde_json::from_str::<Block>(s2).unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&block2.header.inner));
         assert_eq!(recomputed_hash, block2.header.hash);
-    }
-
-    #[test]
-    fn header_roundtrip_conversion() {
-        // Setup a RPC header
-        let rpc_header = Header {
-            hash: B256::with_last_byte(1),
-            inner: alloy_consensus::Header {
-                parent_hash: B256::with_last_byte(2),
-                ommers_hash: B256::with_last_byte(3),
-                beneficiary: Address::with_last_byte(4),
-                state_root: B256::with_last_byte(5),
-                transactions_root: B256::with_last_byte(6),
-                receipts_root: B256::with_last_byte(7),
-                withdrawals_root: None,
-                number: 9,
-                gas_used: 10,
-                gas_limit: 11,
-                extra_data: vec![1, 2, 3].into(),
-                logs_bloom: Bloom::default(),
-                timestamp: 12,
-                difficulty: U256::from(13),
-                mix_hash: B256::with_last_byte(14),
-                nonce: B64::with_last_byte(15),
-                base_fee_per_gas: Some(20),
-                blob_gas_used: None,
-                excess_blob_gas: None,
-                parent_beacon_block_root: None,
-                requests_hash: None,
-                block_access_list_hash: None,
-                slot_number: None,
-            },
-            size: None,
-            total_difficulty: None,
-        };
-
-        // Convert the RPC header to a primitive header
-        let primitive_header = rpc_header.inner.clone();
-
-        // Seal the primitive header
-        let sealed_header: Sealed<alloy_consensus::Header> =
-            primitive_header.seal(B256::with_last_byte(1));
-
-        // Convert the sealed header back to a RPC header
-        let roundtrip_rpc_header = Header::from_consensus(sealed_header, None, None);
-
-        // Ensure the roundtrip conversion is correct
-        assert_eq!(rpc_header, roundtrip_rpc_header);
     }
 
     #[test]

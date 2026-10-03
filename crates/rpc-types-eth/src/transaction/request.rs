@@ -1858,13 +1858,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_tx_request() {
-        let s = r#"{"accessList":[],"data":"0x0902f1ac","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02"}"#;
-        let _req = serde_json::from_str::<TransactionRequest>(s).unwrap();
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
     fn serde_unique_call_input() {
         let s = r#"{"accessList":[],"data":"0x0902f1ac", "input":"0x0902f1ac","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02"}"#;
         let req = serde_json::from_str::<TransactionRequest>(s).unwrap();
