@@ -158,4 +158,4 @@ impl tower::Service<j::RequestPacket> for MockTransport {
     }
 }
 
-// Tests are in `providers/tests/it/mock.rs`.
+// Tests are in `crates/provider/tests/it/mock.rs`.
