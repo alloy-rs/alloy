@@ -185,6 +185,8 @@ mod test {
             (TestCase { id: Id::Number(1) }, r#"{"id":1}"#),
             (TestCase { id: Id::String("foo".to_string()) }, r#"{"id":"foo"}"#),
             (TestCase { id: Id::None }, r#"{"id":null}"#),
+            (TestCase { id: Id::Number(u64::MAX) }, r#"{"id":18446744073709551615}"#),
+            (TestCase { id: Id::String("".to_string()) }, r#"{"id":""}"#),
         ];
         for (case, expected) in cases {
             let serialized = serde_json::to_string(&case).unwrap();
@@ -204,23 +206,6 @@ mod test {
         assert!(id_number < id_string);
         assert!(id_string < id_none);
         assert!(id_none == Id::None);
-    }
-
-    #[test]
-    fn test_serialization_deserialization_edge_cases() {
-        // Edge cases for large numbers, empty strings, and None.
-        let cases = [
-            (TestCase { id: Id::Number(u64::MAX) }, r#"{"id":18446744073709551615}"#),
-            (TestCase { id: Id::String("".to_string()) }, r#"{"id":""}"#),
-            (TestCase { id: Id::None }, r#"{"id":null}"#),
-        ];
-        for (case, expected) in cases {
-            let serialized = serde_json::to_string(&case).unwrap();
-            assert_eq!(serialized, expected);
-
-            let deserialized: TestCase = serde_json::from_str(expected).unwrap();
-            assert_eq!(deserialized, case);
-        }
     }
 
     #[test]

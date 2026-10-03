@@ -268,29 +268,14 @@ mod tests {
     }
 
     #[test]
-    fn deserializer_test_invalid_structure() {
-        // An invalid structure should fail deserialization
-        let invalid_notification = r#"
-           {
-               "jsonrpc": "2.0",
-               "method": "eth_subscription"
-           }"#;
-
-        let deser = serde_json::from_str::<PubSubItem>(invalid_notification);
-        assert!(deser.is_err());
-    }
-
-    #[test]
-    fn deserializer_test_missing_fields() {
-        // A notification missing essential fields should fail
-        let missing_fields = r#"
-           {
-               "jsonrpc": "2.0",
-               "method": "eth_subscription",
-               "params": {}
-           }"#;
-
-        let deser = serde_json::from_str::<PubSubItem>(missing_fields);
-        assert!(deser.is_err());
+    fn deserializer_test_invalid_notifications() {
+        for invalid in [
+            // no params
+            r#"{"jsonrpc": "2.0", "method": "eth_subscription"}"#,
+            // params without subscription and result
+            r#"{"jsonrpc": "2.0", "method": "eth_subscription", "params": {}}"#,
+        ] {
+            assert!(serde_json::from_str::<PubSubItem>(invalid).is_err(), "{invalid}");
+        }
     }
 }
