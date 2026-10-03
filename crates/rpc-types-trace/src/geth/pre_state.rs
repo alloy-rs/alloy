@@ -173,7 +173,6 @@ pub struct AccountState {
 impl AccountState {
     /// Creates a new `AccountState` with the given account info.
     ///
-    /// If balance is zero, it will be omitted.
     /// If nonce is zero, it will be omitted.
     /// If code is empty, it will be omitted.
     pub fn from_account_info(nonce: u64, balance: U256, code: Option<Bytes>) -> Self {
