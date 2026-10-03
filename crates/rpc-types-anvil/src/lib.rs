@@ -232,63 +232,22 @@ mod tests {
     }
 
     #[test]
-    fn test_serde_deserialize_options_with_values() {
-        let data = r#"{"timestamp": 1620000000, "blocks": 10}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
-        );
-
-        let data = r#"{"timestamp": "0x608f3d00", "blocks": 10}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
-        );
-    }
-
-    #[test]
-    fn test_serde_deserialize_options_without_timestamp() {
-        let data = r#"{"blocks": 5}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::Options { timestamp: None, blocks: Some(5) });
-
-        let data = r#"{}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::default());
-
-        // Unknown keys are ignored, matching maps with a `timestamp` key.
-        let data = r#"{"foo": 1}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::default());
-    }
-
-    #[test]
-    fn test_serde_deserialize_options_with_timestamp() {
-        let data = r#"{"timestamp":"1620000000"}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
-        );
-
-        let data = r#"{"timestamp":"0x608f3d00"}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
-        );
-    }
-
-    #[test]
-    fn test_serde_deserialize_timestamp() {
-        let data = r#""1620000000""#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
-
-        let data = r#""0x608f3d00""#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
+    fn test_serde_deserialize_mine_options() {
+        let options = |timestamp, blocks| MineOptions::Options { timestamp, blocks };
+        for (data, expected) in [
+            (r#"{"timestamp": 1620000000, "blocks": 10}"#, options(Some(1620000000), Some(10))),
+            (r#"{"timestamp": "0x608f3d00", "blocks": 10}"#, options(Some(1620000000), Some(10))),
+            (r#"{"blocks": 5}"#, options(None, Some(5))),
+            (r#"{}"#, MineOptions::default()),
+            // Unknown keys are ignored, matching maps with a `timestamp` key.
+            (r#"{"foo": 1}"#, MineOptions::default()),
+            (r#"{"timestamp":"1620000000"}"#, options(Some(1620000000), None)),
+            (r#"{"timestamp":"0x608f3d00"}"#, options(Some(1620000000), None)),
+            (r#""1620000000""#, MineOptions::Timestamp(Some(1620000000))),
+            (r#""0x608f3d00""#, MineOptions::Timestamp(Some(1620000000))),
+        ] {
+            let deserialized: MineOptions = serde_json::from_str(data).unwrap();
+            assert_eq!(deserialized, expected, "{data}");
+        }
     }
 }
