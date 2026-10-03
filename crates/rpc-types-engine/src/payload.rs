@@ -5796,19 +5796,12 @@ mod tests {
         let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
         let block_hash = B256::with_last_byte(3);
 
-        let execution_data = ExecutionData::from(Sealed::new_unchecked(block, block_hash));
-
-        assert_eq!(execution_data.block_hash(), block_hash);
-    }
-
-    #[test]
-    fn execution_data_from_sealed_block_ref_uses_sealed_hash() {
-        let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
-        let block_hash = B256::with_last_byte(4);
-
-        let execution_data = ExecutionData::from(Sealed::new_unchecked(&block, block_hash));
-
-        assert_eq!(execution_data.block_hash(), block_hash);
+        for execution_data in [
+            ExecutionData::from(Sealed::new_unchecked(&block, block_hash)),
+            ExecutionData::from(Sealed::new_unchecked(block, block_hash)),
+        ] {
+            assert_eq!(execution_data.block_hash(), block_hash);
+        }
     }
 
     #[test]
@@ -5822,35 +5815,16 @@ mod tests {
 
         let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
         let block_hash = B256::with_last_byte(5);
-        let execution_data = ExecutionData::from((
-            Sealed::new_unchecked(block, block_hash),
-            PayloadExtras::from(block_access_list.clone()),
-        ));
+        let extras = PayloadExtras::from(block_access_list.clone());
 
-        assert_eq!(execution_data.block_hash(), block_hash);
-        assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
-        assert_eq!(execution_data.payload.slot_number(), Some(7));
-    }
-
-    #[test]
-    fn execution_data_from_sealed_block_ref_with_extras_preserves_bal() {
-        let block_access_list = Bytes::from(vec![0xaa, 0xbb, 0xcc]);
-        let header = Header {
-            block_access_list_hash: Some(keccak256(&block_access_list)),
-            slot_number: Some(7),
-            ..Default::default()
-        };
-
-        let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
-        let block_hash = B256::with_last_byte(6);
-        let execution_data = ExecutionData::from((
-            Sealed::new_unchecked(&block, block_hash),
-            PayloadExtras::from(block_access_list.clone()),
-        ));
-
-        assert_eq!(execution_data.block_hash(), block_hash);
-        assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
-        assert_eq!(execution_data.payload.slot_number(), Some(7));
+        for execution_data in [
+            ExecutionData::from((Sealed::new_unchecked(&block, block_hash), extras.clone())),
+            ExecutionData::from((Sealed::new_unchecked(block, block_hash), extras)),
+        ] {
+            assert_eq!(execution_data.block_hash(), block_hash);
+            assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
+            assert_eq!(execution_data.payload.slot_number(), Some(7));
+        }
     }
 
     #[test]
