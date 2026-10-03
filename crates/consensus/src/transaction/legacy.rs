@@ -135,11 +135,6 @@ impl RlpEcdsaEncodableTx for TxLegacy {
         Header { list: true, payload_length }
     }
 
-    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
-        // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
-        self.rlp_header_signed(signature).length_with_payload()
-    }
-
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
         self.rlp_header_signed(signature).encode(out);
@@ -219,10 +214,6 @@ impl RlpEcdsaDecodableTx for TxLegacy {
         buf: &mut &[u8],
         _ty: u8,
     ) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
-        Self::rlp_decode_signed(buf).map_err(Into::into)
-    }
-
-    fn eip2718_decode(buf: &mut &[u8]) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
         Self::rlp_decode_signed(buf).map_err(Into::into)
     }
 
