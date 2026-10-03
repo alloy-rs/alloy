@@ -683,6 +683,13 @@ impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844Variant<
         }
         TxEip4844::rlp_decode_with_signature(buf).map(|(tx, signature)| (tx.into(), signature))
     }
+
+    fn eip2718_decode_with_type(
+        buf: &mut &[u8],
+        ty: u8,
+    ) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
+        eip2718_decode_excluding_sidecar(buf, ty)
+    }
 }
 
 impl<T> Typed2718 for TxEip4844Variant<T> {
@@ -1329,6 +1336,32 @@ impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844WithSide
 
         Ok((Self { tx, sidecar }, signature))
     }
+
+    fn eip2718_decode_with_type(
+        buf: &mut &[u8],
+        ty: u8,
+    ) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
+        eip2718_decode_excluding_sidecar(buf, ty)
+    }
+}
+
+/// EIP-2718 decodes a blob transaction that may carry a sidecar.
+///
+/// The default [`RlpEcdsaDecodableTx::eip2718_decode_with_type`] hashes the decoded bytes, which
+/// include the sidecar, while the transaction hash is computed without it.
+fn eip2718_decode_excluding_sidecar<T: RlpEcdsaDecodableTx>(
+    buf: &mut &[u8],
+    ty: u8,
+) -> alloy_eips::eip2718::Eip2718Result<Signed<T>> {
+    let (&actual, rest) = buf.split_first().ok_or(alloy_rlp::Error::InputTooShort)?;
+    if actual != ty {
+        return Err(alloy_eips::eip2718::Eip2718Error::UnexpectedType(actual));
+    }
+    *buf = rest;
+
+    let (tx, signature) = T::rlp_decode_with_signature(buf)?;
+    let hash = tx.tx_hash_with_type(&signature, ty);
+    Ok(Signed::new_unchecked(tx, signature, hash))
 }
 
 #[cfg(test)]
