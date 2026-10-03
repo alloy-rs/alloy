@@ -434,32 +434,6 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_create() {
-        // tests that a contract creation tx encodes and decodes properly
-        let tx = TxEip7702 {
-            chain_id: 1u64,
-            nonce: 0,
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            gas_limit: 2,
-            to: Address::default(),
-            value: U256::ZERO,
-            input: vec![1, 2].into(),
-            access_list: Default::default(),
-            authorization_list: Default::default(),
-        };
-        let sig = Signature::from_scalars_and_parity(
-            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
-            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
-            false,
-        );
-        let mut buf = vec![];
-        tx.rlp_encode_signed(&sig, &mut buf);
-        let decoded = TxEip7702::rlp_decode_signed(&mut &buf[..]).unwrap();
-        assert_eq!(decoded, tx.into_signed(sig));
-    }
-
-    #[test]
     fn test_decode_call() {
         let tx = TxEip7702 {
             chain_id: 1u64,

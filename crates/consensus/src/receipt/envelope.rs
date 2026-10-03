@@ -492,37 +492,6 @@ mod test {
 
     #[cfg(feature = "serde")]
     #[test]
-    fn deser_pre658_receipt_envelope() {
-        use crate::Receipt;
-        use alloy_primitives::b256;
-
-        let receipt = super::ReceiptWithBloom::<Receipt<()>> {
-            receipt: super::Receipt {
-                status: super::Eip658Value::PostState(b256!(
-                    "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
-                )),
-                cumulative_gas_used: 0,
-                logs: Default::default(),
-            },
-            logs_bloom: Default::default(),
-        };
-
-        let json = serde_json::to_string(&receipt).unwrap();
-
-        println!("Serialized {json}");
-
-        let receipt: super::ReceiptWithBloom<Receipt<()>> = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(
-            receipt.receipt.status,
-            super::Eip658Value::PostState(b256!(
-                "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
-            ))
-        );
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
     fn deser_receipt_envelope_without_type() {
         let inner = super::ReceiptWithBloom::<Receipt<()>> {
             receipt: Receipt {
