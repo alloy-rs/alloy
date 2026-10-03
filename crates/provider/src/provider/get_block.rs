@@ -515,4 +515,28 @@ mod tests {
 
         assert_eq!(block.header.beneficiary, miner);
     }
+
+    // <https://github.com/alloy-rs/alloy/issues/2117>
+    #[tokio::test]
+    async fn pending_block_fills_null_fields() {
+        let pending_block_response: Block = Block::default();
+        let mut pending_block = serde_json::to_value(pending_block_response).unwrap();
+        pending_block["hash"] = Value::Null;
+        pending_block["nonce"] = Value::Null;
+        pending_block["miner"] = Value::Null;
+        pending_block.as_object_mut().unwrap().remove("beneficiary");
+
+        let asserter = alloy_transport::mock::Asserter::new();
+        asserter.push_success(&pending_block);
+        asserter.push_success(&Value::Null);
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+        let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap().unwrap();
+        assert_eq!(block.header.hash, B256::ZERO);
+        assert_eq!(block.header.nonce, B64::ZERO);
+        assert_eq!(block.header.beneficiary, Address::ZERO);
+
+        let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap();
+        assert!(block.is_none());
+    }
 }
