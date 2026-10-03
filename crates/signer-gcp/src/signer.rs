@@ -329,11 +329,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "requires GOOGLE_APPLICATION_CREDENTIALS and the GOOGLE_* key settings"]
     async fn sign_message() {
-        if std::env::var("GOOGLE_APPLICATION_CREDENTIALS").is_err() {
-            return;
-        }
-
         let project_id = std::env::var("GOOGLE_PROJECT_ID").expect("GOOGLE_PROJECT_ID");
         let location = std::env::var("GOOGLE_LOCATION").expect("GOOGLE_LOCATION");
         let keyring = std::env::var("GOOGLE_KEYRING").expect("GOOGLE_KEYRING");
