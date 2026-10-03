@@ -1924,6 +1924,8 @@ mod tests {
             Log { address, data: LogData::new_unchecked(vec![topic1, topic2], Default::default()) };
 
         assert!(filter.matches(&log));
+        assert!(filter.matches_address(address));
+        assert!(!filter.matches_address(Address::with_last_byte(2)));
     }
 
     #[test]
@@ -1977,31 +1979,6 @@ mod tests {
     }
 
     #[test]
-    fn can_match_address_filter() {
-        let address = Address::with_last_byte(1);
-        let filter = Filter {
-            block_option: Default::default(),
-            address: address.into(),
-            topics: Default::default(),
-        };
-
-        assert!(filter.matches_address(address));
-    }
-
-    #[test]
-    fn can_detect_different_address() {
-        let address = Address::with_last_byte(1);
-        let bad_address = Address::with_last_byte(2);
-        let filter = Filter {
-            block_option: Default::default(),
-            address: address.into(),
-            topics: Default::default(),
-        };
-
-        assert!(!filter.matches_address(bad_address));
-    }
-
-    #[test]
     #[cfg(feature = "serde")]
     fn can_convert_to_ethers_filter() {
         let json = json!(
@@ -2050,168 +2027,60 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn can_convert_to_ethers_filter_with_null_fields() {
-        let json = json!(
-                    {
-          "fromBlock": "0x429d3b",
-          "toBlock": "0x429d3b",
-          "address": null,
-          "topics": null
-        }
-            );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter,
-            Filter {
-                block_option: FilterBlockOption::Range {
+    fn deserialize_filter_with_null_fields() {
+        for (json, block_option) in [
+            (
+                json!({"fromBlock": "0x429d3b", "toBlock": "0x429d3b", "address": null, "topics": null}),
+                FilterBlockOption::Range {
                     from_block: Some(4365627u64.into()),
                     to_block: Some(4365627u64.into()),
                 },
-                address: Default::default(),
-                topics: Default::default(),
-            }
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_filter_with_null_range_block() {
-        let json = json!(
-                    {
-          "fromBlock": null,
-          "toBlock": null,
-          "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
-          "address": null,
-          "topics": null
-        }
+            ),
+            (
+                json!({
+                    "fromBlock": null,
+                    "toBlock": null,
+                    "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
+                    "address": null,
+                    "topics": null
+                }),
+                FilterBlockOption::AtBlockHash(
+                    "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
+                        .parse()
+                        .unwrap(),
+                ),
+            ),
+            (
+                json!({"fromBlock": "0x1", "toBlock": "0x2", "blockHash": null, "address": null, "topics": null}),
+                FilterBlockOption::Range {
+                    from_block: Some(1u64.into()),
+                    to_block: Some(2u64.into()),
+                },
+            ),
+            (
+                json!({"fromBlock": null, "toBlock": "0x2", "blockHash": null, "address": null, "topics": null}),
+                FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) },
+            ),
+            (
+                json!({"fromBlock": "0x1", "toBlock": null, "blockHash": null, "address": null, "topics": null}),
+                FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None },
+            ),
+        ] {
+            let filter: Filter = serde_json::from_value(json).unwrap();
+            assert_eq!(
+                filter,
+                Filter { block_option, address: Default::default(), topics: Default::default() }
             );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter.block_option,
-            FilterBlockOption::AtBlockHash(
-                "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
-                    .parse()
-                    .unwrap()
-            )
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_filter_with_null_block_hash() {
-        let json = json!(
-                    {
-          "fromBlock": "0x1",
-          "toBlock": "0x2",
-          "blockHash": null,
-          "address": null,
-          "topics": null
         }
-            );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter.block_option,
-            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: Some(2u64.into()) }
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_filter_with_null_block_hash_and_null_from_block() {
-        let json = json!(
-                    {
-          "fromBlock": null,
-          "toBlock": "0x2",
-          "blockHash": null,
-          "address": null,
-          "topics": null
-        }
-            );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter.block_option,
-            FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) }
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_filter_with_null_block_hash_and_null_to_block() {
-        let json = json!(
-                    {
-          "fromBlock": "0x1",
-          "toBlock": null,
-          "blockHash": null,
-          "address": null,
-          "topics": null
-        }
-            );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter.block_option,
-            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None }
-        );
     }
 
     #[test]
     fn test_is_pending_block_filter() {
-        let filter = Filter {
-            block_option: FilterBlockOption::Range {
-                from_block: Some(BlockNumberOrTag::Pending),
-                to_block: Some(BlockNumberOrTag::Pending),
-            },
-            address: "0xb59f67a8bff5d8cd03f6ac17265c550ed8f33907"
-                .parse::<Address>()
-                .unwrap()
-                .into(),
-            topics: [
-                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
-            ],
-        };
+        let filter =
+            Filter::new().from_block(BlockNumberOrTag::Pending).to_block(BlockNumberOrTag::Pending);
         assert!(filter.is_pending_block_filter());
 
-        let filter = Filter {
-            block_option: FilterBlockOption::Range {
-                from_block: Some(4365627u64.into()),
-                to_block: Some(4365627u64.into()),
-            },
-            address: "0xb59f67a8bff5d8cd03f6ac17265c550ed8f33907"
-                .parse::<Address>()
-                .unwrap()
-                .into(),
-            topics: [
-                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
-            ],
-        };
+        let filter = Filter::new().from_block(4365627u64).to_block(4365627u64);
         assert!(!filter.is_pending_block_filter());
     }
 

@@ -361,50 +361,34 @@ mod tests {
     }
 
     #[test]
-    fn params_serialize_none() {
-        let param = Params::None;
-        let serialized = serde_json::to_string(&param).unwrap();
-        assert_eq!(serialized, "[]");
-    }
-
-    #[test]
-    fn params_serialize_bool() {
-        let param = Params::Bool(true);
-        let serialized = serde_json::to_string(&param).unwrap();
-        assert_eq!(serialized, "true");
-
-        let param = Params::Bool(false);
-        let serialized = serde_json::to_string(&param).unwrap();
-        assert_eq!(serialized, "false");
-    }
-
-    #[test]
-    fn params_serialize_logs() {
-        let filter = Filter::default();
-        let param = Params::Logs(Box::new(filter.clone()));
-        let serialized = serde_json::to_string(&param).unwrap();
-        let expected = serde_json::to_string(&filter).unwrap();
-        assert_eq!(serialized, expected);
-    }
-
-    #[test]
-    fn params_serialize_transaction_receipts() {
-        let params = TransactionReceiptsParams {
-            transaction_hashes: Some(vec![B256::from(hex!(
-                "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"
-            ))]),
-        };
-        let param = Params::TransactionReceipts(params);
-        let serialized = serde_json::to_string(&param).unwrap();
-        let expected = r#"{"transactionHashes":["0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"]}"#;
-        assert_eq!(serialized, expected);
+    fn params_serialize() {
+        let filter = serde_json::to_string(&Filter::default()).unwrap();
+        for (param, expected) in [
+            (Params::None, "[]"),
+            (Params::Bool(true), "true"),
+            (Params::Bool(false), "false"),
+            (Params::Logs(Box::default()), filter.as_str()),
+            (
+                Params::TransactionReceipts(TransactionReceiptsParams {
+                    transaction_hashes: Some(vec![B256::from(hex!(
+                        "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"
+                    ))]),
+                }),
+                r#"{"transactionHashes":["0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"]}"#,
+            ),
+            (
+                Params::TransactionReceipts(TransactionReceiptsParams::default()),
+                r#"{"transactionHashes":null}"#,
+            ),
+        ] {
+            assert_eq!(serde_json::to_string(&param).unwrap(), expected);
+        }
 
         // None must be serialized as `null` (not omitted) so that round-tripping
         // through `Params::from_json_value` keeps the `TransactionReceipts` variant.
         let param = Params::TransactionReceipts(TransactionReceiptsParams::default());
-        let serialized = serde_json::to_string(&param).unwrap();
-        assert_eq!(serialized, r#"{"transactionHashes":null}"#);
-        let roundtrip: Params = serde_json::from_str(&serialized).unwrap();
+        let roundtrip: Params =
+            serde_json::from_str(&serde_json::to_string(&param).unwrap()).unwrap();
         assert_eq!(roundtrip, param);
     }
 
