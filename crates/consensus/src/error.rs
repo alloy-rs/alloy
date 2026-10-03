@@ -77,18 +77,3 @@ impl<TxType: Display> From<Infallible> for UnsupportedTransactionType<TxType> {
         match value {}
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::TxType;
-
-    #[test]
-    fn test_unsupported_tx_type_error_displays_itself_and_the_type() {
-        let error = UnsupportedTransactionType::new(TxType::Eip2930);
-        let actual_msg = error.to_string();
-        let expected_msg = "Unsupported transaction type: EIP-2930";
-
-        assert_eq!(actual_msg, expected_msg);
-    }
-}

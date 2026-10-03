@@ -298,7 +298,6 @@ dependencies = [
  "either",
  "ethereum_ssz",
  "ethereum_ssz_derive",
- "rand 0.8.8",
  "serde",
  "serde_json",
  "serde_with",
