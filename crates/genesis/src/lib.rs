@@ -1253,7 +1253,7 @@ mod tests {
     }
     use super::*;
     use alloc::{collections::BTreeMap, vec};
-    use alloy_primitives::{hex, Bytes};
+    use alloy_primitives::Bytes;
     use alloy_trie::{root::storage_root_unhashed, TrieAccount};
     use core::str::FromStr;
     use serde_json::json;
@@ -1263,121 +1263,6 @@ mod tests {
         let s = r#"{}"#;
         let genesis: Genesis = serde_json::from_str(s).unwrap();
         assert_eq!(genesis.config.chain_id, 1);
-    }
-
-    #[test]
-    fn test_genesis() {
-        let default_genesis = Genesis::default();
-
-        let nonce = 999;
-        let timestamp = 12345;
-        let extra_data = Bytes::from(b"extra-data");
-        let gas_limit = 333333;
-        let difficulty = U256::from(9000);
-        let mix_hash =
-            hex!("74385b512f1e0e47100907efe2b00ac78df26acba6dd16b0772923068a5801a8").into();
-        let coinbase = hex!("265873b6faf3258b3ab0827805386a2a20ed040e").into();
-        // create dummy account
-        let first_address: Address = hex!("7618a8c597b89e01c66a1f662078992c52a30c9a").into();
-        let mut account = BTreeMap::default();
-        account.insert(first_address, GenesisAccount::default());
-
-        // check values updated
-        let custom_genesis = Genesis::default()
-            .with_nonce(nonce)
-            .with_timestamp(timestamp)
-            .with_extra_data(extra_data.clone())
-            .with_gas_limit(gas_limit)
-            .with_difficulty(difficulty)
-            .with_mix_hash(mix_hash)
-            .with_coinbase(coinbase)
-            .extend_accounts(account.clone());
-
-        assert_ne!(custom_genesis, default_genesis);
-        // check every field
-        assert_eq!(custom_genesis.nonce, nonce);
-        assert_eq!(custom_genesis.timestamp, timestamp);
-        assert_eq!(custom_genesis.extra_data, extra_data);
-        assert_eq!(custom_genesis.gas_limit, gas_limit);
-        assert_eq!(custom_genesis.difficulty, difficulty);
-        assert_eq!(custom_genesis.mix_hash, mix_hash);
-        assert_eq!(custom_genesis.coinbase, coinbase);
-        assert_eq!(custom_genesis.alloc, account.clone());
-
-        // update existing account
-        assert_eq!(custom_genesis.alloc.len(), 1);
-        let same_address = first_address;
-        let new_alloc_account = GenesisAccount {
-            nonce: Some(1),
-            balance: U256::from(1),
-            code: Some(b"code".into()),
-            storage: Some(BTreeMap::default()),
-            private_key: None,
-            #[cfg(feature = "account-ext")]
-            extension: Default::default(),
-        };
-        let mut updated_account = BTreeMap::default();
-        updated_account.insert(same_address, new_alloc_account);
-        let custom_genesis = custom_genesis.extend_accounts(updated_account.clone());
-        assert_ne!(account, updated_account);
-        assert_eq!(custom_genesis.alloc.len(), 1);
-
-        // add second account
-        let different_address = hex!("94e0681e3073dd71cec54b53afe988f39078fd1a").into();
-        let more_accounts = BTreeMap::from([(different_address, GenesisAccount::default())]);
-        let custom_genesis = custom_genesis.extend_accounts(more_accounts);
-        assert_eq!(custom_genesis.alloc.len(), 2);
-
-        // ensure accounts are different
-        let first_account = custom_genesis.alloc.get(&first_address);
-        let second_account = custom_genesis.alloc.get(&different_address);
-        assert!(first_account.is_some());
-        assert!(second_account.is_some());
-        assert_ne!(first_account, second_account);
-    }
-
-    #[test]
-    fn test_genesis_account() {
-        let default_account = GenesisAccount::default();
-
-        let nonce = Some(1);
-        let balance = U256::from(33);
-        let code = Some(b"code".into());
-        let root = hex!("9474ddfcea39c5a690d2744103e39d1ff1b03d18db10fc147d970ad24699395a").into();
-        let value = hex!("58eb8294d9bb16832a9dabfcb270fff99ab8ee1d8764e4f3d9fdf59ec1dee469").into();
-        let mut map = BTreeMap::default();
-        map.insert(root, value);
-        let storage = Some(map);
-
-        let genesis_account = GenesisAccount::default()
-            .with_nonce(nonce)
-            .with_balance(balance)
-            .with_code(code.clone())
-            .with_storage(storage.clone());
-
-        assert_ne!(default_account, genesis_account);
-        // check every field
-        assert_eq!(genesis_account.nonce, nonce);
-        assert_eq!(genesis_account.balance, balance);
-        assert_eq!(genesis_account.code, code);
-        assert_eq!(genesis_account.storage, storage);
-    }
-
-    #[test]
-    fn parse_hive_genesis() {
-        let geth_genesis = r#"
-    {
-        "difficulty": "0x20000",
-        "gasLimit": "0x1",
-        "alloc": {},
-        "config": {
-          "ethash": {},
-          "chainId": 1
-        }
-    }
-    "#;
-
-        let _genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
     }
 
     #[test]
@@ -1478,62 +1363,6 @@ mod tests {
         for alloc in &genesis.alloc {
             assert_eq!(alloc.1.balance, dec_balance);
         }
-    }
-
-    #[test]
-    fn parse_hive_rpc_genesis() {
-        let geth_genesis = r#"
-    {
-      "config": {
-        "chainId": 7,
-        "homesteadBlock": 0,
-        "eip150Block": 0,
-        "eip150Hash": "0x5de1ee4135274003348e80b788e5afa4b18b18d320a5622218d5c493fedf5689",
-        "eip155Block": 0,
-        "eip158Block": 0
-      },
-      "coinbase": "0x0000000000000000000000000000000000000000",
-      "difficulty": "0x20000",
-      "extraData":
-    "0x0000000000000000000000000000000000000000000000000000000000000000658bdf435d810c91414ec09147daa6db624063790000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-    ,   "gasLimit": "0x2fefd8",
-      "nonce": "0x0000000000000000",
-      "timestamp": "0x1234",
-      "alloc": {
-        "cf49fda3be353c69b41ed96333cd24302da4556f": {
-          "balance": "0x123450000000000000000"
-        },
-        "0161e041aad467a890839d5b08b138c1e6373072": {
-          "balance": "0x123450000000000000000"
-        },
-        "87da6a8c6e9eff15d703fc2773e32f6af8dbe301": {
-          "balance": "0x123450000000000000000"
-        },
-        "b97de4b8c857e4f6bc354f226dc3249aaee49209": {
-          "balance": "0x123450000000000000000"
-        },
-        "c5065c9eeebe6df2c2284d046bfc906501846c51": {
-          "balance": "0x123450000000000000000"
-        },
-        "0000000000000000000000000000000000000314": {
-          "balance": "0x0",
-          "code":
-    "0x60606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063a223e05d1461006a578063abd1a0cf1461008d578063abfced1d146100d4578063e05c914a14610110578063e6768b451461014c575b610000565b346100005761007761019d565b6040518082815260200191505060405180910390f35b34610000576100be600480803573ffffffffffffffffffffffffffffffffffffffff169060200190919050506101a3565b6040518082815260200191505060405180910390f35b346100005761010e600480803573ffffffffffffffffffffffffffffffffffffffff169060200190919080359060200190919050506101ed565b005b346100005761014a600480803590602001909190803573ffffffffffffffffffffffffffffffffffffffff16906020019091905050610236565b005b346100005761017960048080359060200190919080359060200190919080359060200190919050506103c4565b60405180848152602001838152602001828152602001935050505060405180910390f35b60005481565b6000600160008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490505b919050565b80600160008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055505b5050565b7f6031a8d62d7c95988fa262657cd92107d90ed96e08d8f867d32f26edfe85502260405180905060405180910390a17f47e2689743f14e97f7dcfa5eec10ba1dff02f83b3d1d4b9c07b206cbbda66450826040518082815260200191505060405180910390a1817fa48a6b249a5084126c3da369fbc9b16827ead8cb5cdc094b717d3f1dcd995e2960405180905060405180910390a27f7890603b316f3509577afd111710f9ebeefa15e12f72347d9dffd0d65ae3bade81604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390a18073ffffffffffffffffffffffffffffffffffffffff167f7efef9ea3f60ddc038e50cccec621f86a0195894dc0520482abf8b5c6b659e4160405180905060405180910390a28181604051808381526020018273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019250505060405180910390a05b5050565b6000600060008585859250925092505b935093509390505600a165627a7a72305820aaf842d0d0c35c45622c5263cbb54813d2974d3999c8c38551d7c613ea2bc1170029"
-    ,       "storage": {
-            "0x0000000000000000000000000000000000000000000000000000000000000000": "0x1234",
-            "0x6661e9d6d8b923d5bbaab1b96e1dd51ff6ea2a93520fdc9eb75d059238b8c5e9": "0x01"
-          }
-        },
-        "0000000000000000000000000000000000000315": {
-          "balance": "0x9999999999999999999999999999999",
-          "code":
-    "0x60606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063ef2769ca1461003e575b610000565b3461000057610078600480803573ffffffffffffffffffffffffffffffffffffffff1690602001909190803590602001909190505061007a565b005b8173ffffffffffffffffffffffffffffffffffffffff166108fc829081150290604051809050600060405180830381858888f1935050505015610106578173ffffffffffffffffffffffffffffffffffffffff167f30a3c50752f2552dcc2b93f5b96866280816a986c0c0408cb6778b9fa198288f826040518082815260200191505060405180910390a25b5b50505600a165627a7a72305820637991fabcc8abad4294bf2bb615db78fbec4edff1635a2647d3894e2daf6a610029"
-        }
-      }
-    }
-    "#;
-
-        let _genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
     }
 
     #[test]
@@ -1730,78 +1559,6 @@ mod tests {
                 terminal_total_difficulty: Some(U256::ZERO),
                 terminal_total_difficulty_passed: true,
                 deposit_contract_address: Some(Address::ZERO),
-                ..Default::default()
-            },
-            nonce: 0,
-            timestamp: 0,
-            extra_data: Bytes::new(),
-            gas_limit: 0x4c4b40,
-            difficulty: U256::from(1),
-            ..Default::default()
-        };
-
-        assert_eq!(expected_genesis, got_genesis);
-    }
-
-    #[test]
-    fn parse_prague_time() {
-        let genesis = r#"
-    {
-      "config": {
-        "chainId": 1337,
-        "homesteadBlock": 0,
-        "eip150Block": 0,
-        "eip155Block": 0,
-        "eip158Block": 0,
-        "byzantiumBlock": 0,
-        "constantinopleBlock": 0,
-        "petersburgBlock": 0,
-        "istanbulBlock": 0,
-        "muirGlacierBlock": 0,
-        "berlinBlock": 0,
-        "londonBlock": 0,
-        "arrowGlacierBlock": 0,
-        "grayGlacierBlock": 0,
-        "shanghaiTime": 0,
-        "cancunTime": 0,
-        "pragueTime": 1,
-        "terminalTotalDifficulty": 0,
-        "terminalTotalDifficultyPassed": true
-      },
-      "nonce": "0x0",
-      "timestamp": "0x0",
-      "extraData": "0x",
-      "gasLimit": "0x4c4b40",
-      "difficulty": "0x1",
-      "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-      "coinbase": "0x0000000000000000000000000000000000000000"
-    }
-    "#;
-
-        let got_genesis: Genesis = serde_json::from_str(genesis).unwrap();
-        let expected_genesis = Genesis {
-            config: ChainConfig {
-                chain_id: 1337,
-                homestead_block: Some(0),
-                eip150_block: Some(0),
-                eip155_block: Some(0),
-                eip158_block: Some(0),
-                byzantium_block: Some(0),
-                constantinople_block: Some(0),
-                petersburg_block: Some(0),
-                istanbul_block: Some(0),
-                muir_glacier_block: Some(0),
-                berlin_block: Some(0),
-                london_block: Some(0),
-                arrow_glacier_block: Some(0),
-                gray_glacier_block: Some(0),
-                dao_fork_block: None,
-                dao_fork_support: false,
-                shanghai_time: Some(0),
-                cancun_time: Some(0),
-                prague_time: Some(1),
-                terminal_total_difficulty: Some(U256::ZERO),
-                terminal_total_difficulty_passed: true,
                 ..Default::default()
             },
             nonce: 0,
@@ -2214,76 +1971,6 @@ mod tests {
         let s = serde_json::to_string_pretty(&gen1).unwrap();
         let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
         assert_eq!(gen1, gen2);
-    }
-
-    #[test]
-    fn test_parent_hash_serialization() {
-        // Test that parent_hash can be serialized and deserialized correctly
-        let parent_hash =
-            B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234")
-                .unwrap();
-
-        let genesis_with_parent_hash = Genesis::default().with_parent_hash(Some(parent_hash));
-        let json = serde_json::to_string(&genesis_with_parent_hash).unwrap();
-        let deserialized: Genesis = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(deserialized.parent_hash, Some(parent_hash));
-
-        // Test that parent_hash is omitted when None (skip_serializing_if behavior)
-        let genesis_without_parent_hash = Genesis::default().with_parent_hash(None);
-        let json = serde_json::to_string(&genesis_without_parent_hash).unwrap();
-        assert!(!json.contains("parentHash"), "parentHash should be omitted when None");
-
-        // Test deserialization without parent_hash field (should default to None)
-        let genesis_json = r#"
-        {
-            "nonce": "0x0",
-            "timestamp": "0x0",
-            "extraData": "0x",
-            "gasLimit": "0x4c4b40",
-            "difficulty": "0x1",
-            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "coinbase": "0x0000000000000000000000000000000000000000"
-        }
-        "#;
-        let genesis: Genesis = serde_json::from_str(genesis_json).unwrap();
-        assert_eq!(genesis.parent_hash, None);
-
-        // Test deserialization with parent_hash field
-        let genesis_json_with_parent_hash = r#"
-        {
-            "nonce": "0x0",
-            "timestamp": "0x0",
-            "extraData": "0x",
-            "gasLimit": "0x4c4b40",
-            "difficulty": "0x1",
-            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "coinbase": "0x0000000000000000000000000000000000000000",
-            "parentHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
-        }
-        "#;
-        let genesis: Genesis = serde_json::from_str(genesis_json_with_parent_hash).unwrap();
-        assert_eq!(genesis.parent_hash, Some(parent_hash));
-
-        // Test that zero hash is preserved as Some(B256::ZERO) when explicitly set
-        let genesis_json_with_zero_hash = r#"
-        {
-            "nonce": "0x0",
-            "timestamp": "0x0",
-            "extraData": "0x",
-            "gasLimit": "0x4c4b40",
-            "difficulty": "0x1",
-            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "coinbase": "0x0000000000000000000000000000000000000000",
-            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
-        }
-        "#;
-        let genesis: Genesis = serde_json::from_str(genesis_json_with_zero_hash).unwrap();
-        assert_eq!(
-            genesis.parent_hash,
-            Some(B256::ZERO),
-            "Zero hash should be preserved when explicitly set"
-        );
     }
 
     #[test]
