@@ -14,7 +14,7 @@ pub struct Log<T = LogData> {
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<BlockHash>,
     /// Number of the block the transaction that emitted this log was mined in
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
     /// The block timestamp in Unix seconds, as proposed in:
     /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
@@ -32,11 +32,11 @@ pub struct Log<T = LogData> {
     #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<TxHash>,
     /// Index of the Transaction in the block
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     #[doc(alias = "tx_index")]
     pub transaction_index: Option<u64>,
     /// Log Index in Block
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub log_index: Option<u64>,
     /// Whether a previously emitted log was removed from the canonical chain by a reorganization.
     ///
@@ -284,5 +284,36 @@ mod tests {
 
         let deserialized: Log = serde_json::from_str(&serialized).unwrap();
         assert_eq!(log, deserialized);
+    }
+
+    // `blockNumber`, `transactionIndex` and `logIndex` are optional in `eth_getLogs` responses and
+    // may be omitted entirely by the node, so an omitted field must deserialize to `None` instead
+    // of failing with `missing field`.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_log_omitted_optional_metadata() {
+        let json = r#"{"address":"0x0000000000000000000000000000000000000069","topics":["0x0000000000000000000000000000000000000000000000000000000000000069"],"data":"0x69","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000069","transactionHash":"0x0000000000000000000000000000000000000000000000000000000000000069","removed":false}"#;
+        let log: Log = serde_json::from_str(json).unwrap();
+
+        assert_eq!(log.block_number, None);
+        assert_eq!(log.transaction_index, None);
+        assert_eq!(log.log_index, None);
+        assert_eq!(log.block_timestamp, None);
+        // Non-quantity optional fields already behaved this way.
+        assert_eq!(log.block_hash, Some(B256::with_last_byte(0x69)));
+        assert_eq!(log.transaction_hash, Some(B256::with_last_byte(0x69)));
+    }
+
+    // Explicit `null`s must keep working after adding `default`.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_log_null_optional_metadata() {
+        let json = r#"{"address":"0x0000000000000000000000000000000000000069","topics":["0x0000000000000000000000000000000000000000000000000000000000000069"],"data":"0x69","blockNumber":null,"blockTimestamp":null,"transactionIndex":null,"logIndex":null,"removed":false}"#;
+        let log: Log = serde_json::from_str(json).unwrap();
+
+        assert_eq!(log.block_number, None);
+        assert_eq!(log.block_timestamp, None);
+        assert_eq!(log.transaction_index, None);
+        assert_eq!(log.log_index, None);
     }
 }
