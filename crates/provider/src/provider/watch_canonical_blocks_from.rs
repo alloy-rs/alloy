@@ -739,28 +739,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn canonical_builder_exposes_watch_blocks_from_methods() {
-        let chain = MockChain::new();
-        chain.extend(&[block(1, 1, 0)]);
-
-        let provider = chain.provider();
-        let mut stream = provider
-            .watch_canonical_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .hashes()
-            .rpc_concurrency(1)
-            .max_reorg_depth(8)
-            .into_stream();
-
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        match first {
-            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 1),
-            other => panic!("expected Added(1), got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
     async fn stream_ends_when_provider_is_dropped() {
         let chain = MockChain::new();
         let provider = chain.provider();

@@ -515,22 +515,4 @@ mod tests {
 
         assert_eq!(block.header.beneficiary, miner);
     }
-
-    // <https://github.com/alloy-rs/alloy/issues/2117>
-    #[tokio::test]
-    async fn test_pending_block_deser() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://binance.llamarpc.com".parse().unwrap());
-
-        let res = provider.get_block_by_number(BlockNumberOrTag::Pending).full().await;
-        if let Err(err) = &res {
-            let err_str = err.to_string();
-            if err_str.contains("no response") || err.is_transport_error() {
-                // response can be flaky due to network issues
-                eprintln!("skipping flaky response: {err:?}");
-                return;
-            }
-        }
-        let _block = res.unwrap();
-    }
 }

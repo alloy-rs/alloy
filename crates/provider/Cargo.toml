@@ -85,7 +85,6 @@ alloy-consensus = { workspace = true, features = ["kzg", "k256"] }
 alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
-alloy-rlp.workspace = true
 alloy-signer.workspace = true
 alloy-signer-local.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest", "jwt-auth"] }
