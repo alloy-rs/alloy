@@ -73,7 +73,6 @@ impl BeaconNodeEventTopic {
 /// This event gives block builders and relays sufficient information to construct or verify a block
 /// at `proposal_slot`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PayloadAttributesEvent {
     /// the identifier of the beacon hard fork at `proposal_slot`, e.g `"bellatrix"`, `"capella"`.
     pub version: String,
@@ -126,7 +125,6 @@ pub struct BlockEvent {
 /// Event for the `Attestation` topic of the beacon API node event stream.
 ///
 /// The node has received a valid attestation (from P2P or API)
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestationEvent {
     /// The aggregation bits of the attestation.
@@ -184,7 +182,7 @@ pub struct BlsToExecutionChangeMessage {
     pub to_execution_address: Address,
 }
 
-/// Event for the `Deposit` topic of the beacon API node event stream.
+/// Event for the `FinalizedCheckpoint` topic of the beacon API node event stream.
 ///
 /// Finalized checkpoint has been updated
 #[serde_as]
