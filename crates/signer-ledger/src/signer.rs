@@ -337,7 +337,7 @@ impl LedgerSigner {
 
     /// Helper function for signing either transaction data, personal messages or EIP712 derived
     /// structs.
-    #[instrument(err, skip_all, fields(command = %command, payload = hex::encode(payload)))]
+    #[instrument(err, skip_all, fields(command = ?command, payload = hex::encode(payload)))]
     async fn sign_payload(&self, command: INS, payload: &[u8]) -> Result<Signature, LedgerError> {
         // @note Because tlv encoding is done on 7702 auth types sig, it checks if chunks are the
         // header or continuations. @note We need to mention the starter chunk first.
