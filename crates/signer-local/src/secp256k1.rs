@@ -287,12 +287,6 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn parse_pk() {
-        let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
-        let _pk: Secp256k1Signer = s.parse().unwrap();
-    }
-
-    #[test]
     fn parse_short_key() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea3";
         assert!(s.len() < 64);

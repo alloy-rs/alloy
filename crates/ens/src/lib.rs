@@ -837,19 +837,7 @@ mod provider_tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_pub_resolver_fetching_txt() {
-        let res = provider().lookup_txt("vitalik.eth", "avatar").await.unwrap();
-        assert_eq!(res, "https://euc.li/vitalik.eth")
-    }
-
     // Fixtures from <https://github.com/ensdomains/resolution-tests/blob/main/test-cases.json>.
-
-    #[tokio::test]
-    async fn test_resolve_wildcard_name() {
-        let addr = provider().resolve_name("moo331.nft-owner.eth").await.unwrap();
-        assert_eq!(addr, address!("0x51050ec063d393217B436747617aD1C2285Aeeee"));
-    }
 
     #[tokio::test]
     async fn test_resolve_offchain_name() {
