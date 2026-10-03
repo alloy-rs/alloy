@@ -1,8 +1,11 @@
-//! Variant selection of the untagged [`ExecutionPayload`] deserializer.
+//! Deserialization of execution payloads from JSON.
 
 #![cfg(feature = "serde")]
 
-use alloy_rpc_types_engine::ExecutionPayload;
+use alloy_rpc_types_engine::{
+    ExecutionPayload, ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ExecutionPayloadV2,
+};
+use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 
 const MAINNET_PAYLOAD: &str = include_str!(
@@ -103,6 +106,72 @@ fn execution_payload_variant_selection() {
             assert_eq!(payload.block_access_list.as_ref(), [0xc0]);
             assert_eq!(payload.slot_number, 0x10);
             assert_eq!(payload.payload_inner.blob_gas_used, 0x20000);
+        }
+    }
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
+fn accepts<T: DeserializeOwned>(json: &str) -> bool {
+    serde_json::from_str::<T>(json).is_ok()
+}
+
+#[test]
+fn execution_payload_field_handling() {
+    const V2_FIELDS: [&str; 15] = [
+        "parentHash",
+        "feeRecipient",
+        "stateRoot",
+        "receiptsRoot",
+        "logsBloom",
+        "prevRandao",
+        "blockNumber",
+        "gasLimit",
+        "gasUsed",
+        "timestamp",
+        "extraData",
+        "baseFeePerGas",
+        "blockHash",
+        "transactions",
+        "withdrawals",
+    ];
+
+    let v2 = v1_payload_with(json!({ "withdrawals": [] }));
+    let duplicate_field =
+        v2.to_string().replacen('{', &format!("{{\"blockNumber\":{},", v2["blockNumber"]), 1);
+    let sequence = Value::Array(V2_FIELDS.iter().map(|field| v2[field].clone()).collect());
+
+    // ExecutionPayload, ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ExecutionPayloadV2
+    let cases = [
+        ("v2", v2.to_string(), [true, true, true, true]),
+        (
+            "unknown field",
+            v1_payload_with(json!({ "withdrawals": [], "unknownField": "0x1" })).to_string(),
+            [false, true, false, true],
+        ),
+        (
+            "null withdrawals",
+            v1_payload_with(json!({ "withdrawals": null })).to_string(),
+            [false, true, true, false],
+        ),
+        (
+            "null blobGasUsed",
+            v1_payload_with(json!({ "withdrawals": [], "blobGasUsed": null })).to_string(),
+            [false, true, false, true],
+        ),
+        ("duplicate field", duplicate_field, [false; 4]),
+        ("sequence", sequence.to_string(), [false, false, true, true]),
+    ];
+
+    let mut mismatches = Vec::new();
+    for (name, json, expected) in cases {
+        let accepted = [
+            accepts::<ExecutionPayload>(&json),
+            accepts::<ExecutionPayloadFieldV2>(&json),
+            accepts::<ExecutionPayloadInputV2>(&json),
+            accepts::<ExecutionPayloadV2>(&json),
+        ];
+        if accepted != expected {
+            mismatches.push(format!("{name}: expected {expected:?}, got {accepted:?}"));
         }
     }
     assert!(mismatches.is_empty(), "{mismatches:#?}");
