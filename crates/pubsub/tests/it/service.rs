@@ -147,6 +147,29 @@ async fn reconnect_resubscribes_under_new_server_id() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn unsubscribe_during_resubscribe_keeps_service_alive() {
+    let (frontend, _, [mut first, mut second]) = spawn_service().await;
+    let local_id = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
+    first.notify("0xaaa", json!(1));
+    drop(frontend.get_subscription(local_id).await.unwrap());
+
+    first.close();
+    assert_eq!(second.recv().await["method"], "eth_subscribe");
+    frontend.unsubscribe(local_id).unwrap();
+    assert!(frontend.get_subscription(local_id).await.is_err());
+    second.respond(1, json!("0xbbb"));
+
+    let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 2, json!([]))));
+    assert_eq!(second.recv().await["method"], "eth_blockNumber");
+    second.respond(2, json!("0x10"));
+    assert_eq!(
+        within(resp).await.unwrap().unwrap().payload.as_success().unwrap().get(),
+        r#""0x10""#
+    );
+    assert!(frontend.get_subscription(local_id).await.is_err());
+}
+
+#[tokio::test(start_paused = true)]
 async fn exhausted_reconnects_shut_down_service() {
     let (mut frontend, connector, [mut backend]) = spawn_service().await;
     let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 1, json!([]))));
