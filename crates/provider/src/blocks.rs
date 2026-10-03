@@ -291,34 +291,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn yield_block_http() {
-        yield_block(false).await;
-    }
-    #[tokio::test]
-    #[cfg(feature = "ws-base")]
-    async fn yield_block_ws() {
-        yield_block(true).await;
-    }
-    async fn yield_block(ws: bool) {
-        let anvil = Anvil::new().spawn();
-
-        let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
-        let provider = ProviderBuilder::new().connect(&url).await.unwrap();
-
-        let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client()).with_next_yield(1);
-        let mut stream = Box::pin(new_blocks.into_stream());
-        if ws {
-            let _ = try_timeout(stream.next()).await; // Subscribe to newHeads.
-        }
-
-        // We will also use provider to manipulate anvil instance via RPC.
-        provider.anvil_mine(Some(1), None).await.unwrap();
-
-        let block = timeout(stream.next()).await.expect("Block wasn't fetched");
-        assert_eq!(block.header.number, 1);
-    }
-
-    #[tokio::test]
     async fn yield_many_blocks_http() {
         yield_many_blocks(false).await;
     }

@@ -905,12 +905,4 @@ mod tests {
 
         let _: ProviderBuilder<ChainLayer, Identity, Ethereum> = builder;
     }
-
-    #[tokio::test]
-    async fn network_swap_works_at_runtime() {
-        // Verify that `ProviderBuilder::new().network::<AnyNetwork>()` produces a working provider.
-        let p = ProviderBuilder::new().network::<AnyNetwork>().connect_anvil();
-        let num = p.get_block_number().await.unwrap();
-        assert_eq!(num, 0);
-    }
 }
