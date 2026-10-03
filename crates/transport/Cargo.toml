@@ -45,6 +45,7 @@ auto_impl.workspace = true
 # Test-only dependencies
 [dev-dependencies]
 alloy-primitives.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
 tokio = { workspace = true, features = ["rt", "time", "sync", "macros"] }
