@@ -1,6 +1,6 @@
 use crate::ProviderCall;
 use alloy_eips::BlockId;
-use alloy_json_rpc::RpcRecv;
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes};
 use alloy_rpc_types_eth::{
@@ -14,7 +14,7 @@ use std::{
     future::{Future, IntoFuture},
     marker::PhantomData,
     sync::Arc,
-    task::Poll,
+    task::{Context, Poll},
     time::Duration,
 };
 
@@ -45,85 +45,7 @@ where
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {
-    inner: EthCallFutInner<N, Resp, Output, Map>,
-}
-
-enum EthCallFutInner<N, Resp, Output, Map>
-where
-    N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
-{
-    Preparing {
-        caller: Arc<dyn Caller<N, Resp>>,
-        params: EthCallParams<N>,
-        method: &'static str,
-        map: Map,
-    },
-    Running {
-        map: Map,
-        fut: ProviderCall<EthCallParams<N>, Resp>,
-    },
-    Polling,
-}
-
-impl<N, Resp, Output, Map> core::fmt::Debug for EthCallFutInner<N, Resp, Output, Map>
-where
-    N: Network,
-    Resp: RpcRecv,
-    Output: 'static,
-    Map: Fn(Resp) -> Output,
-{
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Preparing { caller: _, params, method, map: _ } => {
-                f.debug_struct("Preparing").field("params", params).field("method", method).finish()
-            }
-            Self::Running { .. } => f.debug_tuple("Running").finish(),
-            Self::Polling => f.debug_tuple("Polling").finish(),
-        }
-    }
-}
-
-impl<N, Resp, Output, Map> EthCallFut<N, Resp, Output, Map>
-where
-    N: Network,
-    Resp: RpcRecv,
-    Output: 'static,
-    Map: Fn(Resp) -> Output,
-{
-    /// Returns `true` if the future is in the preparing state.
-    const fn is_preparing(&self) -> bool {
-        matches!(self.inner, EthCallFutInner::Preparing { .. })
-    }
-
-    /// Returns `true` if the future is in the running state.
-    const fn is_running(&self) -> bool {
-        matches!(self.inner, EthCallFutInner::Running { .. })
-    }
-
-    fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let EthCallFutInner::Preparing { caller, params, method, map } =
-            std::mem::replace(&mut self.inner, EthCallFutInner::Polling)
-        else {
-            unreachable!("bad state")
-        };
-
-        let fut =
-            if method.eq("eth_call") { caller.call(params) } else { caller.estimate_gas(params) }?;
-
-        self.inner = EthCallFutInner::Running { map, fut };
-
-        self.poll_running(cx)
-    }
-
-    fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let EthCallFutInner::Running { ref map, ref mut fut } = self.inner else {
-            unreachable!("bad state")
-        };
-
-        fut.poll_unpin(cx).map(|res| res.map(map))
-    }
+    inner: CallFutState<N, Resp, (EthCallParams<N>, &'static str), EthCallParams<N>, Map>,
 }
 
 impl<N, Resp, Output, Map> Future for EthCallFut<N, Resp, Output, Map>
@@ -135,17 +57,81 @@ where
 {
     type Output = TransportResult<Output>;
 
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let this = self.get_mut();
-        if this.is_preparing() {
-            this.poll_preparing(cx)
-        } else if this.is_running() {
-            this.poll_running(cx)
-        } else {
-            panic!("unexpected state")
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.get_mut().inner.poll(cx, |caller, (params, method)| {
+            if method.eq("eth_call") {
+                caller.call(params)
+            } else {
+                caller.estimate_gas(params)
+            }
+        })
+    }
+}
+
+/// State machine shared by [`EthCallFut`] and [`CallManyFut`](call_many::CallManyFut).
+///
+/// The request is handed to the [`Caller`] on the first poll, then the returned [`ProviderCall`]
+/// is polled to completion.
+enum CallFutState<N, Resp, Req, Params, Map>
+where
+    N: Network,
+    Resp: RpcRecv,
+    Params: RpcSend,
+{
+    Preparing { caller: Arc<dyn Caller<N, Resp>>, req: Req, map: Map },
+    Running { fut: ProviderCall<Params, Resp>, map: Map },
+    Polling,
+}
+
+impl<N, Resp, Req, Params, Map> CallFutState<N, Resp, Req, Params, Map>
+where
+    N: Network,
+    Resp: RpcRecv,
+    Params: RpcSend,
+{
+    fn poll<Output>(
+        &mut self,
+        cx: &mut Context<'_>,
+        dispatch: impl FnOnce(&dyn Caller<N, Resp>, Req) -> TransportResult<ProviderCall<Params, Resp>>,
+    ) -> Poll<TransportResult<Output>>
+    where
+        Map: Fn(Resp) -> Output,
+    {
+        match self {
+            Self::Preparing { .. } => {
+                let Self::Preparing { caller, req, map } = std::mem::replace(self, Self::Polling)
+                else {
+                    unreachable!("bad state")
+                };
+                *self = Self::Running { fut: dispatch(&*caller, req)?, map };
+                self.poll_running(cx)
+            }
+            Self::Running { .. } => self.poll_running(cx),
+            Self::Polling => panic!("unexpected state"),
+        }
+    }
+
+    fn poll_running<Output>(&mut self, cx: &mut Context<'_>) -> Poll<TransportResult<Output>>
+    where
+        Map: Fn(Resp) -> Output,
+    {
+        let Self::Running { fut, map } = self else { unreachable!("bad state") };
+        fut.poll_unpin(cx).map(|res| res.map(&*map))
+    }
+}
+
+impl<N, Resp, Req, Params, Map> core::fmt::Debug for CallFutState<N, Resp, Req, Params, Map>
+where
+    N: Network,
+    Resp: RpcRecv,
+    Req: core::fmt::Debug,
+    Params: RpcSend,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Preparing { req, .. } => f.debug_tuple("Preparing").field(req).finish(),
+            Self::Running { .. } => f.debug_tuple("Running").finish(),
+            Self::Polling => f.debug_tuple("Polling").finish(),
         }
     }
 }
@@ -420,10 +406,9 @@ where
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut {
-            inner: EthCallFutInner::Preparing {
+            inner: CallFutState::Preparing {
                 caller: self.caller,
-                params: self.params,
-                method: self.method,
+                req: (self.params, self.method),
                 map: self.map,
             },
         }
@@ -533,5 +518,80 @@ mod test {
             serde_json::to_string(&params).unwrap(),
             r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"0x1"]"#
         );
+    }
+}
+
+#[cfg(test)]
+mod fut_tests {
+    use super::*;
+    use alloy_network::Ethereum;
+    use alloy_primitives::U256;
+    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_transport::TransportErrorKind;
+
+    /// Answers each [`Caller`] method with a distinct value, or fails to dispatch.
+    #[derive(Clone, Copy, Debug)]
+    struct StaticCaller {
+        fail: bool,
+    }
+
+    impl StaticCaller {
+        fn respond<P: RpcSend>(self, value: u64) -> TransportResult<ProviderCall<P, U256>> {
+            if self.fail {
+                return Err(TransportErrorKind::backend_gone());
+            }
+            Ok(ProviderCall::Ready(Some(Ok(U256::from(value)))))
+        }
+    }
+
+    impl Caller<Ethereum, U256> for StaticCaller {
+        fn call(
+            &self,
+            _params: EthCallParams<Ethereum>,
+        ) -> TransportResult<ProviderCall<EthCallParams<Ethereum>, U256>> {
+            self.respond(1)
+        }
+
+        fn estimate_gas(
+            &self,
+            _params: EthCallParams<Ethereum>,
+        ) -> TransportResult<ProviderCall<EthCallParams<Ethereum>, U256>> {
+            self.respond(2)
+        }
+
+        fn call_many(
+            &self,
+            _params: EthCallManyParams<'_>,
+        ) -> TransportResult<ProviderCall<EthCallManyParams<'static>, U256>> {
+            self.respond(3)
+        }
+    }
+
+    #[tokio::test]
+    async fn dispatches_to_caller_and_maps_response() {
+        let caller = StaticCaller { fail: false };
+        let tx = TransactionRequest::default();
+
+        assert_eq!(EthCall::call(caller, tx.clone()).await.unwrap(), U256::from(1));
+        assert_eq!(EthCall::gas_estimate(caller, tx.clone()).await.unwrap(), U256::from(2));
+        assert_eq!(EthCallMany::new(caller, &[]).await.unwrap(), U256::from(3));
+        assert_eq!(
+            EthCall::call(caller, tx).map_resp(|v: U256| v.to::<u64>() + 10).await.unwrap(),
+            11
+        );
+        assert_eq!(
+            EthCallMany::new(caller, &[]).map(|v: U256| v.to::<u64>() + 10).await.unwrap(),
+            13
+        );
+    }
+
+    #[tokio::test]
+    async fn returns_dispatch_error() {
+        let caller = StaticCaller { fail: true };
+
+        let err = EthCall::call(caller, TransactionRequest::default()).await.unwrap_err();
+        assert!(err.as_transport_err().is_some_and(TransportErrorKind::is_backend_gone));
+        let err = EthCallMany::new(caller, &[]).await.unwrap_err();
+        assert!(err.as_transport_err().is_some_and(TransportErrorKind::is_backend_gone));
     }
 }

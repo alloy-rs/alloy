@@ -5,11 +5,9 @@ use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_rpc_types_eth::{state::StateOverride, Bundle, StateContext, TransactionIndex};
 use alloy_transport::TransportResult;
-use futures::{future, FutureExt};
+use futures::future;
 
-use crate::ProviderCall;
-
-use super::{Caller, EthCallManyParams};
+use super::{CallFutState, Caller, EthCallManyParams};
 
 /// A builder for an `"eth_callMany"` RPC request.
 #[derive(Clone)]
@@ -157,11 +155,7 @@ where
 
     fn into_future(self) -> Self::IntoFuture {
         CallManyFut {
-            inner: CallManyInnerFut::Preparing {
-                caller: self.caller,
-                params: self.params,
-                map: self.map,
-            },
+            inner: CallFutState::Preparing { caller: self.caller, req: self.params, map: self.map },
         }
     }
 }
@@ -172,42 +166,7 @@ where
 #[expect(unnameable_types)]
 #[pin_project::pin_project]
 pub struct CallManyFut<'req, N: Network, Resp: RpcRecv, Output, Map: Fn(Resp) -> Output> {
-    inner: CallManyInnerFut<'req, N, Resp, Output, Map>,
-}
-
-impl<N, Resp, Output, Map> CallManyFut<'_, N, Resp, Output, Map>
-where
-    N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
-{
-    const fn is_preparing(&self) -> bool {
-        matches!(self.inner, CallManyInnerFut::Preparing { .. })
-    }
-
-    const fn is_running(&self) -> bool {
-        matches!(self.inner, CallManyInnerFut::Running { .. })
-    }
-
-    fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let CallManyInnerFut::Preparing { caller, params, map } =
-            std::mem::replace(&mut self.inner, CallManyInnerFut::Polling)
-        else {
-            unreachable!("bad state");
-        };
-
-        let fut = caller.call_many(params)?;
-        self.inner = CallManyInnerFut::Running { fut, map };
-        self.poll_running(cx)
-    }
-
-    fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let CallManyInnerFut::Running { ref mut fut, ref map } = self.inner else {
-            unreachable!("bad state");
-        };
-
-        fut.poll_unpin(cx).map(|res| res.map(map))
-    }
+    inner: CallFutState<N, Resp, EthCallManyParams<'req>, EthCallManyParams<'static>, Map>,
 }
 
 impl<N, Resp, Output, Map> future::Future for CallManyFut<'_, N, Resp, Output, Map>
@@ -219,37 +178,6 @@ where
     type Output = TransportResult<Output>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-
-        if this.is_preparing() {
-            this.poll_preparing(cx)
-        } else if this.is_running() {
-            this.poll_running(cx)
-        } else {
-            panic!("bad state");
-        }
-    }
-}
-
-enum CallManyInnerFut<'req, N: Network, Resp: RpcRecv, Output, Map: Fn(Resp) -> Output> {
-    Preparing { caller: Arc<dyn Caller<N, Resp>>, params: EthCallManyParams<'req>, map: Map },
-    Running { fut: ProviderCall<EthCallManyParams<'static>, Resp>, map: Map },
-    Polling,
-}
-
-impl<N, Resp, Output, Map> std::fmt::Debug for CallManyInnerFut<'_, N, Resp, Output, Map>
-where
-    N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CallManyInnerFut::Preparing { params, .. } => {
-                f.debug_tuple("Preparing").field(&params).finish()
-            }
-            CallManyInnerFut::Running { .. } => f.debug_tuple("Running").finish(),
-            CallManyInnerFut::Polling => f.debug_tuple("Polling").finish(),
-        }
+        self.get_mut().inner.poll(cx, |caller, params| caller.call_many(params))
     }
 }
