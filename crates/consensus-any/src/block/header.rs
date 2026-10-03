@@ -145,57 +145,7 @@ impl AnyHeader {
             return Err(ValueError::new(self, "missing mix hash field"));
         }
 
-        let Self {
-            parent_hash,
-            ommers_hash,
-            beneficiary,
-            state_root,
-            transactions_root,
-            receipts_root,
-            logs_bloom,
-            difficulty,
-            number,
-            gas_limit,
-            gas_used,
-            timestamp,
-            extra_data,
-            mix_hash,
-            nonce,
-            base_fee_per_gas,
-            withdrawals_root,
-            blob_gas_used,
-            excess_blob_gas,
-            parent_beacon_block_root,
-            requests_hash,
-            block_access_list_hash,
-            slot_number,
-        } = self;
-
-        Ok(Header {
-            parent_hash,
-            ommers_hash,
-            beneficiary,
-            state_root,
-            transactions_root,
-            receipts_root,
-            logs_bloom,
-            difficulty,
-            number,
-            gas_limit,
-            gas_used,
-            timestamp,
-            extra_data,
-            mix_hash: mix_hash.unwrap(),
-            nonce: nonce.unwrap(),
-            base_fee_per_gas,
-            withdrawals_root,
-            blob_gas_used,
-            excess_blob_gas,
-            parent_beacon_block_root,
-            requests_hash,
-            block_access_list_hash,
-            slot_number,
-        })
+        Ok(self.into_header_with_defaults())
     }
 
     /// Converts this header into a [`Header`] with default values for missing mandatory fields:
