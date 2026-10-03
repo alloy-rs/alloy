@@ -226,6 +226,9 @@ impl JwtSecret {
 
     /// Creates a random [`JwtSecret`] and tries to store it at the specified path. I/O errors might
     /// occur during write operations in the form of a [`JwtError`]
+    ///
+    /// On Unix, the file is created (or overwritten) with `0600` permissions, so that it is only
+    /// readable and writable by its owner.
     #[cfg(feature = "std")]
     pub fn try_create_random(fpath: &Path) -> Result<Self, JwtError> {
         if let Some(dir) = fpath.parent() {
@@ -237,7 +240,20 @@ impl JwtSecret {
         let secret = Self::random();
         let bytes = &secret.0;
         let hex = hex::encode(bytes);
-        fs::write(fpath, hex).map_err(|err| JwtError::Write { source: err, path: fpath.into() })?;
+        let write = || -> io::Result<()> {
+            let mut opts = fs::OpenOptions::new();
+            opts.write(true).create(true).truncate(false);
+            #[cfg(unix)]
+            std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+            let mut file = opts.open(fpath)?;
+            // `mode` only applies to new files, so also restrict the permissions of an existing
+            // file. This happens before truncating, so its contents are kept if it fails.
+            #[cfg(unix)]
+            file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+            file.set_len(0)?;
+            io::Write::write_all(&mut file, hex.as_bytes())
+        };
+        write().map_err(|err| JwtError::Write { source: err, path: fpath.into() })?;
         Ok(secret)
     }
 
@@ -526,6 +542,35 @@ mod tests {
         JwtSecret::try_create_random(fpath).expect("A secret file should be created");
         assert!(fs::metadata(fpath).is_ok());
         fs::remove_file(fpath).unwrap();
+    }
+
+    #[test]
+    #[cfg(all(feature = "std", unix))]
+    fn created_secret_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let fpath = dir.path().join("jwt.hex");
+        let secret = JwtSecret::try_create_random(&fpath).unwrap();
+        let mode = fs::metadata(&fpath).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(JwtSecret::from_file(&fpath).unwrap(), secret);
+    }
+
+    #[test]
+    #[cfg(all(feature = "std", unix))]
+    fn overwritten_secret_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let fpath = dir.path().join("jwt.hex");
+        // longer than the new secret, to also check that the file is truncated
+        fs::write(&fpath, "f".repeat(128)).unwrap();
+        fs::set_permissions(&fpath, fs::Permissions::from_mode(0o644)).unwrap();
+        let secret = JwtSecret::try_create_random(&fpath).unwrap();
+        let mode = fs::metadata(&fpath).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(JwtSecret::from_file(&fpath).unwrap(), secret);
     }
 
     #[test]
