@@ -158,7 +158,6 @@ pub struct SignedBidSubmissionV3 {
 ///
 ///
 /// Also known as `ElectraSubmitBlockRequest`.
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -180,7 +179,6 @@ pub struct SignedBidSubmissionV4 {
 ///
 ///
 /// Also known as `FuluSubmitBlockRequest`.
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -202,7 +200,6 @@ pub struct SignedBidSubmissionV5 {
 ///
 ///
 /// Also known as `AmsterdamSubmitBlockRequest`.
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -387,23 +384,12 @@ impl BuilderBlockValidationRequestV4 {
     #[cfg(all(feature = "sha2", feature = "ssz"))]
     pub fn into_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
         let versioned_hashes = self.request.blobs_bundle.versioned_hashes();
-
-        // Create Cancun payload fields
-        let cancun_fields = alloy_rpc_types_engine::CancunPayloadFields {
-            parent_beacon_block_root: self.parent_beacon_block_root,
+        execution_data_with_v4_sidecar(
+            self.request.execution_payload.into(),
+            self.parent_beacon_block_root,
             versioned_hashes,
-        };
-
-        // Convert execution requests to Requests type
-        let prague_fields = alloy_rpc_types_engine::PraguePayloadFields::new(
             self.request.execution_requests.to_requests(),
-        );
-
-        // Create the execution payload sidecar
-        let sidecar =
-            alloy_rpc_types_engine::ExecutionPayloadSidecar::v4(cancun_fields, prague_fields);
-
-        alloy_rpc_types_engine::ExecutionData::new(self.request.execution_payload.into(), sidecar)
+        )
     }
 }
 
@@ -436,23 +422,12 @@ impl BuilderBlockValidationRequestV5 {
     #[cfg(all(feature = "sha2", feature = "ssz"))]
     pub fn into_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
         let versioned_hashes = self.request.blobs_bundle.versioned_hashes();
-
-        // Create Cancun payload fields
-        let cancun_fields = alloy_rpc_types_engine::CancunPayloadFields {
-            parent_beacon_block_root: self.parent_beacon_block_root,
+        execution_data_with_v4_sidecar(
+            self.request.execution_payload.into(),
+            self.parent_beacon_block_root,
             versioned_hashes,
-        };
-
-        // Convert execution requests to Requests type
-        let prague_fields = alloy_rpc_types_engine::PraguePayloadFields::new(
             self.request.execution_requests.to_requests(),
-        );
-
-        // Create the execution payload sidecar
-        let sidecar =
-            alloy_rpc_types_engine::ExecutionPayloadSidecar::v4(cancun_fields, prague_fields);
-
-        alloy_rpc_types_engine::ExecutionData::new(self.request.execution_payload.into(), sidecar)
+        )
     }
 }
 
@@ -485,25 +460,11 @@ impl BuilderBlockValidationRequestV6 {
     #[cfg(all(feature = "sha2", feature = "ssz"))]
     pub fn into_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
         let versioned_hashes = self.request.blobs_bundle.versioned_hashes();
-
-        // Create Cancun payload fields
-        let cancun_fields = alloy_rpc_types_engine::CancunPayloadFields {
-            parent_beacon_block_root: self.parent_beacon_block_root,
-            versioned_hashes,
-        };
-
-        // Convert execution requests to Requests type
-        let prague_fields = alloy_rpc_types_engine::PraguePayloadFields::new(
-            self.request.execution_requests.to_requests(),
-        );
-
-        // Create the execution payload sidecar
-        let sidecar =
-            alloy_rpc_types_engine::ExecutionPayloadSidecar::v4(cancun_fields, prague_fields);
-
-        alloy_rpc_types_engine::ExecutionData::new(
+        execution_data_with_v4_sidecar(
             alloy_rpc_types_engine::ExecutionPayload::V4(self.request.execution_payload),
-            sidecar,
+            self.parent_beacon_block_root,
+            versioned_hashes,
+            self.request.execution_requests.to_requests(),
         )
     }
 }
@@ -513,6 +474,22 @@ impl From<BuilderBlockValidationRequestV6> for alloy_rpc_types_engine::Execution
     fn from(request: BuilderBlockValidationRequestV6) -> Self {
         request.into_execution_data()
     }
+}
+
+/// Builds [`alloy_rpc_types_engine::ExecutionData`] with a V4 sidecar from the parts of a block
+/// validation request.
+#[cfg(all(feature = "sha2", feature = "ssz"))]
+fn execution_data_with_v4_sidecar(
+    payload: alloy_rpc_types_engine::ExecutionPayload,
+    parent_beacon_block_root: B256,
+    versioned_hashes: Vec<B256>,
+    requests: alloy_eips::eip7685::Requests,
+) -> alloy_rpc_types_engine::ExecutionData {
+    let sidecar = alloy_rpc_types_engine::ExecutionPayloadSidecar::v4(
+        alloy_rpc_types_engine::CancunPayloadFields { parent_beacon_block_root, versioned_hashes },
+        alloy_rpc_types_engine::PraguePayloadFields::new(requests),
+    );
+    alloy_rpc_types_engine::ExecutionData::new(payload, sidecar)
 }
 
 /// Response type for the GET `/relay/v1/data/bidtraces/builder_blocks_received`

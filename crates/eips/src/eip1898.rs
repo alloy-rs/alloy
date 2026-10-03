@@ -916,7 +916,7 @@ impl Decodable for HashOrNumber {
             Ok(B256::decode(buf)?.into())
         } else {
             // a block number when encoded as bytes ranges from 0 to any number of bytes - we're
-            // going to accept numbers which fit in less than 64 bytes.
+            // going to accept numbers which fit in less than 64 bits.
             // Any data larger than this which is not caught by the Hash decoding should error and
             // is considered an invalid block number.
             Ok(u64::decode(buf)?.into())

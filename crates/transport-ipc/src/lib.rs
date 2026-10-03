@@ -158,7 +158,7 @@ where
         let mut this = self.project();
 
         loop {
-            // Complete small frames: one serde pass, same cost as `main`.
+            // Complete small frames: one serde pass.
             // A partial value flips `partial` so we do not re-parse the
             // growing buffer on every subsequent read.
             if !*this.partial && !this.buf.is_empty() {

@@ -211,8 +211,8 @@ impl<'a> SerdeGenerator<'a> {
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name);
 
         quote! {
-            // Manually modified derived serde(untagged) to preserve the error of the TaggedTxEnvelope
-            // attempt. Note: This uses private serde API
+            // Manually modified derived serde(untagged) to preserve the error of the TaggedTxTypes
+            // attempt.
             impl<'de, #unwrapped_generics> #serde::Deserialize<'de> for UntaggedTxTypes #generics where #serde_bounds {
                 fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where
@@ -239,7 +239,7 @@ impl<'a> SerdeGenerator<'a> {
                     #legacy_deserialize
 
                     // return the original error, which is more useful than the untagged error
-                    //  > "data did not match any variant of untagged enum MaybeTaggedTxEnvelope"
+                    //  > "data did not match any variant of untagged enum UntaggedTxTypes"
                     tagged_res
                 }
             }

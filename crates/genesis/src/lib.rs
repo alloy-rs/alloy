@@ -503,7 +503,6 @@ pub mod serde_bincode_compat {
         string::{String, ToString},
     };
     use alloy_primitives::{Address, U256};
-    use alloy_serde::OtherFields;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
@@ -636,14 +635,12 @@ pub mod serde_bincode_compat {
                 parlia: value.parlia,
                 deposit_contract_address: value.deposit_contract_address,
                 blob_schedule: Cow::Borrowed(&value.blob_schedule),
-                extra_fields: {
-                    let mut extra_fields = BTreeMap::new();
-                    for (k, v) in &value.extra_fields {
-                        // Convert all serde_json::Value types to string for bincode compatibility
-                        extra_fields.insert(k.clone(), v.to_string());
-                    }
-                    extra_fields
-                },
+                // Convert all serde_json::Value types to string for bincode compatibility
+                extra_fields: value
+                    .extra_fields
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.to_string()))
+                    .collect(),
             }
         }
     }
@@ -684,17 +681,14 @@ pub mod serde_bincode_compat {
                 ethash: value.ethash,
                 clique: value.clique,
                 parlia: value.parlia,
-                extra_fields: {
-                    let mut extra_fields = OtherFields::default();
-                    for (k, v) in value.extra_fields {
-                        // Parse strings back to serde_json::Value
-                        extra_fields.insert(
-                            k,
-                            v.parse().expect("Failed to parse extra field value back to JSON"),
-                        );
-                    }
-                    extra_fields
-                },
+                // Parse strings back to serde_json::Value
+                extra_fields: value
+                    .extra_fields
+                    .into_iter()
+                    .map(|(k, v)| {
+                        (k, v.parse().expect("Failed to parse extra field value back to JSON"))
+                    })
+                    .collect(),
                 deposit_contract_address: value.deposit_contract_address,
                 blob_schedule: value.blob_schedule.into_owned(),
                 _non_exhaustive: (),
@@ -970,44 +964,33 @@ impl ChainConfig {
                 .with_blob_base_cost(eip7840::BLOB_BASE_COST)
                 .with_max_blobs_per_tx(eip7594::MAX_BLOBS_PER_TX_FUSAKA);
 
-            match key.as_str() {
-                "osaka" => osaka = Some(params),
-                "bpo1" => {
-                    if let Some(timestamp) = self.bpo1_time {
-                        scheduled.push((timestamp, params));
-                    }
+            let bpo_time = match key.as_str() {
+                "osaka" => {
+                    osaka = Some(params);
+                    None
                 }
-                "bpo2" => {
-                    if let Some(timestamp) = self.bpo2_time {
-                        scheduled.push((timestamp, params));
-                    }
-                }
-                "bpo3" => {
-                    if let Some(timestamp) = self.bpo3_time {
-                        scheduled.push((timestamp, params));
-                    }
-                }
-                "bpo4" => {
-                    if let Some(timestamp) = self.bpo4_time {
-                        scheduled.push((timestamp, params));
-                    }
-                }
-                "bpo5" => {
-                    if let Some(timestamp) = self.bpo5_time {
-                        scheduled.push((timestamp, params));
-                    }
-                }
+                "bpo1" => self.bpo1_time,
+                "bpo2" => self.bpo2_time,
+                "bpo3" => self.bpo3_time,
+                "bpo4" => self.bpo4_time,
+                "bpo5" => self.bpo5_time,
                 "Amsterdam" => {
                     if let Some(timestamp) = self.amsterdam_time {
                         amsterdam = Some((timestamp, params));
                     }
+                    None
                 }
                 "Bogota" => {
                     if let Some(timestamp) = self.bogota_time {
                         bogota = Some((timestamp, params));
                     }
+                    None
                 }
-                _ => (),
+                _ => None,
+            };
+
+            if let Some(timestamp) = bpo_time {
+                scheduled.push((timestamp, params));
             }
         }
 

@@ -281,45 +281,38 @@ impl Anvil {
     }
 
     /// Select the [`EthereumHardfork`] to start anvil with.
-    pub fn hardfork(mut self, hardfork: EthereumHardfork) -> Self {
-        self = self.args(["--hardfork", hardfork.to_string().as_str()]);
-        self
+    pub fn hardfork(self, hardfork: EthereumHardfork) -> Self {
+        self.args(["--hardfork", hardfork.to_string().as_str()])
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Paris`].
-    pub fn paris(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Paris);
-        self
+    pub fn paris(self) -> Self {
+        self.hardfork(EthereumHardfork::Paris)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Cancun`].
-    pub fn cancun(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Cancun);
-        self
+    pub fn cancun(self) -> Self {
+        self.hardfork(EthereumHardfork::Cancun)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Shanghai`].
-    pub fn shanghai(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Shanghai);
-        self
+    pub fn shanghai(self) -> Self {
+        self.hardfork(EthereumHardfork::Shanghai)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Prague`].
-    pub fn prague(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Prague);
-        self
+    pub fn prague(self) -> Self {
+        self.hardfork(EthereumHardfork::Prague)
     }
 
     /// Instantiate `anvil` with the `--odyssey` flag.
-    pub fn odyssey(mut self) -> Self {
-        self = self.arg("--odyssey");
-        self
+    pub fn odyssey(self) -> Self {
+        self.arg("--odyssey")
     }
 
     /// Instantiate `anvil` with the `--auto-impersonate` flag.
-    pub fn auto_impersonate(mut self) -> Self {
-        self = self.arg("--auto-impersonate");
-        self
+    pub fn auto_impersonate(self) -> Self {
+        self.arg("--auto-impersonate")
     }
 
     /// Adds an argument to pass to the `anvil`.

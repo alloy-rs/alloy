@@ -92,12 +92,7 @@ where
         return Err(serde::de::Error::custom("input too long to be a B256"));
     }
 
-    // left pad with zeros to 32 bytes
-    let mut padded = [0u8; 32];
-    padded[32 - bytes.0.len()..].copy_from_slice(&bytes.0);
-
-    // then convert to B256 without a panic
-    Ok(B256::from_slice(&padded))
+    Ok(B256::left_padding_from(&bytes.0))
 }
 
 /// Deserializes an optional storage map, accepting keys and values shorter than 32 bytes and
