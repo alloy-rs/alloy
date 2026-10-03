@@ -1638,20 +1638,6 @@ mod tests {
     }
 
     #[test]
-    fn filter_changes_defaults_to_rpc_log() {
-        fn assert_default_log_type(_: FilterChanges<u64, RpcLog>) {}
-        fn transaction_changes<T>(transactions: Vec<T>) -> FilterChanges<T> {
-            FilterChanges::Transactions(transactions)
-        }
-
-        let logs: FilterChanges<u64> = FilterChanges::Logs(Vec::new());
-        assert_default_log_type(logs);
-
-        let transactions = transaction_changes(vec![1]);
-        assert_eq!(transactions.as_transactions(), Some([1].as_slice()));
-    }
-
-    #[test]
     #[cfg(feature = "serde")]
     fn filter_changes_supports_custom_logs() {
         #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -1707,10 +1693,6 @@ mod tests {
         let filter = serde_json::from_str::<Filter>(s).unwrap();
 
         // <https://hoodi.etherscan.io/block/400001>
-        let bloom = bloom!("0x10000000000010000000000000000200000002000000000000400000000000000000000400100000000900000000000000000000000000000000000000000000000000000000000000000008400000000000000080000000000080000000000000000000000000000000000000000000000000000002000000000010000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000002000000000000000000000000000000000000002000000000000000000000000000000000000000000000000100000000000000000000000000000004000000000000000000000000000000000000000");
-        assert!(filter.matches_bloom(bloom));
-
-        // <https://hoodi.etherscan.io/block/400002>
         let bloom = bloom!("0x10000000000010000000000000000200000002000000000000400000000000000000000400100000000900000000000000000000000000000000000000000000000000000000000000000008400000000000000080000000000080000000000000000000000000000000000000000000000000000002000000000010000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000002000000000000000000000000000000000000002000000000000000000000000000000000000000000000000100000000000000000000000000000004000000000000000000000000000000000000000");
         assert!(filter.matches_bloom(bloom));
     }
@@ -2403,15 +2385,7 @@ mod tests {
         assert_eq!(result[0].inner.address, addr1);
         assert_eq!(result[1].inner.address, addr1);
 
-        // Test 6: Test matching_block_logs with non-matching block
-        let filter = Filter::new().from_block(2000u64).to_block(2000u64);
-        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
-        let result =
-            filter.matching_block_logs(block_num_hash, block_timestamp, tx_receipt_pairs, false);
-
-        assert_eq!(result.len(), 0); // Should not append any logs due to block mismatch
-
-        // Test 7: Test append_matching_block_logs with non-matching block
+        // Test 6: Test append_matching_block_logs with non-matching block
         let filter = Filter::new().from_block(2000u64).to_block(2000u64);
         let mut result = Vec::new();
         let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();

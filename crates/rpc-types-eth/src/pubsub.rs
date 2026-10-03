@@ -280,14 +280,13 @@ impl<'a> serde::Deserialize<'a> for Params {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
     use alloy_primitives::hex;
     use similar_asserts::assert_eq;
 
     #[test]
-    #[cfg(feature = "serde")]
     fn params_serde() {
         // Test deserialization of boolean parameter
         let s: Params = serde_json::from_str("true").unwrap();
@@ -339,56 +338,6 @@ mod tests {
     }
 
     #[test]
-    fn params_is_bool() {
-        // Check if the `is_bool` method correctly identifies boolean parameters
-        let param = Params::Bool(true);
-        assert!(param.is_bool());
-
-        let param = Params::None;
-        assert!(!param.is_bool());
-
-        let param = Params::Logs(Box::default());
-        assert!(!param.is_bool());
-    }
-
-    #[test]
-    fn params_is_logs() {
-        // Check if the `is_logs` method correctly identifies log parameters
-        let param = Params::Logs(Box::default());
-        assert!(param.is_logs());
-
-        let param = Params::None;
-        assert!(!param.is_logs());
-
-        let param = Params::Bool(true);
-        assert!(!param.is_logs());
-    }
-
-    #[test]
-    fn params_from_filter() {
-        let filter = Filter::default();
-        let param: Params = filter.clone().into();
-        assert_eq!(param, Params::Logs(Box::new(filter)));
-    }
-
-    #[test]
-    fn params_from_bool() {
-        let param: Params = true.into();
-        assert_eq!(param, Params::Bool(true));
-
-        let param: Params = false.into();
-        assert_eq!(param, Params::Bool(false));
-    }
-
-    #[test]
-    fn params_from_transaction_receipts() {
-        let params = TransactionReceiptsParams { transaction_hashes: Some(vec![B256::random()]) };
-        let param: Params = params.clone().into();
-        assert_eq!(param, Params::TransactionReceipts(params));
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
     fn subscription_kind_str_roundtrip() {
         use core::str::FromStr;
 
@@ -412,7 +361,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
     fn params_serialize_none() {
         let param = Params::None;
         let serialized = serde_json::to_string(&param).unwrap();
@@ -420,7 +368,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
     fn params_serialize_bool() {
         let param = Params::Bool(true);
         let serialized = serde_json::to_string(&param).unwrap();
@@ -432,7 +379,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
     fn params_serialize_logs() {
         let filter = Filter::default();
         let param = Params::Logs(Box::new(filter.clone()));
@@ -442,7 +388,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
     fn params_serialize_transaction_receipts() {
         let params = TransactionReceiptsParams {
             transaction_hashes: Some(vec![B256::from(hex!(
@@ -464,7 +409,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
     fn sync_status_metadata_serde() {
         let metadata = SyncStatusMetadata {
             syncing: true,

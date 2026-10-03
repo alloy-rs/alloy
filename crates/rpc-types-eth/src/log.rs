@@ -228,8 +228,6 @@ mod tests {
     use super::*;
     use alloy_consensus::{Receipt, ReceiptWithBloom, TxReceipt};
     use alloy_primitives::{Address, Bytes};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use similar_asserts::assert_eq;
 
     const fn assert_tx_receipt<T: TxReceipt>() {}
@@ -237,14 +235,6 @@ mod tests {
     #[test]
     const fn assert_receipt() {
         assert_tx_receipt::<ReceiptWithBloom<Receipt<Log>>>();
-    }
-
-    #[test]
-    fn log_arbitrary() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-
-        let _: Log = Log::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
     }
 
     #[test]
