@@ -286,10 +286,7 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
 
     /// Returns an iterator over the [ErrorPayload]s in the response.
     pub fn iter_errors(&self) -> impl Iterator<Item = &ErrorPayload<ErrData>> + '_ {
-        match self {
-            Self::Single(single) => ResponsePacketErrorsIter::Single(Some(single)),
-            Self::Batch(batch) => ResponsePacketErrorsIter::Batch(batch.iter()),
-        }
+        self.responses().iter().filter_map(|res| res.payload.as_error())
     }
 
     /// Returns the first error code in this packet if it contains any error responses.
@@ -346,28 +343,5 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
         K: Borrow<Id> + Eq + Hash,
     {
         self.responses().iter().filter(|res| ids.contains(&res.id)).collect()
-    }
-}
-
-/// An Iterator over the [ErrorPayload]s in a [ResponsePacket].
-#[derive(Clone, Debug)]
-enum ResponsePacketErrorsIter<'a, Payload, ErrData> {
-    Single(Option<&'a Response<Payload, ErrData>>),
-    Batch(std::slice::Iter<'a, Response<Payload, ErrData>>),
-}
-
-impl<'a, Payload, ErrData> Iterator for ResponsePacketErrorsIter<'a, Payload, ErrData> {
-    type Item = &'a ErrorPayload<ErrData>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            ResponsePacketErrorsIter::Single(single) => single.take()?.payload.as_error(),
-            ResponsePacketErrorsIter::Batch(batch) => loop {
-                let res = batch.next()?;
-                if let Some(err) = res.payload.as_error() {
-                    return Some(err);
-                }
-            },
-        }
     }
 }
