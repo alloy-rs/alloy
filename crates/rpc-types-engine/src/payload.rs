@@ -759,6 +759,11 @@ pub struct ExecutionPayloadV1 {
     pub transactions: Vec<Bytes>,
 }
 
+/// Decodes an EIP-2718 encoded payload transaction.
+fn decode_transaction<T: Decodable2718>(tx: Bytes) -> Result<T, PayloadError> {
+    T::decode_2718_exact(tx.as_ref()).map_err(alloy_rlp::Error::from).map_err(PayloadError::from)
+}
+
 impl ExecutionPayloadV1 {
     /// Returns the block number and hash as a [`BlockNumHash`].
     pub const fn block_num_hash(&self) -> BlockNumHash {
@@ -770,11 +775,7 @@ impl ExecutionPayloadV1 {
     /// This does not recompute or compare the payload's advertised [`Self::block_hash`]. Callers
     /// performing Engine API validation must hash the returned block and compare it separately.
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            T::decode_2718_exact(tx.as_ref())
-                .map_err(alloy_rlp::Error::from)
-                .map_err(PayloadError::from)
-        })
+        self.try_into_block_with(decode_transaction)
     }
 
     /// Converts [`ExecutionPayloadV1`] to [`Block`] with the given closure.
@@ -1056,11 +1057,7 @@ impl ExecutionPayloadV2 {
     ///
     /// See also [`ExecutionPayloadV1::try_into_block`].
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            T::decode_2718_exact(tx.as_ref())
-                .map_err(alloy_rlp::Error::from)
-                .map_err(PayloadError::from)
-        })
+        self.try_into_block_with(decode_transaction)
     }
 
     /// Converts [`ExecutionPayloadV2`] to [`Block`] with a custom transaction mapper.
@@ -1339,11 +1336,7 @@ impl ExecutionPayloadV3 {
     ///
     /// See also [`ExecutionPayloadV2::try_into_block`].
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            T::decode_2718_exact(tx.as_ref())
-                .map_err(alloy_rlp::Error::from)
-                .map_err(PayloadError::from)
-        })
+        self.try_into_block_with(decode_transaction)
     }
 
     /// Converts [`ExecutionPayloadV3`] to [`Block`] with a custom transaction mapper.
@@ -1741,14 +1734,13 @@ impl ExecutionPayloadV4 {
         T: Encodable2718,
         H: BlockHeader,
     {
-        Self {
-            payload_inner: ExecutionPayloadV3::from_block_unchecked(block_hash, block),
-            block_access_list: block.header.block_access_list_hash().map_or_else(
-                || Bytes::copy_from_slice(EMPTY_BLOCK_ACCESS_LIST_HASH.as_slice()),
-                |hash| Bytes::copy_from_slice(hash.as_slice()),
-            ),
-            slot_number: block.header.slot_number().unwrap_or_default(),
-        }
+        let bal_hash =
+            block.header.block_access_list_hash().unwrap_or(EMPTY_BLOCK_ACCESS_LIST_HASH);
+        Self::from_block_unchecked_with_bal(
+            block_hash,
+            block,
+            Bytes::copy_from_slice(bal_hash.as_slice()),
+        )
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`] using the given block hash
@@ -1786,11 +1778,7 @@ impl ExecutionPayloadV4 {
     ///
     /// See also [`ExecutionPayloadV3::try_into_block`].
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            T::decode_2718_exact(tx.as_ref())
-                .map_err(alloy_rlp::Error::from)
-                .map_err(PayloadError::from)
-        })
+        self.try_into_block_with(decode_transaction)
     }
 
     /// Converts [`ExecutionPayloadV4`] to [`Block`] with a custom transaction mapper.
@@ -1809,13 +1797,7 @@ impl ExecutionPayloadV4 {
     /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
     /// without any conversion.
     pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
-        let mut base_block = self.payload_inner.into_block_raw()?;
-
-        let block_access_list_hash = alloy_primitives::keccak256(&self.block_access_list);
-        base_block.header.block_access_list_hash = Some(block_access_list_hash);
-        base_block.header.slot_number = Some(self.slot_number);
-
-        Ok(base_block)
+        self.into_block_raw_with_transactions_root_opt(None)
     }
 
     /// Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions using the
@@ -1883,13 +1865,14 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
             blobs: Vec<alloy_consensus::Blob>,
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
+        let bundle = Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs };
 
-        if raw.proofs.len() == raw.commitments.len() && raw.proofs.len() == raw.blobs.len() {
-            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        if bundle.has_valid_lengths() {
+            Ok(bundle)
         } else {
             Err(serde::de::Error::invalid_length(
-                raw.proofs.len(),
-                &format!("{}", raw.commitments.len()).as_str(),
+                bundle.proofs.len(),
+                &format!("{}", bundle.commitments.len()).as_str(),
             ))
         }
     }
@@ -1918,6 +1901,12 @@ impl BlobsBundleV1 {
     /// payload for API compatibility reasons.
     pub fn empty() -> Self {
         Self::default()
+    }
+
+    /// Returns true if the bundle has one commitment and one proof per blob.
+    #[cfg(any(feature = "serde", feature = "kzg"))]
+    const fn has_valid_lengths(&self) -> bool {
+        self.commitments.len() == self.proofs.len() && self.commitments.len() == self.blobs.len()
     }
 
     /// Computes the versioned hashes from the KZG commitments.
@@ -1961,8 +1950,7 @@ impl BlobsBundleV1 {
     pub fn try_into_sidecar(
         self,
     ) -> Result<BlobTransactionSidecar, alloy_consensus::error::ValueError<Self>> {
-        if self.commitments.len() != self.proofs.len() || self.commitments.len() != self.blobs.len()
-        {
+        if !self.has_valid_lengths() {
             return Err(alloy_consensus::error::ValueError::new(self, "length mismatch"));
         }
 
@@ -1996,8 +1984,6 @@ impl BlobsBundleV1 {
         self,
         settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
     ) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
-        use alloy_eips::eip7594::CELLS_PER_EXT_BLOB;
-
         if let [blob] = self.blobs.as_slice() {
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
             let cell_proofs =
@@ -2081,15 +2067,14 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
             blobs: Vec<alloy_consensus::Blob>,
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
+        let bundle = Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs };
 
-        if raw.proofs.len() == raw.blobs.len() * CELLS_PER_EXT_BLOB
-            && raw.commitments.len() == raw.blobs.len()
-        {
-            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        if bundle.ensure_valid_lengths().is_ok() {
+            Ok(bundle)
         } else {
             Err(serde::de::Error::invalid_length(
-                raw.proofs.len(),
-                &format!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
+                bundle.proofs.len(),
+                &format!("{}", bundle.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
             ))
         }
     }
@@ -2110,20 +2095,19 @@ impl ssz::Decode for BlobsBundleV2 {
         }
 
         let raw = BlobsBundleRaw::from_ssz_bytes(bytes)?;
+        let bundle = Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs };
 
-        if raw.proofs.len() == raw.blobs.len() * CELLS_PER_EXT_BLOB
-            && raw.commitments.len() == raw.blobs.len()
-        {
-            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        if bundle.ensure_valid_lengths().is_ok() {
+            Ok(bundle)
         } else {
             Err(ssz::DecodeError::BytesInvalid(
                 format!(
                     "Invalid BlobsBundleV2: expected {} proofs and {} commitments for {} blobs, got {} proofs and {} commitments",
-                    raw.blobs.len() * CELLS_PER_EXT_BLOB,
-                    raw.blobs.len(),
-                    raw.blobs.len(),
-                    raw.proofs.len(),
-                    raw.commitments.len()
+                    bundle.blobs.len() * CELLS_PER_EXT_BLOB,
+                    bundle.blobs.len(),
+                    bundle.blobs.len(),
+                    bundle.proofs.len(),
+                    bundle.commitments.len()
                 )
             ))
         }
@@ -2425,12 +2409,7 @@ impl ExecutionPayload {
         T: Encodable2718 + Transaction,
         H: BlockHeader + Sealable,
     {
-        let extras = extras.into();
-        if let Some(block_access_list) = extras.bal {
-            Self::from_block_unchecked_with_bal(block.hash_slow(), block, block_access_list)
-        } else {
-            Self::from_block_unchecked(block.hash_slow(), block)
-        }
+        Self::from_block_unchecked_with_extras(block.hash_slow(), block, extras)
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
@@ -2456,23 +2435,7 @@ impl ExecutionPayload {
         T: Encodable2718 + Transaction,
         H: BlockHeader,
     {
-        let sidecar = ExecutionPayloadSidecar::from_block(block);
-
-        let execution_payload = if block.header.block_access_list_hash().is_some() {
-            // block with block access list hash: V4 (Amsterdam)
-            Self::V4(ExecutionPayloadV4::from_block_unchecked(block_hash, block))
-        } else if block.header.parent_beacon_block_root().is_some() {
-            // block with parent beacon block root: V3
-            Self::V3(ExecutionPayloadV3::from_block_unchecked(block_hash, block))
-        } else if block.body.withdrawals.is_some() {
-            // block with withdrawals: V2
-            Self::V2(ExecutionPayloadV2::from_block_unchecked(block_hash, block))
-        } else {
-            // otherwise V1
-            Self::V1(ExecutionPayloadV1::from_block_unchecked(block_hash, block))
-        };
-
-        (execution_payload, sidecar)
+        Self::from_block_unchecked_with_bal_opt(block_hash, block, None)
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
@@ -2491,15 +2454,32 @@ impl ExecutionPayload {
         T: Encodable2718 + Transaction,
         H: BlockHeader,
     {
+        Self::from_block_unchecked_with_bal_opt(block_hash, block, Some(block_access_list))
+    }
+
+    /// Shared implementation of [`Self::from_block_unchecked`] (`None`) and
+    /// [`Self::from_block_unchecked_with_bal`] (`Some`).
+    fn from_block_unchecked_with_bal_opt<T, H>(
+        block_hash: B256,
+        block: &Block<T, H>,
+        block_access_list: Option<Bytes>,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader,
+    {
         let sidecar = ExecutionPayloadSidecar::from_block(block);
 
         let execution_payload = if block.header.block_access_list_hash().is_some() {
             // block with block access list hash: V4 (Amsterdam)
-            Self::V4(ExecutionPayloadV4::from_block_unchecked_with_bal(
-                block_hash,
-                block,
-                block_access_list,
-            ))
+            Self::V4(match block_access_list {
+                Some(block_access_list) => ExecutionPayloadV4::from_block_unchecked_with_bal(
+                    block_hash,
+                    block,
+                    block_access_list,
+                ),
+                None => ExecutionPayloadV4::from_block_unchecked(block_hash, block),
+            })
         } else if block.header.parent_beacon_block_root().is_some() {
             // block with parent beacon block root: V3
             Self::V3(ExecutionPayloadV3::from_block_unchecked(block_hash, block))
@@ -2530,12 +2510,7 @@ impl ExecutionPayload {
         T: Encodable2718 + Transaction,
         H: BlockHeader,
     {
-        let extras = extras.into();
-        if let Some(block_access_list) = extras.bal {
-            Self::from_block_unchecked_with_bal(block_hash, block, block_access_list)
-        } else {
-            Self::from_block_unchecked(block_hash, block)
-        }
+        Self::from_block_unchecked_with_bal_opt(block_hash, block, extras.into().bal)
     }
 
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
@@ -2552,11 +2527,7 @@ impl ExecutionPayload {
         self,
         sidecar: &ExecutionPayloadSidecar,
     ) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with_sidecar_with(sidecar, |tx| {
-            T::decode_2718_exact(tx.as_ref())
-                .map_err(alloy_rlp::Error::from)
-                .map_err(PayloadError::from)
-        })
+        self.try_into_block_with_sidecar_with(sidecar, decode_transaction)
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`] with sidecar and a custom transaction mapper.
@@ -2584,10 +2555,7 @@ impl ExecutionPayload {
         self,
         sidecar: &ExecutionPayloadSidecar,
     ) -> Result<Block<Bytes>, PayloadError> {
-        let mut base_block = self.into_block_raw()?;
-        base_block.header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
-        base_block.header.requests_hash = sidecar.requests_hash();
-        Ok(base_block)
+        self.into_block_with_sidecar_raw_with_transactions_root_opt(sidecar, None)
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`].
@@ -2602,11 +2570,7 @@ impl ExecutionPayload {
     ///
     /// See also: [`ExecutionPayload::try_into_block_with_sidecar`]
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            T::decode_2718_exact(tx.as_ref())
-                .map_err(alloy_rlp::Error::from)
-                .map_err(PayloadError::from)
-        })
+        self.try_into_block_with(decode_transaction)
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`] with a custom transaction mapper.
@@ -2677,7 +2641,20 @@ impl ExecutionPayload {
         sidecar: &ExecutionPayloadSidecar,
         transactions_root: B256,
     ) -> Result<Block<Bytes>, PayloadError> {
-        let mut base_block = self.into_block_raw_with_transactions_root(transactions_root)?;
+        self.into_block_with_sidecar_raw_with_transactions_root_opt(
+            sidecar,
+            Some(transactions_root),
+        )
+    }
+
+    /// Shared implementation of [`Self::into_block_with_sidecar_raw`] (`None`) and
+    /// [`Self::into_block_with_sidecar_raw_with_transactions_root`] (`Some`).
+    fn into_block_with_sidecar_raw_with_transactions_root_opt(
+        self,
+        sidecar: &ExecutionPayloadSidecar,
+        transactions_root: Option<B256>,
+    ) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_block = self.into_block_raw_with_transactions_root_opt(transactions_root)?;
         base_block.header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
         base_block.header.requests_hash = sidecar.requests_hash();
         Ok(base_block)
@@ -4186,11 +4163,7 @@ impl ExecutionData {
     pub fn try_into_block<T: Decodable2718>(
         self,
     ) -> Result<alloy_consensus::Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            T::decode_2718_exact(tx.as_ref())
-                .map_err(alloy_rlp::Error::from)
-                .map_err(PayloadError::from)
-        })
+        self.payload.try_into_block_with_sidecar(&self.sidecar)
     }
 
     /// Tries to create a new unsealed block from the given payload and payload sidecar with a
@@ -4219,10 +4192,7 @@ impl ExecutionData {
     /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
     /// without any conversion.
     pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
-        let mut base_block = self.payload.into_block_raw()?;
-        base_block.header.parent_beacon_block_root = self.sidecar.parent_beacon_block_root();
-        base_block.header.requests_hash = self.sidecar.requests_hash();
-        Ok(base_block)
+        self.payload.into_block_with_sidecar_raw(&self.sidecar)
     }
 }
 
