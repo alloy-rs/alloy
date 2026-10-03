@@ -1230,7 +1230,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_anvil_rollback() {
         let provider = ProviderBuilder::new().connect_anvil();
 
