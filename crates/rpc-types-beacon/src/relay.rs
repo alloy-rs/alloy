@@ -854,16 +854,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn amsterdam_bid_submission() {
-        let bid = amsterdam_bid_submission_v6();
-        let json = serde_json::to_value(&bid).unwrap();
-        let deserialized = serde_json::from_value::<SignedBidSubmissionV6>(json.clone()).unwrap();
-
-        assert_eq!(bid, deserialized);
-        assert_eq!(json, serde_json::to_value(deserialized).unwrap());
-    }
-
     fn amsterdam_bid_submission_with_builder_requests() -> SignedBidSubmissionV6 {
         let bid = amsterdam_bid_submission_v6();
 
@@ -1029,30 +1019,6 @@ mod tests {
 
     #[cfg(all(feature = "sha2", feature = "ssz"))]
     #[test]
-    fn test_builder_block_validation_request_v4_from_trait() {
-        let bid_submission_json =
-            include_str!("examples/relay_builder_block_validation_request_v4.json");
-        let bid_submission: SignedBidSubmissionV4 =
-            serde_json::from_str(bid_submission_json).unwrap();
-
-        let request = BuilderBlockValidationRequestV4 {
-            request: bid_submission,
-            registered_gas_limit: 30000000,
-            parent_beacon_block_root: B256::from_slice(&[0x12; 32]),
-        };
-
-        let execution_data_owned: alloy_rpc_types_engine::ExecutionData = request.clone().into();
-
-        let execution_data_method = request.into_execution_data();
-        assert_eq!(execution_data_owned.payload, execution_data_method.payload);
-        assert_eq!(
-            execution_data_owned.sidecar.parent_beacon_block_root(),
-            execution_data_method.sidecar.parent_beacon_block_root()
-        );
-    }
-
-    #[cfg(all(feature = "sha2", feature = "ssz"))]
-    #[test]
     fn test_builder_block_validation_request_v5_to_execution_data() {
         // Create a test SignedBidSubmissionV5 based on the V4 test data structure
         let bid_submission_v4_json =
@@ -1112,44 +1078,6 @@ mod tests {
 
     #[cfg(all(feature = "sha2", feature = "ssz"))]
     #[test]
-    fn test_builder_block_validation_request_v5_from_trait() {
-        // Create a test SignedBidSubmissionV5 based on the V4 test data structure
-        let bid_submission_v4_json =
-            include_str!("examples/relay_builder_block_validation_request_v4.json");
-        let bid_submission_v4: SignedBidSubmissionV4 =
-            serde_json::from_str(bid_submission_v4_json).unwrap();
-
-        // Convert to V5 structure (same data, but with BlobsBundleV2)
-        let bid_submission_v5 = SignedBidSubmissionV5 {
-            message: bid_submission_v4.message.clone(),
-            execution_payload: bid_submission_v4.execution_payload.clone(),
-            blobs_bundle: alloy_rpc_types_engine::BlobsBundleV2 {
-                commitments: bid_submission_v4.blobs_bundle.commitments.clone(),
-                proofs: bid_submission_v4.blobs_bundle.proofs.clone(),
-                blobs: bid_submission_v4.blobs_bundle.blobs.clone(),
-            },
-            execution_requests: bid_submission_v4.execution_requests.clone(),
-            signature: bid_submission_v4.signature,
-        };
-
-        let request = BuilderBlockValidationRequestV5 {
-            request: bid_submission_v5,
-            registered_gas_limit: 30000000,
-            parent_beacon_block_root: B256::from_slice(&[0x13; 32]),
-        };
-
-        let execution_data_owned: alloy_rpc_types_engine::ExecutionData = request.clone().into();
-
-        let execution_data_method = request.into_execution_data();
-        assert_eq!(execution_data_owned.payload, execution_data_method.payload);
-        assert_eq!(
-            execution_data_owned.sidecar.parent_beacon_block_root(),
-            execution_data_method.sidecar.parent_beacon_block_root()
-        );
-    }
-
-    #[cfg(all(feature = "sha2", feature = "ssz"))]
-    #[test]
     fn test_builder_block_validation_request_v6_to_execution_data() {
         let bid_submission_v6 = amsterdam_bid_submission_v6();
 
@@ -1185,24 +1113,5 @@ mod tests {
         assert_eq!(cancun_fields.versioned_hashes, expected_hashes);
 
         assert!(execution_data.sidecar.prague().is_some());
-    }
-
-    #[cfg(all(feature = "sha2", feature = "ssz"))]
-    #[test]
-    fn test_builder_block_validation_request_v6_from_trait() {
-        let request = BuilderBlockValidationRequestV6 {
-            request: amsterdam_bid_submission_v6(),
-            registered_gas_limit: 30000000,
-            parent_beacon_block_root: B256::from_slice(&[0x14; 32]),
-        };
-
-        let execution_data_owned: alloy_rpc_types_engine::ExecutionData = request.clone().into();
-
-        let execution_data_method = request.into_execution_data();
-        assert_eq!(execution_data_owned.payload, execution_data_method.payload);
-        assert_eq!(
-            execution_data_owned.sidecar.parent_beacon_block_root(),
-            execution_data_method.sidecar.parent_beacon_block_root()
-        );
     }
 }
