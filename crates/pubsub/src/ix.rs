@@ -11,6 +11,12 @@ pub enum PubSubInstruction {
     GetSub(B256, oneshot::Sender<Option<RawSubscription>>),
     /// Unsubscribe from a subscription.
     Unsubscribe(B256),
+    /// Send multiple JSON-RPC requests as one wire-level batch.
+    ///
+    /// Each request remains an independent `InFlight` entry for response
+    /// routing, but the service should serialize all entries into a single
+    /// JSON-RPC array before dispatching them to the transport backend.
+    Batch(Vec<InFlight>),
 }
 
 impl fmt::Debug for PubSubInstruction {
@@ -19,6 +25,7 @@ impl fmt::Debug for PubSubInstruction {
             Self::Request(arg0) => f.debug_tuple("Request").field(arg0).finish(),
             Self::GetSub(arg0, _) => f.debug_tuple("GetSub").field(arg0).finish(),
             Self::Unsubscribe(arg0) => f.debug_tuple("Unsubscribe").field(arg0).finish(),
+            Self::Batch(arg0) => f.debug_tuple("Batch").field(arg0).finish(),
         }
     }
 }
