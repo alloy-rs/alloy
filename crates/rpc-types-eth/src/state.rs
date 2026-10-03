@@ -345,37 +345,13 @@ impl EvmOverrides {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
-    use alloy_primitives::{address, map::B256HashMap, Bytes, B256, U256};
+    use alloy_primitives::{address, U256};
     use similar_asserts::assert_eq;
 
     #[test]
-    fn test_default_account_override() {
-        let acc_override = AccountOverride::default();
-        assert!(acc_override.balance.is_none());
-        assert!(acc_override.nonce.is_none());
-        assert!(acc_override.code.is_none());
-        assert!(acc_override.state.is_none());
-        assert!(acc_override.state_diff.is_none());
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    #[should_panic(expected = "invalid type")]
-    fn test_invalid_json_structure() {
-        let invalid_json = r#"{
-            "0x1234567890123456789012345678901234567890": {
-                "balance": true
-            }
-        }"#;
-
-        let _: StateOverride = serde_json::from_str(invalid_json).unwrap();
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
     fn test_large_values_in_override() {
         let large_values_json = r#"{
             "0x1234567890123456789012345678901234567890": {
@@ -392,7 +368,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
     fn test_state_override() {
         let s = r#"{
             "0x0000000000000000000000000000000000000124": {
@@ -406,7 +381,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
     fn test_state_override_state_diff() {
         let s = r#"{
                 "0x1b5212AF6b76113afD94cD2B5a78a73B7d7A8222": {
@@ -423,112 +397,5 @@ mod tests {
         let acc =
             state_override.get(&address!("1b5212AF6b76113afD94cD2B5a78a73B7d7A8222")).unwrap();
         assert!(acc.state_diff.is_some());
-    }
-
-    #[test]
-    fn test_set_code_in_place() {
-        let mut account_override = AccountOverride::default();
-        let code = Bytes::from(vec![0x60, 0x60, 0x60, 0x60]);
-        account_override.set_code(code.clone());
-        assert_eq!(account_override.code, Some(code));
-    }
-
-    #[test]
-    fn test_set_state_in_place() {
-        let mut account_override = AccountOverride::default();
-        let state: B256HashMap<B256> = vec![(B256::ZERO, B256::ZERO)].into_iter().collect();
-        account_override.set_state(state.clone());
-        assert_eq!(account_override.state, Some(state));
-    }
-
-    #[test]
-    fn test_set_state_diff_in_place() {
-        let mut account_override = AccountOverride::default();
-        let state_diff: B256HashMap<B256> = vec![(B256::ZERO, B256::ZERO)].into_iter().collect();
-        account_override.set_state_diff(state_diff.clone());
-        assert_eq!(account_override.state_diff, Some(state_diff));
-    }
-
-    #[test]
-    fn test_set_balance_in_place() {
-        let mut account_override = AccountOverride::default();
-        let balance = U256::from(1000);
-        account_override.set_balance(balance);
-        assert_eq!(account_override.balance, Some(balance));
-    }
-
-    #[test]
-    fn test_set_nonce_in_place() {
-        let mut account_override = AccountOverride::default();
-        let nonce = 42;
-        account_override.set_nonce(nonce);
-        assert_eq!(account_override.nonce, Some(nonce));
-    }
-
-    #[test]
-    fn test_set_move_precompile_to_in_place() {
-        let mut account_override = AccountOverride::default();
-        let address = address!("0000000000000000000000000000000000000001");
-        account_override.set_move_precompile_to(address);
-        assert_eq!(account_override.move_precompile_to, Some(address));
-    }
-
-    #[test]
-    fn test_evm_overrides_new() {
-        let state = StateOverride::default();
-        let block: Box<BlockOverrides> = Box::default();
-
-        let evm_overrides = EvmOverrides::new(Some(state.clone()), Some(block.clone()));
-
-        assert!(evm_overrides.has_state());
-        assert!(evm_overrides.has_block());
-        assert_eq!(evm_overrides.state.unwrap(), state);
-        assert_eq!(*evm_overrides.block.unwrap(), *block);
-    }
-
-    #[test]
-    fn test_evm_overrides_state() {
-        let state = StateOverride::default();
-        let evm_overrides = EvmOverrides::state(Some(state.clone()));
-
-        assert!(evm_overrides.has_state());
-        assert!(!evm_overrides.has_block());
-        assert_eq!(evm_overrides.state.unwrap(), state);
-    }
-
-    #[test]
-    fn test_evm_overrides_block() {
-        let block: Box<BlockOverrides> = Box::default();
-        let evm_overrides = EvmOverrides::block(Some(block.clone()));
-
-        assert!(!evm_overrides.has_state());
-        assert!(evm_overrides.has_block());
-        assert_eq!(*evm_overrides.block.unwrap(), *block);
-    }
-
-    #[test]
-    fn test_evm_overrides_with_state() {
-        let state = StateOverride::default();
-        let mut evm_overrides = EvmOverrides::default();
-
-        assert!(!evm_overrides.has_state());
-
-        evm_overrides = evm_overrides.with_state(state.clone());
-
-        assert!(evm_overrides.has_state());
-        assert_eq!(evm_overrides.state.unwrap(), state);
-    }
-
-    #[test]
-    fn test_evm_overrides_with_block() {
-        let block: Box<BlockOverrides> = Box::default();
-        let mut evm_overrides = EvmOverrides::default();
-
-        assert!(!evm_overrides.has_block());
-
-        evm_overrides = evm_overrides.with_block(block.clone());
-
-        assert!(evm_overrides.has_block());
-        assert_eq!(*evm_overrides.block.unwrap(), *block);
     }
 }

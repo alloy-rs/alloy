@@ -556,71 +556,49 @@ mod tests {
         TenderlySimulationResult,
     };
 
-    #[test]
-    fn test_success_response() {
-        let input = include_str!("../test_data/success.json");
-        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
-
-        // strip whitespace to force equal formatting
+    // strip whitespace to force equal formatting
+    fn assert_roundtrip<T: serde::Serialize + serde::de::DeserializeOwned>(input: &str) {
+        let parsed: T = serde_json::from_str(input).unwrap();
         assert_eq!(
             serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
             input.split_whitespace().collect::<String>()
         );
+    }
+
+    #[test]
+    fn test_success_response() {
+        assert_roundtrip::<TenderlySimulationResult>(include_str!("../test_data/success.json"));
     }
 
     #[test]
     fn test_failure_response() {
-        let input = include_str!("../test_data/failure.json");
-        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
-
-        assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
-        );
+        assert_roundtrip::<TenderlySimulationResult>(include_str!("../test_data/failure.json"));
     }
 
     #[test]
     fn test_bundle_success_response() {
-        let input = include_str!("../test_data/bundle_success.json");
-        let parsed: Vec<TenderlySimulationResult> = serde_json::from_str(input).unwrap();
-
-        assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
-        );
+        assert_roundtrip::<Vec<TenderlySimulationResult>>(include_str!(
+            "../test_data/bundle_success.json"
+        ));
     }
 
     #[test]
     fn test_trace_success_response() {
-        let input = include_str!("../test_data/trace_success.json");
-        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
-
-        assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
-        );
+        assert_roundtrip::<TenderlySimulationResult>(include_str!(
+            "../test_data/trace_success.json"
+        ));
     }
 
     #[test]
     fn test_trace_complex_response() {
-        let input = include_str!("../test_data/trace_complex.json");
-        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
-
-        assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
-        );
+        assert_roundtrip::<TenderlySimulationResult>(include_str!(
+            "../test_data/trace_complex.json"
+        ));
     }
 
     #[test]
     fn test_trace_swap_response() {
-        let input = include_str!("../test_data/trace_swap.json");
-        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
-
-        assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
-        );
+        assert_roundtrip::<TenderlySimulationResult>(include_str!("../test_data/trace_swap.json"));
     }
 
     #[test]
