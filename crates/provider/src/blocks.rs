@@ -17,6 +17,9 @@ use std::{
 #[cfg(feature = "pubsub")]
 use futures::{future::Either, FutureExt};
 
+#[cfg(test)]
+mod block_stream_tests;
+
 /// The size of the block cache.
 const BLOCK_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(10).unwrap();
 
