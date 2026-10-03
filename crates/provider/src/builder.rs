@@ -457,7 +457,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// the final [`Provider`] type with all stack components.
     ///
     /// This is a convenience function for
-    /// `ProviderBuilder::on_provider(RootProvider::new(client))`.
+    /// `ProviderBuilder::connect_provider(RootProvider::new(client))`.
     pub fn connect_client(self, client: RpcClient) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,
@@ -471,7 +471,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// the final [`Provider`] type with all stack components.
     ///
     /// This is a convenience function for
-    /// `ProviderBuilder::on_client(RpcClient::mocked(asserter))`.
+    /// `ProviderBuilder::connect_client(RpcClient::mocked(asserter))`.
     pub fn connect_mocked_client(self, asserter: alloy_transport::mock::Asserter) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,
@@ -653,7 +653,7 @@ type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 
 #[cfg(any(test, feature = "anvil-node"))]
 impl<L, F, N: Network> ProviderBuilder<L, F, N> {
-    /// Build this provider with anvil, using the BoxTransport.
+    /// Build this provider with anvil.
     ///
     /// This method requires the `anvil-node` feature on `alloy-provider`.
     /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
@@ -670,9 +670,8 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         self.connect_anvil_with_config(std::convert::identity)
     }
 
-    /// Build this provider with anvil, using the BoxTransport. This
-    /// function configures a wallet backed by anvil keys, and is intended for
-    /// use in tests.
+    /// Build this provider with anvil. This function configures a wallet backed by anvil keys, and
+    /// is intended for use in tests.
     ///
     /// This method requires the `anvil-node` feature on `alloy-provider`.
     /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
@@ -693,8 +692,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             .expect("failed to build provider")
     }
 
-    /// Build this provider with anvil, using the BoxTransport. The
-    /// given function is used to configure the anvil instance.
+    /// Build this provider with anvil. The given function is used to configure the anvil instance.
     ///
     /// This method requires the `anvil-node` feature on `alloy-provider`.
     /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
@@ -719,8 +717,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         self.layer(anvil_layer).connect_client(rpc_client)
     }
 
-    /// Build this provider with anvil, using the BoxTransport. The
-    /// given function is used to configure the anvil instance.
+    /// Build this provider with anvil. The given function is used to configure the anvil instance.
     ///
     /// This method requires the `anvil-node` feature on `alloy-provider`.
     /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
@@ -735,16 +732,11 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         L: ProviderLayer<crate::layers::AnvilProvider<RootProvider<N>, N>, N>,
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
     {
-        let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
-        let url = anvil_layer.endpoint_url();
-
-        let rpc_client = ClientBuilder::default().http(url);
-
-        self.layer(anvil_layer).connect_client(rpc_client)
+        self.connect_anvil_with_config(f)
     }
 
-    /// Build this provider with anvil, using the BoxTransport.
-    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    /// Build this provider with anvil and a wallet backed by anvil keys. The given function is
+    /// used to configure the anvil instance.
     ///
     /// This method requires the `anvil-node` feature on `alloy-provider`.
     /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
@@ -777,8 +769,8 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         Ok(self.wallet(wallet).layer(anvil_layer).connect_client(rpc_client))
     }
 
-    /// Build this provider with anvil, using the BoxTransport.
-    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    /// Build this provider with anvil and a wallet backed by anvil keys. The given function is
+    /// used to configure the anvil instance.
     ///
     /// This method requires the `anvil-node` feature on `alloy-provider`.
     /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
@@ -799,17 +791,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         >,
         alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
-        let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
-        let url = anvil_layer.endpoint_url();
-
-        let wallet = anvil_layer
-            .instance()
-            .wallet()
-            .ok_or(alloy_node_bindings::NodeError::NoKeysAvailable)?;
-
-        let rpc_client = ClientBuilder::default().http(url);
-
-        Ok(self.wallet(wallet).layer(anvil_layer).connect_client(rpc_client))
+        self.connect_anvil_with_wallet_and_config(f)
     }
 }
 

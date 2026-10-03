@@ -1,7 +1,5 @@
 //! Ethereum JSON-RPC provider.
 
-#![allow(unknown_lints, mismatched_lifetime_syntaxes)]
-
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
 use super::{
@@ -1837,8 +1835,6 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// [`PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
     async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
         P: RpcSend,
