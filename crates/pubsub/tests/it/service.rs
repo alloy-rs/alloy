@@ -210,6 +210,22 @@ async fn unsubscribe_sends_server_id_and_drops_subscription() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn unsubscribe_reply_does_not_resolve_unrelated_request() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let local_id = subscribe(&frontend, &mut backend, 0, json!(["newHeads"]), "0xaaa").await;
+    let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 1, json!([]))));
+    backend.recv().await;
+
+    frontend.unsubscribe(local_id).unwrap();
+    let unsubscribe = backend.recv().await;
+    backend.send(json!({ "jsonrpc": "2.0", "id": unsubscribe["id"], "result": true }));
+    backend.respond(1, json!("0x10"));
+
+    let resp = within(resp).await.unwrap().unwrap();
+    assert_eq!(resp.payload.as_success().unwrap().get(), r#""0x10""#);
+}
+
+#[tokio::test(start_paused = true)]
 async fn get_subscription_for_unknown_id_fails() {
     let (frontend, _, [_backend]) = spawn_service().await;
     let err = frontend.get_subscription(B256::repeat_byte(1)).await.unwrap_err();
