@@ -100,6 +100,28 @@ impl GasFiller {
         Self { estimator: Eip1559Estimator::Default, legacy: true }
     }
 
+    fn adjust_1559_estimate(
+        mut estimate: Eip1559Estimation,
+        max_fee: Option<u128>,
+        priority_fee: Option<u128>,
+    ) -> Eip1559Estimation {
+        match (max_fee, priority_fee) {
+            (None, Some(priority_fee)) => {
+                estimate.max_fee_per_gas = estimate
+                    .max_fee_per_gas
+                    .saturating_sub(estimate.max_priority_fee_per_gas)
+                    .saturating_add(priority_fee);
+                estimate.max_priority_fee_per_gas = priority_fee;
+            }
+            (Some(max_fee), None) => {
+                estimate.max_fee_per_gas = max_fee;
+                estimate.max_priority_fee_per_gas = estimate.max_priority_fee_per_gas.min(max_fee);
+            }
+            _ => {}
+        }
+        estimate
+    }
+
     async fn prepare_legacy<P, N>(
         &self,
         provider: &P,
@@ -133,11 +155,6 @@ impl GasFiller {
         P: Provider<N>,
         N: Network,
     {
-        let gas_limit_fut = tx.gas_limit().map_or_else(
-            || provider.estimate_gas(tx.clone()).into_future().right_future(),
-            |gas_limit| async move { Ok(gas_limit) }.left_future(),
-        );
-
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
             (tx.max_fee_per_gas(), tx.max_priority_fee_per_gas())
         {
@@ -147,7 +164,33 @@ impl GasFiller {
             provider.estimate_eip1559_fees_with(self.estimator.clone()).right_future()
         };
 
+        // Estimate gas with a complete fee pair when the request sets only one fee field.
+        if tx.gas_limit().is_none()
+            && (tx.max_fee_per_gas().is_some() ^ tx.max_priority_fee_per_gas().is_some())
+        {
+            let estimate = Self::adjust_1559_estimate(
+                eip1559_fees_fut.await?,
+                tx.max_fee_per_gas(),
+                tx.max_priority_fee_per_gas(),
+            );
+            let mut estimate_tx = tx.clone();
+            estimate_tx.set_max_fee_per_gas(estimate.max_fee_per_gas);
+            estimate_tx.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+            let gas_limit = provider.estimate_gas(estimate_tx).await?;
+            return Ok(GasFillable::Eip1559 { gas_limit, estimate });
+        }
+
+        let gas_limit_fut = tx.gas_limit().map_or_else(
+            || provider.estimate_gas(tx.clone()).into_future().right_future(),
+            |gas_limit| async move { Ok(gas_limit) }.left_future(),
+        );
+
         let (gas_limit, estimate) = futures::try_join!(gas_limit_fut, eip1559_fees_fut)?;
+        let estimate = Self::adjust_1559_estimate(
+            estimate,
+            tx.max_fee_per_gas(),
+            tx.max_priority_fee_per_gas(),
+        );
 
         Ok(GasFillable::Eip1559 { gas_limit, estimate })
     }
@@ -203,13 +246,23 @@ impl<N: Network> TxFiller<N> for GasFiller {
         if let Some(builder) = tx.as_mut_builder() {
             match fillable {
                 GasFillable::Legacy { gas_limit, gas_price } => {
-                    builder.set_gas_limit(gas_limit);
-                    builder.set_gas_price(gas_price);
+                    if builder.gas_limit().is_none() {
+                        builder.set_gas_limit(gas_limit);
+                    }
+                    if builder.gas_price().is_none() {
+                        builder.set_gas_price(gas_price);
+                    }
                 }
                 GasFillable::Eip1559 { gas_limit, estimate } => {
-                    builder.set_gas_limit(gas_limit);
-                    builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
-                    builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+                    if builder.gas_limit().is_none() {
+                        builder.set_gas_limit(gas_limit);
+                    }
+                    if builder.max_fee_per_gas().is_none() {
+                        builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
+                    }
+                    if builder.max_priority_fee_per_gas().is_none() {
+                        builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+                    }
                 }
             }
         };
@@ -497,5 +550,51 @@ mod tests {
             <BlobGasFiller as TxFiller<Ethereum>>::status(&BlobGasFiller::default(), &tx),
             FillerControlFlow::Ready
         );
+    }
+
+    #[tokio::test]
+    async fn preserves_user_set_max_fee_per_gas() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let user_max_fee = 100_000_000_000u128;
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            chain_id: Some(31337),
+            max_fee_per_gas: Some(user_max_fee),
+            // max_priority_fee_per_gas is intentionally not set
+            ..Default::default()
+        };
+
+        let tx = provider.send_transaction(tx).await.unwrap();
+        let receipt = tx.get_receipt().await.unwrap();
+
+        let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
+
+        // User-set max_fee_per_gas should be preserved
+        assert_eq!(tx.max_fee_per_gas(), user_max_fee);
+    }
+
+    #[tokio::test]
+    async fn preserves_user_set_max_priority_fee_per_gas() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let user_priority_fee = 100_000_000_000u128;
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            chain_id: Some(31337),
+            // max_fee_per_gas is intentionally not set
+            max_priority_fee_per_gas: Some(user_priority_fee),
+            ..Default::default()
+        };
+
+        let tx = provider.send_transaction(tx).await.unwrap();
+        let receipt = tx.get_receipt().await.unwrap();
+
+        let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
+
+        // User-set max_priority_fee_per_gas should be preserved
+        assert_eq!(tx.max_priority_fee_per_gas().unwrap(), user_priority_fee);
     }
 }
