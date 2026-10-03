@@ -66,6 +66,10 @@ impl RetryBackoffLayer {
 
     /// Sets the average Compute Unit (CU) cost per request. Defaults to `20` CU.
     ///
+    /// A value of `0` is treated as `1` when computing the compute-budget backoff, so that
+    /// the calculation can never divide by zero. Pass the actual average cost of the
+    /// requests sent through this layer whenever it is known.
+    ///
     /// Based on Alchemy’s published Compute Unit (CU) table, most frequently used
     /// JSON-RPC methods fall within the `10–20` CU range, with only a small number
     /// of higher-cost outliers (such as log queries or transaction submissions).
@@ -343,6 +347,7 @@ where
 /// is supposed to wait to not get rate limited. The budget per second is
 /// `compute_units_per_second`, assuming an average cost of `avg_cost` this allows (in theory)
 /// `compute_units_per_second / avg_cost` requests per seconds without getting rate limited.
+/// An `avg_cost` of `0` is treated as `1`, so this never divides by zero.
 /// By taking into account the number of concurrent request and the position in queue when the
 /// request was first issued and determine the number of seconds a request is supposed to wait, if
 /// at all
@@ -352,7 +357,10 @@ fn compute_unit_offset_in_secs(
     current_queued_requests: u64,
     ahead_in_queue: u64,
 ) -> u64 {
-    let request_capacity_per_second = compute_units_per_second.saturating_div(avg_cost).max(1);
+    // `avg_cost` is user-configurable and may be `0`. `saturating_div` only saturates the
+    // overflow case, it still panics on a zero divisor, so clamp the divisor to `1`.
+    let request_capacity_per_second =
+        compute_units_per_second.saturating_div(avg_cost.max(1)).max(1);
     if current_queued_requests > request_capacity_per_second {
         current_queued_requests.min(ahead_in_queue).saturating_div(request_capacity_per_second)
     } else {
@@ -390,5 +398,32 @@ mod tests {
         assert_eq!(offset, 0);
         let offset = compute_unit_offset_in_secs(17, 10, 2, 2);
         assert_eq!(offset, 2);
+    }
+
+    #[test]
+    fn test_compute_unit_offset_with_zero_avg_cost() {
+        // A zero `avg_cost` is clamped to `1` and must not panic.
+        let offset = compute_unit_offset_in_secs(0, 10, 0, 0);
+        assert_eq!(offset, 0);
+        let offset = compute_unit_offset_in_secs(0, 10, 20, 20);
+        assert_eq!(offset, 2);
+    }
+
+    #[tokio::test]
+    async fn retry_with_zero_avg_cost_does_not_panic() {
+        // Regression test: a retryable error used to divide by zero and panic when the
+        // average unit cost was configured as `0`.
+        let inner = tower::service_fn(|_| -> TransportFut<'static> {
+            Box::pin(async { Err(TransportErrorKind::custom_str("429 Too Many Requests")) })
+        });
+        let mut service = RetryBackoffLayer::new(1, 0, 10).with_avg_unit_cost(0).layer(inner);
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        let err = service.call(request).await.unwrap_err();
+        assert!(err.to_string().contains("Max retries exceeded"));
     }
 }
