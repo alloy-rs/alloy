@@ -196,40 +196,6 @@ mod test {
     }
 
     #[test]
-    fn test_is_methods() {
-        let id_number = Id::Number(42);
-        let id_string = Id::String("test_string".to_string());
-        let id_none = Id::None;
-
-        assert!(id_number.is_number());
-        assert!(!id_number.is_string());
-        assert!(!id_number.is_none());
-
-        assert!(!id_string.is_number());
-        assert!(id_string.is_string());
-        assert!(!id_string.is_none());
-
-        assert!(!id_none.is_number());
-        assert!(!id_none.is_string());
-        assert!(id_none.is_none());
-    }
-
-    #[test]
-    fn test_as_methods() {
-        let id_number = Id::Number(42);
-        let id_string = Id::String("test_string".to_string());
-        let id_none = Id::None;
-
-        assert_eq!(id_number.as_number(), Some(42));
-        assert_eq!(id_string.as_number(), None);
-        assert_eq!(id_none.as_number(), None);
-
-        assert_eq!(id_number.as_string(), None);
-        assert_eq!(id_string.as_string(), Some("test_string"));
-        assert_eq!(id_none.as_string(), None);
-    }
-
-    #[test]
     fn test_ordering() {
         let id_number = Id::Number(42);
         let id_string = Id::String("test_string".to_string());

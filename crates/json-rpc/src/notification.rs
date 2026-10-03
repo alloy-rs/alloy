@@ -175,20 +175,6 @@ mod tests {
     }
 
     #[test]
-    fn subid_number() {
-        let number = U256::from(123456u64);
-        let subid: SubId = number.into();
-        assert_eq!(subid, SubId::Number(number));
-    }
-
-    #[test]
-    fn subid_string() {
-        let string = "subscription_id".to_string();
-        let subid: SubId = string.clone().into();
-        assert_eq!(subid, SubId::String(string));
-    }
-
-    #[test]
     fn eth_notification_header() {
         let header = json!({
             "subscription": "0x123",

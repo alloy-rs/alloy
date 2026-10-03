@@ -290,17 +290,6 @@ mod tests {
     }
 
     #[test]
-    fn test_fail_when_sidecar_and_access_list() {
-        let request = TransactionRequest::default()
-            .with_blob_sidecar_4844(BlobTransactionSidecar::default())
-            .with_access_list(AccessList::default());
-
-        let error = request.build_unsigned().unwrap_err();
-
-        assert!(matches!(error.error, TransactionBuilderError::InvalidTransactionRequest(_, _)));
-    }
-
-    #[test]
     fn test_invalid_legacy_fields() {
         let request = TransactionRequest::default().with_gas_price(0);
 

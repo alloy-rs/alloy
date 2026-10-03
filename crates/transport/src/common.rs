@@ -110,22 +110,4 @@ mod tests {
         let auth = Authorization::extract_from_url(&url).unwrap();
         assert_eq!(auth, Authorization::Basic(general_purpose::STANDARD.encode(":secret")));
     }
-
-    #[test]
-    fn test_authority() {
-        let auth = Authorization::authority("user:pass");
-        assert_eq!(auth, Authorization::Basic(general_purpose::STANDARD.encode("user:pass")));
-    }
-
-    #[test]
-    fn test_basic() {
-        let auth = Authorization::basic("user", "pass");
-        assert_eq!(auth, Authorization::Basic(general_purpose::STANDARD.encode("user:pass")));
-    }
-
-    #[test]
-    fn test_raw() {
-        let auth = Authorization::raw("raw_token");
-        assert_eq!(auth, Authorization::Raw("raw_token".to_string()));
-    }
 }

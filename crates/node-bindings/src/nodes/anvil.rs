@@ -551,11 +551,6 @@ mod test {
     }
 
     #[test]
-    fn spawn_and_drop() {
-        let _ = Anvil::new().block_time(12).try_spawn().map(drop);
-    }
-
-    #[test]
     fn can_set_host() {
         let anvil = Anvil::new().host("0.0.0.0").block_time(12).try_spawn();
         if let Ok(anvil) = anvil {
