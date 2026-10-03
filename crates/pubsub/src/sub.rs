@@ -362,19 +362,30 @@ impl<T: DeserializeOwned> Stream for SubAnyStream<T> {
     type Item = SubscriptionItem<T>;
 
     fn poll_next(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
-        loop {
-            match ready!(self.inner.poll_next_unpin(cx)) {
-                Some(Ok(value)) => return task::Poll::Ready(Some(value.into())),
-                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
-                    // This is OK.
-                    debug!(%err, %self.id, "stream lagged");
-                    continue;
-                }
-                None => return task::Poll::Ready(None),
+        let this = self.get_mut();
+        poll_next_notification(&this.id, &mut this.inner, cx).map(|value| value.map(Into::into))
+    }
+}
+
+/// Polls the next notification of a subscription stream, logging and skipping broadcast lag
+/// errors.
+fn poll_next_notification(
+    id: &B256,
+    inner: &mut BroadcastStream<Box<RawValue>>,
+    cx: &mut task::Context<'_>,
+) -> task::Poll<Option<Box<RawValue>>> {
+    loop {
+        match ready!(inner.poll_next_unpin(cx)) {
+            Some(Ok(value)) => return task::Poll::Ready(Some(value)),
+            Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
+                // This is OK.
+                debug!(%err, self.id = %id, "stream lagged");
+                continue;
             }
+            None => return task::Poll::Ready(None),
         }
     }
 }
@@ -404,20 +415,15 @@ impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
         loop {
-            match ready!(self.inner.poll_next_unpin(cx)) {
-                Some(Ok(value)) => match serde_json::from_str(value.get()) {
-                    Ok(item) => return task::Poll::Ready(Some(item)),
-                    Err(err) => {
-                        debug!(value = ?value.get(), %err, %self.id, "failed deserializing subscription item");
-                        continue;
-                    }
-                },
-                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
-                    // This is OK.
-                    debug!(%err, %self.id, "stream lagged");
-                    continue;
+            let this = &mut *self;
+            let Some(value) = ready!(poll_next_notification(&this.id, &mut this.inner, cx)) else {
+                return task::Poll::Ready(None);
+            };
+            match serde_json::from_str(value.get()) {
+                Ok(item) => return task::Poll::Ready(Some(item)),
+                Err(err) => {
+                    debug!(value = ?value.get(), %err, %self.id, "failed deserializing subscription item");
                 }
-                None => return task::Poll::Ready(None),
             }
         }
     }
@@ -445,21 +451,11 @@ impl<T: DeserializeOwned> Stream for SubResultStream<T> {
     type Item = serde_json::Result<T>;
 
     fn poll_next(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
-        loop {
-            match ready!(self.inner.poll_next_unpin(cx)) {
-                Some(Ok(value)) => {
-                    return task::Poll::Ready(Some(serde_json::from_str(value.get())))
-                }
-                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
-                    // This is OK.
-                    debug!(%err, %self.id, "stream lagged");
-                    continue;
-                }
-                None => return task::Poll::Ready(None),
-            }
-        }
+        let this = self.get_mut();
+        poll_next_notification(&this.id, &mut this.inner, cx)
+            .map(|value| value.map(|value| serde_json::from_str(value.get())))
     }
 }
