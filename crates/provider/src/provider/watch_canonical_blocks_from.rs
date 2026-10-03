@@ -303,249 +303,99 @@ impl<T> FixedBuf<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{Provider, ProviderBuilder};
-    use alloy_eips::BlockNumberOrTag;
-    use alloy_primitives::{B256, U64};
-    use alloy_rpc_client::RpcClient;
-    use alloy_rpc_types_eth::Block;
-    use alloy_transport::{TransportError, TransportFut};
-    use futures::StreamExt;
-    use std::{
-        collections::HashMap,
-        sync::{Arc, RwLock},
-        task::Poll,
-        time::Duration,
+    use super::{
+        super::watch_logs_test_utils::{block, MockChain},
+        *,
     };
+    use crate::Provider;
+    use alloy_eips::BlockNumberOrTag;
+    use alloy_primitives::B256;
+    use alloy_rpc_types_eth::{Block, Log};
+    use futures::StreamExt;
+    use std::time::Duration;
     use tokio::time::timeout;
 
-    struct ChainState {
-        blocks: HashMap<u64, Block>,
-        head: u64,
+    fn without_logs<const N: usize>(blocks: [Block; N]) -> Vec<(Block, Vec<Log>)> {
+        blocks.into_iter().map(|block| (block, Vec::new())).collect()
     }
 
-    #[derive(Clone)]
-    struct MockChain {
-        state: Arc<RwLock<ChainState>>,
+    async fn next_event(
+        stream: &mut WatchCanonicalBlocksFromStream<alloy_network::Ethereum>,
+    ) -> CanonicalEvent<Block> {
+        timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap()
     }
 
-    impl MockChain {
-        fn new() -> Self {
-            Self { state: Arc::new(RwLock::new(ChainState { blocks: HashMap::new(), head: 0 })) }
-        }
-
-        /// Insert blocks and set head to the highest block number.
-        fn extend(&self, blocks: &[Block]) {
-            let mut state = self.state.write().unwrap();
-            for b in blocks {
-                let number = b.header.inner.number;
-                state.blocks.insert(number, b.clone());
-                if number > state.head {
-                    state.head = number;
-                }
+    fn assert_added(event: CanonicalEvent<Block>, number: u64, hash_last_byte: u8) {
+        match event {
+            CanonicalEvent::Added(block) => {
+                assert_eq!(block.header.number, number);
+                assert_eq!(block.header.hash, B256::with_last_byte(hash_last_byte));
             }
+            other => panic!("expected Added({number}), got {other:?}"),
         }
+    }
 
-        /// Simulate a reorg: remove all blocks at height >= the first block's
-        /// height, insert the new blocks, and set head to the highest.
-        fn reorg(&self, blocks: &[Block]) {
-            let mut state = self.state.write().unwrap();
-            let min_height =
-                blocks.iter().map(|b| b.header.inner.number).min().expect("reorg needs blocks");
-            state.blocks.retain(|&h, _| h < min_height);
-            let mut max = state.head;
-            for b in blocks {
-                let number = b.header.inner.number;
-                state.blocks.insert(number, b.clone());
-                if number > max {
-                    max = number;
-                }
+    fn assert_removed(event: CanonicalEvent<Block>, number: u64, hash_last_byte: u8) {
+        match event {
+            CanonicalEvent::Removed(block) => {
+                assert_eq!(block.header.number, number);
+                assert_eq!(block.header.hash, B256::with_last_byte(hash_last_byte));
             }
-            state.head = max;
-        }
-
-        fn provider(&self) -> impl Provider {
-            let transport = MockChainTransport { chain: self.clone() };
-            ProviderBuilder::new().connect_client(RpcClient::new(transport, true))
-        }
-
-        fn handle_request(
-            &self,
-            req: &alloy_json_rpc::SerializedRequest,
-        ) -> alloy_json_rpc::Response {
-            let state = self.state.read().unwrap();
-            let payload = match req.method() {
-                "eth_blockNumber" => {
-                    let raw = serde_json::to_string(&U64::from(state.head)).unwrap();
-                    alloy_json_rpc::ResponsePayload::Success(
-                        serde_json::value::RawValue::from_string(raw).unwrap(),
-                    )
-                }
-                "eth_getBlockByNumber" => {
-                    let params = req.params().expect("eth_getBlockByNumber requires params");
-                    let (tag, _full): (BlockNumberOrTag, bool) =
-                        serde_json::from_str(params.get()).unwrap();
-                    let number = match tag {
-                        BlockNumberOrTag::Number(n) => n,
-                        BlockNumberOrTag::Latest => state.head,
-                        _ => unimplemented!("unsupported block tag in MockChain: {tag:?}"),
-                    };
-                    let block = state.blocks.get(&number).cloned();
-                    let raw = serde_json::to_string(&block).unwrap();
-                    alloy_json_rpc::ResponsePayload::Success(
-                        serde_json::value::RawValue::from_string(raw).unwrap(),
-                    )
-                }
-                other => panic!("MockChain: unexpected RPC method `{other}`"),
-            };
-            alloy_json_rpc::Response { id: req.id().clone(), payload }
+            other => panic!("expected Removed({number}), got {other:?}"),
         }
     }
 
-    #[derive(Clone)]
-    struct MockChainTransport {
-        chain: MockChain,
-    }
-
-    impl tower::Service<alloy_json_rpc::RequestPacket> for MockChainTransport {
-        type Response = alloy_json_rpc::ResponsePacket;
-        type Error = TransportError;
-        type Future = TransportFut<'static>;
-
-        fn poll_ready(
-            &mut self,
-            _cx: &mut std::task::Context<'_>,
-        ) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-
-        fn call(&mut self, req: alloy_json_rpc::RequestPacket) -> Self::Future {
-            let chain = self.chain.clone();
-            Box::pin(async move {
-                Ok(match req {
-                    alloy_json_rpc::RequestPacket::Single(req) => {
-                        alloy_json_rpc::ResponsePacket::Single(chain.handle_request(&req))
-                    }
-                    alloy_json_rpc::RequestPacket::Batch(reqs) => {
-                        alloy_json_rpc::ResponsePacket::Batch(
-                            reqs.iter().map(|r| chain.handle_request(r)).collect(),
-                        )
-                    }
-                })
-            })
-        }
-    }
-
-    fn block(number: u64, hash_last_byte: u8, parent_hash_last_byte: u8) -> Block {
-        let mut block: Block = Block::default();
-        block.header.inner.number = number;
-        block.header.hash = B256::with_last_byte(hash_last_byte);
-        block.header.inner.parent_hash = B256::with_last_byte(parent_hash_last_byte);
-        block
+    fn canonical_stream(
+        provider: &impl Provider,
+        max_reorg_depth: usize,
+    ) -> WatchCanonicalBlocksFromStream<alloy_network::Ethereum> {
+        provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .canonical()
+            .rpc_concurrency(1)
+            .max_reorg_depth(max_reorg_depth)
+            .into_stream()
     }
 
     #[tokio::test]
     async fn emits_removed_then_added_on_reorg_within_buffer() {
         let chain = MockChain::new();
-        // Initial chain: 1 -> 2 -> 3.
-        chain.extend(&[block(1, 1, 0), block(2, 2, 1), block(3, 3, 2)]);
+        chain.extend(&without_logs([block(1, 1, 0), block(2, 2, 1), block(3, 3, 2)]));
 
         let provider = chain.provider();
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .canonical()
-            .rpc_concurrency(1)
-            .max_reorg_depth(16)
-            .into_stream();
+        let mut stream = canonical_stream(&provider, 16);
 
-        // Added 1, 2, 3.
-        for expected in [1_u64, 2, 3] {
-            let item =
-                timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-            match item {
-                CanonicalEvent::Added(block) => assert_eq!(block.header.number, expected),
-                other => panic!("expected Added({expected}), got {other:?}"),
-            }
+        for number in [1, 2, 3] {
+            assert_added(next_event(&mut stream).await, number, number as u8);
         }
 
         // Reorg: replace block 3, add block 4.
-        chain.reorg(&[block(3, 33, 2), block(4, 44, 33)]);
+        chain.reorg(&without_logs([block(3, 33, 2), block(4, 44, 33)]));
 
-        // Removed 3, Added 3', Added 4.
-        let removed_3 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let added_3_prime =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let added_4 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-
-        match removed_3 {
-            CanonicalEvent::Removed(block) => {
-                assert_eq!(block.header.number, 3);
-                assert_eq!(block.header.hash, B256::with_last_byte(3));
-            }
-            other => panic!("expected Removed(3), got {other:?}"),
-        }
-        match added_3_prime {
-            CanonicalEvent::Added(block) => {
-                assert_eq!(block.header.number, 3);
-                assert_eq!(block.header.hash, B256::with_last_byte(33));
-            }
-            other => panic!("expected Added(3'), got {other:?}"),
-        }
-        match added_4 {
-            CanonicalEvent::Added(block) => {
-                assert_eq!(block.header.number, 4);
-                assert_eq!(block.header.hash, B256::with_last_byte(44));
-            }
-            other => panic!("expected Added(4), got {other:?}"),
-        }
+        assert_removed(next_event(&mut stream).await, 3, 3);
+        assert_added(next_event(&mut stream).await, 3, 33);
+        assert_added(next_event(&mut stream).await, 4, 44);
     }
 
     #[tokio::test]
     async fn emits_error_when_reorg_exceeds_retained_history() {
         let chain = MockChain::new();
-        // Initial chain: 1 -> 2 -> 3.
-        chain.extend(&[block(1, 1, 0), block(2, 2, 1), block(3, 3, 2)]);
+        chain.extend(&without_logs([block(1, 1, 0), block(2, 2, 1), block(3, 3, 2)]));
 
         let provider = chain.provider();
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .canonical()
-            .rpc_concurrency(1)
-            .max_reorg_depth(2)
-            .into_stream();
+        let mut stream = canonical_stream(&provider, 2);
 
-        // Added 1, 2, 3.
-        for expected in [1_u64, 2, 3] {
-            let item =
-                timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-            match item {
-                CanonicalEvent::Added(block) => assert_eq!(block.header.number, expected),
-                other => panic!("expected Added({expected}), got {other:?}"),
-            }
+        for number in [1, 2, 3] {
+            assert_added(next_event(&mut stream).await, number, number as u8);
         }
 
         // Deep reorg: entirely new chain from height 2 onward.
-        chain.reorg(&[block(2, 22, 11), block(3, 33, 22), block(4, 44, 33)]);
+        chain.reorg(&without_logs([block(2, 22, 11), block(3, 33, 22), block(4, 44, 33)]));
 
-        // Removed 3, Removed 2.
-        let removed_3 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let removed_2 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        match removed_3 {
-            CanonicalEvent::Removed(block) => assert_eq!(block.header.number, 3),
-            other => panic!("expected Removed(3), got {other:?}"),
-        }
-        match removed_2 {
-            CanonicalEvent::Removed(block) => assert_eq!(block.header.number, 2),
-            other => panic!("expected Removed(2), got {other:?}"),
-        }
+        assert_removed(next_event(&mut stream).await, 3, 3);
+        assert_removed(next_event(&mut stream).await, 2, 2);
 
         let err =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap_err();
@@ -559,167 +409,65 @@ mod tests {
     #[tokio::test]
     async fn backfills_parent_chain_when_reorg_ancestor_is_retained() {
         let chain = MockChain::new();
-        // Initial chain: 1 -> 2 -> 3 -> 4.
-        chain.extend(&[block(1, 1, 0), block(2, 2, 1), block(3, 3, 2), block(4, 4, 3)]);
+        chain.extend(&without_logs([
+            block(1, 1, 0),
+            block(2, 2, 1),
+            block(3, 3, 2),
+            block(4, 4, 3),
+        ]));
 
         let provider = chain.provider();
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .canonical()
-            .rpc_concurrency(1)
-            .max_reorg_depth(8)
-            .into_stream();
+        let mut stream = canonical_stream(&provider, 8);
 
-        // Added 1, 2, 3, 4.
-        for expected in [1_u64, 2, 3, 4] {
-            let item =
-                timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-            match item {
-                CanonicalEvent::Added(block) => assert_eq!(block.header.number, expected),
-                other => panic!("expected Added({expected}), got {other:?}"),
-            }
+        for number in [1, 2, 3, 4] {
+            assert_added(next_event(&mut stream).await, number, number as u8);
         }
 
         // Reorg: new chain from height 3 onward, adding block 5.
-        chain.reorg(&[block(3, 33, 2), block(4, 44, 33), block(5, 5, 44)]);
+        chain.reorg(&without_logs([block(3, 33, 2), block(4, 44, 33), block(5, 5, 44)]));
 
-        // Removed 4, Removed 3, Added 3', Added 4', Added 5.
-        let removed_4 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let removed_3 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let added_3_prime =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let added_4_prime =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let added_5 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-
-        match removed_4 {
-            CanonicalEvent::Removed(block) => {
-                assert_eq!(block.header.number, 4);
-                assert_eq!(block.header.hash, B256::with_last_byte(4));
-            }
-            other => panic!("expected Removed(4), got {other:?}"),
-        }
-        match removed_3 {
-            CanonicalEvent::Removed(block) => {
-                assert_eq!(block.header.number, 3);
-                assert_eq!(block.header.hash, B256::with_last_byte(3));
-            }
-            other => panic!("expected Removed(3), got {other:?}"),
-        }
-        match added_3_prime {
-            CanonicalEvent::Added(block) => {
-                assert_eq!(block.header.number, 3);
-                assert_eq!(block.header.hash, B256::with_last_byte(33));
-            }
-            other => panic!("expected Added(3'), got {other:?}"),
-        }
-        match added_4_prime {
-            CanonicalEvent::Added(block) => {
-                assert_eq!(block.header.number, 4);
-                assert_eq!(block.header.hash, B256::with_last_byte(44));
-            }
-            other => panic!("expected Added(4'), got {other:?}"),
-        }
-        match added_5 {
-            CanonicalEvent::Added(block) => {
-                assert_eq!(block.header.number, 5);
-                assert_eq!(block.header.hash, B256::with_last_byte(5));
-            }
-            other => panic!("expected Added(5), got {other:?}"),
-        }
+        assert_removed(next_event(&mut stream).await, 4, 4);
+        assert_removed(next_event(&mut stream).await, 3, 3);
+        assert_added(next_event(&mut stream).await, 3, 33);
+        assert_added(next_event(&mut stream).await, 4, 44);
+        assert_added(next_event(&mut stream).await, 5, 5);
     }
 
     #[tokio::test]
     async fn recovers_when_chain_changes_during_backfill() {
         let chain = MockChain::new();
-        // Initial chain: 1 -> 2 -> 3.
-        chain.extend(&[block(1, 1, 0), block(2, 2, 1), block(3, 3, 2)]);
+        chain.extend(&without_logs([block(1, 1, 0), block(2, 2, 1), block(3, 3, 2)]));
 
         let provider = chain.provider();
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .canonical()
-            .rpc_concurrency(1)
-            .max_reorg_depth(8)
-            .into_stream();
+        let mut stream = canonical_stream(&provider, 8);
 
-        // Added 1, 2, 3.
-        for expected in [1_u64, 2, 3] {
-            let item =
-                timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-            match item {
-                CanonicalEvent::Added(block) => assert_eq!(block.header.number, expected),
-                other => panic!("expected Added({expected}), got {other:?}"),
-            }
+        for number in [1, 2, 3] {
+            assert_added(next_event(&mut stream).await, number, number as u8);
         }
 
-        // First reorg: block 4 expects parent hash 33, but block 3 has hash 34.
-        // The stream will detect the mismatch during backfill and abandon reconciliation
-        // via `continue 'stream`, then poll for new blocks.
-        chain.reorg(&[block(3, 34, 2), block(4, 4, 33)]);
+        // First reorg: block 4 expects parent hash 33, but block 3 has hash 34, so the stream
+        // abandons reconciliation during backfill and polls for new blocks.
+        chain.reorg(&without_logs([block(3, 34, 2), block(4, 4, 33)]));
 
         // Removed(3) is yielded before the mismatch is discovered.
-        let removed_3 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        match removed_3 {
-            CanonicalEvent::Removed(block) => {
-                assert_eq!(block.header.number, 3);
-                assert_eq!(block.header.hash, B256::with_last_byte(3));
-            }
-            other => panic!("expected Removed(3), got {other:?}"),
-        }
+        assert_removed(next_event(&mut stream).await, 3, 3);
 
-        // Schedule the second reorg to happen while the stream is polling for new blocks.
-        // The generator has already resumed and hit `continue 'stream` (because it saw
-        // hash 34 instead of the expected 33). It's now waiting for the head to advance.
+        // Second reorg while the stream is waiting for the head to advance.
         let chain_clone = chain.clone();
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(10)).await;
-            chain_clone.reorg(&[block(3, 33, 2), block(4, 44, 33), block(5, 5, 44)]);
+            chain_clone.reorg(&without_logs([block(3, 33, 2), block(4, 44, 33), block(5, 5, 44)]));
         });
 
-        // Recovery: Added 3', Added 4', Added 5.
-        let added_3_prime =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let added_4_prime =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let added_5 =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-
-        match added_3_prime {
-            CanonicalEvent::Added(block) => {
-                assert_eq!(block.header.number, 3);
-                assert_eq!(block.header.hash, B256::with_last_byte(33));
-            }
-            other => panic!("expected Added(3'), got {other:?}"),
-        }
-        match added_4_prime {
-            CanonicalEvent::Added(block) => {
-                assert_eq!(block.header.number, 4);
-                assert_eq!(block.header.hash, B256::with_last_byte(44));
-            }
-            other => panic!("expected Added(4'), got {other:?}"),
-        }
-        match added_5 {
-            CanonicalEvent::Added(block) => {
-                assert_eq!(block.header.number, 5);
-                assert_eq!(block.header.hash, B256::with_last_byte(5));
-            }
-            other => panic!("expected Added(5), got {other:?}"),
-        }
+        assert_added(next_event(&mut stream).await, 3, 33);
+        assert_added(next_event(&mut stream).await, 4, 44);
+        assert_added(next_event(&mut stream).await, 5, 5);
     }
 
     #[tokio::test]
     async fn clamps_zero_values_for_rpc_concurrency_and_reorg_depth() {
         let chain = MockChain::new();
-        chain.extend(&[block(1, 1, 0)]);
+        chain.extend(&without_logs([block(1, 1, 0)]));
 
         let provider = chain.provider();
         let mut stream = provider
@@ -731,11 +479,7 @@ mod tests {
             .max_reorg_depth(0)
             .into_stream();
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        match first {
-            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 1),
-            other => panic!("expected Added(1), got {other:?}"),
-        }
+        assert_added(next_event(&mut stream).await, 1, 1);
     }
 
     #[tokio::test]
@@ -752,31 +496,16 @@ mod tests {
     #[tokio::test]
     async fn errors_instead_of_underflow_when_backfilling_genesis_parent() {
         let chain = MockChain::new();
-        {
-            let mut state = chain.state.write().unwrap();
-            state.head = 2;
-            // Intentionally inconsistent mock state to force a malformed backfill path:
-            // request #1 -> block number 0 (hash=1), request #2 -> another block number 0
-            // with a non-matching parent hash. This drives reconciliation to `height == 0`.
-            state.blocks.insert(1, block(0, 1, 0));
-            state.blocks.insert(2, block(0, 2, 9));
-        }
+        // Intentionally inconsistent mock state to force a malformed backfill path:
+        // request #1 -> block number 0 (hash=1), request #2 -> another block number 0
+        // with a non-matching parent hash. This drives reconciliation to `height == 0`.
+        chain.insert_at(1, block(0, 1, 0));
+        chain.insert_at(2, block(0, 2, 9));
 
         let provider = chain.provider();
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .canonical()
-            .rpc_concurrency(1)
-            .max_reorg_depth(8)
-            .into_stream();
+        let mut stream = canonical_stream(&provider, 8);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        match first {
-            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 0),
-            other => panic!("expected Added(0), got {other:?}"),
-        }
+        assert_added(next_event(&mut stream).await, 0, 1);
 
         let err =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap_err();
