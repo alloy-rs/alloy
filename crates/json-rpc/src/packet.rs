@@ -74,15 +74,7 @@ impl RequestPacket {
 
     /// Get the request IDs of all subscription requests in the packet.
     pub fn subscription_request_ids(&self) -> HashSet<&Id> {
-        match self {
-            Self::Single(single) => {
-                let id = single.is_subscription().then(|| single.id());
-                HashSet::from_iter(id)
-            }
-            Self::Batch(batch) => {
-                batch.iter().filter(|req| req.is_subscription()).map(|req| req.id()).collect()
-            }
-        }
+        self.requests().iter().filter(|req| req.is_subscription()).map(|req| req.id()).collect()
     }
 
     /// Get the number of requests in the packet.
@@ -161,19 +153,7 @@ impl<Payload, ErrData> FromIterator<Response<Payload, ErrData>>
     for ResponsePacket<Payload, ErrData>
 {
     fn from_iter<T: IntoIterator<Item = Response<Payload, ErrData>>>(iter: T) -> Self {
-        let mut iter = iter.into_iter().peekable();
-        // return single if iter has exactly one element, else make a batch
-        if let Some(first) = iter.next() {
-            return if iter.peek().is_none() {
-                Self::Single(first)
-            } else {
-                let mut batch = Vec::new();
-                batch.push(first);
-                batch.extend(iter);
-                Self::Batch(batch)
-            };
-        }
-        Self::Batch(vec![])
+        iter.into_iter().collect::<Vec<_>>().into()
     }
 }
 
@@ -287,20 +267,14 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     ///
     /// For batch responses, this returns `true` if __all__ responses are successful.
     pub fn is_success(&self) -> bool {
-        match self {
-            Self::Single(single) => single.is_success(),
-            Self::Batch(batch) => batch.iter().all(|res| res.is_success()),
-        }
+        self.responses().iter().all(|res| res.is_success())
     }
 
     /// Returns `true` if the response payload is an error.
     ///
     /// For batch responses, this returns `true` there's at least one error response.
     pub fn is_error(&self) -> bool {
-        match self {
-            Self::Single(single) => single.is_error(),
-            Self::Batch(batch) => batch.iter().any(|res| res.is_error()),
-        }
+        self.responses().iter().any(|res| res.is_error())
     }
 
     /// Returns the [ErrorPayload] if the response is an error.
@@ -371,11 +345,7 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     where
         K: Borrow<Id> + Eq + Hash,
     {
-        match self {
-            Self::Single(single) if ids.contains(&single.id) => vec![single],
-            Self::Batch(batch) => batch.iter().filter(|res| ids.contains(&res.id)).collect(),
-            _ => Vec::new(),
-        }
+        self.responses().iter().filter(|res| ids.contains(&res.id)).collect()
     }
 }
 
