@@ -350,13 +350,7 @@ impl<T> Block<T> {
     ///  - If the block's transaction is not [`BlockTransactions::Full`], the returned block will
     ///    have an empty transaction vec.
     pub fn into_consensus(self) -> alloy_consensus::Block<T> {
-        let Self { header, transactions, withdrawals, .. } = self;
-        alloy_consensus::BlockBody {
-            transactions: transactions.into_transactions_vec(),
-            ommers: vec![],
-            withdrawals,
-        }
-        .into_block(header.into_consensus())
+        self.map_header(Header::into_consensus).into_consensus_block()
     }
 
     /// Same as [`Self::into_consensus`] but returns the block as [`Sealed`] with its stored RPC
