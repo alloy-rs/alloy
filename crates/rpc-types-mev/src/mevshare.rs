@@ -247,7 +247,7 @@ impl PartialEq<[u8; 4]> for FunctionSelector {
     }
 }
 
-/// Deserializes missing or null sequences as empty vectors.
+/// Deserializes null sequences as empty vectors and serializes empty vectors as null.
 mod null_sequence {
     use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 

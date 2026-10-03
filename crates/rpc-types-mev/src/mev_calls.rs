@@ -15,16 +15,15 @@ pub struct MevSendBundle {
     #[serde(rename = "version")]
     pub protocol_version: ProtocolVersion,
     /// Data used by block builders to check if the bundle should be considered for inclusion.
-    #[serde(rename = "inclusion")]
     pub inclusion: Inclusion,
     /// The transactions to include in the bundle.
     #[serde(rename = "body")]
     pub bundle_body: Vec<BundleItem>,
     /// Requirements for the bundle to be included in the block.
-    #[serde(rename = "validity", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub validity: Option<Validity>,
     /// Preferences on what data should be shared about the bundle and its transactions
-    #[serde(rename = "privacy", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub privacy: Option<Privacy>,
 }
 
@@ -191,7 +190,6 @@ impl Inclusion {
 /// A bundle tx, which can either be a transaction hash, or a full tx.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
-#[serde(rename_all = "camelCase")]
 pub enum BundleItem {
     /// The hash of either a transaction or bundle we are trying to backrun.
     Hash {
@@ -207,7 +205,6 @@ pub enum BundleItem {
         can_revert: bool,
     },
     /// A nested bundle request.
-    #[serde(rename_all = "camelCase")]
     Bundle {
         /// A bundle request of type MevSendBundle
         bundle: MevSendBundle,
