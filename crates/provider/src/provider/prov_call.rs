@@ -227,7 +227,8 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if called after the request has been polled.
+    /// Panics if this is not a [`ProviderCall::RpcCall`], or if called after the request has been
+    /// polled.
     pub fn into_owned_params(self) -> ProviderCall<Params::Owned, Resp, Output, Map> {
         match self {
             Self::RpcCall(call) => ProviderCall::RpcCall(call.into_owned_params()),
