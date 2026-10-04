@@ -276,19 +276,15 @@ where
                 QueuedRequest::new(this.requests_enqueued.clone());
             let mut rate_limit_retry_number: u32 = 0;
             loop {
-                let err;
                 let res = inner.call(request.clone()).await;
 
-                match res {
-                    Ok(res) => {
-                        if let Some(e) = res.as_error() {
-                            err = TransportError::ErrorResp(e.clone())
-                        } else {
-                            return Ok(res);
-                        }
-                    }
-                    Err(e) => err = e,
-                }
+                let (err, packet) = match res {
+                    Ok(res) => match res.as_error() {
+                        Some(e) => (TransportError::ErrorResp(e.clone()), Some(res)),
+                        None => return Ok(res),
+                    },
+                    Err(e) => (e, None),
+                };
 
                 let should_retry = this.policy.should_retry(&err);
                 if should_retry {
@@ -326,7 +322,9 @@ where
 
                     sleep(total_backoff).await;
                 } else {
-                    return Err(err);
+                    // An error payload is returned as received, so the other responses of a
+                    // batch still reach their callers.
+                    return packet.ok_or(err);
                 }
             }
         })
