@@ -538,6 +538,17 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                 self.unconfirmed.remove(tx_hash);
             }
         }
+
+        if to_reap.is_empty() {
+            return;
+        }
+        for watchers in self.waiting_confs.values_mut() {
+            for watcher in watchers.extract_if(.., |w| w.reap_at.is_some_and(|at| at < now)) {
+                debug!(tx=%watcher.config.tx_hash, "reaped while waiting for confirmations");
+                watcher.notify(Err(WatchTxError::Timeout));
+            }
+        }
+        self.waiting_confs.retain(|_, watchers| !watchers.is_empty());
     }
 
     /// Reap transactions overridden by a chain gap (true reorg or resync after a pause).
@@ -580,6 +591,11 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         // Start watching for the transaction.
         debug!(tx=%to_watch.config.tx_hash, "watching");
         trace!(?to_watch.config, ?to_watch.received_at_block);
+        if let Some(timeout) = to_watch.config.timeout {
+            let reap_at = Instant::now() + timeout;
+            to_watch.reap_at = Some(reap_at);
+            self.reap_at.insert(reap_at, to_watch.config.tx_hash);
+        }
         if let Some(received_at_block) = to_watch.received_at_block {
             // Transaction is already confirmed, we just need to wait for the required
             // confirmations.
@@ -596,11 +612,6 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             return;
         }
 
-        if let Some(timeout) = to_watch.config.timeout {
-            let reap_at = Instant::now() + timeout;
-            to_watch.reap_at = Some(reap_at);
-            self.reap_at.insert(reap_at, to_watch.config.tx_hash);
-        }
         // Transaction may be confirmed already, check the lookbehind history first.
         // If so, insert it into the waiting list.
         for (block_height, txs) in self.past_blocks.iter().rev() {

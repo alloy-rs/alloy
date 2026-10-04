@@ -233,3 +233,26 @@ async fn timeout_reaps_only_the_watcher_that_set_it() {
     harness.block(1, &[TX]);
     assert_eq!(pending.await.unwrap(), TX);
 }
+
+#[tokio::test(start_paused = true)]
+async fn timeout_applies_while_waiting_for_confirmations() {
+    for received_at_block in [None, Some(1)] {
+        let harness = Harness::new();
+        harness.block(1, &[TX]);
+        settle().await;
+
+        let config = PendingTransactionConfig::new(TX)
+            .with_required_confirmations(3)
+            .with_timeout(Some(Duration::ZERO));
+        let pending = harness.watch(config, received_at_block).await;
+        let res = tokio::time::timeout(Duration::from_secs(60), pending)
+            .await
+            .unwrap_or_else(|_| panic!("{received_at_block:?}: watcher never timed out"));
+        assert!(
+            matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+            "{received_at_block:?}: {res:?}"
+        );
+        settle().await;
+        assert!(harness.paused.is_paused(), "{received_at_block:?}");
+    }
+}
