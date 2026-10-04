@@ -87,16 +87,8 @@ impl Visitor<'_> for TxpoolInspectSummaryVisitor {
 
         Ok(TxpoolInspectSummary { to, value, gas, gas_price })
     }
-
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        self.visit_str(&value)
-    }
 }
 
-/// Implement the `Deserialize` trait for `TxpoolInspectSummary` struct.
 impl<'de> Deserialize<'de> for TxpoolInspectSummary {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

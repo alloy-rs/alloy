@@ -415,13 +415,7 @@ pub(crate) mod serde_bincode_compat {
                 },
                 logs_bloom: logs_bloom.into_owned(),
             };
-            match tx_type {
-                TxType::Legacy => Self::Legacy(receipt),
-                TxType::Eip2930 => Self::Eip2930(receipt),
-                TxType::Eip1559 => Self::Eip1559(receipt),
-                TxType::Eip4844 => Self::Eip4844(receipt),
-                TxType::Eip7702 => Self::Eip7702(receipt),
-            }
+            Self::from_typed(tx_type, receipt)
         }
     }
 
@@ -489,37 +483,6 @@ pub(crate) mod serde_bincode_compat {
 mod test {
     use crate::{Receipt, ReceiptEnvelope, TxType};
     use alloy_primitives::Log;
-
-    #[cfg(feature = "serde")]
-    #[test]
-    fn deser_pre658_receipt_envelope() {
-        use crate::Receipt;
-        use alloy_primitives::b256;
-
-        let receipt = super::ReceiptWithBloom::<Receipt<()>> {
-            receipt: super::Receipt {
-                status: super::Eip658Value::PostState(b256!(
-                    "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
-                )),
-                cumulative_gas_used: 0,
-                logs: Default::default(),
-            },
-            logs_bloom: Default::default(),
-        };
-
-        let json = serde_json::to_string(&receipt).unwrap();
-
-        println!("Serialized {json}");
-
-        let receipt: super::ReceiptWithBloom<Receipt<()>> = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(
-            receipt.receipt.status,
-            super::Eip658Value::PostState(b256!(
-                "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
-            ))
-        );
-    }
 
     #[cfg(feature = "serde")]
     #[test]

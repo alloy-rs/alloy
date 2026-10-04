@@ -134,8 +134,11 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // TODO: ideally we can send this with an unused id
-            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
+            // A string id keeps the reply from matching a request issued by `RpcClient`,
+            // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
+            // dropped on arrival.
+            let id = Id::String(format!("unsubscribe-{local_id}"));
+            let req = Request::new("eth_unsubscribe", id, [server_id]);
             let brv = req.serialize().expect("no ser error").take_request();
 
             self.dispatch_request(brv)?;
@@ -179,6 +182,12 @@ impl<T: PubSubConnect> PubSubService<T> {
     ) -> TransportResult<()> {
         let request = in_flight.request;
         let id = request.id().clone();
+
+        // Nobody waits for the response and the subscription is gone, e.g. it was unsubscribed
+        // while being re-issued after a reconnect. Don't re-create it without a consumer.
+        if in_flight.tx.is_closed() && !self.subs.contains(&request.params_hash()) {
+            return Ok(());
+        }
 
         let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
 

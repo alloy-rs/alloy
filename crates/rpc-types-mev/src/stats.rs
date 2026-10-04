@@ -88,10 +88,10 @@ pub struct StatsSimulated {
     pub received_at: String,
     /// indicates time at which each builder selected the bundle to be included in the target
     /// block
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
     pub considered_by_builders_at: Vec<ConsideredByBuildersAt>,
     /// indicates time at which each builder sealed a block containing the bundle
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
     pub sealed_by_builders_at: Vec<SealedByBuildersAt>,
 }
 

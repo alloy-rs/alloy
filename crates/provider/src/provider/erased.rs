@@ -1,6 +1,8 @@
+#[cfg(feature = "pubsub")]
+use super::get_block::SubFullBlocks;
 use super::{
-    EthCallMany, EthGetBlock, FilterPollerBuilder, WatchBlocksFrom, WatchCanonicalBlocksFrom,
-    WatchCanonicalLogsFrom, WatchLogsFrom,
+    EthCallMany, EthGetBlock, FilterPollerBuilder, WatchBlocks, WatchBlocksFrom,
+    WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchHeaders, WatchLogsFrom,
 };
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -10,6 +12,7 @@ use crate::{
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
     ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
+use alloy_eips::eip7928::BlockAccessList;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{
@@ -81,6 +84,13 @@ impl<N: Network> Provider<N> for DynProvider<N> {
 
     fn get_block_number(&self) -> ProviderCall<NoParams, U64, BlockNumber> {
         self.0.get_block_number()
+    }
+
+    async fn get_block_number_by_id(
+        &self,
+        block_id: BlockId,
+    ) -> TransportResult<Option<BlockNumber>> {
+        self.0.get_block_number_by_id(block_id).await
     }
 
     fn call(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
@@ -188,6 +198,31 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_block_receipts(block)
     }
 
+    async fn get_block_access_list(
+        &self,
+        block: BlockId,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.0.get_block_access_list(block).await
+    }
+
+    async fn get_block_access_list_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.0.get_block_access_list_by_hash(hash).await
+    }
+
+    async fn get_block_access_list_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.0.get_block_access_list_by_number(number).await
+    }
+
+    async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+        self.0.get_block_access_list_raw(block).await
+    }
+
     async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
         self.0.get_header(block).await
     }
@@ -212,6 +247,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
 
     async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<B256>> {
         self.0.watch_blocks().await
+    }
+
+    async fn watch_full_blocks(&self) -> TransportResult<WatchBlocks<N::BlockResponse>> {
+        self.0.watch_full_blocks().await
+    }
+
+    async fn watch_headers(&self) -> TransportResult<WatchHeaders<N::HeaderResponse>> {
+        self.0.watch_headers().await
     }
 
     async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<B256>> {
@@ -390,6 +433,13 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.send_raw_transaction(encoded_tx).await
     }
 
+    async fn send_raw_transaction_sync(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.0.send_raw_transaction_sync(encoded_tx).await
+    }
+
     async fn send_raw_transaction_conditional(
         &self,
         encoded_tx: &[u8],
@@ -423,7 +473,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         &self,
         tx: N::TransactionRequest,
     ) -> TransportResult<N::ReceiptResponse> {
-        self.0.send_transaction_sync_internal(SendableTx::Builder(tx)).await
+        self.0.send_transaction_sync(tx).await
+    }
+
+    async fn send_transaction_sync_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.0.send_transaction_sync_internal(tx).await
     }
 
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
@@ -450,6 +507,11 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     #[cfg(feature = "pubsub")]
     fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
         self.0.subscribe_blocks()
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_full_blocks(&self) -> SubFullBlocks<N> {
+        self.0.subscribe_full_blocks()
     }
 
     #[cfg(feature = "pubsub")]

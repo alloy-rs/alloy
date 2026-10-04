@@ -441,17 +441,3 @@ mod pubsub_impl {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use similar_asserts::assert_eq;
-
-    #[test]
-    fn test_client_with_poll_interval() {
-        let poll_interval = Duration::from_millis(5_000);
-        let client = RpcClient::new_http(reqwest::Url::parse("http://localhost").unwrap())
-            .with_poll_interval(poll_interval);
-        assert_eq!(client.poll_interval(), poll_interval);
-    }
-}

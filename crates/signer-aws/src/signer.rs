@@ -113,7 +113,6 @@ impl alloy_network::TxSigner<Signature> for AwsSigner {
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for AwsSigner {
-    #[allow(clippy::blocks_in_conditions)] // tracing::instrument on async fn
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_digest_inner(hash).await.map_err(alloy_signer::Error::other)
     }
@@ -275,8 +274,9 @@ mod tests {
     use aws_config::BehaviorVersion;
 
     #[tokio::test]
+    #[ignore = "requires AWS_KEY_ID and AWS credentials"]
     async fn sign_message() {
-        let Ok(key_id) = std::env::var("AWS_KEY_ID") else { return };
+        let key_id = std::env::var("AWS_KEY_ID").expect("AWS_KEY_ID");
         let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
         let client = aws_sdk_kms::Client::new(&config);
 

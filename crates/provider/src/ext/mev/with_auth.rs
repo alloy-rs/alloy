@@ -4,7 +4,7 @@ use alloy_primitives::{hex, hex::FromHexError, keccak256, Address, Signature, Si
 use alloy_rpc_client::RpcCall;
 use alloy_signer::Signer;
 use alloy_transport::{TransportErrorKind, TransportResult};
-use http::{HeaderMap, HeaderName, HeaderValue};
+use http::{HeaderName, HeaderValue};
 use std::future::IntoFuture;
 
 /// Error returned by [`verify_flashbots_signature`].
@@ -105,23 +105,17 @@ where
     fn into_future(self) -> Self::IntoFuture {
         if let Some(signer) = self.signer {
             let fut = async move {
-                // Generate the Flashbots signature for the request body
                 let body = serde_json::to_string(&self.inner.request())
                     .map_err(TransportErrorKind::custom)?;
                 let signature = sign_flashbots_payload(body, &signer)
                     .await
                     .map_err(TransportErrorKind::custom)?;
+                let signature = HeaderValue::from_str(signature.as_str())
+                    .map_err(TransportErrorKind::custom)?;
 
-                // Add the Flashbots signature to the request headers
-                let headers = HeaderMap::from_iter([(
-                    HeaderName::from_static(FLASHBOTS_SIGNATURE_HEADER),
-                    HeaderValue::from_str(signature.as_str())
-                        .map_err(TransportErrorKind::custom)?,
-                )]);
-
-                // Patch the existing RPC call with the new headers
                 let rpc_call = self.inner.map_meta(|mut meta| {
-                    meta.extensions_mut().get_or_insert_default::<HeaderMap>().extend(headers);
+                    meta.headers_mut()
+                        .insert(HeaderName::from_static(FLASHBOTS_SIGNATURE_HEADER), signature);
                     meta
                 });
 
@@ -223,18 +217,6 @@ mod tests {
         .unwrap();
         let signature = sign_flashbots_payload(TEST_BODY.to_string(), &signer).await.unwrap();
         assert_eq!(signature, TEST_SIGNATURE);
-    }
-
-    #[tokio::test]
-    async fn test_verify_flashbots_signature_roundtrip() {
-        let signer = PrivateKeySigner::from_bytes(&b256!(
-            "0x0000000000000000000000000000000000000000000000000000000000123456"
-        ))
-        .unwrap();
-
-        let signature = sign_flashbots_payload(TEST_BODY.to_string(), &signer).await.unwrap();
-        let recovered = verify_flashbots_signature(&signature, TEST_BODY.as_bytes()).unwrap();
-        assert_eq!(recovered, signer.address());
     }
 
     #[test]

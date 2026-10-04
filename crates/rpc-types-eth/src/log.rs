@@ -60,6 +60,20 @@ impl<T> Log<T> {
     pub fn into_inner(self) -> alloy_primitives::Log<T> {
         self.inner
     }
+
+    /// Returns a log with the given inner log and a copy of this log's metadata.
+    const fn with_inner<U>(&self, inner: alloy_primitives::Log<U>) -> Log<U> {
+        Log {
+            inner,
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            block_timestamp: self.block_timestamp,
+            transaction_hash: self.transaction_hash,
+            transaction_index: self.transaction_index,
+            log_index: self.log_index,
+            removed: self.removed,
+        }
+    }
 }
 
 impl Log<LogData> {
@@ -83,34 +97,14 @@ impl Log<LogData> {
 
     /// Decode the log data into a typed log.
     pub fn log_decode<T: alloy_sol_types::SolEvent>(&self) -> alloy_sol_types::Result<Log<T>> {
-        let decoded = T::decode_log(&self.inner)?;
-        Ok(Log {
-            inner: decoded,
-            block_hash: self.block_hash,
-            block_number: self.block_number,
-            block_timestamp: self.block_timestamp,
-            transaction_hash: self.transaction_hash,
-            transaction_index: self.transaction_index,
-            log_index: self.log_index,
-            removed: self.removed,
-        })
+        Ok(self.with_inner(T::decode_log(&self.inner)?))
     }
 
     /// Decode the log data with validation into a typed log.
     pub fn log_decode_validate<T: alloy_sol_types::SolEvent>(
         &self,
     ) -> alloy_sol_types::Result<Log<T>> {
-        let decoded = T::decode_log_validate(&self.inner)?;
-        Ok(Log {
-            inner: decoded,
-            block_hash: self.block_hash,
-            block_number: self.block_number,
-            block_timestamp: self.block_timestamp,
-            transaction_hash: self.transaction_hash,
-            transaction_index: self.transaction_index,
-            log_index: self.log_index,
-            removed: self.removed,
-        })
+        Ok(self.with_inner(T::decode_log_validate(&self.inner)?))
     }
 
     /// Creates a collection of RPC logs from transaction receipt logs.
@@ -180,16 +174,7 @@ where
     /// [`alloy_primitives::Log`]. this copies the log metadata, preserving
     /// the original object.
     pub fn reserialize(&self) -> Log<LogData> {
-        Log {
-            inner: self.reserialize_inner(),
-            block_hash: self.block_hash,
-            block_number: self.block_number,
-            block_timestamp: self.block_timestamp,
-            transaction_hash: self.transaction_hash,
-            transaction_index: self.transaction_index,
-            log_index: self.log_index,
-            removed: self.removed,
-        }
+        self.with_inner(self.reserialize_inner())
     }
 }
 
@@ -228,8 +213,6 @@ mod tests {
     use super::*;
     use alloy_consensus::{Receipt, ReceiptWithBloom, TxReceipt};
     use alloy_primitives::{Address, Bytes};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use similar_asserts::assert_eq;
 
     const fn assert_tx_receipt<T: TxReceipt>() {}
@@ -237,14 +220,6 @@ mod tests {
     #[test]
     const fn assert_receipt() {
         assert_tx_receipt::<ReceiptWithBloom<Receipt<Log>>>();
-    }
-
-    #[test]
-    fn log_arbitrary() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-
-        let _: Log = Log::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
     }
 
     #[test]

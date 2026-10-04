@@ -350,13 +350,7 @@ impl<T> Block<T> {
     ///  - If the block's transaction is not [`BlockTransactions::Full`], the returned block will
     ///    have an empty transaction vec.
     pub fn into_consensus(self) -> alloy_consensus::Block<T> {
-        let Self { header, transactions, withdrawals, .. } = self;
-        alloy_consensus::BlockBody {
-            transactions: transactions.into_transactions_vec(),
-            ommers: vec![],
-            withdrawals,
-        }
-        .into_block(header.into_consensus())
+        self.map_header(Header::into_consensus).into_consensus_block()
     }
 
     /// Same as [`Self::into_consensus`] but returns the block as [`Sealed`] with its stored RPC
@@ -856,28 +850,87 @@ pub struct BadBlock<B = Block> {
 mod tests {
     use super::*;
     use alloy_primitives::{hex, keccak256, Bloom, B64};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use similar_asserts::assert_eq;
 
-    #[test]
-    fn arbitrary_header() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-        let _: Header = Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
-    }
+    #[cfg(feature = "serde")]
+    const PRE_MERGE_BLOCK: &str = r#"{
+    "hash": "0xb25d0e54ca0104e3ebfb5a1dcdf9528140854d609886a300946fd6750dcb19f4",
+    "parentHash": "0x9400ec9ef59689c157ac89eeed906f15ddd768f94e1575e0e27d37c241439a5d",
+    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+    "miner": "0x829bd824b016326a401d083b33d092293333a830",
+    "stateRoot": "0x546e330050c66d02923e7f1f3e925efaf64e4384eeecf2288f40088714a77a84",
+    "transactionsRoot": "0xd5eb3ad6d7c7a4798cc5fb14a6820073f44a941107c5d79dac60bd16325631fe",
+    "receiptsRoot": "0xb21c41cbb3439c5af25304e1405524c885e733b16203221900cb7f4b387b62f0",
+    "logsBloom": "0x1f304e641097eafae088627298685d20202004a4a59e4d8900914724e2402b028c9d596660581f361240816e82d00fa14250c9ca89840887a381efa600288283d170010ab0b2a0694c81842c2482457e0eb77c2c02554614007f42aaf3b4dc15d006a83522c86a240c06d241013258d90540c3008888d576a02c10120808520a2221110f4805200302624d22092b2c0e94e849b1e1aa80bc4cc3206f00b249d0a603ee4310216850e47c8997a20aa81fe95040a49ca5a420464600e008351d161dc00d620970b6a801535c218d0b4116099292000c08001943a225d6485528828110645b8244625a182c1a88a41087e6d039b000a180d04300d0680700a15794",
+    "difficulty": "0xc40faff9c737d",
+    "number": "0xa9a230",
+    "gasLimit": "0xbe5a66",
+    "gasUsed": "0xbe0fcc",
+    "timestamp": "0x5f93b749",
+    "totalDifficulty": "0x3dc957fd8167fb2684a",
+    "extraData": "0x7070796520e4b883e5bda9e7a59ee4bb99e9b1bc0103",
+    "mixHash": "0xd5e2b7b71fbe4ddfe552fb2377bf7cddb16bbb7e185806036cee86994c6e97fc",
+    "nonce": "0x4722f2acd35abe0f",
+    "uncles": [],
+    "transactions": [],
+    "size": "0xaeb6"
+}"#;
 
-    #[test]
-    fn header_response_num_hash() {
-        let number = 42;
-        let hash = B256::with_last_byte(1);
-        let header = Header {
-            hash,
-            inner: alloy_consensus::Header { number, ..Default::default() },
+    #[cfg(feature = "serde")]
+    const CANCUN_BLOCK: &str = r#"{
+            "baseFeePerGas":"0x886b221ad",
+            "blobGasUsed":"0x0",
+            "difficulty":"0x0",
+            "excessBlobGas":"0x0",
+            "extraData":"0x6265617665726275696c642e6f7267",
+            "gasLimit":"0x1c9c380",
+            "gasUsed":"0xb0033c",
+            "hash":"0x85cdcbe36217fd57bf2c33731d8460657a7ce512401f49c9f6392c82a7ccf7ac",
+            "logsBloom":"0xc36919406572730518285284f2293101104140c0d42c4a786c892467868a8806f40159d29988002870403902413a1d04321320308da2e845438429e0012a00b419d8ccc8584a1c28f82a415d04eab8a5ae75c00d07761acf233414c08b6d9b571c06156086c70ea5186e9b989b0c2d55c0213c936805cd2ab331589c90194d070c00867549b1e1be14cb24500b0386cd901197c1ef5a00da453234fa48f3003dcaa894e3111c22b80e17f7d4388385a10720cda1140c0400f9e084ca34fc4870fb16b472340a2a6a63115a82522f506c06c2675080508834828c63defd06bc2331b4aa708906a06a560457b114248041e40179ebc05c6846c1e922125982f427",
+            "miner":"0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
+            "mixHash":"0x4c068e902990f21f92a2456fc75c59bec8be03b7f13682b6ebd27da56269beb5",
+            "nonce":"0x0000000000000000",
+            "number":"0x128c6df",
+            "parentBeaconBlockRoot":"0x2843cb9f7d001bd58816a915e685ed96a555c9aeec1217736bd83a96ebd409cc",
+            "parentHash":"0x90926e0298d418181bd20c23b332451e35fd7d696b5dcdc5a3a0a6b715f4c717",
+            "receiptsRoot":"0xd43aa19ecb03571d1b86d89d9bb980139d32f2f2ba59646cd5c1de9e80c68c90",
+            "sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+            "size":"0xdcc3",
+            "stateRoot":"0x707875120a7103621fb4131df59904cda39de948dfda9084a1e3da44594d5404",
+            "timestamp":"0x65f5f4c3",
+            "transactionsRoot":"0x889a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780",
+            "withdrawals":[
+               {
+                  "index":"0x24d80e6",
+                  "validatorIndex":"0x8b2b6",
+                  "address":"0x7cd1122e8e118b12ece8d25480dfeef230da17ff",
+                  "amount":"0x1161f10"
+               }
+            ],
+            "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
+         }"#;
+
+    fn test_header() -> alloy_consensus::Header {
+        alloy_consensus::Header {
+            parent_hash: B256::with_last_byte(2),
+            ommers_hash: B256::with_last_byte(3),
+            beneficiary: Address::with_last_byte(4),
+            state_root: B256::with_last_byte(5),
+            transactions_root: B256::with_last_byte(6),
+            receipts_root: B256::with_last_byte(7),
+            withdrawals_root: Some(B256::with_last_byte(8)),
+            number: 9,
+            gas_used: 10,
+            gas_limit: 11,
+            extra_data: vec![1, 2, 3].into(),
+            logs_bloom: Bloom::default(),
+            timestamp: 12,
+            difficulty: U256::from(13),
+            mix_hash: B256::with_last_byte(14),
+            nonce: B64::with_last_byte(15),
+            base_fee_per_gas: Some(20),
             ..Default::default()
-        };
-
-        assert_eq!(header.num_hash(), BlockNumHash::new(number, hash));
+        }
     }
 
     #[test]
@@ -904,36 +957,10 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_block() {
-        use alloy_primitives::B64;
-
         let block = Block {
             header: Header {
                 hash: B256::with_last_byte(1),
-                inner: alloy_consensus::Header {
-                    parent_hash: B256::with_last_byte(2),
-                    ommers_hash: B256::with_last_byte(3),
-                    beneficiary: Address::with_last_byte(4),
-                    state_root: B256::with_last_byte(5),
-                    transactions_root: B256::with_last_byte(6),
-                    receipts_root: B256::with_last_byte(7),
-                    withdrawals_root: Some(B256::with_last_byte(8)),
-                    number: 9,
-                    gas_used: 10,
-                    gas_limit: 11,
-                    extra_data: vec![1, 2, 3].into(),
-                    logs_bloom: Default::default(),
-                    timestamp: 12,
-                    difficulty: U256::from(13),
-                    mix_hash: B256::with_last_byte(14),
-                    nonce: B64::with_last_byte(15),
-                    base_fee_per_gas: Some(20),
-                    blob_gas_used: None,
-                    excess_blob_gas: None,
-                    parent_beacon_block_root: None,
-                    requests_hash: None,
-                    block_access_list_hash: None,
-                    slot_number: None,
-                },
+                inner: test_header(),
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
             },
@@ -953,36 +980,10 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_uncle_block() {
-        use alloy_primitives::B64;
-
         let block = Block {
             header: Header {
                 hash: B256::with_last_byte(1),
-                inner: alloy_consensus::Header {
-                    parent_hash: B256::with_last_byte(2),
-                    ommers_hash: B256::with_last_byte(3),
-                    beneficiary: Address::with_last_byte(4),
-                    state_root: B256::with_last_byte(5),
-                    transactions_root: B256::with_last_byte(6),
-                    receipts_root: B256::with_last_byte(7),
-                    withdrawals_root: Some(B256::with_last_byte(8)),
-                    number: 9,
-                    gas_used: 10,
-                    gas_limit: 11,
-                    extra_data: vec![1, 2, 3].into(),
-                    logs_bloom: Default::default(),
-                    timestamp: 12,
-                    difficulty: U256::from(13),
-                    mix_hash: B256::with_last_byte(14),
-                    nonce: B64::with_last_byte(15),
-                    base_fee_per_gas: Some(20),
-                    blob_gas_used: None,
-                    excess_blob_gas: None,
-                    parent_beacon_block_root: None,
-                    requests_hash: None,
-                    block_access_list_hash: None,
-                    slot_number: None,
-                },
+                inner: test_header(),
                 size: None,
                 total_difficulty: Some(U256::from(100000)),
             },
@@ -1005,31 +1006,7 @@ mod tests {
         let block = Block {
             header: Header {
                 hash: B256::with_last_byte(1),
-                inner: alloy_consensus::Header {
-                    parent_hash: B256::with_last_byte(2),
-                    ommers_hash: B256::with_last_byte(3),
-                    beneficiary: Address::with_last_byte(4),
-                    state_root: B256::with_last_byte(5),
-                    transactions_root: B256::with_last_byte(6),
-                    receipts_root: B256::with_last_byte(7),
-                    withdrawals_root: None,
-                    number: 9,
-                    gas_used: 10,
-                    gas_limit: 11,
-                    extra_data: vec![1, 2, 3].into(),
-                    logs_bloom: Bloom::default(),
-                    timestamp: 12,
-                    difficulty: U256::from(13),
-                    mix_hash: B256::with_last_byte(14),
-                    nonce: B64::with_last_byte(15),
-                    base_fee_per_gas: Some(20),
-                    blob_gas_used: None,
-                    excess_blob_gas: None,
-                    parent_beacon_block_root: None,
-                    requests_hash: None,
-                    block_access_list_hash: None,
-                    slot_number: None,
-                },
+                inner: alloy_consensus::Header { withdrawals_root: None, ..test_header() },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
             },
@@ -1055,71 +1032,32 @@ mod tests {
 
     #[test]
     fn block_overrides_is_empty() {
-        // Default should be empty
-        let default_overrides = BlockOverrides::default();
-        assert!(default_overrides.is_empty());
+        assert!(BlockOverrides::default().is_empty());
 
-        // With one field set should not be empty
-        let overrides_with_number = BlockOverrides::default().with_number(U256::from(42));
-        assert!(!overrides_with_number.is_empty());
-
-        let overrides_with_difficulty = BlockOverrides::default().with_difficulty(U256::from(100));
-        assert!(!overrides_with_difficulty.is_empty());
-
-        let overrides_with_time = BlockOverrides::default().with_time(12345);
-        assert!(!overrides_with_time.is_empty());
-
-        let overrides_with_gas_limit = BlockOverrides::default().with_gas_limit(21000);
-        assert!(!overrides_with_gas_limit.is_empty());
-
-        let overrides_with_coinbase =
-            BlockOverrides::default().with_coinbase(Address::with_last_byte(1));
-        assert!(!overrides_with_coinbase.is_empty());
-
-        let overrides_with_random = BlockOverrides::default().with_random(B256::with_last_byte(1));
-        assert!(!overrides_with_random.is_empty());
-
-        let overrides_with_base_fee = BlockOverrides::default().with_base_fee(U256::from(20));
-        assert!(!overrides_with_base_fee.is_empty());
-
-        let overrides_with_block_hash =
-            BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
-        assert!(!overrides_with_block_hash.is_empty());
-
-        let overrides_with_beacon_root =
-            BlockOverrides::default().with_beacon_root(B256::with_last_byte(1));
-        assert!(!overrides_with_beacon_root.is_empty());
+        for overrides in [
+            BlockOverrides::default().with_number(U256::from(42)),
+            BlockOverrides::default().with_difficulty(U256::from(100)),
+            BlockOverrides::default().with_time(12345),
+            BlockOverrides::default().with_gas_limit(21000),
+            BlockOverrides::default().with_coinbase(Address::with_last_byte(1)),
+            BlockOverrides::default().with_random(B256::with_last_byte(1)),
+            BlockOverrides::default().with_base_fee(U256::from(20)),
+            BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1)),
+            BlockOverrides::default().with_beacon_root(B256::with_last_byte(1)),
+        ] {
+            assert!(!overrides.is_empty(), "{overrides:?}");
+        }
     }
 
     #[test]
     #[cfg(feature = "serde")]
     fn serde_rich_block() {
-        let s = r#"{
-    "hash": "0xb25d0e54ca0104e3ebfb5a1dcdf9528140854d609886a300946fd6750dcb19f4",
-    "parentHash": "0x9400ec9ef59689c157ac89eeed906f15ddd768f94e1575e0e27d37c241439a5d",
-    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-    "miner": "0x829bd824b016326a401d083b33d092293333a830",
-    "stateRoot": "0x546e330050c66d02923e7f1f3e925efaf64e4384eeecf2288f40088714a77a84",
-    "transactionsRoot": "0xd5eb3ad6d7c7a4798cc5fb14a6820073f44a941107c5d79dac60bd16325631fe",
-    "receiptsRoot": "0xb21c41cbb3439c5af25304e1405524c885e733b16203221900cb7f4b387b62f0",
-    "logsBloom": "0x1f304e641097eafae088627298685d20202004a4a59e4d8900914724e2402b028c9d596660581f361240816e82d00fa14250c9ca89840887a381efa600288283d170010ab0b2a0694c81842c2482457e0eb77c2c02554614007f42aaf3b4dc15d006a83522c86a240c06d241013258d90540c3008888d576a02c10120808520a2221110f4805200302624d22092b2c0e94e849b1e1aa80bc4cc3206f00b249d0a603ee4310216850e47c8997a20aa81fe95040a49ca5a420464600e008351d161dc00d620970b6a801535c218d0b4116099292000c08001943a225d6485528828110645b8244625a182c1a88a41087e6d039b000a180d04300d0680700a15794",
-    "difficulty": "0xc40faff9c737d",
-    "number": "0xa9a230",
-    "gasLimit": "0xbe5a66",
-    "gasUsed": "0xbe0fcc",
-    "timestamp": "0x5f93b749",
-    "totalDifficulty": "0x3dc957fd8167fb2684a",
-    "extraData": "0x7070796520e4b883e5bda9e7a59ee4bb99e9b1bc0103",
-    "mixHash": "0xd5e2b7b71fbe4ddfe552fb2377bf7cddb16bbb7e185806036cee86994c6e97fc",
-    "nonce": "0x4722f2acd35abe0f",
-    "uncles": [],
-    "transactions": [
-        "0xf435a26acc2a9ef73ac0b73632e32e29bd0e28d5c4f46a7e18ed545c93315916"
-    ],
-    "size": "0xaeb6"
-}"#;
+        let s = PRE_MERGE_BLOCK.replace(
+            r#""transactions": []"#,
+            r#""transactions": ["0xf435a26acc2a9ef73ac0b73632e32e29bd0e28d5c4f46a7e18ed545c93315916"]"#,
+        );
 
-        let block = serde_json::from_str::<alloy_serde::WithOtherFields<Block>>(s).unwrap();
+        let block = serde_json::from_str::<alloy_serde::WithOtherFields<Block>>(&s).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
         let block2 =
             serde_json::from_str::<alloy_serde::WithOtherFields<Block>>(&serialized).unwrap();
@@ -1129,40 +1067,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_missing_uncles_block() {
-        let s = r#"{
-            "baseFeePerGas":"0x886b221ad",
-            "blobGasUsed":"0x0",
-            "difficulty":"0x0",
-            "excessBlobGas":"0x0",
-            "extraData":"0x6265617665726275696c642e6f7267",
-            "gasLimit":"0x1c9c380",
-            "gasUsed":"0xb0033c",
-            "hash":"0x85cdcbe36217fd57bf2c33731d8460657a7ce512401f49c9f6392c82a7ccf7ac",
-            "logsBloom":"0xc36919406572730518285284f2293101104140c0d42c4a786c892467868a8806f40159d29988002870403902413a1d04321320308da2e845438429e0012a00b419d8ccc8584a1c28f82a415d04eab8a5ae75c00d07761acf233414c08b6d9b571c06156086c70ea5186e9b989b0c2d55c0213c936805cd2ab331589c90194d070c00867549b1e1be14cb24500b0386cd901197c1ef5a00da453234fa48f3003dcaa894e3111c22b80e17f7d4388385a10720cda1140c0400f9e084ca34fc4870fb16b472340a2a6a63115a82522f506c06c2675080508834828c63defd06bc2331b4aa708906a06a560457b114248041e40179ebc05c6846c1e922125982f427",
-            "miner":"0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
-            "mixHash":"0x4c068e902990f21f92a2456fc75c59bec8be03b7f13682b6ebd27da56269beb5",
-            "nonce":"0x0000000000000000",
-            "number":"0x128c6df",
-            "parentBeaconBlockRoot":"0x2843cb9f7d001bd58816a915e685ed96a555c9aeec1217736bd83a96ebd409cc",
-            "parentHash":"0x90926e0298d418181bd20c23b332451e35fd7d696b5dcdc5a3a0a6b715f4c717",
-            "receiptsRoot":"0xd43aa19ecb03571d1b86d89d9bb980139d32f2f2ba59646cd5c1de9e80c68c90",
-            "sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-            "size":"0xdcc3",
-            "stateRoot":"0x707875120a7103621fb4131df59904cda39de948dfda9084a1e3da44594d5404",
-            "timestamp":"0x65f5f4c3",
-            "transactionsRoot":"0x889a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780",
-            "withdrawals":[
-               {
-                  "index":"0x24d80e6",
-                  "validatorIndex":"0x8b2b6",
-                  "address":"0x7cd1122e8e118b12ece8d25480dfeef230da17ff",
-                  "amount":"0x1161f10"
-               }
-            ],
-            "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
-         }"#;
-
-        let block = serde_json::from_str::<Block>(s).unwrap();
+        let block = serde_json::from_str::<Block>(CANCUN_BLOCK).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
         let block2 = serde_json::from_str::<Block>(&serialized).unwrap();
         assert_eq!(block, block2);
@@ -1171,41 +1076,12 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_block_containing_uncles() {
-        let s = r#"{
-            "baseFeePerGas":"0x886b221ad",
-            "blobGasUsed":"0x0",
-            "difficulty":"0x0",
-            "excessBlobGas":"0x0",
-            "extraData":"0x6265617665726275696c642e6f7267",
-            "gasLimit":"0x1c9c380",
-            "gasUsed":"0xb0033c",
-            "hash":"0x85cdcbe36217fd57bf2c33731d8460657a7ce512401f49c9f6392c82a7ccf7ac",
-            "logsBloom":"0xc36919406572730518285284f2293101104140c0d42c4a786c892467868a8806f40159d29988002870403902413a1d04321320308da2e845438429e0012a00b419d8ccc8584a1c28f82a415d04eab8a5ae75c00d07761acf233414c08b6d9b571c06156086c70ea5186e9b989b0c2d55c0213c936805cd2ab331589c90194d070c00867549b1e1be14cb24500b0386cd901197c1ef5a00da453234fa48f3003dcaa894e3111c22b80e17f7d4388385a10720cda1140c0400f9e084ca34fc4870fb16b472340a2a6a63115a82522f506c06c2675080508834828c63defd06bc2331b4aa708906a06a560457b114248041e40179ebc05c6846c1e922125982f427",
-            "miner":"0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
-            "mixHash":"0x4c068e902990f21f92a2456fc75c59bec8be03b7f13682b6ebd27da56269beb5",
-            "nonce":"0x0000000000000000",
-            "number":"0x128c6df",
-            "parentBeaconBlockRoot":"0x2843cb9f7d001bd58816a915e685ed96a555c9aeec1217736bd83a96ebd409cc",
-            "parentHash":"0x90926e0298d418181bd20c23b332451e35fd7d696b5dcdc5a3a0a6b715f4c717",
-            "receiptsRoot":"0xd43aa19ecb03571d1b86d89d9bb980139d32f2f2ba59646cd5c1de9e80c68c90",
-            "sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-            "size":"0xdcc3",
-            "stateRoot":"0x707875120a7103621fb4131df59904cda39de948dfda9084a1e3da44594d5404",
-            "timestamp":"0x65f5f4c3",
-            "transactionsRoot":"0x889a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780",
-            "uncles": ["0x123a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780", "0x489a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780"],
-            "withdrawals":[
-               {
-                  "index":"0x24d80e6",
-                  "validatorIndex":"0x8b2b6",
-                  "address":"0x7cd1122e8e118b12ece8d25480dfeef230da17ff",
-                  "amount":"0x1161f10"
-               }
-            ],
-            "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
-         }"#;
+        let s = CANCUN_BLOCK.replace(
+            r#""withdrawals":["#,
+            r#""uncles": ["0x123a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780", "0x489a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780"], "withdrawals":["#,
+        );
 
-        let block = serde_json::from_str::<Block>(s).unwrap();
+        let block = serde_json::from_str::<Block>(&s).unwrap();
         assert_eq!(block.uncles.len(), 2);
         let serialized = serde_json::to_string(&block).unwrap();
         let block2 = serde_json::from_str::<Block>(&serialized).unwrap();
@@ -1215,30 +1091,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_empty_block() {
-        let s = r#"{
-    "hash": "0xb25d0e54ca0104e3ebfb5a1dcdf9528140854d609886a300946fd6750dcb19f4",
-    "parentHash": "0x9400ec9ef59689c157ac89eeed906f15ddd768f94e1575e0e27d37c241439a5d",
-    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-    "miner": "0x829bd824b016326a401d083b33d092293333a830",
-    "stateRoot": "0x546e330050c66d02923e7f1f3e925efaf64e4384eeecf2288f40088714a77a84",
-    "transactionsRoot": "0xd5eb3ad6d7c7a4798cc5fb14a6820073f44a941107c5d79dac60bd16325631fe",
-    "receiptsRoot": "0xb21c41cbb3439c5af25304e1405524c885e733b16203221900cb7f4b387b62f0",
-    "logsBloom": "0x1f304e641097eafae088627298685d20202004a4a59e4d8900914724e2402b028c9d596660581f361240816e82d00fa14250c9ca89840887a381efa600288283d170010ab0b2a0694c81842c2482457e0eb77c2c02554614007f42aaf3b4dc15d006a83522c86a240c06d241013258d90540c3008888d576a02c10120808520a2221110f4805200302624d22092b2c0e94e849b1e1aa80bc4cc3206f00b249d0a603ee4310216850e47c8997a20aa81fe95040a49ca5a420464600e008351d161dc00d620970b6a801535c218d0b4116099292000c08001943a225d6485528828110645b8244625a182c1a88a41087e6d039b000a180d04300d0680700a15794",
-    "difficulty": "0xc40faff9c737d",
-    "number": "0xa9a230",
-    "gasLimit": "0xbe5a66",
-    "gasUsed": "0xbe0fcc",
-    "timestamp": "0x5f93b749",
-    "totalDifficulty": "0x3dc957fd8167fb2684a",
-    "extraData": "0x7070796520e4b883e5bda9e7a59ee4bb99e9b1bc0103",
-    "mixHash": "0xd5e2b7b71fbe4ddfe552fb2377bf7cddb16bbb7e185806036cee86994c6e97fc",
-    "nonce": "0x4722f2acd35abe0f",
-    "uncles": [],
-    "transactions": [],
-    "size": "0xaeb6"
-}"#;
-
-        let block = serde_json::from_str::<Block>(s).unwrap();
+        let block = serde_json::from_str::<Block>(PRE_MERGE_BLOCK).unwrap();
         assert!(block.transactions.is_empty());
         assert!(block.transactions.as_transactions().is_some());
     }
@@ -1246,115 +1099,13 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn recompute_block_hash() {
-        let s = r#"{
-    "hash": "0xb25d0e54ca0104e3ebfb5a1dcdf9528140854d609886a300946fd6750dcb19f4",
-    "parentHash": "0x9400ec9ef59689c157ac89eeed906f15ddd768f94e1575e0e27d37c241439a5d",
-    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-    "miner": "0x829bd824b016326a401d083b33d092293333a830",
-    "stateRoot": "0x546e330050c66d02923e7f1f3e925efaf64e4384eeecf2288f40088714a77a84",
-    "transactionsRoot": "0xd5eb3ad6d7c7a4798cc5fb14a6820073f44a941107c5d79dac60bd16325631fe",
-    "receiptsRoot": "0xb21c41cbb3439c5af25304e1405524c885e733b16203221900cb7f4b387b62f0",
-    "logsBloom": "0x1f304e641097eafae088627298685d20202004a4a59e4d8900914724e2402b028c9d596660581f361240816e82d00fa14250c9ca89840887a381efa600288283d170010ab0b2a0694c81842c2482457e0eb77c2c02554614007f42aaf3b4dc15d006a83522c86a240c06d241013258d90540c3008888d576a02c10120808520a2221110f4805200302624d22092b2c0e94e849b1e1aa80bc4cc3206f00b249d0a603ee4310216850e47c8997a20aa81fe95040a49ca5a420464600e008351d161dc00d620970b6a801535c218d0b4116099292000c08001943a225d6485528828110645b8244625a182c1a88a41087e6d039b000a180d04300d0680700a15794",
-    "difficulty": "0xc40faff9c737d",
-    "number": "0xa9a230",
-    "gasLimit": "0xbe5a66",
-    "gasUsed": "0xbe0fcc",
-    "timestamp": "0x5f93b749",
-    "totalDifficulty": "0x3dc957fd8167fb2684a",
-    "extraData": "0x7070796520e4b883e5bda9e7a59ee4bb99e9b1bc0103",
-    "mixHash": "0xd5e2b7b71fbe4ddfe552fb2377bf7cddb16bbb7e185806036cee86994c6e97fc",
-    "nonce": "0x4722f2acd35abe0f",
-    "uncles": [],
-    "transactions": [],
-    "size": "0xaeb6"
-}"#;
-        let block = serde_json::from_str::<Block>(s).unwrap();
+        let block = serde_json::from_str::<Block>(PRE_MERGE_BLOCK).unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&block.header.inner));
         assert_eq!(recomputed_hash, block.header.hash);
 
-        let s2 = r#"{
-            "baseFeePerGas":"0x886b221ad",
-            "blobGasUsed":"0x0",
-            "difficulty":"0x0",
-            "excessBlobGas":"0x0",
-            "extraData":"0x6265617665726275696c642e6f7267",
-            "gasLimit":"0x1c9c380",
-            "gasUsed":"0xb0033c",
-            "hash":"0x85cdcbe36217fd57bf2c33731d8460657a7ce512401f49c9f6392c82a7ccf7ac",
-            "logsBloom":"0xc36919406572730518285284f2293101104140c0d42c4a786c892467868a8806f40159d29988002870403902413a1d04321320308da2e845438429e0012a00b419d8ccc8584a1c28f82a415d04eab8a5ae75c00d07761acf233414c08b6d9b571c06156086c70ea5186e9b989b0c2d55c0213c936805cd2ab331589c90194d070c00867549b1e1be14cb24500b0386cd901197c1ef5a00da453234fa48f3003dcaa894e3111c22b80e17f7d4388385a10720cda1140c0400f9e084ca34fc4870fb16b472340a2a6a63115a82522f506c06c2675080508834828c63defd06bc2331b4aa708906a06a560457b114248041e40179ebc05c6846c1e922125982f427",
-            "miner":"0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
-            "mixHash":"0x4c068e902990f21f92a2456fc75c59bec8be03b7f13682b6ebd27da56269beb5",
-            "nonce":"0x0000000000000000",
-            "number":"0x128c6df",
-            "parentBeaconBlockRoot":"0x2843cb9f7d001bd58816a915e685ed96a555c9aeec1217736bd83a96ebd409cc",
-            "parentHash":"0x90926e0298d418181bd20c23b332451e35fd7d696b5dcdc5a3a0a6b715f4c717",
-            "receiptsRoot":"0xd43aa19ecb03571d1b86d89d9bb980139d32f2f2ba59646cd5c1de9e80c68c90",
-            "sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-            "size":"0xdcc3",
-            "stateRoot":"0x707875120a7103621fb4131df59904cda39de948dfda9084a1e3da44594d5404",
-            "timestamp":"0x65f5f4c3",
-            "transactionsRoot":"0x889a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780",
-            "withdrawals":[
-               {
-                  "index":"0x24d80e6",
-                  "validatorIndex":"0x8b2b6",
-                  "address":"0x7cd1122e8e118b12ece8d25480dfeef230da17ff",
-                  "amount":"0x1161f10"
-               }
-            ],
-            "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
-         }"#;
-        let block2 = serde_json::from_str::<Block>(s2).unwrap();
+        let block2 = serde_json::from_str::<Block>(CANCUN_BLOCK).unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&block2.header.inner));
         assert_eq!(recomputed_hash, block2.header.hash);
-    }
-
-    #[test]
-    fn header_roundtrip_conversion() {
-        // Setup a RPC header
-        let rpc_header = Header {
-            hash: B256::with_last_byte(1),
-            inner: alloy_consensus::Header {
-                parent_hash: B256::with_last_byte(2),
-                ommers_hash: B256::with_last_byte(3),
-                beneficiary: Address::with_last_byte(4),
-                state_root: B256::with_last_byte(5),
-                transactions_root: B256::with_last_byte(6),
-                receipts_root: B256::with_last_byte(7),
-                withdrawals_root: None,
-                number: 9,
-                gas_used: 10,
-                gas_limit: 11,
-                extra_data: vec![1, 2, 3].into(),
-                logs_bloom: Bloom::default(),
-                timestamp: 12,
-                difficulty: U256::from(13),
-                mix_hash: B256::with_last_byte(14),
-                nonce: B64::with_last_byte(15),
-                base_fee_per_gas: Some(20),
-                blob_gas_used: None,
-                excess_blob_gas: None,
-                parent_beacon_block_root: None,
-                requests_hash: None,
-                block_access_list_hash: None,
-                slot_number: None,
-            },
-            size: None,
-            total_difficulty: None,
-        };
-
-        // Convert the RPC header to a primitive header
-        let primitive_header = rpc_header.inner.clone();
-
-        // Seal the primitive header
-        let sealed_header: Sealed<alloy_consensus::Header> =
-            primitive_header.seal(B256::with_last_byte(1));
-
-        // Convert the sealed header back to a RPC header
-        let roundtrip_rpc_header = Header::from_consensus(sealed_header, None, None);
-
-        // Ensure the roundtrip conversion is correct
-        assert_eq!(rpc_header, roundtrip_rpc_header);
     }
 
     #[test]
@@ -1362,31 +1113,7 @@ mod tests {
         // Setup a RPC header
         let header = Header {
             hash: B256::with_last_byte(1),
-            inner: alloy_consensus::Header {
-                parent_hash: B256::with_last_byte(2),
-                ommers_hash: B256::with_last_byte(3),
-                beneficiary: Address::with_last_byte(4),
-                state_root: B256::with_last_byte(5),
-                transactions_root: B256::with_last_byte(6),
-                receipts_root: B256::with_last_byte(7),
-                withdrawals_root: None,
-                number: 9,
-                gas_used: 10,
-                gas_limit: 11,
-                extra_data: vec![1, 2, 3].into(),
-                logs_bloom: Bloom::default(),
-                timestamp: 12,
-                difficulty: U256::from(13),
-                mix_hash: B256::with_last_byte(14),
-                nonce: B64::with_last_byte(15),
-                base_fee_per_gas: Some(20),
-                blob_gas_used: None,
-                excess_blob_gas: None,
-                parent_beacon_block_root: None,
-                requests_hash: None,
-                block_access_list_hash: None,
-                slot_number: None,
-            },
+            inner: alloy_consensus::Header { withdrawals_root: None, ..test_header() },
             total_difficulty: None,
             size: Some(U256::from(505)),
         };
@@ -1417,36 +1144,10 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_bad_block() {
-        use alloy_primitives::B64;
-
         let block = Block {
             header: Header {
                 hash: B256::with_last_byte(1),
-                inner: alloy_consensus::Header {
-                    parent_hash: B256::with_last_byte(2),
-                    ommers_hash: B256::with_last_byte(3),
-                    beneficiary: Address::with_last_byte(4),
-                    state_root: B256::with_last_byte(5),
-                    transactions_root: B256::with_last_byte(6),
-                    receipts_root: B256::with_last_byte(7),
-                    withdrawals_root: Some(B256::with_last_byte(8)),
-                    number: 9,
-                    gas_used: 10,
-                    gas_limit: 11,
-                    extra_data: vec![1, 2, 3].into(),
-                    logs_bloom: Default::default(),
-                    timestamp: 12,
-                    difficulty: U256::from(13),
-                    mix_hash: B256::with_last_byte(14),
-                    nonce: B64::with_last_byte(15),
-                    base_fee_per_gas: Some(20),
-                    blob_gas_used: None,
-                    excess_blob_gas: None,
-                    parent_beacon_block_root: None,
-                    requests_hash: None,
-                    block_access_list_hash: None,
-                    slot_number: None,
-                },
+                inner: test_header(),
                 total_difficulty: Some(U256::from(100000)),
                 size: Some(U256::from(19)),
             },

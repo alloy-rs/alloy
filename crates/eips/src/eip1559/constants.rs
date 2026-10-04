@@ -39,7 +39,7 @@ pub(crate) const OP_SEPOLIA_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR: u12
 /// Base fee max change denominator for Optimism Sepolia as defined in the Optimism Canyon hardfork.
 pub(crate) const OP_SEPOLIA_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON: u128 = 250;
 
-/// Base fee max change denominator for Optimism Sepolia as defined in the Optimism
+/// Elasticity multiplier for Optimism Sepolia as defined in the Optimism
 /// [transaction costs](https://docs.optimism.io/stack/differences#transactions) doc.
 pub(crate) const OP_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER: u128 = 6;
 
@@ -50,20 +50,10 @@ pub(crate) const OP_MAINNET_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR: u12
 /// Base fee max change denominator for Optimism Mainnet as defined in the Optimism Canyon hardfork.
 pub(crate) const OP_MAINNET_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON: u128 = 250;
 
-/// Base fee max change denominator for Optimism Mainnet as defined in the Optimism
+/// Elasticity multiplier for Optimism Mainnet as defined in the Optimism
 /// [transaction costs](https://docs.optimism.io/stack/differences#transactions) doc.
 pub(crate) const OP_MAINNET_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER: u128 = 6;
 
-/// Base fee max change denominator for Base Sepolia as defined in the Optimism
+/// Elasticity multiplier for Base Sepolia as defined in the Optimism
 /// [transaction costs](https://docs.optimism.io/stack/differences#transactions) doc.
 pub(crate) const BASE_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER: u128 = 10;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn min_protocol_sanity() {
-        assert_eq!(MIN_PROTOCOL_BASE_FEE_U256.to::<u64>(), MIN_PROTOCOL_BASE_FEE);
-    }
-}

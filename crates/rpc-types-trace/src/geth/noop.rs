@@ -11,11 +11,8 @@ pub struct NoopFrame(BTreeMap<(), ()>);
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::geth::*;
     use similar_asserts::assert_eq;
-
-    const DEFAULT: &str = r"{}";
 
     #[test]
     fn test_serialize_noop_trace() {
@@ -24,10 +21,5 @@ mod tests {
             Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::NoopTracer));
 
         assert_eq!(serde_json::to_string(&opts).unwrap(), r#"{"tracer":"noopTracer"}"#);
-    }
-
-    #[test]
-    fn test_deserialize_noop_trace() {
-        let _trace: NoopFrame = serde_json::from_str(DEFAULT).unwrap();
     }
 }

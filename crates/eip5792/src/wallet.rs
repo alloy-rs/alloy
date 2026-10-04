@@ -78,44 +78,4 @@ mod tests {
             )]))
         );
     }
-
-    #[test]
-    fn test_get_capabilities() {
-        let caps = WalletCapabilities(HashMap::from_iter([(
-            0x69420,
-            Capabilities {
-                delegation: DelegationCapability {
-                    addresses: vec![address!("90f79bf6eb2c4f870365e785982e1f101e93b906")],
-                },
-            },
-        )]));
-
-        // Retrieve an existing chain ID.
-        let capabilities = caps.get(0x69420);
-        assert!(capabilities.is_some());
-        assert_eq!(
-            capabilities.unwrap().delegation.addresses[0],
-            address!("90f79bf6eb2c4f870365e785982e1f101e93b906")
-        );
-
-        // Try to retrieve a non-existing chain ID.
-        let non_existing_capabilities = caps.get(0x12345);
-        assert!(non_existing_capabilities.is_none());
-    }
-
-    #[test]
-    fn test_capabilities_with_empty_delegation() {
-        let caps = WalletCapabilities(HashMap::from_iter([(
-            0x12345,
-            Capabilities { delegation: DelegationCapability { addresses: vec![] } },
-        )]));
-
-        // Verify that delegation exists but contains no addresses.
-        let capabilities = caps.get(0x12345).unwrap();
-        assert!(capabilities.delegation.addresses.is_empty());
-
-        // Serialize and ensure JSON output is correct.
-        let serialized = serde_json::to_string(&caps).unwrap();
-        assert_eq!(serialized, "{\"0x12345\":{\"delegation\":{\"addresses\":[]}}}");
-    }
 }

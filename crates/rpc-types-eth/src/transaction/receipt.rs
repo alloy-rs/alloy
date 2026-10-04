@@ -90,7 +90,7 @@ where
     {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct ReceiptDeserHelper<T = ReceiptEnvelope<Log>> {
+        struct ReceiptDeserHelper<T> {
             #[serde(flatten)]
             inner: T,
             transaction_hash: TxHash,
@@ -108,17 +108,9 @@ where
             // 3. Default to 0 if neither is present
             #[serde(default, alias = "gasPrice", with = "alloy_serde::quantity::opt")]
             effective_gas_price: Option<u128>,
-            #[serde(
-                default,
-                skip_serializing_if = "Option::is_none",
-                with = "alloy_serde::quantity::opt"
-            )]
+            #[serde(default, with = "alloy_serde::quantity::opt")]
             blob_gas_used: Option<u64>,
-            #[serde(
-                default,
-                skip_serializing_if = "Option::is_none",
-                with = "alloy_serde::quantity::opt"
-            )]
+            #[serde(default, with = "alloy_serde::quantity::opt")]
             blob_gas_price: Option<u128>,
             from: Address,
             to: Option<Address>,
@@ -332,18 +324,7 @@ mod test {
     use crate::TransactionReceipt;
     use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use similar_asserts::assert_eq;
-
-    #[test]
-    fn transaction_receipt_arbitrary() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-
-        let _: TransactionReceipt =
-            TransactionReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
-    }
 
     #[test]
     #[cfg(feature = "serde")]

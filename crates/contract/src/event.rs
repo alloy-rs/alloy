@@ -1,6 +1,6 @@
 use crate::Error;
 use alloy_network::Ethereum;
-use alloy_primitives::{Address, LogData, B256};
+use alloy_primitives::{Address, B256};
 use alloy_provider::{FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topic, ValueOrArray};
 use alloy_sol_types::SolEvent;
@@ -490,9 +490,7 @@ async fn resolve_block_tag<P: Provider<N>, N: Network>(
 }
 
 fn decode_log<E: SolEvent>(log: &Log) -> alloy_sol_types::Result<E> {
-    let log_data: &LogData = log.as_ref();
-
-    E::decode_raw_log(log_data.topics().iter().copied(), &log_data.data)
+    E::decode_log_data(log.as_ref())
 }
 
 #[cfg(feature = "pubsub")]

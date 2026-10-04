@@ -295,32 +295,28 @@ impl Header {
         length += self.receipts_root.length();
         length += self.logs_bloom.length();
         length += self.difficulty.length();
-        length += U256::from(self.number).length();
-        length += U256::from(self.gas_limit).length();
-        length += U256::from(self.gas_used).length();
+        length += self.number.length();
+        length += self.gas_limit.length();
+        length += self.gas_used.length();
         length += self.timestamp.length();
         length += self.extra_data.length();
         length += self.mix_hash.length();
         length += self.nonce.length();
 
         if let Some(base_fee) = self.base_fee_per_gas {
-            // Adding base fee length if it exists.
-            length += U256::from(base_fee).length();
+            length += base_fee.length();
         }
 
         if let Some(root) = self.withdrawals_root {
-            // Adding withdrawals_root length if it exists.
             length += root.length();
         }
 
         if let Some(blob_gas_used) = self.blob_gas_used {
-            // Adding blob_gas_used length if it exists.
-            length += U256::from(blob_gas_used).length();
+            length += blob_gas_used.length();
         }
 
         if let Some(excess_blob_gas) = self.excess_blob_gas {
-            // Adding excess_blob_gas length if it exists.
-            length += U256::from(excess_blob_gas).length();
+            length += excess_blob_gas.length();
         }
 
         if let Some(parent_beacon_block_root) = self.parent_beacon_block_root {
@@ -336,7 +332,7 @@ impl Header {
         }
 
         if let Some(slot_number) = self.slot_number {
-            length += U256::from(slot_number).length();
+            length += slot_number.length();
         }
 
         length
@@ -413,9 +409,9 @@ impl Encodable for Header {
         self.receipts_root.encode(out);
         self.logs_bloom.encode(out);
         self.difficulty.encode(out);
-        U256::from(self.number).encode(out);
-        U256::from(self.gas_limit).encode(out);
-        U256::from(self.gas_used).encode(out);
+        self.number.encode(out);
+        self.gas_limit.encode(out);
+        self.gas_used.encode(out);
         self.timestamp.encode(out);
         self.extra_data.encode(out);
         self.mix_hash.encode(out);
@@ -423,7 +419,7 @@ impl Encodable for Header {
 
         // Encode all the fork specific fields
         if let Some(ref base_fee) = self.base_fee_per_gas {
-            U256::from(*base_fee).encode(out);
+            base_fee.encode(out);
         }
 
         if let Some(ref root) = self.withdrawals_root {
@@ -431,11 +427,11 @@ impl Encodable for Header {
         }
 
         if let Some(ref blob_gas_used) = self.blob_gas_used {
-            U256::from(*blob_gas_used).encode(out);
+            blob_gas_used.encode(out);
         }
 
         if let Some(ref excess_blob_gas) = self.excess_blob_gas {
-            U256::from(*excess_blob_gas).encode(out);
+            excess_blob_gas.encode(out);
         }
 
         if let Some(ref parent_beacon_block_root) = self.parent_beacon_block_root {
@@ -451,7 +447,7 @@ impl Encodable for Header {
         }
 
         if let Some(ref slot_number) = self.slot_number {
-            U256::from(*slot_number).encode(out);
+            slot_number.encode(out);
         }
     }
 
@@ -1181,32 +1177,11 @@ pub(crate) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use super::super::{serde_bincode_compat, Header};
-        use arbitrary::Arbitrary;
-        use bincode::config;
-        use rand::Rng;
-        use serde::{Deserialize, Serialize};
-        use serde_with::serde_as;
-
-        #[test]
-        fn test_header_bincode_roundtrip() {
-            #[serde_as]
-            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-            struct Data {
-                #[serde_as(as = "serde_bincode_compat::Header")]
-                header: Header,
-            }
-
-            let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
-                header: Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
-            };
-
-            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _) =
-                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
-            assert_eq!(decoded, data);
-        }
+        bincode_compat_roundtrip_test!(
+            test_header_bincode_roundtrip,
+            Header,
+            "serde_bincode_compat::Header"
+        );
     }
 }
 

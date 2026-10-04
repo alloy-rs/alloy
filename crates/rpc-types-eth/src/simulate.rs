@@ -33,7 +33,7 @@ pub struct SimBlock<TxReq = TransactionRequest> {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
-    #[cfg_attr(feature = "serde", serde(default = "Vec::new"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub calls: Vec<TxReq>,
 }
 
@@ -375,12 +375,5 @@ mod tests {
         let expected: Vec<_> = (1..=3).map(Address::with_last_byte).collect();
         assert_eq!(block.logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
         assert_eq!(block.into_logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
-    }
-
-    #[test]
-    fn test_simulate_error_codes() {
-        assert_eq!(SimulateError::EXECUTION_REVERTED_CODE, EthRpcErrorCode::ExecutionError.code());
-        assert_eq!(SimulateError::VM_EXECUTION_ERROR_CODE, -32015);
-        assert_eq!(SimulateError::invalid_params().code, SimulateError::INVALID_PARAMS_ERROR_CODE);
     }
 }

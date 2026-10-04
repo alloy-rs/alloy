@@ -171,7 +171,6 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for GcpSigner {
     #[instrument(err)]
-    #[allow(clippy::blocks_in_conditions)]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_digest_inner(hash).await.map_err(alloy_signer::Error::other)
     }
@@ -329,11 +328,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "requires GOOGLE_APPLICATION_CREDENTIALS and the GOOGLE_* key settings"]
     async fn sign_message() {
-        if std::env::var("GOOGLE_APPLICATION_CREDENTIALS").is_err() {
-            return;
-        }
-
         let project_id = std::env::var("GOOGLE_PROJECT_ID").expect("GOOGLE_PROJECT_ID");
         let location = std::env::var("GOOGLE_LOCATION").expect("GOOGLE_LOCATION");
         let keyring = std::env::var("GOOGLE_KEYRING").expect("GOOGLE_KEYRING");
