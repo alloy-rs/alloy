@@ -604,14 +604,18 @@ mod forwarding_tests {
     #[test]
     fn forwards_all_object_safe_methods() {
         fn method_names<'a>(src: &'a str, block_start: &str) -> BTreeSet<&'a str> {
-            let block = src.split_once(block_start).unwrap().1.split_once("\n}\n").unwrap().0;
-            block
+            // `lines` keeps this independent of the line endings of the checkout.
+            let names: BTreeSet<_> = src
                 .lines()
+                .skip_while(|line| !line.contains(block_start))
+                .take_while(|line| *line != "}")
                 .filter_map(|line| {
                     line.strip_prefix("    fn ").or_else(|| line.strip_prefix("    async fn "))
                 })
                 .map(|rest| rest.split(['(', '<']).next().unwrap())
-                .collect()
+                .collect();
+            assert!(!names.is_empty(), "no methods found after `{block_start}`");
+            names
         }
 
         // `Self: Sized` methods, which cannot be called through `dyn Provider`.
