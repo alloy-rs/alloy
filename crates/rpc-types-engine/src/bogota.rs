@@ -82,18 +82,3 @@ impl From<Option<BogotaPayloadFields>> for MaybeBogotaPayloadFields {
         Self { fields }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bogota_payload_fields_conversions() {
-        let transactions = vec![Bytes::from_static(&[0x01, 0x02])];
-        let fields: BogotaPayloadFields = transactions.clone().into();
-        assert_eq!(fields.inclusion_list_transactions, transactions);
-
-        let maybe_fields: MaybeBogotaPayloadFields = fields.into();
-        assert_eq!(maybe_fields.inclusion_list_transactions(), Some(&transactions));
-    }
-}

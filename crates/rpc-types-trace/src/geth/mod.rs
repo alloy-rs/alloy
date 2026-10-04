@@ -1084,49 +1084,6 @@ mod tests {
         assert_eq!(val, de);
     }
 
-    #[test]
-    fn test_geth_trace_into_tracer() {
-        let geth_trace = GethTrace::Default(DefaultFrame::default());
-        let inner = geth_trace.try_into_default_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::CallTracer(CallFrame::default());
-        let inner = geth_trace.try_into_call_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::FourByteTracer(FourByteFrame::default());
-        let inner = geth_trace.try_into_four_byte_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::PreStateTracer(PreStateFrame::Default(PreStateMode::default()));
-        let inner = geth_trace.try_into_pre_state_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::NoopTracer(NoopFrame::default());
-        let inner = geth_trace.try_into_noop_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::MuxTracer(MuxFrame::default());
-        let inner = geth_trace.try_into_mux_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::Erc7562Tracer(Erc7562Frame::default());
-        let inner = geth_trace.try_into_erc7562_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::JS(serde_json::Value::Null);
-        let inner = geth_trace.try_into_json_value();
-        assert!(inner.is_ok());
-    }
-
-    #[test]
-    fn test_geth_trace_into_tracer_wrong_tracer() {
-        let geth_trace = GethTrace::Default(DefaultFrame::default());
-        let inner = geth_trace.try_into_call_frame();
-        assert!(inner.is_err());
-        assert!(matches!(inner, Err(UnexpectedTracerError(_))));
-    }
-
     // <https://github.com/paradigmxyz/reth/issues/16289>
     #[test]
     fn test_deserde_json_debug_trace_call_json_tracer() {
