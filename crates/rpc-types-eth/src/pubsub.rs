@@ -218,7 +218,8 @@ impl Params {
     /// Creates a new [`Params`] from a [`serde_json::Value`].
     #[cfg(feature = "serde")]
     pub fn from_json_value(v: serde_json::Value) -> Result<Self, serde_json::Error> {
-        if v.is_null() {
+        // `Params::None` serializes as `[]`
+        if v.is_null() || v.as_array().is_some_and(|params| params.is_empty()) {
             return Ok(Self::None);
         }
 
@@ -424,5 +425,21 @@ mod tests {
 
         let deserialized: SyncStatusMetadata = serde_json::from_str(&serialized).unwrap();
         assert_eq!(metadata_no_highest, deserialized);
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod params_none_tests {
+    use super::*;
+
+    #[test]
+    fn params_none_roundtrip() {
+        let serialized = serde_json::to_string(&Params::None).unwrap();
+        assert_eq!(serde_json::from_str::<Params>(&serialized).unwrap(), Params::None);
+    }
+
+    #[test]
+    fn params_non_empty_array_is_rejected() {
+        assert!(serde_json::from_str::<Params>("[true]").is_err());
     }
 }
