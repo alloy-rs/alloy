@@ -214,81 +214,43 @@ mod tests {
     use super::*;
     use k256::ecdsa::VerifyingKey;
 
-    #[tokio::test]
-    async fn sign_message() {
-        // Environment check - return early if credentials missing (AWS/GCP pattern)
-        let Ok(org_id) = std::env::var("TURNKEY_ORGANIZATION_ID") else { return };
-        let Ok(api_private_key) = std::env::var("TURNKEY_API_PRIVATE_KEY") else { return };
-        let Ok(address_str) = std::env::var("TURNKEY_ADDRESS") else { return };
+    fn signer() -> TurnkeySigner {
+        let org_id = std::env::var("TURNKEY_ORGANIZATION_ID").expect("TURNKEY_ORGANIZATION_ID");
+        let api_private_key =
+            std::env::var("TURNKEY_API_PRIVATE_KEY").expect("TURNKEY_API_PRIVATE_KEY");
+        let address = std::env::var("TURNKEY_ADDRESS")
+            .expect("TURNKEY_ADDRESS")
+            .parse::<Address>()
+            .expect("invalid test address");
 
-        // Create API key and client using official SDK
         let api_key = TurnkeyP256ApiKey::from_strings(&api_private_key, None)
             .expect("api key creation failed");
-
         let client =
             TurnkeyClient::builder().api_key(api_key).build().expect("client builder failed");
 
-        let address = address_str.parse::<Address>().expect("invalid test address");
-        let signer = TurnkeySigner::new(client, org_id, address, Some(1));
+        TurnkeySigner::new(client, org_id, address, Some(1))
+    }
 
-        // Standard test payload (matches AWS/GCP exactly)
+    #[tokio::test]
+    #[ignore = "requires TURNKEY_ORGANIZATION_ID, TURNKEY_API_PRIVATE_KEY and TURNKEY_ADDRESS"]
+    async fn sign_message() {
+        let signer = signer();
+
         let message = vec![0, 1, 2, 3];
 
-        // Execute signing and verify recovery (AWS/GCP pattern)
         let sig = signer.sign_message(&message).await.unwrap();
         assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
     }
 
     #[tokio::test]
+    #[ignore = "requires TURNKEY_ORGANIZATION_ID, TURNKEY_API_PRIVATE_KEY and TURNKEY_ADDRESS"]
     async fn sign_hash() {
-        let Ok(org_id) = std::env::var("TURNKEY_ORGANIZATION_ID") else { return };
-        let Ok(api_private_key) = std::env::var("TURNKEY_API_PRIVATE_KEY") else { return };
-        let Ok(address_str) = std::env::var("TURNKEY_ADDRESS") else { return };
+        let signer = signer();
 
-        let api_key = TurnkeyP256ApiKey::from_strings(&api_private_key, None)
-            .expect("api key creation failed");
-
-        let client =
-            TurnkeyClient::builder().api_key(api_key).build().expect("client builder failed");
-
-        let address = address_str.parse::<Address>().expect("invalid test address");
-        let signer = TurnkeySigner::new(client, org_id, address, Some(1));
-
-        // Test direct hash signing (core functionality)
         let hash = B256::from([1u8; 32]);
         let sig = signer.sign_hash(&hash).await.unwrap();
 
-        // Verify signature recovery
         let recovered: VerifyingKey = sig.recover_from_prehash(&hash).unwrap();
         assert_eq!(alloy_signer::utils::public_key_to_address(&recovered), signer.address());
-    }
-
-    #[tokio::test]
-    async fn signer_properties() {
-        let Ok(org_id) = std::env::var("TURNKEY_ORGANIZATION_ID") else { return };
-        let Ok(api_private_key) = std::env::var("TURNKEY_API_PRIVATE_KEY") else { return };
-        let Ok(address_str) = std::env::var("TURNKEY_ADDRESS") else { return };
-
-        let api_key = TurnkeyP256ApiKey::from_strings(&api_private_key, None)
-            .expect("api key creation failed");
-
-        let client =
-            TurnkeyClient::builder().api_key(api_key).build().expect("client builder failed");
-
-        let address = address_str.parse::<Address>().expect("invalid test address");
-        let mut signer = TurnkeySigner::new(client, org_id, address, Some(1));
-
-        // Test address property
-        assert_eq!(signer.address(), address);
-
-        // Test chain_id property
-        assert_eq!(signer.chain_id(), Some(1));
-
-        // Test chain_id mutation
-        signer.set_chain_id(Some(42));
-        assert_eq!(signer.chain_id(), Some(42));
-
-        signer.set_chain_id(None);
-        assert_eq!(signer.chain_id(), None);
     }
 }

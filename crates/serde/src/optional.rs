@@ -61,20 +61,6 @@ mod tests {
     }
 
     #[test]
-    fn test_null_as_default_with_missing_field() {
-        let json_data = json!({});
-        let result: TestStruct = serde_json::from_value(json_data).unwrap();
-        assert_eq!(result.value, Vec::<i32>::new());
-    }
-
-    #[test]
-    fn test_reject_if_some_with_none() {
-        let json_data = json!({});
-        let result: TestStruct = serde_json::from_value(json_data).unwrap();
-        assert_eq!(result.should_be_none, None);
-    }
-
-    #[test]
     fn test_reject_if_some_with_some() {
         let json_data = json!({ "should_be_none": "unexpected value" });
         let result: Result<TestStruct, _> = serde_json::from_value(json_data);

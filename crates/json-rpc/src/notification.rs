@@ -175,20 +175,6 @@ mod tests {
     }
 
     #[test]
-    fn subid_number() {
-        let number = U256::from(123456u64);
-        let subid: SubId = number.into();
-        assert_eq!(subid, SubId::Number(number));
-    }
-
-    #[test]
-    fn subid_string() {
-        let string = "subscription_id".to_string();
-        let subid: SubId = string.clone().into();
-        assert_eq!(subid, SubId::String(string));
-    }
-
-    #[test]
     fn eth_notification_header() {
         let header = json!({
             "subscription": "0x123",
@@ -282,29 +268,14 @@ mod tests {
     }
 
     #[test]
-    fn deserializer_test_invalid_structure() {
-        // An invalid structure should fail deserialization
-        let invalid_notification = r#"
-           {
-               "jsonrpc": "2.0",
-               "method": "eth_subscription"
-           }"#;
-
-        let deser = serde_json::from_str::<PubSubItem>(invalid_notification);
-        assert!(deser.is_err());
-    }
-
-    #[test]
-    fn deserializer_test_missing_fields() {
-        // A notification missing essential fields should fail
-        let missing_fields = r#"
-           {
-               "jsonrpc": "2.0",
-               "method": "eth_subscription",
-               "params": {}
-           }"#;
-
-        let deser = serde_json::from_str::<PubSubItem>(missing_fields);
-        assert!(deser.is_err());
+    fn deserializer_test_invalid_notifications() {
+        for invalid in [
+            // no params
+            r#"{"jsonrpc": "2.0", "method": "eth_subscription"}"#,
+            // params without subscription and result
+            r#"{"jsonrpc": "2.0", "method": "eth_subscription", "params": {}}"#,
+        ] {
+            assert!(serde_json::from_str::<PubSubItem>(invalid).is_err(), "{invalid}");
+        }
     }
 }

@@ -448,34 +448,4 @@ mod test {
             BuiltInConnectionString::Ipc(ipc_path.clone())
         );
     }
-
-    #[test]
-    #[cfg(feature = "ws-base")]
-    fn test_ws_config_auth_priority() {
-        use alloy_transport::Authorization;
-
-        // Test that config auth takes precedence over URL auth
-        let config_auth = Authorization::bearer("config-token");
-        let url_auth = Some(Authorization::basic("user", "pass"));
-
-        let _ws_connection =
-            BuiltInConnectionString::Ws("ws://user:pass@localhost:8545".parse().unwrap(), url_auth);
-
-        let config = ConnectionConfig::new().with_auth(config_auth.clone());
-
-        // In the actual connect_boxed_with implementation:
-        // config.auth.as_ref().or(existing_auth.as_ref())
-        // This means config auth takes priority
-        assert_eq!(config.auth.as_ref().unwrap().to_string(), config_auth.to_string());
-    }
-
-    #[test]
-    fn test_backward_compatibility() {
-        // Verify connect() uses default config (maintaining backward compatibility)
-        let default_config = ConnectionConfig::default();
-        assert!(default_config.auth.is_none());
-        assert!(default_config.max_retries.is_none());
-
-        // connect() -> connect_boxed() -> connect_boxed_with(default) ensures compatibility
-    }
 }

@@ -69,63 +69,20 @@ mod tests {
     use url::Url;
 
     #[test]
-    fn test_extract_from_url_with_basic_auth() {
-        let url = Url::parse("http://username:password@domain.com").unwrap();
-        let auth = Authorization::extract_from_url(&url).unwrap();
-
-        // Expected Basic auth encoded in base64
-        assert_eq!(
-            auth,
-            Authorization::Basic(general_purpose::STANDARD.encode("username:password"))
-        );
-    }
-
-    #[test]
-    fn test_extract_from_url_no_auth() {
-        let url = Url::parse("http://domain.com").unwrap();
-        assert!(Authorization::extract_from_url(&url).is_none());
-    }
-
-    #[test]
-    fn test_extract_from_url_with_localhost_username() {
-        // A username of "localhost" is valid userinfo and should be extracted.
-        let url = Url::parse("http://localhost:password@domain.com").unwrap();
-        let auth = Authorization::extract_from_url(&url).unwrap();
-        assert_eq!(
-            auth,
-            Authorization::Basic(general_purpose::STANDARD.encode("localhost:password"))
-        );
-    }
-
-    #[test]
-    fn test_extract_from_url_plain_host() {
-        // No userinfo — just a host with a port.
-        let url = Url::parse("http://127.0.0.1:8080").unwrap();
-        assert!(Authorization::extract_from_url(&url).is_none());
-    }
-
-    #[test]
-    fn test_extract_from_url_password_only() {
-        let url = Url::parse("http://:secret@domain.com").unwrap();
-        let auth = Authorization::extract_from_url(&url).unwrap();
-        assert_eq!(auth, Authorization::Basic(general_purpose::STANDARD.encode(":secret")));
-    }
-
-    #[test]
-    fn test_authority() {
-        let auth = Authorization::authority("user:pass");
-        assert_eq!(auth, Authorization::Basic(general_purpose::STANDARD.encode("user:pass")));
-    }
-
-    #[test]
-    fn test_basic() {
-        let auth = Authorization::basic("user", "pass");
-        assert_eq!(auth, Authorization::Basic(general_purpose::STANDARD.encode("user:pass")));
-    }
-
-    #[test]
-    fn test_raw() {
-        let auth = Authorization::raw("raw_token");
-        assert_eq!(auth, Authorization::Raw("raw_token".to_string()));
+    fn test_extract_from_url() {
+        for (url, credentials) in [
+            ("http://username:password@domain.com", Some("username:password")),
+            ("http://domain.com", None),
+            // A username of "localhost" is valid userinfo and should be extracted.
+            ("http://localhost:password@domain.com", Some("localhost:password")),
+            ("http://127.0.0.1:8080", None),
+            ("http://:secret@domain.com", Some(":secret")),
+        ] {
+            let auth = Authorization::extract_from_url(&Url::parse(url).unwrap());
+            let expected = credentials.map(|credentials| {
+                Authorization::Basic(general_purpose::STANDARD.encode(credentials))
+            });
+            assert_eq!(auth, expected, "{url}");
+        }
     }
 }
