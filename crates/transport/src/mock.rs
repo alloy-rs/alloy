@@ -1,7 +1,8 @@
 //! Mock transport and utility types.
 //!
 //! [`MockTransport`] returns responses that have been pushed into its associated [`Asserter`]'s
-//! queue using FIFO.
+//! queue using FIFO, and records every request it receives so that tests can assert what was
+//! sent.
 //!
 //! # Examples
 //!
@@ -17,6 +18,17 @@
 //! asserter.push_success(&n);
 //! let actual = provider.get_block_number().await.unwrap();
 //! assert_eq!(actual, n);
+//!
+//! asserter.push_success(&U256::from(1));
+//! provider.get_balance(Address::ZERO).await.unwrap();
+//!
+//! let requests = asserter.take_requests();
+//! assert_eq!(requests[0].method(), "eth_blockNumber");
+//! assert_eq!(requests[1].method(), "eth_getBalance");
+//! assert_eq!(
+//!     requests[1].params().unwrap().get(),
+//!     r#"["0x0000000000000000000000000000000000000000","latest"]"#
+//! );
 //! ```
 
 use crate::{TransportErrorKind, TransportResult};
@@ -35,10 +47,14 @@ pub type MockResponse = j::ResponsePayload;
 ///
 /// Mock responses are stored and returned with a FIFO queue.
 ///
+/// Requests received by the [`MockTransport`] are recorded in a second FIFO queue, see
+/// [`requests`](Self::requests).
+///
 /// See the [module documentation][self].
 #[derive(Debug, Clone, Default)]
 pub struct Asserter {
     responses: Arc<RwLock<VecDeque<MockResponse>>>,
+    requests: Arc<RwLock<VecDeque<j::SerializedRequest>>>,
 }
 
 impl Asserter {
@@ -87,6 +103,38 @@ impl Asserter {
     pub fn write_q(&self) -> impl std::ops::DerefMut<Target = VecDeque<MockResponse>> + '_ {
         self.responses.write().unwrap_or_else(PoisonError::into_inner)
     }
+
+    /// Returns a copy of the recorded requests, oldest first.
+    ///
+    /// The [`MockTransport`] records every request it handles before popping the matching
+    /// response, including requests that fail because the response queue is empty. Requests of a
+    /// batch are recorded individually, in batch order.
+    ///
+    /// Recorded requests are kept until they are removed with [`pop_request`](Self::pop_request)
+    /// or [`take_requests`](Self::take_requests).
+    pub fn requests(&self) -> Vec<j::SerializedRequest> {
+        self.requests.read().unwrap_or_else(PoisonError::into_inner).iter().cloned().collect()
+    }
+
+    /// Removes and returns the oldest recorded request.
+    ///
+    /// See [`requests`](Self::requests).
+    pub fn pop_request(&self) -> Option<j::SerializedRequest> {
+        self.write_requests().pop_front()
+    }
+
+    /// Removes and returns all recorded requests, oldest first.
+    ///
+    /// See [`requests`](Self::requests).
+    pub fn take_requests(&self) -> Vec<j::SerializedRequest> {
+        self.write_requests().drain(..).collect()
+    }
+
+    fn write_requests(
+        &self,
+    ) -> impl std::ops::DerefMut<Target = VecDeque<j::SerializedRequest>> + '_ {
+        self.requests.write().unwrap_or_else(PoisonError::into_inner)
+    }
 }
 
 /// A transport that returns responses from an associated [`Asserter`].
@@ -109,6 +157,7 @@ impl MockTransport {
     }
 
     async fn handle(self, req: j::RequestPacket) -> TransportResult<j::ResponsePacket> {
+        self.asserter.write_requests().extend(req.requests().iter().cloned());
         Ok(match req {
             j::RequestPacket::Single(req) => j::ResponsePacket::Single(self.map_request(req)?),
             j::RequestPacket::Batch(reqs) => j::ResponsePacket::Batch(
