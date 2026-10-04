@@ -101,7 +101,7 @@ impl BuiltInConnectionString {
     ///
     /// # Notes
     ///
-    /// - If `hyper` feature is enabled
+    /// - If the `hyper` feature is enabled, HTTP connections use hyper instead of reqwest.
     /// - WS will extract auth, however, auth is disabled for wasm.
     pub async fn connect_boxed(&self) -> Result<BoxTransport, TransportError> {
         self.connect_boxed_with(ConnectionConfig::default()).await
@@ -114,7 +114,7 @@ impl BuiltInConnectionString {
     ///
     /// # Notes
     ///
-    /// - If `hyper` feature is enabled
+    /// - If the `hyper` feature is enabled, HTTP connections use hyper instead of reqwest.
     /// - WS will extract auth, however, auth is disabled for wasm.
     /// - Some configuration options may not apply to all transport types.
     pub async fn connect_boxed_with(
@@ -146,7 +146,7 @@ impl BuiltInConnectionString {
                 "reqwest HTTP transport is not supported on wasm32-wasip1",
             )),
 
-            // hyper is enabled, reqwest is not
+            // hyper takes precedence over reqwest when enabled
             #[cfg(feature = "hyper")]
             Self::Http(url) => Ok(alloy_transport::Transport::boxed(
                 alloy_transport_http::HyperTransport::new_hyper(url.clone()),

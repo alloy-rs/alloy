@@ -10,9 +10,6 @@ use std::{
 };
 use tempfile::TempDir;
 
-#[cfg(unix)]
-use libc;
-
 /// Helper for graceful process shutdown.
 pub(crate) struct GracefulShutdown;
 

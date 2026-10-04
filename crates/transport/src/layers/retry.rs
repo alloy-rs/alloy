@@ -55,13 +55,12 @@ impl RetryBackoffLayer {
         initial_backoff: u64,
         compute_units_per_second: u64,
     ) -> Self {
-        Self {
+        Self::new_with_policy(
             max_rate_limit_retries,
             initial_backoff,
             compute_units_per_second,
-            avg_cost: DEFAULT_AVG_COST,
-            policy: RateLimitRetryPolicy,
-        }
+            RateLimitRetryPolicy,
+        )
     }
 
     /// Sets the average Compute Unit (CU) cost per request. Defaults to `20` CU.
@@ -303,8 +302,7 @@ where
 
                     let current_queued_reqs = this.requests_enqueued.load(Ordering::SeqCst) as u64;
 
-                    // try to extract the requested backoff from the error or compute the next
-                    // backoff based on retry count
+                    // use the backoff requested by the error, or fall back to the initial backoff
                     let backoff_hint = this.policy.backoff_hint(&err);
                     let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
 

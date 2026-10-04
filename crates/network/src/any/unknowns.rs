@@ -187,23 +187,16 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn is_dynamic_fee(&self) -> bool {
-        self.fields.get_deserialized::<U128>("maxFeePerGas").is_some()
-            || self.fields.get_deserialized::<U128>("maxFeePerBlobGas").is_some()
+        self.fields.contains_key("maxFeePerGas") || self.fields.contains_key("maxFeePerBlobGas")
     }
 
     #[inline]
     fn kind(&self) -> TxKind {
         self.fields
             .get("to")
-            .or(Some(&serde_json::Value::Null))
-            .and_then(|v| {
-                if v.is_null() {
-                    Some(TxKind::Create)
-                } else {
-                    v.as_str().and_then(|v| v.parse::<Address>().ok().map(Into::into))
-                }
-            })
-            .unwrap_or_default()
+            .and_then(|v| v.as_str())
+            .and_then(|v| v.parse::<Address>().ok())
+            .map_or(TxKind::Create, TxKind::Call)
     }
 
     #[inline]

@@ -234,17 +234,13 @@ impl From<U256> for Topic {
 
 impl From<Address> for Topic {
     fn from(address: Address) -> Self {
-        let mut bytes = [0u8; 32];
-        bytes[12..].copy_from_slice(address.as_slice());
-        B256::from(bytes).into()
+        address.into_word().into()
     }
 }
 
 impl From<bool> for Topic {
     fn from(value: bool) -> Self {
-        let mut bytes = [0u8; 32];
-        bytes[31] = if value { 1 } else { 0 };
-        B256::from(bytes).into()
+        B256::with_last_byte(value as u8).into()
     }
 }
 
@@ -703,26 +699,17 @@ impl Filter {
     /// Numeric bounds are inclusive. Dynamic tags such as `latest`, `safe`, and `pending` are not
     /// resolved here and therefore do not impose a numeric bound.
     pub const fn matches_block_range(&self, block_number: u64) -> bool {
-        let mut res = true;
-
         if let Some(BlockNumberOrTag::Number(num)) = self.block_option.get_from_block() {
             if *num > block_number {
-                res = false;
+                return false;
             }
         }
 
-        if let Some(to) = self.block_option.get_to_block() {
-            match to {
-                BlockNumberOrTag::Number(num) if *num < block_number => {
-                    res = false;
-                }
-                BlockNumberOrTag::Earliest => {
-                    res = false;
-                }
-                _ => {}
-            }
+        match self.block_option.get_to_block() {
+            Some(BlockNumberOrTag::Number(num)) => *num >= block_number,
+            Some(BlockNumberOrTag::Earliest) => false,
+            _ => true,
         }
-        res
     }
 
     /// Returns `true` if the filter matches the given block hash.
@@ -1330,31 +1317,13 @@ where
             Transactions(Vec<T>),
         }
 
-        let changes = Changes::<T, L>::deserialize(deserializer)?;
-        let changes = match changes {
-            Changes::Logs(vals) => {
-                if vals.is_empty() {
-                    Self::Empty
-                } else {
-                    Self::Logs(vals)
-                }
-            }
-            Changes::Hashes(vals) => {
-                if vals.is_empty() {
-                    Self::Empty
-                } else {
-                    Self::Hashes(vals)
-                }
-            }
-            Changes::Transactions(vals) => {
-                if vals.is_empty() {
-                    Self::Empty
-                } else {
-                    Self::Transactions(vals)
-                }
-            }
-        };
-        Ok(changes)
+        // `Hashes` is tried first, so an empty array always ends up there.
+        Ok(match Changes::<T, L>::deserialize(deserializer)? {
+            Changes::Hashes(vals) if vals.is_empty() => Self::Empty,
+            Changes::Hashes(vals) => Self::Hashes(vals),
+            Changes::Logs(vals) => Self::Logs(vals),
+            Changes::Transactions(vals) => Self::Transactions(vals),
+        })
     }
 }
 
@@ -1474,19 +1443,8 @@ impl FilteredParams {
 
     /// Returns `true` if the bloom matches the topics
     pub fn matches_topics(bloom: Bloom, topic_filters: &[BloomFilter]) -> bool {
-        if topic_filters.is_empty() {
-            return true;
-        }
-
-        // for each filter, iterate through the list of filter blooms. for each set of filter
-        // (each BloomFilter), the given `bloom` must match at least one of them, unless the list is
-        // empty (no filters).
-        for filter in topic_filters {
-            if !filter.matches(bloom) {
-                return false;
-            }
-        }
-        true
+        // the given `bloom` must match at least one bloom of each non-empty `BloomFilter`
+        topic_filters.iter().all(|filter| filter.matches(bloom))
     }
 
     /// Returns `true` if the bloom contains one of the address blooms, or the address blooms

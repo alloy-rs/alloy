@@ -33,7 +33,7 @@ pub struct SimBlock<TxReq = TransactionRequest> {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
-    #[cfg_attr(feature = "serde", serde(default = "Vec::new"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub calls: Vec<TxReq>,
 }
 

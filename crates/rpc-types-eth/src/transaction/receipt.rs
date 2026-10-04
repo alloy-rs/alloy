@@ -90,7 +90,7 @@ where
     {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct ReceiptDeserHelper<T = ReceiptEnvelope<Log>> {
+        struct ReceiptDeserHelper<T> {
             #[serde(flatten)]
             inner: T,
             transaction_hash: TxHash,
@@ -108,17 +108,9 @@ where
             // 3. Default to 0 if neither is present
             #[serde(default, alias = "gasPrice", with = "alloy_serde::quantity::opt")]
             effective_gas_price: Option<u128>,
-            #[serde(
-                default,
-                skip_serializing_if = "Option::is_none",
-                with = "alloy_serde::quantity::opt"
-            )]
+            #[serde(default, with = "alloy_serde::quantity::opt")]
             blob_gas_used: Option<u64>,
-            #[serde(
-                default,
-                skip_serializing_if = "Option::is_none",
-                with = "alloy_serde::quantity::opt"
-            )]
+            #[serde(default, with = "alloy_serde::quantity::opt")]
             blob_gas_price: Option<u128>,
             from: Address,
             to: Option<Address>,

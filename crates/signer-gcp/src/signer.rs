@@ -171,7 +171,6 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for GcpSigner {
     #[instrument(err)]
-    #[allow(clippy::blocks_in_conditions)]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_digest_inner(hash).await.map_err(alloy_signer::Error::other)
     }

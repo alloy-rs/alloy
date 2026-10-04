@@ -4,14 +4,14 @@
 //! as an alternative to the default [`k256`] implementation.
 
 use crate::{LocalSigner, LocalSignerError};
-use alloy_primitives::{hex, keccak256, Address, B256, B512};
-use alloy_signer::Signer;
+use alloy_primitives::{hex, Address, B256, B512};
+use alloy_signer::{utils::raw_public_key_to_address, Signer};
 use k256::ecdsa::{
     signature::{hazmat::PrehashSigner, Error as SignatureError},
     RecoveryId, Signature as K256Signature,
 };
 use rand::{CryptoRng, Rng};
-use secp256k1::{Message, PublicKey, Secp256k1, SecretKey, SECP256K1};
+use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
 use std::str::FromStr;
 
 #[cfg(feature = "keystore")]
@@ -93,16 +93,8 @@ impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
 /// Converts a [`secp256k1::SecretKey`] to its corresponding Ethereum address.
 #[inline]
 fn secret_key_to_address(secret_key: &SecretKey) -> Address {
-    let public = secret_key.public_key(SECP256K1);
-    public_key_to_address(&public)
-}
-
-/// Converts a [`secp256k1::PublicKey`] to its corresponding Ethereum address.
-#[inline]
-fn public_key_to_address(public: &PublicKey) -> Address {
     // Strip out the first byte (0x04 tag for uncompressed public key)
-    let hash = keccak256(&public.serialize_uncompressed()[1..]);
-    Address::from_slice(&hash[12..])
+    raw_public_key_to_address(&secret_key.public_key(SECP256K1).serialize_uncompressed()[1..])
 }
 
 impl LocalSigner<Secp256k1Credential> {
@@ -138,8 +130,7 @@ impl LocalSigner<Secp256k1Credential> {
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        let secp = Secp256k1::new();
-        let (secret_key, _) = secp.generate_keypair(rng);
+        let (secret_key, _) = SECP256K1.generate_keypair(rng);
         Self::from_secp256k1(secret_key)
     }
 

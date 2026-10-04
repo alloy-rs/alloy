@@ -144,20 +144,6 @@ struct CallBatchMsg<N: Network> {
     tx: oneshot::Sender<CallBatchMsgTx>,
 }
 
-impl<N: Network> Clone for CallBatchMsgKind<N>
-where
-    N::TransactionRequest: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::Call(tx) => Self::Call(tx.clone()),
-            Self::BlockNumber => Self::BlockNumber,
-            Self::ChainId => Self::ChainId,
-            Self::Balance(addr) => Self::Balance(*addr),
-        }
-    }
-}
-
 impl<N: Network> fmt::Debug for CallBatchMsg<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("BatchProviderMessage(")?;
@@ -314,14 +300,13 @@ struct CallBatchBackend<P, N: Network = Ethereum> {
     arbsys: bool,
     rx: mpsc::UnboundedReceiver<CallBatchMsg<N>>,
     pending: Vec<CallBatchMsg<N>>,
-    _pd: PhantomData<N>,
 }
 
 impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     fn spawn(inner: Arc<P>, layer: &CallBatchLayer) -> mpsc::UnboundedSender<CallBatchMsg<N>> {
         let CallBatchLayer { m3a, wait, arbsys } = *layer;
         let (tx, rx) = mpsc::unbounded_channel();
-        let this = Self { inner, m3a, wait, arbsys, rx, pending: Vec::new(), _pd: PhantomData };
+        let this = Self { inner, m3a, wait, arbsys, rx, pending: Vec::new() };
         this.run().spawn_task();
         tx
     }

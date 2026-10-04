@@ -204,14 +204,6 @@ pub struct TraceFilterMatcher {
 impl TraceFilterMatcher {
     /// Returns `true` if the given `TransactionTrace` matches this filter.
     ///
-    /// # Arguments
-    ///
-    /// - `trace`: A reference to a `TransactionTrace` to be evaluated against the filter.
-    ///
-    /// # Returns
-    ///
-    /// - `true` if the transaction trace matches the filter criteria; otherwise, `false`.
-    ///
     /// # Behavior
     ///
     /// This function evaluates whether the `trace` matches based on its action type:

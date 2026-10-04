@@ -12,15 +12,13 @@ use rand::Rng;
 use std::{marker::PhantomData, path::PathBuf};
 use thiserror::Error;
 
-#[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 
 /// Represents a structure that can resolve into a `PrivateKeySigner`.
-#[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
 #[must_use = "builders do nothing unless `build` is called"]
 pub struct MnemonicBuilder<W: Wordlist = English> {
     /// The mnemonic phrase can be supplied to the builder as a string. A builder that has a valid
@@ -31,13 +29,13 @@ pub struct MnemonicBuilder<W: Wordlist = English> {
     word_count: usize,
     /// The derivation path at which the extended private key child will be derived at. By default
     /// the mnemonic builder uses the path: "m/44'/60'/0'/0/0".
-    #[cfg_attr(feature = "zeroize", zeroize(skip))]
+    #[zeroize(skip)]
     derivation_path: DerivationPath,
     /// Optional password for the mnemonic phrase.
     password: Option<String>,
     /// Optional field that if enabled, writes the mnemonic phrase to disk storage at the provided
     /// path.
-    #[cfg_attr(feature = "zeroize", zeroize(skip))]
+    #[zeroize(skip)]
     write_to: Option<PathBuf>,
     /// PhantomData
     _wordlist: PhantomData<W>,
@@ -197,11 +195,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// Builds a `PrivateKeySigner` using the parameters set in mnemonic builder. This method
     /// expects the phrase field to be set.
     pub fn build(&self) -> Result<PrivateKeySigner, LocalSignerError> {
-        let mnemonic = match &self.phrase {
-            Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
-            None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
-        };
-        self.mnemonic_to_signer(&mnemonic)
+        self.mnemonic_to_signer(&self.phrase_mnemonic()?)
     }
 
     /// Builds a `PrivateKeySigner` using the parameters set in the mnemonic builder and
@@ -241,10 +235,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// The returned key can then derive individual children, extract a signer, or be used as an
     /// iterator.
     pub fn build_parent_key(&self) -> Result<MnemonicKey, LocalSignerError> {
-        let mnemonic = match &self.phrase {
-            Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
-            None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
-        };
+        let mnemonic = self.phrase_mnemonic()?;
 
         let mut key = mnemonic.master_key(self.password.as_deref())?;
         if self.derivation_path.len() > 1 {
@@ -259,11 +250,15 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// Builds a [`MnemonicKey`] by deriving the full configured derivation path from the
     /// mnemonic phrase.
     pub fn build_key(&self) -> Result<MnemonicKey, LocalSignerError> {
-        let mnemonic = match &self.phrase {
-            Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
-            None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
-        };
-        self.mnemonic_to_key(&mnemonic)
+        self.mnemonic_to_key(&self.phrase_mnemonic()?)
+    }
+
+    /// Parses the configured phrase, failing if none is set.
+    fn phrase_mnemonic(&self) -> Result<Mnemonic<W>, LocalSignerError> {
+        match &self.phrase {
+            Some(phrase) => Ok(Mnemonic::<W>::new_from_phrase(phrase)?),
+            None => Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
+        }
     }
 
     fn mnemonic_to_signer(

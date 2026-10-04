@@ -583,7 +583,6 @@ impl Geth {
                 .map_err(NodeError::SpawnError)?
                 .wait()
                 .map_err(NodeError::WaitError)?;
-            // .expect("failed to wait for geth init to exit");
             if !res.success() {
                 return Err(NodeError::InitError);
             }

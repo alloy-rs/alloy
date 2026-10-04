@@ -479,7 +479,7 @@ impl TrezorSigner {
                 }
                 MessageType::MessageType_PinMatrixRequest => {
                     return Err(trezor_client::Error::UnexpectedInteractionRequest(
-                        trezor_client::client::InteractionType::PinMatrix,
+                        InteractionType::PinMatrix,
                     )
                     .into());
                 }

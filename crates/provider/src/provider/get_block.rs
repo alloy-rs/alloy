@@ -54,12 +54,14 @@ impl EthGetBlockParams {
     }
 }
 
-/// A builder for an `"eth_getBlockByHash"` request. This type is returned by the
-/// [`Provider::call`] method.
+/// A builder for an `"eth_getBlockByHash"` or `"eth_getBlockByNumber"` request. This type is
+/// returned by the [`Provider::get_block`], [`Provider::get_block_by_hash`] and
+/// [`Provider::get_block_by_number`] methods.
 ///
-/// [`Provider::call`]: crate::Provider::call
-#[must_use = "EthGetBlockBy must be awaited to execute the request"]
-//#[derive(Clone, Debug)]
+/// [`Provider::get_block`]: crate::Provider::get_block
+/// [`Provider::get_block_by_hash`]: crate::Provider::get_block_by_hash
+/// [`Provider::get_block_by_number`]: crate::Provider::get_block_by_number
+#[must_use = "EthGetBlock must be awaited to execute the request"]
 pub struct EthGetBlock<BlockResp>
 where
     BlockResp: alloy_network::BlockResponse + RpcRecv,
@@ -452,9 +454,6 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     pub async fn into_stream(
         self,
     ) -> TransportResult<impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin> {
-        use alloy_network_primitives::HeaderResponse;
-        use futures::StreamExt;
-
         let sub = self.sub.await?;
 
         let stream = sub

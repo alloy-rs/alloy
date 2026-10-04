@@ -29,7 +29,7 @@ pub fn calc_effective_gas_price(
     })
 }
 
-/// Return type of EIP1155 gas fee estimator.
+/// Return type of EIP-1559 gas fee estimator.
 ///
 /// Contains EIP-1559 fields
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,7 +107,6 @@ pub fn calc_next_block_base_fee(
         return base_fee;
     }
 
-    // Calculate the target gas by dividing the gas limit by the elasticity multiplier.
     let gas_target = (gas_limit as u128 / elasticity) as u64;
 
     if gas_target == 0 {
@@ -115,13 +114,8 @@ pub fn calc_next_block_base_fee(
     }
 
     match gas_used.cmp(&gas_target) {
-        // If the gas used in the current block is equal to the gas target, the base fee remains the
-        // same (no increase).
         core::cmp::Ordering::Equal => base_fee,
-        // If the gas used in the current block is greater than the gas target, calculate a new
-        // increased base fee.
         core::cmp::Ordering::Greater => {
-            // Calculate the increase in base fee based on the formula defined by EIP-1559.
             base_fee
                 + (core::cmp::max(
                     // Ensure a minimum increase of 1.
@@ -130,16 +124,10 @@ pub fn calc_next_block_base_fee(
                         / (gas_target as u128 * base_fee_params.max_change_denominator),
                 ) as u64)
         }
-        // If the gas used in the current block is less than the gas target, calculate a new
-        // decreased base fee.
-        core::cmp::Ordering::Less => {
-            // Calculate the decrease in base fee based on the formula defined by EIP-1559.
-            base_fee.saturating_sub(
-                (base_fee as u128 * (gas_target - gas_used) as u128
-                    / (gas_target as u128 * base_fee_params.max_change_denominator))
-                    as u64,
-            )
-        }
+        core::cmp::Ordering::Less => base_fee.saturating_sub(
+            (base_fee as u128 * (gas_target - gas_used) as u128
+                / (gas_target as u128 * base_fee_params.max_change_denominator)) as u64,
+        ),
     }
 }
 

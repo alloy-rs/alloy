@@ -29,7 +29,6 @@ pub enum OperationType {
     OpEofCreate = 4,
 }
 
-// Implement Serialize for OperationType
 impl Serialize for OperationType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -39,13 +38,11 @@ impl Serialize for OperationType {
     }
 }
 
-// Implement Deserialize for OperationType
 impl<'de> Deserialize<'de> for OperationType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        // Deserialize string, then parse it to u8
         let value = u8::deserialize(deserializer)?;
         match value {
             0 => Ok(Self::OpTransfer),

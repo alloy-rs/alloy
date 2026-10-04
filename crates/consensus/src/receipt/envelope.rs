@@ -415,13 +415,7 @@ pub(crate) mod serde_bincode_compat {
                 },
                 logs_bloom: logs_bloom.into_owned(),
             };
-            match tx_type {
-                TxType::Legacy => Self::Legacy(receipt),
-                TxType::Eip2930 => Self::Eip2930(receipt),
-                TxType::Eip1559 => Self::Eip1559(receipt),
-                TxType::Eip4844 => Self::Eip4844(receipt),
-                TxType::Eip7702 => Self::Eip7702(receipt),
-            }
+            Self::from_typed(tx_type, receipt)
         }
     }
 

@@ -306,13 +306,7 @@ where
     fn from(value: EthereumReceipt<TxType, L>) -> Self {
         let tx_type = value.tx_type;
         let receipt = value.into_with_bloom().map_receipt(Into::into);
-        match tx_type {
-            TxType::Legacy => Self::Legacy(receipt),
-            TxType::Eip2930 => Self::Eip2930(receipt),
-            TxType::Eip1559 => Self::Eip1559(receipt),
-            TxType::Eip4844 => Self::Eip4844(receipt),
-            TxType::Eip7702 => Self::Eip7702(receipt),
-        }
+        Self::from_typed(tx_type, receipt)
     }
 }
 
