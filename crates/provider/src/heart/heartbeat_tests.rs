@@ -185,3 +185,74 @@ async fn pauses_while_nothing_is_watched() {
     assert_eq!(poll(&mut pending).unwrap().unwrap(), TX);
     assert!(harness.paused.is_paused());
 }
+
+#[tokio::test(start_paused = true)]
+async fn second_watcher_for_same_tx_does_not_replace_first() {
+    let harness = Harness::new();
+    let first = harness.watch(PendingTransactionConfig::new(TX), None).await;
+    let second = harness.watch(PendingTransactionConfig::new(TX), None).await;
+
+    harness.block(1, &[TX]);
+    assert_eq!(first.await.unwrap(), TX);
+    assert_eq!(second.await.unwrap(), TX);
+}
+
+#[tokio::test(start_paused = true)]
+async fn chain_gap_keeps_every_watcher_for_same_tx() {
+    let harness = Harness::new();
+    harness.block(1, &[TX]);
+    settle().await;
+    let config = PendingTransactionConfig::new(TX).with_required_confirmations(3);
+    let first = harness.watch(config.clone(), Some(1)).await;
+    let second = harness.watch(config, Some(1)).await;
+
+    harness.block(1, &[]);
+    for number in 2..=4 {
+        harness.block(number, if number == 2 { &[TX] } else { &[] });
+    }
+    assert_eq!(first.await.unwrap(), TX);
+    assert_eq!(second.await.unwrap(), TX);
+}
+
+#[tokio::test(start_paused = true)]
+async fn timeout_reaps_only_the_watcher_that_set_it() {
+    let harness = Harness::new();
+    let config = PendingTransactionConfig::new(TX);
+    let mut pending = harness.watch(config.clone(), None).await;
+    let timed_out = harness.watch(config.with_timeout(Some(Duration::ZERO)), None).await;
+
+    let res = tokio::time::timeout(Duration::from_secs(60), timed_out).await.expect("not reaped");
+    assert!(
+        matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+        "{res:?}"
+    );
+
+    settle().await;
+    let res = poll(&mut pending);
+    assert!(res.is_none(), "{res:?}");
+    harness.block(1, &[TX]);
+    assert_eq!(pending.await.unwrap(), TX);
+}
+
+#[tokio::test(start_paused = true)]
+async fn timeout_applies_while_waiting_for_confirmations() {
+    for received_at_block in [None, Some(1)] {
+        let harness = Harness::new();
+        harness.block(1, &[TX]);
+        settle().await;
+
+        let config = PendingTransactionConfig::new(TX)
+            .with_required_confirmations(3)
+            .with_timeout(Some(Duration::ZERO));
+        let pending = harness.watch(config, received_at_block).await;
+        let res = tokio::time::timeout(Duration::from_secs(60), pending)
+            .await
+            .unwrap_or_else(|_| panic!("{received_at_block:?}: watcher never timed out"));
+        assert!(
+            matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+            "{received_at_block:?}: {res:?}"
+        );
+        settle().await;
+        assert!(harness.paused.is_paused(), "{received_at_block:?}");
+    }
+}
