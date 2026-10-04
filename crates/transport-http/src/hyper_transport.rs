@@ -11,19 +11,12 @@ use hyper::{
 };
 use hyper_util::client::legacy::Error;
 use itertools::Itertools;
-use std::{future::Future, marker::PhantomData, pin::Pin, task, time::Duration};
+use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::{Layer, Service};
-use tracing::{debug, debug_span, instrument, trace, Instrument};
+use tracing::{debug, debug_span, instrument, Instrument};
 
-#[cfg(feature = "hyper-tls")]
 type Hyper = hyper_util::client::legacy::Client<
     hyper_tls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
-    http_body_util::Full<::hyper::body::Bytes>,
->;
-
-#[cfg(not(feature = "hyper-tls"))]
-type Hyper = hyper_util::client::legacy::Client<
-    hyper_util::client::legacy::connect::HttpConnector,
     http_body_util::Full<::hyper::body::Bytes>,
 >;
 
@@ -53,17 +46,11 @@ pub type HyperResponseFut<T = HyperResponse, E = Error> =
     Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
 
 impl HyperClient {
-    /// Create a new [HyperClient] with the given URL and default hyper client.
+    /// Create a new [HyperClient] with the default hyper client.
     pub fn new() -> Self {
         let executor = hyper_util::rt::TokioExecutor::new();
-
-        #[cfg(feature = "hyper-tls")]
         let service = hyper_util::client::legacy::Client::builder(executor)
             .build(hyper_tls::HttpsConnector::new());
-
-        #[cfg(not(feature = "hyper-tls"))]
-        let service =
-            hyper_util::client::legacy::Client::builder(executor).build_http::<Full<Bytes>>();
         Self { service, _pd: PhantomData }
     }
 }
@@ -75,7 +62,7 @@ impl Default for HyperClient {
 }
 
 impl<B, S> HyperClient<B, S> {
-    /// Create a new [HyperClient] with the given URL and service.
+    /// Create a new [HyperClient] with the given service.
     pub const fn with_service(service: S) -> Self {
         Self { service, _pd: PhantomData }
     }
@@ -137,47 +124,14 @@ where
         let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
 
         let status = resp.status();
-        // Delay requested by the server via a `Retry-After` header, delay-seconds form only.
-        let retry_after = resp
-            .headers()
-            .get(header::RETRY_AFTER)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.trim().parse().ok())
-            .map(Duration::from_secs);
+        let retry_after = crate::parse_retry_after(
+            resp.headers().get(header::RETRY_AFTER).and_then(|value| value.to_str().ok()),
+        );
 
         debug!(%status, "received response from server");
 
-        // Unpack data from the response body. We do this regardless of
-        // the status code, as we want to return the error in the body
-        // if there is one.
-        let body = match resp.into_body().collect().await {
-            Ok(body) => body.to_bytes(),
-            // A failed body read on an error response still carries retryable metadata.
-            Err(err) if !status.is_success() => {
-                return Err(TransportErrorKind::http_error_with_retry_after(
-                    status.as_u16(),
-                    format!("<failed to read response body: {err}>"),
-                    retry_after,
-                ));
-            }
-            Err(err) => return Err(TransportErrorKind::custom(err)),
-        };
-
-        if tracing::enabled!(tracing::Level::TRACE) {
-            trace!(body = %String::from_utf8_lossy(&body), "response body");
-        } else {
-            debug!(bytes = body.len(), "retrieved response body");
-        }
-
-        if !status.is_success() {
-            return crate::http_error_response(status.as_u16(), body.as_ref(), retry_after);
-        }
-
-        // Deserialize a Box<RawValue> from the body. If deserialization fails, return
-        // the body as a string in the error. The conversion to String
-        // is lossy and may not cover all the bytes in the body.
-        serde_json::from_slice(&body)
-            .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref())))
+        let body = resp.into_body().collect().await.map(|body| body.to_bytes());
+        crate::handle_response(status.as_u16(), retry_after, body)
     }
 }
 

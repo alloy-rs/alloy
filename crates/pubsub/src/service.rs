@@ -8,7 +8,7 @@ use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcErro
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
-    TransportErrorKind, TransportResult,
+    TransportError, TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -236,6 +236,20 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
     }
 
+    /// Handle the loss of the backend, given the error it reported, if any.
+    ///
+    /// Non-retryable errors are returned, otherwise the backend is reconnected with retries.
+    async fn handle_backend_error(&mut self, err: Option<TransportError>) -> TransportResult<()> {
+        if let Some(err) = err {
+            if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
+                error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
+                return Err(err);
+            }
+            error!(%err, "Pubsub service backend error.");
+        }
+        self.reconnect_with_retries().await
+    }
+
     /// Spawn the service.
     pub(crate) fn spawn(mut self) {
         let fut = async move {
@@ -256,14 +270,8 @@ impl<T: PubSubConnect> PubSubService<T> {
                             // It may have also signaled a typed error via the
                             // `error` oneshot; drain it before reconnecting
                             // so a non-retryable error short-circuits the loop.
-                            if let Ok(err) = self.handle.error.try_recv() {
-                                if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
-                                    error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
-                                    break Err(err)
-                                }
-                                error!(%err, "Pubsub service backend error.");
-                            }
-                            if let Err(e) = self.reconnect_with_retries().await {
+                            let err = self.handle.error.try_recv().ok();
+                            if let Err(e) = self.handle_backend_error(err).await {
                                 break Err(e)
                             }
                         }
@@ -275,12 +283,7 @@ impl<T: PubSubConnect> PubSubService<T> {
                         // If the sender was dropped without a value, fall back
                         // to a generic backend-gone error.
                         let err = res.unwrap_or_else(|_| TransportErrorKind::backend_gone());
-                        if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
-                            error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
-                            break Err(err)
-                        }
-                        error!(%err, "Pubsub service backend error.");
-                        if let Err(e) = self.reconnect_with_retries().await {
+                        if let Err(e) = self.handle_backend_error(Some(err)).await {
                             break Err(e)
                         }
                     }
