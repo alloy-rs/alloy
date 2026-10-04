@@ -22,12 +22,12 @@ use crate::provider::multicall::bindings::IMulticall3::{
 mod inner_types;
 pub use inner_types::{
     CallInfoTrait, CallItem, CallItemBuilder, Dynamic, Failure, MulticallError, MulticallItem,
-    Result,
+    Nested, Result,
 };
 
 mod tuple;
 use tuple::TuplePush;
-pub use tuple::{CallTuple, Empty};
+pub use tuple::{CallDecoder, CallTuple, Empty};
 
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
 pub const MULTICALL3_ADDRESS: Address = address!("0xcA11bde05977b3631167028862bE2a173976CA11");
@@ -135,6 +135,40 @@ where
             _pd: Default::default(),
         }
     }
+
+    /// Converts an empty [`MulticallBuilder`] into a dynamic nested one.
+    ///
+    /// This is the "tuple nested inside a dynamic multicall" shape: each entry added via
+    /// [`add_nested_dynamic`](MulticallBuilder::add_nested_dynamic) is an inner builder sharing the
+    /// same [`CallTuple`] `Inner`, and [`aggregate`](MulticallBuilder::aggregate) returns a
+    /// `Vec<Inner::SuccessReturns>` (e.g. `Vec<(A, B)>`).
+    ///
+    /// ```ignore
+    /// let results: Vec<(totalSupplyReturn, balanceOfReturn)> = provider
+    ///     .multicall()
+    ///     .dynamic_nested()
+    ///     .extend_nested_dynamic(tokens.iter().map(|t| {
+    ///         provider.multicall().add(t.totalSupply()).add(t.balanceOf(owner))
+    ///     }))
+    ///     .aggregate()
+    ///     .await?;
+    /// ```
+    ///
+    /// For the inverse shape (`(Vec<A>, Vec<B>)`), use
+    /// [`add_nested`](MulticallBuilder::add_nested).
+    pub fn dynamic_nested<Inner: CallTuple + 'static>(
+        self,
+    ) -> MulticallBuilder<Dynamic<Nested<Inner>>, P, N> {
+        MulticallBuilder {
+            calls: self.calls,
+            provider: self.provider,
+            block: self.block,
+            state_override: self.state_override,
+            address: self.address,
+            input_kind: self.input_kind,
+            _pd: Default::default(),
+        }
+    }
 }
 
 impl<D: SolCall + 'static, P, N> MulticallBuilder<Dynamic<D>, P, N>
@@ -232,6 +266,51 @@ where
     }
 }
 
+impl<Inner, P, N> MulticallBuilder<Dynamic<Nested<Inner>>, P, N>
+where
+    Inner: CallTuple + 'static,
+    P: Provider<N>,
+    N: Network,
+{
+    /// Add a nested multicall to the dynamic builder.
+    ///
+    /// The `inner` builder's calls are encoded as one `aggregate3` call targeting its `address`
+    /// (which must be a Multicall3-compatible contract). All entries must share the same `Inner`
+    /// tuple. The `inner` builder's `block` and `state_override` are ignored.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the `inner` builder's calls carry a non-zero `value` (nested payable calls
+    /// are not supported).
+    pub fn add_nested_dynamic<IP: Provider<N>>(
+        mut self,
+        inner: MulticallBuilder<Inner, IP, N>,
+    ) -> Self {
+        assert!(
+            inner.calls.iter().all(|c| c.value.is_zero()),
+            "nested multicall builders do not support payable/value calls"
+        );
+        self.calls.push(Call3Value {
+            target: inner.address,
+            allowFailure: false,
+            value: U256::ZERO,
+            callData: inner.to_aggregate3_call().abi_encode().into(),
+        });
+        self
+    }
+
+    /// Extend the dynamic builder with a sequence of nested multicalls.
+    pub fn extend_nested_dynamic<IP: Provider<N>>(
+        mut self,
+        inners: impl IntoIterator<Item = MulticallBuilder<Inner, IP, N>>,
+    ) -> Self {
+        for inner in inners {
+            self = self.add_nested_dynamic(inner);
+        }
+        self
+    }
+}
+
 impl<T, P, N> MulticallBuilder<T, &P, N>
 where
     T: CallTuple,
@@ -302,6 +381,51 @@ where
         <T as TuplePush<D>>::Pushed: CallTuple,
     {
         self.calls.push(call.to_call3_value());
+        MulticallBuilder {
+            calls: self.calls,
+            provider: self.provider,
+            block: self.block,
+            state_override: self.state_override,
+            address: self.address,
+            input_kind: self.input_kind,
+            _pd: Default::default(),
+        }
+    }
+
+    /// Appends a nested multicall to the stack.
+    ///
+    /// The `inner` builder's calls are encoded as one `aggregate3` call, so the nested result
+    /// becomes one entry of the outer tuple (e.g. nesting two dynamic multicalls yields
+    /// `(Vec<A>, Vec<B>)`). The nested call is not allowed to fail: if an inner call reverts, the
+    /// inner `aggregate3` reverts and propagates to the outer call.
+    ///
+    /// The `inner` builder's `block` and `state_override` are ignored; its `address` is used as the
+    /// nested call target and must be a Multicall3-compatible contract.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the `inner` builder's calls carry a non-zero `value` (nested payable calls
+    /// are not supported).
+    pub fn add_nested<InnerT, IP>(
+        mut self,
+        inner: MulticallBuilder<InnerT, IP, N>,
+    ) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        InnerT: CallTuple + 'static,
+        IP: Provider<N>,
+        T: TuplePush<Nested<InnerT>>,
+        <T as TuplePush<Nested<InnerT>>>::Pushed: CallTuple,
+    {
+        assert!(
+            inner.calls.iter().all(|c| c.value.is_zero()),
+            "nested multicall builders do not support payable/value calls"
+        );
+        self.calls.push(Call3Value {
+            target: inner.address,
+            allowFailure: false,
+            value: U256::ZERO,
+            callData: inner.to_aggregate3_call().abi_encode().into(),
+        });
         MulticallBuilder {
             calls: self.calls,
             provider: self.provider,
