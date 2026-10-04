@@ -153,7 +153,19 @@ impl<Payload, ErrData> FromIterator<Response<Payload, ErrData>>
     for ResponsePacket<Payload, ErrData>
 {
     fn from_iter<T: IntoIterator<Item = Response<Payload, ErrData>>>(iter: T) -> Self {
-        iter.into_iter().collect::<Vec<_>>().into()
+        let mut iter = iter.into_iter().peekable();
+        // Return single without allocating if the iterator has exactly one element.
+        if let Some(first) = iter.next() {
+            return if iter.peek().is_none() {
+                Self::Single(first)
+            } else {
+                let mut batch = Vec::new();
+                batch.push(first);
+                batch.extend(iter);
+                Self::Batch(batch)
+            };
+        }
+        Self::Batch(vec![])
     }
 }
 
