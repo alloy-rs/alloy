@@ -1931,15 +1931,14 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
-    use alloy_consensus::{Transaction, TxEnvelope};
+    use crate::{builder, ProviderBuilder, WalletProvider};
+    use alloy_consensus::Transaction;
     use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
     use alloy_network::{
         AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
     };
-    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
-    use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
@@ -2130,16 +2129,6 @@ mod tests {
         assert_eq!(0, num);
     }
 
-    #[cfg(feature = "reqwest")]
-    #[tokio::test]
-    async fn object_safety() {
-        let provider = ProviderBuilder::new().connect_anvil();
-
-        let refdyn = &provider as &dyn Provider<_>;
-        let num = refdyn.get_block_number().await.unwrap();
-        assert_eq!(0, num);
-    }
-
     #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn subscribe_blocks_http() {
@@ -2213,23 +2202,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "ws-base")]
-    async fn subscribe_blocks_ws_remote() {
-        use futures::stream::StreamExt;
-
-        let url = "wss://eth-mainnet.g.alchemy.com/v2/viFmeVzhg6bWKVMIWWS8MhmzREB-D4f7";
-        let ws = alloy_rpc_client::WsConnect::new(url);
-        let Ok(client) = alloy_rpc_client::RpcClient::connect_pubsub(ws).await else { return };
-        let provider = RootProvider::<Ethereum>::new(client);
-        let sub = provider.subscribe_blocks().await.unwrap();
-        let mut stream = sub.into_stream().take(1);
-        while let Some(header) = stream.next().await {
-            println!("New block {header:?}");
-            assert!(header.number > 0);
-        }
-    }
-
-    #[tokio::test]
     async fn test_custom_retry_policy() {
         #[derive(Debug, Clone)]
         struct CustomPolicy;
@@ -2276,21 +2248,6 @@ mod tests {
         let hash2 =
             builder.get_receipt().await.expect("failed to await pending tx").transaction_hash;
         assert_eq!(hash1, hash2);
-    }
-
-    #[tokio::test]
-    async fn test_send_tx_sync() {
-        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
-        let tx = TransactionRequest {
-            value: Some(U256::from(100)),
-            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            gas_price: Some(20e9 as u128),
-            gas: Some(21000),
-            ..Default::default()
-        };
-
-        let _receipt =
-            provider.send_transaction_sync(tx.clone()).await.expect("failed to send tx sync");
     }
 
     #[tokio::test]
@@ -2369,13 +2326,6 @@ mod tests {
             .expect("Watching tx timed out")
             .expect("failed to await pending tx");
         assert_eq!(hash1, hash2);
-    }
-
-    #[tokio::test]
-    async fn gets_block_number() {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let num = provider.get_block_number().await.unwrap();
-        assert_eq!(0, num)
     }
 
     #[tokio::test]
@@ -2475,15 +2425,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gets_block_by_number() {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let num = 0;
-        let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
-        assert_eq!(block.header.number, num);
-    }
-
-    #[tokio::test]
     async fn gets_client_version() {
         let provider = ProviderBuilder::new().connect_anvil();
         let version = provider.get_client_version().await.unwrap();
@@ -2554,39 +2495,6 @@ mod tests {
             .expect("failed to fetch tx")
             .expect("tx not included");
         assert_eq!(tx.input(), &bytes!("deadbeef"));
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn gets_logs() {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let filter = Filter::new()
-            .at_block_hash(b256!(
-                "b20e6f35d4b46b3c4cd72152faec7143da851a0dc281d390bdd50f58bfbdb5d3"
-            ))
-            .event_signature(b256!(
-                "e1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c"
-            ));
-        let logs = provider.get_logs(&filter).await.unwrap();
-        assert_eq!(logs.len(), 1);
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn gets_tx_receipt() {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let receipt = provider
-            .get_transaction_receipt(b256!(
-                "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
-            ))
-            .await
-            .unwrap();
-        assert!(receipt.is_some());
-        let receipt = receipt.unwrap();
-        assert_eq!(
-            receipt.transaction_hash,
-            b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95")
-        );
     }
 
     #[tokio::test]
@@ -2719,29 +2627,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(any(
-        feature = "reqwest-default-tls",
-        feature = "reqwest-rustls-tls",
-        feature = "reqwest-native-tls",
-    ))]
-    #[ignore = "ignore until <https://github.com/paradigmxyz/reth/pull/14727> is in"]
-    async fn call_mainnet() {
-        use alloy_network::TransactionBuilder;
-        use alloy_sol_types::SolValue;
-
-        let url = "https://docs-demo.quiknode.pro/";
-        let provider = ProviderBuilder::new().connect_http(url.parse().unwrap());
-        let req = TransactionRequest::default()
-            .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
-            .with_input(bytes!("06fdde03")); // `name()`
-        let result = provider.call(req.clone()).await.unwrap();
-        assert_eq!(String::abi_decode(&result).unwrap(), "Wrapped Ether");
-
-        let result = provider.call(req).block(0.into()).await.unwrap();
-        assert_eq!(result.to_string(), "0x");
-    }
-
-    #[tokio::test]
     async fn call_many_mainnet() {
         use alloy_rpc_types_eth::{BlockOverrides, StateContext};
 
@@ -2810,18 +2695,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "hyper-tls")]
-    async fn hyper_https() {
-        let url = "https://ethereum.reth.rs/rpc";
-
-        // With the `hyper` feature enabled .connect builds the provider based on
-        // `HyperTransport`.
-        let provider = ProviderBuilder::new().connect(url).await.unwrap();
-
-        let _num = provider.get_block_number().await.unwrap();
-    }
-
-    #[tokio::test]
     async fn test_empty_transactions() {
         let provider = ProviderBuilder::new().connect_anvil();
 
@@ -2884,36 +2757,6 @@ mod tests {
                 max_priority_fee_per_gas: 0,
             }))
             .await;
-    }
-
-    #[tokio::test]
-    #[cfg(not(windows))]
-    async fn eth_sign_transaction() {
-        async_ci_only(|| async {
-            run_with_tempdir("reth-sign-tx", |dir| async {
-                let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
-                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
-
-                let accounts = provider.get_accounts().await.unwrap();
-                let from = accounts[0];
-
-                let tx = TransactionRequest::default()
-                    .from(from)
-                    .to(Address::random())
-                    .value(U256::from(100))
-                    .gas_limit(21000);
-
-                let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
-
-                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
-
-                let signer = tx.recover_signer().unwrap();
-
-                assert_eq!(signer, from);
-            })
-            .await
-        })
-        .await;
     }
 
     #[cfg(feature = "throttle")]

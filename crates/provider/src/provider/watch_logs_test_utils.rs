@@ -17,6 +17,19 @@ use std::{
     time::Duration,
 };
 
+#[derive(Clone, Debug)]
+pub(crate) struct AlwaysRetryPolicy;
+
+impl RetryPolicy for AlwaysRetryPolicy {
+    fn should_retry(&self, _error: &TransportError) -> bool {
+        true
+    }
+
+    fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
+        None
+    }
+}
+
 struct ChainState {
     blocks: HashMap<u64, Block>,
     logs: HashMap<B256, Vec<Log>>,
@@ -59,6 +72,13 @@ impl MockChain {
                 state.head = number;
             }
         }
+    }
+
+    /// Inserts `block` at `height` regardless of its own number and advances the head.
+    pub(crate) fn insert_at(&self, height: u64, block: Block) {
+        let mut state = self.state.write().unwrap();
+        state.blocks.insert(height, block);
+        state.head = state.head.max(height);
     }
 
     pub(crate) fn reorg(&self, blocks: &[(Block, Vec<Log>)]) {
@@ -117,19 +137,6 @@ impl MockChain {
     }
 
     pub(crate) fn provider_with_retry(&self) -> impl Provider {
-        #[derive(Clone, Debug)]
-        struct AlwaysRetryPolicy;
-
-        impl RetryPolicy for AlwaysRetryPolicy {
-            fn should_retry(&self, _error: &TransportError) -> bool {
-                true
-            }
-
-            fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
-                None
-            }
-        }
-
         let retry_layer = RetryBackoffLayer::new_with_policy(1, 0, 10_000, AlwaysRetryPolicy);
         let transport = MockChainTransport { chain: self.clone() };
         let client = RpcClient::builder().layer(retry_layer).transport(transport, true);

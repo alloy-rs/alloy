@@ -411,8 +411,7 @@ mod tests {
         assert_eq!(receipt.gas_used, 21000);
     }
 
-    #[tokio::test]
-    async fn no_max_fee_per_blob_gas() {
+    async fn assert_blob_gas_filled(max_fee_per_blob_gas: Option<u128>) {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
@@ -420,6 +419,7 @@ mod tests {
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            max_fee_per_blob_gas,
             sidecar: Some(sidecar.into()),
             ..Default::default()
         };
@@ -439,31 +439,13 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn no_max_fee_per_blob_gas() {
+        assert_blob_gas_filled(None).await;
+    }
+
+    #[tokio::test]
     async fn zero_max_fee_per_blob_gas() {
-        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
-
-        let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
-        let sidecar = sidecar.build_4844().unwrap();
-
-        let tx = TransactionRequest {
-            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            max_fee_per_blob_gas: Some(0),
-            sidecar: Some(sidecar.into()),
-            ..Default::default()
-        };
-
-        let tx = provider.send_transaction(tx).await.unwrap();
-
-        let receipt = tx.get_receipt().await.unwrap();
-
-        let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
-
-        assert!(tx.max_fee_per_blob_gas().unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
-        assert_eq!(receipt.gas_used, 21000);
-        assert_eq!(
-            receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
-            DATA_GAS_PER_BLOB
-        );
+        assert_blob_gas_filled(Some(0)).await;
     }
 
     #[tokio::test]
