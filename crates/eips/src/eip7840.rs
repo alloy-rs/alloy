@@ -142,7 +142,7 @@ impl BlobParams {
         }
 
         if U256::from(self.blob_base_cost) * U256::from(base_fee_per_gas)
-            > U256::from(DATA_GAS_PER_BLOB) * U256::from(self.calc_blob_fee(excess_blob_gas))
+            > U256::from(DATA_GAS_PER_BLOB) * U256::from(self.calc_blob_fee(excess_blob_gas)) && self.max_blob_count > 0
         {
             let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
                 / self.max_blob_count;
