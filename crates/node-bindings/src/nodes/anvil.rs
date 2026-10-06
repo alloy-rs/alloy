@@ -281,45 +281,38 @@ impl Anvil {
     }
 
     /// Select the [`EthereumHardfork`] to start anvil with.
-    pub fn hardfork(mut self, hardfork: EthereumHardfork) -> Self {
-        self = self.args(["--hardfork", hardfork.to_string().as_str()]);
-        self
+    pub fn hardfork(self, hardfork: EthereumHardfork) -> Self {
+        self.args(["--hardfork", hardfork.to_string().as_str()])
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Paris`].
-    pub fn paris(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Paris);
-        self
+    pub fn paris(self) -> Self {
+        self.hardfork(EthereumHardfork::Paris)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Cancun`].
-    pub fn cancun(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Cancun);
-        self
+    pub fn cancun(self) -> Self {
+        self.hardfork(EthereumHardfork::Cancun)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Shanghai`].
-    pub fn shanghai(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Shanghai);
-        self
+    pub fn shanghai(self) -> Self {
+        self.hardfork(EthereumHardfork::Shanghai)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Prague`].
-    pub fn prague(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Prague);
-        self
+    pub fn prague(self) -> Self {
+        self.hardfork(EthereumHardfork::Prague)
     }
 
     /// Instantiate `anvil` with the `--odyssey` flag.
-    pub fn odyssey(mut self) -> Self {
-        self = self.arg("--odyssey");
-        self
+    pub fn odyssey(self) -> Self {
+        self.arg("--odyssey")
     }
 
     /// Instantiate `anvil` with the `--auto-impersonate` flag.
-    pub fn auto_impersonate(mut self) -> Self {
-        self = self.arg("--auto-impersonate");
-        self
+    pub fn auto_impersonate(self) -> Self {
+        self.arg("--auto-impersonate")
     }
 
     /// Adds an argument to pass to the `anvil`.
@@ -474,7 +467,13 @@ impl Anvil {
             }
 
             let mut line = String::new();
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+                let _ = child.kill();
+                let status = child.wait().map_err(NodeError::WaitError)?;
+                return Err(NodeError::Fatal(format!(
+                    "anvil exited before it was ready ({status})"
+                )));
+            }
             trace!(target: "alloy::node::anvil", line);
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
@@ -551,11 +550,6 @@ mod test {
     }
 
     #[test]
-    fn spawn_and_drop() {
-        let _ = Anvil::new().block_time(12).try_spawn().map(drop);
-    }
-
-    #[test]
     fn can_set_host() {
         let anvil = Anvil::new().host("0.0.0.0").block_time(12).try_spawn();
         if let Ok(anvil) = anvil {
@@ -573,5 +567,22 @@ mod test {
             assert!(anvil.endpoint().starts_with("http://localhost:"));
             assert!(anvil.ws_endpoint().starts_with("ws://localhost:"));
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod early_exit_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn early_exit_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("anvil");
+        std::fs::write(&program, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let err = Anvil::at(&program).try_spawn().unwrap_err();
+        assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
     }
 }

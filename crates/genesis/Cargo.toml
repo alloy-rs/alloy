@@ -40,6 +40,7 @@ bincode = { workspace = true, features = ["serde"] }
 serde_json.workspace = true
 
 [features]
+account-ext = ["alloy-trie/account-ext", "alloy-trie/serde"]
 default = ["std"]
 std = [
 	"alloy-primitives/std",
@@ -53,6 +54,7 @@ std = [
 ]
 serde-bincode-compat = ["dep:serde_with", "alloy-eips/serde-bincode-compat"]
 borsh = [
+    "alloy-trie/borsh",
 	"dep:borsh",
 	"alloy-primitives/borsh",
 	"alloy-eips/borsh",

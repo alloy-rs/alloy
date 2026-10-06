@@ -52,6 +52,7 @@ alloy-serde = { workspace = true, optional = true }
 # signer
 alloy-signer = { workspace = true, optional = true }
 alloy-signer-aws = { workspace = true, optional = true }
+alloy-signer-azure = { workspace = true, optional = true }
 alloy-signer-gcp = { workspace = true, optional = true }
 alloy-signer-ledger = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
@@ -118,20 +119,26 @@ reqwest = [
 reqwest-default-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-default-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-default-tls",
+    "alloy-ens?/reqwest-default-tls",
 ]
 reqwest-rustls-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-rustls-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-rustls-tls",
+    "alloy-ens?/reqwest-rustls-tls",
 ]
 reqwest-native-tls = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
+    "alloy-provider?/reqwest-native-tls",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-native-tls",
+    "alloy-ens?/reqwest-native-tls",
 ]
 hyper = [
     "alloy-rpc-client?/hyper",
@@ -215,6 +222,7 @@ provider-anvil-node = [
     "alloy-provider?/anvil-node",
     "node-bindings",
 ]
+provider-ccip-read = ["providers", "alloy-provider?/ccip-read-http"]
 
 # pubsub
 pubsub = [
@@ -271,6 +279,7 @@ rpc-types-txpool = [
 # signers
 signers = ["dep:alloy-signer"]
 signer-aws = ["signers", "dep:alloy-signer-aws"]
+signer-azure = ["signers", "dep:alloy-signer-azure"]
 signer-gcp = ["signers", "dep:alloy-signer-gcp"]
 signer-ledger = ["signers", "dep:alloy-signer-ledger"]
 signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
@@ -313,7 +322,7 @@ trie = ["dep:alloy-trie"]
 dyn-abi = ["alloy-core/dyn-abi"]
 json-abi = ["alloy-core/json-abi"]
 json = ["alloy-core/json"]
-sol-types = ["alloy-core/sol-types"]
+sol-types = ["alloy-core/sol-types", "alloy-eips?/sol-types"]
 
 asm-keccak = ["alloy-core/asm-keccak"]
 native-keccak = ["alloy-core/native-keccak"]
@@ -357,12 +366,12 @@ eip712 = [
     "alloy-core/eip712",
     "alloy-signer?/eip712",
     "alloy-signer-aws?/eip712",
+    "alloy-signer-azure?/eip712",
     "alloy-signer-gcp?/eip712",
     "alloy-signer-ledger?/eip712",
     "alloy-signer-local?/eip712",
+    "alloy-signer-trezor?/eip712",
     "alloy-signer-turnkey?/eip712",
-    # TODO: https://github.com/alloy-rs/alloy/issues/201
-    # "alloy-signer-trezor?/eip712",
 ]
 more-tuple-impls = ["alloy-core/more-tuple-impls", "alloy-provider/more-tuple-impls"]
 

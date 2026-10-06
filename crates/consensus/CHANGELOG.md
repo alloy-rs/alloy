@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [consensus] Stop dummy crypto-backend from poisoning signer recovery ([#4152](https://github.com/alloy-rs/alloy/issues/4152))
+- [trace] Decode regularGasUsed and explain gas ([#4195](https://github.com/alloy-rs/alloy/issues/4195))
+- [consensus] Reject 0x00-tagged legacy transactions and receipts ([#4197](https://github.com/alloy-rs/alloy/issues/4197))
+
+### Documentation
+
+- Document decoder compatibility constraints ([#4217](https://github.com/alloy-rs/alloy/issues/4217))
+- [consensus] Clarify generic EIP-4844 return doc ([#3997](https://github.com/alloy-rs/alloy/issues/3997))
+
+### Features
+
+- [genesis] Support feature-gated account extensions ([#4182](https://github.com/alloy-rs/alloy/issues/4182))
+- [consensus] Add standalone EIP-8141 transaction ([#4201](https://github.com/alloy-rs/alloy/issues/4201))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Bug Fixes
+
+- [consensus] Bound sealed block RLP decoding ([#4155](https://github.com/alloy-rs/alloy/issues/4155))
+- [consensus] Reject invalid EIP-658 status values ([#4157](https://github.com/alloy-rs/alloy/issues/4157))
+
 ## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
 
 ### Documentation

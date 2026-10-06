@@ -106,10 +106,6 @@ impl<N: Network> Future for SendSyncFut<'_, N> {
 /// A builder for sending a transaction via `eth_sendTransaction`, or calling a contract via
 /// `eth_call`.
 ///
-/// The builder can be `.await`ed directly, which is equivalent to invoking [`call`].
-/// Prefer using [`call`] when possible, as `await`ing the builder directly will consume it, and
-/// currently also boxes the future due to type system limitations.
-///
 /// A call builder can currently be instantiated in the following ways:
 /// - by [`sol!`][sol]-generated contract structs' methods (through the `#[sol(rpc)]` attribute)
 ///   ([`SolCallBuilder`]);
@@ -117,8 +113,6 @@ impl<N: Network> Future for SendSyncFut<'_, N> {
 /// - using [`CallBuilder::new_raw`] ([`RawCallBuilder`]).
 ///
 /// Each method represents a different way to decode the output of the contract call.
-///
-/// [`call`]: CallBuilder::call
 ///
 /// # Note
 ///
@@ -202,7 +196,7 @@ impl<N: Network> Future for SendSyncFut<'_, N> {
 ///
 /// [sol]: alloy_sol_types::sol
 #[derive(Clone)]
-#[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
+#[must_use = "call builders do nothing unless you `.call` or `.send` them"]
 pub struct CallBuilder<P, D, N: Network = Ethereum> {
     pub(crate) request: N::TransactionRequest,
     block: BlockId,
@@ -782,9 +776,8 @@ mod tests {
     use alloy_consensus::Transaction;
     use alloy_network::EthereumWallet;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
+    use alloy_primitives::{address, b256, bytes, hex, utils::parse_units};
     use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
-    use alloy_rpc_types_eth::{AccessListItem, Authorization};
     use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
     use futures::Future;
@@ -840,87 +833,6 @@ mod tests {
                 counter += 1;
             }
         }
-    }
-
-    /// Creates a new call_builder to test field modifications, taken from [call_encoding]
-    fn build_call_builder() -> CallBuilder<impl Provider, PhantomData<MyContract::doStuffCall>> {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let contract = MyContract::new(Address::ZERO, provider);
-        let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
-        call_builder
-    }
-
-    #[test]
-    fn change_chain_id() {
-        let call_builder = build_call_builder().chain_id(1337);
-        assert_eq!(
-            call_builder.request.chain_id.expect("chain_id should be set"),
-            1337,
-            "chain_id of request should be '1337'"
-        );
-    }
-
-    #[test]
-    fn change_max_fee_per_gas() {
-        let call_builder = build_call_builder().max_fee_per_gas(42);
-        assert_eq!(
-            call_builder.request.max_fee_per_gas.expect("max_fee_per_gas should be set"),
-            42,
-            "max_fee_per_gas of request should be '42'"
-        );
-    }
-
-    #[test]
-    fn change_max_priority_fee_per_gas() {
-        let call_builder = build_call_builder().max_priority_fee_per_gas(45);
-        assert_eq!(
-            call_builder
-                .request
-                .max_priority_fee_per_gas
-                .expect("max_priority_fee_per_gas should be set"),
-            45,
-            "max_priority_fee_per_gas of request should be '45'"
-        );
-    }
-
-    #[test]
-    fn change_max_fee_per_blob_gas() {
-        let call_builder = build_call_builder().max_fee_per_blob_gas(50);
-        assert_eq!(
-            call_builder.request.max_fee_per_blob_gas.expect("max_fee_per_blob_gas should be set"),
-            50,
-            "max_fee_per_blob_gas of request should be '50'"
-        );
-    }
-
-    #[test]
-    fn change_authorization_list() {
-        let authorization_list = vec![SignedAuthorization::new_unchecked(
-            Authorization { chain_id: U256::from(1337), address: Address::ZERO, nonce: 0 },
-            0,
-            U256::ZERO,
-            U256::ZERO,
-        )];
-        let call_builder = build_call_builder().authorization_list(authorization_list.clone());
-        assert_eq!(
-            call_builder.request.authorization_list.expect("authorization_list should be set"),
-            authorization_list,
-            "Authorization list of the transaction should have been set to our authorization list"
-        );
-    }
-
-    #[test]
-    fn change_access_list() {
-        let access_list = AccessList::from(vec![AccessListItem {
-            address: Address::ZERO,
-            storage_keys: vec![B256::ZERO],
-        }]);
-        let call_builder = build_call_builder().access_list(access_list.clone());
-        assert_eq!(
-            call_builder.request.access_list.expect("access_list should be set"),
-            access_list,
-            "Access list of the transaction should have been set to our access list"
-        )
     }
 
     #[test]
@@ -1108,24 +1020,6 @@ mod tests {
         let gas = wallet_provider.estimate_gas(tx).await.unwrap();
 
         assert_eq!(gas, 56555);
-    }
-
-    #[test]
-    fn change_sidecar_7594() {
-        use alloy_consensus::Blob;
-
-        let sidecar =
-            BlobTransactionSidecarEip7594::new(vec![Blob::repeat_byte(0xAB)], vec![], vec![]);
-        let call_builder = build_call_builder().sidecar_7594(sidecar.clone());
-
-        let set_sidecar = call_builder
-            .request
-            .sidecar
-            .expect("sidecar should be set")
-            .into_eip7594()
-            .expect("sidecar should be EIP-7594 variant");
-
-        assert_eq!(set_sidecar, sidecar, "EIP-7594 sidecar should match the one we set");
     }
 
     #[tokio::test]

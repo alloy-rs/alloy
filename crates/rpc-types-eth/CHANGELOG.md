@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [trace] Decode regularGasUsed and explain gas ([#4195](https://github.com/alloy-rs/alloy/issues/4195))
+- [rpc-types-eth] Remove filter Hash implementations ([#4211](https://github.com/alloy-rs/alloy/issues/4211))
+- [rpc-types-eth] Ignore bloom cache in FilterSet equality ([#4204](https://github.com/alloy-rs/alloy/issues/4204))
+
+### Features
+
+- [genesis] Support feature-gated account extensions ([#4182](https://github.com/alloy-rs/alloy/issues/4182))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Documentation
+
+- [rpc-types-eth] Fix incorrect doc links in Filter matching methods ([#4164](https://github.com/alloy-rs/alloy/issues/4164))
+
 ## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
 
 ### Documentation

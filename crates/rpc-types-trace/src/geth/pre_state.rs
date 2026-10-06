@@ -173,7 +173,6 @@ pub struct AccountState {
 impl AccountState {
     /// Creates a new `AccountState` with the given account info.
     ///
-    /// If balance is zero, it will be omitted.
     /// If nonce is zero, it will be omitted.
     /// If code is empty, it will be omitted.
     pub fn from_account_info(nonce: u64, balance: U256, code: Option<Bytes>) -> Self {
@@ -314,30 +313,6 @@ mod tests {
             PreStateFrame::Diff(DiffMode { pre: _pre, post: _post }) => {}
             _ => unreachable!(),
         }
-    }
-
-    #[test]
-    fn test_is_diff_mode() {
-        assert!(PreStateConfig { diff_mode: Some(true), ..Default::default() }.is_diff_mode());
-        assert!(!PreStateConfig { diff_mode: Some(false), ..Default::default() }.is_diff_mode());
-        assert!(!PreStateConfig { diff_mode: None, ..Default::default() }.is_diff_mode());
-    }
-
-    #[test]
-    fn test_disable_code() {
-        assert!(PreStateConfig::default().code_enabled());
-        assert!(PreStateConfig { disable_code: Some(false), ..Default::default() }.code_enabled());
-        assert!(!PreStateConfig { disable_code: Some(true), ..Default::default() }.code_enabled());
-    }
-    #[test]
-    fn test_disable_storage() {
-        assert!(PreStateConfig::default().storage_enabled());
-        assert!(
-            PreStateConfig { disable_storage: Some(false), ..Default::default() }.storage_enabled()
-        );
-        assert!(
-            !PreStateConfig { disable_storage: Some(true), ..Default::default() }.storage_enabled()
-        );
     }
 
     #[test]

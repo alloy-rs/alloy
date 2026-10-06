@@ -1,6 +1,21 @@
 use alloc::vec::Vec;
 use alloy_rlp::BufMut;
 
+/// Selects the blob payload representation used when encoding a blob transaction sidecar.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum BlobSidecarEncoding {
+    /// Encode the complete sidecar, including its blob payloads.
+    #[default]
+    WithBlobs,
+    /// Encode an empty blob list while retaining commitments and proofs.
+    ///
+    /// This is the sidecar representation used by eth/72 `PooledTransactions` responses as
+    /// specified by [EIP-8070].
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    WithoutBlobs,
+}
+
 /// A helper trait for encoding [EIP-7594](https://eips.ethereum.org/EIPS/eip-7594) sidecars.
 pub trait Encodable7594 {
     /// The length of the 7594 encoded envelope. This is the length of the wrapper
@@ -15,6 +30,22 @@ pub trait Encodable7594 {
     ///
     /// [EIP-7594]: https://eips.ethereum.org/EIPS/eip-7594
     fn encode_7594(&self, out: &mut dyn BufMut);
+
+    /// Returns the length of the EIP-7594 encoding for the selected blob representation.
+    ///
+    /// The default delegates to [`Self::encode_7594_len`] because encodings without blob payloads
+    /// only differ for sidecar types that contain blobs.
+    fn encode_7594_len_with(&self, _encoding: BlobSidecarEncoding) -> usize {
+        self.encode_7594_len()
+    }
+
+    /// Encodes the sidecar using the selected blob representation.
+    ///
+    /// The default delegates to [`Self::encode_7594`] because encodings without blob payloads only
+    /// differ for sidecar types that contain blobs.
+    fn encode_7594_with(&self, _encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        self.encode_7594(out);
+    }
 
     /// Encode the sidecar according to [EIP-7594] rules. First a 1-byte
     /// wrapper version (if any), then the body of the sidecar.

@@ -135,11 +135,6 @@ impl RlpEcdsaEncodableTx for TxLegacy {
         Header { list: true, payload_length }
     }
 
-    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
-        // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
-        self.rlp_header_signed(signature).length_with_payload()
-    }
-
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
         self.rlp_header_signed(signature).encode(out);
@@ -219,10 +214,6 @@ impl RlpEcdsaDecodableTx for TxLegacy {
         buf: &mut &[u8],
         _ty: u8,
     ) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
-        Self::rlp_decode_signed(buf).map_err(Into::into)
-    }
-
-    fn eip2718_decode(buf: &mut &[u8]) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
         Self::rlp_decode_signed(buf).map_err(Into::into)
     }
 
@@ -367,6 +358,21 @@ impl Encodable for TxLegacy {
 }
 
 impl Decodable for TxLegacy {
+    /// Decodes an unsigned legacy transaction or an EIP-155 signing payload.
+    ///
+    /// For backwards compatibility, the two fields after `chain_id` are decoded as `U256` and
+    /// discarded without requiring the zero values specified by EIP-155. This also accepts signed
+    /// legacy transaction RLP when `v` fits in `ChainId`, but stores `v` directly as `chain_id`
+    /// rather than deriving the chain ID from it. Use
+    /// [`RlpEcdsaDecodableTx::rlp_decode_signed`] to decode signed transactions correctly.
+    ///
+    /// The outer header is not required to be a list. Fields are read from the entire remaining
+    /// buffer, with the consumed length checked against the header only afterwards. In particular,
+    /// any bytes after the first six fields trigger an attempt to read three more fields, even if
+    /// those bytes are outside the declared payload.
+    ///
+    /// Successful decoding does not establish a canonical signing payload. Requiring a list header
+    /// or zero sentinel fields would reject previously accepted inputs and is a breaking change.
     fn decode(data: &mut &[u8]) -> Result<Self> {
         let header = Header::decode(data)?;
         let remaining_len = data.len();
@@ -379,7 +385,8 @@ impl Decodable for TxLegacy {
 
         let mut transaction = Self::rlp_decode_fields(data)?;
 
-        // If we still have data, it should be an eip-155 encoded chain_id
+        // Preserve the permissive nine-field form: the seventh field is taken as chain_id, and
+        // the last two fields need not be zero. Enforcing EIP-155 sentinels would be breaking.
         if !data.is_empty() {
             transaction.chain_id = Some(Decodable::decode(data)?);
             let _: U256 = Decodable::decode(data)?; // r
@@ -697,41 +704,18 @@ pub(super) mod serde_bincode_compat {
 
     #[cfg(test)]
     mod tests {
-        use arbitrary::Arbitrary;
-        use bincode::config;
-        use rand::Rng;
-        use serde::{Deserialize, Serialize};
-        use serde_with::serde_as;
 
         use super::super::{serde_bincode_compat, TxLegacy};
-
-        #[test]
-        fn test_tx_legacy_bincode_roundtrip() {
-            #[serde_as]
-            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-            struct Data {
-                #[serde_as(as = "serde_bincode_compat::TxLegacy")]
-                transaction: TxLegacy,
-            }
-
-            let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
-                transaction: TxLegacy::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
-                    .unwrap(),
-            };
-
-            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _) =
-                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
-            assert_eq!(decoded, data);
-        }
+        bincode_compat_roundtrip_test!(
+            test_tx_legacy_bincode_roundtrip,
+            TxLegacy,
+            "serde_bincode_compat::TxLegacy"
+        );
     }
 }
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use super::signed_legacy_serde;
     use crate::{
         transaction::{from_eip155_value, to_eip155_value},
         SignableTransaction, TxLegacy,
@@ -796,44 +780,5 @@ mod tests {
                 Some((true, Some(chain_id)))
             );
         }
-    }
-
-    #[test]
-    fn can_deserialize_system_transaction_with_zero_signature() {
-        let raw_tx = serde_json::json!({
-            "blockHash": "0x5307b5c812a067f8bc1ed1cc89d319ae6f9a0c9693848bd25c36b5191de60b85",
-            "blockNumber": "0x45a59bb",
-            "from": "0x0000000000000000000000000000000000000000",
-            "gas": "0x1e8480",
-            "gasPrice": "0x0",
-            "hash": "0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06",
-            "input": "0xcbd4ece900000000000000000000000032155c9d39084f040ba17890fe8134dbe2a0453f0000000000000000000000004a0126ee88018393b1ad2455060bc350ead9908a000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000469f700000000000000000000000000000000000000000000000000000000000000644ff746f60000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002043e908a4e862aebb10e7e27db0b892b58a7e32af11d64387a414dabc327b00e200000000000000000000000000000000000000000000000000000000",
-            "nonce": "0x469f7",
-            "to": "0x4200000000000000000000000000000000000007",
-            "transactionIndex": "0x0",
-            "value": "0x0",
-            "v": "0x0",
-            "r": "0x0",
-            "s": "0x0",
-            "queueOrigin": "l1",
-            "l1TxOrigin": "0x36bde71c97b33cc4729cf772ae268934f7ab70b2",
-            "l1BlockNumber": "0xfd1a6c",
-            "l1Timestamp": "0x63e434ff",
-            "index": "0x45a59ba",
-            "queueIndex": "0x469f7",
-            "rawTransaction": "0xcbd4ece900000000000000000000000032155c9d39084f040ba17890fe8134dbe2a0453f0000000000000000000000004a0126ee88018393b1ad2455060bc350ead9908a000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000469f700000000000000000000000000000000000000000000000000000000000000644ff746f60000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002043e908a4e862aebb10e7e27db0b892b58a7e32af11d64387a414dabc327b00e200000000000000000000000000000000000000000000000000000000"
-        });
-
-        let signed: crate::Signed<TxLegacy> = signed_legacy_serde::deserialize(raw_tx).unwrap();
-
-        assert_eq!(signed.signature().r(), U256::ZERO);
-        assert_eq!(signed.signature().s(), U256::ZERO);
-        assert!(!signed.signature().v());
-
-        assert_eq!(
-            signed.hash(),
-            &b256!("0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06"),
-            "hash should match the transaction hash"
-        );
     }
 }

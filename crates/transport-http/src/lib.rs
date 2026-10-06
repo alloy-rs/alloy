@@ -60,6 +60,66 @@ fn http_error_response(
     ))
 }
 
+/// Parses the value of a `Retry-After` header, delay-seconds form only.
+#[cfg(any(
+    all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))),
+    all(not(target_family = "wasm"), feature = "hyper")
+))]
+fn parse_retry_after(value: Option<&str>) -> Option<std::time::Duration> {
+    value.and_then(|value| value.trim().parse().ok()).map(std::time::Duration::from_secs)
+}
+
+/// Converts a received HTTP response into a [`ResponsePacket`](alloy_json_rpc::ResponsePacket).
+///
+/// The body is inspected regardless of the status code, as an error response may carry a JSON-RPC
+/// error.
+#[cfg(any(
+    all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))),
+    all(not(target_family = "wasm"), feature = "hyper")
+))]
+fn handle_response<B, E>(
+    status: u16,
+    retry_after: Option<std::time::Duration>,
+    body: Result<B, E>,
+) -> alloy_transport::TransportResult<alloy_json_rpc::ResponsePacket>
+where
+    B: AsRef<[u8]>,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    let is_success = (200..300).contains(&status);
+
+    let body = match body {
+        Ok(body) => body,
+        // A failed body read on an error response still carries retryable metadata.
+        Err(err) if !is_success => {
+            return Err(alloy_transport::TransportErrorKind::http_error_with_retry_after(
+                status,
+                format!("<failed to read response body: {err}>"),
+                retry_after,
+            ));
+        }
+        Err(err) => return Err(alloy_transport::TransportErrorKind::custom(err)),
+    };
+    let body = body.as_ref();
+
+    if tracing::enabled!(tracing::Level::TRACE) {
+        tracing::trace!(body = %String::from_utf8_lossy(body), "response body");
+    } else {
+        tracing::debug!(bytes = body.len(), "retrieved response body");
+    }
+
+    if !is_success {
+        return http_error_response(status, body, retry_after);
+    }
+
+    // Deserialize a Box<RawValue> from the body. If deserialization fails, return
+    // the body as a string in the error. The conversion to String
+    // is lossy and may not cover all the bytes in the body.
+    serde_json::from_slice(body).map_err(|err| {
+        alloy_transport::TransportError::deser_err(err, String::from_utf8_lossy(body))
+    })
+}
+
 /// Connection details for an HTTP transport.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[doc(hidden)]
@@ -93,7 +153,7 @@ impl<T> FromStr for HttpConnect<T> {
 /// An Http transport.
 ///
 /// The user must provide an internal http client and a URL to which to
-/// connect. It implements `Service<Box<RawValue>>`, and therefore
+/// connect. It implements `Service<RequestPacket>`, and therefore
 /// [`Transport`].
 ///
 /// [`Transport`]: alloy_transport::Transport
@@ -191,5 +251,68 @@ mod tests {
         let TransportError::Transport(error) = error else { panic!("expected transport error") };
         assert_eq!(error.retry_after(), Some(Duration::from_secs(52)));
         assert_eq!(error.as_http_error().unwrap().status, 429);
+    }
+}
+
+#[cfg(all(
+    test,
+    any(
+        all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))),
+        all(not(target_family = "wasm"), feature = "hyper")
+    )
+))]
+mod response_tests {
+    use super::{handle_response, parse_retry_after};
+    use alloy_transport::{TransportError, TransportErrorKind};
+    use std::{io, time::Duration};
+
+    const SUCCESS: &[u8] = br#"{"jsonrpc":"2.0","id":1,"result":"0x1"}"#;
+    const JSON_RPC_ERROR: &[u8] =
+        br#"{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"filter not found"}}"#;
+
+    fn transport_kind(err: TransportError) -> TransportErrorKind {
+        let TransportError::Transport(kind) = err else { panic!("expected transport error") };
+        kind
+    }
+
+    #[test]
+    fn parses_retry_after_seconds_only() {
+        assert_eq!(parse_retry_after(Some(" 52 ")), Some(Duration::from_secs(52)));
+        assert_eq!(parse_retry_after(Some("Wed, 21 Oct 2015 07:28:00 GMT")), None);
+        assert_eq!(parse_retry_after(None), None);
+    }
+
+    #[test]
+    fn maps_responses_by_status_and_body() {
+        let ok = handle_response(200, None, Ok::<_, io::Error>(SUCCESS)).unwrap();
+        assert!(ok.is_success());
+
+        let err = handle_response(200, None, Ok::<_, io::Error>(&b"not json"[..])).unwrap_err();
+        assert!(err.is_deser_error());
+
+        let rpc_err = handle_response(500, None, Ok::<_, io::Error>(JSON_RPC_ERROR)).unwrap();
+        assert_eq!(rpc_err.first_error_code(), Some(-32000));
+
+        let retry_after = Some(Duration::from_secs(5));
+        let err = handle_response(429, retry_after, Ok::<_, io::Error>(&b"slow down"[..]));
+        let kind = transport_kind(err.unwrap_err());
+        assert_eq!(kind.retry_after(), retry_after);
+        assert_eq!(kind.as_http_error().unwrap().body, "slow down");
+    }
+
+    #[test]
+    fn maps_body_read_failures() {
+        let read_err = || io::Error::other("connection reset");
+
+        let retry_after = Some(Duration::from_secs(3));
+        let err = handle_response::<&[u8], _>(503, retry_after, Err(read_err())).unwrap_err();
+        let kind = transport_kind(err);
+        assert_eq!(kind.retry_after(), retry_after);
+        let http = kind.as_http_error().unwrap();
+        assert_eq!(http.status, 503);
+        assert_eq!(http.body, "<failed to read response body: connection reset>");
+
+        let err = handle_response::<&[u8], _>(200, None, Err(read_err())).unwrap_err();
+        assert!(matches!(transport_kind(err), TransportErrorKind::Custom(_)));
     }
 }

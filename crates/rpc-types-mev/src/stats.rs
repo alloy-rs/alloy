@@ -38,7 +38,7 @@ impl<'de> Deserialize<'de> for BundleStats {
 
         if map.get("receivedAt").is_none() {
             Ok(Self::Unknown)
-        } else if map["isSimulated"] == false {
+        } else if map.get("isSimulated").is_some_and(|v| *v == false) {
             StatsSeen::deserialize(serde_json::Value::Object(map))
                 .map(BundleStats::Seen)
                 .map_err(serde::de::Error::custom)
@@ -88,10 +88,10 @@ pub struct StatsSimulated {
     pub received_at: String,
     /// indicates time at which each builder selected the bundle to be included in the target
     /// block
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
     pub considered_by_builders_at: Vec<ConsideredByBuildersAt>,
     /// indicates time at which each builder sealed a block containing the bundle
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
     pub sealed_by_builders_at: Vec<SealedByBuildersAt>,
 }
 
@@ -205,5 +205,17 @@ mod tests {
             let serialized_expected = &serde_json::to_string(&deserialized).unwrap();
             assert_eq!(strip_whitespaces(serialized), strip_whitespaces(serialized_expected));
         }
+    }
+}
+
+#[cfg(test)]
+mod missing_field_tests {
+    use super::*;
+
+    #[test]
+    fn bundle_stats_without_is_simulated_is_an_error() {
+        let res =
+            serde_json::from_str::<BundleStats>(r#"{"isHighPriority":false,"receivedAt":"222"}"#);
+        assert!(res.unwrap_err().to_string().contains("isSimulated"));
     }
 }

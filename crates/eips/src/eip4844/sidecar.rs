@@ -5,11 +5,11 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{Decodable7594, Encodable7594},
+    eip7594::{BlobSidecarEncoding, Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
-use alloy_rlp::{Decodable, Encodable, Header};
+use alloy_rlp::{Decodable, Encodable, Header, EMPTY_LIST_CODE};
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
@@ -511,6 +511,23 @@ impl Encodable7594 for BlobTransactionSidecar {
 
     fn encode_7594(&self, out: &mut dyn BufMut) {
         self.rlp_encode_fields(out);
+    }
+
+    fn encode_7594_len_with(&self, encoding: BlobSidecarEncoding) -> usize {
+        let blobs_len = match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.length(),
+            BlobSidecarEncoding::WithoutBlobs => 1,
+        };
+        blobs_len + self.commitments.length() + self.proofs.length()
+    }
+
+    fn encode_7594_with(&self, encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.encode(out),
+            BlobSidecarEncoding::WithoutBlobs => out.put_u8(EMPTY_LIST_CODE),
+        }
+        self.commitments.encode(out);
+        self.proofs.encode(out);
     }
 }
 

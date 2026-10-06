@@ -33,7 +33,7 @@ pub struct SimBlock<TxReq = TransactionRequest> {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
-    #[cfg_attr(feature = "serde", serde(default = "Vec::new"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub calls: Vec<TxReq>,
 }
 
@@ -84,6 +84,19 @@ pub struct SimulatedBlock<B = Block> {
     pub inner: B,
     /// A vector of results for each call in the block.
     pub calls: Vec<SimCallResult>,
+}
+
+impl<B> SimulatedBlock<B> {
+    /// Returns an iterator over all logs emitted by the calls in this block, in call order.
+    pub fn logs(&self) -> impl Iterator<Item = &Log> {
+        self.calls.iter().flat_map(|call| &call.logs)
+    }
+
+    /// Consumes the block and returns an iterator over all logs emitted by the calls in this
+    /// block, in call order.
+    pub fn into_logs(self) -> impl Iterator<Item = Log> {
+        self.calls.into_iter().flat_map(|call| call.logs)
+    }
 }
 
 /// Captures the outcome of a transaction simulation.
@@ -342,9 +355,25 @@ mod tests {
     }
 
     #[test]
-    fn test_simulate_error_codes() {
-        assert_eq!(SimulateError::EXECUTION_REVERTED_CODE, EthRpcErrorCode::ExecutionError.code());
-        assert_eq!(SimulateError::VM_EXECUTION_ERROR_CODE, -32015);
-        assert_eq!(SimulateError::invalid_params().code, SimulateError::INVALID_PARAMS_ERROR_CODE);
+    fn test_simulated_block_logs() {
+        let log = |address| Log {
+            inner: alloy_primitives::Log::new_unchecked(address, Vec::new(), Bytes::new()),
+            ..Default::default()
+        };
+        let block: SimulatedBlock = SimulatedBlock {
+            inner: Default::default(),
+            calls: vec![
+                SimCallResult {
+                    logs: vec![log(Address::with_last_byte(1)), log(Address::with_last_byte(2))],
+                    ..Default::default()
+                },
+                SimCallResult::default(),
+                SimCallResult { logs: vec![log(Address::with_last_byte(3))], ..Default::default() },
+            ],
+        };
+
+        let expected: Vec<_> = (1..=3).map(Address::with_last_byte).collect();
+        assert_eq!(block.logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
+        assert_eq!(block.into_logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
     }
 }

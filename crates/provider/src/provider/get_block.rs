@@ -54,12 +54,14 @@ impl EthGetBlockParams {
     }
 }
 
-/// A builder for an `"eth_getBlockByHash"` request. This type is returned by the
-/// [`Provider::call`] method.
+/// A builder for an `"eth_getBlockByHash"` or `"eth_getBlockByNumber"` request. This type is
+/// returned by the [`Provider::get_block`], [`Provider::get_block_by_hash`] and
+/// [`Provider::get_block_by_number`] methods.
 ///
-/// [`Provider::call`]: crate::Provider::call
-#[must_use = "EthGetBlockBy must be awaited to execute the request"]
-//#[derive(Clone, Debug)]
+/// [`Provider::get_block`]: crate::Provider::get_block
+/// [`Provider::get_block_by_hash`]: crate::Provider::get_block_by_hash
+/// [`Provider::get_block_by_number`]: crate::Provider::get_block_by_number
+#[must_use = "EthGetBlock must be awaited to execute the request"]
 pub struct EthGetBlock<BlockResp>
 where
     BlockResp: alloy_network::BlockResponse + RpcRecv,
@@ -452,9 +454,6 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     pub async fn into_stream(
         self,
     ) -> TransportResult<impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin> {
-        use alloy_network_primitives::HeaderResponse;
-        use futures::StreamExt;
-
         let sub = self.sub.await?;
 
         let stream = sub
@@ -518,19 +517,25 @@ mod tests {
 
     // <https://github.com/alloy-rs/alloy/issues/2117>
     #[tokio::test]
-    async fn test_pending_block_deser() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://binance.llamarpc.com".parse().unwrap());
+    async fn pending_block_fills_null_fields() {
+        let pending_block_response: Block = Block::default();
+        let mut pending_block = serde_json::to_value(pending_block_response).unwrap();
+        pending_block["hash"] = Value::Null;
+        pending_block["nonce"] = Value::Null;
+        pending_block["miner"] = Value::Null;
+        pending_block.as_object_mut().unwrap().remove("beneficiary");
 
-        let res = provider.get_block_by_number(BlockNumberOrTag::Pending).full().await;
-        if let Err(err) = &res {
-            let err_str = err.to_string();
-            if err_str.contains("no response") || err.is_transport_error() {
-                // response can be flaky due to network issues
-                eprintln!("skipping flaky response: {err:?}");
-                return;
-            }
-        }
-        let _block = res.unwrap();
+        let asserter = alloy_transport::mock::Asserter::new();
+        asserter.push_success(&pending_block);
+        asserter.push_success(&Value::Null);
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+        let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap().unwrap();
+        assert_eq!(block.header.hash, B256::ZERO);
+        assert_eq!(block.header.nonce, B64::ZERO);
+        assert_eq!(block.header.beneficiary, Address::ZERO);
+
+        let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap();
+        assert!(block.is_none());
     }
 }

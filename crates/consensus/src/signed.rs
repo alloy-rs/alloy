@@ -1,16 +1,15 @@
 use crate::{
     transaction::{
-        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction, TxHashRef, TxHashable,
+        delegate_transaction, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction,
+        TxHashRef, TxHashable,
     },
     Transaction,
 };
 use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result},
-    eip2930::AccessList,
-    eip7702::SignedAuthorization,
     Decodable2718, Encodable2718, Typed2718,
 };
-use alloy_primitives::{Bytes, Sealed, Signature, TxKind, B256, U256};
+use alloy_primitives::{Sealed, Signature, B256};
 use alloy_rlp::BufMut;
 use core::{
     fmt::Debug,
@@ -312,175 +311,11 @@ where
 }
 
 impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<T, Sig> {
-    #[inline]
-    fn chain_id(&self) -> Option<u64> {
-        self.tx.chain_id()
-    }
-
-    #[inline]
-    fn nonce(&self) -> u64 {
-        self.tx.nonce()
-    }
-
-    #[inline]
-    fn gas_limit(&self) -> u64 {
-        self.tx.gas_limit()
-    }
-
-    #[inline]
-    fn gas_price(&self) -> Option<u128> {
-        self.tx.gas_price()
-    }
-
-    #[inline]
-    fn max_fee_per_gas(&self) -> u128 {
-        self.tx.max_fee_per_gas()
-    }
-
-    #[inline]
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.tx.max_priority_fee_per_gas()
-    }
-
-    #[inline]
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.tx.max_fee_per_blob_gas()
-    }
-
-    #[inline]
-    fn priority_fee_or_price(&self) -> u128 {
-        self.tx.priority_fee_or_price()
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        self.tx.effective_gas_price(base_fee)
-    }
-
-    #[inline]
-    fn is_dynamic_fee(&self) -> bool {
-        self.tx.is_dynamic_fee()
-    }
-
-    #[inline]
-    fn kind(&self) -> TxKind {
-        self.tx.kind()
-    }
-
-    #[inline]
-    fn is_create(&self) -> bool {
-        self.tx.is_create()
-    }
-
-    #[inline]
-    fn value(&self) -> U256 {
-        self.tx.value()
-    }
-
-    #[inline]
-    fn input(&self) -> &Bytes {
-        self.tx.input()
-    }
-
-    #[inline]
-    fn access_list(&self) -> Option<&AccessList> {
-        self.tx.access_list()
-    }
-
-    #[inline]
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        self.tx.blob_versioned_hashes()
-    }
-
-    #[inline]
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.tx.authorization_list()
-    }
+    delegate_transaction!(self => &self.tx);
 }
 
 impl<T: Transaction> Transaction for Sealed<T> {
-    #[inline]
-    fn chain_id(&self) -> Option<u64> {
-        self.inner().chain_id()
-    }
-
-    #[inline]
-    fn nonce(&self) -> u64 {
-        self.inner().nonce()
-    }
-
-    #[inline]
-    fn gas_limit(&self) -> u64 {
-        self.inner().gas_limit()
-    }
-
-    #[inline]
-    fn gas_price(&self) -> Option<u128> {
-        self.inner().gas_price()
-    }
-
-    #[inline]
-    fn max_fee_per_gas(&self) -> u128 {
-        self.inner().max_fee_per_gas()
-    }
-
-    #[inline]
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.inner().max_priority_fee_per_gas()
-    }
-
-    #[inline]
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.inner().max_fee_per_blob_gas()
-    }
-
-    #[inline]
-    fn priority_fee_or_price(&self) -> u128 {
-        self.inner().priority_fee_or_price()
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        self.inner().effective_gas_price(base_fee)
-    }
-
-    #[inline]
-    fn is_dynamic_fee(&self) -> bool {
-        self.inner().is_dynamic_fee()
-    }
-
-    #[inline]
-    fn kind(&self) -> TxKind {
-        self.inner().kind()
-    }
-
-    #[inline]
-    fn is_create(&self) -> bool {
-        self.inner().is_create()
-    }
-
-    #[inline]
-    fn value(&self) -> U256 {
-        self.inner().value()
-    }
-
-    #[inline]
-    fn input(&self) -> &Bytes {
-        self.inner().input()
-    }
-
-    #[inline]
-    fn access_list(&self) -> Option<&AccessList> {
-        self.inner().access_list()
-    }
-
-    #[inline]
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        self.inner().blob_versioned_hashes()
-    }
-
-    #[inline]
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.inner().authorization_list()
-    }
+    delegate_transaction!(self => self.inner());
 }
 
 #[cfg(any(feature = "secp256k1", feature = "k256"))]
@@ -543,6 +378,13 @@ where
     T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
 {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        // Legacy transactions are untagged: `encode_2718` never emits a `0x00` type byte, so a
+        // literal `0x00` prefix must be rejected rather than decoded as legacy, which would not
+        // round-trip. Untagged legacy transactions are handled by `fallback_decode`.
+        if ty == 0 {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+
         let decoded = T::rlp_decode_signed(buf)?;
 
         if decoded.ty() != ty {

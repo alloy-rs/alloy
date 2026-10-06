@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [jwt] Strip 0x prefix when reporting InvalidLength ([#3782](https://github.com/alloy-rs/alloy/issues/3782))
+
+### Features
+
+- [engine] Add REST-SSZ wire types ([#4038](https://github.com/alloy-rs/alloy/issues/4038))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Bug Fixes
+
+- [rpc-types] Avoid stack overflow when decoding V2 blobs ([#4186](https://github.com/alloy-rs/alloy/issues/4186))
+
+### Features
+
+- [rpc-types-engine] Add amsterdam payload errors ([#4179](https://github.com/alloy-rs/alloy/issues/4179))
+
 ## [2.4.1](https://github.com/alloy-rs/alloy/releases/tag/v2.4.1) - 2026-08-13
 
 ### Features

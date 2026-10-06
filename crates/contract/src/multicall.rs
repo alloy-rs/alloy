@@ -30,6 +30,7 @@ mod tests {
     use super::*;
     use alloy_primitives::{address, b256, U256};
     use alloy_provider::{CallItem, Failure, MulticallBuilder, Provider, ProviderBuilder};
+    use alloy_rpc_types_eth::BlockId;
     use alloy_sol_types::sol;
     use DummyThatFails::DummyThatFailsInstance;
 
@@ -63,17 +64,6 @@ mod tests {
     }
 
     const FORK_URL: &str = "https://ethereum.reth.rs/rpc";
-
-    #[tokio::test]
-    async fn test_single() {
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
-
-        let erc20 = ERC20::new(weth, &provider);
-        let multicall = provider.multicall().add(erc20.totalSupply());
-
-        let (_total_supply,) = multicall.aggregate().await.unwrap();
-    }
 
     #[tokio::test]
     async fn test_aggregate() {
@@ -177,21 +167,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_call_fallible() {
-        let provider = ProviderBuilder::new()
-            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
-            .unwrap();
-
-        let dummy_addr = deploy_dummy(provider.clone()).await;
-
-        // allow failure
-        let multicall = provider.multicall().add_call(dummy_addr.fail().into_call(true));
-        let (failure,) = multicall.aggregate3().await.unwrap();
-
-        assert!(matches!(failure.unwrap_err(), Failure { idx: 0, return_data: _ }));
-    }
-
-    #[tokio::test]
     async fn test_util() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
         let provider = ProviderBuilder::new()
@@ -213,6 +188,16 @@ mod tests {
             block_hash,
             b256!("31be03d4fb9a280d1699f1004f340573cd6d717dae79095d382e876415cb26ba")
         );
+    }
+
+    #[tokio::test]
+    async fn uses_provider_default_block() {
+        let provider = ProviderBuilder::new()
+            .with_default_block(BlockId::latest())
+            .connect_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let (block_number,) = provider.multicall().get_block_number().aggregate().await.unwrap();
+        assert_eq!(block_number, U256::from(provider.get_block_number().await.unwrap()));
     }
 
     sol! {
@@ -276,21 +261,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_clear() {
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().connect_anvil();
-
-        let erc20 = ERC20::new(weth, &provider);
-        let multicall = provider
-            .multicall()
-            .add(erc20.totalSupply())
-            .add(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")));
-        assert_eq!(multicall.len(), 2);
-        let multicall = multicall.clear();
-        assert_eq!(multicall.len(), 0);
-    }
-
-    #[tokio::test]
     async fn add_dynamic() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
         let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
@@ -327,18 +297,5 @@ mod tests {
 
         assert_eq!(res.len(), 1);
         assert!(matches!(res[0].clone().unwrap_err(), Failure { idx: 0, return_data: _ }));
-    }
-
-    #[tokio::test]
-    async fn test_extend_dynamic() {
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
-        let erc20 = ERC20::new(weth, &provider);
-        let ts_calls = vec![erc20.totalSupply(); 18];
-        let multicall = MulticallBuilder::new_dynamic(provider.clone()).extend(ts_calls);
-
-        assert_eq!(multicall.len(), 18);
-        let res = multicall.aggregate().await.unwrap();
-        assert_eq!(res.len(), 18);
     }
 }

@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [provider] Revert five recent RPC compatibility changes ([#4225](https://github.com/alloy-rs/alloy/issues/4225))
+- [provider] Accept nullable raw debug results ([#4223](https://github.com/alloy-rs/alloy/issues/4223))
+- [provider] Handle nullable trace collection results ([#4219](https://github.com/alloy-rs/alloy/issues/4219))
+- [provider] Preserve individual replay transaction hashes
+- [provider] Accept nullable uncle counts
+- [provider] Accept tree paths in trace_get
+- [trace] Decode regularGasUsed and explain gas ([#4195](https://github.com/alloy-rs/alloy/issues/4195))
+- [provider] Call eth_getBlockAccessList ([#4208](https://github.com/alloy-rs/alloy/issues/4208))
+
+### Testing
+
+- Allow slow Geth startup in Windows integration tests ([#4213](https://github.com/alloy-rs/alloy/issues/4213))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Features
+
+- [provider] Add CCIP Read (ERC-3668) support ([#4184](https://github.com/alloy-rs/alloy/issues/4184))
+- [provider] Expose request metadata and header helpers ([#4144](https://github.com/alloy-rs/alloy/issues/4144))
+- [provider] Add bogota engine api methods ([#4142](https://github.com/alloy-rs/alloy/issues/4142))
+
+### Other
+
+- Add block_opt method for optional block setting ([#4187](https://github.com/alloy-rs/alloy/issues/4187))
+
+### Styling
+
+- Fmt ([#4177](https://github.com/alloy-rs/alloy/issues/4177))
+
 ## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
 
 ### Bug Fixes

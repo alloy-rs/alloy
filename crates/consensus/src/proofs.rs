@@ -35,11 +35,9 @@ pub fn calculate_ommers_root<T>(ommers: &[T]) -> B256
 where
     T: Encodable,
 {
-    // Check if `ommers` list is empty
     if ommers.is_empty() {
         return EMPTY_OMMER_ROOT_HASH;
     }
-    // RLP Encode
     let mut ommers_rlp = Vec::new();
     alloy_rlp::encode_list(ommers, &mut ommers_rlp);
     keccak256(ommers_rlp)

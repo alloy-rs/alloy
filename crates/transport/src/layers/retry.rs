@@ -55,13 +55,12 @@ impl RetryBackoffLayer {
         initial_backoff: u64,
         compute_units_per_second: u64,
     ) -> Self {
-        Self {
+        Self::new_with_policy(
             max_rate_limit_retries,
             initial_backoff,
             compute_units_per_second,
-            avg_cost: DEFAULT_AVG_COST,
-            policy: RateLimitRetryPolicy,
-        }
+            RateLimitRetryPolicy,
+        )
     }
 
     /// Sets the average Compute Unit (CU) cost per request. Defaults to `20` CU.
@@ -277,19 +276,15 @@ where
                 QueuedRequest::new(this.requests_enqueued.clone());
             let mut rate_limit_retry_number: u32 = 0;
             loop {
-                let err;
                 let res = inner.call(request.clone()).await;
 
-                match res {
-                    Ok(res) => {
-                        if let Some(e) = res.as_error() {
-                            err = TransportError::ErrorResp(e.clone())
-                        } else {
-                            return Ok(res);
-                        }
-                    }
-                    Err(e) => err = e,
-                }
+                let (err, packet) = match res {
+                    Ok(res) => match res.as_error() {
+                        Some(e) => (TransportError::ErrorResp(e.clone()), Some(res)),
+                        None => return Ok(res),
+                    },
+                    Err(e) => (e, None),
+                };
 
                 let should_retry = this.policy.should_retry(&err);
                 if should_retry {
@@ -303,8 +298,7 @@ where
 
                     let current_queued_reqs = this.requests_enqueued.load(Ordering::SeqCst) as u64;
 
-                    // try to extract the requested backoff from the error or compute the next
-                    // backoff based on retry count
+                    // use the backoff requested by the error, or fall back to the initial backoff
                     let backoff_hint = this.policy.backoff_hint(&err);
                     let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
 
@@ -328,7 +322,9 @@ where
 
                     sleep(total_backoff).await;
                 } else {
-                    return Err(err);
+                    // An error payload is returned as received, so the other responses of a
+                    // batch still reach their callers.
+                    return packet.ok_or(err);
                 }
             }
         })

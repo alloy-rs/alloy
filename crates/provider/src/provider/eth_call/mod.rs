@@ -335,6 +335,12 @@ where
         self
     }
 
+    /// Set the block to use for this call, if any.
+    pub const fn block_opt(mut self, block: Option<BlockId>) -> Self {
+        self.params.block = block;
+        self
+    }
+
     /// Set the block id to "pending".
     pub const fn pending(self) -> Self {
         self.block(BlockId::pending())

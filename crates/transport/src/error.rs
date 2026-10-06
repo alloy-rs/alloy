@@ -1,4 +1,4 @@
-use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
+use alloy_json_rpc::{ErrorPayload, ErrorResponseCode, Id, RpcError, RpcResult};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug, time::Duration};
@@ -218,6 +218,23 @@ impl HttpError {
     }
 }
 
+impl ErrorResponseCode for TransportErrorKind {
+    fn error_response_code(&self) -> Option<i64> {
+        error_code_from_body(&self.as_http_error()?.body)
+    }
+}
+
+/// Extracts a JSON-RPC error code from a raw HTTP error response body.
+///
+/// Accepts both a full JSON-RPC error response and a bare error object.
+fn error_code_from_body(body: &str) -> Option<i64> {
+    // HTTP transports may append human-readable diagnostics after the JSON-RPC body, so parse the
+    // first complete JSON value instead of requiring the entire body to be JSON.
+    let value =
+        serde_json::Deserializer::from_str(body).into_iter::<serde_json::Value>().next()?.ok()?;
+    value.get("error").unwrap_or(&value).get("code")?.as_i64()
+}
+
 /// Extension trait to implement methods for [`RpcError<TransportErrorKind, E>`].
 pub(crate) trait RpcErrorExt {
     /// Analyzes whether to retry the request depending on the error.
@@ -419,5 +436,62 @@ mod tests {
         assert!(kind.is_http_error());
         assert_eq!(kind.retry_after(), Some(Duration::from_secs(52)));
         assert_eq!(kind.as_http_error().unwrap().status, 429);
+    }
+
+    #[test]
+    fn extracts_rpc_error_code() {
+        let error: TransportError = TransportError::ErrorResp(ErrorPayload::invalid_request());
+        assert_eq!(error.error_code(), Some(-32600));
+
+        let error = TransportErrorKind::http_error(
+            400,
+            r#"{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"}}"#.to_owned(),
+        );
+        assert_eq!(error.error_code(), Some(-32601));
+
+        // a bare error object, without the enclosing response
+        let error =
+            TransportErrorKind::http_error(400, r#"{"code":-32000,"message":"err"}"#.to_owned());
+        assert_eq!(error.error_code(), Some(-32000));
+    }
+
+    #[test]
+    fn extracts_rpc_error_codes_outside_i32_range() {
+        for code in [i64::MIN, i64::from(i32::MIN) - 1, i64::from(i32::MAX) + 1, i64::MAX] {
+            let mut payload = ErrorPayload::invalid_request();
+            payload.code = code;
+            let error: TransportError = TransportError::ErrorResp(payload);
+            assert_eq!(error.error_code(), Some(code));
+
+            for body in [
+                format!(r#"{{"code":{code},"message":"err"}}"#),
+                format!(r#"{{"jsonrpc":"2.0","error":{{"code":{code},"message":"err"}}}}"#),
+            ] {
+                let error = TransportErrorKind::http_error(400, body);
+                assert_eq!(error.error_code(), Some(code));
+            }
+        }
+    }
+
+    #[test]
+    fn extracts_rpc_error_code_from_http_body_with_diagnostics() {
+        let error = TransportErrorKind::http_error(
+            400,
+            "{\"code\":-32000,\"message\":\"Server error\"}\nupstream request failed".to_owned(),
+        );
+        assert_eq!(error.error_code(), Some(-32000));
+    }
+
+    #[test]
+    fn rpc_error_code_returns_none_for_unrelated_errors() {
+        assert_eq!(TransportErrorKind::backend_gone().error_code(), None);
+
+        let error = TransportErrorKind::http_error(500, "not JSON".to_owned());
+        assert_eq!(error.error_code(), None);
+
+        // a code outside the supported i64 range cannot be represented
+        let error =
+            TransportErrorKind::http_error(500, r#"{"code":9223372036854775808}"#.to_owned());
+        assert_eq!(error.error_code(), None);
     }
 }

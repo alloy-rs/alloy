@@ -50,7 +50,10 @@ pub enum GasFillable {
 /// - Otherwise, it will process as a EIP-1559 tx and populate the `gas_limit`, `max_fee_per_gas`
 ///   and `max_priority_fee_per_gas` fields if unset.
 /// - If the network does not support EIP-1559, it will fallback to the legacy tx and populate the
-///   `gas_limit` and `gas_price` fields if unset.
+///   `gas_limit` and `gas_price` fields if unset. This fallback only triggers when the latest block
+///   header has no base fee.
+/// - If the filler was created with [`GasFiller::legacy`], it skips EIP-1559 estimation entirely
+///   and always populates the `gas_limit` and `gas_price` fields if unset.
 ///
 /// # Example
 ///
@@ -75,9 +78,28 @@ pub enum GasFillable {
 pub struct GasFiller {
     /// The eip1559 gas estimator to use.
     pub estimator: Eip1559Estimator,
+    /// Whether to always populate the legacy `gas_price` field instead of estimating EIP-1559
+    /// fees, see [`GasFiller::legacy`].
+    pub legacy: bool,
 }
 
 impl GasFiller {
+    /// Creates a [`GasFiller`] that uses the given [`Eip1559Estimator`].
+    pub const fn new(estimator: Eip1559Estimator) -> Self {
+        Self { estimator, legacy: false }
+    }
+
+    /// Creates a [`GasFiller`] that always populates the legacy `gas_price` field instead of the
+    /// EIP-1559 `max_fee_per_gas` and `max_priority_fee_per_gas` fields.
+    ///
+    /// The default filler only falls back to legacy fees when the latest block header has no base
+    /// fee. Chains that report a `baseFeePerGas` (typically `0`) in their headers but do not
+    /// accept EIP-1559 transactions are not detected by that fallback, so legacy fees have to be
+    /// opted into explicitly with this constructor.
+    pub const fn legacy() -> Self {
+        Self { estimator: Eip1559Estimator::Default, legacy: true }
+    }
+
     async fn prepare_legacy<P, N>(
         &self,
         provider: &P,
@@ -161,7 +183,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
     where
         P: Provider<N>,
     {
-        if tx.gas_price().is_some() {
+        if self.legacy || tx.gas_price().is_some() {
             self.prepare_legacy(provider, tx).await
         } else {
             match self.prepare_1559(provider, tx).await {
@@ -389,8 +411,7 @@ mod tests {
         assert_eq!(receipt.gas_used, 21000);
     }
 
-    #[tokio::test]
-    async fn no_max_fee_per_blob_gas() {
+    async fn assert_blob_gas_filled(max_fee_per_blob_gas: Option<u128>) {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
@@ -398,6 +419,7 @@ mod tests {
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            max_fee_per_blob_gas,
             sidecar: Some(sidecar.into()),
             ..Default::default()
         };
@@ -417,31 +439,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn zero_max_fee_per_blob_gas() {
-        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+    async fn no_max_fee_per_blob_gas() {
+        assert_blob_gas_filled(None).await;
+    }
 
-        let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
-        let sidecar = sidecar.build_4844().unwrap();
+    #[tokio::test]
+    async fn zero_max_fee_per_blob_gas() {
+        assert_blob_gas_filled(Some(0)).await;
+    }
+
+    #[tokio::test]
+    async fn legacy_filler_skips_eip1559() {
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .filler(GasFiller::legacy())
+            .with_simple_nonce_management()
+            .fetch_chain_id()
+            .connect_anvil_with_wallet();
 
         let tx = TransactionRequest {
+            value: Some(U256::from(100)),
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            max_fee_per_blob_gas: Some(0),
-            sidecar: Some(sidecar.into()),
             ..Default::default()
         };
 
-        let tx = provider.send_transaction(tx).await.unwrap();
-
-        let receipt = tx.get_receipt().await.unwrap();
-
-        let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
-
-        assert!(tx.max_fee_per_blob_gas().unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
-        assert_eq!(receipt.gas_used, 21000);
-        assert_eq!(
-            receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
-            DATA_GAS_PER_BLOB
-        );
+        let SendableTx::Envelope(envelope) = provider.fill(tx).await.unwrap() else {
+            panic!("expected a signed envelope");
+        };
+        assert!(envelope.is_legacy());
     }
 
     #[test]

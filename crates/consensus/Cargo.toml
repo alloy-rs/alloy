@@ -130,4 +130,5 @@ borsh = [
 	"dep:borsh",
 	"alloy-primitives/borsh",
 	"alloy-eips/borsh",
+	"alloy-trie/borsh"
 ]

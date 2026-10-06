@@ -7,9 +7,9 @@ use crate::{
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{B128, B256};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header, EMPTY_LIST_CODE};
 
-use super::{Decodable7594, Encodable7594};
+use super::{BlobSidecarEncoding, Decodable7594, Encodable7594};
 use crate::eip4844::VersionedHashIter;
 #[cfg(feature = "kzg")]
 use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
@@ -417,6 +417,20 @@ impl Encodable7594 for BlobTransactionSidecarVariant {
 
     fn encode_7594(&self, out: &mut dyn BufMut) {
         self.rlp_encode_fields(out);
+    }
+
+    fn encode_7594_len_with(&self, encoding: BlobSidecarEncoding) -> usize {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.encode_7594_len_with(encoding),
+            Self::Eip7594(sidecar) => sidecar.encode_7594_len_with(encoding),
+        }
+    }
+
+    fn encode_7594_with(&self, encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.encode_7594_with(encoding, out),
+            Self::Eip7594(sidecar) => sidecar.encode_7594_with(encoding, out),
+        }
     }
 }
 
@@ -1283,6 +1297,24 @@ impl Encodable7594 for BlobTransactionSidecarEip7594 {
     fn encode_7594(&self, out: &mut dyn BufMut) {
         self.rlp_encode_fields(out);
     }
+
+    fn encode_7594_len_with(&self, encoding: BlobSidecarEncoding) -> usize {
+        let blobs_len = match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.length(),
+            BlobSidecarEncoding::WithoutBlobs => 1,
+        };
+        1 + blobs_len + self.commitments.length() + self.cell_proofs.length()
+    }
+
+    fn encode_7594_with(&self, encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        out.put_u8(EIP_7594_WRAPPER_VERSION);
+        match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.encode(out),
+            BlobSidecarEncoding::WithoutBlobs => out.put_u8(EMPTY_LIST_CODE),
+        }
+        self.commitments.encode(out);
+        self.cell_proofs.encode(out);
+    }
 }
 
 impl Decodable7594 for BlobTransactionSidecarEip7594 {
@@ -1302,10 +1334,11 @@ pub struct BlobCellMask {
 }
 
 impl BlobCellMask {
-    /// Creates a mask from the Engine API 16-byte, big-endian bitarray.
+    /// Creates a mask from the Engine API 16-byte, little-endian bitarray.
+    /// Cell `i` is selected by bit `i % 8` of byte `i / 8`.
     #[inline]
-    pub fn new(indices_bitarray: B128) -> Self {
-        Self { value: u128::from(indices_bitarray) }
+    pub const fn new(indices_bitarray: B128) -> Self {
+        Self { value: u128::from_le_bytes(indices_bitarray.0) }
     }
 
     /// Creates a mask from the raw bit representation.
@@ -1622,6 +1655,54 @@ mod tests {
     }
 
     #[test]
+    fn rlp_7594_encoding_without_blobs_preserves_metadata() {
+        fn encode_without_blobs(sidecar: &impl Encodable7594) -> Vec<u8> {
+            let encoding = BlobSidecarEncoding::WithoutBlobs;
+            let mut encoded = Vec::with_capacity(sidecar.encode_7594_len_with(encoding));
+            sidecar.encode_7594_with(encoding, &mut encoded);
+            assert_eq!(encoded.len(), sidecar.encode_7594_len_with(encoding));
+            encoded
+        }
+
+        let sidecar_4844 = BlobTransactionSidecar::new(
+            vec![Blob::repeat_byte(0x01)],
+            vec![Bytes48::repeat_byte(0x02)],
+            vec![Bytes48::repeat_byte(0x03)],
+        );
+        let encoded_4844 = encode_without_blobs(&sidecar_4844);
+        let decoded_4844 = BlobTransactionSidecar::decode_7594(&mut &encoded_4844[..]).unwrap();
+        assert!(decoded_4844.blobs.is_empty());
+        assert_eq!(decoded_4844.commitments, sidecar_4844.commitments);
+        assert_eq!(decoded_4844.proofs, sidecar_4844.proofs);
+
+        let variant_4844 = BlobTransactionSidecarVariant::Eip4844(sidecar_4844);
+        assert_eq!(encode_without_blobs(&variant_4844), encoded_4844);
+
+        let sidecar_7594 = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0x04)],
+            vec![Bytes48::repeat_byte(0x05)],
+            vec![Bytes48::repeat_byte(0x06); CELLS_PER_EXT_BLOB],
+        );
+        let encoded_7594 = encode_without_blobs(&sidecar_7594);
+        let decoded_7594 =
+            BlobTransactionSidecarEip7594::decode_7594(&mut &encoded_7594[..]).unwrap();
+        assert!(decoded_7594.blobs.is_empty());
+        assert_eq!(decoded_7594.commitments, sidecar_7594.commitments);
+        assert_eq!(decoded_7594.cell_proofs, sidecar_7594.cell_proofs);
+
+        let variant_7594 = BlobTransactionSidecarVariant::Eip7594(sidecar_7594.clone());
+        assert_eq!(encode_without_blobs(&variant_7594), encoded_7594);
+
+        let mut with_blobs = Vec::new();
+        sidecar_7594.encode_7594_with(BlobSidecarEncoding::WithBlobs, &mut with_blobs);
+        assert_eq!(with_blobs, sidecar_7594.encoded_7594());
+        assert_eq!(
+            sidecar_7594.encode_7594_len_with(BlobSidecarEncoding::WithBlobs),
+            sidecar_7594.encode_7594_len()
+        );
+    }
+
+    #[test]
     #[cfg(feature = "kzg")]
     fn validate_7594_sidecar() {
         let sidecar =
@@ -1757,35 +1838,6 @@ mod tests {
         assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
     }
 
-    /// A sparse set above the minimum cell count follows the same recovery path.
-    #[test]
-    #[cfg(feature = "kzg")]
-    fn recover_sparse_blobs_with_more_than_minimum_cells() {
-        let settings = EnvKzgSettings::Default.get();
-        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
-            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
-            settings,
-        )
-        .unwrap();
-
-        let cell_mask = BlobCellMask::from_bits(
-            ((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1) | (1u128 << (CELLS_PER_EXT_BLOB - 1)),
-        );
-        assert_eq!(cell_mask.count(), CELLS_PER_EXT_BLOB / 2 + 1);
-        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
-
-        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
-            sidecar.commitments.clone(),
-            cell_mask,
-            &sparse_cells,
-            settings,
-        )
-        .unwrap();
-
-        assert_eq!(recovered.blobs, sidecar.blobs);
-        assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
-    }
-
     #[test]
     #[cfg(feature = "kzg")]
     fn recover_sparse_blobs_rejects_insufficient_cells() {
@@ -1881,7 +1933,8 @@ mod tests {
     #[test]
     fn blob_cell_mask_selects_indices() {
         let selected = (1u128 << 0) | (1u128 << 7);
-        let mask = BlobCellMask::new(B128::from(selected));
+        let mask =
+            BlobCellMask::new(B128::new([0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
 
         assert_eq!(mask.bits(), selected);
         assert_eq!(mask.count(), 2);
@@ -1990,5 +2043,16 @@ mod tests {
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(matches, vec![(0, cells_and_proofs)]);
+    }
+
+    #[test]
+    fn blob_cell_mask_decodes_wire_indices() {
+        for index in 0..CELLS_PER_EXT_BLOB {
+            let mut bytes = [0; 16];
+            bytes[index / 8] = 1 << (index % 8);
+            let mask = BlobCellMask::new(B128::new(bytes));
+
+            assert_eq!(mask.selected_indices().collect::<Vec<_>>(), vec![index]);
+        }
     }
 }

@@ -13,6 +13,7 @@ Signer implementations in Alloy:
 - [Trezor](https://docs.rs/alloy-signer-trezor)
 - [AWS KMS](https://docs.rs/alloy-signer-aws)
 - [GCP KMS](https://docs.rs/alloy-signer-gcp)
+- [Azure Key Vault](https://docs.rs/alloy-signer-azure)
 - [Turnkey](https://docs.rs/alloy-signer-turnkey)
 - [Tempo wallet keystore](https://docs.rs/alloy-signer-tempo)
 

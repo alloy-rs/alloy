@@ -227,7 +227,8 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if called after the request has been polled.
+    /// Panics if this is not a [`ProviderCall::RpcCall`], or if called after the request has been
+    /// polled.
     pub fn into_owned_params(self) -> ProviderCall<Params::Owned, Resp, Output, Map> {
         match self {
             Self::RpcCall(call) => ProviderCall::RpcCall(call.into_owned_params()),
@@ -350,30 +351,22 @@ mod tests {
     #[test]
     fn with_headers_updates_rpc_call_headers() {
         let client = ClientBuilder::default().transport(MockTransport::new(Asserter::new()), true);
-        let call: ProviderCall<NoParams, u64> = client.request_noparams("test_method").into();
         let mut headers = HeaderMap::new();
         headers.insert("x-api-key", HeaderValue::from_static("secret"));
 
-        let call = call.with_headers(headers).expect("call is an RPC call");
-
-        assert_eq!(
-            call.as_rpc_call().unwrap().request().meta.headers().unwrap().get("x-api-key"),
-            Some(&HeaderValue::from_static("secret"))
-        );
-    }
-
-    #[test]
-    fn with_header_updates_rpc_call_header() {
-        let client = ClientBuilder::default().transport(MockTransport::new(Asserter::new()), true);
         let call: ProviderCall<NoParams, u64> = client.request_noparams("test_method").into();
+        let with_headers = call.with_headers(headers).expect("call is an RPC call");
 
-        let call = call
+        let call: ProviderCall<NoParams, u64> = client.request_noparams("test_method").into();
+        let with_header = call
             .with_header(HeaderName::from_static("x-api-key"), HeaderValue::from_static("secret"))
             .expect("call is an RPC call");
 
-        assert_eq!(
-            call.as_rpc_call().unwrap().request().meta.headers().unwrap().get("x-api-key"),
-            Some(&HeaderValue::from_static("secret"))
-        );
+        for call in [with_headers, with_header] {
+            assert_eq!(
+                call.as_rpc_call().unwrap().request().meta.headers().unwrap().get("x-api-key"),
+                Some(&HeaderValue::from_static("secret"))
+            );
+        }
     }
 }
