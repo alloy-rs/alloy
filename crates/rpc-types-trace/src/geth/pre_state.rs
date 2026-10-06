@@ -198,7 +198,7 @@ impl AccountState {
     /// that code was cleared.
     ///
     /// Callers building prestate should omit empty and zero code hashes.
-    pub fn with_code_hash(mut self, code_hash: B256) -> Self {
+    pub const fn with_code_hash(mut self, code_hash: B256) -> Self {
         self.code_hash = Some(code_hash);
         self
     }
