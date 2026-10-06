@@ -755,3 +755,28 @@ fn witness_bounds() {
         assert_eq!(ExecutionWitness::from_ssz_bytes(&witness.as_ssz_bytes()).is_ok(), valid);
     }
 }
+
+#[test]
+fn payload_attributes_legacy_conversions_reject_inclusion_lists() {
+    for transactions in [vec![], vec![Bytes::from_static(&[1, 2])]] {
+        let paris = LegacyPayloadAttributes::from(PayloadAttributesParis::default())
+            .with_inclusion_list_transactions(transactions.clone());
+        let shanghai = LegacyPayloadAttributes::from(PayloadAttributesShanghai::default())
+            .with_inclusion_list_transactions(transactions.clone());
+        let cancun = LegacyPayloadAttributes::from(PayloadAttributesCancun::default())
+            .with_inclusion_list_transactions(transactions.clone());
+        let amsterdam = LegacyPayloadAttributes::from(PayloadAttributesAmsterdam::default())
+            .with_inclusion_list_transactions(transactions);
+        let results = [
+            PayloadAttributesParis::try_from(paris).map(|_| ()),
+            PayloadAttributesShanghai::try_from(shanghai).map(|_| ()),
+            PayloadAttributesCancun::try_from(cancun).map(|_| ()),
+            PayloadAttributesAmsterdam::try_from(amsterdam).map(|_| ()),
+        ];
+        assert_eq!(
+            results,
+            [Err(PayloadAttributesConversionError::UnexpectedField("inclusion_list_transactions",));
+                4],
+        );
+    }
+}

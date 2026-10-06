@@ -160,6 +160,7 @@ impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesParis {
         ensure_absent(&value.parent_beacon_block_root, "parent_beacon_block_root")?;
         ensure_absent(&value.slot_number, "slot_number")?;
         ensure_absent(&value.target_gas_limit, "target_gas_limit")?;
+        ensure_absent(&value.inclusion_list_transactions, "inclusion_list_transactions")?;
         Ok(Self {
             timestamp: value.timestamp,
             prev_randao: value.prev_randao,
@@ -189,6 +190,7 @@ impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesShanghai {
         ensure_absent(&value.parent_beacon_block_root, "parent_beacon_block_root")?;
         ensure_absent(&value.slot_number, "slot_number")?;
         ensure_absent(&value.target_gas_limit, "target_gas_limit")?;
+        ensure_absent(&value.inclusion_list_transactions, "inclusion_list_transactions")?;
         Ok(Self {
             timestamp: value.timestamp,
             prev_randao: value.prev_randao,
@@ -218,6 +220,7 @@ impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesCancun {
     fn try_from(value: LegacyPayloadAttributes) -> Result<Self, Self::Error> {
         ensure_absent(&value.slot_number, "slot_number")?;
         ensure_absent(&value.target_gas_limit, "target_gas_limit")?;
+        ensure_absent(&value.inclusion_list_transactions, "inclusion_list_transactions")?;
         Ok(Self {
             timestamp: value.timestamp,
             prev_randao: value.prev_randao,
@@ -251,6 +254,7 @@ impl TryFrom<LegacyPayloadAttributes> for PayloadAttributesAmsterdam {
     type Error = PayloadAttributesConversionError;
 
     fn try_from(value: LegacyPayloadAttributes) -> Result<Self, Self::Error> {
+        ensure_absent(&value.inclusion_list_transactions, "inclusion_list_transactions")?;
         Ok(Self {
             timestamp: value.timestamp,
             prev_randao: value.prev_randao,

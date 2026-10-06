@@ -159,9 +159,9 @@ struct BeaconPayloadAttributes {
     slot_number: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde_as(as = "Option<DisplayFromStr>")]
-    pub target_gas_limit: Option<u64>,
+    target_gas_limit: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub inclusion_list_transactions: Option<Vec<Bytes>>,
+    inclusion_list_transactions: Option<Vec<Bytes>>,
 }
 
 /// A helper module for serializing and deserializing the payload attributes for the beacon API.
