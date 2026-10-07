@@ -5,6 +5,7 @@ use crate::{
     Log, TransactionRequest,
 };
 use alloc::{string::String, vec::Vec};
+use alloy_eips::eip8141::FrameStatus;
 use alloy_primitives::{Bytes, U256};
 
 /// The maximum number of blocks that can be simulated in a single request,
@@ -127,6 +128,33 @@ pub struct SimCallResult {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub status: bool,
     /// Error in case the call failed
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub error: Option<SimulateError>,
+}
+
+/// Execution result of a single [EIP-8141] frame in `eth_simulateV1`.
+///
+/// [EIP-8141]: https://eips.ethereum.org/EIPS/eip-8141
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct FrameCallResult {
+    /// Whether the frame succeeded, failed or was skipped.
+    pub status: FrameStatus,
+    /// Total gas consumed by the frame.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub gas_used: u64,
+    /// Execution gas consumed by the frame.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub execution_gas_used: u64,
+    /// State gas consumed by the frame.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub state_gas_used: u64,
+    /// Surviving logs emitted by the frame.
+    pub logs: Vec<Log>,
+    /// Frame output or revert bytes.
+    pub return_data: Bytes,
+    /// Error in case the frame failed.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub error: Option<SimulateError>,
 }
