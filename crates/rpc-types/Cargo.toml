@@ -41,10 +41,6 @@ alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive", "std"] }
 
-[dev-dependencies]
-serde_json.workspace = true
-similar-asserts.workspace = true
-
 [features]
 default = [
     "eth",

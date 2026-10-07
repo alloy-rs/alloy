@@ -612,8 +612,6 @@ dependencies = [
  "alloy-rpc-types-txpool",
  "alloy-serde",
  "serde",
- "serde_json",
- "similar-asserts",
 ]
 
 [[package]]
