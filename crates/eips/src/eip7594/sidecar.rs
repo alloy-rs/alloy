@@ -9,7 +9,7 @@ use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{B128, B256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, EMPTY_LIST_CODE};
 
-use super::{BlobSidecarEncoding, Decodable7594, Encodable7594};
+use super::{decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594};
 use crate::eip4844::VersionedHashIter;
 #[cfg(feature = "kzg")]
 use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
@@ -195,10 +195,7 @@ impl BlobTransactionSidecarVariant {
         self,
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
-        match self {
-            Self::Eip4844(legacy) => legacy.try_into_7594(settings).map(Self::Eip7594),
-            sidecar @ Self::Eip7594(_) => Ok(sidecar),
-        }
+        self.try_into_eip7594_with_settings(settings).map(Self::Eip7594)
     }
 
     /// Consumes this sidecar and returns a [`BlobTransactionSidecarEip7594`] using default KZG
@@ -323,10 +320,7 @@ impl BlobTransactionSidecarVariant {
 
     /// Returns the index of the versioned hash in the commitments vector.
     pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
-        match self {
-            Self::Eip4844(s) => s.versioned_hash_index(hash),
-            Self::Eip7594(s) => s.versioned_hash_index(hash),
-        }
+        self.versioned_hashes().position(|versioned_hash| versioned_hash == *hash)
     }
 
     /// Returns the blob corresponding to the versioned hash, if it exists.
@@ -393,20 +387,7 @@ impl Encodable for BlobTransactionSidecarVariant {
 impl Decodable for BlobTransactionSidecarVariant {
     /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        if buf.len() < header.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-        let remaining = buf.len();
-        let this = Self::rlp_decode_fields(buf)?;
-        if buf.len() + header.payload_length != remaining {
-            return Err(alloy_rlp::Error::UnexpectedLength);
-        }
-
-        Ok(this)
+        decode_sidecar(buf, Self::rlp_decode_fields)
     }
 }
 
@@ -856,9 +837,9 @@ impl BlobTransactionSidecarEip7594 {
     /// elements, commitments, and proofs. The cells are constructed from each blob and verified
     /// against the commitments and proofs.
     ///
-    /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
-    /// fails to verify, or if the versioned hashes in the transaction do not match the actual
-    /// commitment versioned hashes.
+    /// Returns [BlobTransactionValidationError::InvalidProof] if any cell KZG proof fails to
+    /// verify, or [BlobTransactionValidationError::WrongVersionedHash] if a transaction's versioned
+    /// hash does not match its commitment.
     #[cfg(feature = "kzg")]
     pub fn validate(
         &self,
@@ -912,22 +893,12 @@ impl BlobTransactionSidecarEip7594 {
             commitments.extend(core::iter::repeat_n(*commitment, CELLS_PER_EXT_BLOB));
         }
 
-        let cells = if let [blob] = self.blobs.as_slice() {
-            let cells: Box<[c_kzg::Cell]> = proof_settings.compute_cells(blob.as_ckzg())?;
-            cells.into()
-        } else {
-            let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
-            for blob in &self.blobs {
-                let blob_cells = proof_settings.compute_cells(blob.as_ckzg())?;
-                cells.extend_from_slice(blob_cells.as_ref());
-            }
-            cells
-        };
+        let cells = self.compute_cells_with_settings(proof_settings)?;
 
         let res = proof_settings.verify_cell_kzg_proof_batch(
             Bytes48::slice_as_ckzg(&commitments),
             &cell_indices,
-            &cells,
+            crate::eip7594::Cell::slice_as_ckzg(&cells),
             Bytes48::slice_as_ckzg(self.cell_proofs.as_slice()),
         )?;
 
@@ -941,9 +912,7 @@ impl BlobTransactionSidecarEip7594 {
 
     /// Returns the index of the versioned hash in the commitments vector.
     pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
-        self.commitments.iter().position(|commitment| {
-            crate::eip4844::kzg_to_versioned_hash(commitment.as_slice()) == *hash
-        })
+        self.versioned_hashes().position(|versioned_hash| versioned_hash == *hash)
     }
 
     /// Returns the blob corresponding to the versioned hash, if it exists.
@@ -1180,21 +1149,7 @@ impl BlobTransactionSidecarEip7594 {
 
     /// Decodes the [BlobTransactionSidecarEip7594] from RLP bytes.
     pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        if buf.len() < header.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-        let remaining = buf.len();
-
-        let this = Self::decode_7594(buf)?;
-        if buf.len() + header.payload_length != remaining {
-            return Err(alloy_rlp::Error::UnexpectedLength);
-        }
-
-        Ok(this)
+        decode_sidecar(buf, Self::decode_7594)
     }
 }
 
