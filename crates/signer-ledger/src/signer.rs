@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST_0, P1_FIRST_1, P2};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, SignatureError, B256};
-use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
+use alloy_signer::{Result, Signer};
 use async_trait::async_trait;
 use coins_ledger::{
     common::{APDUCommand, APDUData},
@@ -53,7 +53,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        let encoded = tx.encoded_for_signing();
+        let encoded = Self::signing_payload(self.chain_id, tx)?;
 
         match encoded.as_slice() {
             // Ledger requires passing EIP712 data to a separate instruction
@@ -75,14 +75,12 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
                     })
                     .map(B256::from_slice)?;
 
-                sign_transaction_with_chain_id!(
-                    self,
-                    tx,
-                    self.sign_typed_data_with_separator(&hash, &domain_sep).await
-                )
+                self.sign_typed_data_with_separator(&hash, &domain_sep)
+                    .await
+                    .map_err(alloy_signer::Error::other)
             }
             // Usual flow
-            encoded => sign_transaction_with_chain_id!(self, tx, self.sign_tx_rlp(encoded).await),
+            encoded => self.sign_tx_rlp(encoded).await.map_err(alloy_signer::Error::other),
         }
     }
 }
@@ -152,9 +150,8 @@ alloy_network::impl_into_wallet!(LedgerSigner);
 impl LedgerSigner {
     /// Connects to the first compatible Ledger device and reads the derived address.
     ///
-    /// The device must be unlocked with its Ethereum app open. Set the transaction's chain ID
-    /// explicitly before signing. `chain_id` applies only to transaction signing and rejects a
-    /// conflicting transaction ID; do not rely on it to supply a missing ID.
+    /// The device must be unlocked with its Ethereum app open. `chain_id` applies only to
+    /// transaction signing: it fills a missing transaction chain ID and rejects a different one.
     ///
     /// # Examples
     ///
@@ -394,6 +391,23 @@ impl LedgerSigner {
         Ok(sig)
     }
 
+    /// Applies the signer's `chain_id` to `tx` and returns the payload to send to the device.
+    fn signing_payload(
+        chain_id: Option<ChainId>,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> Result<Vec<u8>> {
+        if let Some(chain_id) = chain_id {
+            if !tx.set_chain_id_checked(chain_id) {
+                return Err(alloy_signer::Error::TransactionChainIdMismatch {
+                    signer: chain_id,
+                    // we can only end up here if the tx has a chain id
+                    tx: tx.chain_id().unwrap(),
+                });
+            }
+        }
+        Ok(tx.encoded_for_signing())
+    }
+
     // helper which converts a derivation path to bytes
     fn path_to_bytes(derivation: &DerivationType) -> Result<Vec<u8>, LedgerError> {
         let derivation = derivation.to_string();
@@ -412,6 +426,31 @@ impl LedgerSigner {
         }
 
         Ok(bytes)
+    }
+}
+
+#[cfg(test)]
+mod signing_payload_tests {
+    use super::*;
+    use alloy_consensus::TxLegacy;
+
+    #[test]
+    fn signer_chain_id_is_applied_before_encoding() {
+        let mut tx = TxLegacy::default();
+        let payload = LedgerSigner::signing_payload(Some(1), &mut tx).unwrap();
+        assert_eq!(tx.chain_id, Some(1));
+        assert_eq!(payload, tx.encoded_for_signing());
+    }
+
+    #[test]
+    fn conflicting_chain_id_is_rejected() {
+        let mut tx = TxLegacy { chain_id: Some(2), ..Default::default() };
+        let err = LedgerSigner::signing_payload(Some(1), &mut tx).unwrap_err();
+        assert!(matches!(
+            err,
+            alloy_signer::Error::TransactionChainIdMismatch { signer: 1, tx: 2 }
+        ));
+        assert_eq!(tx.chain_id, Some(2));
     }
 }
 

@@ -24,11 +24,10 @@ Raw digest signing through `Signer::sign_hash` is not supported. Passing a 32-by
 
 ## Chain IDs
 
-Set each transaction's chain ID explicitly before signing. The optional chain ID passed to
-`LedgerSigner::new` applies only to transaction signing: `Some(id)` rejects a transaction carrying
-a different ID, but must not be relied on to supply a missing ID. `None` leaves the transaction
-unchanged. The signer setting does not constrain messages, EIP-712 domains, or EIP-7702
-authorizations.
+The optional chain ID passed to `LedgerSigner::new` applies only to transaction signing: `Some(id)`
+fills a transaction that has no chain ID and rejects a different transaction chain ID before the
+device is prompted. `None` leaves the transaction unchanged. The signer setting does not constrain
+messages, EIP-712 domains, or EIP-7702 authorizations.
 
 ## Example
 
