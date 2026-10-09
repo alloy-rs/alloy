@@ -140,8 +140,12 @@ where
     async fn sign_transaction_from(
         &self,
         sender: Address,
-        mut tx: N::UnsignedTx,
+        tx: N::UnsignedTx,
     ) -> alloy_signer::Result<N::TxEnvelope> {
+        let mut tx = match N::try_into_presigned(tx) {
+            Ok(envelope) => return Ok(envelope),
+            Err(tx) => tx,
+        };
         let sig = self.sign_transaction_inner(sender, &mut tx).await?;
         Ok(tx.into_signed(sig).into())
     }

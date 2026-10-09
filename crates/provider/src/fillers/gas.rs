@@ -12,7 +12,9 @@ use crate::{
 };
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
+use alloy_network::{
+    Network, NetworkTransactionBuilder, TransactionBuilder, TransactionBuilder4844,
+};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::TransportResult;
 use futures::FutureExt;
@@ -54,6 +56,8 @@ pub enum GasFillable {
 ///   header has no base fee.
 /// - If the filler was created with [`GasFiller::legacy`], it skips EIP-1559 estimation entirely
 ///   and always populates the `gas_limit` and `gas_price` fields if unset.
+/// - If the request opts out through [`NetworkTransactionBuilder::should_fill_gas`], it is left
+///   untouched.
 ///
 /// # Example
 ///
@@ -157,6 +161,10 @@ impl<N: Network> TxFiller<N> for GasFiller {
     type Fillable = GasFillable;
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        if !tx.should_fill_gas() {
+            return FillerControlFlow::Finished;
+        }
+
         // legacy and eip2930 tx
         if tx.gas_price().is_some() && tx.gas_limit().is_some() {
             return FillerControlFlow::Finished;
@@ -298,6 +306,8 @@ impl fmt::Debug for BlobGasEstimator {
 }
 
 /// Filler for the `max_fee_per_blob_gas` field in blob transactions.
+///
+/// Requests that opt out through [`NetworkTransactionBuilder::should_fill_gas`] are left untouched.
 #[derive(Clone, Debug, Default)]
 pub struct BlobGasFiller {
     /// The blob gas estimator to use.
@@ -311,6 +321,10 @@ where
     type Fillable = u128;
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        if !tx.should_fill_gas() {
+            return FillerControlFlow::Finished;
+        }
+
         // Nothing to fill if no blob sidecar is present or `max_fee_per_blob_gas` is already set
         // to a valid value.
         if !tx.has_blob_sidecar()
