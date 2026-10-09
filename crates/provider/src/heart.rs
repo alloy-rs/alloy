@@ -25,14 +25,17 @@ use tokio::{
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::{
     std::Instant,
-    tokio::{interval, sleep_until},
+    tokio::{interval, sleep, sleep_until},
 };
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use {
     std::time::Instant,
-    tokio::time::{interval, sleep_until},
+    tokio::time::{interval, sleep, sleep_until},
 };
+
+/// Maximum number of retries for fetching the receipt of a confirmed transaction.
+const MAX_RECEIPT_RETRIES: usize = 3;
 
 /// Errors which may occur when watching a pending transaction.
 #[derive(Debug, thiserror::Error)]
@@ -263,6 +266,16 @@ impl<N: Network> PendingTransactionBuilder<N> {
             }
 
             if confirmed {
+                // The transaction is confirmed, but the node may not have indexed its receipt yet,
+                // e.g. when a load balancer routes this request to a backend that lags behind the
+                // one the heartbeat saw the block on. Poll a few more times before giving up.
+                let poll_interval = self.provider.client().poll_interval();
+                for _ in 0..MAX_RECEIPT_RETRIES {
+                    sleep(poll_interval).await;
+                    if let Some(receipt) = self.provider.get_transaction_receipt(hash).await? {
+                        return Ok(receipt);
+                    }
+                }
                 return Err(RpcError::NullResp.into());
             }
         }
