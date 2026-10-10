@@ -155,15 +155,23 @@ impl GethInstance {
     ///
     /// Requires [`Geth::keep_stderr`] to have been set and [`Self::stderr`] not to have taken the
     /// handle.
+    ///
+    /// Returns [`NodeError::Fatal`] if geth closes stderr, i.e. exits, before the peer is added.
     pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeError> {
         let mut stderr = self.pid.stderr.as_mut().ok_or(NodeError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
         let start = Instant::now();
 
-        while start.elapsed() < NODE_DIAL_LOOP_TIMEOUT {
+        loop {
+            if start.elapsed() >= NODE_DIAL_LOOP_TIMEOUT {
+                return Err(NodeError::Timeout);
+            }
+
             line.clear();
-            err_reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if err_reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+                break;
+            }
 
             // geth ids are truncated
             let truncated_id = if id.len() > 16 { &id[..16] } else { id };
@@ -171,7 +179,14 @@ impl GethInstance {
                 return Ok(());
             }
         }
-        Err(NodeError::Timeout)
+
+        // stderr hit EOF, so geth is gone and the peer can never be added. Report it right away
+        // instead of spinning on `read_line` until the deadline.
+        let detail = match self.pid.try_wait().map_err(NodeError::WaitError)? {
+            Some(status) => format!("geth exited with {status}"),
+            None => "geth closed its stderr".to_string(),
+        };
+        Err(NodeError::Fatal(format!("{detail} before adding the peer")))
     }
 }
 
@@ -795,6 +810,28 @@ mod early_exit_tests {
 
         let err = Geth::at(&program).try_spawn().unwrap_err();
         assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
+    }
+
+    #[test]
+    fn stderr_eof_is_reported_instead_of_spinning() {
+        let dir = tempdir().unwrap();
+        let program = dir.path().join("geth");
+        // Startup looks healthy, then the process exits without ever adding the peer.
+        std::fs::write(
+            &program,
+            "#!/bin/sh\necho 'HTTP server started endpoint=127.0.0.1:8545 auth=false' >&2\nexit 0\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let mut geth = Geth::at(&program).keep_stderr().try_spawn().unwrap();
+
+        let start = Instant::now();
+        let err = geth.wait_to_add_peer("enode://deadbeef@127.0.0.1:30303").unwrap_err();
+        let elapsed = start.elapsed();
+
+        assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
+        assert!(elapsed < NODE_DIAL_LOOP_TIMEOUT, "spun until the deadline: {elapsed:?}");
     }
 }
 
