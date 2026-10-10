@@ -100,6 +100,18 @@ impl GasFiller {
         Self { estimator: Eip1559Estimator::Default, legacy: true }
     }
 
+    fn merge_1559_estimate<N: Network>(
+        tx: &N::TransactionRequest,
+        estimate: Eip1559Estimation,
+    ) -> Eip1559Estimation {
+        Eip1559Estimation {
+            max_fee_per_gas: tx.max_fee_per_gas().unwrap_or(estimate.max_fee_per_gas),
+            max_priority_fee_per_gas: tx
+                .max_priority_fee_per_gas()
+                .unwrap_or(estimate.max_priority_fee_per_gas),
+        }
+    }
+
     async fn prepare_legacy<P, N>(
         &self,
         provider: &P,
@@ -148,6 +160,7 @@ impl GasFiller {
         };
 
         let (gas_limit, estimate) = futures::try_join!(gas_limit_fut, eip1559_fees_fut)?;
+        let estimate = Self::merge_1559_estimate::<N>(tx, estimate);
 
         Ok(GasFillable::Eip1559 { gas_limit, estimate })
     }
@@ -371,6 +384,38 @@ mod tests {
     use alloy_network::Ethereum;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
+
+    #[test]
+    fn preserves_explicit_max_fee_per_gas_when_priority_fee_missing() {
+        let tx =
+            TransactionRequest { max_fee_per_gas: Some(100_000_000_000), ..Default::default() };
+        let estimate = Eip1559Estimation {
+            max_fee_per_gas: 20_000_000_000,
+            max_priority_fee_per_gas: 2_000_000_000,
+        };
+
+        let merged = GasFiller::merge_1559_estimate::<Ethereum>(&tx, estimate);
+
+        assert_eq!(merged.max_fee_per_gas, 100_000_000_000);
+        assert_eq!(merged.max_priority_fee_per_gas, 2_000_000_000);
+    }
+
+    #[test]
+    fn preserves_explicit_priority_fee_when_max_fee_missing() {
+        let tx = TransactionRequest {
+            max_priority_fee_per_gas: Some(3_000_000_000),
+            ..Default::default()
+        };
+        let estimate = Eip1559Estimation {
+            max_fee_per_gas: 20_000_000_000,
+            max_priority_fee_per_gas: 2_000_000_000,
+        };
+
+        let merged = GasFiller::merge_1559_estimate::<Ethereum>(&tx, estimate);
+
+        assert_eq!(merged.max_fee_per_gas, 20_000_000_000);
+        assert_eq!(merged.max_priority_fee_per_gas, 3_000_000_000);
+    }
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
