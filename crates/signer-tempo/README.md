@@ -1,6 +1,6 @@
 # alloy-signer-tempo
 
-Read-only [Tempo wallet](https://github.com/tempoxyz/wallet) keystore reader
+Read-only [Tempo wallet](https://github.com/tempoxyz/wallet-cli) keystore reader
 for alloy. Parses the file that `tempo wallet login` writes and exposes the
 materialized signer plus optional Keychain-mode metadata. No network I/O.
 
