@@ -1012,8 +1012,13 @@ mod tests {
 
         assert!(tx.from.is_none());
 
-        let std_provider = ProviderBuilder::new().connect_http(anvil.endpoint_url());
-        let should_fail = std_provider.estimate_gas(tx.clone()).await.is_err();
+        // Anvil funds the default sender when estimating a value transfer without `from`, so a
+        // sender-less request succeeds. Use an unfunded signer instead: its estimate only fails if
+        // the filler sets `from` to the signer's address.
+        let unfunded_provider = ProviderBuilder::new()
+            .wallet(EthereumWallet::new(PrivateKeySigner::random()))
+            .connect_http(anvil.endpoint_url());
+        let should_fail = unfunded_provider.estimate_gas(tx.clone()).await.is_err();
 
         assert!(should_fail);
 
