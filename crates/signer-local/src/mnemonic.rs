@@ -5,8 +5,8 @@
 
 use crate::{LocalSigner, LocalSignerError, PrivateKeySigner};
 use alloy_signer::utils::secret_key_to_address;
-use coins_bip32::{path::DerivationPath, prelude::Parent, xkeys::XPriv, BIP32_HARDEN};
-use coins_bip39::{English, Mnemonic, Wordlist};
+use coins_bip32::{path::DerivationPath, prelude::Parent, xkeys::XPriv};
+use coins_bip39::{English, Entropy, Mnemonic, MnemonicError, WordCount, Wordlist};
 use k256::ecdsa::SigningKey;
 use rand::Rng;
 use std::{marker::PhantomData, path::PathBuf};
@@ -146,20 +146,16 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// Sets the derivation path of the child key to be derived. The derivation path is calculated
     /// using the default derivation path prefix used in Ethereum, i.e. "m/44'/60'/0'/0/{index}".
     ///
-    /// An `index` at or above the BIP-32 harden bit (`0x8000_0000`) is rejected. See
-    /// [`MnemonicBuilderError::HardenBitOverflow`] for why.
+    /// An `index` at or above the BIP-32 harden bit (`0x8000_0000`) is rejected.
     pub fn index(self, index: u32) -> Result<Self, LocalSignerError> {
         self.derivation_path(format!("{DEFAULT_DERIVATION_PATH_PREFIX}{index}"))
     }
 
     /// Sets the derivation path of the child key to be derived.
     ///
-    /// Path components at or above the BIP-32 harden bit (`0x8000_0000`) are rejected. See
-    /// [`MnemonicBuilderError::HardenBitOverflow`] for why.
+    /// Path components at or above the BIP-32 harden bit (`0x8000_0000`) are rejected.
     pub fn derivation_path<T: AsRef<str>>(mut self, path: T) -> Result<Self, LocalSignerError> {
-        let path = path.as_ref();
-        check_harden_bit(path)?;
-        self.derivation_path = path.parse()?;
+        self.derivation_path = path.as_ref().parse()?;
         Ok(self)
     }
 
@@ -211,7 +207,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         rng: &mut R,
     ) -> Result<PrivateKeySigner, LocalSignerError> {
         let mnemonic = match &self.phrase {
-            None => Mnemonic::<W>::new_with_count(rng, self.word_count)?,
+            None => mnemonic_from_rng(rng, self.word_count)?,
             _ => return Err(MnemonicBuilderError::UnexpectedPhraseFound.into()),
         };
         let signer = self.mnemonic_to_signer(&mnemonic)?;
@@ -384,39 +380,30 @@ pub enum MnemonicBuilderError {
     /// Error suggests that a phrase (path or words) was not expected but found.
     #[error("unexpected phrase found")]
     UnexpectedPhraseFound,
-    /// A derivation path component is at or above the BIP-32 harden bit (`0x8000_0000`).
-    ///
-    /// `coins-bip32` 0.12 applies the harden marker with an unchecked `index + 0x8000_0000`, so
-    /// such a component wraps instead of erroring: in release builds `m/44'/60'/0'/0/2147483648'`
-    /// silently derives the unhardened child `0`, and a bare `2147483648` silently becomes `0'`.
-    /// Rejecting these matches `coins-bip32` 0.13.1 and go-ethereum's `ParseDerivationPath`.
-    #[error(
-        "BIP-32 derivation path component `{0}` is at or above the harden bit (0x8000_0000); \
-         valid indices are 0..=2147483647, optionally suffixed with ' or h to harden"
-    )]
-    HardenBitOverflow(String),
 }
 
-/// Rejects path components that would overflow the BIP-32 harden bit.
+/// Generates a mnemonic with `count` words from `rng`.
 ///
-/// Only the numeric range is checked here; malformed syntax is left to [`DerivationPath`]'s own
-/// parser so its error messages are preserved.
-fn check_harden_bit(path: &str) -> Result<(), MnemonicBuilderError> {
-    for component in path.split('/') {
-        let digits = component
-            .strip_suffix('\'')
-            .or_else(|| component.strip_suffix('h'))
-            .unwrap_or(component);
-        if digits.parse::<u32>().is_ok_and(|index| index >= BIP32_HARDEN) {
-            return Err(MnemonicBuilderError::HardenBitOverflow(component.to_string()));
-        }
-    }
-    Ok(())
+/// `coins-bip39` takes a different major version of `rand`, so entropy is drawn here and handed
+/// over as bytes.
+fn mnemonic_from_rng<W: Wordlist, R: Rng>(
+    rng: &mut R,
+    count: usize,
+) -> Result<Mnemonic<W>, MnemonicError> {
+    let len = WordCount::try_from(count)?.entropy_bytes();
+    let mut buf = zeroize::Zeroizing::new([0u8; 32]);
+    rng.fill_bytes(&mut buf[..len]);
+    Ok(Mnemonic::new_from_entropy(Entropy::from_slice(&buf[..len])?))
 }
 
 fn xpriv_to_signer(xpriv: &XPriv) -> PrivateKeySigner {
-    let credential: &coins_bip32::prelude::SigningKey = xpriv.as_ref();
-    let credential = credential.clone();
+    // `coins-bip32` uses a different major version of `k256`, so the key is moved across by its
+    // secret scalar bytes.
+    let xkey: &coins_bip32::prelude::SigningKey = xpriv.as_ref();
+    let mut bytes = zeroize::Zeroizing::new([0u8; 32]);
+    bytes.copy_from_slice(&xkey.to_bytes());
+    let credential =
+        SigningKey::from_slice(bytes.as_slice()).expect("bip32 keys are valid secp256k1 scalars");
     let address = secret_key_to_address(&credential);
     LocalSigner::<SigningKey> { credential, address, chain_id: None }
 }
@@ -425,6 +412,7 @@ fn xpriv_to_signer(xpriv: &XPriv) -> PrivateKeySigner {
 mod tests {
     use super::*;
     use alloy_primitives::address;
+    use coins_bip32::{Bip32Error, BIP32_HARDEN};
     use coins_bip39::English;
     use tempfile::tempdir;
 
@@ -589,11 +577,10 @@ mod tests {
 
     /// The BIP-32 harden bit overflow that silently derived the wrong key.
     ///
-    /// `coins-bip32` 0.12 hardens with an unchecked `index + 0x8000_0000`. Verified against
-    /// 0.12.0 in a release build: `m/44'/60'/0'/0/2147483648'` wrapped to the *unhardened*
-    /// child `0` and handed back anvil account 0 below, with no error. A bare `2147483648`
-    /// wrapped the other way, silently becoming `0'` (it also re-encodes as `"m/0'"`).
-    /// Debug builds panicked on the overflow instead, so neither mode was usable.
+    /// `coins-bip32` 0.12 hardened with an unchecked `index + 0x8000_0000`, so in release builds
+    /// `m/44'/60'/0'/0/2147483648'` wrapped to the *unhardened* child `0` and handed back anvil
+    /// account 0 below, with no error. A bare `2147483648` wrapped the other way, silently
+    /// becoming `0'`. `coins-bip32` now rejects these; this guards against regressions.
     #[test]
     fn mnemonic_rejects_harden_bit_overflow() {
         const ANVIL: &str = "test test test test test test test test test test test junk";
@@ -614,12 +601,7 @@ mod tests {
         ] {
             let err = build(path).unwrap_err();
             assert!(
-                matches!(
-                    err,
-                    LocalSignerError::MnemonicBuilderError(
-                        MnemonicBuilderError::HardenBitOverflow(_)
-                    )
-                ),
+                matches!(err, LocalSignerError::Bip32Error(Bip32Error::MalformattedDerivation(_))),
                 "{path} should be rejected as harden-bit overflow, got {err:?}"
             );
         }
@@ -631,8 +613,5 @@ mod tests {
         // gives a key distinct from account 0 rather than collapsing onto it.
         let max_hardened = build("m/44'/60'/0'/0/2147483647'").unwrap();
         assert_ne!(max_hardened.address(), account_0.address());
-
-        // Malformed components are still the underlying parser's to report, not ours.
-        assert!(matches!(build("m/not-a-number").unwrap_err(), LocalSignerError::Bip32Error(_)));
     }
 }
