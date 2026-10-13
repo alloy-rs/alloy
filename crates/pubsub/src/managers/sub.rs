@@ -11,9 +11,7 @@ use std::collections::BTreeMap;
 /// must address the same local subscription.
 fn canonical_server_id(id: &SubId) -> SubId {
     match id {
-        SubId::String(value)
-            if value.starts_with("0x") || value.starts_with("0X") =>
-        {
+        SubId::String(value) if value.starts_with("0x") || value.starts_with("0X") => {
             value.parse::<U256>().map(SubId::Number).unwrap_or_else(|_| id.clone())
         }
         _ => id.clone(),
@@ -159,13 +157,7 @@ mod tests {
         manager.upsert(request.clone(), SubId::String("0x01".to_owned()), 1);
         manager.upsert(request, SubId::String("0x02".to_owned()), 1);
 
-        assert_eq!(
-            manager.local_id_for(&SubId::Number("0x01".parse().unwrap())),
-            None
-        );
-        assert_eq!(
-            manager.local_id_for(&SubId::Number("0x02".parse().unwrap())),
-            Some(local_id)
-        );
+        assert_eq!(manager.local_id_for(&SubId::Number("0x01".parse().unwrap())), None);
+        assert_eq!(manager.local_id_for(&SubId::Number("0x02".parse().unwrap())), Some(local_id));
     }
 }
