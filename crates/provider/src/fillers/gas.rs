@@ -208,8 +208,16 @@ impl<N: Network> TxFiller<N> for GasFiller {
                 }
                 GasFillable::Eip1559 { gas_limit, estimate } => {
                     builder.set_gas_limit(gas_limit);
-                    builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
-                    builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+                    // Keep caller-set fees and fill only the missing ones, ensuring the priority
+                    // fee does not exceed the max fee.
+                    let tx_priority_fee = builder.max_priority_fee_per_gas();
+                    let max_fee = builder.max_fee_per_gas().unwrap_or_else(|| {
+                        estimate.max_fee_per_gas.max(tx_priority_fee.unwrap_or_default())
+                    });
+                    let priority_fee = tx_priority_fee
+                        .unwrap_or_else(|| estimate.max_priority_fee_per_gas.min(max_fee));
+                    builder.set_max_fee_per_gas(max_fee);
+                    builder.set_max_priority_fee_per_gas(priority_fee);
                 }
             }
         };
@@ -467,6 +475,62 @@ mod tests {
             panic!("expected a signed envelope");
         };
         assert!(envelope.is_legacy());
+    }
+
+    async fn fill_eip1559_fees(
+        max_fee_per_gas: Option<u128>,
+        max_priority_fee_per_gas: Option<u128>,
+    ) -> (u128, Option<u128>) {
+        let estimator = Eip1559Estimator::new(|_, _| Eip1559Estimation {
+            max_fee_per_gas: 3_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000,
+        });
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .filler(GasFiller::new(estimator))
+            .with_simple_nonce_management()
+            .fetch_chain_id()
+            .connect_anvil_with_wallet();
+
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas: Some(21000),
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
+            ..Default::default()
+        };
+
+        let SendableTx::Envelope(envelope) = provider.fill(tx).await.unwrap() else {
+            panic!("expected a signed envelope");
+        };
+        (envelope.max_fee_per_gas(), envelope.max_priority_fee_per_gas())
+    }
+
+    #[tokio::test]
+    async fn keeps_max_fee_per_gas() {
+        assert_eq!(
+            fill_eip1559_fees(Some(5_000_000_000), None).await,
+            (5_000_000_000, Some(1_000_000_000))
+        );
+        // The estimated priority fee is clamped to the caller's max fee.
+        assert_eq!(
+            fill_eip1559_fees(Some(500_000_000), None).await,
+            (500_000_000, Some(500_000_000))
+        );
+    }
+
+    #[tokio::test]
+    async fn keeps_max_priority_fee_per_gas() {
+        assert_eq!(
+            fill_eip1559_fees(None, Some(2_000_000_000)).await,
+            (3_000_000_000, Some(2_000_000_000))
+        );
+        // The estimated max fee is raised to the caller's priority fee.
+        assert_eq!(
+            fill_eip1559_fees(None, Some(4_000_000_000)).await,
+            (4_000_000_000, Some(4_000_000_000))
+        );
     }
 
     #[test]
