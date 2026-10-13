@@ -209,11 +209,17 @@ impl<N: Network> TxFiller<N> for GasFiller {
                 GasFillable::Eip1559 { gas_limit, estimate } => {
                     builder.set_gas_limit(gas_limit);
                     // Keep caller-set fees and fill only the missing ones, ensuring the priority
-                    // fee does not exceed the max fee.
+                    // fee does not exceed the max fee. A caller-set priority fee replaces the
+                    // estimated one in the max fee, keeping the estimated base fee headroom.
                     let tx_priority_fee = builder.max_priority_fee_per_gas();
-                    let max_fee = builder.max_fee_per_gas().unwrap_or_else(|| {
-                        estimate.max_fee_per_gas.max(tx_priority_fee.unwrap_or_default())
-                    });
+                    let max_fee =
+                        builder.max_fee_per_gas().unwrap_or_else(|| match tx_priority_fee {
+                            Some(priority_fee) => estimate
+                                .max_fee_per_gas
+                                .saturating_sub(estimate.max_priority_fee_per_gas)
+                                .saturating_add(priority_fee),
+                            None => estimate.max_fee_per_gas,
+                        });
                     let priority_fee = tx_priority_fee
                         .unwrap_or_else(|| estimate.max_priority_fee_per_gas.min(max_fee));
                     builder.set_max_fee_per_gas(max_fee);
@@ -522,14 +528,14 @@ mod tests {
 
     #[tokio::test]
     async fn keeps_max_priority_fee_per_gas() {
+        // The caller's priority fee replaces the estimated one in the max fee.
         assert_eq!(
             fill_eip1559_fees(None, Some(2_000_000_000)).await,
-            (3_000_000_000, Some(2_000_000_000))
+            (4_000_000_000, Some(2_000_000_000))
         );
-        // The estimated max fee is raised to the caller's priority fee.
         assert_eq!(
             fill_eip1559_fees(None, Some(4_000_000_000)).await,
-            (4_000_000_000, Some(4_000_000_000))
+            (6_000_000_000, Some(4_000_000_000))
         );
     }
 
