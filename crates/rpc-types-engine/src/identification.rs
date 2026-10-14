@@ -6,7 +6,7 @@ use alloc::string::String;
 /// have a code reserved in this list MUST use this code when identifying themselves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
-#[derive(strum::IntoStaticStr)] // Into<&'static str>, AsRef<str>, fmt::Display and serde::Serialize
+#[derive(strum::IntoStaticStr)] // Into<&'static str>
 #[derive(strum::EnumString)] // FromStr, TryFrom<&str>
 #[non_exhaustive]
 pub enum ClientCode {

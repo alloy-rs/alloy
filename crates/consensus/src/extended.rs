@@ -1,23 +1,11 @@
 //! Extended transaction types
 
-use crate::{EthereumTxEnvelope, Transaction};
+use crate::{transaction::delegate_transaction, EthereumTxEnvelope, Transaction};
 use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result, IsTyped2718},
-    eip2930::AccessList,
-    eip7702::SignedAuthorization,
     Decodable2718, Encodable2718, Typed2718,
 };
-use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Result as RlpResult};
-
-macro_rules! delegate {
-    ($self:expr => $tx:ident.$method:ident($($arg:expr),*)) => {
-        match $self {
-            Self::BuiltIn($tx) => $tx.$method($($arg),*),
-            Self::Other($tx) => $tx.$method($($arg),*),
-        }
-    };
-}
 
 /// An enum that combines two different transaction types.
 ///
@@ -121,73 +109,7 @@ where
     B: Transaction,
     T: Transaction,
 {
-    fn chain_id(&self) -> Option<ChainId> {
-        delegate!(self => tx.chain_id())
-    }
-
-    fn nonce(&self) -> u64 {
-        delegate!(self => tx.nonce())
-    }
-
-    fn gas_limit(&self) -> u64 {
-        delegate!(self => tx.gas_limit())
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        delegate!(self => tx.gas_price())
-    }
-
-    fn max_fee_per_gas(&self) -> u128 {
-        delegate!(self => tx.max_fee_per_gas())
-    }
-
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        delegate!(self => tx.max_priority_fee_per_gas())
-    }
-
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        delegate!(self => tx.max_fee_per_blob_gas())
-    }
-
-    fn priority_fee_or_price(&self) -> u128 {
-        delegate!(self => tx.priority_fee_or_price())
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        delegate!(self => tx.effective_gas_price(base_fee))
-    }
-
-    fn is_dynamic_fee(&self) -> bool {
-        delegate!(self => tx.is_dynamic_fee())
-    }
-
-    fn kind(&self) -> TxKind {
-        delegate!(self => tx.kind())
-    }
-
-    fn is_create(&self) -> bool {
-        delegate!(self => tx.is_create())
-    }
-
-    fn value(&self) -> U256 {
-        delegate!(self => tx.value())
-    }
-
-    fn input(&self) -> &Bytes {
-        delegate!(self => tx.input())
-    }
-
-    fn access_list(&self) -> Option<&AccessList> {
-        delegate!(self => tx.access_list())
-    }
-
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        delegate!(self => tx.blob_versioned_hashes())
-    }
-
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        delegate!(self => tx.authorization_list())
-    }
+    delegate_transaction!(self => match Self::BuiltIn, Self::Other);
 }
 
 impl<B, T> IsTyped2718 for Extended<B, T>

@@ -128,6 +128,8 @@ impl BlobParams {
 
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas`, `blob_gas_used` and `base_fee_per_gas`.
+    ///
+    /// When `max_blob_count` is zero, falls back to the pre-Osaka excess blob gas calculation.
     #[inline]
     pub fn next_block_excess_blob_gas_osaka(
         &self,
@@ -143,6 +145,7 @@ impl BlobParams {
 
         if U256::from(self.blob_base_cost) * U256::from(base_fee_per_gas)
             > U256::from(DATA_GAS_PER_BLOB) * U256::from(self.calc_blob_fee(excess_blob_gas))
+            && self.max_blob_count > 0
         {
             let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
                 / self.max_blob_count;
@@ -164,7 +167,6 @@ mod serde_impl {
     use crate::{eip4844, eip7840::BlobParams};
 
     #[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
-    #[serde(rename_all = "camelCase")]
     pub(crate) struct SerdeHelper {
         #[serde(rename = "baseFeeUpdateFraction")]
         update_fraction: u128,
@@ -172,8 +174,6 @@ mod serde_impl {
         max_blob_count: u64,
         #[serde(rename = "target")]
         target_blob_count: u64,
-        #[serde(skip)]
-        min_blob_fee: Option<u128>,
     }
 
     impl From<BlobParams> for SerdeHelper {
@@ -182,31 +182,24 @@ mod serde_impl {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
-                min_blob_fee,
+                min_blob_fee: _,
                 max_blobs_per_tx: _,
                 blob_base_cost: _,
             } = params;
 
-            Self {
-                target_blob_count,
-                max_blob_count,
-                update_fraction,
-                min_blob_fee: (min_blob_fee != eip4844::BLOB_TX_MIN_BLOB_GASPRICE)
-                    .then_some(min_blob_fee),
-            }
+            Self { target_blob_count, max_blob_count, update_fraction }
         }
     }
 
     impl From<SerdeHelper> for BlobParams {
         fn from(helper: SerdeHelper) -> Self {
-            let SerdeHelper { target_blob_count, max_blob_count, update_fraction, min_blob_fee } =
-                helper;
+            let SerdeHelper { target_blob_count, max_blob_count, update_fraction } = helper;
 
             Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
-                min_blob_fee: min_blob_fee.unwrap_or(eip4844::BLOB_TX_MIN_BLOB_GASPRICE),
+                min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
                 max_blobs_per_tx: max_blob_count,
                 blob_base_cost: 0,
             }

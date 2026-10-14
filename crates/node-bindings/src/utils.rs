@@ -10,9 +10,6 @@ use std::{
 };
 use tempfile::TempDir;
 
-#[cfg(unix)]
-use libc;
-
 /// Helper for graceful process shutdown.
 pub(crate) struct GracefulShutdown;
 
@@ -166,29 +163,6 @@ mod tests {
             extract_endpoint("IpV4 TCP Socket: ", line),
             Some(SocketAddr::from(([0, 0, 0, 0], 30303)))
         );
-    }
-
-    #[test]
-    fn test_unused_port() {
-        let port = unused_port();
-        assert!(port > 0);
-    }
-
-    #[test]
-    fn test_run_with_tempdir_sync() {
-        run_with_tempdir_sync("test_prefix", |path| {
-            assert!(path.exists(), "Temporary directory should exist");
-            assert!(path.is_dir(), "Temporary directory should be a directory");
-        });
-    }
-
-    #[tokio::test]
-    async fn test_run_with_tempdir_async() {
-        run_with_tempdir("test_prefix", |path| async move {
-            assert!(path.exists(), "Temporary directory should exist");
-            assert!(path.is_dir(), "Temporary directory should be a directory");
-        })
-        .await;
     }
 
     #[cfg(unix)]

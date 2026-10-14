@@ -144,20 +144,6 @@ struct CallBatchMsg<N: Network> {
     tx: oneshot::Sender<CallBatchMsgTx>,
 }
 
-impl<N: Network> Clone for CallBatchMsgKind<N>
-where
-    N::TransactionRequest: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::Call(tx) => Self::Call(tx.clone()),
-            Self::BlockNumber => Self::BlockNumber,
-            Self::ChainId => Self::ChainId,
-            Self::Balance(addr) => Self::Balance(*addr),
-        }
-    }
-}
-
 impl<N: Network> fmt::Debug for CallBatchMsg<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("BatchProviderMessage(")?;
@@ -314,14 +300,13 @@ struct CallBatchBackend<P, N: Network = Ethereum> {
     arbsys: bool,
     rx: mpsc::UnboundedReceiver<CallBatchMsg<N>>,
     pending: Vec<CallBatchMsg<N>>,
-    _pd: PhantomData<N>,
 }
 
 impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     fn spawn(inner: Arc<P>, layer: &CallBatchLayer) -> mpsc::UnboundedSender<CallBatchMsg<N>> {
         let CallBatchLayer { m3a, wait, arbsys } = *layer;
         let (tx, rx) = mpsc::unbounded_channel();
-        let this = Self { inner, m3a, wait, arbsys, rx, pending: Vec::new(), _pd: PhantomData };
+        let this = Self { inner, m3a, wait, arbsys, rx, pending: Vec::new() };
         this.run().spawn_task();
         tx
     }
@@ -685,35 +670,5 @@ mod tests {
             tokio::join!(provider.get_balance(COUNTER_ADDRESS), provider.get_chain_id());
         assert_eq!(single, U256::from(200));
         assert_eq!(batched.unwrap(), U256::from(200));
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn arbitrum() {
-        let url = "https://arbitrum.rpc.subquery.network/public";
-
-        let batched = ProviderBuilder::new().with_call_batching().connect(url).await.unwrap();
-
-        let batch_layer = CallBatchLayer::new().arbitrum_compat();
-        let batched_compat = ProviderBuilder::new().layer(batch_layer).connect(url).await.unwrap();
-
-        // single call so won't go through multicall3
-        let block = batched.get_block_number().await.unwrap();
-
-        // force batching
-        let (b, _) = tokio::join!(batched.get_block_number(), batched.get_chain_id());
-        // we expect this to be the L1 block number
-        let block_wrong = b.unwrap();
-
-        // force batch transaction
-        let (b, _) = tokio::join!(batched_compat.get_block_number(), batched.get_chain_id());
-        // compat mode returns correct block
-        let block_compat = b.unwrap();
-
-        dbg!(block, block_wrong, block_compat);
-
-        // arbitrum blocks move fast so we assert with some error margin
-        assert!(block.abs_diff(block_compat) < 10);
-        assert!(block.abs_diff(block_wrong) > 100_000);
     }
 }

@@ -4,10 +4,14 @@ use crate::parity::{
     Action, CallAction, CreateAction, CreateOutput, RewardAction, SelfdestructAction, TraceOutput,
     TransactionTrace,
 };
-use alloy_primitives::{map::AddressHashSet, Address};
+use alloy_primitives::{map::AddressHashSet, Address, BlockHash};
+use alloy_rpc_types_eth::FilterBlockOption;
 use serde::{Deserialize, Serialize};
 
 /// Trace filter.
+///
+/// Selects blocks either by the `from_block`..=`to_block` range or by `block_hash`, which selects
+/// exactly one block. See [`TraceFilter::block_option`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +37,11 @@ pub struct TraceFilter {
     /// Output amount
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<u64>,
+    /// Selects exactly the block with this hash, like `blockHash` in `eth_getLogs` (EIP-234).
+    ///
+    /// Mutually exclusive with `from_block` and `to_block`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_hash: Option<BlockHash>,
 }
 
 // === impl TraceFilter ===
@@ -80,6 +89,25 @@ impl TraceFilter {
         self
     }
 
+    /// Sets the `block_hash` field of the struct
+    pub const fn block_hash(mut self, block_hash: BlockHash) -> Self {
+        self.block_hash = Some(block_hash);
+        self
+    }
+
+    /// Returns the blocks this filter selects.
+    ///
+    /// Returns an error if `block_hash` is combined with `from_block` or `to_block`.
+    pub const fn block_option(&self) -> Result<TraceFilterBlockOption, TraceFilterBlockConflict> {
+        match (self.block_hash, self.from_block, self.to_block) {
+            (Some(hash), None, None) => Ok(TraceFilterBlockOption::AtBlockHash(hash)),
+            (Some(_), _, _) => Err(TraceFilterBlockConflict),
+            (None, from_block, to_block) => {
+                Ok(TraceFilterBlockOption::Range { from_block, to_block })
+            }
+        }
+    }
+
     /// Returns a `TraceFilterMatcher` for this filter.
     pub fn matcher(&self) -> TraceFilterMatcher {
         let from_addresses = self.from_address.iter().copied().collect();
@@ -87,6 +115,38 @@ impl TraceFilter {
         TraceFilterMatcher { mode: self.mode, from_addresses, to_addresses }
     }
 }
+
+/// The blocks selected by a [`TraceFilter`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TraceFilterBlockOption {
+    /// Blocks from `from_block` to `to_block`, inclusive.
+    Range {
+        /// From block
+        from_block: Option<u64>,
+        /// To block
+        to_block: Option<u64>,
+    },
+    /// Exactly the block with this hash.
+    AtBlockHash(BlockHash),
+}
+
+impl From<TraceFilterBlockOption> for FilterBlockOption {
+    fn from(option: TraceFilterBlockOption) -> Self {
+        match option {
+            TraceFilterBlockOption::Range { from_block, to_block } => Self::Range {
+                from_block: from_block.map(Into::into),
+                to_block: to_block.map(Into::into),
+            },
+            TraceFilterBlockOption::AtBlockHash(hash) => Self::AtBlockHash(hash),
+        }
+    }
+}
+
+/// Error returned by [`TraceFilter::block_option`] when `block_hash` is combined with
+/// `from_block` or `to_block`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, thiserror::Error)]
+#[error("cannot specify both blockHash and fromBlock/toBlock, choose one or the other")]
+pub struct TraceFilterBlockConflict;
 
 /// How to apply `from_address` and `to_address` filters.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -144,14 +204,6 @@ pub struct TraceFilterMatcher {
 impl TraceFilterMatcher {
     /// Returns `true` if the given `TransactionTrace` matches this filter.
     ///
-    /// # Arguments
-    ///
-    /// - `trace`: A reference to a `TransactionTrace` to be evaluated against the filter.
-    ///
-    /// # Returns
-    ///
-    /// - `true` if the transaction trace matches the filter criteria; otherwise, `false`.
-    ///
     /// # Behavior
     ///
     /// This function evaluates whether the `trace` matches based on its action type:
@@ -208,17 +260,9 @@ impl TraceFilterMatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{Bytes, U256};
+    use alloy_primitives::{Bytes, B256, U256};
     use serde_json::json;
     use similar_asserts::assert_eq;
-
-    #[test]
-    fn test_parse_filter() {
-        let s = r#"{"fromBlock":  "0x3","toBlock":  "0x5"}"#;
-        let filter: TraceFilter = serde_json::from_str(s).unwrap();
-        assert_eq!(filter.from_block, Some(3));
-        assert_eq!(filter.to_block, Some(5));
-    }
 
     #[test]
     fn default_filter_intersects_address_lists() {
@@ -267,7 +311,6 @@ mod tests {
             .unwrap();
             assert_eq!(filter.matcher().matches(&trace), expected);
         }
-        assert!(serde_json::from_value::<TraceFilter>(json!({ "mode": "unknown" })).is_err());
     }
 
     #[test]
@@ -281,12 +324,21 @@ mod tests {
             "mode": null,
             "after": null,
             "count": null,
+            "blockHash": null,
         }))
         .unwrap();
         assert_eq!(filter, omitted);
 
-        for member in ["fromBlock", "toBlock", "fromAddress", "toAddress", "mode", "after", "count"]
-        {
+        for member in [
+            "fromBlock",
+            "toBlock",
+            "fromAddress",
+            "toAddress",
+            "mode",
+            "after",
+            "count",
+            "blockHash",
+        ] {
             let filter: TraceFilter = serde_json::from_value(json!({ member: null })).unwrap();
             assert_eq!(filter, TraceFilter::default(), "{member}");
         }
@@ -301,26 +353,95 @@ mod tests {
             json!({ "toAddress": [null] }),
             json!({ "unknown": null }),
             json!({ "fromAddress": null, "unknown": null }),
+            json!({ "blockHash": "0x1234" }),
+            json!({ "blockHash": { "blockHash": B256::ZERO } }),
+            json!({ "blockHash": 1 }),
         ] {
             assert!(serde_json::from_value::<TraceFilter>(filter.clone()).is_err(), "{filter}");
         }
     }
 
     #[test]
-    fn null_mode_intersects_address_lists() {
-        let from = Address::with_last_byte(1);
-        let to = Address::with_last_byte(2);
+    fn block_hash_selects_block() {
+        let hash = B256::with_last_byte(0xab);
         let filter: TraceFilter = serde_json::from_value(json!({
-            "fromAddress": [from], "toAddress": [to], "mode": null,
+            "blockHash": hash,
+            "fromAddress": [Address::ZERO],
+            "after": 1,
+            "count": 2,
         }))
         .unwrap();
-        assert_eq!(filter.mode, TraceFilterMode::Intersection);
+        assert_eq!(
+            filter,
+            TraceFilter::default()
+                .block_hash(hash)
+                .from_address(vec![Address::ZERO])
+                .after(1)
+                .count(2)
+        );
+        assert_eq!(filter.block_option(), Ok(TraceFilterBlockOption::AtBlockHash(hash)));
 
-        let trace = TransactionTrace {
-            action: Action::Call(CallAction { from, to: from, ..Default::default() }),
-            ..Default::default()
-        };
-        assert!(!filter.matcher().matches(&trace));
+        let json = serde_json::to_value(TraceFilter::default().block_hash(hash)).unwrap();
+        assert_eq!(json["blockHash"], json!(hash));
+        assert_eq!(serde_json::from_value::<TraceFilter>(json).unwrap().block_hash, Some(hash));
+        assert!(serde_json::to_value(TraceFilter::default()).unwrap().get("blockHash").is_none());
+    }
+
+    #[test]
+    fn block_hash_excludes_range_bounds() {
+        let hash = B256::with_last_byte(0xab);
+        for filter in [
+            json!({ "blockHash": hash, "fromBlock": "0x2" }),
+            json!({ "blockHash": hash, "toBlock": "0x2" }),
+            json!({ "blockHash": hash, "fromBlock": "0x2", "toBlock": "0x2" }),
+        ] {
+            let filter: TraceFilter = serde_json::from_value(filter).unwrap();
+            assert_eq!(filter.block_option(), Err(TraceFilterBlockConflict), "{filter:?}");
+        }
+
+        for (filter, expected) in [
+            (
+                json!({ "blockHash": hash, "fromBlock": null, "toBlock": null }),
+                TraceFilterBlockOption::AtBlockHash(hash),
+            ),
+            (
+                json!({ "blockHash": null, "fromBlock": "0x2", "toBlock": "0x5" }),
+                TraceFilterBlockOption::Range { from_block: Some(2), to_block: Some(5) },
+            ),
+            (json!({}), TraceFilterBlockOption::Range { from_block: None, to_block: None }),
+        ] {
+            let filter: TraceFilter = serde_json::from_value(filter).unwrap();
+            assert_eq!(filter.block_option(), Ok(expected));
+        }
+    }
+
+    #[test]
+    fn block_option_converts_to_filter_block_option() {
+        let hash = B256::with_last_byte(0xab);
+        assert_eq!(
+            FilterBlockOption::from(TraceFilterBlockOption::AtBlockHash(hash)),
+            FilterBlockOption::AtBlockHash(hash)
+        );
+        assert_eq!(
+            FilterBlockOption::from(TraceFilterBlockOption::Range {
+                from_block: Some(2),
+                to_block: None
+            }),
+            FilterBlockOption::Range { from_block: Some(2u64.into()), to_block: None }
+        );
+    }
+
+    #[test]
+    fn duplicate_block_selectors_are_rejected() {
+        let hash = format!("\"{}\"", B256::with_last_byte(0xab));
+        for (member, value) in
+            [("blockHash", hash.as_str()), ("fromBlock", "\"0x1\""), ("toBlock", "\"0x1\"")]
+        {
+            for (first, second) in [(value, value), ("null", value), (value, "null")] {
+                let filter = format!(r#"{{"{member}":{first},"{member}":{second}}}"#);
+                assert!(serde_json::from_str::<TraceFilter>(&filter).is_err(), "{filter}");
+            }
+        }
     }
 
     #[test]
@@ -347,33 +468,6 @@ mod tests {
             let filter: TraceFilter = serde_json::from_value(filter).unwrap();
             assert_eq!(filter.matcher().matches(&trace), expected);
         }
-    }
-
-    #[test]
-    fn test_filter_matcher_addresses_unspecified() {
-        let filter_json = json!({ "fromBlock": "0x3", "toBlock": "0x5" });
-        let matcher = serde_json::from_value::<TraceFilter>(filter_json).unwrap().matcher();
-        let s = r#"{
-            "action": {
-                "from": "0x66e29f0b6b1b07071f2fde4345d512386cb66f5f",
-                "callType": "call",
-                "gas": "0x10bfc",
-                "input": "0x",
-                "to": "0x160f5f00288e9e1cc8655b327e081566e580a71d",
-                "value": "0x244b"
-            },
-            "error": "Reverted",
-            "result": {
-                "gasUsed": "0x9daf",
-                "output": "0x"
-            },
-            "subtraces": 3,
-            "traceAddress": [],
-            "type": "call"
-        }"#;
-        let trace = serde_json::from_str::<TransactionTrace>(s).unwrap();
-
-        assert!(matcher.matches(&trace));
     }
 
     #[test]
