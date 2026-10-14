@@ -169,6 +169,10 @@ pub mod signers {
     #[doc(inline)]
     pub use alloy_signer_aws as aws;
 
+    #[cfg(feature = "signer-azure")]
+    #[doc(inline)]
+    pub use alloy_signer_azure as azure;
+
     #[cfg(feature = "signer-gcp")]
     #[doc(inline)]
     pub use alloy_signer_gcp as gcp;

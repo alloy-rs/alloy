@@ -583,7 +583,6 @@ impl Geth {
                 .map_err(NodeError::SpawnError)?
                 .wait()
                 .map_err(NodeError::WaitError)?;
-            // .expect("failed to wait for geth init to exit");
             if !res.success() {
                 return Err(NodeError::InitError);
             }
@@ -655,7 +654,13 @@ impl Geth {
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+                let _ = child.kill();
+                let status = child.wait().map_err(NodeError::WaitError)?;
+                return Err(NodeError::Fatal(format!(
+                    "geth exited before it was ready ({status})"
+                )));
+            }
 
             if matches!(self.mode, NodeMode::NonDev(_)) && line.contains("Started P2P networking") {
                 p2p_started = true;
@@ -723,7 +728,7 @@ impl Geth {
             ipc: self.ipc_path,
             data_dir: self.data_dir,
             p2p_port,
-            auth_port: self.authrpc_port,
+            auth_port: Some(authrpc_port),
             genesis: self.genesis,
             clique_private_key: self.clique_private_key,
         })
@@ -773,5 +778,54 @@ mod tests {
             assert!(geth.endpoint().starts_with("http://localhost:"));
             assert!(geth.ws_endpoint().starts_with("ws://localhost:"));
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod early_exit_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn early_exit_is_reported() {
+        let dir = tempdir().unwrap();
+        let program = dir.path().join("geth");
+        std::fs::write(&program, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let err = Geth::at(&program).try_spawn().unwrap_err();
+        assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
+    }
+}
+
+#[cfg(all(test, unix))]
+mod auth_port_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn auto_selected_auth_port_is_reported() {
+        let dir = tempdir().unwrap();
+        let program = dir.path().join("geth");
+        let args = dir.path().join("args");
+        std::fs::write(
+            &program,
+            format!(
+                "#!/bin/sh\necho \"$@\" > '{}'\necho 'HTTP server started endpoint=127.0.0.1:8545 auth=false' >&2\n",
+                args.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let geth = Geth::at(&program).try_spawn().unwrap();
+        let args = std::fs::read_to_string(args).unwrap();
+        let passed = args
+            .split_whitespace()
+            .skip_while(|arg| *arg != "--authrpc.port")
+            .nth(1)
+            .and_then(|port| port.parse::<u16>().ok());
+        assert!(passed.is_some(), "no --authrpc.port in {args:?}");
+        assert_eq!(geth.auth_port(), passed);
     }
 }

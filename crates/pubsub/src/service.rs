@@ -8,7 +8,7 @@ use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcErro
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
-    TransportErrorKind, TransportResult,
+    TransportError, TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -134,8 +134,11 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // TODO: ideally we can send this with an unused id
-            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
+            // A string id keeps the reply from matching a request issued by `RpcClient`,
+            // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
+            // dropped on arrival.
+            let id = Id::String(format!("unsubscribe-{local_id}"));
+            let req = Request::new("eth_unsubscribe", id, [server_id]);
             let brv = req.serialize().expect("no ser error").take_request();
 
             self.dispatch_request(brv)?;
@@ -179,6 +182,12 @@ impl<T: PubSubConnect> PubSubService<T> {
     ) -> TransportResult<()> {
         let request = in_flight.request;
         let id = request.id().clone();
+
+        // Nobody waits for the response and the subscription is gone, e.g. it was unsubscribed
+        // while being re-issued after a reconnect. Don't re-create it without a consumer.
+        if in_flight.tx.is_closed() && !self.subs.contains(&request.params_hash()) {
+            return Ok(());
+        }
 
         let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
 
@@ -227,6 +236,20 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
     }
 
+    /// Handle the loss of the backend, given the error it reported, if any.
+    ///
+    /// Non-retryable errors are returned, otherwise the backend is reconnected with retries.
+    async fn handle_backend_error(&mut self, err: Option<TransportError>) -> TransportResult<()> {
+        if let Some(err) = err {
+            if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
+                error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
+                return Err(err);
+            }
+            error!(%err, "Pubsub service backend error.");
+        }
+        self.reconnect_with_retries().await
+    }
+
     /// Spawn the service.
     pub(crate) fn spawn(mut self) {
         let fut = async move {
@@ -247,14 +270,8 @@ impl<T: PubSubConnect> PubSubService<T> {
                             // It may have also signaled a typed error via the
                             // `error` oneshot; drain it before reconnecting
                             // so a non-retryable error short-circuits the loop.
-                            if let Ok(err) = self.handle.error.try_recv() {
-                                if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
-                                    error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
-                                    break Err(err)
-                                }
-                                error!(%err, "Pubsub service backend error.");
-                            }
-                            if let Err(e) = self.reconnect_with_retries().await {
+                            let err = self.handle.error.try_recv().ok();
+                            if let Err(e) = self.handle_backend_error(err).await {
                                 break Err(e)
                             }
                         }
@@ -266,12 +283,7 @@ impl<T: PubSubConnect> PubSubService<T> {
                         // If the sender was dropped without a value, fall back
                         // to a generic backend-gone error.
                         let err = res.unwrap_or_else(|_| TransportErrorKind::backend_gone());
-                        if matches!(&err, RpcError::Transport(k) if k.is_non_retryable()) {
-                            error!(%err, "Pubsub service backend reported a non-retryable error, shutting down.");
-                            break Err(err)
-                        }
-                        error!(%err, "Pubsub service backend error.");
-                        if let Err(e) = self.reconnect_with_retries().await {
+                        if let Err(e) = self.handle_backend_error(Some(err)).await {
                             break Err(e)
                         }
                     }

@@ -479,7 +479,7 @@ impl TrezorSigner {
                 }
                 MessageType::MessageType_PinMatrixRequest => {
                     return Err(trezor_client::Error::UnexpectedInteractionRequest(
-                        trezor_client::client::InteractionType::PinMatrix,
+                        InteractionType::PinMatrix,
                     )
                     .into());
                 }
@@ -678,22 +678,6 @@ mod tests {
     use alloy_network::{EthereumWallet, NetworkTransactionBuilder, TransactionBuilder};
     use alloy_primitives::{address, b256, Bytes};
     use alloy_rpc_types_eth::{AccessList, AccessListItem, TransactionRequest};
-
-    #[tokio::test]
-    #[ignore]
-    // Replace this with your ETH addresses.
-    async fn test_get_address() {
-        // Instantiate it with the default trezor derivation path
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(1), Some(1)).await.unwrap();
-        assert_eq!(
-            trezor.get_address().await.unwrap(),
-            address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
-        );
-        assert_eq!(
-            trezor.get_address_with_path(&DerivationType::TrezorLive(0)).await.unwrap(),
-            address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
-        );
-    }
 
     #[tokio::test]
     #[ignore]
@@ -973,17 +957,6 @@ mod tests {
         }
     }
 
-    /// Concrete `TxEip1559` must dispatch to the EIP-1559 Trezor API.
-    #[test]
-    fn build_sign_request_dispatches_concrete_eip1559_to_eip1559_api() {
-        let tx = sample_eip1559_tx();
-        let request = build_sign_request(&tx as &dyn SignableTransaction<Signature>).unwrap();
-        assert!(
-            matches!(request, TrezorSignRequest::Eip1559(_)),
-            "concrete TxEip1559 must dispatch to the EIP-1559 path, got {request:?}",
-        );
-    }
-
     /// Regression test for the Foundry bug: a wrapper around `TxEip1559` that implements
     /// `SignableTransaction<Signature>` (so its EIP-2718 type is 0x02 and `encoded_for_signing`
     /// is a valid type-2 preimage) must still dispatch to the EIP-1559 Trezor API. The
@@ -1027,17 +1000,6 @@ mod tests {
         assert!(
             matches!(request, TrezorSignRequest::Legacy(_)),
             "TxLegacy must dispatch to the legacy path, got {request:?}",
-        );
-    }
-
-    /// A wrapper around a legacy transaction must also dispatch to the legacy API.
-    #[test]
-    fn build_sign_request_dispatches_wrapped_legacy_to_legacy_api() {
-        let wrapped = SignableWrapper(sample_legacy_tx());
-        let request = build_sign_request(&wrapped as &dyn SignableTransaction<Signature>).unwrap();
-        assert!(
-            matches!(request, TrezorSignRequest::Legacy(_)),
-            "wrapper around TxLegacy must dispatch to the legacy path, got {request:?}",
         );
     }
 

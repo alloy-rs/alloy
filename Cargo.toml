@@ -61,6 +61,7 @@ alloy-rpc-types = { version = "2.5.0", path = "crates/rpc-types", default-featur
 alloy-serde = { version = "2.5.0", path = "crates/serde", default-features = false }
 alloy-signer = { version = "2.5.0", path = "crates/signer", default-features = false }
 alloy-signer-aws = { version = "2.5.0", path = "crates/signer-aws", default-features = false }
+alloy-signer-azure = { version = "2.5.0", path = "crates/signer-azure", default-features = false }
 alloy-signer-gcp = { version = "2.5.0", path = "crates/signer-gcp", default-features = false }
 alloy-signer-ledger = { version = "2.5.0", path = "crates/signer-ledger", default-features = false }
 alloy-signer-local = { version = "2.5.0", path = "crates/signer-local", default-features = false }
