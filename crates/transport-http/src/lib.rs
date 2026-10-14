@@ -227,7 +227,7 @@ impl<T> Http<T> {
 }
 
 /// Settings for an [`Http`] transport.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct HttpTransportSettings {
     max_response_size: Option<usize>,
 }
