@@ -3,6 +3,35 @@ use alloy_network::Ethereum;
 use alloy_primitives::B256;
 use alloy_rpc_types_eth::Block;
 
+#[tokio::test]
+async fn confirmed_receipt_retries_are_bounded() {
+    for (missing, succeeds) in [(0, true), (1, true), (3, true), (4, false)] {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let receipt = alloy_rpc_types_eth::TransactionReceipt::default();
+        // Registration sees an included receipt and confirms immediately.
+        asserter.push_success(&Some(&receipt));
+        for _ in 0..missing {
+            asserter.push_success(&Option::<alloy_rpc_types_eth::TransactionReceipt>::None);
+        }
+        if succeeds {
+            asserter.push_success(&Some(&receipt));
+        }
+        let client = alloy_rpc_client::RpcClient::mocked(asserter.clone());
+        client.set_poll_interval(Duration::from_millis(1));
+        let provider = RootProvider::<Ethereum>::new(client);
+        let result = PendingTransactionBuilder::new(provider, B256::ZERO).get_receipt().await;
+        if succeeds {
+            assert_eq!(result.unwrap(), receipt);
+        } else {
+            assert!(matches!(
+                result,
+                Err(PendingTransactionError::TransportError(RpcError::NullResp))
+            ));
+        }
+        assert!(asserter.read_q().is_empty(), "unexpected number of receipt requests: {missing}");
+    }
+}
+
 fn watcher(
     hash: TxHash,
     confirmations: u64,

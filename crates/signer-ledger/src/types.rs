@@ -79,19 +79,6 @@ pub(crate) enum INS {
     SIGN_EIP7702_AUTHORIZATION = 0x34,
 }
 
-impl fmt::Display for INS {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::GET_PUBLIC_KEY => write!(f, "GET_PUBLIC_KEY"),
-            Self::SIGN => write!(f, "SIGN"),
-            Self::GET_APP_CONFIGURATION => write!(f, "GET_APP_CONFIGURATION"),
-            Self::SIGN_PERSONAL_MESSAGE => write!(f, "SIGN_PERSONAL_MESSAGE"),
-            Self::SIGN_ETH_EIP_712 => write!(f, "SIGN_ETH_EIP_712"),
-            Self::SIGN_EIP7702_AUTHORIZATION => write!(f, "SIGN_EIP7702_AUTHORIZATION"),
-        }
-    }
-}
-
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[expect(non_camel_case_types)]

@@ -29,19 +29,22 @@ use tokio::{
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::{
     std::Instant,
-    tokio::{sleep_until, timeout},
+    tokio::{sleep, sleep_until, timeout},
 };
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use {
     std::time::Instant,
-    tokio::time::{sleep_until, timeout},
+    tokio::time::{sleep, sleep_until, timeout},
 };
 
 #[cfg(not(target_family = "wasm"))]
 use futures::stream::BoxStream;
 #[cfg(target_family = "wasm")]
 use futures::stream::LocalBoxStream as BoxStream;
+
+#[cfg(test)]
+mod heartbeat_tests;
 
 /// Errors which may occur when watching a pending transaction.
 #[derive(Debug, thiserror::Error)]
@@ -234,7 +237,17 @@ impl<N: Network> PendingTransactionBuilder<N> {
     pub async fn get_receipt(self) -> Result<N::ReceiptResponse, PendingTransactionError> {
         let hash = self.config.tx_hash;
         self.provider.watch_pending_transaction(self.config).await?.await?;
-        self.provider.get_transaction_receipt(hash).await?.ok_or_else(|| RpcError::NullResp.into())
+        let poll_interval = self.provider.client().poll_interval();
+        // Confirmation and receipt requests may reach different RPC replicas.
+        for attempt in 0..=3 {
+            if let Some(receipt) = self.provider.get_transaction_receipt(hash).await? {
+                return Ok(receipt);
+            }
+            if attempt < 3 {
+                sleep(poll_interval).await;
+            }
+        }
+        Err(RpcError::NullResp.into())
     }
 }
 
@@ -561,7 +574,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
     /// Handle a watch instruction by adding it to the watch list, and
     /// preserving its individual timeout.
-    fn handle_watch_ix(&mut self, to_watch: TxWatcher) {
+    fn handle_watch_ix(&mut self, mut to_watch: TxWatcher) {
         if let Some(deadline) = to_watch.deadline {
             self.next_timeout = Some(self.next_timeout.map_or(deadline, |next| next.min(deadline)));
         }
@@ -597,7 +610,6 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                 } else {
                     debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
                     // Ensure reorg handling can move this watcher back if needed.
-                    let mut to_watch = to_watch;
                     if to_watch.received_at_block.is_none() {
                         to_watch.received_at_block = Some(*block_height);
                     }

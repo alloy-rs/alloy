@@ -154,8 +154,14 @@ pub trait Decodable2718: Sized {
     /// format is used ONLY by the Ethereum p2p protocol. Do not call this
     /// method unless you are building a p2p protocol client.
     ///
-    /// The network encoding is the RLP encoding of the eip2718-encoded
-    /// envelope.
+    /// Canonical network encoding wraps a typed envelope (`type || payload`) in an RLP string;
+    /// legacy envelopes retain their RLP list encoding.
+    ///
+    /// For backwards compatibility, the default implementation also accepts typed envelopes
+    /// without the RLP string wrapper. Successful decoding therefore does not establish canonical
+    /// network encoding, and re-encoding may produce different bytes. Requiring the wrapper would
+    /// be a breaking change for callers relying on this behavior. Use [`Self::decode_2718`] when
+    /// decoding the direct EIP-2718 format.
     ///
     /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
     fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
@@ -178,9 +184,9 @@ pub trait Decodable2718: Sized {
         let tx = Self::typed_decode(ty, buf)?;
 
         let bytes_consumed = remaining_len - buf.len();
-        // because Header::decode works for single bytes (including the tx type), returning a
-        // string Header with payload_length of 1, we need to make sure this check is only
-        // performed for transactions with a string header
+        // Header::decode also accepts a bare type byte as a one-byte RLP string. Preserve
+        // acceptance of these unwrapped typed envelopes for backwards compatibility; rejecting
+        // them here would be a breaking change.
         if bytes_consumed != h.payload_length && h_decode[0] > EMPTY_STRING_CODE {
             return Err(alloy_rlp::Error::UnexpectedLength.into());
         }

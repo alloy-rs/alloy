@@ -19,6 +19,8 @@ pub mod checksum;
 mod optional;
 pub use self::optional::*;
 
+pub mod json_rpc;
+
 pub mod quantity;
 
 /// Storage related helpers.

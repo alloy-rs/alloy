@@ -19,7 +19,7 @@
 //! [`Provider`]: crate::Provider
 
 mod chain_id;
-use alloy_eips::{BlockId, BlockNumberOrTag};
+use alloy_eips::{eip7928::BlockAccessList, BlockId, BlockNumberOrTag};
 use alloy_primitives::{
     Address, BlockHash, BlockNumber, StorageKey, StorageValue, TxHash, B256, U128, U256,
 };
@@ -54,14 +54,14 @@ use crate::{
     PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
     SendableTxErr,
 };
-use alloy_json_rpc::RpcError;
+use alloy_json_rpc::{RpcError, RpcRecv};
 use alloy_network::{AnyNetwork, Ethereum, Network};
 use alloy_primitives::{Bytes, U64};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
-    AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
-    FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
+    AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, FillTransaction,
+    Filter, FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
 };
 use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
@@ -547,6 +547,31 @@ where
         self.inner.get_block_receipts(block)
     }
 
+    async fn get_block_access_list(
+        &self,
+        block: BlockId,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.inner.get_block_access_list(block).await
+    }
+
+    async fn get_block_access_list_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.inner.get_block_access_list_by_hash(hash).await
+    }
+
+    async fn get_block_access_list_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.inner.get_block_access_list_by_number(number).await
+    }
+
+    async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+        self.inner.get_block_access_list_raw(block).await
+    }
+
     async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
         self.inner.get_header(block).await
     }
@@ -729,6 +754,13 @@ where
         self.inner.send_raw_transaction(encoded_tx).await
     }
 
+    async fn send_raw_transaction_sync(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.inner.send_raw_transaction_sync(encoded_tx).await
+    }
+
     async fn send_raw_transaction_conditional(
         &self,
         encoded_tx: &[u8],
@@ -777,6 +809,34 @@ where
         let tx = self.fill(tx).await?;
         let tx = tx.try_into_request().map_err(TransportError::local_usage)?;
         self.inner.sign_transaction(tx).await
+    }
+
+    async fn fill_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
+        self.inner.fill_transaction(tx).await
+    }
+
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        match self.fill(tx).await? {
+            SendableTx::Envelope(envelope) => Ok(envelope),
+            SendableTx::Builder(tx) => {
+                if let FillerControlFlow::Missing(missing) = self.filler.status(&tx) {
+                    let message = format!("missing properties: {missing:?}");
+                    return Err(RpcError::local_usage_str(&message));
+                }
+                Err(RpcError::local_usage_str(
+                    "no wallet configured, fillers did not produce a signed transaction",
+                ))
+            }
+        }
     }
 
     #[cfg(feature = "pubsub")]
@@ -859,5 +919,114 @@ impl RecommendedFillers for AnyNetwork {
 
     fn recommended_fillers() -> Self::RecommendedFillers {
         Default::default()
+    }
+}
+
+#[cfg(test)]
+mod forwarding_tests {
+    use super::*;
+    use crate::ProviderBuilder;
+    use alloy_consensus::TxEnvelope;
+    use alloy_rpc_client::RpcClient;
+    use alloy_rpc_types_eth::{TransactionReceipt, TransactionRequest};
+    use alloy_transport::mock::Asserter;
+    use std::sync::{Arc, Mutex};
+
+    /// An inner layer that records which of its methods are reached.
+    #[derive(Clone, Debug)]
+    struct Recorder<P> {
+        inner: P,
+        calls: Arc<Mutex<Vec<&'static str>>>,
+    }
+
+    impl<P> Recorder<P> {
+        fn record(&self, method: &'static str) {
+            self.calls.lock().unwrap().push(method);
+        }
+    }
+
+    #[async_trait]
+    impl<P: Provider> Provider for Recorder<P> {
+        fn root(&self) -> &RootProvider {
+            self.inner.root()
+        }
+
+        async fn send_raw_transaction_sync(
+            &self,
+            encoded_tx: &[u8],
+        ) -> TransportResult<TransactionReceipt> {
+            self.record("send_raw_transaction_sync");
+            self.inner.send_raw_transaction_sync(encoded_tx).await
+        }
+
+        async fn get_block_access_list(
+            &self,
+            block: BlockId,
+        ) -> TransportResult<Option<BlockAccessList>> {
+            self.record("get_block_access_list");
+            self.inner.get_block_access_list(block).await
+        }
+
+        async fn get_block_access_list_by_hash(
+            &self,
+            hash: BlockHash,
+        ) -> TransportResult<Option<BlockAccessList>> {
+            self.record("get_block_access_list_by_hash");
+            self.inner.get_block_access_list_by_hash(hash).await
+        }
+
+        async fn get_block_access_list_by_number(
+            &self,
+            number: BlockNumberOrTag,
+        ) -> TransportResult<Option<BlockAccessList>> {
+            self.record("get_block_access_list_by_number");
+            self.inner.get_block_access_list_by_number(number).await
+        }
+
+        async fn get_block_access_list_raw(
+            &self,
+            block: BlockId,
+        ) -> TransportResult<Option<Bytes>> {
+            self.record("get_block_access_list_raw");
+            self.inner.get_block_access_list_raw(block).await
+        }
+
+        async fn fill_transaction(
+            &self,
+            tx: TransactionRequest,
+        ) -> TransportResult<FillTransaction<TxEnvelope>> {
+            self.record("fill_transaction");
+            self.inner.fill_transaction(tx).await
+        }
+    }
+
+    #[tokio::test]
+    async fn forwards_to_inner_layers() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let inner = Recorder {
+            inner: RootProvider::new(RpcClient::mocked(Asserter::new())),
+            calls: calls.clone(),
+        };
+        let provider = ProviderBuilder::new().connect_provider(inner);
+
+        // The empty mock fails every request, only the calls reaching the inner layer matter.
+        let _ = provider.send_raw_transaction_sync(&[]).await;
+        let _ = provider.get_block_access_list(BlockId::latest()).await;
+        let _ = provider.get_block_access_list_by_hash(B256::ZERO).await;
+        let _ = provider.get_block_access_list_by_number(BlockNumberOrTag::Latest).await;
+        let _ = provider.get_block_access_list_raw(BlockId::latest()).await;
+        let _ = provider.fill_transaction(TransactionRequest::default()).await;
+
+        assert_eq!(
+            *calls.lock().unwrap(),
+            [
+                "send_raw_transaction_sync",
+                "get_block_access_list",
+                "get_block_access_list_by_hash",
+                "get_block_access_list_by_number",
+                "get_block_access_list_raw",
+                "fill_transaction",
+            ]
+        );
     }
 }
