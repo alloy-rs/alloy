@@ -297,24 +297,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_basic_auth_from_url() {
-        let ws = WsConnect::new("wss://user:pass@example.com/path");
-        assert_eq!(ws.url(), "wss://user:pass@example.com/path");
-        assert_eq!(ws.auth(), Some(&Authorization::basic("user", "pass")));
-    }
-
-    #[test]
-    fn parse_username_only_from_url() {
-        let ws = WsConnect::new("ws://user@example.com");
-        assert_eq!(ws.url(), "ws://user@example.com");
-        assert_eq!(ws.auth(), Some(&Authorization::basic("user", "")));
-    }
-
-    #[test]
-    fn no_auth_when_url_has_no_credentials() {
-        let ws = WsConnect::new("wss://example.com/rpc");
-        assert_eq!(ws.url(), "wss://example.com/rpc");
-        assert!(ws.auth().is_none());
+    fn auth_from_url() {
+        for (url, auth) in [
+            ("wss://user:pass@example.com/path", Some(Authorization::basic("user", "pass"))),
+            ("ws://user@example.com", Some(Authorization::basic("user", ""))),
+            ("wss://example.com/rpc", None),
+            ("ws://localhost:8545", None),
+        ] {
+            let ws = WsConnect::new(url);
+            assert_eq!(ws.url(), url);
+            assert_eq!(ws.auth(), auth.as_ref(), "{url}");
+        }
     }
 
     #[test]
@@ -322,11 +315,5 @@ mod tests {
         let ws =
             WsConnect::new("wss://user:pass@example.com").with_auth(Authorization::bearer("tok"));
         assert_eq!(ws.auth(), Some(&Authorization::bearer("tok")));
-    }
-
-    #[test]
-    fn no_auth_for_localhost_username() {
-        let ws = WsConnect::new("ws://localhost:8545");
-        assert!(ws.auth().is_none());
     }
 }

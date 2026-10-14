@@ -145,14 +145,9 @@ pub mod u128_vec_vec_opt {
     where
         D: Deserializer<'de>,
     {
-        Option::<Vec<Vec<U128>>>::deserialize(deserializer)?.map_or_else(
-            || Ok(None),
-            |vec| {
-                Ok(Some(
-                    vec.into_iter().map(|v| v.into_iter().map(|val| val.to()).collect()).collect(),
-                ))
-            },
-        )
+        Ok(Option::<Vec<Vec<U128>>>::deserialize(deserializer)?.map(|vec| {
+            vec.into_iter().map(|v| v.into_iter().map(|val| val.to()).collect()).collect()
+        }))
     }
 
     /// Serializes u128 as hex string

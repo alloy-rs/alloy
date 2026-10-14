@@ -137,11 +137,9 @@ mod ssz_requests_conversions {
     use super::*;
     use crate::requests::TryFromRequestsError::SszDecodeError;
     use alloy_eips::{
-        eip6110::{DepositRequest, DEPOSIT_REQUEST_TYPE, MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD},
-        eip7002::{WithdrawalRequest, MAX_WITHDRAWAL_REQUESTS_PER_BLOCK, WITHDRAWAL_REQUEST_TYPE},
-        eip7251::{
-            ConsolidationRequest, CONSOLIDATION_REQUEST_TYPE, MAX_CONSOLIDATION_REQUESTS_PER_BLOCK,
-        },
+        eip6110::{DEPOSIT_REQUEST_TYPE, MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD},
+        eip7002::{MAX_WITHDRAWAL_REQUESTS_PER_BLOCK, WITHDRAWAL_REQUEST_TYPE},
+        eip7251::{CONSOLIDATION_REQUEST_TYPE, MAX_CONSOLIDATION_REQUESTS_PER_BLOCK},
         eip7685::Requests,
         eip8282::{
             BUILDER_DEPOSIT_REQUEST_TYPE, BUILDER_EXIT_REQUEST_TYPE,
@@ -180,60 +178,39 @@ mod ssz_requests_conversions {
         type Error = TryFromRequestsError;
 
         fn try_from(value: &Requests) -> Result<Self, Self::Error> {
-            #[derive(Default)]
-            struct RequestAccumulator {
-                deposits: Vec<DepositRequest>,
-                withdrawals: Vec<WithdrawalRequest>,
-                consolidations: Vec<ConsolidationRequest>,
-            }
+            let mut requests = Self::default();
 
-            impl RequestAccumulator {
-                fn accumulate(mut self, request: &[u8]) -> Result<Self, TryFromRequestsError> {
-                    if request.is_empty() {
-                        return Err(TryFromRequestsError::EmptyRequest);
+            for request in value.iter() {
+                let (request_type, payload) =
+                    request.split_first().ok_or(TryFromRequestsError::EmptyRequest)?;
+
+                match *request_type {
+                    DEPOSIT_REQUEST_TYPE => {
+                        requests.deposits = parse_request_payload(
+                            payload,
+                            MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD,
+                            DEPOSIT_REQUEST_TYPE,
+                        )?;
                     }
-
-                    let (request_type, payload) =
-                        request.split_first().expect("already checked for empty");
-
-                    match *request_type {
-                        DEPOSIT_REQUEST_TYPE => {
-                            self.deposits = parse_request_payload(
-                                payload,
-                                MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD,
-                                DEPOSIT_REQUEST_TYPE,
-                            )?;
-                        }
-                        WITHDRAWAL_REQUEST_TYPE => {
-                            self.withdrawals = parse_request_payload(
-                                payload,
-                                MAX_WITHDRAWAL_REQUESTS_PER_BLOCK,
-                                WITHDRAWAL_REQUEST_TYPE,
-                            )?;
-                        }
-                        CONSOLIDATION_REQUEST_TYPE => {
-                            self.consolidations = parse_request_payload(
-                                payload,
-                                MAX_CONSOLIDATION_REQUESTS_PER_BLOCK,
-                                CONSOLIDATION_REQUEST_TYPE,
-                            )?;
-                        }
-                        unknown => return Err(TryFromRequestsError::UnknownRequestType(unknown)),
+                    WITHDRAWAL_REQUEST_TYPE => {
+                        requests.withdrawals = parse_request_payload(
+                            payload,
+                            MAX_WITHDRAWAL_REQUESTS_PER_BLOCK,
+                            WITHDRAWAL_REQUEST_TYPE,
+                        )?;
                     }
-
-                    Ok(self)
+                    CONSOLIDATION_REQUEST_TYPE => {
+                        requests.consolidations = parse_request_payload(
+                            payload,
+                            MAX_CONSOLIDATION_REQUESTS_PER_BLOCK,
+                            CONSOLIDATION_REQUEST_TYPE,
+                        )?;
+                    }
+                    unknown => return Err(TryFromRequestsError::UnknownRequestType(unknown)),
                 }
             }
 
-            let accumulator = value
-                .iter()
-                .try_fold(RequestAccumulator::default(), |acc, request| acc.accumulate(request))?;
-
-            Ok(Self {
-                deposits: accumulator.deposits,
-                withdrawals: accumulator.withdrawals,
-                consolidations: accumulator.consolidations,
-            })
+            Ok(requests)
         }
     }
 

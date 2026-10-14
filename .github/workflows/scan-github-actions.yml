@@ -10,7 +10,7 @@ permissions: {}
 
 jobs:
   scan:
-    uses: tempoxyz/gh-actions/.github/workflows/scan-github-actions.yml@d5402286a7abdfb7232173b3228d56473feb8a66 # 2026-09-29T02-04-45Z-d5402286
+    uses: tempoxyz/gh-actions/.github/workflows/scan-github-actions.yml@2ab28a31ae569be9f780c7675b684471060afa40 # 2026-10-09T21-43-19Z-2ab28a31
     permissions:
       actions: read
       contents: read
