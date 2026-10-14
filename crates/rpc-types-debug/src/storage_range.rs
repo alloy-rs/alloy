@@ -31,7 +31,6 @@ impl From<StorageResult> for (StorageKey, B256) {
 #[derive(
     Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, AsRef, Deref, AsMut, DerefMut,
 )]
-#[serde(rename_all = "camelCase")]
 pub struct StorageMap(pub BTreeMap<B256, StorageResult>);
 
 impl From<BTreeMap<B256, StorageResult>> for StorageMap {

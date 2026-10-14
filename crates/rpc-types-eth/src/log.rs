@@ -14,7 +14,7 @@ pub struct Log<T = LogData> {
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<BlockHash>,
     /// Number of the block the transaction that emitted this log was mined in
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
     /// The block timestamp in Unix seconds, as proposed in:
     /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
@@ -32,11 +32,11 @@ pub struct Log<T = LogData> {
     #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<TxHash>,
     /// Index of the Transaction in the block
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     #[doc(alias = "tx_index")]
     pub transaction_index: Option<u64>,
     /// Log Index in Block
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub log_index: Option<u64>,
     /// Whether a previously emitted log was removed from the canonical chain by a reorganization.
     ///
@@ -59,6 +59,20 @@ impl<T> Log<T> {
     /// Consumes the type and returns the wrapped [`alloy_primitives::Log`]
     pub fn into_inner(self) -> alloy_primitives::Log<T> {
         self.inner
+    }
+
+    /// Returns a log with the given inner log and a copy of this log's metadata.
+    const fn with_inner<U>(&self, inner: alloy_primitives::Log<U>) -> Log<U> {
+        Log {
+            inner,
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            block_timestamp: self.block_timestamp,
+            transaction_hash: self.transaction_hash,
+            transaction_index: self.transaction_index,
+            log_index: self.log_index,
+            removed: self.removed,
+        }
     }
 }
 
@@ -83,34 +97,14 @@ impl Log<LogData> {
 
     /// Decode the log data into a typed log.
     pub fn log_decode<T: alloy_sol_types::SolEvent>(&self) -> alloy_sol_types::Result<Log<T>> {
-        let decoded = T::decode_log(&self.inner)?;
-        Ok(Log {
-            inner: decoded,
-            block_hash: self.block_hash,
-            block_number: self.block_number,
-            block_timestamp: self.block_timestamp,
-            transaction_hash: self.transaction_hash,
-            transaction_index: self.transaction_index,
-            log_index: self.log_index,
-            removed: self.removed,
-        })
+        Ok(self.with_inner(T::decode_log(&self.inner)?))
     }
 
     /// Decode the log data with validation into a typed log.
     pub fn log_decode_validate<T: alloy_sol_types::SolEvent>(
         &self,
     ) -> alloy_sol_types::Result<Log<T>> {
-        let decoded = T::decode_log_validate(&self.inner)?;
-        Ok(Log {
-            inner: decoded,
-            block_hash: self.block_hash,
-            block_number: self.block_number,
-            block_timestamp: self.block_timestamp,
-            transaction_hash: self.transaction_hash,
-            transaction_index: self.transaction_index,
-            log_index: self.log_index,
-            removed: self.removed,
-        })
+        Ok(self.with_inner(T::decode_log_validate(&self.inner)?))
     }
 
     /// Creates a collection of RPC logs from transaction receipt logs.
@@ -180,16 +174,7 @@ where
     /// [`alloy_primitives::Log`]. this copies the log metadata, preserving
     /// the original object.
     pub fn reserialize(&self) -> Log<LogData> {
-        Log {
-            inner: self.reserialize_inner(),
-            block_hash: self.block_hash,
-            block_number: self.block_number,
-            block_timestamp: self.block_timestamp,
-            transaction_hash: self.transaction_hash,
-            transaction_index: self.transaction_index,
-            log_index: self.log_index,
-            removed: self.removed,
-        }
+        self.with_inner(self.reserialize_inner())
     }
 }
 
@@ -228,8 +213,6 @@ mod tests {
     use super::*;
     use alloy_consensus::{Receipt, ReceiptWithBloom, TxReceipt};
     use alloy_primitives::{Address, Bytes};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use similar_asserts::assert_eq;
 
     const fn assert_tx_receipt<T: TxReceipt>() {}
@@ -237,14 +220,6 @@ mod tests {
     #[test]
     const fn assert_receipt() {
         assert_tx_receipt::<ReceiptWithBloom<Receipt<Log>>>();
-    }
-
-    #[test]
-    fn log_arbitrary() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-
-        let _: Log = Log::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
     }
 
     #[test]
@@ -284,5 +259,36 @@ mod tests {
 
         let deserialized: Log = serde_json::from_str(&serialized).unwrap();
         assert_eq!(log, deserialized);
+    }
+
+    // `blockNumber`, `transactionIndex` and `logIndex` are optional in `eth_getLogs` responses and
+    // may be omitted entirely by the node, so an omitted field must deserialize to `None` instead
+    // of failing with `missing field`.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_log_omitted_optional_metadata() {
+        let json = r#"{"address":"0x0000000000000000000000000000000000000069","topics":["0x0000000000000000000000000000000000000000000000000000000000000069"],"data":"0x69","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000069","transactionHash":"0x0000000000000000000000000000000000000000000000000000000000000069","removed":false}"#;
+        let log: Log = serde_json::from_str(json).unwrap();
+
+        assert_eq!(log.block_number, None);
+        assert_eq!(log.transaction_index, None);
+        assert_eq!(log.log_index, None);
+        assert_eq!(log.block_timestamp, None);
+        // Non-quantity optional fields already behaved this way.
+        assert_eq!(log.block_hash, Some(B256::with_last_byte(0x69)));
+        assert_eq!(log.transaction_hash, Some(B256::with_last_byte(0x69)));
+    }
+
+    // Explicit `null`s must keep working after adding `default`.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_log_null_optional_metadata() {
+        let json = r#"{"address":"0x0000000000000000000000000000000000000069","topics":["0x0000000000000000000000000000000000000000000000000000000000000069"],"data":"0x69","blockNumber":null,"blockTimestamp":null,"transactionIndex":null,"logIndex":null,"removed":false}"#;
+        let log: Log = serde_json::from_str(json).unwrap();
+
+        assert_eq!(log.block_number, None);
+        assert_eq!(log.block_timestamp, None);
+        assert_eq!(log.transaction_index, None);
+        assert_eq!(log.log_index, None);
     }
 }

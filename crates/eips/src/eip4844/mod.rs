@@ -659,6 +659,33 @@ mod tests {
     }
 
     #[test]
+    fn osaka_excess_blob_gas_with_zero_blob_capacity() {
+        let params = crate::eip7840::BlobParams {
+            target_blob_count: 0,
+            max_blob_count: 0,
+            max_blobs_per_tx: 0,
+            ..crate::eip7840::BlobParams::osaka()
+        };
+
+        for t @ &(base_fee, excess, expected) in &[
+            (0, 0, 0),
+            (0, 1, 1),
+            // Blob fee is 1 for these inputs. At base fee 16,
+            // the reserve-price comparison is equal; at 17 it is exceeded.
+            (16, 0, 0),
+            (16, 1, 1),
+            (17, 0, 0),
+            (17, 1, 1),
+            (1_000_000_000, 0, 0),
+            (1_000_000_000, 1, 1),
+        ] {
+            let actual = params.next_block_excess_blob_gas_osaka(excess, 0, base_fee);
+
+            assert_eq!(actual, expected, "test: {t:?}");
+        }
+    }
+
+    #[test]
     fn osaka_excess_blob_gas_handles_large_blob_fee_comparison() {
         let params = crate::eip7840::BlobParams::osaka();
         let excess_blob_gas = crate::eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA as u64 * 88;

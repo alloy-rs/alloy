@@ -1,3 +1,5 @@
+//! Field-level sidecar codecs and shared RLP list framing.
+
 use alloc::vec::Vec;
 use alloy_rlp::BufMut;
 
@@ -69,4 +71,25 @@ pub trait Decodable7594: Sized {
     ///
     /// [EIP-7594]: https://eips.ethereum.org/EIPS/eip-7594
     fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
+}
+
+#[cfg(feature = "kzg-sidecar")]
+pub(crate) fn decode_sidecar<T>(
+    buf: &mut &[u8],
+    decode_fields: impl FnOnce(&mut &[u8]) -> alloy_rlp::Result<T>,
+) -> alloy_rlp::Result<T> {
+    let header = alloy_rlp::Header::decode(buf)?;
+    if !header.list {
+        return Err(alloy_rlp::Error::UnexpectedString);
+    }
+    if buf.len() < header.payload_length {
+        return Err(alloy_rlp::Error::InputTooShort);
+    }
+    let remaining = buf.len();
+    let sidecar = decode_fields(buf)?;
+    if buf.len() + header.payload_length != remaining {
+        return Err(alloy_rlp::Error::UnexpectedLength);
+    }
+
+    Ok(sidecar)
 }

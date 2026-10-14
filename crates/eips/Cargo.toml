@@ -74,7 +74,6 @@ alloy-primitives = { workspace = true, features = [
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-rand.workspace = true
 
 [features]
 default = ["std", "kzg-sidecar"]
@@ -108,7 +107,6 @@ serde = [
 	"alloy-eip8141/serde",
 	"alloy-eip2124/serde",
 	"either/serde",
-	"rand/serde",
 ]
 # Solidity event types and deposit log encoding.
 sol-types = ["dep:alloy-sol-types"]

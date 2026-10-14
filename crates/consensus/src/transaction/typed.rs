@@ -11,7 +11,7 @@ use crate::{
 };
 use alloy_eips::{eip2718::Eip2718Result, Typed2718};
 use alloy_primitives::{ChainId, Signature, TxHash};
-use alloy_rlp::{Buf, BufMut, Decodable};
+use alloy_rlp::{Buf, BufMut, Decodable, Header};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
 pub type TypedTransaction = EthereumTypedTransaction<TxEip4844Variant>;
@@ -263,6 +263,46 @@ impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
         }
     }
 
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        match self {
+            Self::Legacy(tx) => tx.rlp_header_signed(signature),
+            Self::Eip2930(tx) => tx.rlp_header_signed(signature),
+            Self::Eip1559(tx) => tx.rlp_header_signed(signature),
+            Self::Eip4844(tx) => tx.rlp_header_signed(signature),
+            Self::Eip7702(tx) => tx.rlp_header_signed(signature),
+        }
+    }
+
+    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip2930(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip1559(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip4844(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip7702(tx) => tx.rlp_encoded_length_with_signature(signature),
+        }
+    }
+
+    fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        match self {
+            Self::Legacy(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip2930(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip1559(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip4844(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip7702(tx) => tx.rlp_encode_signed(signature, out),
+        }
+    }
+
+    fn eip2718_encoded_length(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip2930(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip1559(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip4844(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip7702(tx) => tx.eip2718_encoded_length(signature),
+        }
+    }
+
     fn eip2718_encode_with_type(&self, signature: &Signature, _ty: u8, out: &mut dyn BufMut) {
         match self {
             Self::Legacy(tx) => tx.eip2718_encode_with_type(signature, tx.ty(), out),
@@ -280,6 +320,26 @@ impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
             Self::Eip1559(tx) => tx.eip2718_encode(signature, out),
             Self::Eip4844(tx) => tx.eip2718_encode(signature, out),
             Self::Eip7702(tx) => tx.eip2718_encode(signature, out),
+        }
+    }
+
+    fn network_header(&self, signature: &Signature) -> Header {
+        match self {
+            Self::Legacy(tx) => tx.network_header(signature),
+            Self::Eip2930(tx) => tx.network_header(signature),
+            Self::Eip1559(tx) => tx.network_header(signature),
+            Self::Eip4844(tx) => tx.network_header(signature),
+            Self::Eip7702(tx) => tx.network_header(signature),
+        }
+    }
+
+    fn network_encoded_length(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.network_encoded_length(signature),
+            Self::Eip2930(tx) => tx.network_encoded_length(signature),
+            Self::Eip1559(tx) => tx.network_encoded_length(signature),
+            Self::Eip4844(tx) => tx.network_encoded_length(signature),
+            Self::Eip7702(tx) => tx.network_encoded_length(signature),
         }
     }
 
@@ -472,35 +532,11 @@ pub(crate) mod serde_bincode_compat {
     mod tests {
         use super::super::{serde_bincode_compat, EthereumTypedTransaction};
         use crate::TxEip4844;
-        use arbitrary::Arbitrary;
-        use bincode::config;
-        use rand::Rng;
-        use serde::{Deserialize, Serialize};
-        use serde_with::serde_as;
-
-        #[test]
-        fn test_typed_tx_bincode_roundtrip() {
-            #[serde_as]
-            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-            struct Data {
-                #[serde_as(as = "serde_bincode_compat::EthereumTypedTransaction<'_>")]
-                transaction: EthereumTypedTransaction<TxEip4844>,
-            }
-
-            let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
-                transaction: EthereumTypedTransaction::arbitrary(
-                    &mut arbitrary::Unstructured::new(&bytes),
-                )
-                .unwrap(),
-            };
-
-            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _) =
-                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
-            assert_eq!(decoded, data);
-        }
+        bincode_compat_roundtrip_test!(
+            test_typed_tx_bincode_roundtrip,
+            EthereumTypedTransaction<TxEip4844>,
+            "serde_bincode_compat::EthereumTypedTransaction<'_>"
+        );
     }
 }
 
