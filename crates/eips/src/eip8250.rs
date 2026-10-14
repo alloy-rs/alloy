@@ -1,15 +1,20 @@
 //! EIP-8250 keyed nonce domains.
 
 use alloc::vec::Vec;
-use alloy_primitives::{address, keccak256, Address, B256, U256};
+use alloy_primitives::{address, keccak256, Address, Keccak256, B256, U256};
 use alloy_rlp::Encodable;
 
-/// Protocol-owned keyed nonce storage account.
-pub const NONCE_MANAGER: Address = address!("0000000000000000000000000000000000008250");
+/// Protocol-owned keyed nonce storage account, deployed as an ordinary contract before activation.
+pub const NONCE_MANAGER: Address = address!("8250968C12e01A19d6F667b9B2F3b3A4d0e51cB7");
 /// Runtime that rejects ordinary calls to the nonce manager.
 pub const NONCE_MANAGER_CODE: [u8; 5] = [0x60, 0x00, 0x60, 0x00, 0xfd];
 /// Maximum number of nonce domains selected by one transaction.
 pub const MAX_NONCE_KEYS: usize = 16;
+
+/// Exhausted EIP-8250 sequence value.
+///
+/// Transaction validity requires `nonce_seq < MAX_NONCE_SEQ`, independently of state.
+pub const MAX_NONCE_SEQ: u64 = u64::MAX;
 
 /// Validates the canonical set of nonce keys, including the legacy singleton `[0]`.
 pub fn validate_nonce_keys(keys: &[U256]) -> Result<(), &'static str> {
@@ -35,12 +40,12 @@ pub fn nonce_slot(sender: Address, key: U256) -> U256 {
 
 /// Hashes the key count followed by each key as a 32-byte big-endian integer.
 pub fn nonce_keys_hash(keys: &[U256]) -> B256 {
-    let mut input = Vec::with_capacity(32 * (keys.len() + 1));
-    input.extend_from_slice(&U256::from(keys.len()).to_be_bytes::<32>());
+    let mut hasher = Keccak256::new();
+    hasher.update(U256::from(keys.len()).to_be_bytes::<32>());
     for key in keys {
-        input.extend_from_slice(&key.to_be_bytes::<32>());
+        hasher.update(key.to_be_bytes::<32>());
     }
-    keccak256(input)
+    hasher.finalize()
 }
 
 /// Encodes the nonce fields charged as transaction calldata by EIP-8250.
@@ -89,6 +94,23 @@ mod tests {
                 "cc69885fda6bcc1a4ace058b4a62bf5e179ea78fd58a1ccd71c22cc9b688792f"
             )
         );
+    }
+
+    #[test]
+    fn nonce_keys_hash_matches_concatenated_input() {
+        // Include empty and oversized sets: hashing does not validate nonce keys.
+        let keys: [U256; MAX_NONCE_KEYS + 1] = core::array::from_fn(|i| U256::MAX - U256::from(i));
+        for len in 0..=keys.len() {
+            let mut input = [0u8; 32 * (MAX_NONCE_KEYS + 2)];
+            input[..32].copy_from_slice(&U256::from(len).to_be_bytes::<32>());
+            for (i, key) in keys[..len].iter().enumerate() {
+                input[32 * (i + 1)..32 * (i + 2)].copy_from_slice(&key.to_be_bytes::<32>());
+            }
+            assert_eq!(nonce_keys_hash(&keys[..len]), keccak256(&input[..32 * (len + 1)]));
+        }
+        let mut zero_key_input = [0u8; 64];
+        zero_key_input[31] = 1;
+        assert_eq!(nonce_keys_hash(&[U256::ZERO]), keccak256(zero_key_input));
     }
 
     #[test]
