@@ -28,7 +28,7 @@ pub use error::{HttpError, TransportError, TransportResult};
 mod r#trait;
 pub use r#trait::Transport;
 
-pub use alloy_json_rpc::{RpcError, RpcResult};
+pub use alloy_json_rpc::{ErrorResponseCode, RpcError, RpcResult};
 pub use futures_utils_wasm::{impl_future, BoxFuture};
 
 pub mod layers;

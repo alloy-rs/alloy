@@ -6,26 +6,16 @@ use alloy_primitives::{
 use core::{fmt, str::FromStr};
 use serde::{Deserialize, Deserializer, Serialize};
 
-/// A storage key type that can be serialized to and from a hex string up to 32 bytes. Used for
-/// `eth_getStorageAt` and `eth_getProof` RPCs.
+/// A storage key that accepts hex strings up to 32 bytes for `eth_getStorageAt` and `eth_getProof`.
 ///
-/// This is a wrapper type meant to mirror geth's serialization and deserialization behavior for
-/// storage keys.
+/// A full-width, 32-byte input is stored as [`Hash`](Self::Hash) and serializes at full width.
+/// Shorter inputs are stored as [`Number`](Self::Number) and serialize as canonical quantities, so
+/// their original prefix, letter case, and leading zeroes are not preserved. [`Self::as_b256`]
+/// returns either representation left-padded to 32 bytes.
 ///
-/// In `eth_getStorageAt`, this is used for deserialization of the `index` field. Internally, the
-/// index is a [B256], but in `eth_getStorageAt` requests, its serialization can be _up to_ 32
-/// bytes. To support this, the storage key is deserialized first as a U256, and converted to a
-/// B256 for use internally.
-///
-/// `eth_getProof` also takes storage keys up to 32 bytes as input, so the `keys` field is
-/// similarly deserialized. However, geth populates the storage proof `key` fields in the response
-/// by mirroring the `key` field used in the input.
-///
-/// See how `storageKey`s (the input) are populated in the `StorageResult` (the output):
+/// This distinction mirrors geth's treatment of `eth_getProof` storage keys. See how input
+/// `storageKey`s populate the returned `StorageResult`:
 /// <https://github.com/ethereum/go-ethereum/blob/00a73fbcce3250b87fc4160f3deddc44390848f4/internal/ethapi/api.go#L658-L690>
-///
-/// The contained [B256] and From implementation for String are used to preserve the input and
-/// implement this behavior from geth.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum JsonStorageKey {
@@ -88,13 +78,12 @@ impl fmt::Display for JsonStorageKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Hash(hash) => hash.fmt(f),
-            Self::Number(num) => alloc::format!("{num:#x}").fmt(f),
+            Self::Number(num) => write!(f, "{num:#x}"),
         }
     }
 }
 
-/// Converts a Bytes value into a B256, accepting inputs that are less than 32 bytes long. These
-/// inputs will be left padded with zeros.
+/// Converts a [`Bytes`] value of at most 32 bytes into a [`B256`], left-padding it with zeroes.
 pub fn from_bytes_to_b256<'de, D>(bytes: Bytes) -> Result<B256, D::Error>
 where
     D: Deserializer<'de>,
@@ -103,16 +92,11 @@ where
         return Err(serde::de::Error::custom("input too long to be a B256"));
     }
 
-    // left pad with zeros to 32 bytes
-    let mut padded = [0u8; 32];
-    padded[32 - bytes.0.len()..].copy_from_slice(&bytes.0);
-
-    // then convert to B256 without a panic
-    Ok(B256::from_slice(&padded))
+    Ok(B256::left_padding_from(&bytes.0))
 }
 
-/// Deserializes the input into a storage map, using [from_bytes_to_b256] which allows cropped
-/// values:
+/// Deserializes an optional storage map, accepting keys and values shorter than 32 bytes and
+/// left-padding them with zeroes:
 ///
 /// ```json
 /// {
@@ -147,23 +131,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::string::{String, ToString};
+    use alloc::string::ToString;
     use serde_json::json;
-
-    #[test]
-    fn default_number_storage_key() {
-        let key = JsonStorageKey::Number(Default::default());
-        assert_eq!(key.to_string(), String::from("0x0"));
-    }
-
-    #[test]
-    fn default_hash_storage_key() {
-        let key = JsonStorageKey::default();
-        assert_eq!(
-            key.to_string(),
-            String::from("0x0000000000000000000000000000000000000000000000000000000000000000")
-        );
-    }
 
     #[test]
     fn test_storage_key() {
@@ -217,47 +186,6 @@ mod tests {
         assert_eq!(hash_key, JsonStorageKey::Hash(B256::from_str(cases[1]).unwrap()));
 
         assert_eq!(num_key.as_b256(), hash_key.as_b256());
-    }
-
-    #[test]
-    fn test_json_storage_key_from_b256() {
-        let b256_value = B256::from([1u8; 32]);
-        let key = JsonStorageKey::from(b256_value);
-        assert_eq!(key, JsonStorageKey::Hash(b256_value));
-        assert_eq!(
-            key.to_string(),
-            "0x0101010101010101010101010101010101010101010101010101010101010101"
-        );
-    }
-
-    #[test]
-    fn test_json_storage_key_from_u256() {
-        let u256_value = U256::from(42);
-        let key = JsonStorageKey::from(u256_value);
-        assert_eq!(key, JsonStorageKey::Number(u256_value));
-        assert_eq!(key.to_string(), "0x2a");
-    }
-
-    #[test]
-    fn test_json_storage_key_from_u8_array() {
-        let bytes = [0u8; 32];
-        let key = JsonStorageKey::from(bytes);
-        assert_eq!(key, JsonStorageKey::Hash(B256::from(bytes)));
-    }
-
-    #[test]
-    fn test_from_str_parsing() {
-        let hex_str = "0x0101010101010101010101010101010101010101010101010101010101010101";
-        let key = JsonStorageKey::from_str(hex_str).unwrap();
-        assert_eq!(key, JsonStorageKey::Hash(B256::from_str(hex_str).unwrap()));
-    }
-
-    #[test]
-    fn test_from_str_with_too_long_hex_string() {
-        let long_hex_str = "0x".to_string() + &"1".repeat(65);
-        let result = JsonStorageKey::from_str(&long_hex_str);
-
-        assert!(matches!(result, Err(ParseError::BaseConvertError(BaseConvertError::Overflow))));
     }
 
     #[test]

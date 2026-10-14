@@ -7,6 +7,11 @@ use core::ops::{Deref, DerefMut};
 use serde::{Deserialize, Serialize};
 
 /// A catch-all receipt type for handling receipts on multiple networks.
+///
+/// Unknown top-level, network-specific RPC fields are retained in [`OtherFields`]. Inspect them
+/// through [`Self::other_fields`] or [`Self::deserialize_other`]. Methods that return only a
+/// [`TransactionReceipt`], including [`Self::into_inner`], mapping, and conversion methods,
+/// discard those fields; use [`Self::into_parts`] to retain both components.
 #[doc(alias = "AnyTxReceipt")]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnyTransactionReceipt(pub WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>);
@@ -23,7 +28,7 @@ impl AnyTransactionReceipt {
         (inner, other)
     }
 
-    /// Consumes the type and returns the wrapped receipt.
+    /// Consumes the type and returns the wrapped receipt, discarding unknown fields.
     pub fn into_inner(self) -> TransactionReceipt<AnyReceiptEnvelope<Log>> {
         self.0.into_inner()
     }

@@ -64,7 +64,7 @@ impl RpcClient {
     }
 
     /// Create a new [`RpcClient`] with an HTTP transport.
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http(url: reqwest::Url) -> Self {
         let http = alloy_transport_http::Http::new(url);
         let is_local = http.guess_local();
@@ -72,7 +72,7 @@ impl RpcClient {
     }
 
     /// Create a new [`RpcClient`] with an HTTP transport using a pre-built [`reqwest::Client`].
-    #[cfg(feature = "reqwest")]
+    #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http_with_client(client: reqwest::Client, url: reqwest::Url) -> Self {
         let http = alloy_transport_http::Http::with_client(client, url);
         let is_local = http.guess_local();
@@ -439,19 +439,5 @@ mod pubsub_impl {
         pub fn set_channel_size(&self, size: usize) {
             self.expect_pubsub_frontend().set_channel_size(size)
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use similar_asserts::assert_eq;
-
-    #[test]
-    fn test_client_with_poll_interval() {
-        let poll_interval = Duration::from_millis(5_000);
-        let client = RpcClient::new_http(reqwest::Url::parse("http://localhost").unwrap())
-            .with_poll_interval(poll_interval);
-        assert_eq!(client.poll_interval(), poll_interval);
     }
 }

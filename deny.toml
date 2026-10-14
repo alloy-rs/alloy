@@ -3,14 +3,15 @@ version = 2
 yanked = "warn"
 unused-ignored-advisory = "allow"
 ignore = [
-    # https://rustsec.org/advisories/RUSTSEC-2024-0437, trezor-client dependency, no fix available yet
-    "RUSTSEC-2024-0437",
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
     "RUSTSEC-2024-0436",
     # https://rustsec.org/advisories/RUSTSEC-2026-0097 rand unsoundness requires a custom logger calling rand::rng()
     "RUSTSEC-2026-0097",
     # https://rustsec.org/advisories/RUSTSEC-2025-0141 bincode is unmaintained, need to transition all deps to wincode first
     "RUSTSEC-2025-0141",
+    # https://rustsec.org/advisories/RUSTSEC-2026-0173 proc-macro-error2 is unmaintained
+    # and is pulled in transitively by upstream crates with no safe upgrade available.
+    "RUSTSEC-2026-0173",
 ]
 
 [bans]

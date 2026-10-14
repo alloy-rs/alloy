@@ -1,4 +1,4 @@
-use crate::{Http, HttpConnect};
+use crate::{body::BodyError, Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
@@ -6,24 +6,17 @@ use alloy_transport::{
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
-    body::{Bytes, Incoming},
+    body::{Body, Buf, Bytes, Incoming},
     header, Request, Response,
 };
 use hyper_util::client::legacy::Error;
 use itertools::Itertools;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::{Layer, Service};
-use tracing::{debug, debug_span, instrument, trace, Instrument};
+use tracing::{debug, debug_span, instrument, Instrument};
 
-#[cfg(feature = "hyper-tls")]
 type Hyper = hyper_util::client::legacy::Client<
     hyper_tls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
-    http_body_util::Full<::hyper::body::Bytes>,
->;
-
-#[cfg(not(feature = "hyper-tls"))]
-type Hyper = hyper_util::client::legacy::Client<
-    hyper_util::client::legacy::connect::HttpConnector,
     http_body_util::Full<::hyper::body::Bytes>,
 >;
 
@@ -53,17 +46,11 @@ pub type HyperResponseFut<T = HyperResponse, E = Error> =
     Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
 
 impl HyperClient {
-    /// Create a new [HyperClient] with the given URL and default hyper client.
+    /// Create a new [HyperClient] with the default hyper client.
     pub fn new() -> Self {
         let executor = hyper_util::rt::TokioExecutor::new();
-
-        #[cfg(feature = "hyper-tls")]
         let service = hyper_util::client::legacy::Client::builder(executor)
             .build(hyper_tls::HttpsConnector::new());
-
-        #[cfg(not(feature = "hyper-tls"))]
-        let service =
-            hyper_util::client::legacy::Client::builder(executor).build_http::<Full<Bytes>>();
         Self { service, _pd: PhantomData }
     }
 }
@@ -75,7 +62,7 @@ impl Default for HyperClient {
 }
 
 impl<B, S> HyperClient<B, S> {
-    /// Create a new [HyperClient] with the given URL and service.
+    /// Create a new [HyperClient] with the given service.
     pub const fn with_service(service: S) -> Self {
         Self { service, _pd: PhantomData }
     }
@@ -137,33 +124,41 @@ where
         let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
 
         let status = resp.status();
+        let retry_after = crate::parse_retry_after(
+            resp.headers().get(header::RETRY_AFTER).and_then(|value| value.to_str().ok()),
+        );
 
         debug!(%status, "received response from server");
 
-        // Unpack data from the response body. We do this regardless of
-        // the status code, as we want to return the error in the body
-        // if there is one.
-        let body = resp.into_body().collect().await.map_err(TransportErrorKind::custom)?.to_bytes();
-
-        if tracing::enabled!(tracing::Level::TRACE) {
-            trace!(body = %String::from_utf8_lossy(&body), "response body");
-        } else {
-            debug!(bytes = body.len(), "retrieved response body");
-        }
-
-        if !status.is_success() {
-            return Err(TransportErrorKind::http_error(
-                status.as_u16(),
-                String::from_utf8_lossy(&body).into_owned(),
-            ));
-        }
-
-        // Deserialize a Box<RawValue> from the body. If deserialization fails, return
-        // the body as a string in the error. The conversion to String
-        // is lossy and may not cover all the bytes in the body.
-        serde_json::from_slice(&body)
-            .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref())))
+        let body = collect_body(resp.into_body(), self.settings.max_response_size()).await;
+        crate::handle_response(status.as_u16(), retry_after, body)
     }
+}
+
+/// Collects the response body, failing as soon as it exceeds `max` bytes, if set.
+async fn collect_body<B: Body>(body: B, max: Option<usize>) -> Result<Bytes, BodyError<B::Error>> {
+    let Some(max) = max else {
+        return body.collect().await.map(|body| body.to_bytes()).map_err(BodyError::Read);
+    };
+    if body.size_hint().lower() > max as u64 {
+        return Err(BodyError::TooLarge(max));
+    }
+
+    let mut body = std::pin::pin!(body);
+    let mut buf = Vec::new();
+    while let Some(frame) = body.frame().await {
+        let Ok(mut data) = frame.map_err(BodyError::Read)?.into_data() else { continue };
+        if buf.len() + data.remaining() > max {
+            return Err(BodyError::TooLarge(max));
+        }
+        while data.has_remaining() {
+            let chunk = data.chunk();
+            let len = chunk.len();
+            buf.extend_from_slice(chunk);
+            data.advance(len);
+        }
+    }
+    Ok(buf.into())
 }
 
 impl TransportConnect for HttpConnect<HyperTransport> {

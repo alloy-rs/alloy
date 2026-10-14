@@ -23,10 +23,15 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[auto_impl(&mut, Box)]
 pub trait Signer<Sig = Signature> {
-    /// Signs the given hash.
+    /// Signs the given 32-byte prehash exactly as supplied.
+    ///
+    /// This method does not hash, prefix, or domain-separate the input. Use
+    /// [`sign_message`](Self::sign_message) for EIP-191 messages or `sign_typed_data` for EIP-712
+    /// typed data when the `eip712` feature is enabled.
     async fn sign_hash(&self, hash: &B256) -> Result<Sig>;
 
     /// Signs the hash of the provided message after prefixing it, as specified in [EIP-191].
+    /// The signer's configured chain ID is not included.
     ///
     /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     #[inline]
@@ -35,6 +40,9 @@ pub trait Signer<Sig = Signature> {
     }
 
     /// Encodes and signs the typed data according to [EIP-712].
+    ///
+    /// Any chain ID is taken from `domain`; the signer's configured chain ID is not applied or
+    /// checked.
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
@@ -55,6 +63,7 @@ pub trait Signer<Sig = Signature> {
     ///
     /// Unlike [`Signer::sign_typed_data`], this method works with unsized Signers (trait objects
     /// like `Box<dyn Signer>`).
+    /// The signer's configured chain ID is not applied or checked.
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
@@ -63,16 +72,23 @@ pub trait Signer<Sig = Signature> {
         self.sign_hash(&payload.eip712_signing_hash()?).await
     }
 
-    /// Returns the signer's Ethereum Address.
+    /// Returns the signer's Ethereum address.
     fn address(&self) -> Address;
 
-    /// Returns the signer's chain ID.
+    /// Returns the chain ID used to fill or validate transactions before signing.
+    ///
+    /// This value does not affect hash, message, or typed-data signing.
     fn chain_id(&self) -> Option<ChainId>;
 
-    /// Sets the signer's chain ID.
+    /// Sets the chain ID used to fill or validate transactions before signing.
+    ///
+    /// Passing `None` disables signer-side transaction chain-ID validation. This setting does not
+    /// affect hash, message, or typed-data signing.
     fn set_chain_id(&mut self, chain_id: Option<ChainId>);
 
-    /// Sets the signer's chain ID and returns `self`.
+    /// Sets the transaction chain ID and returns `self`.
+    ///
+    /// Passing `None` clears the setting. See [`Signer::set_chain_id`] for its scope.
     #[inline]
     #[must_use]
     #[auto_impl(keep_default_for(&mut, Box))]
@@ -98,10 +114,15 @@ pub trait Signer<Sig = Signature> {
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 #[auto_impl(&, &mut, Box, Rc, Arc)]
 pub trait SignerSync<Sig = Signature> {
-    /// Signs the given hash.
+    /// Signs the given 32-byte prehash exactly as supplied.
+    ///
+    /// This method does not hash, prefix, or domain-separate the input. Use
+    /// [`sign_message_sync`](Self::sign_message_sync) for EIP-191 messages or
+    /// `sign_typed_data_sync` for EIP-712 typed data when the `eip712` feature is enabled.
     fn sign_hash_sync(&self, hash: &B256) -> Result<Sig>;
 
     /// Signs the hash of the provided message after prefixing it, as specified in [EIP-191].
+    /// The signer's configured chain ID is not included.
     ///
     /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     #[inline]
@@ -110,6 +131,9 @@ pub trait SignerSync<Sig = Signature> {
     }
 
     /// Encodes and signs the typed data according to [EIP-712].
+    ///
+    /// Any chain ID is taken from `domain`; the signer's configured chain ID is not applied or
+    /// checked.
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
@@ -126,6 +150,7 @@ pub trait SignerSync<Sig = Signature> {
     ///
     /// Unlike [`SignerSync::sign_typed_data_sync`], this method works with unsized Signers (trait
     /// objects like `Box<dyn SignerSync>`).
+    /// The signer's configured chain ID is not applied or checked.
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
@@ -135,7 +160,9 @@ pub trait SignerSync<Sig = Signature> {
         self.sign_hash_sync(&hash)
     }
 
-    /// Returns the signer's chain ID.
+    /// Returns the chain ID used to fill or validate transactions before signing.
+    ///
+    /// This value does not affect hash, message, or typed-data signing.
     fn chain_id_sync(&self) -> Option<ChainId>;
 }
 

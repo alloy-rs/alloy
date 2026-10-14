@@ -11,7 +11,7 @@ use crate::{
 };
 use alloy_eips::{eip2718::Eip2718Result, Typed2718};
 use alloy_primitives::{ChainId, Signature, TxHash};
-use alloy_rlp::{Buf, BufMut, Decodable};
+use alloy_rlp::{Buf, BufMut, Decodable, Header};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
 pub type TypedTransaction = EthereumTypedTransaction<TxEip4844Variant>;
@@ -134,14 +134,14 @@ impl<Eip4844: RlpEcdsaDecodableTx> EthereumTypedTransaction<Eip4844> {
 
         let first_byte = buf[0];
 
-        // Eip2718: legacy transactions start with >= 0xc0
+        // Eip2718: legacy transactions are untagged and start with >= 0xc0. A literal `0x00`
+        // type byte is not a valid type flag and is rejected below.
         if first_byte >= 0xc0 {
             return Ok(Self::Legacy(TxLegacy::decode(buf)?));
         }
 
         let tx_type = buf.get_u8();
         match tx_type {
-            0x00 => Ok(Self::Legacy(TxLegacy::decode(buf)?)),
             0x01 => Ok(Self::Eip2930(TxEip2930::decode(buf)?)),
             0x02 => Ok(Self::Eip1559(TxEip1559::decode(buf)?)),
             0x03 => Ok(Self::Eip4844(Eip4844::rlp_decode(buf)?)),
@@ -263,6 +263,46 @@ impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
         }
     }
 
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        match self {
+            Self::Legacy(tx) => tx.rlp_header_signed(signature),
+            Self::Eip2930(tx) => tx.rlp_header_signed(signature),
+            Self::Eip1559(tx) => tx.rlp_header_signed(signature),
+            Self::Eip4844(tx) => tx.rlp_header_signed(signature),
+            Self::Eip7702(tx) => tx.rlp_header_signed(signature),
+        }
+    }
+
+    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip2930(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip1559(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip4844(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip7702(tx) => tx.rlp_encoded_length_with_signature(signature),
+        }
+    }
+
+    fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        match self {
+            Self::Legacy(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip2930(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip1559(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip4844(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip7702(tx) => tx.rlp_encode_signed(signature, out),
+        }
+    }
+
+    fn eip2718_encoded_length(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip2930(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip1559(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip4844(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip7702(tx) => tx.eip2718_encoded_length(signature),
+        }
+    }
+
     fn eip2718_encode_with_type(&self, signature: &Signature, _ty: u8, out: &mut dyn BufMut) {
         match self {
             Self::Legacy(tx) => tx.eip2718_encode_with_type(signature, tx.ty(), out),
@@ -280,6 +320,26 @@ impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
             Self::Eip1559(tx) => tx.eip2718_encode(signature, out),
             Self::Eip4844(tx) => tx.eip2718_encode(signature, out),
             Self::Eip7702(tx) => tx.eip2718_encode(signature, out),
+        }
+    }
+
+    fn network_header(&self, signature: &Signature) -> Header {
+        match self {
+            Self::Legacy(tx) => tx.network_header(signature),
+            Self::Eip2930(tx) => tx.network_header(signature),
+            Self::Eip1559(tx) => tx.network_header(signature),
+            Self::Eip4844(tx) => tx.network_header(signature),
+            Self::Eip7702(tx) => tx.network_header(signature),
+        }
+    }
+
+    fn network_encoded_length(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.network_encoded_length(signature),
+            Self::Eip2930(tx) => tx.network_encoded_length(signature),
+            Self::Eip1559(tx) => tx.network_encoded_length(signature),
+            Self::Eip4844(tx) => tx.network_encoded_length(signature),
+            Self::Eip7702(tx) => tx.network_encoded_length(signature),
         }
     }
 
@@ -472,35 +532,11 @@ pub(crate) mod serde_bincode_compat {
     mod tests {
         use super::super::{serde_bincode_compat, EthereumTypedTransaction};
         use crate::TxEip4844;
-        use arbitrary::Arbitrary;
-        use bincode::config;
-        use rand::Rng;
-        use serde::{Deserialize, Serialize};
-        use serde_with::serde_as;
-
-        #[test]
-        fn test_typed_tx_bincode_roundtrip() {
-            #[serde_as]
-            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-            struct Data {
-                #[serde_as(as = "serde_bincode_compat::EthereumTypedTransaction<'_>")]
-                transaction: EthereumTypedTransaction<TxEip4844>,
-            }
-
-            let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
-                transaction: EthereumTypedTransaction::arbitrary(
-                    &mut arbitrary::Unstructured::new(&bytes),
-                )
-                .unwrap(),
-            };
-
-            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _) =
-                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
-            assert_eq!(decoded, data);
-        }
+        bincode_compat_roundtrip_test!(
+            test_typed_tx_bincode_roundtrip,
+            EthereumTypedTransaction<TxEip4844>,
+            "serde_bincode_compat::EthereumTypedTransaction<'_>"
+        );
     }
 }
 
@@ -573,6 +609,32 @@ mod tests {
         if let Err(err) = result {
             assert!(matches!(err, alloy_eips::eip2718::Eip2718Error::UnexpectedType(0x99)));
         }
+    }
+
+    #[test]
+    fn test_decode_unsigned_rejects_tagged_legacy() {
+        let tx = TypedTransaction::Legacy(TxLegacy {
+            chain_id: Some(1),
+            nonce: 0,
+            gas_price: 1,
+            gas_limit: 2,
+            to: Address::ZERO.into(),
+            value: U256::ZERO,
+            input: Bytes::default(),
+        });
+        let mut encoded = Vec::new();
+        tx.encode_for_signing(&mut encoded);
+        assert!(encoded[0] >= 0xc0, "sanity: unsigned legacy txs are encoded as a bare RLP list");
+        assert_eq!(TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap(), tx);
+
+        // Legacy transactions are untagged, so a literal `0x00` type byte must be rejected rather
+        // than decoded as legacy, which would not round-trip through `encode_for_signing`.
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&encoded);
+        assert!(matches!(
+            TypedTransaction::decode_unsigned(&mut tagged.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0x00))
+        ));
     }
 
     #[test]
