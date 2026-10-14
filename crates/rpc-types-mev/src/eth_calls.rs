@@ -471,6 +471,35 @@ pub struct EthSendEndOfBlockBundle {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn call_bundle_serializes_plain_integers_and_accepts_legacy_quantities() {
+        let bundle = super::EthCallBundle {
+            timestamp: Some(1000),
+            timeout: Some(500),
+            gas_limit: Some(30_000_000),
+            ..Default::default()
+        };
+        let numeric = serde_json::to_value(&bundle).unwrap();
+        assert_eq!(numeric["timestamp"], 1000);
+        assert_eq!(numeric["timeout"], 500);
+        assert_eq!(numeric["gasLimit"], 30_000_000);
+        assert_eq!(
+            serde_json::from_value::<super::EthCallBundle>(numeric.clone()).unwrap(),
+            bundle
+        );
+
+        let mut legacy = numeric;
+        legacy["timestamp"] = "0x3e8".into();
+        legacy["timeout"] = "0x1f4".into();
+        legacy["gasLimit"] = "0x1c9c380".into();
+        assert_eq!(serde_json::from_value::<super::EthCallBundle>(legacy).unwrap(), bundle);
+
+        let omitted = serde_json::to_value(super::EthCallBundle::default()).unwrap();
+        for field in ["timestamp", "timeout", "gasLimit"] {
+            assert!(omitted.get(field).is_none());
+        }
+    }
     use super::EthCallBundleResponse;
     use crate::EthSendBundle;
     use alloy_primitives::{address, b256, bytes};
