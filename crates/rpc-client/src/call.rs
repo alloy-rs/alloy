@@ -106,7 +106,7 @@ where
                             if res.id != *expected_id {
                                 Ready(RpcResult::Err(TransportErrorKind::custom_str(&format!(
                                     "received response with ID {}, expected {}",
-                                    res.id, &*expected_id
+                                    res.id, *expected_id
                                 ))))
                             } else {
                                 Ready(transform_response_payload(res.payload))
