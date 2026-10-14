@@ -600,6 +600,21 @@ mod provider {
                 bytes4 callbackFunction,
                 bytes extraData
             );
+
+            struct BatchGatewayRequest {
+                address sender;
+                string[] urls;
+                bytes data;
+            }
+
+            function query(BatchGatewayRequest[] requests)
+                external view returns (bool[] failures, bytes[] responses);
+
+            function resolveCallback(bytes response, bytes extraData) external view;
+
+            interface DnsOracle {
+                function resolve(bytes name, uint16 qtype) external view;
+            }
         }
 
         /// Gateway that answers every request with the same bytes.
@@ -684,6 +699,110 @@ mod provider {
                     EnsError::CcipRead(_)
                 ));
             }
+        }
+
+        /// Checks the DNS gateway request without contacting a live DNSSEC service.
+        struct DnsGateway {
+            request: CcipReadRequest,
+            response: Bytes,
+        }
+
+        #[async_trait::async_trait]
+        impl CcipReadGateway for DnsGateway {
+            async fn request(
+                &self,
+                request: &CcipReadRequest,
+                _max_response_size: usize,
+            ) -> Result<Bytes, CcipReadGatewayError> {
+                assert_eq!(request, &self.request);
+                Ok(self.response.clone())
+            }
+        }
+
+        #[tokio::test]
+        async fn resolve_dns_name_follows_batch_gateway() {
+            let expected = address!("0x534631Bcf33BDb069fB20A93d2fdb9e4D4dD42CF");
+            let dns_resolver = address!("0xf142b308cf687d4358410a4cb885513b30a42025");
+            let urls = vec!["https://dnssec-oracle.example/".into()];
+            // resolve(bytes,uint16) for the DNS wire name pokersback.com and TXT (16).
+            let dns_query: Bytes = DnsOracle::resolveCall {
+                name: bytes!("0a706f6b6572736261636b03636f6d00"),
+                qtype: 16,
+            }
+            .abi_encode()
+            .into();
+            // Opaque mock proof: DNSSEC verification remains the on-chain resolver's job.
+            let proof = bytes!("aabbccdd");
+            let extra_data = bytes!("01020304");
+            let lookup: Bytes = OffchainLookup {
+                sender: UNIVERSAL_RESOLVER_ADDRESS,
+                urls: vec!["x-batch-gateway:true".into()],
+                callData: queryCall {
+                    requests: vec![BatchGatewayRequest {
+                        sender: dns_resolver,
+                        urls: urls.clone(),
+                        data: dns_query.clone(),
+                    }],
+                }
+                .abi_encode()
+                .into(),
+                callbackFunction: resolveCallbackCall::SELECTOR.into(),
+                extraData: extra_data.clone(),
+            }
+            .abi_encode()
+            .into();
+            let output: Bytes = UniversalResolver::resolveCall::abi_encode_returns(
+                &UniversalResolver::resolveReturn {
+                    _0: expected.abi_encode().into(),
+                    _1: dns_resolver,
+                },
+            )
+            .into();
+            let asserter = Asserter::new();
+            asserter.push_failure(revert(&lookup));
+            asserter.push_success(&output);
+            let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+            let client = CcipReadClient::new(DnsGateway {
+                request: CcipReadRequest { sender: dns_resolver, urls, data: dns_query },
+                response: proof.clone(),
+            });
+
+            let resolved =
+                provider.resolve_name_with_ccip_read("pokersback.com", &client).await.unwrap();
+            assert_eq!(resolved, expected);
+
+            let requests = asserter.take_requests();
+            assert_eq!(requests.len(), 2);
+            for request in &requests {
+                assert_eq!(request.method(), "eth_call");
+            }
+            let initial: serde_json::Value =
+                serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+            let callback: serde_json::Value =
+                serde_json::from_str(requests[1].params().unwrap().get()).unwrap();
+            let expected_call = UniversalResolver::resolveCall {
+                name: bytes!("0a706f6b6572736261636b03636f6d00"),
+                data: EnsResolver::addrCall { node: namehash("pokersback.com") }
+                    .abi_encode()
+                    .into(),
+            };
+            assert_eq!(
+                initial[0]["input"],
+                serde_json::json!(Bytes::from(expected_call.abi_encode()))
+            );
+            let expected_callback = resolveCallbackCall {
+                response: queryCall::abi_encode_returns(&queryReturn {
+                    failures: vec![false],
+                    responses: vec![proof],
+                })
+                .into(),
+                extraData: extra_data,
+            };
+            assert_eq!(callback[0]["to"], serde_json::json!(UNIVERSAL_RESOLVER_ADDRESS));
+            assert_eq!(
+                callback[0]["input"],
+                serde_json::json!(Bytes::from(expected_callback.abi_encode()))
+            );
         }
     }
 }
@@ -852,6 +971,7 @@ mod provider_tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires the live ENS DNSSEC gateway and on-chain trust anchors to be current"]
     async fn test_resolve_dns_name() {
         let addr = provider().resolve_name("pokersback.com").await.unwrap();
         assert_eq!(addr, address!("0x534631Bcf33BDb069fB20A93d2fdb9e4D4dD42CF"));

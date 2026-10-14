@@ -92,7 +92,7 @@ alloy-serde.workspace = true
 
 itertools.workspace = true
 reqwest.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread"] }
 tower.workspace = true
 tower-http = { workspace = true, features = [
     "set-header",
@@ -112,7 +112,7 @@ default = ["reqwest", "reqwest-default-tls"]
 ccip-read = []
 # Default `reqwest`-backed CCIP Read HTTP gateway. Enable one of the `reqwest-*-tls` features
 # for HTTPS gateways.
-ccip-read-http = ["ccip-read", "dep:reqwest"]
+ccip-read-http = ["ccip-read", "dep:reqwest", "reqwest?/stream"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",
