@@ -462,13 +462,13 @@ impl Anvil {
         let mut wallet = None;
         loop {
             if start + timeout <= Instant::now() {
-                let _ = child.kill();
+                let _ = GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Timeout);
             }
 
             let mut line = String::new();
             if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
-                let _ = child.kill();
+                let _ = GracefulShutdown::kill_and_wait(&mut child);
                 let status = child.wait().map_err(NodeError::WaitError)?;
                 return Err(NodeError::Fatal(format!(
                     "anvil exited before it was ready ({status})"

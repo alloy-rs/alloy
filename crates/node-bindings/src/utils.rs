@@ -16,6 +16,10 @@ pub(crate) struct GracefulShutdown;
 impl GracefulShutdown {
     /// Attempts graceful shutdown with SIGTERM, then SIGKILL after timeout.
     pub(crate) fn shutdown(child: &mut Child, timeout_secs: u64, process_name: &str) {
+        if child.try_wait().ok().flatten().is_some() {
+            return;
+        }
+
         #[cfg(unix)]
         {
             unsafe {
@@ -34,14 +38,25 @@ impl GracefulShutdown {
             }
         }
 
-        if child.try_wait().ok().flatten().is_some() {
-            return;
-        }
-
-        if let Err(err) = child.kill() {
+        if let Err(err) = Self::kill_and_wait(child) {
             eprintln!("alloy-node-bindings: failed to kill {process_name} process: {err}");
         }
-        let _ = child.wait();
+    }
+
+    /// Force kill and reap a child, without waiting if killing fails.
+    pub(crate) fn kill_and_wait(child: &mut Child) -> std::io::Result<()> {
+        Self::kill_and_wait_with(child, Child::kill)
+    }
+
+    fn kill_and_wait_with(
+        child: &mut Child,
+        kill: impl FnOnce(&mut Child) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
+        if child.try_wait()?.is_some() {
+            return Ok(());
+        }
+        kill(child)?;
+        child.wait().map(|_| ())
     }
 }
 
@@ -189,11 +204,31 @@ mod tests {
     #[test]
     fn graceful_shutdown_returns_if_child_has_already_exited() {
         let mut child = std::process::Command::new("sh").arg("-c").arg("exit 0").spawn().unwrap();
-
-        std::thread::sleep(Duration::from_millis(100));
-
+        child.wait().unwrap();
         GracefulShutdown::shutdown(&mut child, 0, "sh");
-
         assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kill_and_wait_reaps_child() {
+        let mut child = std::process::Command::new("sleep").arg("1").spawn().unwrap();
+        GracefulShutdown::kill_and_wait(&mut child).unwrap();
+        assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_kill_does_not_wait_for_running_child() {
+        let mut child = std::process::Command::new("sleep").arg("1").spawn().unwrap();
+        let result = GracefulShutdown::kill_and_wait_with(&mut child, |_| {
+            Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "injected kill failure"))
+        });
+        let still_running = child.try_wait().unwrap().is_none();
+        let _ = child.kill();
+        let _ = child.wait();
+
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(still_running, "a failed kill must return before the child exits");
     }
 }
