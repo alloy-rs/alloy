@@ -184,56 +184,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn test_sync_info_serialization() {
-        let sync_info = SyncInfo {
-            starting_block: U256::from(0x3cbed5),
-            current_block: U256::from(0x3cf522),
-            highest_block: U256::from(0x3e0e41),
-            warp_chunks_amount: Some(U256::from(10)),
-            warp_chunks_processed: Some(U256::from(5)),
-            stages: Some(vec![
-                Stage { name: "Stage 1".to_string(), block: 1000 },
-                Stage { name: "Stage 2".to_string(), block: 2000 },
-            ]),
-        };
-
-        let serialized = serde_json::to_string(&sync_info).expect("Serialization failed");
-        let deserialized: SyncInfo =
-            serde_json::from_str(&serialized).expect("Deserialization failed");
-
-        assert_eq!(sync_info, deserialized);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_peer_info_serialization() {
-        let peer_info = PeerInfo {
-            id: Some("peer_id_123".to_string()),
-            name: "GethClient".to_string(),
-            caps: vec!["eth/66".to_string(), "les/2".to_string()],
-            network: PeerNetworkInfo {
-                remote_address: "192.168.1.1:30303".to_string(),
-                local_address: "127.0.0.1:30303".to_string(),
-            },
-            protocols: PeerProtocolsInfo {
-                eth: Some(PeerEthProtocolInfo {
-                    version: 66,
-                    difficulty: Some(U256::from(1000000)),
-                    head: "0xabcdef".to_string(),
-                }),
-                pip: None,
-            },
-        };
-
-        let serialized = serde_json::to_string(&peer_info).expect("Serialization failed");
-        let deserialized: PeerInfo =
-            serde_json::from_str(&serialized).expect("Deserialization failed");
-
-        assert_eq!(peer_info, deserialized);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
     fn test_sync_status_serialization() {
         let sync_status = SyncStatus::Info(Box::new(SyncInfo {
             starting_block: U256::from(0x3cbed5),

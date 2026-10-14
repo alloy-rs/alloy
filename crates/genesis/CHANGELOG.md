@@ -5,10 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-17
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Features
+
+- [genesis] Support feature-gated account extensions ([#4182](https://github.com/alloy-rs/alloy/issues/4182))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+## [2.4.1](https://github.com/alloy-rs/alloy/releases/tag/v2.4.1) - 2026-08-13
+
+### Features
+
+- [genesis] Add slot_number genesis header field (EIP-7843) ([#4138](https://github.com/alloy-rs/alloy/issues/4138))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Features
+
+- [genesis] Add account code helpers ([#4132](https://github.com/alloy-rs/alloy/issues/4132))
 
 ### Miscellaneous Tasks
 
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+- Add bogota hardfork for support ([#4087](https://github.com/alloy-rs/alloy/issues/4087))
+- Release 2.2.0
+- Release 2.1.1
+- Release 2.1.0
+- Fixed amsterdam docs and sequence in chain config ([#4021](https://github.com/alloy-rs/alloy/issues/4021))
+- Release 2.0.5
+
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Miscellaneous Tasks
+
+- Release 2.0.4
+
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
+
+### Features
+
+- Non-exhaustive ChainConfig ([#3566](https://github.com/alloy-rs/alloy/issues/3566))
+- Add amsterdam fields ([#3871](https://github.com/alloy-rs/alloy/issues/3871))
+
+### Miscellaneous Tasks
+
+- Release 2.0.3
+- Release 2.0.2
+- Release 2.0.1
+- Release 2.0.0
+- Make _non_exhaustive pub ([#3873](https://github.com/alloy-rs/alloy/issues/3873))
+- Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
+- Release 1.8.2
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+- Release 1.8.0
+
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
+- Release 1.7.3
 - Release 1.7.2
 
 ## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17

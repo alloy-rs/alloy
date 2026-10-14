@@ -3,16 +3,56 @@
 
 use super::EthereumTxEnvelope;
 use crate::{error::ValueError, Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
-use alloy_eips::eip7594::Encodable7594;
+use alloy_eips::eip7594::{
+    BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, Encodable7594,
+};
 
-/// All possible transactions that can be included in a response to `GetPooledTransactions`.
-/// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
-/// non-4844 signed transaction.
+/// Pooled transaction format for Osaka and later.
+///
+/// This can contain an [EIP-7594] blob transaction with its cell-proof sidecar or any non-blob
+/// signed Ethereum transaction. For cross-fork [EIP-4844]/[EIP-7594] handling, use
+/// `EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>>` instead.
 ///
 /// The difference between this and the [`EthereumTxEnvelope<TxEip4844Variant<T>>`] is that this
 /// type always requires the [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only
 /// be propagated with the sidecar over p2p.
-pub type PooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
+///
+/// After the Osaka upgrade (EIP-7594), the blob sidecar uses
+/// [`BlobTransactionSidecarEip7594`] which replaces single KZG proofs with cell proofs
+/// for PeerDAS data availability sampling.
+///
+/// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
+/// [EIP-7594]: https://eips.ethereum.org/EIPS/eip-7594
+pub type PooledTransaction =
+    EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>;
+
+impl EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>> {
+    /// Clears EIP-7594 blob payloads while retaining commitments and cell proofs.
+    ///
+    /// This prepares the transaction for inclusion in an eth/72 `PooledTransactions` response as
+    /// specified by [EIP-8070]. This has no effect on non-blob transactions.
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    pub fn clear_eip7594_blobs(&mut self) {
+        if let Self::Eip4844(tx) = self {
+            tx.tx_mut().sidecar.clear_eip7594_blobs();
+        }
+    }
+}
+
+impl EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>> {
+    /// Clears EIP-7594 blob payloads while retaining commitments and cell proofs.
+    ///
+    /// This prepares the transaction for inclusion in an eth/72 `PooledTransactions` response as
+    /// specified by [EIP-8070]. This has no effect on non-blob transactions or EIP-4844 sidecars.
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    pub fn clear_eip7594_blobs(&mut self) {
+        if let Self::Eip4844(tx) = self {
+            tx.tx_mut().sidecar.clear_eip7594_blobs();
+        }
+    }
+}
 
 impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844WithSidecar<T>> {
     /// Converts the transaction into [`EthereumTxEnvelope<TxEip4844Variant<T>>`].
@@ -78,10 +118,55 @@ impl<T: Encodable7594> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>>
 mod tests {
     use super::*;
     use crate::Transaction;
-    use alloy_eips::{Decodable2718, Encodable2718};
-    use alloy_primitives::{address, hex, Bytes};
+    use alloy_eips::{
+        eip4844::{Blob, Bytes48},
+        eip7594::CELLS_PER_EXT_BLOB,
+        Decodable2718, Encodable2718,
+    };
+    use alloy_primitives::{address, hex, Bytes, Signature, U256};
     use alloy_rlp::Decodable;
     use std::path::PathBuf;
+
+    fn eip7594_sidecar() -> BlobTransactionSidecarEip7594 {
+        BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0x01)],
+            vec![Bytes48::repeat_byte(0x02)],
+            vec![Bytes48::repeat_byte(0x03); CELLS_PER_EXT_BLOB],
+        )
+    }
+
+    fn signature() -> Signature {
+        Signature::new(U256::from(1), U256::from(2), false)
+    }
+
+    #[test]
+    fn clear_eip7594_blobs_from_pooled_envelopes() {
+        let sidecar = eip7594_sidecar();
+        let commitments = sidecar.commitments.clone();
+        let cell_proofs = sidecar.cell_proofs.clone();
+        let tx = TxEip4844WithSidecar::from_tx_and_sidecar(TxEip4844::default(), sidecar);
+        let mut pooled: PooledTransaction = Signed::new_unhashed(tx, signature()).into();
+
+        pooled.clear_eip7594_blobs();
+
+        let sidecar = &pooled.as_eip4844().unwrap().tx().sidecar;
+        assert!(sidecar.blobs.is_empty());
+        assert_eq!(sidecar.commitments, commitments);
+        assert_eq!(sidecar.cell_proofs, cell_proofs);
+
+        let tx = TxEip4844WithSidecar::from_tx_and_sidecar(
+            TxEip4844::default(),
+            BlobTransactionSidecarVariant::Eip7594(eip7594_sidecar()),
+        );
+        let mut pooled = EthereumTxEnvelope::Eip4844(Signed::new_unhashed(tx, signature()));
+
+        pooled.clear_eip7594_blobs();
+
+        let sidecar = pooled.as_eip4844().unwrap().tx().sidecar.as_eip7594().unwrap();
+        assert!(sidecar.blobs.is_empty());
+        assert_eq!(sidecar.commitments, commitments);
+        assert_eq!(sidecar.cell_proofs, cell_proofs);
+    }
 
     #[test]
     fn invalid_legacy_pooled_decoding_input_too_short() {
@@ -159,13 +244,17 @@ mod tests {
 
     #[test]
     fn decode_encode_raw_4844_rlp() {
+        // Test data is in legacy EIP-4844 RLP format, so use BlobTransactionSidecarVariant
+        // which can decode both EIP-4844 and EIP-7594.
+        type VariantPooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
+
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/4844rlp");
         let dir = std::fs::read_dir(path).expect("Unable to read folder");
         for entry in dir {
             let entry = entry.unwrap();
             let content = std::fs::read_to_string(entry.path()).unwrap();
             let raw = hex::decode(content.trim()).unwrap();
-            let tx = PooledTransaction::decode_2718(&mut raw.as_ref())
+            let tx = VariantPooledTransaction::decode_2718(&mut raw.as_ref())
                 .map_err(|err| {
                     panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
                 })
@@ -180,6 +269,10 @@ mod tests {
     #[test]
     #[cfg(feature = "kzg")]
     fn convert_to_eip7594() {
+        // Test data is in legacy EIP-4844 RLP format, so use BlobTransactionSidecarVariant
+        // which can decode both EIP-4844 and EIP-7594.
+        type VariantPooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
+
         let kzg_settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::default();
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/4844rlp");
         let dir = std::fs::read_dir(path).expect("Unable to read folder");
@@ -187,11 +280,12 @@ mod tests {
             let entry = entry.unwrap();
             let content = std::fs::read_to_string(entry.path()).unwrap();
             let raw = hex::decode(content.trim()).unwrap();
-            let PooledTransaction::Eip4844(tx) = PooledTransaction::decode_2718(&mut raw.as_ref())
-                .map_err(|err| {
-                    panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
-                })
-                .unwrap()
+            let VariantPooledTransaction::Eip4844(tx) =
+                VariantPooledTransaction::decode_2718(&mut raw.as_ref())
+                    .map_err(|err| {
+                        panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
+                    })
+                    .unwrap()
             else {
                 panic!("Expected EIP-4844 transaction");
             };
@@ -207,6 +301,50 @@ mod tests {
 
             assert!(!tx.sidecar.blobs().is_empty());
             assert!(tx.validate_blob(kzg_settings.get()).is_ok());
+        }
+    }
+
+    /// Tests that `PooledTransaction` (with [`BlobTransactionSidecarEip7594`]) can encode and
+    /// decode EIP-7594 blob transactions round-trip.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn pooled_transaction_eip7594_roundtrip() {
+        // Decode legacy 4844 test data, convert sidecar to EIP-7594, then verify
+        // PooledTransaction roundtrips correctly with the new sidecar format.
+        type VariantPooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
+
+        let kzg_settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::default();
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/4844rlp");
+        let dir = std::fs::read_dir(path).expect("Unable to read folder");
+        for entry in dir {
+            let entry = entry.unwrap();
+            let content = std::fs::read_to_string(entry.path()).unwrap();
+            let raw = hex::decode(content.trim()).unwrap();
+            let VariantPooledTransaction::Eip4844(tx) =
+                VariantPooledTransaction::decode_2718(&mut raw.as_ref())
+                    .map_err(|err| {
+                        panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
+                    })
+                    .unwrap()
+            else {
+                panic!("Expected EIP-4844 transaction");
+            };
+
+            // Convert the sidecar from EIP-4844 to EIP-7594
+            let (tx_with_sidecar, sig, hash) = tx.into_parts();
+            let tx_eip7594 = tx_with_sidecar
+                .try_map_sidecar(|sidecar| {
+                    sidecar.try_into_eip7594_with_settings(kzg_settings.get())
+                })
+                .unwrap();
+
+            // Build a PooledTransaction (EIP-7594) and roundtrip encode/decode
+            let pooled_tx: PooledTransaction = Signed::new_unchecked(tx_eip7594, sig, hash).into();
+            assert!(pooled_tx.is_eip4844());
+
+            let encoded = pooled_tx.encoded_2718();
+            let decoded = PooledTransaction::decode_2718(&mut encoded.as_ref()).unwrap();
+            assert_eq!(pooled_tx, decoded);
         }
     }
 }

@@ -39,6 +39,10 @@ pub struct HeaderInfo {
     ///
     /// [EIP-4399]: https://eips.ethereum.org/EIPS/eip-4399
     pub mix_hash: Option<B256>,
+    /// The slot number corresponding to this block, calculated in the consensus layer.
+    ///
+    /// [EIP-7843]: https://eips.ethereum.org/EIPS/eip-7843
+    pub slot_number: Option<u64>,
 }
 
 /// Roots contained in a block header.

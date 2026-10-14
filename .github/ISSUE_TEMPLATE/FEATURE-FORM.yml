@@ -8,6 +8,7 @@ body:
       value: |
         Please ensure that the feature has not already been requested in the issue tracker.
   - type: dropdown
+    id: component
     attributes:
       label: Component
       description: What component is the feature for?
@@ -27,6 +28,7 @@ body:
     validations:
       required: true
   - type: textarea
+    id: description
     attributes:
       label: Describe the feature you would like
       description:

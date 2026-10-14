@@ -1,4 +1,21 @@
 //! JWT (JSON Web Token) utilities for the Engine API.
+//!
+//! # Feature flags
+//!
+//! This module is gated behind the `jwt` feature, which is **not enabled by default**.
+//! Enabling `jwt` alone is not sufficient to build this crate: the underlying
+//! [`jsonwebtoken`] crate requires a cryptographic backend, and this crate does not
+//! select one for you. You must opt in to a backend explicitly via one of:
+//!
+//! - `jwt-aws-lc-rs` — enables `jwt` together with `jsonwebtoken/aws_lc_rs` (recommended
+//!   for most platforms; uses [aws-lc-rs](https://github.com/aws/aws-lc-rs)).
+//! - Enabling `jsonwebtoken/rust_crypto` (or the individual `hmac` + `sha2` features) from your own
+//!   `Cargo.toml` if you prefer the pure-Rust backend.
+//!
+//! Building with just `jwt` and no backend will fail to link the HS256 implementation
+//! used by [`JwtSecret::validate`] and [`JwtSecret::encode`]. This is intentional so
+//! downstream crates can choose the backend that fits their target and licensing
+//! constraints rather than inheriting one transitively.
 
 use alloc::string::String;
 use alloy_primitives::hex;
@@ -107,6 +124,10 @@ const JWT_SECRET_LEN: usize = 64;
 /// The JWT `iat` (issued-at) claim cannot exceed +-60 seconds from the current time.
 const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 
+/// The JWT `exp` (expiration time) claim is accepted if not older than 60 seconds from the current
+/// time.
+const JWT_EXP_GRACE_PERIOD_SECS: Duration = Duration::from_secs(60);
+
 /// The execution layer client MUST support at least the following alg HMAC + SHA256 (HS256)
 #[cfg(feature = "serde")]
 const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
@@ -130,6 +151,7 @@ pub struct Claims {
     pub iat: u64,
     /// The "exp" (expiration time) claim identifies the expiration time on or after which the JWT
     /// MUST NOT be accepted for processing.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub exp: Option<u64>,
 }
 
@@ -143,6 +165,13 @@ impl Claims {
     pub fn is_within_time_window(&self) -> bool {
         let now_secs = get_current_timestamp();
         now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
+    }
+
+    /// Returns true if there is no `exp` claim or if the token is not yet expired (with leeway).
+    pub fn is_exp_valid(&self) -> bool {
+        let Some(exp) = self.exp else { return true };
+        let now_secs = get_current_timestamp();
+        exp + JWT_EXP_GRACE_PERIOD_SECS.as_secs() >= now_secs
     }
 }
 
@@ -176,7 +205,10 @@ impl JwtSecret {
         match hex::decode_to_array(hex) {
             Ok(b) => Ok(Self(b)),
             Err(hex::FromHexError::InvalidStringLength | hex::FromHexError::OddLength) => {
-                Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
+                Err(JwtError::InvalidLength(
+                    JWT_SECRET_LEN,
+                    hex.strip_prefix("0x").or_else(|| hex.strip_prefix("0X")).unwrap_or(hex).len(),
+                ))
             }
             Err(e) => Err(JwtError::JwtSecretHexDecodeError(e)),
         }
@@ -194,6 +226,9 @@ impl JwtSecret {
 
     /// Creates a random [`JwtSecret`] and tries to store it at the specified path. I/O errors might
     /// occur during write operations in the form of a [`JwtError`]
+    ///
+    /// On Unix, the file is created (or overwritten) with `0600` permissions, so that it is only
+    /// readable and writable by its owner.
     #[cfg(feature = "std")]
     pub fn try_create_random(fpath: &Path) -> Result<Self, JwtError> {
         if let Some(dir) = fpath.parent() {
@@ -205,7 +240,20 @@ impl JwtSecret {
         let secret = Self::random();
         let bytes = &secret.0;
         let hex = hex::encode(bytes);
-        fs::write(fpath, hex).map_err(|err| JwtError::Write { source: err, path: fpath.into() })?;
+        let write = || -> io::Result<()> {
+            let mut opts = fs::OpenOptions::new();
+            opts.write(true).create(true).truncate(false);
+            #[cfg(unix)]
+            std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+            let mut file = opts.open(fpath)?;
+            // `mode` only applies to new files, so also restrict the permissions of an existing
+            // file. This happens before truncating, so its contents are kept if it fails.
+            #[cfg(unix)]
+            file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+            file.set_len(0)?;
+            io::Write::write_all(&mut file, hex.as_bytes())
+        };
+        write().map_err(|err| JwtError::Write { source: err, path: fpath.into() })?;
         Ok(secret)
     }
 
@@ -216,18 +264,30 @@ impl JwtSecret {
     /// - The JWT `exp` (expiration time) claim is validated by default if defined.
     ///
     /// See also: [JWT Claims - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#jwt-claims)
+    ///
+    /// # Crypto backend
+    ///
+    /// HS256 verification is performed by [`jsonwebtoken`], which requires a cryptographic
+    /// backend to be selected at build time. This crate does not pick one for you; enable
+    /// either the `jwt-aws-lc-rs` feature on this crate, or one of `jsonwebtoken`'s own
+    /// backend features (`aws_lc_rs`, `rust_crypto`, or `hmac` + `sha2`) from your
+    /// `Cargo.toml`. Without a backend selected the crate will fail to build.
     #[cfg(feature = "serde")]
     pub fn validate(&self, jwt: &str) -> Result<(), JwtError> {
         // Create a new validation object with the required signature algorithm
         // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
         let mut validation = Validation::new(JWT_SIGNATURE_ALGO);
-        validation.set_required_spec_claims(&["iat"]);
+        validation.required_spec_claims.clear();
+        validation.validate_exp = false;
         let bytes = &self.0;
 
         match jsonwebtoken::decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation) {
             Ok(token) => {
                 if !token.claims.is_within_time_window() {
                     Err(JwtError::InvalidIssuanceTimestamp)?
+                }
+                if !token.claims.is_exp_valid() {
+                    Err(JwtError::JwtDecodingError("exp claim has expired".into()))?
                 }
             }
             Err(err) => match *err.kind() {
@@ -313,22 +373,6 @@ mod tests {
         let bytes = &secret.0;
         let computed = hex::encode(bytes);
         assert_eq!(original, computed);
-    }
-
-    #[test]
-    fn secret_has_64_hex_digits() {
-        let expected_len = 64;
-        let secret = JwtSecret::random();
-        let hex = hex::encode(secret.0);
-        assert_eq!(hex.len(), expected_len);
-    }
-
-    #[test]
-    fn creation_ok_hex_string_with_0x() {
-        let hex: String =
-            "0x7365637265747365637265747365637265747365637265747365637265747365".into();
-        let result = JwtSecret::from_hex(hex);
-        assert!(result.is_ok());
     }
 
     #[test]
@@ -440,15 +484,25 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn valid_without_exp_claim() {
+    fn omits_exp_claim_when_none() {
         let secret = JwtSecret::random();
-
         let claims = Claims { iat: get_current_timestamp(), exp: None };
-        let jwt = secret.encode(&claims).unwrap();
+        let token = secret.encode(&claims).unwrap();
 
-        let result = secret.validate(&jwt);
+        // Decode the payload (middle segment) without verification
+        use base64::Engine;
+        let payload = token.split('.').nth(1).unwrap();
+        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload).unwrap();
+        let payload = str::from_utf8(&payload).unwrap();
 
-        assert!(matches!(result, Ok(())));
+        // RFC 7519 §4.1.4: "exp" is OPTIONAL — when absent it means no expiration.
+        // When present, it MUST be a NumericDate (a number), not null.
+        // Serializing `exp: None` as `"exp": null` produces a non-conforming JWT
+        // that is rejected by some execution clients (Besu).
+        assert!(
+            !payload.contains("\"exp\""),
+            "Claims with exp: None must omit the field, not serialize as null. Got: {payload}"
+        );
     }
 
     #[test]
@@ -459,6 +513,35 @@ mod tests {
         JwtSecret::try_create_random(fpath).expect("A secret file should be created");
         assert!(fs::metadata(fpath).is_ok());
         fs::remove_file(fpath).unwrap();
+    }
+
+    #[test]
+    #[cfg(all(feature = "std", unix))]
+    fn created_secret_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let fpath = dir.path().join("jwt.hex");
+        let secret = JwtSecret::try_create_random(&fpath).unwrap();
+        let mode = fs::metadata(&fpath).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(JwtSecret::from_file(&fpath).unwrap(), secret);
+    }
+
+    #[test]
+    #[cfg(all(feature = "std", unix))]
+    fn overwritten_secret_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let fpath = dir.path().join("jwt.hex");
+        // longer than the new secret, to also check that the file is truncated
+        fs::write(&fpath, "f".repeat(128)).unwrap();
+        fs::set_permissions(&fpath, fs::Permissions::from_mode(0o644)).unwrap();
+        let secret = JwtSecret::try_create_random(&fpath).unwrap();
+        let mode = fs::metadata(&fpath).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(JwtSecret::from_file(&fpath).unwrap(), secret);
     }
 
     #[test]

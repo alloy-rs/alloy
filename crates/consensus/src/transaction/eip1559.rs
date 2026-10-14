@@ -377,35 +377,13 @@ pub(super) mod serde_bincode_compat {
 
     #[cfg(test)]
     mod tests {
-        use arbitrary::Arbitrary;
-        use bincode::config;
-        use rand::Rng;
-        use serde::{Deserialize, Serialize};
-        use serde_with::serde_as;
 
         use super::super::{serde_bincode_compat, TxEip1559};
-
-        #[test]
-        fn test_tx_eip1559_bincode_roundtrip() {
-            #[serde_as]
-            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-            struct Data {
-                #[serde_as(as = "serde_bincode_compat::TxEip1559")]
-                transaction: TxEip1559,
-            }
-
-            let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
-                transaction: TxEip1559::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
-                    .unwrap(),
-            };
-
-            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _) =
-                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
-            assert_eq!(decoded, data);
-        }
+        bincode_compat_roundtrip_test!(
+            test_tx_eip1559_bincode_roundtrip,
+            TxEip1559,
+            "serde_bincode_compat::TxEip1559"
+        );
     }
 }
 

@@ -154,8 +154,14 @@ pub trait Decodable2718: Sized {
     /// format is used ONLY by the Ethereum p2p protocol. Do not call this
     /// method unless you are building a p2p protocol client.
     ///
-    /// The network encoding is the RLP encoding of the eip2718-encoded
-    /// envelope.
+    /// Canonical network encoding wraps a typed envelope (`type || payload`) in an RLP string;
+    /// legacy envelopes retain their RLP list encoding.
+    ///
+    /// For backwards compatibility, the default implementation also accepts typed envelopes
+    /// without the RLP string wrapper. Successful decoding therefore does not establish canonical
+    /// network encoding, and re-encoding may produce different bytes. Requiring the wrapper would
+    /// be a breaking change for callers relying on this behavior. Use [`Self::decode_2718`] when
+    /// decoding the direct EIP-2718 format.
     ///
     /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
     fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
@@ -178,9 +184,9 @@ pub trait Decodable2718: Sized {
         let tx = Self::typed_decode(ty, buf)?;
 
         let bytes_consumed = remaining_len - buf.len();
-        // because Header::decode works for single bytes (including the tx type), returning a
-        // string Header with payload_length of 1, we need to make sure this check is only
-        // performed for transactions with a string header
+        // Header::decode also accepts a bare type byte as a one-byte RLP string. Preserve
+        // acceptance of these unwrapped typed envelopes for backwards compatibility; rejecting
+        // them here would be a breaking change.
         if bytes_consumed != h.payload_length && h_decode[0] > EMPTY_STRING_CODE {
             return Err(alloy_rlp::Error::UnexpectedLength.into());
         }
@@ -410,7 +416,11 @@ impl<T: Typed2718> Typed2718 for alloy_serde::WithOtherFields<T> {
     }
 }
 
-/// Generic wrapper with encoded Bytes, such as transaction data.
+/// A value paired with bytes presumed to be its exact EIP-2718 encoding.
+///
+/// [`Self::new`] does not verify that the value and bytes correspond. Mapping and transforming
+/// preserve the bytes unchanged and are correct only for encoding-preserving conversions. Prefer
+/// [`Self::from_2718_encodable`] when constructing this wrapper from a value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WithEncoded<T>(Bytes, pub T);
 
@@ -421,7 +431,7 @@ impl<T> From<(Bytes, T)> for WithEncoded<T> {
 }
 
 impl<T> WithEncoded<T> {
-    /// Wraps the value with the bytes.
+    /// Wraps the value with caller-supplied bytes without verifying that they correspond.
     pub const fn new(bytes: Bytes, value: T) -> Self {
         Self(bytes, value)
     }
@@ -446,7 +456,7 @@ impl<T> WithEncoded<T> {
         self.1
     }
 
-    /// Transform the value
+    /// Transforms the value while retaining the encoded bytes unchanged.
     pub fn transform<F: From<T>>(self) -> WithEncoded<F> {
         WithEncoded(self.0, self.1.into())
     }
@@ -456,7 +466,7 @@ impl<T> WithEncoded<T> {
         (self.0, self.1)
     }
 
-    /// Maps the inner value to a new value using the given function.
+    /// Maps the inner value while retaining the encoded bytes unchanged.
     pub fn map<U, F: FnOnce(T) -> U>(self, op: F) -> WithEncoded<U> {
         WithEncoded(self.0, op(self.1))
     }
@@ -476,7 +486,7 @@ impl<T: Encodable2718> WithEncoded<T> {
 }
 
 impl<T> WithEncoded<Option<T>> {
-    /// returns `None` if the inner value is `None`, otherwise returns `Some(WithEncoded<T>)`.
+    /// Returns `None` if the inner value is `None`; otherwise retains the encoded bytes unchanged.
     pub fn transpose(self) -> Option<WithEncoded<T>> {
         self.1.map(|v| WithEncoded(self.0, v))
     }

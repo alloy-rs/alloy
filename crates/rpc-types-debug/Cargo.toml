@@ -23,10 +23,11 @@ rustdoc-args = [
 workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["serde"] }
+alloy-primitives = { workspace = true, features = ["serde", "rlp"] }
+alloy-rlp.workspace = true
 
 serde.workspace = true
-serde_with = { workspace = true, features = ["base64"] }
+serde_with = { workspace = true, features = ["alloc", "base64"] }
 
 derive_more = { workspace = true, features = [
 	"as_ref",

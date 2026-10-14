@@ -5,11 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-17
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Features
+
+- [json-rpc] Add RpcError::error_code ([#4172](https://github.com/alloy-rs/alloy/issues/4172))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
 
 ### Miscellaneous Tasks
 
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Bug Fixes
+
+- [transport-http] Honor Retry-After ([#4103](https://github.com/alloy-rs/alloy/issues/4103))
+- [transport] Make retry queue count cancel-safe ([#3956](https://github.com/alloy-rs/alloy/issues/3956))
+
+### Features
+
+- [pubsub] Typed terminal-error channel ([#3963](https://github.com/alloy-rs/alloy/issues/3963))
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+- Release 2.2.0
+- Release 2.1.1
+- Release 2.1.0
+- Release 2.0.5
+
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Miscellaneous Tasks
+
+- Release 2.0.4
+
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
+
+### Features
+
+- [transport] Add ThrottleLayer burst configuration ([#3854](https://github.com/alloy-rs/alloy/issues/3854))
+
+### Miscellaneous Tasks
+
+- Release 2.0.3
+- Release 2.0.2
+- Release 2.0.1
+- Release 2.0.0
+- Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
+- Release 1.8.2
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Bug Fixes
+
+- [transport] Return clear error when no transports available ([#3806](https://github.com/alloy-rs/alloy/issues/3806))
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+- Release 1.8.0
+
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Dependencies
+
+- Bump deps ([#3712](https://github.com/alloy-rs/alloy/issues/3712))
+
+### Features
+
+- [transport] Parse retry backoff hint from RPC error messages ([#3780](https://github.com/alloy-rs/alloy/issues/3780))
+- [ws] Auto-extract basic auth from URL in WsConnect ([#3728](https://github.com/alloy-rs/alloy/issues/3728))
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
+- Release 1.7.3
 - Release 1.7.2
+
+### Refactor
+
+- [transport] Deduplicate DualTransport constructor logic ([#3746](https://github.com/alloy-rs/alloy/issues/3746))
 
 ## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
 

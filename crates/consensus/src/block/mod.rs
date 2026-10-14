@@ -1,7 +1,7 @@
 //! Block-related consensus types.
 
 mod header;
-pub use header::{BlockHeader, Header};
+pub use header::{BlockHeader, GasLimitMismatch, Header};
 
 mod traits;
 pub use traits::EthBlock;
@@ -182,6 +182,25 @@ impl<T, H> Block<T, H> {
     }
 }
 
+impl<T: Encodable2718> Block<T, Header> {
+    /// Creates a new block from a header and an iterator of transactions.
+    ///
+    /// Computes and sets the `transactions_root` on the header automatically.
+    /// `ommers_hash` is set to [`EMPTY_OMMER_ROOT_HASH`](crate::EMPTY_OMMER_ROOT_HASH).
+    ///
+    /// This updates no other header fields, creates a body without withdrawals, and does not
+    /// calculate the receipts root, validate transactions, or seal the header.
+    pub fn from_transactions(
+        mut header: Header,
+        transactions: impl IntoIterator<Item = T>,
+    ) -> Self {
+        let transactions: Vec<T> = transactions.into_iter().collect();
+        header.transactions_root = crate::proofs::calculate_transaction_root(&transactions);
+        header.ommers_hash = crate::EMPTY_OMMER_ROOT_HASH;
+        Self::new(header, BlockBody { transactions, ommers: Vec::new(), withdrawals: None })
+    }
+}
+
 impl<T, H> Default for Block<T, H>
 where
     H: Default,
@@ -214,7 +233,7 @@ where
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
-#[rlp(trailing)]
+#[rlp(trailing(no_gaps))]
 pub struct BlockBody<T, H = Header> {
     /// Transactions in this block.
     pub transactions: Vec<T>,
@@ -320,7 +339,7 @@ mod block_rlp {
     use super::*;
 
     #[derive(RlpDecodable)]
-    #[rlp(trailing)]
+    #[rlp(trailing(no_gaps))]
     struct Helper<T, H> {
         header: H,
         transactions: Vec<T>,
@@ -329,7 +348,7 @@ mod block_rlp {
     }
 
     #[derive(RlpEncodable)]
-    #[rlp(trailing)]
+    #[rlp(trailing(no_gaps))]
     pub(crate) struct HelperRef<'a, T, H> {
         pub(crate) header: &'a H,
         pub(crate) transactions: &'a Vec<T>,
@@ -380,21 +399,31 @@ mod block_rlp {
         /// This is more efficient than decoding the block and then sealing it, as the header
         /// hash is computed from the raw RLP bytes without re-encoding.
         pub fn decode_sealed(buf: &mut &[u8]) -> alloy_rlp::Result<Sealed<Self>> {
-            // Decode the outer block list header
-            let block_rlp_head = alloy_rlp::Header::decode(buf)?;
-            if !block_rlp_head.list {
-                return Err(alloy_rlp::Error::UnexpectedString);
-            }
+            // Restrict child decoding to the outer block list's declared payload.
+            let mut payload = alloy_rlp::Header::decode_bytes(buf, true)?;
 
             // Decode header and compute hash from raw RLP bytes
-            let header_start = *buf;
-            let header = H::decode(buf)?;
-            let header_hash = keccak256(&header_start[..header_start.len() - buf.len()]);
+            let header_start = payload;
+            let header = H::decode(&mut payload)?;
+            let header_length = header_start
+                .len()
+                .checked_sub(payload.len())
+                .ok_or(alloy_rlp::Error::InputTooShort)?;
+            let header_rlp =
+                header_start.get(..header_length).ok_or(alloy_rlp::Error::InputTooShort)?;
+            let header_hash = keccak256(header_rlp);
 
             // Decode remaining body fields
-            let transactions = Vec::<T>::decode(buf)?;
-            let ommers = Vec::<H>::decode(buf)?;
-            let withdrawals = if buf.is_empty() { None } else { Some(Decodable::decode(buf)?) };
+            let transactions = Vec::<T>::decode(&mut payload)?;
+            let ommers = Vec::<H>::decode(&mut payload)?;
+            let withdrawals =
+                if payload.is_empty() { None } else { Some(Decodable::decode(&mut payload)?) };
+            if !payload.is_empty() {
+                return Err(alloy_rlp::Error::ListLengthMismatch {
+                    expected: header_start.len(),
+                    got: header_start.len().saturating_sub(payload.len()),
+                });
+            }
 
             let block = Self { header, body: BlockBody { transactions, ommers, withdrawals } };
 
@@ -428,7 +457,7 @@ where
 mod tests {
     use super::*;
     use crate::{Signed, TxEnvelope, TxLegacy};
-    use alloy_rlp::Encodable;
+    use alloy_rlp::{Decodable, Encodable};
 
     #[test]
     fn can_convert_block() {
@@ -503,76 +532,137 @@ mod tests {
         assert_eq!(sealed.body.transactions.len(), 1);
         assert!(buf.is_empty());
     }
+
+    #[test]
+    fn decode_sealed_rejects_fields_past_outer_rlp_boundary() {
+        let block: Block<TxEnvelope> = Block::default();
+        let mut encoded = alloy_rlp::encode(&block);
+
+        let mut payload = encoded.as_slice();
+        let outer = alloy_rlp::Header::decode(&mut payload).unwrap();
+        let header_length = encoded.len() - payload.len();
+        assert!(outer.list);
+        assert!(outer.payload_length > 56);
+
+        let mut replacement = Vec::with_capacity(header_length);
+        alloy_rlp::Header { list: true, payload_length: outer.payload_length - 1 }
+            .encode(&mut replacement);
+        assert_eq!(replacement.len(), header_length);
+        encoded[..header_length].copy_from_slice(&replacement);
+
+        assert!(Block::<TxEnvelope>::decode_sealed(&mut encoded.as_slice()).is_err());
+    }
+
+    #[test]
+    fn decode_sealed_rejects_decoder_that_expands_input() {
+        #[derive(Debug)]
+        struct ExpandingHeader;
+
+        impl Decodable for ExpandingHeader {
+            fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+                *buf = &[0, 0];
+                Ok(Self)
+            }
+        }
+
+        let mut encoded: &[u8] = &[0xc1, 0x80];
+        let result = Block::<TxEnvelope, ExpandingHeader>::decode_sealed(&mut encoded);
+
+        assert!(matches!(result, Err(alloy_rlp::Error::InputTooShort)));
+    }
+
+    #[test]
+    fn block_body_rejects_present_string_withdrawals() {
+        let mut omitted: &[u8] = &[0xc2, 0xc0, 0xc0];
+        let body = BlockBody::<TxEnvelope>::decode(&mut omitted).unwrap();
+        assert!(body.withdrawals.is_none());
+        assert!(omitted.is_empty());
+
+        let mut present_empty: &[u8] = &[0xc3, 0xc0, 0xc0, 0xc0];
+        let body = BlockBody::<TxEnvelope>::decode(&mut present_empty).unwrap();
+        assert!(body.withdrawals.as_ref().is_some_and(|w| w.is_empty()));
+        assert!(present_empty.is_empty());
+
+        let mut present_string: &[u8] = &[0xc3, 0xc0, 0xc0, 0x80];
+        assert!(BlockBody::<TxEnvelope>::decode(&mut present_string).is_err());
+    }
+
+    #[test]
+    fn block_decoders_reject_present_string_withdrawals() {
+        fn block_rlp_with_body_fields(body_fields: &[u8]) -> Vec<u8> {
+            let mut header = Vec::new();
+            Header::default().encode(&mut header);
+
+            let block_header =
+                alloy_rlp::Header { list: true, payload_length: header.len() + body_fields.len() };
+            let mut out = Vec::with_capacity(block_header.length_with_payload());
+            block_header.encode(&mut out);
+            out.extend_from_slice(&header);
+            out.extend_from_slice(body_fields);
+            out
+        }
+
+        let omitted = block_rlp_with_body_fields(&[0xc0, 0xc0]);
+        assert!(Block::<TxEnvelope>::decode(&mut omitted.as_slice()).is_ok());
+        assert!(Block::<TxEnvelope>::decode_sealed(&mut omitted.as_slice()).is_ok());
+
+        let present_empty = block_rlp_with_body_fields(&[0xc0, 0xc0, 0xc0]);
+        assert!(Block::<TxEnvelope>::decode(&mut present_empty.as_slice()).is_ok());
+        assert!(Block::<TxEnvelope>::decode_sealed(&mut present_empty.as_slice()).is_ok());
+
+        let present_string = block_rlp_with_body_fields(&[0xc0, 0xc0, 0x80]);
+        assert!(Block::<TxEnvelope>::decode(&mut present_string.as_slice()).is_err());
+        assert!(Block::<TxEnvelope>::decode_sealed(&mut present_string.as_slice()).is_err());
+    }
 }
 
 #[cfg(all(test, feature = "arbitrary"))]
 mod fuzz_tests {
     use super::*;
-    use alloy_primitives::Bytes;
-    use alloy_rlp::{Decodable, Encodable};
+    use crate::{EthereumTxEnvelope, TxEip4844};
+    use alloy_rlp::Encodable;
     use arbitrary::{Arbitrary, Unstructured};
+    use rand::Rng;
 
     #[test]
     fn fuzz_decode_sealed_block_roundtrip() {
-        let mut data = [0u8; 8192];
-        for (i, byte) in data.iter_mut().enumerate() {
-            *byte = (i.wrapping_mul(31).wrapping_add(17)) as u8;
+        for _ in 0..10 {
+            let mut bytes = [0u8; 1024 * 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+
+            let block = Block::<EthereumTxEnvelope<TxEip4844>>::arbitrary(&mut u).unwrap();
+            let expected_hash = block.header.hash_slow();
+
+            let mut encoded = Vec::new();
+            block.encode(&mut encoded);
+
+            let sealed =
+                Block::<EthereumTxEnvelope<TxEip4844>>::decode_sealed(&mut encoded.as_slice())
+                    .unwrap();
+            assert_eq!(sealed.hash(), expected_hash);
+            assert_eq!(*sealed.inner(), block);
         }
-
-        let mut success_count = 0;
-        for offset in 0..200 {
-            let slice = &data[offset..];
-            let mut u = Unstructured::new(slice);
-
-            if let Ok(block) = Block::<Bytes, Header>::arbitrary(&mut u) {
-                let expected_hash = block.header.hash_slow();
-
-                let mut encoded = Vec::new();
-                block.encode(&mut encoded);
-
-                let mut buf = encoded.as_slice();
-                if Block::<Bytes>::decode(&mut buf).is_ok() {
-                    let mut buf = encoded.as_slice();
-                    let sealed = Block::<Bytes>::decode_sealed(&mut buf).unwrap();
-
-                    assert_eq!(sealed.hash(), expected_hash);
-                    assert_eq!(*sealed.inner(), block);
-                    success_count += 1;
-                }
-            }
-        }
-        assert!(success_count > 0, "No blocks were successfully tested");
     }
 
     #[test]
     fn fuzz_header_decode_sealed_roundtrip() {
-        let mut data = [0u8; 4096];
-        for (i, byte) in data.iter_mut().enumerate() {
-            *byte = (i.wrapping_mul(37).wrapping_add(23)) as u8;
+        for _ in 0..200 {
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+
+            let header = Header::arbitrary(&mut u).unwrap();
+            let expected_hash = header.hash_slow();
+
+            let mut encoded = Vec::new();
+            header.encode(&mut encoded);
+
+            let mut buf = encoded.as_slice();
+            let sealed = Header::decode_sealed(&mut buf).unwrap();
+
+            assert_eq!(sealed.hash(), expected_hash);
+            assert_eq!(*sealed.inner(), header);
         }
-
-        let mut success_count = 0;
-        for offset in 0..200 {
-            let slice = &data[offset..];
-            let mut u = Unstructured::new(slice);
-
-            if let Ok(header) = Header::arbitrary(&mut u) {
-                let expected_hash = header.hash_slow();
-
-                let mut encoded = Vec::new();
-                header.encode(&mut encoded);
-
-                let mut buf = encoded.as_slice();
-                if Header::decode(&mut buf).is_ok() {
-                    let mut buf = encoded.as_slice();
-                    let sealed = Header::decode_sealed(&mut buf).unwrap();
-
-                    assert_eq!(sealed.hash(), expected_hash);
-                    assert_eq!(*sealed.inner(), header);
-                    success_count += 1;
-                }
-            }
-        }
-        assert!(success_count > 0, "No headers were successfully tested");
     }
 }

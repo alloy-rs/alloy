@@ -33,7 +33,7 @@ pub struct SimBlock<TxReq = TransactionRequest> {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
-    #[cfg_attr(feature = "serde", serde(default = "Vec::new"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub calls: Vec<TxReq>,
 }
 
@@ -75,7 +75,7 @@ impl<TxReq> SimBlock<TxReq> {
 }
 
 /// Represents the result of simulating a block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulatedBlock<B = Block> {
@@ -84,6 +84,19 @@ pub struct SimulatedBlock<B = Block> {
     pub inner: B,
     /// A vector of results for each call in the block.
     pub calls: Vec<SimCallResult>,
+}
+
+impl<B> SimulatedBlock<B> {
+    /// Returns an iterator over all logs emitted by the calls in this block, in call order.
+    pub fn logs(&self) -> impl Iterator<Item = &Log> {
+        self.calls.iter().flat_map(|call| &call.logs)
+    }
+
+    /// Consumes the block and returns an iterator over all logs emitted by the calls in this
+    /// block, in call order.
+    pub fn into_logs(self) -> impl Iterator<Item = Log> {
+        self.calls.into_iter().flat_map(|call| call.logs)
+    }
 }
 
 /// Captures the outcome of a transaction simulation.
@@ -100,6 +113,16 @@ pub struct SimCallResult {
     /// The amount of gas used by the transaction.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
+    /// Maximum gas consumed during execution, before refunds.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub max_used_gas: Option<u64>,
     /// The final status of the transaction, typically indicating success or failure.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub status: bool,
@@ -112,6 +135,8 @@ pub struct SimCallResult {
 ///
 /// This struct configures how simulations are executed, including whether to trace token transfers,
 /// validate transaction sequences, and whether to return full transaction objects.
+/// The RPC accepts at most [`MAX_SIMULATE_BLOCKS`] blocks; this type and its builder methods do not
+/// enforce that limit.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -195,6 +220,9 @@ pub struct SimulateError {
     pub code: i32,
     /// Message error
     pub message: String,
+    /// Data for the error, e.g. revert reason.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub data: Option<Bytes>,
 }
 
 impl SimulateError {
@@ -207,17 +235,44 @@ impl SimulateError {
 
     /// Creates a new invalid params error.
     pub fn invalid_params() -> Self {
-        Self { code: Self::INVALID_PARAMS_ERROR_CODE, message: "invalid params".to_string() }
+        Self {
+            code: Self::INVALID_PARAMS_ERROR_CODE,
+            message: "invalid params".to_string(),
+            data: None,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{Address, TxKind};
+    use alloy_primitives::{bytes, Address, TxKind};
     #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_deserialize_simulate_error_no_data() {
+        let error_json = json!({
+            "code": -32000,
+            "message": "Execution reverted"
+        });
+        let err: SimulateError = serde_json::from_value(error_json).unwrap();
+        assert_eq!(err.data, None);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_deserialize_simulate_error_with_data() {
+        let error_json = json!({
+            "code": -32000,
+            "message": "Execution reverted",
+            "data": "0xcabedea8"
+        });
+        let err: SimulateError = serde_json::from_value(error_json).unwrap();
+        assert_eq!(err.data, Some(bytes!("cabedea8")));
+    }
 
     #[test]
     #[cfg(feature = "serde")]
@@ -300,9 +355,25 @@ mod tests {
     }
 
     #[test]
-    fn test_simulate_error_codes() {
-        assert_eq!(SimulateError::EXECUTION_REVERTED_CODE, EthRpcErrorCode::ExecutionError.code());
-        assert_eq!(SimulateError::VM_EXECUTION_ERROR_CODE, -32015);
-        assert_eq!(SimulateError::invalid_params().code, SimulateError::INVALID_PARAMS_ERROR_CODE);
+    fn test_simulated_block_logs() {
+        let log = |address| Log {
+            inner: alloy_primitives::Log::new_unchecked(address, Vec::new(), Bytes::new()),
+            ..Default::default()
+        };
+        let block: SimulatedBlock = SimulatedBlock {
+            inner: Default::default(),
+            calls: vec![
+                SimCallResult {
+                    logs: vec![log(Address::with_last_byte(1)), log(Address::with_last_byte(2))],
+                    ..Default::default()
+                },
+                SimCallResult::default(),
+                SimCallResult { logs: vec![log(Address::with_last_byte(3))], ..Default::default() },
+            ],
+        };
+
+        let expected: Vec<_> = (1..=3).map(Address::with_last_byte).collect();
+        assert_eq!(block.logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
+        assert_eq!(block.into_logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
     }
 }

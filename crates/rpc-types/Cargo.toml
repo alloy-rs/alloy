@@ -69,5 +69,5 @@ arbitrary = [
     "alloy-rpc-types-engine?/arbitrary"
 ]
 ssz = ["alloy-rpc-types-beacon?/ssz", "alloy-rpc-types-engine?/ssz"]
-k256 = ["alloy-rpc-types-eth?/k256"]
+k256 = ["alloy-rpc-types-eth?/k256", "alloy-primitives/k256"]
 kzg = ["alloy-rpc-types-engine?/kzg"]

@@ -5,7 +5,10 @@ use crate::{
 };
 use alloc::vec::Vec;
 use alloy_eips::{
-    eip1559::{calc_next_block_base_fee, BaseFeeParams},
+    eip1559::{
+        calc_next_block_base_fee, calculate_block_gas_limit_with_bound_divisor, BaseFeeParams,
+        GAS_LIMIT_BOUND_DIVISOR,
+    },
     eip1898::BlockWithParent,
     eip7840::BlobParams,
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
@@ -53,9 +56,15 @@ pub struct Header {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub number: BlockNumber,
     /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) it bounds each of the block's two
+    /// gas dimensions (execution and state) separately, not their sum.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_limit: u64,
     /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this is the larger of the block's
+    /// execution-gas and state-gas totals, counted before refunds ([EIP-7778](https://eips.ethereum.org/EIPS/eip-7778)),
+    /// so it need not equal the last receipt's `cumulativeGasUsed`. State totals remain net of
+    /// state refills.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
     /// A scalar value equal to the reasonable output of Unix’s time() at this block’s inception;
@@ -129,6 +138,27 @@ pub struct Header {
     /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
+    /// The Keccak 256-bit hash of the block's access list.
+    ///
+    /// When no state changes are present, this field is the hash of an empty RLP list:
+    /// `keccak256(rlp.encode([]))` =
+    /// `0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347`
+    ///
+    /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub block_access_list_hash: Option<B256>,
+    /// The slot number corresponding to this block, calculated in the consensus layer.
+    ///
+    /// [EIP-7843]: https://eips.ethereum.org/EIPS/eip-7843
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
+    pub slot_number: Option<u64>,
 }
 
 impl AsRef<Self> for Header {
@@ -161,6 +191,8 @@ impl Default for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
+            block_access_list_hash: None,
+            slot_number: None,
         }
     }
 }
@@ -263,32 +295,28 @@ impl Header {
         length += self.receipts_root.length();
         length += self.logs_bloom.length();
         length += self.difficulty.length();
-        length += U256::from(self.number).length();
-        length += U256::from(self.gas_limit).length();
-        length += U256::from(self.gas_used).length();
+        length += self.number.length();
+        length += self.gas_limit.length();
+        length += self.gas_used.length();
         length += self.timestamp.length();
         length += self.extra_data.length();
         length += self.mix_hash.length();
         length += self.nonce.length();
 
         if let Some(base_fee) = self.base_fee_per_gas {
-            // Adding base fee length if it exists.
-            length += U256::from(base_fee).length();
+            length += base_fee.length();
         }
 
         if let Some(root) = self.withdrawals_root {
-            // Adding withdrawals_root length if it exists.
             length += root.length();
         }
 
         if let Some(blob_gas_used) = self.blob_gas_used {
-            // Adding blob_gas_used length if it exists.
-            length += U256::from(blob_gas_used).length();
+            length += blob_gas_used.length();
         }
 
         if let Some(excess_blob_gas) = self.excess_blob_gas {
-            // Adding excess_blob_gas length if it exists.
-            length += U256::from(excess_blob_gas).length();
+            length += excess_blob_gas.length();
         }
 
         if let Some(parent_beacon_block_root) = self.parent_beacon_block_root {
@@ -297,6 +325,14 @@ impl Header {
 
         if let Some(requests_hash) = self.requests_hash {
             length += requests_hash.length();
+        }
+
+        if let Some(block_access_list_hash) = self.block_access_list_hash {
+            length += block_access_list_hash.length();
+        }
+
+        if let Some(slot_number) = self.slot_number {
+            length += slot_number.length();
         }
 
         length
@@ -351,6 +387,13 @@ impl Header {
     pub const fn prague_active(&self) -> bool {
         self.requests_hash.is_some()
     }
+
+    /// True if the Amsterdam hardfork is active.
+    ///
+    /// This function checks that the block access list hash is present.
+    pub const fn amsterdam_active(&self) -> bool {
+        self.block_access_list_hash.is_some()
+    }
 }
 
 impl Encodable for Header {
@@ -366,9 +409,9 @@ impl Encodable for Header {
         self.receipts_root.encode(out);
         self.logs_bloom.encode(out);
         self.difficulty.encode(out);
-        U256::from(self.number).encode(out);
-        U256::from(self.gas_limit).encode(out);
-        U256::from(self.gas_used).encode(out);
+        self.number.encode(out);
+        self.gas_limit.encode(out);
+        self.gas_used.encode(out);
         self.timestamp.encode(out);
         self.extra_data.encode(out);
         self.mix_hash.encode(out);
@@ -376,7 +419,7 @@ impl Encodable for Header {
 
         // Encode all the fork specific fields
         if let Some(ref base_fee) = self.base_fee_per_gas {
-            U256::from(*base_fee).encode(out);
+            base_fee.encode(out);
         }
 
         if let Some(ref root) = self.withdrawals_root {
@@ -384,11 +427,11 @@ impl Encodable for Header {
         }
 
         if let Some(ref blob_gas_used) = self.blob_gas_used {
-            U256::from(*blob_gas_used).encode(out);
+            blob_gas_used.encode(out);
         }
 
         if let Some(ref excess_blob_gas) = self.excess_blob_gas {
-            U256::from(*excess_blob_gas).encode(out);
+            excess_blob_gas.encode(out);
         }
 
         if let Some(ref parent_beacon_block_root) = self.parent_beacon_block_root {
@@ -397,6 +440,14 @@ impl Encodable for Header {
 
         if let Some(ref requests_hash) = self.requests_hash {
             requests_hash.encode(out);
+        }
+
+        if let Some(ref block_access_list_hash) = self.block_access_list_hash {
+            block_access_list_hash.encode(out);
+        }
+
+        if let Some(ref slot_number) = self.slot_number {
+            slot_number.encode(out);
         }
     }
 
@@ -437,6 +488,8 @@ impl Decodable for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
+            block_access_list_hash: None,
+            slot_number: None,
         };
         if started_len - buf.len() < rlp_head.payload_length {
             this.base_fee_per_gas = Some(u64::decode(buf)?);
@@ -466,6 +519,16 @@ impl Decodable for Header {
             this.requests_hash = Some(B256::decode(buf)?);
         }
 
+        // Decode block access list hash.
+        if started_len - buf.len() < rlp_head.payload_length {
+            this.block_access_list_hash = Some(B256::decode(buf)?);
+        }
+
+        // Decode slot number.
+        if started_len - buf.len() < rlp_head.payload_length {
+            this.slot_number = Some(u64::decode(buf)?);
+        }
+
         let consumed = started_len - buf.len();
         if consumed != rlp_head.payload_length {
             return Err(alloy_rlp::Error::ListLengthMismatch {
@@ -477,50 +540,15 @@ impl Decodable for Header {
     }
 }
 
-/// Generates a header which is valid __with respect to past and future forks__. This means, for
-/// example, that if the withdrawals root is present, the base fee per gas is also present.
-///
-/// If blob gas used were present, then the excess blob gas and parent beacon block root are also
-/// present. In this example, the withdrawals root would also be present.
-///
-/// This __does not, and should not guarantee__ that the header is valid with respect to __anything
-/// else__.
-#[cfg(any(test, feature = "arbitrary"))]
-pub(crate) const fn generate_valid_header(
-    mut header: Header,
-    eip_4844_active: bool,
-    blob_gas_used: u64,
-    excess_blob_gas: u64,
-    parent_beacon_block_root: B256,
-) -> Header {
-    // Clear all related fields if EIP-1559 is inactive
-    if header.base_fee_per_gas.is_none() {
-        header.withdrawals_root = None;
-    }
-
-    // Set fields based on EIP-4844 being active
-    if eip_4844_active {
-        header.blob_gas_used = Some(blob_gas_used);
-        header.excess_blob_gas = Some(excess_blob_gas);
-        header.parent_beacon_block_root = Some(parent_beacon_block_root);
-    } else {
-        header.blob_gas_used = None;
-        header.excess_blob_gas = None;
-        header.parent_beacon_block_root = None;
-    }
-
-    // Placeholder for future EIP adjustments
-    header.requests_hash = None;
-
-    header
-}
-
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for Header {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // Generate an arbitrary header, passing it to the generate_valid_header function to make
-        // sure it is valid _with respect to hardforks only_.
-        let base = Self {
+        let is_prague = u.arbitrary::<bool>()?;
+        let is_cancun = is_prague || u.arbitrary::<bool>()?;
+        let is_shanghai = is_cancun || u.arbitrary::<bool>()?;
+        let is_london = is_shanghai || u.arbitrary::<bool>()?;
+
+        Ok(Self {
             parent_hash: u.arbitrary()?,
             ommers_hash: u.arbitrary()?,
             beneficiary: u.arbitrary()?,
@@ -536,22 +564,28 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             extra_data: u.arbitrary()?,
             mix_hash: u.arbitrary()?,
             nonce: u.arbitrary()?,
-            base_fee_per_gas: u.arbitrary()?,
-            blob_gas_used: u.arbitrary()?,
-            excess_blob_gas: u.arbitrary()?,
-            parent_beacon_block_root: u.arbitrary()?,
-            requests_hash: u.arbitrary()?,
-            withdrawals_root: u.arbitrary()?,
-        };
-
-        Ok(generate_valid_header(
-            base,
-            u.arbitrary()?,
-            u.arbitrary()?,
-            u.arbitrary()?,
-            u.arbitrary()?,
-        ))
+            base_fee_per_gas: if is_london { Some(u.arbitrary()?) } else { None },
+            withdrawals_root: if is_shanghai { Some(u.arbitrary()?) } else { None },
+            blob_gas_used: if is_cancun { Some(u.arbitrary()?) } else { None },
+            excess_blob_gas: if is_cancun { Some(u.arbitrary()?) } else { None },
+            parent_beacon_block_root: if is_cancun { Some(u.arbitrary()?) } else { None },
+            requests_hash: if is_prague { Some(u.arbitrary()?) } else { None },
+            // Amsterdam fields do not yet participate in the hardfork-aware arbitrary model.
+            block_access_list_hash: None,
+            slot_number: None,
+        })
     }
+}
+
+/// Error returned when a block's gas limit is not the closest possible value to the desired gas
+/// limit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("gas limit mismatch: got {got}, expected {expected}")]
+pub struct GasLimitMismatch {
+    /// The gas limit from the block header.
+    pub got: u64,
+    /// The closest valid gas limit to the desired gas limit.
+    pub expected: u64,
 }
 
 /// Trait for extracting specific Ethereum block data from a header
@@ -569,6 +603,7 @@ pub trait BlockHeader {
             blob_gas_used: self.blob_gas_used(),
             difficulty: self.difficulty(),
             mix_hash: self.mix_hash(),
+            slot_number: self.slot_number(),
         }
     }
 
@@ -614,10 +649,16 @@ pub trait BlockHeader {
     /// Retrieves the block number
     fn number(&self) -> BlockNumber;
 
-    /// Retrieves the gas limit of the block
+    /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) it bounds each of the block's two
+    /// gas dimensions (execution and state) separately, not their sum.
     fn gas_limit(&self) -> u64;
 
-    /// Retrieves the gas used by the block
+    /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
+    /// Under [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) this is the larger of the block's
+    /// execution-gas and state-gas totals, counted before refunds ([EIP-7778](https://eips.ethereum.org/EIPS/eip-7778)),
+    /// so it need not equal the last receipt's `cumulativeGasUsed`. State totals remain net of
+    /// state refills.
     fn gas_used(&self) -> u64;
 
     /// Retrieves the timestamp of the block
@@ -643,6 +684,16 @@ pub trait BlockHeader {
 
     /// Retrieves the requests hash of the block, if available
     fn requests_hash(&self) -> Option<B256>;
+
+    /// Retrieves the block access list hash of the block, if available
+    ///
+    /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+    fn block_access_list_hash(&self) -> Option<B256>;
+
+    /// Retrieves the slot number of the block, if available
+    ///
+    /// [EIP-7843]: https://eips.ethereum.org/EIPS/eip-7843
+    fn slot_number(&self) -> Option<u64>;
 
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
@@ -701,6 +752,51 @@ pub trait BlockHeader {
             self.base_fee_per_gas()?,
             base_fee_params,
         ))
+    }
+
+    /// Validates that a child block's gas limit is the closest possible value to the desired gas
+    /// limit, using the default [`GAS_LIMIT_BOUND_DIVISOR`].
+    ///
+    /// `self` is the parent block header and `gas_limit` is the child block's gas limit.
+    ///
+    /// Ref: <https://github.com/flashbots/builder/blob/a742641e24df68bc2fc476199b012b0abce40ffe/core/blockchain.go#L2474-L2477>
+    fn validate_gas_limit(
+        &self,
+        desired_gas_limit: u64,
+        gas_limit: u64,
+    ) -> Result<(), GasLimitMismatch> {
+        self.validate_gas_limit_with_bound_divisor(
+            desired_gas_limit,
+            gas_limit,
+            GAS_LIMIT_BOUND_DIVISOR,
+        )
+    }
+
+    /// Validates that a child block's gas limit is the closest possible value to the desired gas
+    /// limit, using the provided gas limit bound divisor.
+    ///
+    /// `self` is the parent block header and `gas_limit` is the child block's gas limit.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `gas_limit_bound_divisor` is zero.
+    fn validate_gas_limit_with_bound_divisor(
+        &self,
+        desired_gas_limit: u64,
+        gas_limit: u64,
+        gas_limit_bound_divisor: u64,
+    ) -> Result<(), GasLimitMismatch> {
+        let expected = calculate_block_gas_limit_with_bound_divisor(
+            self.gas_limit(),
+            desired_gas_limit,
+            gas_limit_bound_divisor,
+        );
+
+        if gas_limit != expected {
+            return Err(GasLimitMismatch { got: gas_limit, expected });
+        }
+
+        Ok(())
     }
 
     /// Returns the parent block's number and hash
@@ -830,6 +926,14 @@ impl BlockHeader for Header {
         self.requests_hash
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.block_access_list_hash
+    }
+
+    fn slot_number(&self) -> Option<u64> {
+        self.slot_number
+    }
+
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }
@@ -917,6 +1021,14 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
         self.inner.requests_hash()
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.inner.block_access_list_hash()
+    }
+
+    fn slot_number(&self) -> Option<u64> {
+        self.inner.slot_number()
+    }
+
     fn extra_data(&self) -> &Bytes {
         self.inner.extra_data()
     }
@@ -977,6 +1089,10 @@ pub(crate) mod serde_bincode_compat {
         parent_beacon_block_root: Option<B256>,
         #[serde(default)]
         requests_hash: Option<B256>,
+        #[serde(default)]
+        block_access_list_hash: Option<B256>,
+        #[serde(default)]
+        slot_number: Option<u64>,
         extra_data: Cow<'a, Bytes>,
     }
 
@@ -1003,6 +1119,8 @@ pub(crate) mod serde_bincode_compat {
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
+                block_access_list_hash: value.block_access_list_hash,
+                slot_number: value.slot_number,
                 extra_data: Cow::Borrowed(&value.extra_data),
             }
         }
@@ -1031,6 +1149,8 @@ pub(crate) mod serde_bincode_compat {
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
+                block_access_list_hash: value.block_access_list_hash,
+                slot_number: value.slot_number,
                 extra_data: value.extra_data.into_owned(),
             }
         }
@@ -1057,32 +1177,11 @@ pub(crate) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use super::super::{serde_bincode_compat, Header};
-        use arbitrary::Arbitrary;
-        use bincode::config;
-        use rand::Rng;
-        use serde::{Deserialize, Serialize};
-        use serde_with::serde_as;
-
-        #[test]
-        fn test_header_bincode_roundtrip() {
-            #[serde_as]
-            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-            struct Data {
-                #[serde_as(as = "serde_bincode_compat::Header")]
-                header: Header,
-            }
-
-            let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
-                header: Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
-            };
-
-            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _) =
-                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
-            assert_eq!(decoded, data);
-        }
+        bincode_compat_roundtrip_test!(
+            test_header_bincode_roundtrip,
+            Header,
+            "serde_bincode_compat::Header"
+        );
     }
 }
 
@@ -1090,6 +1189,29 @@ pub(crate) mod serde_bincode_compat {
 mod tests {
     use super::*;
     use alloy_primitives::{b256, hex};
+
+    #[test]
+    fn validate_gas_limit() {
+        let parent = Header { gas_limit: 30_000_000, ..Default::default() };
+
+        assert_eq!(parent.validate_gas_limit(30_000_000, 30_000_000), Ok(()));
+        assert_eq!(parent.validate_gas_limit(20_000_000, 29_970_705), Ok(()));
+
+        let err = parent.validate_gas_limit(40_000_000, 30_000_000).unwrap_err();
+        assert_eq!(err, GasLimitMismatch { got: 30_000_000, expected: 30_029_295 });
+        assert_eq!(err.to_string(), "gas limit mismatch: got 30000000, expected 30029295");
+    }
+
+    #[test]
+    fn validate_gas_limit_with_custom_bound_divisor() {
+        let parent = Header { gas_limit: 1_000, ..Default::default() };
+
+        assert_eq!(parent.validate_gas_limit_with_bound_divisor(2_000, 1_099, 10), Ok(()));
+        assert_eq!(
+            parent.validate_gas_limit_with_bound_divisor(2_000, 1_098, 10),
+            Err(GasLimitMismatch { got: 1_098, expected: 1_099 })
+        );
+    }
 
     #[test]
     fn decode_header_rlp() {

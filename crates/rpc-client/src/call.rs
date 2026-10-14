@@ -2,7 +2,9 @@ use alloy_json_rpc::{
     transform_response, try_deserialize_ok, Request, RequestMeta, RequestPacket, ResponsePacket,
     RpcRecv, RpcResult, RpcSend,
 };
-use alloy_transport::{BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportResult};
+use alloy_transport::{
+    BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportErrorKind, TransportResult,
+};
 use futures::FutureExt;
 use serde_json::value::RawValue;
 use std::{
@@ -100,7 +102,11 @@ where
                     let res = match task::ready!(fut.poll(cx)) {
                         Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
                         Err(e) => Ready(RpcResult::Err(e)),
-                        _ => panic!("received batch response from single request"),
+                        Ok(ResponsePacket::Batch(_)) => {
+                            Ready(RpcResult::Err(TransportErrorKind::custom_str(
+                                "received batch response from single request",
+                            )))
+                        }
                     };
                     self.set(Self::Complete);
                     return res;
@@ -131,6 +137,17 @@ where
 /// [`crate::BatchRequest`], which serializes greedily. This is because the
 /// batch request must immediately erase the `Param` type to allow batching of
 /// requests with different `Param` types, while the `RpcCall` may do so lazily.
+///
+/// ### Cloning and cancellation
+///
+/// A call can be cloned only while it is still prepared, normally before its
+/// first poll. Each clone keeps the same JSON-RPC ID, and polling multiple
+/// clones sends the request multiple times with that ID. Cloning after
+/// dispatch panics.
+///
+/// Dropping an unpolled call leaves it unsent. Dropping a dispatched call stops
+/// waiting locally, but does not guarantee that the remote operation is
+/// cancelled.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
 #[derive(Clone)]

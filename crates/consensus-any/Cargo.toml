@@ -38,6 +38,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
 alloy-consensus = { workspace = true, features = ["arbitrary"] }
+bincode = { workspace = true, features = ["serde"] }
 serde_json.workspace = true
 
 [features]

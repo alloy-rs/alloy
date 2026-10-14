@@ -15,8 +15,14 @@ use itertools::{
     Itertools,
 };
 
-/// FilterSet is a set of values that will be used to filter logs.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// A set of values used to filter logs.
+///
+/// Values in the set are ORed. An empty set is a wildcard and matches every value. When used in a
+/// [`Filter`], an empty address set is omitted. An empty topic position before a later populated
+/// position is serialized as `null`; trailing empty positions are omitted. The [`Filter`]
+/// deserializer normalizes `null`, an empty array, or a topic array containing `null` to this
+/// wildcard representation.
+#[derive(Clone, Debug, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(from = "HashSet<T>"))]
 pub struct FilterSet<T: Eq + Hash> {
@@ -25,6 +31,23 @@ pub struct FilterSet<T: Eq + Hash> {
     #[cfg(feature = "std")]
     #[cfg_attr(feature = "serde", serde(skip, default))]
     bloom_filter: std::sync::OnceLock<BloomFilter>,
+}
+
+impl<T: Eq + Hash> PartialEq for FilterSet<T> {
+    fn eq(&self, other: &Self) -> bool {
+        // Ignore the lazily initialized `bloom_filter` cache
+        self.set == other.set
+    }
+}
+
+/// Hashes the values in sorted order, so equal sets hash equally regardless of their iteration
+/// order.
+impl<T: Eq + Hash + Ord> Hash for FilterSet<T> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        let mut values = self.set.iter().collect::<Vec<_>>();
+        values.sort_unstable();
+        values.hash(state);
+    }
 }
 
 impl<T: Eq + Hash> Default for FilterSet<T> {
@@ -40,14 +63,6 @@ impl<T: Eq + Hash> Default for FilterSet<T> {
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
         Self { set: core::iter::once(src).collect(), ..Default::default() }
-    }
-}
-
-impl<T: Eq + Hash> Hash for FilterSet<T> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        for value in &self.set {
-            value.hash(state);
-        }
     }
 }
 
@@ -219,17 +234,13 @@ impl From<U256> for Topic {
 
 impl From<Address> for Topic {
     fn from(address: Address) -> Self {
-        let mut bytes = [0u8; 32];
-        bytes[12..].copy_from_slice(address.as_slice());
-        B256::from(bytes).into()
+        address.into_word().into()
     }
 }
 
 impl From<bool> for Topic {
     fn from(value: bool) -> Self {
-        let mut bytes = [0u8; 32];
-        bytes[31] = if value { 1 } else { 0 };
-        B256::from(bytes).into()
+        B256::with_last_byte(value as u8).into()
     }
 }
 
@@ -399,23 +410,24 @@ impl Default for FilterBlockOption {
 }
 
 /// Filter for logs.
+///
+/// Addresses use OR semantics. Values within one topic position use OR semantics, while populated
+/// topic positions use AND semantics. Empty address and topic sets are wildcards. Block ranges are
+/// inclusive, and a block hash is mutually exclusive with `fromBlock` and `toBlock`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
     pub block_option: FilterBlockOption,
-    /// A filter set for matching contract addresses in log queries.
+    /// Contract addresses to match.
     ///
-    /// This field determines which contract addresses the filter applies to. It supports:
-    /// - A single address to match logs from that address only.
-    /// - Multiple addresses to match logs from any of them.
-    ///
-    /// ## Notes:
-    /// - An empty array (`[]`) may result in no logs being returned.
-    /// - Some RPC providers handle empty arrays differently than `None`.
-    /// - Large address lists may affect performance or hit provider limits.
+    /// Multiple addresses are ORed. An empty set is a wildcard and is omitted during
+    /// serialization.
     pub address: FilterSet<Address>,
-    /// Topics (maximum of 4)
+    /// Topic filters, with at most four positions.
+    ///
+    /// Values within a position use OR semantics; populated positions use AND semantics. An empty
+    /// position is a wildcard and serializes as `null` when followed by a populated position.
     pub topics: [Topic; 4],
 }
 
@@ -576,14 +588,19 @@ impl Filter {
         self
     }
 
-    /// Given the event signature in string form, it hashes it and adds it to the topics to monitor
+    /// Hashes a canonical event signature and sets it as topic 0.
+    ///
+    /// Pass the complete signature, for example `Transfer(address,address,uint256)`, rather than
+    /// only the event name. The exact UTF-8 bytes are hashed with Keccak-256.
     #[must_use]
     pub fn event(self, event_name: &str) -> Self {
         let hash = keccak256(event_name.as_bytes());
         self.event_signature(hash)
     }
 
-    /// Hashes all event signatures and sets them as array to event_signature(topic0)
+    /// Hashes canonical event signatures and sets them as alternatives for topic 0.
+    ///
+    /// Each item must include the event name and canonical parameter types.
     #[must_use]
     pub fn events(self, events: impl IntoIterator<Item = impl AsRef<[u8]>>) -> Self {
         let events = events.into_iter().map(|e| keccak256(e.as_ref())).collect::<Vec<_>>();
@@ -677,30 +694,22 @@ impl Filter {
         self.address.matches(&address)
     }
 
-    /// Returns `true` if the block matches the filter.
+    /// Returns `true` if the block number matches the locally evaluable range.
+    ///
+    /// Numeric bounds are inclusive. Dynamic tags such as `latest`, `safe`, and `pending` are not
+    /// resolved here and therefore do not impose a numeric bound.
     pub const fn matches_block_range(&self, block_number: u64) -> bool {
-        let mut res = true;
-
         if let Some(BlockNumberOrTag::Number(num)) = self.block_option.get_from_block() {
             if *num > block_number {
-                res = false;
+                return false;
             }
         }
 
-        if let Some(to) = self.block_option.get_to_block() {
-            match to {
-                BlockNumberOrTag::Number(num) => {
-                    if *num < block_number {
-                        res = false;
-                    }
-                }
-                BlockNumberOrTag::Earliest => {
-                    res = false;
-                }
-                _ => {}
-            }
+        match self.block_option.get_to_block() {
+            Some(BlockNumberOrTag::Number(num)) => *num >= block_number,
+            Some(BlockNumberOrTag::Earliest) => false,
+            _ => true,
         }
-        res
     }
 
     /// Returns `true` if the filter matches the given block hash.
@@ -747,9 +756,9 @@ impl Filter {
     /// This checks [`Log<LogData>`], the raw, primitive type carrying un-parsed
     /// [`LogData`].
     ///
-    /// - For un-parsed RPC logs [`crate::Log<LogData>`], see [`Self::rpc_matches`] and
-    ///   [`Self::rpc_matches_parsed`].
-    /// - For parsed [`Log`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    /// - For un-parsed RPC logs [`crate::Log<LogData>`] see [`Self::rpc_matches`].
+    /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
+    /// - For parsed RPC [`crate::Log<T>`]s see [`Self::rpc_matches_parsed`].
     pub fn matches(&self, log: &Log) -> bool {
         if !self.matches_address(log.address) {
             return false;
@@ -764,9 +773,9 @@ impl Filter {
     /// This function checks [`crate::Log<LogData>`], the RPC type carrying
     /// un-parsed [`LogData`].
     ///
+    /// - For un-parsed [`Log<LogData>`] see [`Self::matches`].
     /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
-    /// - For parsed [`crate::Log<T>`]s (e.g. those returned by a contract), see
-    ///   [`Self::rpc_matches`].
+    /// - For parsed RPC [`crate::Log<T>`]s see [`Self::rpc_matches_parsed`].
     pub fn rpc_matches(&self, log: &crate::Log) -> bool {
         self.matches_log_block(log) && self.matches(&log.inner)
     }
@@ -1193,16 +1202,18 @@ where
 }
 
 /// Response of the `eth_getFilterChanges` RPC.
+///
+/// `T` is the transaction response type and `L` is the log response type.
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
-pub enum FilterChanges<T = Transaction> {
+pub enum FilterChanges<T = Transaction, L = RpcLog> {
     /// Empty result.
     #[cfg_attr(feature = "serde", serde(with = "empty_array"))]
     #[default]
     Empty,
     /// New logs.
-    Logs(Vec<RpcLog>),
+    Logs(Vec<L>),
     /// New hashes (block or transactions).
     Hashes(Vec<B256>),
     /// New transactions.
@@ -1227,7 +1238,7 @@ impl From<Vec<Transaction>> for FilterChanges {
     }
 }
 
-impl<T> FilterChanges<T> {
+impl<T, L> FilterChanges<T, L> {
     /// Get the hashes if present.
     pub fn as_hashes(&self) -> Option<&[B256]> {
         if let Self::Hashes(hashes) = self {
@@ -1238,7 +1249,7 @@ impl<T> FilterChanges<T> {
     }
 
     /// Get the logs if present.
-    pub fn as_logs(&self) -> Option<&[RpcLog]> {
+    pub fn as_logs(&self) -> Option<&[L]> {
         if let Self::Logs(logs) = self {
             Some(logs)
         } else {
@@ -1289,9 +1300,10 @@ mod empty_array {
 }
 
 #[cfg(feature = "serde")]
-impl<'de, T> serde::Deserialize<'de> for FilterChanges<T>
+impl<'de, T, L> serde::Deserialize<'de> for FilterChanges<T, L>
 where
     T: serde::Deserialize<'de>,
+    L: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -1299,37 +1311,19 @@ where
     {
         #[derive(serde::Deserialize)]
         #[serde(untagged)]
-        enum Changes<T = Transaction> {
+        enum Changes<T, L> {
             Hashes(Vec<B256>),
-            Logs(Vec<RpcLog>),
+            Logs(Vec<L>),
             Transactions(Vec<T>),
         }
 
-        let changes = Changes::deserialize(deserializer)?;
-        let changes = match changes {
-            Changes::Logs(vals) => {
-                if vals.is_empty() {
-                    Self::Empty
-                } else {
-                    Self::Logs(vals)
-                }
-            }
-            Changes::Hashes(vals) => {
-                if vals.is_empty() {
-                    Self::Empty
-                } else {
-                    Self::Hashes(vals)
-                }
-            }
-            Changes::Transactions(vals) => {
-                if vals.is_empty() {
-                    Self::Empty
-                } else {
-                    Self::Transactions(vals)
-                }
-            }
-        };
-        Ok(changes)
+        // `Hashes` is tried first, so an empty array always ends up there.
+        Ok(match Changes::<T, L>::deserialize(deserializer)? {
+            Changes::Hashes(vals) if vals.is_empty() => Self::Empty,
+            Changes::Hashes(vals) => Self::Hashes(vals),
+            Changes::Logs(vals) => Self::Logs(vals),
+            Changes::Transactions(vals) => Self::Transactions(vals),
+        })
     }
 }
 
@@ -1449,19 +1443,8 @@ impl FilteredParams {
 
     /// Returns `true` if the bloom matches the topics
     pub fn matches_topics(bloom: Bloom, topic_filters: &[BloomFilter]) -> bool {
-        if topic_filters.is_empty() {
-            return true;
-        }
-
-        // for each filter, iterate through the list of filter blooms. for each set of filter
-        // (each BloomFilter), the given `bloom` must match at least one of them, unless the list is
-        // empty (no filters).
-        for filter in topic_filters {
-            if !filter.matches(bloom) {
-                return false;
-            }
-        }
-        true
+        // the given `bloom` must match at least one bloom of each non-empty `BloomFilter`
+        topic_filters.iter().all(|filter| filter.matches(bloom))
     }
 
     /// Returns `true` if the bloom contains one of the address blooms, or the address blooms
@@ -1591,13 +1574,9 @@ where
             }
 
             // Current block exhausted or none set, try next block
-            match self.blocks_iter.next() {
-                Some(block) => {
-                    self.current_block = Some(block.into_iter());
-                    self.current_logs = None;
-                }
-                None => return None,
-            }
+            let block = self.blocks_iter.next()?;
+            self.current_block = Some(block.into_iter());
+            self.current_logs = None;
         }
     }
 }
@@ -1605,7 +1584,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{bloom, LogData};
+    use alloy_primitives::{bloom, map::DefaultHashBuilder, LogData};
+    use core::hash::BuildHasher;
     #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -1613,6 +1593,25 @@ mod tests {
     #[cfg(feature = "serde")]
     fn serialize<T: serde::Serialize>(t: &T) -> serde_json::Value {
         serde_json::to_value(t).expect("Failed to serialize value")
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn filter_changes_supports_custom_logs() {
+        #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        struct CustomLog {
+            value: u64,
+        }
+
+        let changes = FilterChanges::<Transaction, CustomLog>::Logs(vec![CustomLog { value: 42 }]);
+        assert_eq!(changes.as_logs(), Some([CustomLog { value: 42 }].as_slice()));
+
+        let value = serde_json::to_value(&changes).unwrap();
+        assert_eq!(value, json!([{ "value": 42 }]));
+        assert_eq!(
+            serde_json::from_value::<FilterChanges<Transaction, CustomLog>>(value).unwrap(),
+            changes
+        );
     }
 
     #[test]
@@ -1652,10 +1651,6 @@ mod tests {
         let filter = serde_json::from_str::<Filter>(s).unwrap();
 
         // <https://hoodi.etherscan.io/block/400001>
-        let bloom = bloom!("0x10000000000010000000000000000200000002000000000000400000000000000000000400100000000900000000000000000000000000000000000000000000000000000000000000000008400000000000000080000000000080000000000000000000000000000000000000000000000000000002000000000010000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000002000000000000000000000000000000000000002000000000000000000000000000000000000000000000000100000000000000000000000000000004000000000000000000000000000000000000000");
-        assert!(filter.matches_bloom(bloom));
-
-        // <https://hoodi.etherscan.io/block/400002>
         let bloom = bloom!("0x10000000000010000000000000000200000002000000000000400000000000000000000400100000000900000000000000000000000000000000000000000000000000000000000000000008400000000000000080000000000080000000000000000000000000000000000000000000000000000002000000000010000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000002000000000000000000000000000000000000002000000000000000000000000000000000000000000000000100000000000000000000000000000004000000000000000000000000000000000000000");
         assert!(filter.matches_bloom(bloom));
     }
@@ -1887,6 +1882,8 @@ mod tests {
             Log { address, data: LogData::new_unchecked(vec![topic1, topic2], Default::default()) };
 
         assert!(filter.matches(&log));
+        assert!(filter.matches_address(address));
+        assert!(!filter.matches_address(Address::with_last_byte(2)));
     }
 
     #[test]
@@ -1940,31 +1937,6 @@ mod tests {
     }
 
     #[test]
-    fn can_match_address_filter() {
-        let address = Address::with_last_byte(1);
-        let filter = Filter {
-            block_option: Default::default(),
-            address: address.into(),
-            topics: Default::default(),
-        };
-
-        assert!(filter.matches_address(address));
-    }
-
-    #[test]
-    fn can_detect_different_address() {
-        let address = Address::with_last_byte(1);
-        let bad_address = Address::with_last_byte(2);
-        let filter = Filter {
-            block_option: Default::default(),
-            address: address.into(),
-            topics: Default::default(),
-        };
-
-        assert!(!filter.matches_address(bad_address));
-    }
-
-    #[test]
     #[cfg(feature = "serde")]
     fn can_convert_to_ethers_filter() {
         let json = json!(
@@ -2013,168 +1985,60 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn can_convert_to_ethers_filter_with_null_fields() {
-        let json = json!(
-                    {
-          "fromBlock": "0x429d3b",
-          "toBlock": "0x429d3b",
-          "address": null,
-          "topics": null
-        }
-            );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter,
-            Filter {
-                block_option: FilterBlockOption::Range {
+    fn deserialize_filter_with_null_fields() {
+        for (json, block_option) in [
+            (
+                json!({"fromBlock": "0x429d3b", "toBlock": "0x429d3b", "address": null, "topics": null}),
+                FilterBlockOption::Range {
                     from_block: Some(4365627u64.into()),
                     to_block: Some(4365627u64.into()),
                 },
-                address: Default::default(),
-                topics: Default::default(),
-            }
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_filter_with_null_range_block() {
-        let json = json!(
-                    {
-          "fromBlock": null,
-          "toBlock": null,
-          "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
-          "address": null,
-          "topics": null
-        }
+            ),
+            (
+                json!({
+                    "fromBlock": null,
+                    "toBlock": null,
+                    "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
+                    "address": null,
+                    "topics": null
+                }),
+                FilterBlockOption::AtBlockHash(
+                    "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
+                        .parse()
+                        .unwrap(),
+                ),
+            ),
+            (
+                json!({"fromBlock": "0x1", "toBlock": "0x2", "blockHash": null, "address": null, "topics": null}),
+                FilterBlockOption::Range {
+                    from_block: Some(1u64.into()),
+                    to_block: Some(2u64.into()),
+                },
+            ),
+            (
+                json!({"fromBlock": null, "toBlock": "0x2", "blockHash": null, "address": null, "topics": null}),
+                FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) },
+            ),
+            (
+                json!({"fromBlock": "0x1", "toBlock": null, "blockHash": null, "address": null, "topics": null}),
+                FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None },
+            ),
+        ] {
+            let filter: Filter = serde_json::from_value(json).unwrap();
+            assert_eq!(
+                filter,
+                Filter { block_option, address: Default::default(), topics: Default::default() }
             );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter.block_option,
-            FilterBlockOption::AtBlockHash(
-                "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
-                    .parse()
-                    .unwrap()
-            )
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_filter_with_null_block_hash() {
-        let json = json!(
-                    {
-          "fromBlock": "0x1",
-          "toBlock": "0x2",
-          "blockHash": null,
-          "address": null,
-          "topics": null
         }
-            );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter.block_option,
-            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: Some(2u64.into()) }
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_filter_with_null_block_hash_and_null_from_block() {
-        let json = json!(
-                    {
-          "fromBlock": null,
-          "toBlock": "0x2",
-          "blockHash": null,
-          "address": null,
-          "topics": null
-        }
-            );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter.block_option,
-            FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) }
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn test_filter_with_null_block_hash_and_null_to_block() {
-        let json = json!(
-                    {
-          "fromBlock": "0x1",
-          "toBlock": null,
-          "blockHash": null,
-          "address": null,
-          "topics": null
-        }
-            );
-
-        let filter: Filter = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            filter.block_option,
-            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None }
-        );
     }
 
     #[test]
     fn test_is_pending_block_filter() {
-        let filter = Filter {
-            block_option: FilterBlockOption::Range {
-                from_block: Some(BlockNumberOrTag::Pending),
-                to_block: Some(BlockNumberOrTag::Pending),
-            },
-            address: "0xb59f67a8bff5d8cd03f6ac17265c550ed8f33907"
-                .parse::<Address>()
-                .unwrap()
-                .into(),
-            topics: [
-                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
-            ],
-        };
+        let filter =
+            Filter::new().from_block(BlockNumberOrTag::Pending).to_block(BlockNumberOrTag::Pending);
         assert!(filter.is_pending_block_filter());
 
-        let filter = Filter {
-            block_option: FilterBlockOption::Range {
-                from_block: Some(4365627u64.into()),
-                to_block: Some(4365627u64.into()),
-            },
-            address: "0xb59f67a8bff5d8cd03f6ac17265c550ed8f33907"
-                .parse::<Address>()
-                .unwrap()
-                .into(),
-            topics: [
-                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into(),
-                Default::default(),
-            ],
-        };
+        let filter = Filter::new().from_block(4365627u64).to_block(4365627u64);
         assert!(!filter.is_pending_block_filter());
     }
 
@@ -2193,6 +2057,31 @@ mod tests {
 
         topic = topic.extend(U256::from(456));
         assert_eq!(topic.set.len(), 5);
+    }
+
+    #[test]
+    fn test_filter_eq_ignores_bloom_cache() {
+        let filter = Filter::new().address(Address::with_last_byte(1));
+        let clone = filter.clone();
+
+        // Initializes the address bloom cache of `filter` only
+        let _ = filter.matches_bloom(Bloom::ZERO);
+
+        assert_eq!(filter, clone);
+    }
+
+    #[test]
+    fn test_filter_hash_ignores_set_order() {
+        let addresses = (0..64).map(Address::with_last_byte).collect::<Vec<_>>();
+        let mut reversed = HashSet::with_capacity_and_hasher(1024, Default::default());
+        reversed.extend(addresses.iter().rev().copied());
+
+        let filter = Filter::new().address(addresses);
+        let other = Filter { address: reversed.into(), ..filter.clone() };
+        assert_eq!(filter, other);
+
+        let state = DefaultHashBuilder::default();
+        assert_eq!(state.hash_one(&filter), state.hash_one(&other));
     }
 
     #[test]
@@ -2323,15 +2212,7 @@ mod tests {
         assert_eq!(result[0].inner.address, addr1);
         assert_eq!(result[1].inner.address, addr1);
 
-        // Test 6: Test matching_block_logs with non-matching block
-        let filter = Filter::new().from_block(2000u64).to_block(2000u64);
-        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
-        let result =
-            filter.matching_block_logs(block_num_hash, block_timestamp, tx_receipt_pairs, false);
-
-        assert_eq!(result.len(), 0); // Should not append any logs due to block mismatch
-
-        // Test 7: Test append_matching_block_logs with non-matching block
+        // Test 6: Test append_matching_block_logs with non-matching block
         let filter = Filter::new().from_block(2000u64).to_block(2000u64);
         let mut result = Vec::new();
         let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();

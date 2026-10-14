@@ -14,8 +14,13 @@ mod cancun;
 pub use cancun::*;
 mod prague;
 pub use prague::*;
+mod bogota;
+pub use bogota::*;
 mod sidecar;
 pub use sidecar::*;
+
+#[cfg(feature = "ssz")]
+pub mod ssz_engine_types;
 
 mod forkchoice;
 pub use forkchoice::*;
@@ -47,10 +52,10 @@ pub use testing::*;
 pub use alloy_eips::eip4844::BlobAndProofV1;
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobAndProofV2;
+#[doc(inline)]
+pub use alloy_eips::eip4844::BlobCellsAndProofsV1;
 
 /// The list of all supported Engine capabilities available over the engine endpoint.
-///
-/// Latest spec: Amsterdam
 pub const CAPABILITIES: &[&str] = &[
     "engine_forkchoiceUpdatedV1",
     "engine_forkchoiceUpdatedV2",

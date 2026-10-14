@@ -167,7 +167,7 @@ mod test {
     use super::*;
     use crate::{ext::test::async_ci_only, ProviderBuilder};
     use alloy_eips::{BlockNumberOrTag, Encodable2718};
-    use alloy_network::{EthereumWallet, TransactionBuilder};
+    use alloy_network::{EthereumWallet, NetworkTransactionBuilder, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;

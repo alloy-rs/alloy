@@ -5,11 +5,135 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-17
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [trace] Decode regularGasUsed and explain gas ([#4195](https://github.com/alloy-rs/alloy/issues/4195))
+- [rpc-types-eth] Remove filter Hash implementations ([#4211](https://github.com/alloy-rs/alloy/issues/4211))
+- [rpc-types-eth] Ignore bloom cache in FilterSet equality ([#4204](https://github.com/alloy-rs/alloy/issues/4204))
+
+### Features
+
+- [genesis] Support feature-gated account extensions ([#4182](https://github.com/alloy-rs/alloy/issues/4182))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Documentation
+
+- [rpc-types-eth] Fix incorrect doc links in Filter matching methods ([#4164](https://github.com/alloy-rs/alloy/issues/4164))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
 
 ### Miscellaneous Tasks
 
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Bug Fixes
+
+- [consensus] Default missing receipt type to legacy
+- Address Rust 1.97 clippy lints ([#4074](https://github.com/alloy-rs/alloy/issues/4074))
+
+### Documentation
+
+- [rpc-types-eth] Clarify block header docs ([#3998](https://github.com/alloy-rs/alloy/issues/3998))
+- [rpc-types-eth] Correct sealed_header docs ([#3995](https://github.com/alloy-rs/alloy/issues/3995))
+
+### Features
+
+- [rpc-types-eth] Generalize filter change logs ([#4102](https://github.com/alloy-rs/alloy/issues/4102))
+- [network-primitives] Add header num_hash helper ([#4046](https://github.com/alloy-rs/alloy/issues/4046))
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+- Release 2.2.0
+- Release 2.1.1
+- Expand zepter feature checks ([#4063](https://github.com/alloy-rs/alloy/issues/4063))
+- Release 2.1.0
+- Replaced typed tx with consensus tx in build_typed_simulate_tx… ([#4015](https://github.com/alloy-rs/alloy/issues/4015))
+- Release 2.0.5
+
+## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
+
+### Miscellaneous Tasks
+
+- Release 2.0.4
+
+## [2.0.3](https://github.com/alloy-rs/alloy/releases/tag/v2.0.3) - 2026-04-29
+
+### Features
+
+- [rpc-types-eth] Add `max_used_gas` to `SimCallResult` ([#3707](https://github.com/alloy-rs/alloy/issues/3707))
+- Add amsterdam fields ([#3871](https://github.com/alloy-rs/alloy/issues/3871))
+- [consensus] Change default tx env type
+- [network] Generic TransactionResponse to TransactionRequest conversion
+- [rpc-types-eth] Add optional timestamp field to Transaction
+- [rpc-types-eth] Parse data field on eth_simulateV1 errors
+
+### Miscellaneous Tasks
+
+- Release 2.0.3
+- Release 2.0.2
+- Release 2.0.1
+- Release 2.0.0
+- Release 1.8.3 ([#3848](https://github.com/alloy-rs/alloy/issues/3848))
+- Release 1.8.2
+
+### Other
+
+- "revert: remove transactionReceipts subscription kind" ([#3410](https://github.com/alloy-rs/alloy/issues/3410))
+
+### Refactor
+
+- [network] Unify EIP-4844 tx builder trait
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Bug Fixes
+
+- [provider] Detect EIP-7594 blob sidecars in BlobGasFiller ([#3815](https://github.com/alloy-rs/alloy/issues/3815))
+
+### Features
+
+- [rpc-types-eth] Add parent beacon root to BlockOverrides ([#3798](https://github.com/alloy-rs/alloy/issues/3798))
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+- Release 1.8.0
+- [rpc] Clippy happy with outer match ([#3793](https://github.com/alloy-rs/alloy/issues/3793))
+
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Bug Fixes
+
+- [rpc-types-eth] Matches_block always returns true for AtBlockHash… ([#3734](https://github.com/alloy-rs/alloy/issues/3734))
+- [rpc-types] Off-by-one in TransactionConditional has_exceeded checks ([#3721](https://github.com/alloy-rs/alloy/issues/3721))
+
+### Documentation
+
+- [rpc-types-eth] Fix incorrect error code in SimulateError ([#3762](https://github.com/alloy-rs/alloy/issues/3762))
+
+### Features
+
+- Impl From<Recovered<T>> for TransactionRequest ([#3731](https://github.com/alloy-rs/alloy/issues/3731))
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
+- Release 1.7.3
 - Release 1.7.2
+
+### Refactor
+
+- [rpc-types-eth] Centralize SimulateError codes ([#3769](https://github.com/alloy-rs/alloy/issues/3769))
 
 ## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
 

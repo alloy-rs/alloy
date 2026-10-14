@@ -17,21 +17,53 @@ We also have a [book](https://alloy.rs/) on all things Alloy and many [examples]
 
 Alloy consists of a number of crates that provide a range of functionality essential for interfacing with any Ethereum-based blockchain.
 
-The easiest way to get started is to add the `alloy` crate with the `full` feature flag from the command-line using Cargo:
+The easiest way to get started is to add the `alloy` crate from the command line using Cargo:
 
 ```sh
-cargo add alloy --features full
+cargo add alloy
 ```
 
 Alternatively, you can add the following to your `Cargo.toml` file:
 
 ```toml
-alloy = { version = "1", features = ["full"] }
+alloy = "2"
 ```
 
-For a more fine-grained control over the features you wish to include, you can add the individual crates to your `Cargo.toml` file, or use the `alloy` crate with the features you need.
+The default features include contracts, an HTTP provider, Ethereum RPC types, and a local signer.
+For WebSocket and IPC transports plus commonly used extended RPC APIs, enable the `full`
+feature:
+
+```sh
+cargo add alloy --features full
+```
+
+`full` is a convenience bundle, not every optional integration. Node process bindings, ENS,
+genesis and trie support, and cloud or hardware signers remain opt-in. For finer control, enable
+only the features you need or depend on the individual crates directly.
 
 A comprehensive list of available features can be found on [docs.rs](https://docs.rs/crate/alloy/latest/features) or in the [`alloy` crate's `Cargo.toml`](https://github.com/alloy-rs/alloy/blob/main/crates/alloy/Cargo.toml).
+
+If you want to use `ProviderBuilder::connect_anvil*` helpers from the `alloy` meta-crate,
+enable the `provider-anvil-node` feature:
+
+```sh
+cargo add alloy --features provider-anvil-node
+```
+
+If you only need the `alloy::node_bindings` re-export, enable the `node-bindings` feature:
+
+```sh
+cargo add alloy --features node-bindings
+```
+
+If you are already using `full`, add `node-bindings` explicitly because `full` does not include it:
+
+```sh
+cargo add alloy --features "full,node-bindings"
+```
+
+If you depend on `alloy-provider` directly instead of the `alloy` meta-crate, enable the
+`anvil-node` feature there.
 
 ## Examples
 
@@ -111,9 +143,11 @@ This repository contains the following crates:
 - [`alloy-serde`] - [Serde]-related utilities
 - [`alloy-signer`] - Ethereum signer abstraction
   - [`alloy-signer-aws`] - [AWS KMS] signer implementation
+  - [`alloy-signer-azure`] - [Azure Key Vault] signer implementation
   - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
   - [`alloy-signer-ledger`] - [Ledger] signer implementation
   - [`alloy-signer-local`] - Local (private key, keystore, mnemonic, YubiHSM) signer implementations
+  - [`alloy-signer-tempo`] - Read-only [Tempo] wallet keystore lookup that materializes local signers
   - [`alloy-signer-trezor`] - [Trezor] signer implementation
   - [`alloy-signer-turnkey`] - [Turnkey] signer implementation
 - [`alloy-transport`] - Low-level Ethereum JSON-RPC transport abstraction
@@ -153,9 +187,11 @@ This repository contains the following crates:
 [`alloy-serde`]: https://github.com/alloy-rs/alloy/tree/main/crates/serde
 [`alloy-signer`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer
 [`alloy-signer-aws`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-aws
+[`alloy-signer-azure`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-azure
 [`alloy-signer-gcp`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-gcp
 [`alloy-signer-ledger`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-ledger
 [`alloy-signer-local`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-local
+[`alloy-signer-tempo`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-tempo
 [`alloy-signer-trezor`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-trezor
 [`alloy-signer-turnkey`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-turnkey
 [`alloy-transport`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport
@@ -166,8 +202,10 @@ This repository contains the following crates:
 [`alloy-ens`]: https://github.com/alloy-rs/alloy/tree/main/crates/ens
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
+[Azure Key Vault]: https://learn.microsoft.com/azure/key-vault/
 [GCP KMS]: https://cloud.google.com/kms
 [Ledger]: https://www.ledger.com
+[Tempo]: https://tempo.xyz
 [Trezor]: https://trezor.io
 [Turnkey]: https://www.turnkey.com
 [Serde]: https://serde.rs
@@ -183,11 +221,10 @@ When updating this, also update:
 - .github/workflows/ci.yml
 -->
 
-The current MSRV (minimum supported rust version) is 1.91.
+The current MSRV (minimum supported rust version) is 1.94.1.
 
 Alloy will keep a rolling MSRV policy of **at least** two versions behind the
-latest stable release (so if the latest stable release is 1.58, we would
-support 1.56).
+latest stable release.
 
 Note that the MSRV is not increased automatically, and only as part of a patch
 (pre-1.0) or minor (post-1.0) release.

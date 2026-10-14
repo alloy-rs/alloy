@@ -44,7 +44,7 @@ use std::str::FromStr;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a basic HTTP provider
-    let provider = RootProvider::<Ethereum>::new_http("https://reth-ethereum.ithaca.xyz/rpc".parse()?);
+    let provider = RootProvider::<Ethereum>::new_http("https://ethereum.reth.rs/rpc".parse()?);
 
     // Get the latest block number
     let block_number = provider.get_block_number().await?;
@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Balance: {balance}");
 
     // Use the builder pattern to create a provider with recommended fillers
-    let provider = ProviderBuilder::new().connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse()?);
+    let provider = ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse()?);
 
     Ok(())
 }

@@ -11,12 +11,58 @@ use serde::{Deserialize, Serialize};
 pub struct CallFrame {
     /// The address of that initiated the call.
     pub from: Address,
-    /// How much gas was left before the call.
+    /// Gas allowance before the call. For nested frames, regular gas excluding the EIP-8037
+    /// reservoir. The reservoir is passed separately in full, outside the regular-gas 63/64
+    /// rule. The top-level frame describes the transaction; do not interpret this as a
+    /// per-frame combined budget.
     #[serde(default)]
     pub gas: U256,
-    /// How much gas was used by the call.
+    /// Gas used by this call, including nested execution; do not sum parents and their children.
+    /// On the top-level transaction frame this is receipt gas, including both EIP-8037 dimensions,
+    /// after refunds and the calldata floor. Do not add `state_gas_used` to that total.
+    /// Nested-frame gas semantics vary by client and are not a transaction fee or gas-limit
+    /// estimate. See the [tracing schema proposal](https://github.com/ethereum/execution-apis/pull/852).
     #[serde(default, rename = "gasUsed")]
     pub gas_used: U256,
+    /// Regular (execution) gas contribution to block accounting, excluding EIP-8037 state gas.
+    ///
+    /// Includes intrinsic gas and the execution-dimension calldata floor; before ordinary refunds
+    /// under EIP-7778. This is not receipt gas. See the
+    /// [gas accounting guide](crate::geth::state_gas) and
+    /// [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    ///
+    /// A transaction summary on the top-level frame when supported; not a per-child breakdown.
+    /// `None` means not reported (for example, a nested frame, older fork, or unsupported node).
+    #[serde(
+        default,
+        rename = "executionGasUsed",
+        alias = "regularGasUsed",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub execution_gas_used: Option<U256>,
+    /// Net EIP-8037 state gas for the whole transaction, excluding regular execution gas.
+    ///
+    /// Includes state creation charges after state refills and rollback, not peak state gas
+    /// demand. Do not subtract `gas_refund` or `state_gas_refund` from this already-net
+    /// transaction value. Zero when reported for an inactive EIP-8037 fork; `None` means the
+    /// node did not report it. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    /// This transaction summary is reported on the top-level frame when supported.
+    #[serde(default, rename = "stateGasUsed", skip_serializing_if = "Option::is_none")]
+    pub state_gas_used: Option<U256>,
+    /// Ordinary transaction refund reported after transaction-boundary refund processing.
+    ///
+    /// Subject to the [EIP-3529](https://eips.ethereum.org/EIPS/eip-3529) cap; not a raw frame counter.
+    /// Excludes EIP-8037 state refills and unused gas. The calldata floor can limit the fee
+    /// saving; use the transaction's receipt gas for the final charge. `None` means not
+    /// reported. This transaction summary is reported on the top-level frame when supported.
+    #[serde(default, rename = "gasRefund", skip_serializing_if = "Option::is_none")]
+    pub gas_refund: Option<U256>,
+    /// Total EIP-8037 state gas refilled within the transaction, which the proposal calls
+    /// "source-based state-gas refunds". Already netted out of `state_gas_used`; do not subtract
+    /// it again. Optional in the proposal and only meaningful on the top-level frame; `None`
+    /// means not reported. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    #[serde(default, rename = "stateGasRefund", skip_serializing_if = "Option::is_none")]
+    pub state_gas_refund: Option<U256>,
     /// The address of the contract that was called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<Address>,
@@ -46,7 +92,38 @@ pub struct CallFrame {
 }
 
 impl CallFrame {
-    /// Error selector is the first 4 bytes of calldata
+    /// Returns an iterator over this frame and all nested child frames in depth-first pre-order.
+    ///
+    /// Use [`CallFrameIter::skip_children`] to avoid descending into the children of the most
+    /// recently yielded frame.
+    ///
+    /// # Examples
+    ///
+    /// Iterate over all frames:
+    /// ```
+    /// # use alloy_rpc_types_trace::geth::CallFrame;
+    /// # let frame = CallFrame::default();
+    /// for call in frame.iter() {
+    ///     println!("{} -> {:?}", call.from, call.to);
+    /// }
+    /// ```
+    ///
+    /// Skip child calls selectively:
+    /// ```
+    /// # use alloy_rpc_types_trace::geth::CallFrame;
+    /// # let frame = CallFrame::default();
+    /// let mut iter = frame.iter();
+    /// while let Some(call) = iter.next() {
+    ///     if call.is_static_call() {
+    ///         iter.skip_children(); // don't descend into static calls
+    ///     }
+    /// }
+    /// ```
+    pub fn iter(&self) -> CallFrameIter<'_> {
+        CallFrameIter::new(self)
+    }
+
+    /// Returns the first four bytes of calldata, or `None` if the input is shorter.
     pub fn selector(&self) -> Option<Selector> {
         if self.input.len() < 4 {
             return None;
@@ -305,6 +382,50 @@ impl From<CallKind> for CallType {
     }
 }
 
+/// An iterator over [`CallFrame`]s in depth-first pre-order.
+///
+/// Created by [`CallFrame::iter`]. Use [`skip_children`](Self::skip_children) to avoid descending
+/// into the children of the most recently yielded frame.
+#[derive(Debug, Clone)]
+pub struct CallFrameIter<'a> {
+    /// Stack of frames yet to be yielded.
+    stack: Vec<&'a CallFrame>,
+    /// Number of children pushed onto the stack by the last call to `next`.
+    last_children_count: usize,
+}
+
+impl<'a> CallFrameIter<'a> {
+    fn new(frame: &'a CallFrame) -> Self {
+        Self { stack: vec![frame], last_children_count: 0 }
+    }
+
+    /// Skips the children of the most recently yielded [`CallFrame`].
+    ///
+    /// Any children that were pushed onto the internal stack by the last call to
+    /// [`next`](Iterator::next) are removed, so iteration continues with the next sibling or
+    /// ancestor instead.
+    ///
+    /// Has no effect if called more than once without an intervening `next`, or if the last frame
+    /// had no children.
+    pub fn skip_children(&mut self) {
+        let len = self.stack.len();
+        self.stack.truncate(len.saturating_sub(self.last_children_count));
+        self.last_children_count = 0;
+    }
+}
+
+impl<'a> Iterator for CallFrameIter<'a> {
+    type Item = &'a CallFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let frame = self.stack.pop()?;
+        // Push children in reverse order so the first child is popped first.
+        self.stack.extend(frame.calls.iter().rev());
+        self.last_children_count = frame.calls.len();
+        Some(frame)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -375,5 +496,65 @@ mod tests {
         assert_eq!(log_frame_hex.position, Some(5));
         assert_eq!(log_frame_hex.index, Some(10));
         assert_eq!(log_frame, log_frame_hex);
+    }
+
+    /// Helper to build a call frame tree for testing.
+    fn make_frame(label: &str, children: Vec<CallFrame>) -> CallFrame {
+        CallFrame { typ: label.to_string(), calls: children, ..Default::default() }
+    }
+
+    #[test]
+    fn test_callframe_iter_all() {
+        // Build tree:  A -> [B -> [D, E], C]
+        let root = make_frame(
+            "A",
+            vec![
+                make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
+                make_frame("C", vec![]),
+            ],
+        );
+
+        let labels: Vec<&str> = root.iter().map(|f| f.typ.as_str()).collect();
+        assert_eq!(labels, vec!["A", "B", "D", "E", "C"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_skip_children() {
+        // Build tree:  A -> [B -> [D, E], C]
+        let root = make_frame(
+            "A",
+            vec![
+                make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
+                make_frame("C", vec![]),
+            ],
+        );
+
+        let mut labels = Vec::new();
+        let mut iter = root.iter();
+        while let Some(frame) = iter.next() {
+            labels.push(frame.typ.as_str());
+            if frame.typ == "B" {
+                iter.skip_children(); // skip D and E
+            }
+        }
+        assert_eq!(labels, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_single() {
+        let root = make_frame("root", vec![]);
+        let labels: Vec<&str> = root.iter().map(|f| f.typ.as_str()).collect();
+        assert_eq!(labels, vec!["root"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_skip_root_children() {
+        let root = make_frame("A", vec![make_frame("B", vec![]), make_frame("C", vec![])]);
+
+        let mut iter = root.iter();
+        let first = iter.next().unwrap();
+        assert_eq!(first.typ, "A");
+        iter.skip_children();
+        assert!(iter.next().is_none());
     }
 }
