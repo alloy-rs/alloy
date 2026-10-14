@@ -52,7 +52,7 @@ impl GracefulShutdown {
         child: &mut Child,
         kill: impl FnOnce(&mut Child) -> std::io::Result<()>,
     ) -> std::io::Result<()> {
-        if child.try_wait()?.is_some() {
+        if matches!(child.try_wait(), Ok(Some(_))) {
             return Ok(());
         }
         kill(child)?;
