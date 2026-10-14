@@ -16,6 +16,8 @@ updates:
       default-days: 7
   - package-ecosystem: cargo
     directory: /
+    allow:
+      - dependency-type: all
     patterns:
       - '*'
     multi-ecosystem-group: weekly-dependencies

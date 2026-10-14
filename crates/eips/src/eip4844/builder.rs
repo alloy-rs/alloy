@@ -89,7 +89,6 @@ impl PartialSidecar {
     }
 
     /// Get a reference to the blobs currently in the builder.
-    #[allow(clippy::missing_const_for_fn)]
     pub fn blobs(&self) -> &[Blob] {
         &self.blobs
     }
@@ -355,7 +354,7 @@ impl<'a, T: arbitrary::Arbitrary<'a> + Clone> SidecarBuilder<T> {
 impl<T: SidecarCoder + Default> SidecarBuilder<T> {
     /// Instantiate a new builder and new coder instance.
     ///
-    /// By default, this allocates space for 2 blobs (256 KiB). If you want to
+    /// By default, this allocates space for 1 blob (128 KiB). If you want to
     /// preallocate a specific number of blobs, use
     /// [`SidecarBuilder::with_capacity`].
     pub fn new() -> Self {

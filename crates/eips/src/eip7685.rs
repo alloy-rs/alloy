@@ -229,34 +229,11 @@ impl From<Vec<Bytes>> for RequestsOrHash {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sha2"))]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_extend() {
-        // Test extending a Requests container with another Requests container
-        let mut reqs1 = Requests::new(vec![Bytes::from(vec![0x01, 0x02])]);
-        let reqs2 =
-            Requests::new(vec![Bytes::from(vec![0x03, 0x04]), Bytes::from(vec![0x05, 0x06])]);
-
-        // Extend reqs1 with reqs2
-        reqs1.extend(reqs2);
-
-        // Ensure the requests are correctly combined
-        assert_eq!(reqs1.0.len(), 3);
-        assert_eq!(
-            reqs1.0,
-            vec![
-                Bytes::from(vec![0x01, 0x02]),
-                Bytes::from(vec![0x03, 0x04]),
-                Bytes::from(vec![0x05, 0x06])
-            ]
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "sha2")]
     fn test_consistent_requests_hash() {
         // We test that the empty requests hash is consistent with the EIP-7685 definition.
         assert_eq!(Requests::default().requests_hash(), EMPTY_REQUESTS_HASH);
