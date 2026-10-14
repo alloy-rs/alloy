@@ -306,13 +306,7 @@ where
     fn from(value: EthereumReceipt<TxType, L>) -> Self {
         let tx_type = value.tx_type;
         let receipt = value.into_with_bloom().map_receipt(Into::into);
-        match tx_type {
-            TxType::Legacy => Self::Legacy(receipt),
-            TxType::Eip2930 => Self::Eip2930(receipt),
-            TxType::Eip1559 => Self::Eip1559(receipt),
-            TxType::Eip4844 => Self::Eip4844(receipt),
-            TxType::Eip7702 => Self::Eip7702(receipt),
-        }
+        Self::from_typed(tx_type, receipt)
     }
 }
 
@@ -413,35 +407,13 @@ pub(crate) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use crate::TxType;
-        use arbitrary::Arbitrary;
-        use bincode::config;
-        use rand::Rng;
-        use serde_with::serde_as;
 
         use super::super::EthereumReceipt;
-
-        #[test]
-        fn test_ethereum_receipt_bincode_roundtrip() {
-            #[serde_as]
-            #[derive(Debug, PartialEq, Eq)]
-            #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-            struct Data {
-                #[serde_as(as = "super::EthereumReceipt<'_, TxType>")]
-                receipt: EthereumReceipt<TxType>,
-            }
-
-            let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
-                receipt: EthereumReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
-                    .unwrap(),
-            };
-
-            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _): (Data, _) =
-                bincode::serde::decode_from_slice(&encoded, config::legacy()).unwrap();
-            assert_eq!(decoded, data);
-        }
+        bincode_compat_roundtrip_test!(
+            test_ethereum_receipt_bincode_roundtrip,
+            EthereumReceipt<TxType>,
+            "super::EthereumReceipt<'_, TxType>"
+        );
     }
 }
 

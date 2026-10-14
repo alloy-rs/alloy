@@ -4,12 +4,17 @@ use alloc::vec::Vec;
 use alloy_primitives::{address, keccak256, Address, Keccak256, B256, U256};
 use alloy_rlp::Encodable;
 
-/// Protocol-owned keyed nonce storage account.
-pub const NONCE_MANAGER: Address = address!("0000000000000000000000000000000000008250");
+/// Protocol-owned keyed nonce storage account, deployed as an ordinary contract before activation.
+pub const NONCE_MANAGER: Address = address!("8250968C12e01A19d6F667b9B2F3b3A4d0e51cB7");
 /// Runtime that rejects ordinary calls to the nonce manager.
 pub const NONCE_MANAGER_CODE: [u8; 5] = [0x60, 0x00, 0x60, 0x00, 0xfd];
 /// Maximum number of nonce domains selected by one transaction.
 pub const MAX_NONCE_KEYS: usize = 16;
+
+/// Exhausted EIP-8250 sequence value.
+///
+/// Transaction validity requires `nonce_seq < MAX_NONCE_SEQ`, independently of state.
+pub const MAX_NONCE_SEQ: u64 = u64::MAX;
 
 /// Validates the canonical set of nonce keys, including the legacy singleton `[0]`.
 pub fn validate_nonce_keys(keys: &[U256]) -> Result<(), &'static str> {

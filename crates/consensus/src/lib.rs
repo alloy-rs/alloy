@@ -20,6 +20,44 @@ pub use alloy_trie::TrieAccount;
 #[deprecated(since = "0.7.3", note = "use TrieAccount instead")]
 pub type Account = TrieAccount;
 
+/// Generates a test that roundtrips arbitrary values of `$ty` through bincode using the
+/// `serde_bincode_compat` type `$compat`.
+#[cfg(all(test, feature = "serde", feature = "serde-bincode-compat"))]
+macro_rules! bincode_compat_roundtrip_test {
+    ($name:ident, $ty:ty, $compat:literal) => {
+        #[test]
+        fn $name() {
+            use arbitrary::Arbitrary;
+            use rand::{rngs::StdRng, Rng, SeedableRng};
+
+            #[serde_with::serde_as]
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            struct Data {
+                #[serde_as(as = $compat)]
+                value: $ty,
+            }
+
+            let mut rng = StdRng::seed_from_u64(0);
+            for _ in 0..32 {
+                let mut bytes = [0u8; 1024];
+                rng.fill(bytes.as_mut_slice());
+                let data = Data {
+                    value: <$ty>::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
+                };
+
+                let encoded =
+                    bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+                let (decoded, _) = bincode::serde::decode_from_slice::<Data, _>(
+                    &encoded,
+                    bincode::config::legacy(),
+                )
+                .unwrap();
+                assert_eq!(decoded, data);
+            }
+        }
+    };
+}
+
 mod block;
 pub use block::{
     Block, BlockBody, BlockHeader, EthBlock, GasLimitMismatch, Header, HeaderInfo, HeaderRoots,

@@ -5,7 +5,7 @@ use alloy_consensus::Blob;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
-use alloy_transport::{TransportError, TransportResult};
+use alloy_transport::TransportResult;
 use futures::try_join;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
@@ -454,9 +454,9 @@ where
         config: ImpersonateConfig,
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         let from = request.from().ok_or_else(|| {
-            TransportError::from(alloy_transport::TransportErrorKind::Custom(
-                "TransactionRequest must have a `from` address set.".to_string().into(),
-            ))
+            alloy_transport::TransportErrorKind::custom_str(
+                "TransactionRequest must have a `from` address set.",
+            )
         })?;
 
         let impersonate_future = self.anvil_impersonate_account(from);
@@ -1230,7 +1230,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_anvil_rollback() {
         let provider = ProviderBuilder::new().connect_anvil();
 

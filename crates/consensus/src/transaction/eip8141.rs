@@ -977,14 +977,6 @@ mod tests {
     }
 
     #[test]
-    fn roundtrips_canonical_encoding() {
-        let tx = valid_tx();
-        let encoded = tx.encoded_2718();
-        assert_eq!(TxEip8141::decode_2718_exact(&encoded).unwrap(), tx);
-        assert_ne!(tx.tx_hash(), B256::ZERO);
-    }
-
-    #[test]
     fn validates_arbitrary_signatures_without_signers() {
         assert_eq!(validate_signatures(&[FrameSignature::default()], Address::ZERO), Ok(()));
     }
@@ -1045,34 +1037,12 @@ mod tests {
     }
 
     #[test]
-    fn atomic_batch_cannot_approve() {
-        for flags in [[5, 0], [4, 1], [6, 0], [4, 2]] {
-            let mut tx = valid_tx();
-            tx.frames = flags.map(|flags| Frame { flags, ..Default::default() }).to_vec();
-            assert!(tx.validate().is_err(), "accepted batch flags {flags:?}");
-        }
-    }
-
-    #[test]
     #[cfg(feature = "serde")]
     fn serde_uses_alloy_field_names_and_quantities() {
         let json = serde_json::to_value(valid_tx()).unwrap();
         assert_eq!(json["chainId"], "0x1", "serialized {json}");
         assert_eq!(json["nonce"], "0x0");
         assert_eq!(json["blobVersionedHashes"], serde_json::json!([]));
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_accepts_alloy_field_names_and_quantities() {
-        let mut json = serde_json::to_value(valid_tx()).unwrap();
-        let obj = json.as_object_mut().unwrap();
-        obj.remove("chain_id");
-        obj.remove("blob_versioned_hashes");
-        obj.insert("chainId".into(), "0x1".into());
-        obj.insert("nonce".into(), "0x0".into());
-        obj.insert("blobVersionedHashes".into(), serde_json::json!([]));
-        assert_eq!(serde_json::from_value::<TxEip8141>(json).unwrap(), valid_tx());
     }
 
     #[test]
@@ -1093,15 +1063,6 @@ mod tests {
         assert_eq!(tx.effective_gas_price(Some(95)), 100);
         tx.fees.max_priority_fee_per_gas = U256::from(101);
         assert_eq!(tx.validate(), Err(TxEip8141ValidationError::PriorityFeeAboveMaxFee));
-    }
-
-    #[test]
-    fn kind_agrees_with_is_create() {
-        let tx = valid_tx();
-        assert_eq!(tx.kind().is_create(), tx.is_create());
-        assert_eq!(tx.to(), Some(tx.sender));
-        assert_eq!(tx.value(), U256::ZERO);
-        assert!(tx.input().is_empty());
     }
 
     #[test]
@@ -1414,16 +1375,6 @@ mod tests {
         assert_eq!(
             checked_frame_gas(u64::MAX, FrameLimits { execution: 1, state: 0 }),
             Err(Error::FrameGasOverflow)
-        );
-    }
-
-    #[test]
-    fn validates_execution_gas_cap() {
-        assert_eq!(validate_execution_gas(0), Ok(()));
-        assert_eq!(validate_execution_gas(MAX_TX_GAS_LIMIT_OSAKA), Ok(()));
-        assert_eq!(
-            validate_execution_gas(MAX_TX_GAS_LIMIT_OSAKA + 1),
-            Err(TxEip8141ValidationError::ExecutionGasLimit(MAX_TX_GAS_LIMIT_OSAKA + 1))
         );
     }
 

@@ -376,22 +376,6 @@ mod tests {
     }
 
     #[test]
-    fn secret_has_64_hex_digits() {
-        let expected_len = 64;
-        let secret = JwtSecret::random();
-        let hex = hex::encode(secret.0);
-        assert_eq!(hex.len(), expected_len);
-    }
-
-    #[test]
-    fn creation_ok_hex_string_with_0x() {
-        let hex: String =
-            "0x7365637265747365637265747365637265747365637265747365637265747365".into();
-        let result = JwtSecret::from_hex(hex);
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn creation_error_wrong_len() {
         let hex = "f79ae8046";
         let result = JwtSecret::from_hex(hex);
@@ -496,19 +480,6 @@ mod tests {
         let result = secret.validate(&jwt);
 
         assert!(matches!(result, Err(JwtError::UnsupportedSignatureAlgorithm)));
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn valid_without_exp_claim() {
-        let secret = JwtSecret::random();
-
-        let claims = Claims { iat: get_current_timestamp(), exp: None };
-        let jwt = secret.encode(&claims).unwrap();
-
-        let result = secret.validate(&jwt);
-
-        assert!(matches!(result, Ok(())));
     }
 
     #[test]

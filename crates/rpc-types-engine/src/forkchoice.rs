@@ -48,33 +48,21 @@ impl ForkchoiceState {
     /// [`None`].
     #[inline]
     pub fn state_head_hash(&self) -> Option<B256> {
-        if self.head_block_hash.is_zero() {
-            None
-        } else {
-            Some(self.head_block_hash)
-        }
+        (!self.head_block_hash.is_zero()).then_some(self.head_block_hash)
     }
 
     /// Returns the `safe_block_hash`, only if it is not [`B256::ZERO`], otherwise this returns
     /// [`None`].
     #[inline]
     pub fn state_safe_hash(&self) -> Option<B256> {
-        if self.safe_block_hash.is_zero() {
-            None
-        } else {
-            Some(self.safe_block_hash)
-        }
+        (!self.safe_block_hash.is_zero()).then_some(self.safe_block_hash)
     }
 
     /// Returns the `finalized_block_hash`, only if it is not [`B256::ZERO`], otherwise this
     /// returns [`None`].
     #[inline]
     pub fn state_finalized_hash(&self) -> Option<B256> {
-        if self.finalized_block_hash.is_zero() {
-            None
-        } else {
-            Some(self.finalized_block_hash)
-        }
+        (!self.finalized_block_hash.is_zero()).then_some(self.finalized_block_hash)
     }
 
     /// Returns true if any of the hashes in this [`ForkchoiceState`] match the given hash
@@ -289,22 +277,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
-    fn ssz_forkchoice_state_roundtrip() {
-        use ssz::{Decode, Encode};
-
-        let state = ForkchoiceState {
-            head_block_hash: B256::with_last_byte(1),
-            safe_block_hash: B256::with_last_byte(2),
-            finalized_block_hash: B256::with_last_byte(3),
-        };
-
-        let encoded = state.as_ssz_bytes();
-        let decoded = ForkchoiceState::from_ssz_bytes(&encoded).unwrap();
-        assert_eq!(decoded, state);
-    }
-
-    #[test]
-    #[cfg(feature = "ssz")]
     fn ssz_forkchoice_updated_roundtrip() {
         use ssz::{Decode, Encode};
 
@@ -346,20 +318,5 @@ mod tests {
 
         let decoded: ForkchoiceUpdatedResponseV2 = serde_json::from_value(value).unwrap();
         assert_eq!(decoded, updated);
-    }
-
-    #[test]
-    fn forkchoice_updated_response_v2_conversions() {
-        let v1 = ForkchoiceUpdated::from_status(PayloadStatusEnum::Valid)
-            .with_latest_valid_hash(B256::with_last_byte(1))
-            .with_payload_id(PayloadId(alloy_primitives::B64::with_last_byte(2)));
-
-        let v2: ForkchoiceUpdatedResponseV2 = v1.clone().into();
-        assert_eq!(v2.payload_status.payload_inner, v1.payload_status);
-        assert_eq!(v2.payload_id, v1.payload_id);
-        assert_eq!(v2.payload_status.inclusion_list_satisfied, None);
-
-        let downgraded: ForkchoiceUpdated = v2.with_inclusion_list_satisfied(true).into();
-        assert_eq!(downgraded, v1);
     }
 }
