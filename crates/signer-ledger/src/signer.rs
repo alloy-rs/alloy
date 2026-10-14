@@ -104,7 +104,7 @@ impl Signer for LedgerSigner {
         payload.extend_from_slice(&msg_len_u32.to_be_bytes());
         payload.extend_from_slice(message);
 
-        self.sign_payload(INS::SIGN_PERSONAL_MESSAGE, &payload)
+        self.sign_payload(INS::SIGN_PERSONAL_MESSAGE, &payload, VEncoding::Normalized)
             .await
             .map_err(alloy_signer::Error::other)
     }
@@ -276,7 +276,7 @@ impl LedgerSigner {
     pub async fn sign_tx_rlp(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
         let mut payload = Self::path_to_bytes(&self.derivation)?;
         payload.extend_from_slice(tx_rlp);
-        self.sign_payload(INS::SIGN, &payload).await
+        self.sign_payload(INS::SIGN, &payload, VEncoding::for_tx(tx_rlp)).await
     }
 
     #[cfg(feature = "eip712")]
@@ -300,7 +300,7 @@ impl LedgerSigner {
         data.extend_from_slice(separator.as_slice());
         data.extend_from_slice(hash_struct.as_slice());
 
-        self.sign_payload(INS::SIGN_ETH_EIP_712, &data).await
+        self.sign_payload(INS::SIGN_ETH_EIP_712, &data, VEncoding::Normalized).await
     }
 
     #[cfg(feature = "eip712")]
@@ -329,13 +329,18 @@ impl LedgerSigner {
         payload.extend_from_slice(&tlv_length);
         payload.extend_from_slice(&tlv_payload);
 
-        self.sign_payload(INS::SIGN_EIP7702_AUTHORIZATION, &payload).await
+        self.sign_payload(INS::SIGN_EIP7702_AUTHORIZATION, &payload, VEncoding::Normalized).await
     }
 
     /// Helper function for signing either transaction data, personal messages or EIP712 derived
     /// structs.
     #[instrument(err, skip_all, fields(command = ?command, payload = hex::encode(payload)))]
-    async fn sign_payload(&self, command: INS, payload: &[u8]) -> Result<Signature, LedgerError> {
+    async fn sign_payload(
+        &self,
+        command: INS,
+        payload: &[u8],
+        v_encoding: VEncoding,
+    ) -> Result<Signature, LedgerError> {
         // @note Because tlv encoding is done on 7702 auth types sig, it checks if chunks are the
         // header or continuations. @note We need to mention the starter chunk first.
         let p1_first =
@@ -384,8 +389,7 @@ impl LedgerSigner {
             return Err(LedgerError::ShortResponse { got: data.len(), expected: 65 });
         }
 
-        let parity = normalize_v(data[0] as u64)
-            .ok_or(LedgerError::SignatureError(SignatureError::InvalidParity(data[0] as u64)))?;
+        let parity = v_encoding.parity(data[0])?;
         let sig = Signature::from_bytes_and_parity(&data[1..], parity);
         debug!(?sig, "Received signature from device");
         Ok(sig)
@@ -426,6 +430,94 @@ impl LedgerSigner {
         }
 
         Ok(bytes)
+    }
+}
+
+/// How the device encodes the signature parity in the first byte of its response.
+///
+/// See [app-ethereum](https://github.com/LedgerHQ/app-ethereum/blob/master/src/features/sign_tx/ui_common_sign_tx.c).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum VEncoding {
+    /// `0`/`1` or `27`/`28`: typed transactions, personal messages, EIP-712 and EIP-7702
+    /// authorizations.
+    Normalized,
+    /// Legacy transactions: `27 + parity`, or `2 * chain_id + 35 + parity` truncated to a single
+    /// byte if the transaction has a chain ID.
+    Legacy,
+}
+
+impl VEncoding {
+    /// Returns the encoding the device uses when signing `tx_rlp`.
+    fn for_tx(tx_rlp: &[u8]) -> Self {
+        // Legacy transactions are an RLP list, typed transactions start with their type byte.
+        if tx_rlp.first().is_some_and(|&b| b >= 0xc0) {
+            Self::Legacy
+        } else {
+            Self::Normalized
+        }
+    }
+
+    /// Decodes the y-parity from the `v` byte returned by the device.
+    fn parity(self, v: u8) -> Result<bool, LedgerError> {
+        match self {
+            Self::Normalized => normalize_v(v as u64)
+                .ok_or(LedgerError::SignatureError(SignatureError::InvalidParity(v as u64))),
+            // `27` and `2 * chain_id + 35` are odd, and truncation to a byte or the `+ 2` the
+            // device adds for `xGTn` keep the low bit, so an even byte means an odd y-parity.
+            Self::Legacy => Ok(v.is_multiple_of(2)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod v_encoding_tests {
+    use super::*;
+    use alloy_consensus::{TxEip1559, TxLegacy};
+
+    /// The `v` byte the device returns for an EIP-155 legacy transaction.
+    const fn eip155_v(chain_id: u64, parity: bool) -> u8 {
+        (2 * chain_id + 35 + parity as u64) as u8
+    }
+
+    #[test]
+    fn legacy_eip155_parity() {
+        for chain_id in [1, 110, 111, 250, 369, 69420] {
+            for parity in [false, true] {
+                let v = eip155_v(chain_id, parity);
+                assert_eq!(VEncoding::Legacy.parity(v).unwrap(), parity, "{chain_id} {v}");
+                // xGTn
+                let v = v.wrapping_add(2);
+                assert_eq!(VEncoding::Legacy.parity(v).unwrap(), parity, "{chain_id} {v}");
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_pre_eip155_parity() {
+        assert!(!VEncoding::Legacy.parity(27).unwrap());
+        assert!(VEncoding::Legacy.parity(28).unwrap());
+    }
+
+    #[test]
+    fn normalized_parity() {
+        assert!(!VEncoding::Normalized.parity(0).unwrap());
+        assert!(VEncoding::Normalized.parity(1).unwrap());
+        assert!(!VEncoding::Normalized.parity(27).unwrap());
+        assert!(VEncoding::Normalized.parity(28).unwrap());
+        assert!(matches!(
+            VEncoding::Normalized.parity(2),
+            Err(LedgerError::SignatureError(SignatureError::InvalidParity(2)))
+        ));
+    }
+
+    #[test]
+    fn tx_encoding() {
+        let legacy = TxLegacy { chain_id: Some(1), ..Default::default() };
+        assert_eq!(VEncoding::for_tx(&legacy.encoded_for_signing()), VEncoding::Legacy);
+        let pre_eip155 = TxLegacy { chain_id: None, ..Default::default() };
+        assert_eq!(VEncoding::for_tx(&pre_eip155.encoded_for_signing()), VEncoding::Legacy);
+        let typed = TxEip1559 { chain_id: 1, ..Default::default() };
+        assert_eq!(VEncoding::for_tx(&typed.encoded_for_signing()), VEncoding::Normalized);
     }
 }
 
