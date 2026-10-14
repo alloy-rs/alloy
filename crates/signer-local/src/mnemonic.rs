@@ -9,7 +9,11 @@ use coins_bip32::{path::DerivationPath, prelude::Parent, xkeys::XPriv, BIP32_HAR
 use coins_bip39::{English, Mnemonic, Wordlist};
 use k256::ecdsa::SigningKey;
 use rand::Rng;
-use std::{marker::PhantomData, path::PathBuf};
+use std::{
+    marker::PhantomData,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 use thiserror::Error;
 
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -279,13 +283,10 @@ impl<W: Wordlist> IntoIterator for MnemonicBuilder<W> {
     type IntoIter = MnemonicSignerIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        if self.phrase.is_none() {
-            return MnemonicSignerIter::missing_phrase();
+        match self.build_parent_key() {
+            Ok(key) => key.children_from(self.derivation_path.last().copied().unwrap_or(0)),
+            Err(error) => MnemonicSignerIter::failed(error),
         }
-
-        self.build_parent_key()
-            .expect("mnemonic phrase must be set for iteration")
-            .children_from(self.derivation_path.last().copied().unwrap_or(0))
     }
 }
 
@@ -344,12 +345,16 @@ pub struct MnemonicSignerIter {
 #[derive(Debug, Clone)]
 enum MnemonicSignerIterState {
     Signers { key: MnemonicKey, current_index: u32 },
-    MissingPhrase { yielded_error: bool },
+    Failed { error: Arc<Mutex<Option<LocalSignerError>>> },
 }
 
 impl MnemonicSignerIter {
-    const fn missing_phrase() -> Self {
-        Self { state: MnemonicSignerIterState::MissingPhrase { yielded_error: false } }
+    /// Yields `error` once, then ends.
+    ///
+    /// [`LocalSignerError`] is not `Clone`, so clones of the iterator share the error and only the
+    /// first one polled yields it.
+    fn failed(error: LocalSignerError) -> Self {
+        Self { state: MnemonicSignerIterState::Failed { error: Arc::new(Mutex::new(Some(error))) } }
     }
 }
 
@@ -363,13 +368,8 @@ impl Iterator for MnemonicSignerIter {
                 *current_index += 1;
                 Some(result)
             }
-            MnemonicSignerIterState::MissingPhrase { yielded_error } => {
-                if *yielded_error {
-                    None
-                } else {
-                    *yielded_error = true;
-                    Some(Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()))
-                }
+            MnemonicSignerIterState::Failed { error } => {
+                error.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take().map(Err)
             }
         }
     }
@@ -584,6 +584,18 @@ mod tests {
             err,
             LocalSignerError::MnemonicBuilderError(MnemonicBuilderError::ExpectedPhraseNotFound)
         ));
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn mnemonic_iterator_with_invalid_phrase_returns_error() {
+        // Valid words, but the checksum does not match.
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+                      abandon abandon abandon";
+        let mut iter = MnemonicBuilder::<English>::default().phrase(phrase).into_iter();
+        let err = iter.next().unwrap().unwrap_err();
+
+        assert!(matches!(err, LocalSignerError::Bip39Error(_)));
         assert!(iter.next().is_none());
     }
 
