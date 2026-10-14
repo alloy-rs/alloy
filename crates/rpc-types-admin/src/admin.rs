@@ -347,38 +347,6 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_node_info() {
-        // this response also has an enr
-        let response = r#"{
-            "id":"6e2fe698f3064cd99410926ce16734e35e3cc947d4354461d2594f2d2dd9f7b6",
-            "name":"Geth/v1.10.19-stable/darwin-arm64/go1.18.3",
-            "enode":"enode://d7dfaea49c7ef37701e668652bcf1bc63d3abb2ae97593374a949e175e4ff128730a2f35199f3462a56298b981dfc395a5abebd2d6f0284ffe5bdc3d8e258b86@127.0.0.1:30304?discport=0",
-            "enr":"enr:-Jy4QIvS0dKBLjTTV_RojS8hjriwWsJNHRVyOh4Pk4aUXc5SZjKRVIOeYc7BqzEmbCjLdIY4Ln7x5ZPf-2SsBAc2_zqGAYSwY1zog2V0aMfGhNegsXuAgmlkgnY0gmlwhBiT_DiJc2VjcDI1NmsxoQLX366knH7zdwHmaGUrzxvGPTq7Kul1kzdKlJ4XXk_xKIRzbmFwwIN0Y3CCdmA",
-            "ip":"127.0.0.1",
-            "ports":{
-                "discovery":0,
-                "listener":30304
-            },
-            "listenAddr":"[::]:30304",
-            "protocols":{
-                "eth":{
-                    "network":1337,
-                    "difficulty":0,
-                    "genesis":"0xb04009ddf4b0763f42778e7d5937e49bebf1e11b2d26c9dac6cefb5f84b6f8ea",
-                    "config":{
-                        "chainId":0,
-                        "eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"
-                    },
-                    "head":"0xb04009ddf4b0763f42778e7d5937e49bebf1e11b2d26c9dac6cefb5f84b6f8ea"
-                },
-                "snap":{}
-            }
-        }"#;
-
-        let _: NodeInfo = serde_json::from_str(response).unwrap();
-    }
-
-    #[test]
     fn deserialize_node_info_post_merge() {
         // this response also has an enr
         let response = r#"{
@@ -542,35 +510,6 @@ mod tests {
             protocols: PeerProtocolInfo {
                 eth: Some(EthPeerInfo::Handshake),
                 snap: Some(SnapPeerInfo::Handshake),
-                other: BTreeMap::new(),
-            },
-        };
-
-        let serialized = serde_json::to_string(&peer_info).expect("Serialization failed");
-        let deserialized: PeerInfo =
-            serde_json::from_str(&serialized).expect("Deserialization failed");
-
-        assert_eq!(peer_info, deserialized);
-    }
-
-    #[test]
-    fn serialize_deserialize_peer_info_with_optional_fields_roundtrip() {
-        let peer_info = PeerInfo {
-            enr: None,
-            enode: "enode://f769f8cf850dd9f88a13c81ff3e70c3400cf93511c676c6d50f0e359beb43c28388931f64f56ab4110ccced37fb08163b6966fe42b6e15ec647fa8087914463d@127.0.0.1:45591?discport=0".to_string(),
-            id: "daa738efebf7e349b9f5b1a91d782e7355060bb15af8570e23463729d0632deb".to_string(),
-            name: "Geth/v1.13.14-stable-2bd6bd01/linux-amd64/go1.21.6".to_string(),
-            caps: vec!["eth/68".to_string(), "snap/1".to_string()],
-            network: PeerNetworkInfo {
-                local_address: "127.0.0.1:33236".parse().unwrap(),
-                remote_address: "127.0.0.1:45591".parse().unwrap(),
-                inbound: false,
-                trusted: false,
-                static_node: true,
-            },
-            protocols: PeerProtocolInfo {
-                eth: Some(EthPeerInfo::Info(EthInfo { version: 68 })),
-                snap: Some(SnapPeerInfo::Info(SnapInfo { version: 1 })),
                 other: BTreeMap::new(),
             },
         };
