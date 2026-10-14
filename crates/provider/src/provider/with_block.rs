@@ -47,7 +47,7 @@ impl<Params: RpcSend> serde::Serialize for ParamsWithBlock<Params> {
 }
 
 type ProviderCallProducer<Params, Resp, Output, Map> =
-    Box<dyn Fn(BlockId) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
+    Box<dyn FnOnce(BlockId) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
 
 /// Container for various types of calls dependent on a block id.
 enum WithBlockInner<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
@@ -111,6 +111,25 @@ where
     {
         let get_call = Box::new(get_call);
         Self { inner: WithBlockInner::ProviderCall(get_call), block_id: Default::default() }
+    }
+
+    /// Wraps the call after its block ID is resolved, preserving the current default block.
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) fn map_call<F>(self, map: F) -> Self
+    where
+        Self: Send + 'static,
+        Output: 'static,
+        F: FnOnce(BlockId, Self) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map>
+            + Send
+            + 'static,
+    {
+        let block_id = self.block_id;
+        Self {
+            inner: WithBlockInner::ProviderCall(Box::new(move |block_id| {
+                map(block_id, self.block_id(block_id))
+            })),
+            block_id,
+        }
     }
 }
 
