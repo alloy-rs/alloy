@@ -37,5 +37,5 @@ pub use alloy_transport_ws::WebSocketConfig;
 pub use alloy_transport_ipc::IpcConnect;
 
 /// A client using a [`reqwest`] HTTP transport.
-#[cfg(feature = "reqwest")]
+#[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
 pub type ReqwestClient = RpcClient;

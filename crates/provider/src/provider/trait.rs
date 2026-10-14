@@ -1,10 +1,11 @@
 //! Ethereum JSON-RPC provider.
 
-#![allow(unknown_lints, mismatched_lifetime_syntaxes)]
-
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchHeaders};
+use super::{
+    DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom,
+    WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchHeaders, WatchLogsFrom,
+};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -171,16 +172,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// ```no_run
     /// # use alloy_provider::Provider;
-    /// # use alloy_eips::BlockId;
-    /// # use alloy_rpc_types_eth::state::StateOverride;
-    /// # use alloy_transport::BoxTransport;
-    /// # async fn example<P: Provider>(
-    /// #    provider: P,
-    /// #    my_overrides: StateOverride
-    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<P: Provider>(provider: P) -> Result<(), Box<dyn std::error::Error>> {
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
-    /// let output = provider.call(tx).await?;
+    /// let output = provider.call(tx).latest().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -261,6 +256,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Note
     ///
     /// Not all client implementations support state overrides for `eth_estimateGas`.
+    ///
+    /// On networks with [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037), the node must estimate
+    /// one transaction limit covering intrinsic costs, regular (execution) gas, and state gas,
+    /// including temporary charges before state refills. Alloy forwards this request; it does not
+    /// add state gas locally. Use a node implementing the target fork's rules. A receipt's charged
+    /// gas or a trace's net consumption is not a substitute for this estimate.
     fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockNumberOrTag::Pending.into())
@@ -468,20 +469,22 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessList`, the only block access list method specified in
+    /// [execution-apis]. Returns the block access list, or `None` if the block is not found.
+    ///
+    /// [execution-apis]: https://github.com/ethereum/execution-apis/blob/main/src/eth/block.yaml
     async fn get_block_access_list(
         &self,
         block: BlockId,
     ) -> TransportResult<Option<BlockAccessList>> {
-        match block {
-            BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
-            BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
-        }
+        self.client().request("eth_getBlockAccessList", (block,)).await
     }
 
     /// Gets the EIP-7928 block access list by [`BlockHash`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListByBlockHash`, which is not part of execution-apis. Use
+    /// [`Provider::get_block_access_list`] for the specified method. Returns the block access
+    /// list, or `None` if the block is not found.
     async fn get_block_access_list_by_hash(
         &self,
         hash: BlockHash,
@@ -491,7 +494,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
     ///
-    /// Returns the block access list, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListByBlockNumber`, which is not part of execution-apis. Use
+    /// [`Provider::get_block_access_list`] for the specified method. Returns the block access
+    /// list, or `None` if the block is not found.
     async fn get_block_access_list_by_number(
         &self,
         number: BlockNumberOrTag,
@@ -499,9 +504,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
     }
 
-    /// Gets the EIP-7928 block access list by [`BlockId`].
+    /// Gets the RLP encoded EIP-7928 block access list by [`BlockId`].
     ///
-    /// Returns the  block access list raw, or `None` if the block is not found.
+    /// Calls `eth_getBlockAccessListRaw`, which is not part of execution-apis. Returns the
+    /// encoded block access list, or `None` if the block is not found.
     async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
         self.client().request("eth_getBlockAccessListRaw", (block,)).await
     }
@@ -752,6 +758,232 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
+    ///
+    /// This stream continues polling after catching up and continues yielding new blocks
+    /// indefinitely.
+    ///
+    /// This stream _does not_ handle reorgs. Instead, each item yielded from the stream
+    /// is strictly ordered in terms of block number, regardless of the blocks parent.
+    ///
+    /// For example (height, hash, parent):
+    ///
+    /// You should expect blocks in order by number with no gaps and with disjoint parents:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(3,3B,2B)]
+    ///
+    /// And you should not expect receiving two blocks with the same number:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(2,2B,1A)]
+    ///
+    /// Each yielded future contains one block request.
+    ///
+    /// If a block request returns `NullResp`, the yielded future retries the same block until it
+    /// succeeds.
+    ///
+    /// Other errors are surfaced to the caller. Configure retries on the underlying client
+    /// transport (for example with `RetryBackoffLayer`) for transport-level retry behavior.
+    ///
+    /// This can be buffered by the caller, for example with
+    /// [`StreamExt::buffered`](futures::StreamExt::buffered).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::RetryBackoffLayer,
+    /// #     mock::{Asserter, MockTransport},
+    /// # };
+    /// # use futures::StreamExt;
+    ///
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// provider
+    ///     .watch_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .into_stream()
+    ///     // Keep many RPC request futures in flight at the same time.
+    ///     .buffered(4)
+    ///     // Process many resolved blocks concurrently.
+    ///     .for_each_concurrent(Some(4), |block| async move {
+    ///         match block {
+    ///             Ok(block) => {
+    ///                 let _ = block;
+    ///             }
+    ///             Err(err) => eprintln!("block request failed: {err}"),
+    ///         }
+    ///     })
+    ///     .await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
+        WatchBlocksFrom::new(self.weak_client(), start_block)
+    }
+
+    /// Stream canonical block events from a historical block.
+    ///
+    /// This wraps [`watch_blocks_from`](Self::watch_blocks_from) and performs canonical chain
+    /// reconciliation, yielding [`CanonicalEvent`](crate::provider::CanonicalEvent) values.
+    ///
+    /// On a reorg the stream emits
+    /// [`CanonicalEvent::Removed`](crate::provider::CanonicalEvent::Removed)
+    /// for each rolled-back block (newest first), then
+    /// [`CanonicalEvent::Added`](crate::provider::CanonicalEvent::Added) for the new chain segment.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_provider::CanonicalEvent;
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::RetryBackoffLayer,
+    /// #     mock::{Asserter, MockTransport},
+    /// # };
+    /// # use futures::StreamExt;
+    ///
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// let mut stream = provider
+    ///     .watch_canonical_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .rpc_concurrency(4)
+    ///     .max_reorg_depth(64)
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event {
+    ///         Ok(CanonicalEvent::Added(block)) => {
+    ///             let _ = block;
+    ///         }
+    ///         Ok(CanonicalEvent::Removed(block)) => {
+    ///             let _ = block;
+    ///         }
+    ///         Err(err) => eprintln!("canonical stream failed: {err}"),
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
+        self.watch_blocks_from(start_block).canonical()
+    }
+
+    /// Stream block log batches from a historical block.
+    ///
+    /// This follows block numbers from `start_block` and yields one future per block height. Each
+    /// future fetches the block and a one-block log range concurrently, using the range logs when
+    /// they match the fetched block hash and falling back to a block-hash log query when the range
+    /// result is empty or ambiguous.
+    ///
+    /// This stream does not perform canonical reconciliation after a batch has been emitted. Use
+    /// [`watch_canonical_logs_from`](Self::watch_canonical_logs_from) if the caller needs removed
+    /// events when already-emitted blocks are rolled back by a later reorg.
+    ///
+    /// The filter's block option is replaced internally for each exact block; use `start_block` and
+    /// [`block_tag`](crate::provider::WatchLogsFrom::block_tag) to configure range progress.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .into_stream()
+    ///     .buffered(4);
+    ///
+    /// while let Some(batch) = stream.next().await {
+    ///     let block_logs = batch?;
+    ///     for log in block_logs.logs {
+    ///         let _ = log;
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom<N> {
+        WatchLogsFrom::new(self.weak_client(), start_block, filter.clone())
+    }
+
+    /// Stream canonical block log events from a historical block.
+    ///
+    /// This follows canonical blocks from `start_block` and emits block-scoped log batches.
+    /// Removed events use retained logs when a block is rolled back by a reorg. The filter's block
+    /// option is replaced internally for each exact block; use `start_block` and
+    /// [`block_tag`](crate::provider::WatchCanonicalLogsFrom::block_tag) to configure range
+    /// progress.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_primitives::address;
+    /// # use alloy_provider::{CanonicalEvent, Provider, ProviderBuilder};
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("http://localhost:8545".parse()?);
+    /// let filter = Filter::new().address(address!("0x0000000000aE079eB8a274cD51c0f44a9E4d67d4"));
+    ///
+    /// let mut stream = provider
+    ///     .watch_canonical_logs_from(20_000_000, &filter)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .rpc_concurrency(4)
+    ///     .max_reorg_depth(64)
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event {
+    ///         Ok(CanonicalEvent::Added(block_logs)) => {
+    ///             for log in block_logs.logs {
+    ///                 let _ = log;
+    ///             }
+    ///         }
+    ///         Ok(CanonicalEvent::Removed(block_logs)) => {
+    ///             for log in block_logs.logs {
+    ///                 let _ = log;
+    ///             }
+    ///         }
+    ///         Err(err) => eprintln!("canonical log stream failed: {err}"),
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_canonical_logs_from(
+        &self,
+        start_block: u64,
+        filter: &Filter,
+    ) -> WatchCanonicalLogsFrom<N> {
+        self.watch_logs_from(start_block, filter).canonical()
     }
 
     /// Watch for new pending transaction bodies by polling the provider with
@@ -1117,22 +1349,29 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
     }
 
-    /// Broadcasts a transaction to the network.
+    /// Runs any configured transaction fillers and broadcasts a transaction to the network.
+    ///
+    /// The resulting [`SendableTx`] determines submission. An envelope is submitted with
+    /// `eth_sendRawTransaction`; a request builder uses `eth_sendTransaction`, so the node must be
+    /// able to sign for its `from` account. A [`WalletFiller`](crate::fillers::WalletFiller)
+    /// normally transforms a builder into a locally signed envelope, and custom fillers may do the
+    /// same.
     ///
     /// Returns a [`PendingTransactionBuilder`] which can be used to configure
-    /// how and when to await the transaction's confirmation.
+    /// how and when to await the transaction's confirmation. The default is one confirmation with
+    /// no timeout. [`PendingTransactionBuilder::watch`] waits and returns the transaction hash;
+    /// [`PendingTransactionBuilder::get_receipt`] waits and then fetches the receipt.
     ///
     /// # Examples
     ///
-    /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
+    /// See [`PendingTransactionBuilder`] for more examples.
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
-    /// let tx_hash = provider.send_transaction(tx)
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// let receipt = provider.send_transaction(tx)
     ///     .await?
     ///     .with_required_confirmations(2)
-    ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
-    ///     .watch()
+    ///     .get_receipt()
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -1281,6 +1520,50 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         N::TxEnvelope: RpcRecv,
     {
         self.client().request("eth_fillTransaction", (tx,)).await
+    }
+
+    /// Fills the transaction request using the configured
+    /// [`TxFiller`](crate::fillers::TxFiller)s and signs it locally, returning the signed
+    /// envelope without broadcasting it.
+    ///
+    /// Unlike [`fill_transaction`](Self::fill_transaction) and
+    /// [`sign_transaction`](Self::sign_transaction), this does not rely on the node's
+    /// `eth_fillTransaction` and `eth_signTransaction` endpoints, which regular nodes do not
+    /// support. The returned envelope can be broadcast later with
+    /// [`send_tx_envelope`](Self::send_tx_envelope).
+    ///
+    /// The default implementation returns an error, since a bare provider has no fillers.
+    /// [`FillProvider`](crate::fillers::FillProvider) overrides it and requires a signing filler
+    /// such as [`WalletFiller`](crate::fillers::WalletFiller) to be configured, for example via
+    /// [`ProviderBuilder::wallet`](crate::ProviderBuilder::wallet).
+    ///
+    /// # Note
+    ///
+    /// Depending on the configured fillers this can have side effects, such as reserving a nonce,
+    /// even if the returned envelope is never broadcast.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(
+    /// #     provider: impl alloy_provider::Provider,
+    /// #     tx: alloy_rpc_types_eth::TransactionRequest,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// let envelope = provider.fill_and_sign_transaction(tx).await?;
+    ///
+    /// // broadcast the exact same transaction later
+    /// provider.send_tx_envelope(envelope).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        let _ = tx;
+        Err(RpcError::local_usage_str(
+            "no fillers configured, cannot fill and sign transaction locally",
+        ))
     }
 
     /// Subscribe to a stream of new block headers.
@@ -1552,8 +1835,6 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// [`PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
     async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
         P: RpcSend,
@@ -1646,19 +1927,27 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
-    use alloy_consensus::{Transaction, TxEnvelope};
+    use crate::{builder, ProviderBuilder, WalletProvider};
+    use alloy_consensus::Transaction;
+    use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
     use alloy_network::{
         AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
     };
-    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
-    use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
-    use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
-    use std::{io::Read, str::FromStr, time::Duration};
+    use alloy_transport::{
+        layers::{RetryBackoffLayer, RetryPolicy},
+        TransportFut,
+    };
+    use std::{
+        io::Read,
+        str::FromStr,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     // For layer transport tests
     use alloy_consensus::transaction::SignerRecoverable;
@@ -1836,16 +2125,6 @@ mod tests {
         assert_eq!(0, num);
     }
 
-    #[cfg(feature = "reqwest")]
-    #[tokio::test]
-    async fn object_safety() {
-        let provider = ProviderBuilder::new().connect_anvil();
-
-        let refdyn = &provider as &dyn Provider<_>;
-        let num = refdyn.get_block_number().await.unwrap();
-        assert_eq!(0, num);
-    }
-
     #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn subscribe_blocks_http() {
@@ -1864,7 +2143,7 @@ mod tests {
     #[cfg(feature = "ws-base")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
+        for url in ["wss://ethereum.reth.rs/ws"] {
             let _ = ProviderBuilder::<_, _, Ethereum>::default().connect(url).await.unwrap();
         }
     }
@@ -1919,23 +2198,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "ws-base")]
-    async fn subscribe_blocks_ws_remote() {
-        use futures::stream::StreamExt;
-
-        let url = "wss://eth-mainnet.g.alchemy.com/v2/viFmeVzhg6bWKVMIWWS8MhmzREB-D4f7";
-        let ws = alloy_rpc_client::WsConnect::new(url);
-        let Ok(client) = alloy_rpc_client::RpcClient::connect_pubsub(ws).await else { return };
-        let provider = RootProvider::<Ethereum>::new(client);
-        let sub = provider.subscribe_blocks().await.unwrap();
-        let mut stream = sub.into_stream().take(1);
-        while let Some(header) = stream.next().await {
-            println!("New block {header:?}");
-            assert!(header.number > 0);
-        }
-    }
-
-    #[tokio::test]
     async fn test_custom_retry_policy() {
         #[derive(Debug, Clone)]
         struct CustomPolicy;
@@ -1982,21 +2244,6 @@ mod tests {
         let hash2 =
             builder.get_receipt().await.expect("failed to await pending tx").transaction_hash;
         assert_eq!(hash1, hash2);
-    }
-
-    #[tokio::test]
-    async fn test_send_tx_sync() {
-        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
-        let tx = TransactionRequest {
-            value: Some(U256::from(100)),
-            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            gas_price: Some(20e9 as u128),
-            gas: Some(21000),
-            ..Default::default()
-        };
-
-        let _receipt =
-            provider.send_transaction_sync(tx.clone()).await.expect("failed to send tx sync");
     }
 
     #[tokio::test]
@@ -2075,13 +2322,6 @@ mod tests {
             .expect("Watching tx timed out")
             .expect("failed to await pending tx");
         assert_eq!(hash1, hash2);
-    }
-
-    #[tokio::test]
-    async fn gets_block_number() {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let num = provider.get_block_number().await.unwrap();
-        assert_eq!(0, num)
     }
 
     #[tokio::test]
@@ -2181,15 +2421,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gets_block_by_number() {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let num = 0;
-        let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
-        assert_eq!(block.header.number, num);
-    }
-
-    #[tokio::test]
     async fn gets_client_version() {
         let provider = ProviderBuilder::new().connect_anvil();
         let version = provider.get_client_version().await.unwrap();
@@ -2260,39 +2491,6 @@ mod tests {
             .expect("failed to fetch tx")
             .expect("tx not included");
         assert_eq!(tx.input(), &bytes!("deadbeef"));
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn gets_logs() {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let filter = Filter::new()
-            .at_block_hash(b256!(
-                "b20e6f35d4b46b3c4cd72152faec7143da851a0dc281d390bdd50f58bfbdb5d3"
-            ))
-            .event_signature(b256!(
-                "e1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c"
-            ));
-        let logs = provider.get_logs(&filter).await.unwrap();
-        assert_eq!(logs.len(), 1);
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn gets_tx_receipt() {
-        let provider = ProviderBuilder::new().connect_anvil();
-        let receipt = provider
-            .get_transaction_receipt(b256!(
-                "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
-            ))
-            .await
-            .unwrap();
-        assert!(receipt.is_some());
-        let receipt = receipt.unwrap();
-        assert_eq!(
-            receipt.transaction_hash,
-            b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95")
-        );
     }
 
     #[tokio::test]
@@ -2425,29 +2623,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(any(
-        feature = "reqwest-default-tls",
-        feature = "reqwest-rustls-tls",
-        feature = "reqwest-native-tls",
-    ))]
-    #[ignore = "ignore until <https://github.com/paradigmxyz/reth/pull/14727> is in"]
-    async fn call_mainnet() {
-        use alloy_network::TransactionBuilder;
-        use alloy_sol_types::SolValue;
-
-        let url = "https://docs-demo.quiknode.pro/";
-        let provider = ProviderBuilder::new().connect_http(url.parse().unwrap());
-        let req = TransactionRequest::default()
-            .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
-            .with_input(bytes!("06fdde03")); // `name()`
-        let result = provider.call(req.clone()).await.unwrap();
-        assert_eq!(String::abi_decode(&result).unwrap(), "Wrapped Ether");
-
-        let result = provider.call(req).block(0.into()).await.unwrap();
-        assert_eq!(result.to_string(), "0x");
-    }
-
-    #[tokio::test]
     async fn call_many_mainnet() {
         use alloy_rpc_types_eth::{BlockOverrides, StateContext};
 
@@ -2516,18 +2691,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "hyper-tls")]
-    async fn hyper_https() {
-        let url = "https://ethereum.reth.rs/rpc";
-
-        // With the `hyper` feature enabled .connect builds the provider based on
-        // `HyperTransport`.
-        let provider = ProviderBuilder::new().connect(url).await.unwrap();
-
-        let _num = provider.get_block_number().await.unwrap();
-    }
-
-    #[tokio::test]
     async fn test_empty_transactions() {
         let provider = ProviderBuilder::new().connect_anvil();
 
@@ -2590,36 +2753,6 @@ mod tests {
                 max_priority_fee_per_gas: 0,
             }))
             .await;
-    }
-
-    #[tokio::test]
-    #[cfg(not(windows))]
-    async fn eth_sign_transaction() {
-        async_ci_only(|| async {
-            run_with_tempdir("reth-sign-tx", |dir| async {
-                let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
-                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
-
-                let accounts = provider.get_accounts().await.unwrap();
-                let from = accounts[0];
-
-                let tx = TransactionRequest::default()
-                    .from(from)
-                    .to(Address::random())
-                    .value(U256::from(100))
-                    .gas_limit(21000);
-
-                let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
-
-                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
-
-                let signer = tx.recover_signer().unwrap();
-
-                assert_eq!(signer, from);
-            })
-            .await
-        })
-        .await;
     }
 
     #[cfg(feature = "throttle")]
@@ -2730,5 +2863,98 @@ mod tests {
         assert!(filled_tx.to().is_some(), "filled transaction should have to address");
         assert!(filled_tx.gas_limit() > 0, "filled transaction should have gas limit");
         assert!(filled_tx.max_fee_per_gas() > 0, "filled transaction should have max fee per gas");
+    }
+
+    #[tokio::test]
+    async fn get_block_access_list_calls_specified_method() {
+        let method = Arc::new(Mutex::new(None));
+        let service = {
+            let method = method.clone();
+            tower::service_fn(move |request: RequestPacket| {
+                let method = method.clone();
+                Box::pin(async move {
+                    let RequestPacket::Single(request) = request else {
+                        panic!("block access lists are requested one block at a time");
+                    };
+                    *method.lock().unwrap() = Some(request.method().to_string());
+                    Ok(ResponsePacket::Single(Response {
+                        id: request.id().clone(),
+                        payload: ResponsePayload::Success(
+                            RawValue::from_string("null".to_string()).unwrap(),
+                        ),
+                    }))
+                }) as TransportFut<'static>
+            })
+        };
+        let provider = RootProvider::<Ethereum>::new(RpcClient::new(service, true));
+
+        assert_eq!(provider.get_block_access_list(BlockId::latest()).await.unwrap(), None);
+        assert_eq!(method.lock().unwrap().as_deref(), Some("eth_getBlockAccessList"));
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let from = provider.default_signer_address();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let envelope = provider.fill_and_sign_transaction(tx).await.unwrap();
+
+        // the recommended fillers and the wallet filler populated the request before signing
+        assert_eq!(envelope.recover_signer().unwrap(), from);
+        assert_eq!(envelope.nonce(), 0);
+        assert_eq!(envelope.chain_id(), Some(31337));
+        assert!(envelope.gas_limit() > 0);
+        assert!(envelope.max_fee_per_gas() > 0);
+
+        // broadcasting the prepared envelope yields the same hash
+        let hash = *envelope.tx_hash();
+        let pending = provider.send_tx_envelope(envelope).await.unwrap();
+        assert_eq!(*pending.tx_hash(), hash);
+
+        let receipt = pending.get_receipt().await.unwrap();
+        assert_eq!(receipt.transaction_hash, hash);
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction_sequential_nonces() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        // the cached nonce manager hands out consecutive nonces without broadcasting
+        let first = provider.fill_and_sign_transaction(tx.clone()).await.unwrap();
+        let second = provider.fill_and_sign_transaction(tx).await.unwrap();
+        assert_eq!(first.nonce(), 0);
+        assert_eq!(second.nonce(), 1);
+
+        let receipt = provider.send_tx_envelope(first).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
+        let receipt = provider.send_tx_envelope(second).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_fill_and_sign_transaction_dyn_provider() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let from = provider.default_signer_address();
+        let provider = provider.erased();
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let envelope = provider.fill_and_sign_transaction(tx).await.unwrap();
+        assert_eq!(envelope.recover_signer().unwrap(), from);
+
+        let receipt =
+            provider.send_tx_envelope(envelope).await.unwrap().get_receipt().await.unwrap();
+        assert!(receipt.status());
     }
 }

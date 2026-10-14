@@ -22,6 +22,11 @@ impl SubscriptionManager {
         self.local_to_sub.len()
     }
 
+    /// Returns true if a subscription with this local_id exists.
+    pub(crate) fn contains(&self, local_id: &B256) -> bool {
+        self.local_to_sub.contains_left(local_id)
+    }
+
     /// Insert a subscription.
     fn insert(
         &mut self,

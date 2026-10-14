@@ -18,6 +18,7 @@ pub use self::{
         AccountChangeKind, AccountState, DiffMode, DiffStateKind, PreStateConfig, PreStateFrame,
         PreStateMode,
     },
+    state_gas::StateGasTrace,
 };
 
 pub mod call;
@@ -26,6 +27,7 @@ pub mod four_byte;
 pub mod mux;
 pub mod noop;
 pub mod pre_state;
+pub mod state_gas;
 
 /// Error when the inner tracer from [GethTrace] is mismatching to the target tracer.
 #[derive(Debug, thiserror::Error)]
@@ -49,6 +51,21 @@ pub struct BlockTraceResult {
     pub traces: Vec<TraceResult>,
 }
 
+/// Result for one block emitted by a `debug_traceChain` subscription.
+///
+/// <https://github.com/ethereum/go-ethereum/blob/e25efd2c62175e82b364c0344d77c882aa951f68/eth/tracers/api.go#L190-L196>
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChainBlockTraceResult {
+    /// Block number corresponding to the trace task.
+    pub block: U256,
+    /// Block hash corresponding to the trace task.
+    pub hash: B256,
+    /// Trace results produced by the trace task.
+    ///
+    /// Geth leaves entries after the first transaction-level tracing failure as `null`.
+    pub traces: Vec<Option<TraceResult>>,
+}
+
 /// Geth Default struct log trace frame
 ///
 /// <https://github.com/ethereum/go-ethereum/blob/a9ef135e2dd53682d106c6a2aede9187026cc1de/eth/tracers/logger/logger.go#L406-L411>
@@ -57,8 +74,52 @@ pub struct BlockTraceResult {
 pub struct DefaultFrame {
     /// Whether the transaction failed
     pub failed: bool,
-    /// How much gas was used.
+    /// Total transaction gas charged, matching receipt `gasUsed`.
+    /// Includes regular and EIP-8037 state gas, intrinsic costs, refunds, and the calldata floor.
+    /// Excludes blob gas. Do not add `state_gas_used` again or use this as a gas-limit estimate.
     pub gas: u64,
+    /// Regular (execution) gas contribution to block accounting, excluding EIP-8037 state gas.
+    ///
+    /// Includes intrinsic gas and the execution-dimension calldata floor; before ordinary refunds
+    /// under EIP-7778. This is not receipt gas. See the
+    /// [gas accounting guide](crate::geth::state_gas) and
+    /// [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    ///
+    /// Optional because older forks and nodes can omit this field; `None` does not mean zero.
+    #[serde(
+        default,
+        with = "alloy_serde::quantity::opt",
+        rename = "executionGasUsed",
+        alias = "regularGasUsed",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub execution_gas_used: Option<u64>,
+    /// Net EIP-8037 state gas for the whole transaction, excluding regular execution gas.
+    ///
+    /// Includes state creation charges after state refills and rollback, not peak state gas
+    /// demand. Do not subtract `gas_refund` from this already-net transaction value.
+    /// Zero when reported for an inactive EIP-8037 fork; `None` means the node did not report it.
+    /// See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    #[serde(
+        default,
+        with = "alloy_serde::quantity::opt",
+        rename = "stateGasUsed",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub state_gas_used: Option<u64>,
+    /// Ordinary transaction refund reported after transaction-boundary refund processing.
+    ///
+    /// Subject to the [EIP-3529](https://eips.ethereum.org/EIPS/eip-3529) cap; not a raw frame counter.
+    /// Excludes EIP-8037 state refills and unused gas. The calldata floor can limit the fee
+    /// saving; use the transaction's receipt gas for the final charge. `None` means not
+    /// reported.
+    #[serde(
+        default,
+        with = "alloy_serde::quantity::opt",
+        rename = "gasRefund",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub gas_refund: Option<u64>,
     /// Output of the transaction
     pub return_value: Bytes,
     /// Recorded traces of the transaction
@@ -74,11 +135,30 @@ pub struct StructLog {
     pub pc: u64,
     /// opcode to be executed
     pub op: Cow<'static, str>,
-    /// remaining gas
+    /// Regular gas remaining before this opcode, excluding the EIP-8037 state gas reservoir.
+    /// This is the `GAS`/`gasleft()` dimension. State charges can spill into it and refills can
+    /// raise it. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
     pub gas: u64,
-    /// cost for executing op
+    /// Gas charged to the regular gas counter for this opcode.
+    /// Under EIP-8037 this can include state gas spilling out of an empty reservoir; it excludes
+    /// state gas paid from the reservoir. It is not necessarily a pure execution-gas charge.
+    /// Do not blindly add `state_gas_cost`, which can overlap with spillover.
     #[serde(rename = "gasCost")]
     pub gas_cost: u64,
+    /// Net EIP-8037 state gas charged by this opcode, regardless of which gas pool paid it.
+    /// Positive means a charge; negative means a state refill, not an EIP-3529 refund.
+    /// `None` means not reported. Summing steps cannot reconstruct transaction state gas:
+    /// account creation, code deposit, authorization processing, and rollback can occur outside
+    /// steps. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    #[serde(default, rename = "stateGasCost", skip_serializing_if = "Option::is_none")]
+    pub state_gas_cost: Option<i64>,
+    /// EIP-8037 state gas reservoir remaining before this opcode, excluded from `gas`.
+    /// State charges spend it first, then spill into regular gas. Regular execution cannot spend
+    /// it. It is passed to child frames in full, outside the 63/64 rule; it is not a per-call
+    /// gas limit. `Some(0)` means an empty reservoir, not that state gas is disabled. `None`
+    /// means not reported. See [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037).
+    #[serde(default, rename = "stateGasReservoir", skip_serializing_if = "Option::is_none")]
+    pub state_gas_reservoir: Option<u64>,
     /// Current call depth
     pub depth: u64,
     /// Error message if any
@@ -104,7 +184,8 @@ pub struct StructLog {
         serialize_with = "serialize_string_storage_map_opt"
     )]
     pub storage: Option<BTreeMap<B256, B256>>,
-    /// Refund counter
+    /// Ordinary transaction refund counter at this step, before the transaction-wide cap/floor.
+    /// Excludes EIP-8037 state refills. This is not the applied refund or available execution gas.
     #[serde(default, rename = "refund", skip_serializing_if = "Option::is_none")]
     pub refund_counter: Option<u64>,
 }
@@ -119,8 +200,12 @@ impl StructLog {
 /// Tracing response objects
 ///
 /// Note: This deserializes untagged, so it's possible that a custom javascript tracer response
-/// matches another variant, for example a js tracer that returns `{}` would be deserialized as
-/// [GethTrace::NoopTracer]
+/// matches another variant.
+///
+/// An empty object `{}` is ambiguous: it is the response of the `noopTracer` and also of the
+/// `4byteTracer` for a transaction without calls. It deserializes as
+/// [`GethTrace::FourByteTracer`] with an empty map, which [`GethTrace::try_into_noop_frame`]
+/// also accepts.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GethTrace {
@@ -136,6 +221,8 @@ pub enum GethTrace {
     FourByteTracer(FourByteFrame),
     /// The response for pre-state byte tracer
     PreStateTracer(PreStateFrame),
+    /// The response for the EIP-8037 state-gas tracer
+    StateGasTracer(StateGasTrace),
     /// An empty json response
     NoopTracer(NoopFrame),
     /// The response for mux tracer
@@ -144,109 +231,72 @@ pub enum GethTrace {
     JS(serde_json::Value),
 }
 
+macro_rules! geth_trace_frames {
+    ($($variant:ident($frame:ident) => $is:ident, $try_into:ident;)+) => {
+        impl GethTrace {
+            $(
+                #[doc = concat!("Returns true if this is a [`GethTrace::", stringify!($variant), "`].")]
+                pub const fn $is(&self) -> bool {
+                    matches!(self, Self::$variant(_))
+                }
+            )+
+
+            $(
+                #[doc = concat!("Try to convert the inner tracer to [`", stringify!($frame), "`].")]
+                pub fn $try_into(self) -> Result<$frame, UnexpectedTracerError> {
+                    match self {
+                        Self::$variant(inner) => Ok(inner),
+                        _ => Err(UnexpectedTracerError(self)),
+                    }
+                }
+            )+
+        }
+
+        $(
+            impl From<$frame> for GethTrace {
+                fn from(value: $frame) -> Self {
+                    Self::$variant(value)
+                }
+            }
+        )+
+    };
+}
+
+geth_trace_frames! {
+    Default(DefaultFrame) => is_default, try_into_default_frame;
+    Erc7562Tracer(Erc7562Frame) => is_erc7562, try_into_erc7562_frame;
+    CallTracer(CallFrame) => is_call, try_into_call_frame;
+    FlatCallTracer(FlatCallFrame) => is_flat_call, try_into_flat_call_frame;
+    FourByteTracer(FourByteFrame) => is_four_byte, try_into_four_byte_frame;
+    PreStateTracer(PreStateFrame) => is_pre_state, try_into_pre_state_frame;
+    StateGasTracer(StateGasTrace) => is_state_gas, try_into_state_gas_trace;
+    MuxTracer(MuxFrame) => is_mux, try_into_mux_frame;
+}
+
 impl GethTrace {
-    /// Returns true if this is a default structlog frame.
-    pub const fn is_default(&self) -> bool {
-        matches!(self, Self::Default(_))
-    }
-
-    /// Returns true if this is a call frame.
-    pub const fn is_call(&self) -> bool {
-        matches!(self, Self::CallTracer(_))
-    }
-
-    /// Returns true if this is a flat call frame.
-    pub const fn is_flat_call(&self) -> bool {
-        matches!(self, Self::FlatCallTracer(_))
-    }
-
-    /// Returns true if this is a four byte frame.
-    pub const fn is_four_byte(&self) -> bool {
-        matches!(self, Self::FourByteTracer(_))
-    }
-
-    /// Returns true if this is a pre-state frame.
-    pub const fn is_pre_state(&self) -> bool {
-        matches!(self, Self::PreStateTracer(_))
-    }
-
-    /// Returns true if this is a noop frame.
+    /// Returns true if this is a [`GethTrace::NoopTracer`].
+    ///
+    /// A deserialized `noopTracer` response is an empty [`GethTrace::FourByteTracer`], see
+    /// [`GethTrace::try_into_noop_frame`].
     pub const fn is_noop(&self) -> bool {
         matches!(self, Self::NoopTracer(_))
     }
 
-    /// Returns true if this is a mux trace.
-    pub const fn is_mux(&self) -> bool {
-        matches!(self, Self::MuxTracer(_))
+    /// Try to convert the inner tracer to [`NoopFrame`].
+    ///
+    /// Also accepts an empty [`GethTrace::FourByteTracer`], which is what the `noopTracer`
+    /// response `{}` deserializes to.
+    pub fn try_into_noop_frame(self) -> Result<NoopFrame, UnexpectedTracerError> {
+        match self {
+            Self::NoopTracer(inner) => Ok(inner),
+            Self::FourByteTracer(frame) if frame.0.is_empty() => Ok(NoopFrame::default()),
+            _ => Err(UnexpectedTracerError(self)),
+        }
     }
 
     /// Returns true if this is a JS trace
     pub const fn is_js(&self) -> bool {
         matches!(self, Self::JS(_))
-    }
-
-    /// Try to convert the inner tracer to [DefaultFrame]
-    pub fn try_into_default_frame(self) -> Result<DefaultFrame, UnexpectedTracerError> {
-        match self {
-            Self::Default(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
-    }
-
-    /// Try to convert the inner tracer to [CallFrame]
-    pub fn try_into_call_frame(self) -> Result<CallFrame, UnexpectedTracerError> {
-        match self {
-            Self::CallTracer(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
-    }
-
-    /// Try to convert the inner tracer to [FlatCallFrame]
-    pub fn try_into_flat_call_frame(self) -> Result<FlatCallFrame, UnexpectedTracerError> {
-        match self {
-            Self::FlatCallTracer(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
-    }
-
-    /// Try to convert the inner tracer to [FourByteFrame]
-    pub fn try_into_four_byte_frame(self) -> Result<FourByteFrame, UnexpectedTracerError> {
-        match self {
-            Self::FourByteTracer(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
-    }
-
-    /// Try to convert the inner tracer to [PreStateFrame]
-    pub fn try_into_pre_state_frame(self) -> Result<PreStateFrame, UnexpectedTracerError> {
-        match self {
-            Self::PreStateTracer(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
-    }
-
-    /// Try to convert the inner tracer to [NoopFrame]
-    pub fn try_into_noop_frame(self) -> Result<NoopFrame, UnexpectedTracerError> {
-        match self {
-            Self::NoopTracer(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
-    }
-
-    /// Try to convert the inner tracer to [MuxFrame]
-    pub fn try_into_mux_frame(self) -> Result<MuxFrame, UnexpectedTracerError> {
-        match self {
-            Self::MuxTracer(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
-    }
-
-    /// Try to convert the inner tracer to [Erc7562Frame]
-    pub fn try_into_erc7562_frame(self) -> Result<Erc7562Frame, UnexpectedTracerError> {
-        match self {
-            Self::Erc7562Tracer(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
     }
 
     /// Try to convert the inner tracer to [serde_json::Value]
@@ -258,57 +308,15 @@ impl GethTrace {
     }
 }
 
-impl Default for GethTrace {
-    fn default() -> Self {
-        Self::Default(DefaultFrame::default())
-    }
-}
-
-impl From<DefaultFrame> for GethTrace {
-    fn from(value: DefaultFrame) -> Self {
-        Self::Default(value)
-    }
-}
-
-impl From<FourByteFrame> for GethTrace {
-    fn from(value: FourByteFrame) -> Self {
-        Self::FourByteTracer(value)
-    }
-}
-
-impl From<CallFrame> for GethTrace {
-    fn from(value: CallFrame) -> Self {
-        Self::CallTracer(value)
-    }
-}
-
-impl From<FlatCallFrame> for GethTrace {
-    fn from(value: FlatCallFrame) -> Self {
-        Self::FlatCallTracer(value)
-    }
-}
-
-impl From<PreStateFrame> for GethTrace {
-    fn from(value: PreStateFrame) -> Self {
-        Self::PreStateTracer(value)
-    }
-}
-
 impl From<NoopFrame> for GethTrace {
     fn from(value: NoopFrame) -> Self {
         Self::NoopTracer(value)
     }
 }
 
-impl From<MuxFrame> for GethTrace {
-    fn from(value: MuxFrame) -> Self {
-        Self::MuxTracer(value)
-    }
-}
-
-impl From<Erc7562Frame> for GethTrace {
-    fn from(value: Erc7562Frame) -> Self {
-        Self::Erc7562Tracer(value)
+impl Default for GethTrace {
+    fn default() -> Self {
+        Self::Default(DefaultFrame::default())
     }
 }
 
@@ -346,6 +354,9 @@ pub enum GethDebugBuiltInTracerType {
     /// The output is an object where the keys correspond to account addresses.
     #[serde(rename = "prestateTracer")]
     PreStateTracer,
+    /// The EIP-8037 state-gas summary tracer.
+    #[serde(rename = "stateGasTracer")]
+    StateGasTracer,
     /// This tracer is a noop. It returns an empty object and is only meant for testing the setup.
     #[serde(rename = "noopTracer")]
     NoopTracer,
@@ -387,6 +398,7 @@ impl GethDebugTracerType {
                 GethDebugBuiltInTracerType::CallTracer => "callTracer",
                 GethDebugBuiltInTracerType::FlatCallTracer => "flatCallTracer",
                 GethDebugBuiltInTracerType::PreStateTracer => "prestateTracer",
+                GethDebugBuiltInTracerType::StateGasTracer => "stateGasTracer",
                 GethDebugBuiltInTracerType::NoopTracer => "noopTracer",
                 GethDebugBuiltInTracerType::MuxTracer => "muxTracer",
                 GethDebugBuiltInTracerType::Erc7562Tracer => "erc7562Tracer",
@@ -423,41 +435,9 @@ impl GethDebugTracerConfig {
         serde_json::from_value(self.0)
     }
 
-    /// Returns the [CallConfig] if it is a call config.
-    pub fn into_call_config(self) -> Result<CallConfig, serde_json::Error> {
-        if self.0.is_null() {
-            return Ok(Default::default());
-        }
-        self.from_value()
-    }
-
-    /// Returns the [FlatCallConfig] if it is a call config.
-    pub fn into_flat_call_config(self) -> Result<FlatCallConfig, serde_json::Error> {
-        if self.0.is_null() {
-            return Ok(Default::default());
-        }
-        self.from_value()
-    }
-
     /// Returns the raw json value
     pub fn into_json(self) -> serde_json::Value {
         self.0
-    }
-
-    /// Returns the [PreStateConfig] if it is a prestate config.
-    pub fn into_pre_state_config(self) -> Result<PreStateConfig, serde_json::Error> {
-        if self.0.is_null() {
-            return Ok(Default::default());
-        }
-        self.from_value()
-    }
-
-    /// Returns the [MuxConfig] if it is a mux config.
-    pub fn into_mux_config(self) -> Result<MuxConfig, serde_json::Error> {
-        if self.0.is_null() {
-            return Ok(Default::default());
-        }
-        self.from_value()
     }
 }
 
@@ -467,33 +447,45 @@ impl From<serde_json::Value> for GethDebugTracerConfig {
     }
 }
 
-impl From<CallConfig> for GethDebugTracerConfig {
-    fn from(value: CallConfig) -> Self {
-        Self(serde_json::to_value(value).expect("is serializable"))
-    }
-}
-impl From<FlatCallConfig> for GethDebugTracerConfig {
-    fn from(value: FlatCallConfig) -> Self {
-        Self(serde_json::to_value(value).expect("is serializable"))
-    }
+macro_rules! tracer_configs {
+    ($($config:ident => $into:ident;)+) => {
+        impl GethDebugTracerConfig {
+            $(
+                #[doc = concat!(
+                    "Deserializes the config into a [`", stringify!($config),
+                    "`], returning the default if it is null."
+                )]
+                pub fn $into(self) -> Result<$config, serde_json::Error> {
+                    config_or_default(self.0)
+                }
+            )+
+        }
+
+        $(
+            impl From<$config> for GethDebugTracerConfig {
+                fn from(value: $config) -> Self {
+                    Self(serde_json::to_value(value).expect("is serializable"))
+                }
+            }
+        )+
+    };
 }
 
-impl From<PreStateConfig> for GethDebugTracerConfig {
-    fn from(value: PreStateConfig) -> Self {
-        Self(serde_json::to_value(value).expect("is serializable"))
-    }
+tracer_configs! {
+    CallConfig => into_call_config;
+    FlatCallConfig => into_flat_call_config;
+    PreStateConfig => into_pre_state_config;
+    MuxConfig => into_mux_config;
+    Erc7562Config => into_erc7562_config;
 }
 
-impl From<MuxConfig> for GethDebugTracerConfig {
-    fn from(value: MuxConfig) -> Self {
-        Self(serde_json::to_value(value).expect("is serializable"))
+fn config_or_default<T: DeserializeOwned + Default>(
+    value: serde_json::Value,
+) -> Result<T, serde_json::Error> {
+    if value.is_null() {
+        return Ok(T::default());
     }
-}
-
-impl From<Erc7562Config> for GethDebugTracerConfig {
-    fn from(value: Erc7562Config) -> Self {
-        Self(serde_json::to_value(value).expect("is serializable"))
-    }
+    serde_json::from_value(value)
 }
 
 /// Bindings for additional `debug_traceTransaction` options
@@ -520,8 +512,11 @@ pub struct GethDebugTracingOptions {
     /// This could be [CallConfig] or [PreStateConfig] depending on the tracer.
     #[serde(default, skip_serializing_if = "GethDebugTracerConfig::is_null")]
     pub tracer_config: GethDebugTracerConfig,
-    /// A string of decimal integers that overrides the JavaScript-based tracing calls default
-    /// timeout of 5 seconds.
+    /// A Go duration string, such as `5s`, that overrides the default five-second timeout for
+    /// JavaScript-based tracing calls.
+    ///
+    /// [`Self::with_timeout`] represents the supplied duration as integer milliseconds, for
+    /// example `2500ms`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<String>,
 }
@@ -556,6 +551,13 @@ impl GethDebugTracingOptions {
     /// Creates new options for [`GethDebugBuiltInTracerType::PreStateTracer`]
     pub fn prestate_tracer(config: PreStateConfig) -> Self {
         Self::new_tracer(GethDebugBuiltInTracerType::PreStateTracer).with_prestate_config(config)
+    }
+
+    /// Requests the EIP-8037 transaction gas breakdown as [`StateGasTrace`].
+    /// Requires node support for `stateGasTracer`; selecting it does not activate EIP-8037.
+    /// See the [gas accounting guide](crate::geth::state_gas) for fields and network support.
+    pub fn state_gas_tracer() -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::StateGasTracer)
     }
 
     /// Creates new options for [`GethDebugBuiltInTracerType::FourByteTracer`]
@@ -839,6 +841,35 @@ mod tests {
     use similar_asserts::assert_eq;
 
     #[test]
+    fn serde_chain_block_trace_result() {
+        let block_hash = B256::repeat_byte(0x11);
+        let tx_hash = B256::repeat_byte(0x22);
+        let result = ChainBlockTraceResult {
+            block: U256::from(2),
+            hash: block_hash,
+            traces: vec![
+                Some(TraceResult::Error {
+                    error: "trace failed".to_string(),
+                    tx_hash: Some(tx_hash),
+                }),
+                None,
+            ],
+        };
+
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            serde_json::json!({
+                "block": "0x2",
+                "hash": block_hash,
+                "traces": [
+                    {"error": "trace failed", "txHash": tx_hash},
+                    null
+                ]
+            })
+        );
+    }
+
+    #[test]
     fn test_return_data_prefix() {
         let raw = r#"{
   "failed": false,
@@ -937,49 +968,6 @@ mod tests {
         let de = serde_json::to_value(&result).unwrap();
         let val = serde_json::from_str::<serde_json::Value>(s).unwrap();
         assert_eq!(val, de);
-    }
-
-    #[test]
-    fn test_geth_trace_into_tracer() {
-        let geth_trace = GethTrace::Default(DefaultFrame::default());
-        let inner = geth_trace.try_into_default_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::CallTracer(CallFrame::default());
-        let inner = geth_trace.try_into_call_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::FourByteTracer(FourByteFrame::default());
-        let inner = geth_trace.try_into_four_byte_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::PreStateTracer(PreStateFrame::Default(PreStateMode::default()));
-        let inner = geth_trace.try_into_pre_state_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::NoopTracer(NoopFrame::default());
-        let inner = geth_trace.try_into_noop_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::MuxTracer(MuxFrame::default());
-        let inner = geth_trace.try_into_mux_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::Erc7562Tracer(Erc7562Frame::default());
-        let inner = geth_trace.try_into_erc7562_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::JS(serde_json::Value::Null);
-        let inner = geth_trace.try_into_json_value();
-        assert!(inner.is_ok());
-    }
-
-    #[test]
-    fn test_geth_trace_into_tracer_wrong_tracer() {
-        let geth_trace = GethTrace::Default(DefaultFrame::default());
-        let inner = geth_trace.try_into_call_frame();
-        assert!(inner.is_err());
-        assert!(matches!(inner, Err(UnexpectedTracerError(_))));
     }
 
     // <https://github.com/paradigmxyz/reth/issues/16289>

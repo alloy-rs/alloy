@@ -8,14 +8,14 @@ use alloy_primitives::hex;
 use std::fmt;
 use thiserror::Error;
 
+/// A Ledger derivation-path preset.
 #[derive(Clone, Debug)]
-/// Ledger wallet type
 pub enum DerivationType {
-    /// Ledger Live-generated HD path
+    /// Ledger Live path `m/44'/60'/<account>'/0/0`.
     LedgerLive(usize),
-    /// Legacy generated HD Path
+    /// Legacy path `m/44'/60'/0'/<index>`.
     Legacy(usize),
-    /// Any other path
+    /// A custom derivation path.
     Other(String),
 }
 
@@ -44,6 +44,9 @@ pub enum LedgerError {
     /// [`semver`] error.
     #[error(transparent)]
     SemVerError(#[from] semver::Error),
+    /// Invalid derivation path.
+    #[error("invalid derivation path")]
+    InvalidDerivationPath(#[from] std::num::ParseIntError),
     /// Signature Error
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),
@@ -74,19 +77,6 @@ pub(crate) enum INS {
     SIGN_PERSONAL_MESSAGE = 0x08,
     SIGN_ETH_EIP_712 = 0x0C,
     SIGN_EIP7702_AUTHORIZATION = 0x34,
-}
-
-impl fmt::Display for INS {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::GET_PUBLIC_KEY => write!(f, "GET_PUBLIC_KEY"),
-            Self::SIGN => write!(f, "SIGN"),
-            Self::GET_APP_CONFIGURATION => write!(f, "GET_APP_CONFIGURATION"),
-            Self::SIGN_PERSONAL_MESSAGE => write!(f, "SIGN_PERSONAL_MESSAGE"),
-            Self::SIGN_ETH_EIP_712 => write!(f, "SIGN_ETH_EIP_712"),
-            Self::SIGN_EIP7702_AUTHORIZATION => write!(f, "SIGN_EIP7702_AUTHORIZATION"),
-        }
-    }
 }
 
 #[repr(u8)]

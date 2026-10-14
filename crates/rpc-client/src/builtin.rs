@@ -101,7 +101,7 @@ impl BuiltInConnectionString {
     ///
     /// # Notes
     ///
-    /// - If `hyper` feature is enabled
+    /// - If the `hyper` feature is enabled, HTTP connections use hyper instead of reqwest.
     /// - WS will extract auth, however, auth is disabled for wasm.
     pub async fn connect_boxed(&self) -> Result<BoxTransport, TransportError> {
         self.connect_boxed_with(ConnectionConfig::default()).await
@@ -114,7 +114,7 @@ impl BuiltInConnectionString {
     ///
     /// # Notes
     ///
-    /// - If `hyper` feature is enabled
+    /// - If the `hyper` feature is enabled, HTTP connections use hyper instead of reqwest.
     /// - WS will extract auth, however, auth is disabled for wasm.
     /// - Some configuration options may not apply to all transport types.
     pub async fn connect_boxed_with(
@@ -126,14 +126,27 @@ impl BuiltInConnectionString {
         let _ = &config; // Suppress unused warning for non-WS transports
         match self {
             // reqwest is enabled, hyper is not
-            #[cfg(all(not(feature = "hyper"), feature = "reqwest"))]
+            #[cfg(all(
+                not(feature = "hyper"),
+                feature = "reqwest",
+                not(all(target_os = "wasi", target_env = "p1"))
+            ))]
             Self::Http(url) => {
                 Ok(alloy_transport::Transport::boxed(
                     alloy_transport_http::Http::<reqwest::Client>::new(url.clone()),
                 ))
             }
 
-            // hyper is enabled, reqwest is not
+            #[cfg(all(
+                not(feature = "hyper"),
+                feature = "reqwest",
+                all(target_os = "wasi", target_env = "p1")
+            ))]
+            Self::Http(_) => Err(TransportErrorKind::custom_str(
+                "reqwest HTTP transport is not supported on wasm32-wasip1",
+            )),
+
+            // hyper takes precedence over reqwest when enabled
             #[cfg(feature = "hyper")]
             Self::Http(url) => Ok(alloy_transport::Transport::boxed(
                 alloy_transport_http::HyperTransport::new_hyper(url.clone()),
@@ -233,12 +246,17 @@ impl BuiltInConnectionString {
     /// the path does not exist.
     #[cfg(feature = "ipc")]
     pub fn try_as_ipc(s: &str) -> Result<Self, TransportError> {
+        let original = s;
         let s = s.strip_prefix("file://").or_else(|| s.strip_prefix("ipc://")).unwrap_or(s);
 
         // Check if it exists.
         let path = std::path::Path::new(s);
         let _meta = path.metadata().map_err(|e| {
-            let msg = format!("failed to read IPC path {}: {e}", path.display());
+            let msg = if original == s {
+                format!("failed to read IPC path '{}': {e}", path.display())
+            } else {
+                format!("failed to read IPC path '{}' from '{original}': {e}", path.display())
+            };
             TransportErrorKind::custom_str(&msg)
         })?;
 
@@ -275,7 +293,9 @@ pub struct ConnectionConfig {
     pub auth: Option<alloy_transport::Authorization>,
     /// Maximum number of connection retries.
     pub max_retries: Option<u32>,
-    /// Interval between connection retries.
+    /// Base interval between connection retries.
+    ///
+    /// WebSocket reconnect retries use capped exponential backoff from this base interval.
     pub retry_interval: Option<Duration>,
     /// WebSocket-specific configuration.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
@@ -306,7 +326,9 @@ impl ConnectionConfig {
         self
     }
 
-    /// Set the retry interval.
+    /// Set the base retry interval.
+    ///
+    /// WebSocket reconnect retries use capped exponential backoff from this base interval.
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = Some(retry_interval);
         self
@@ -389,6 +411,18 @@ mod test {
     #[test]
     #[cfg(feature = "ipc")]
     #[cfg_attr(windows, ignore = "TODO: windows IPC")]
+    fn empty_ipc_path_error_includes_path() {
+        let err = BuiltInConnectionString::try_as_ipc("ipc://").unwrap_err().to_string();
+
+        assert!(
+            err.contains("failed to read IPC path '' from 'ipc://'"),
+            "unexpected IPC path error: {err}"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "ipc")]
+    #[cfg_attr(windows, ignore = "TODO: windows IPC")]
     fn test_parsing_ipc() {
         use alloy_node_bindings::Anvil;
 
@@ -413,35 +447,5 @@ mod test {
             BuiltInConnectionString::from_str(ipc_path.to_str().unwrap()).unwrap(),
             BuiltInConnectionString::Ipc(ipc_path.clone())
         );
-    }
-
-    #[test]
-    #[cfg(feature = "ws-base")]
-    fn test_ws_config_auth_priority() {
-        use alloy_transport::Authorization;
-
-        // Test that config auth takes precedence over URL auth
-        let config_auth = Authorization::bearer("config-token");
-        let url_auth = Some(Authorization::basic("user", "pass"));
-
-        let _ws_connection =
-            BuiltInConnectionString::Ws("ws://user:pass@localhost:8545".parse().unwrap(), url_auth);
-
-        let config = ConnectionConfig::new().with_auth(config_auth.clone());
-
-        // In the actual connect_boxed_with implementation:
-        // config.auth.as_ref().or(existing_auth.as_ref())
-        // This means config auth takes priority
-        assert_eq!(config.auth.as_ref().unwrap().to_string(), config_auth.to_string());
-    }
-
-    #[test]
-    fn test_backward_compatibility() {
-        // Verify connect() uses default config (maintaining backward compatibility)
-        let default_config = ConnectionConfig::default();
-        assert!(default_config.auth.is_none());
-        assert!(default_config.max_retries.is_none());
-
-        // connect() -> connect_boxed() -> connect_boxed_with(default) ensures compatibility
     }
 }

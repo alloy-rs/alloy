@@ -4,6 +4,7 @@ use crate::{
     eip4844::{self, DATA_GAS_PER_BLOB},
     eip7594, eip7691, eip7892,
 };
+use alloy_primitives::U256;
 
 /// BLOB_BASE_COST represents the minimum execution gas required to include a blob in a block,
 /// as defined by [EIP-7918 (Decoupling Blob Gas from Execution Gas)](https://eips.ethereum.org/EIPS/eip-7918).
@@ -127,8 +128,10 @@ impl BlobParams {
 
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas`, `blob_gas_used` and `base_fee_per_gas`.
+    ///
+    /// When `max_blob_count` is zero, falls back to the pre-Osaka excess blob gas calculation.
     #[inline]
-    pub const fn next_block_excess_blob_gas_osaka(
+    pub fn next_block_excess_blob_gas_osaka(
         &self,
         excess_blob_gas: u64,
         blob_gas_used: u64,
@@ -140,8 +143,9 @@ impl BlobParams {
             return 0;
         }
 
-        if self.blob_base_cost as u128 * base_fee_per_gas as u128
-            > DATA_GAS_PER_BLOB as u128 * self.calc_blob_fee(excess_blob_gas)
+        if U256::from(self.blob_base_cost) * U256::from(base_fee_per_gas)
+            > U256::from(DATA_GAS_PER_BLOB) * U256::from(self.calc_blob_fee(excess_blob_gas))
+            && self.max_blob_count > 0
         {
             let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
                 / self.max_blob_count;
@@ -153,7 +157,7 @@ impl BlobParams {
 
     /// Calculates the blob fee for block based on its `excess_blob_gas`.
     #[inline]
-    pub const fn calc_blob_fee(&self, excess_blob_gas: u64) -> u128 {
+    pub fn calc_blob_fee(&self, excess_blob_gas: u64) -> u128 {
         eip4844::fake_exponential(self.min_blob_fee, excess_blob_gas as u128, self.update_fraction)
     }
 }
@@ -163,7 +167,6 @@ mod serde_impl {
     use crate::{eip4844, eip7840::BlobParams};
 
     #[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
-    #[serde(rename_all = "camelCase")]
     pub(crate) struct SerdeHelper {
         #[serde(rename = "baseFeeUpdateFraction")]
         update_fraction: u128,
@@ -171,8 +174,6 @@ mod serde_impl {
         max_blob_count: u64,
         #[serde(rename = "target")]
         target_blob_count: u64,
-        #[serde(skip)]
-        min_blob_fee: Option<u128>,
     }
 
     impl From<BlobParams> for SerdeHelper {
@@ -181,31 +182,24 @@ mod serde_impl {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
-                min_blob_fee,
+                min_blob_fee: _,
                 max_blobs_per_tx: _,
                 blob_base_cost: _,
             } = params;
 
-            Self {
-                target_blob_count,
-                max_blob_count,
-                update_fraction,
-                min_blob_fee: (min_blob_fee != eip4844::BLOB_TX_MIN_BLOB_GASPRICE)
-                    .then_some(min_blob_fee),
-            }
+            Self { target_blob_count, max_blob_count, update_fraction }
         }
     }
 
     impl From<SerdeHelper> for BlobParams {
         fn from(helper: SerdeHelper) -> Self {
-            let SerdeHelper { target_blob_count, max_blob_count, update_fraction, min_blob_fee } =
-                helper;
+            let SerdeHelper { target_blob_count, max_blob_count, update_fraction } = helper;
 
             Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
-                min_blob_fee: min_blob_fee.unwrap_or(eip4844::BLOB_TX_MIN_BLOB_GASPRICE),
+                min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
                 max_blobs_per_tx: max_blob_count,
                 blob_base_cost: 0,
             }

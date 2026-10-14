@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use alloy_primitives::Bytes;
-use alloy_rlp::Encodable;
+use alloy_rlp::{Encodable, Header};
 use serde::{Deserialize, Serialize};
 
 /// Represents the execution witness of a block. Contains lists of required preimages and
@@ -65,6 +65,40 @@ pub struct ExecutionWitness {
 }
 
 impl ExecutionWitness {
+    /// RLP-encodes the witness in Geth's external witness format: `[headers, codes, state, keys]`.
+    ///
+    /// Headers are embedded as already RLP-encoded lists, while codes and state nodes are encoded
+    /// as byte strings. The debug API's unhashed account and storage keys are omitted by encoding
+    /// an empty keys list. The order of headers, codes, and state nodes is preserved.
+    ///
+    /// The headers must contain valid RLP-encoded block headers; they are not validated here.
+    ///
+    /// See <https://github.com/ethereum/go-ethereum/blob/7538039f06792da46a91165e7eda98917edcfde2/core/stateless/encoding.go>.
+    pub fn encode_witness(&self) -> Bytes {
+        let headers = Header {
+            list: true,
+            payload_length: self.headers.iter().map(|header| header.len()).sum(),
+        };
+        let keys = Header { list: true, payload_length: 0 };
+        let witness = Header {
+            list: true,
+            payload_length: headers.length_with_payload()
+                + self.codes.length()
+                + self.state.length()
+                + keys.length(),
+        };
+        let mut encoded = Vec::with_capacity(witness.length_with_payload());
+        witness.encode(&mut encoded);
+        headers.encode(&mut encoded);
+        for header in &self.headers {
+            encoded.extend_from_slice(header);
+        }
+        self.codes.encode(&mut encoded);
+        self.state.encode(&mut encoded);
+        keys.encode(&mut encoded);
+        encoded.into()
+    }
+
     /// Sets the `headers` field from already RLP-encoded headers.
     pub fn with_rlp_headers(mut self, headers: Vec<Bytes>) -> Self {
         self.headers = headers;
@@ -82,5 +116,39 @@ impl ExecutionWitness {
             })
             .collect();
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+    use alloy_primitives::hex;
+
+    #[test]
+    fn encode_witness_nested_headers_and_empty_keys() {
+        let witness = ExecutionWitness {
+            headers: vec![Bytes::from_static(&hex!("c101")), Bytes::from_static(&hex!("c102"))],
+            codes: vec![Bytes::from_static(b"code")],
+            state: vec![Bytes::from_static(b"node")],
+            keys: vec![Bytes::from_static(b"debug-only")],
+        };
+        assert_eq!(
+            witness.encode_witness().as_ref(),
+            &hex!("d2c4c101c102c584636f6465c5846e6f6465c0")
+        );
+    }
+
+    #[test]
+    fn encode_witness_long_rlp_payload() {
+        let witness =
+            ExecutionWitness { codes: vec![Bytes::from(vec![0x7f; 56])], ..Default::default() };
+        let expected = [&hex!("f83fc0f83ab838")[..], &[0x7f; 56], &hex!("c0c0")].concat();
+        assert_eq!(witness.encode_witness().as_ref(), expected);
+    }
+
+    #[test]
+    fn encode_empty_witness() {
+        assert_eq!(ExecutionWitness::default().encode_witness().as_ref(), &hex!("c4c0c0c0c0"));
     }
 }

@@ -21,7 +21,7 @@ pub fn guess_local_url(s: impl AsRef<str>) -> bool {
     fn _guess_local_url(url: &str) -> bool {
         url.parse::<Url>().is_ok_and(|url| {
             url.host_str()
-                .is_none_or(|host| host == "localhost" || host == "127.0.0.1" || host == "::1")
+                .is_none_or(|host| host == "localhost" || host == "127.0.0.1" || host == "[::1]")
         })
     }
     _guess_local_url(s.as_ref())
@@ -68,5 +68,25 @@ where
 {
     fn spawn_task(self) {
         tokio::task::spawn_local(self);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::guess_local_url;
+
+    #[test]
+    fn guesses_local_urls() {
+        for (url, local) in [
+            ("http://localhost:8545", true),
+            ("http://127.0.0.1:8545", true),
+            ("ws://[::1]:8546", true),
+            ("http://[0:0:0:0:0:0:0:1]:8545", true),
+            ("https://eth.example.com", false),
+            ("file:///tmp/geth.ipc", true),
+            ("not a url", false),
+        ] {
+            assert_eq!(guess_local_url(url), local, "{url}");
+        }
     }
 }

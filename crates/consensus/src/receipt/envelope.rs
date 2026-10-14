@@ -13,16 +13,15 @@ use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
-/// This enum distinguishes between tagged and untagged legacy receipts, as the
-/// in-protocol Merkle tree may commit to EITHER 0-prefixed or raw. Therefore
-/// we must ensure that encoding returns the precise byte-array that was
-/// decoded, preserving the presence or absence of the `TransactionType` flag.
+/// Represents untagged legacy receipts and typed EIP-2718 variants. Binary decoding rejects a
+/// literal `0x00` type prefix; legacy receipts use the untagged fallback encoding. JSON `type: 0x0`
+/// is accepted as legacy.
 ///
 /// Transaction receipt payloads are specified in their respective EIPs.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
@@ -50,6 +49,32 @@ pub enum ReceiptEnvelope<T = Log> {
     /// [EIP-7702]: https://eips.ethereum.org/EIPS/eip-7702
     #[cfg_attr(feature = "serde", serde(rename = "0x4", alias = "0x04"))]
     Eip7702(ReceiptWithBloom<Receipt<T>>),
+}
+
+/// Deserializes a receipt, treating a missing `type` field as [`TxType::Legacy`].
+///
+/// The `type` field is required by the JSON-RPC specification, but some
+/// Ethereum-compatible nodes omit it entirely. A receipt without a type flag is a
+/// pre-[EIP-2718] receipt, which is unambiguously legacy, so it is accepted rather
+/// than rejected.
+///
+/// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+#[cfg(feature = "serde")]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for ReceiptEnvelope<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct ReceiptEnvelopeHelper<T> {
+            #[serde(default, rename = "type", with = "alloy_serde::quantity::opt")]
+            ty: Option<u8>,
+            #[serde(flatten)]
+            receipt: ReceiptWithBloom<Receipt<T>>,
+        }
+
+        let helper = ReceiptEnvelopeHelper::<T>::deserialize(deserializer)?;
+        let ty = TxType::try_from(helper.ty.unwrap_or(LEGACY_TX_TYPE_ID))
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self::from_typed(ty, helper.receipt))
+    }
 }
 
 impl<T> ReceiptEnvelope<T> {
@@ -390,13 +415,7 @@ pub(crate) mod serde_bincode_compat {
                 },
                 logs_bloom: logs_bloom.into_owned(),
             };
-            match tx_type {
-                TxType::Legacy => Self::Legacy(receipt),
-                TxType::Eip2930 => Self::Eip2930(receipt),
-                TxType::Eip1559 => Self::Eip1559(receipt),
-                TxType::Eip4844 => Self::Eip4844(receipt),
-                TxType::Eip7702 => Self::Eip7702(receipt),
-            }
+            Self::from_typed(tx_type, receipt)
         }
     }
 
@@ -467,38 +486,65 @@ mod test {
 
     #[cfg(feature = "serde")]
     #[test]
-    fn deser_pre658_receipt_envelope() {
-        use crate::Receipt;
-        use alloy_primitives::b256;
-
-        let receipt = super::ReceiptWithBloom::<Receipt<()>> {
-            receipt: super::Receipt {
-                status: super::Eip658Value::PostState(b256!(
-                    "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
-                )),
-                cumulative_gas_used: 0,
+    fn deser_receipt_envelope_without_type() {
+        let inner = super::ReceiptWithBloom::<Receipt<()>> {
+            receipt: Receipt {
+                status: super::Eip658Value::Eip658(true),
+                cumulative_gas_used: 0xc3b68,
                 logs: Default::default(),
             },
             logs_bloom: Default::default(),
         };
+        let mut json = serde_json::to_value(&inner).unwrap();
+        assert!(json.get("type").is_none());
 
-        let json = serde_json::to_string(&receipt).unwrap();
+        let envelope: ReceiptEnvelope<()> = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(envelope, ReceiptEnvelope::Legacy(inner.clone()));
 
-        println!("Serialized {json}");
+        // An explicit type flag is still honored.
+        json["type"] = "0x2".into();
+        let envelope: ReceiptEnvelope<()> = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(envelope, ReceiptEnvelope::Eip1559(inner));
 
-        let receipt: super::ReceiptWithBloom<Receipt<()>> = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(
-            receipt.receipt.status,
-            super::Eip658Value::PostState(b256!(
-                "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
-            ))
-        );
+        // An unknown type flag is still rejected.
+        json["type"] = "0x7f".into();
+        serde_json::from_value::<ReceiptEnvelope<()>>(json).unwrap_err();
     }
 
     #[test]
     fn convert_envelope() {
         let receipt = Receipt::<Log>::default();
         let _envelope = ReceiptEnvelope::from_typed(TxType::Eip7702, receipt);
+    }
+
+    #[test]
+    fn tagged_legacy_receipt_envelope_is_rejected() {
+        use alloc::{vec, vec::Vec};
+        use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
+        use alloy_rlp::{Decodable, Header};
+
+        let envelope = ReceiptEnvelope::<Log>::Legacy(Default::default());
+        let encoded = envelope.encoded_2718();
+        assert!(encoded[0] >= 0xc0, "sanity: legacy receipts are encoded as a bare RLP list");
+        assert_eq!(ReceiptEnvelope::decode_2718_exact(&encoded).unwrap(), envelope);
+        assert_eq!(ReceiptEnvelope::network_decode(&mut encoded.as_slice()).unwrap(), envelope);
+        assert_eq!(ReceiptEnvelope::decode(&mut encoded.as_slice()).unwrap(), envelope);
+
+        // A literal `0x00` type byte is rejected in both the raw EIP-2718 and the network framing.
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&encoded);
+        let mut tagged_network = Vec::new();
+        Header { list: false, payload_length: tagged.len() }.encode(&mut tagged_network);
+        tagged_network.extend_from_slice(&tagged);
+
+        assert!(matches!(
+            ReceiptEnvelope::decode_2718_exact(&tagged),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            ReceiptEnvelope::network_decode(&mut tagged_network.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(ReceiptEnvelope::decode(&mut tagged_network.as_slice()).is_err());
     }
 }
