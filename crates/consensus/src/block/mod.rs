@@ -385,8 +385,8 @@ const MAX_TX_PREALLOC_BYTES: usize = 2 * 1024 * 1024;
 /// larger and therefore better sample, too high and the reservation is capped relative to the
 /// number of bytes that are actually left.
 ///
-/// Every reservation is additionally capped at [`MAX_TX_PREALLOC_BYTES`], which bounds the memory
-/// committed for data that has not been validated yet; see that constant for the exact invariant.
+/// Every reservation is additionally capped at 2 MiB, which bounds the memory committed for data
+/// that has not been validated yet.
 ///
 /// # Examples
 ///
