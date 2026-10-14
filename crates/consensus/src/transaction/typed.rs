@@ -11,7 +11,7 @@ use crate::{
 };
 use alloy_eips::{eip2718::Eip2718Result, Typed2718};
 use alloy_primitives::{ChainId, Signature, TxHash};
-use alloy_rlp::{Buf, BufMut, Decodable};
+use alloy_rlp::{Buf, BufMut, Decodable, Header};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
 pub type TypedTransaction = EthereumTypedTransaction<TxEip4844Variant>;
@@ -263,6 +263,46 @@ impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
         }
     }
 
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        match self {
+            Self::Legacy(tx) => tx.rlp_header_signed(signature),
+            Self::Eip2930(tx) => tx.rlp_header_signed(signature),
+            Self::Eip1559(tx) => tx.rlp_header_signed(signature),
+            Self::Eip4844(tx) => tx.rlp_header_signed(signature),
+            Self::Eip7702(tx) => tx.rlp_header_signed(signature),
+        }
+    }
+
+    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip2930(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip1559(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip4844(tx) => tx.rlp_encoded_length_with_signature(signature),
+            Self::Eip7702(tx) => tx.rlp_encoded_length_with_signature(signature),
+        }
+    }
+
+    fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        match self {
+            Self::Legacy(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip2930(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip1559(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip4844(tx) => tx.rlp_encode_signed(signature, out),
+            Self::Eip7702(tx) => tx.rlp_encode_signed(signature, out),
+        }
+    }
+
+    fn eip2718_encoded_length(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip2930(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip1559(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip4844(tx) => tx.eip2718_encoded_length(signature),
+            Self::Eip7702(tx) => tx.eip2718_encoded_length(signature),
+        }
+    }
+
     fn eip2718_encode_with_type(&self, signature: &Signature, _ty: u8, out: &mut dyn BufMut) {
         match self {
             Self::Legacy(tx) => tx.eip2718_encode_with_type(signature, tx.ty(), out),
@@ -280,6 +320,26 @@ impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
             Self::Eip1559(tx) => tx.eip2718_encode(signature, out),
             Self::Eip4844(tx) => tx.eip2718_encode(signature, out),
             Self::Eip7702(tx) => tx.eip2718_encode(signature, out),
+        }
+    }
+
+    fn network_header(&self, signature: &Signature) -> Header {
+        match self {
+            Self::Legacy(tx) => tx.network_header(signature),
+            Self::Eip2930(tx) => tx.network_header(signature),
+            Self::Eip1559(tx) => tx.network_header(signature),
+            Self::Eip4844(tx) => tx.network_header(signature),
+            Self::Eip7702(tx) => tx.network_header(signature),
+        }
+    }
+
+    fn network_encoded_length(&self, signature: &Signature) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.network_encoded_length(signature),
+            Self::Eip2930(tx) => tx.network_encoded_length(signature),
+            Self::Eip1559(tx) => tx.network_encoded_length(signature),
+            Self::Eip4844(tx) => tx.network_encoded_length(signature),
+            Self::Eip7702(tx) => tx.network_encoded_length(signature),
         }
     }
 

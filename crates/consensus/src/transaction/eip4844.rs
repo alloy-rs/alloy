@@ -559,6 +559,10 @@ impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844Variant<
         }
         TxEip4844::rlp_decode_with_signature(buf).map(|(tx, signature)| (tx.into(), signature))
     }
+
+    fn encoding_is_hash_preimage(&self) -> bool {
+        matches!(self, Self::TxEip4844(_))
+    }
 }
 
 impl<T> Typed2718 for TxEip4844Variant<T> {
@@ -1123,6 +1127,10 @@ impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844WithSide
 
         Ok((Self { tx, sidecar }, signature))
     }
+
+    fn encoding_is_hash_preimage(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
@@ -1133,8 +1141,12 @@ mod tests {
         SignableTransaction, TxEnvelope,
     };
     use alloy_eips::{
-        eip2930::AccessList, eip4844::env_settings::EnvKzgSettings,
-        eip7594::BlobTransactionSidecarVariant, Encodable2718 as _,
+        eip2930::AccessList,
+        eip4844::env_settings::EnvKzgSettings,
+        eip7594::{
+            BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, CELLS_PER_EXT_BLOB,
+        },
+        Encodable2718 as _,
     };
     use alloy_primitives::{address, b256, bytes, hex, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
@@ -1199,6 +1211,51 @@ mod tests {
         // now decode the transaction and check the values
         let decoded = TxEnvelope::decode(&mut &buf[..]).unwrap();
         assert_eq!(decoded, expected_envelope);
+    }
+
+    #[test]
+    fn decoded_sidecar_hash_excludes_sidecar() {
+        type WithSidecar = TxEip4844WithSidecar<BlobTransactionSidecarVariant>;
+        type Variant = TxEip4844Variant<BlobTransactionSidecarVariant>;
+
+        let tx = TxEip4844 {
+            chain_id: 1,
+            nonce: 1,
+            gas_limit: 21_000,
+            blob_versioned_hashes: vec![Default::default()],
+            ..Default::default()
+        };
+        let signature = Signature::test_signature();
+        let expected = *tx.clone().into_signed(signature).hash();
+
+        let sidecars = [
+            BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
+                blobs: vec![[2; 131072].into()],
+                commitments: vec![[3; 48].into()],
+                proofs: vec![[4; 48].into()],
+            }),
+            BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
+                blobs: vec![[2; 131072].into()],
+                commitments: vec![[3; 48].into()],
+                cell_proofs: vec![[4; 48].into(); CELLS_PER_EXT_BLOB],
+            }),
+        ];
+        for sidecar in sidecars {
+            let signed = TxEip4844WithSidecar { tx: tx.clone(), sidecar }.into_signed(signature);
+            assert_eq!(*signed.hash(), expected);
+
+            let encoded = signed.encoded_2718();
+            let mut network = Vec::new();
+            signed.network_encode(&mut network);
+
+            let hashes = [
+                *WithSidecar::eip2718_decode(&mut encoded.as_slice()).unwrap().hash(),
+                *WithSidecar::network_decode(&mut network.as_slice()).unwrap().hash(),
+                *Variant::eip2718_decode(&mut encoded.as_slice()).unwrap().hash(),
+                *Variant::network_decode(&mut network.as_slice()).unwrap().hash(),
+            ];
+            assert_eq!(hashes, [expected; 4]);
+        }
     }
 
     #[test]

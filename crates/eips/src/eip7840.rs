@@ -128,6 +128,8 @@ impl BlobParams {
 
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas`, `blob_gas_used` and `base_fee_per_gas`.
+    ///
+    /// When `max_blob_count` is zero, falls back to the pre-Osaka excess blob gas calculation.
     #[inline]
     pub fn next_block_excess_blob_gas_osaka(
         &self,
@@ -143,6 +145,7 @@ impl BlobParams {
 
         if U256::from(self.blob_base_cost) * U256::from(base_fee_per_gas)
             > U256::from(DATA_GAS_PER_BLOB) * U256::from(self.calc_blob_fee(excess_blob_gas))
+            && self.max_blob_count > 0
         {
             let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
                 / self.max_blob_count;

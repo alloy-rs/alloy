@@ -243,6 +243,54 @@ where
     where
         D: serde::Deserializer<'de>,
     {
+        enum Field {
+            Id,
+            Params,
+            Method,
+            Jsonrpc,
+        }
+
+        // Matches keys without borrowing them, so owned input such as `serde_json::Value` and
+        // keys containing escapes deserialize too.
+        impl<'de> Deserialize<'de> for Field {
+            #[inline]
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl serde::de::Visitor<'_> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        formatter.write_str("`id`, `params`, `method` or `jsonrpc`")
+                    }
+
+                    #[inline]
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "id" => Ok(Field::Id),
+                            "params" => Ok(Field::Params),
+                            "method" => Ok(Field::Method),
+                            "jsonrpc" => Ok(Field::Jsonrpc),
+                            other => {
+                                Err(E::unknown_field(other, &["id", "params", "method", "jsonrpc"]))
+                            }
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
         struct Visitor<Params>(PhantomData<Params>);
         impl<'de, Params> serde::de::Visitor<'de> for Visitor<Params>
         where
@@ -269,25 +317,25 @@ where
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        "id" => {
+                        Field::Id => {
                             if id.is_some() {
                                 return Err(serde::de::Error::duplicate_field("id"));
                             }
                             id = Some(map.next_value()?);
                         }
-                        "params" => {
+                        Field::Params => {
                             if params.is_some() {
                                 return Err(serde::de::Error::duplicate_field("params"));
                             }
                             params = Some(map.next_value()?);
                         }
-                        "method" => {
+                        Field::Method => {
                             if method.is_some() {
                                 return Err(serde::de::Error::duplicate_field("method"));
                             }
                             method = Some(map.next_value()?);
                         }
-                        "jsonrpc" => {
+                        Field::Jsonrpc => {
                             let version: String = map.next_value()?;
                             if version != "2.0" {
                                 return Err(serde::de::Error::custom(format!(
@@ -295,12 +343,6 @@ where
                                 )));
                             }
                             jsonrpc = Some(());
-                        }
-                        other => {
-                            return Err(serde::de::Error::unknown_field(
-                                other,
-                                &["id", "params", "method", "jsonrpc"],
-                            ));
                         }
                     }
                 }
