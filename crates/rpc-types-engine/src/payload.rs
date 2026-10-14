@@ -2910,7 +2910,7 @@ impl ExecutionPayload {
         Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas()?,
             self.blob_gas_used()?,
-            self.as_v1().base_fee_per_gas.to(),
+            self.saturated_base_fee_per_gas(),
         ))
     }
 
@@ -3311,7 +3311,12 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 };
 
                 let Some(withdrawals) = withdrawals else {
-                    return if blob_gas_used.is_none() && excess_blob_gas.is_none() {
+                    // reject V3 and V4 fields without V2 fields
+                    return if blob_gas_used.is_none()
+                        && excess_blob_gas.is_none()
+                        && block_access_list.is_none()
+                        && slot_number.is_none()
+                    {
                         Ok(ExecutionPayload::V1(v1))
                     } else {
                         Err(serde::de::Error::custom("invalid enum variant"))

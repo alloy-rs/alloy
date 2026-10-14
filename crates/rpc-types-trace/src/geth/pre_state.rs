@@ -162,6 +162,15 @@ pub struct AccountState {
     /// The optional code of the account.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<Bytes>,
+    /// The optional code hash of the account.
+    ///
+    /// Geth omits empty and zero code hashes in prestate, but post-state diffs can include
+    /// them to signal that code was cleared.
+    ///
+    /// Unlike `code`, it is reported even when code output is disabled, so clients can cache
+    /// bytecode by hash.
+    #[serde(default, rename = "codeHash", skip_serializing_if = "Option::is_none")]
+    pub code_hash: Option<B256>,
     /// The optional nonce of the account.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<u64>,
@@ -179,12 +188,22 @@ impl AccountState {
         Self {
             balance: Some(balance),
             code: code.filter(|code| !code.is_empty()),
+            code_hash: None,
             nonce: (nonce != 0).then_some(nonce),
             storage: Default::default(),
         }
     }
 
-    /// Removes balance,nonce or code if they match the given account info.
+    /// Sets the code hash, preserving empty and zero hashes so post-state diffs can signal
+    /// that code was cleared.
+    ///
+    /// Callers building prestate should omit empty and zero code hashes.
+    pub const fn with_code_hash(mut self, code_hash: B256) -> Self {
+        self.code_hash = Some(code_hash);
+        self
+    }
+
+    /// Removes balance, nonce, code or code hash if they match the given account info.
     ///
     /// This is useful for comparing pre vs post state and only keep changed values in post state.
     pub fn remove_matching_account_info(&mut self, other: &Self) {
@@ -196,6 +215,9 @@ impl AccountState {
         }
         if self.code == other.code {
             self.code = None;
+        }
+        if self.code_hash == other.code_hash {
+            self.code_hash = None;
         }
     }
 }
@@ -276,6 +298,7 @@ impl PreStateConfig {
 mod tests {
     use super::*;
     use crate::geth::*;
+    use alloy_primitives::{address, b256, KECCAK256_EMPTY};
     use similar_asserts::assert_eq;
 
     // See <https://github.com/ethereum/go-ethereum/tree/master/eth/tracers/internal/tracetest/testdata>
@@ -390,5 +413,66 @@ mod tests {
         diff_changed.retain_changed();
         assert!(diff_changed.post.is_empty());
         assert!(diff_changed.pre.is_empty());
+    }
+
+    #[test]
+    fn code_hash_round_trips_as_code_hash() {
+        let s = r#"{
+  "0x35a9f94af726f07b5162df7e828cc9dc8439e7d0": {
+    "balance": "0x0",
+    "code": "0x6001",
+    "codeHash": "0x0ecf8ee1ad68dbe1b5ba4bd9ac6a8fc95f17e0dd4b2dd8e0e1b4a1d7b2e3c4f5",
+    "nonce": 1
+  }
+}"#;
+        let pre_state: PreStateMode = serde_json::from_str(s).unwrap();
+        let account = &pre_state.0[&address!("35a9f94af726f07b5162df7e828cc9dc8439e7d0")];
+        assert_eq!(
+            account.code_hash,
+            Some(b256!("0ecf8ee1ad68dbe1b5ba4bd9ac6a8fc95f17e0dd4b2dd8e0e1b4a1d7b2e3c4f5"))
+        );
+        let value = serde_json::to_value(&pre_state).unwrap();
+        assert_eq!(value, serde_json::from_str::<serde_json::Value>(s).unwrap());
+
+        // Accounts without a code hash keep serializing without the field.
+        let eoa = AccountState::from_account_info(1, U256::ZERO, None);
+        assert_eq!(serde_json::to_string(&eoa).unwrap(), r#"{"balance":"0x0","nonce":1}"#);
+    }
+
+    #[test]
+    fn with_code_hash_preserves_hashes() {
+        for hash in [KECCAK256_EMPTY, B256::ZERO, B256::repeat_byte(0x11)] {
+            let account = AccountState::default().with_code_hash(hash);
+            assert_eq!(account.code_hash, Some(hash));
+        }
+    }
+
+    #[test]
+    fn remove_matching_account_info_preserves_code_removal_hash() {
+        let pre = AccountState::default().with_code_hash(B256::repeat_byte(0x11));
+        for hash in [KECCAK256_EMPTY, B256::ZERO] {
+            let mut post = AccountState::default().with_code_hash(hash);
+            post.remove_matching_account_info(&pre);
+            assert_eq!(post.code_hash, Some(hash));
+
+            let value = serde_json::to_value(&post).unwrap();
+            assert_eq!(value, serde_json::json!({ "codeHash": hash }));
+            assert_eq!(serde_json::from_value::<AccountState>(value).unwrap(), post);
+        }
+    }
+
+    #[test]
+    fn remove_matching_account_info_clears_unchanged_code_hash() {
+        let hash = B256::repeat_byte(0x11);
+        let pre = AccountState::default().with_code_hash(hash);
+
+        let mut unchanged = pre.clone();
+        unchanged.remove_matching_account_info(&pre);
+        assert_eq!(unchanged.code_hash, None);
+
+        let other = B256::repeat_byte(0x22);
+        let mut changed = AccountState::default().with_code_hash(other);
+        changed.remove_matching_account_info(&pre);
+        assert_eq!(changed.code_hash, Some(other));
     }
 }

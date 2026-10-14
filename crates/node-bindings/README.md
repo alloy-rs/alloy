@@ -26,6 +26,6 @@ Keep the returned instance alive for as long as the node is needed. Anvil and Ge
 HTTP port to zero; use the returned instance's `port` or `endpoint` method to read the OS-assigned
 port.
 
-[Anvil]: https://docs.rs/alloy-node-bindings/latest/alloy_node_bindings/struct.Anvil.html
-[Geth]: https://docs.rs/alloy-node-bindings/latest/alloy_node_bindings/struct.Geth.html
-[Reth]: https://docs.rs/alloy-node-bindings/latest/alloy_node_bindings/struct.Reth.html
+[Anvil]: https://docs.rs/alloy-node-bindings/latest/alloy_node_bindings/nodes/anvil/struct.Anvil.html
+[Geth]: https://docs.rs/alloy-node-bindings/latest/alloy_node_bindings/nodes/geth/struct.Geth.html
+[Reth]: https://docs.rs/alloy-node-bindings/latest/alloy_node_bindings/nodes/reth/struct.Reth.html
