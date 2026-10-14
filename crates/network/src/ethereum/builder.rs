@@ -1,12 +1,12 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilder7702,
-    TransactionBuilderError,
+    BuildResult, Ethereum, Network, NetworkTransactionBuilder, NetworkWallet, TransactionBuilder,
+    TransactionBuilder7702, TransactionBuilderError,
 };
 use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList, TransactionInputKind};
 
-impl TransactionBuilder<Ethereum> for TransactionRequest {
+impl TransactionBuilder for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
@@ -114,17 +114,9 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn set_access_list(&mut self, access_list: AccessList) {
         self.access_list = Some(access_list);
     }
+}
 
-    fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
-        match ty {
-            TxType::Legacy => self.complete_legacy(),
-            TxType::Eip2930 => self.complete_2930(),
-            TxType::Eip1559 => self.complete_1559(),
-            TxType::Eip4844 => self.complete_4844(),
-            TxType::Eip7702 => self.complete_7702(),
-        }
-    }
-
+impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     fn can_submit(&self) -> bool {
         // value and data may be None. If they are, they will be set to default.
         // gas fields and nonce may be None, if they are, they will be populated
@@ -148,6 +140,16 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 
         let eip7702 = eip1559 && self.authorization_list().is_some();
         common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)
+    }
+
+    fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
+        match ty {
+            TxType::Legacy => self.complete_legacy(),
+            TxType::Eip2930 => self.complete_2930(),
+            TxType::Eip1559 => self.complete_1559(),
+            TxType::Eip4844 => self.complete_4844(),
+            TxType::Eip7702 => self.complete_7702(),
+        }
     }
 
     #[doc(alias = "output_transaction_type")]
@@ -185,11 +187,15 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 #[cfg(test)]
 mod tests {
     use crate::{
-        TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError,
+        NetworkTransactionBuilder, TransactionBuilder, TransactionBuilder4844,
+        TransactionBuilder7702, TransactionBuilderError,
     };
-    use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
+    use alloy_consensus::{
+        transaction::Recovered, BlobTransactionSidecar, SignableTransaction, TxEip1559, TxEnvelope,
+        TxType, TypedTransaction,
+    };
     use alloy_eips::eip7702::Authorization;
-    use alloy_primitives::{Address, Signature, U256};
+    use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U160, U256};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
     use std::str::FromStr;
 
@@ -216,7 +222,7 @@ mod tests {
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
             .with_to(Address::ZERO)
-            .with_blob_sidecar(BlobTransactionSidecar::default())
+            .with_blob_sidecar_4844(BlobTransactionSidecar::default())
             .with_max_fee_per_blob_gas(0);
 
         let tx = request.clone().build_unsigned().unwrap();
@@ -284,113 +290,91 @@ mod tests {
     }
 
     #[test]
-    fn test_fail_when_sidecar_and_access_list() {
-        let request = TransactionRequest::default()
-            .with_blob_sidecar(BlobTransactionSidecar::default())
-            .with_access_list(AccessList::default());
+    fn test_invalid_fields() {
+        let common = ["to", "nonce", "gas_limit"];
+        let eip1559 = ["max_priority_fee_per_gas", "max_fee_per_gas"];
+        for (request, expected_type, extra) in [
+            (TransactionRequest::default().with_gas_price(0), TxType::Legacy, vec![]),
+            (TransactionRequest::default(), TxType::Eip1559, eip1559.to_vec()),
+            (
+                TransactionRequest::default()
+                    .with_access_list(AccessList::default())
+                    .with_gas_price(Default::default()),
+                TxType::Eip2930,
+                vec![],
+            ),
+            (
+                TransactionRequest::default()
+                    .with_blob_sidecar_4844(BlobTransactionSidecar::default()),
+                TxType::Eip4844,
+                [eip1559.as_slice(), &["max_fee_per_blob_gas"]].concat(),
+            ),
+            (
+                TransactionRequest::default().with_authorization_list(vec![]),
+                TxType::Eip7702,
+                eip1559.to_vec(),
+            ),
+        ] {
+            let error = request.build_unsigned().unwrap_err();
+            let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+            else {
+                panic!("wrong variant")
+            };
 
-        let error = request.build_unsigned().unwrap_err();
-
-        assert!(matches!(error.error, TransactionBuilderError::InvalidTransactionRequest(_, _)));
+            assert_eq!(tx_type, expected_type);
+            assert_eq!(errors.len(), common.len() + extra.len(), "{tx_type:?}: {errors:?}");
+            for key in common.iter().chain(&extra) {
+                assert!(errors.contains(key), "{tx_type:?}: missing {key}");
+            }
+        }
     }
 
     #[test]
-    fn test_invalid_legacy_fields() {
-        let request = TransactionRequest::default().with_gas_price(0);
-
-        let error = request.build_unsigned().unwrap_err();
-
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
-        else {
-            panic!("wrong variant")
+    fn test_tx_response_into_req() {
+        let from = Address::from(U160::from(1));
+        let to = Address::from(U160::from(1));
+        let access_list_item = alloy_rpc_types_eth::AccessListItem {
+            address: Address::from(U160::from(3)),
+            storage_keys: vec![B256::from(U256::from(4)), B256::from(U256::from(5))],
+        };
+        let tx = TxEip1559 {
+            chain_id: 1337,
+            nonce: 12,
+            max_priority_fee_per_gas: 123,
+            max_fee_per_gas: 1234,
+            gas_limit: 21000,
+            to: TxKind::Call(to),
+            value: U256::from(111),
+            access_list: AccessList::from(vec![access_list_item.clone()]),
+            input: Bytes::new(),
+        };
+        let envelope =
+            TxEnvelope::Eip1559(tx.into_signed(Signature::new(U256::ZERO, U256::ZERO, false)));
+        let tx_response = alloy_rpc_types_eth::Transaction {
+            inner: Recovered::new_unchecked(envelope, from),
+            effective_gas_price: Some(1000),
+            block_hash: None,
+            block_number: None,
+            block_timestamp: None,
+            transaction_index: None,
         };
 
-        assert_eq!(tx_type, TxType::Legacy);
-        assert_eq!(errors.len(), 3);
-        assert!(errors.contains(&"to"));
-        assert!(errors.contains(&"nonce"));
-        assert!(errors.contains(&"gas_limit"));
-    }
+        // Convert the transaction response into a transaction request via
+        // From<TransactionResponse>, and check that the fields are correctly populated.
+        let req: TransactionRequest = tx_response.into();
 
-    #[test]
-    fn test_invalid_1559_fields() {
-        let request = TransactionRequest::default();
-
-        let error = request.build_unsigned().unwrap_err();
-
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
-        else {
-            panic!("wrong variant")
-        };
-
-        assert_eq!(tx_type, TxType::Eip1559);
-        assert_eq!(errors.len(), 5);
-        assert!(errors.contains(&"to"));
-        assert!(errors.contains(&"nonce"));
-        assert!(errors.contains(&"gas_limit"));
-        assert!(errors.contains(&"max_priority_fee_per_gas"));
-        assert!(errors.contains(&"max_fee_per_gas"));
-    }
-
-    #[test]
-    fn test_invalid_2930_fields() {
-        let request = TransactionRequest::default()
-            .with_access_list(AccessList::default())
-            .with_gas_price(Default::default());
-
-        let error = request.build_unsigned().unwrap_err();
-
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
-        else {
-            panic!("wrong variant")
-        };
-
-        assert_eq!(tx_type, TxType::Eip2930);
-        assert_eq!(errors.len(), 3);
-        assert!(errors.contains(&"to"));
-        assert!(errors.contains(&"nonce"));
-        assert!(errors.contains(&"gas_limit"));
-    }
-
-    #[test]
-    fn test_invalid_4844_fields() {
-        let request =
-            TransactionRequest::default().with_blob_sidecar(BlobTransactionSidecar::default());
-
-        let error = request.build_unsigned().unwrap_err();
-
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
-        else {
-            panic!("wrong variant")
-        };
-
-        assert_eq!(tx_type, TxType::Eip4844);
-        assert_eq!(errors.len(), 6);
-        assert!(errors.contains(&"to"));
-        assert!(errors.contains(&"nonce"));
-        assert!(errors.contains(&"gas_limit"));
-        assert!(errors.contains(&"max_priority_fee_per_gas"));
-        assert!(errors.contains(&"max_fee_per_gas"));
-        assert!(errors.contains(&"max_fee_per_blob_gas"));
-    }
-
-    #[test]
-    fn test_invalid_7702_fields() {
-        let request = TransactionRequest::default().with_authorization_list(vec![]);
-
-        let error = request.build_unsigned().unwrap_err();
-
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
-        else {
-            panic!("wrong variant")
-        };
-
-        assert_eq!(tx_type, TxType::Eip7702);
-        assert_eq!(errors.len(), 5);
-        assert!(errors.contains(&"to"));
-        assert!(errors.contains(&"nonce"));
-        assert!(errors.contains(&"gas_limit"));
-        assert!(errors.contains(&"max_priority_fee_per_gas"));
-        assert!(errors.contains(&"max_fee_per_gas"));
+        assert_eq!(TransactionBuilder::from(&req).unwrap(), from);
+        assert_eq!(TransactionBuilder::chain_id(&req).unwrap(), 1337);
+        assert_eq!(TransactionBuilder::nonce(&req).unwrap(), 12);
+        assert_eq!(TransactionBuilder::max_priority_fee_per_gas(&req).unwrap(), 123);
+        assert_eq!(TransactionBuilder::max_fee_per_gas(&req).unwrap(), 1234);
+        assert_eq!(TransactionBuilder::gas_limit(&req).unwrap(), 21000);
+        assert_eq!(TransactionBuilder::to(&req).unwrap(), to);
+        assert_eq!(TransactionBuilder::value(&req).unwrap(), 111);
+        assert_eq!(
+            *TransactionBuilder::access_list(&req).unwrap(),
+            AccessList::from(vec![access_list_item])
+        );
+        assert_eq!(*TransactionBuilder::input(&req).unwrap(), Bytes::new());
     }
 }

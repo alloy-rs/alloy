@@ -78,6 +78,10 @@ pub struct NodeInfo {
     pub environment: NodeEnvironment,
     /// Info about the node's fork configuration
     pub fork_config: NodeForkConfig,
+    /// The network type this node is running (e.g., "tempo" for Tempo mode).
+    /// `None` for standard Ethereum.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
 }
 
 /// The current block environment of the node.
@@ -115,8 +119,12 @@ pub struct NodeForkConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Metadata {
-    /// client version
+    /// Client version
     pub client_version: String,
+    /// Client SemVer compatible version
+    pub client_semver: Option<String>,
+    /// Client commit SHA hash
+    pub client_commit_sha: Option<String>,
     /// Chain id of the node.
     pub chain_id: ChainId,
     /// Unique instance id
@@ -151,7 +159,7 @@ pub enum MineOptions {
     /// The options for mining
     Options {
         /// The timestamp the block should be mined with
-        #[serde(with = "alloy_serde::quantity::opt")]
+        #[serde(default, with = "alloy_serde::quantity::opt")]
         timestamp: Option<u64>,
         /// If `blocks` is given, it will mine exactly blocks number of blocks, regardless of any
         /// other blocks mined or reverted during it's operation
@@ -224,47 +232,22 @@ mod tests {
     }
 
     #[test]
-    fn test_serde_deserialize_options_with_values() {
-        let data = r#"{"timestamp": 1620000000, "blocks": 10}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
-        );
-
-        let data = r#"{"timestamp": "0x608f3d00", "blocks": 10}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
-        );
-    }
-
-    #[test]
-    fn test_serde_deserialize_options_with_timestamp() {
-        let data = r#"{"timestamp":"1620000000"}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
-        );
-
-        let data = r#"{"timestamp":"0x608f3d00"}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
-        );
-    }
-
-    #[test]
-    fn test_serde_deserialize_timestamp() {
-        let data = r#""1620000000""#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
-
-        let data = r#""0x608f3d00""#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
+    fn test_serde_deserialize_mine_options() {
+        let options = |timestamp, blocks| MineOptions::Options { timestamp, blocks };
+        for (data, expected) in [
+            (r#"{"timestamp": 1620000000, "blocks": 10}"#, options(Some(1620000000), Some(10))),
+            (r#"{"timestamp": "0x608f3d00", "blocks": 10}"#, options(Some(1620000000), Some(10))),
+            (r#"{"blocks": 5}"#, options(None, Some(5))),
+            (r#"{}"#, MineOptions::default()),
+            // Unknown keys are ignored, matching maps with a `timestamp` key.
+            (r#"{"foo": 1}"#, MineOptions::default()),
+            (r#"{"timestamp":"1620000000"}"#, options(Some(1620000000), None)),
+            (r#"{"timestamp":"0x608f3d00"}"#, options(Some(1620000000), None)),
+            (r#""1620000000""#, MineOptions::Timestamp(Some(1620000000))),
+            (r#""0x608f3d00""#, MineOptions::Timestamp(Some(1620000000))),
+        ] {
+            let deserialized: MineOptions = serde_json::from_str(data).unwrap();
+            assert_eq!(deserialized, expected, "{data}");
+        }
     }
 }

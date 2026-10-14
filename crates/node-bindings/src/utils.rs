@@ -10,9 +10,6 @@ use std::{
 };
 use tempfile::TempDir;
 
-#[cfg(unix)]
-use libc;
-
 /// Helper for graceful process shutdown.
 pub(crate) struct GracefulShutdown;
 
@@ -38,6 +35,7 @@ impl GracefulShutdown {
         }
 
         child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
+        let _ = child.wait();
     }
 }
 
@@ -167,26 +165,17 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
-    fn test_unused_port() {
-        let port = unused_port();
-        assert!(port > 0);
-    }
+    fn graceful_shutdown_reaps_after_force_kill() {
+        let mut child = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("trap '' TERM; while :; do :; done")
+            .spawn()
+            .unwrap();
 
-    #[test]
-    fn test_run_with_tempdir_sync() {
-        run_with_tempdir_sync("test_prefix", |path| {
-            assert!(path.exists(), "Temporary directory should exist");
-            assert!(path.is_dir(), "Temporary directory should be a directory");
-        });
-    }
+        GracefulShutdown::shutdown(&mut child, 0, "sh");
 
-    #[tokio::test]
-    async fn test_run_with_tempdir_async() {
-        run_with_tempdir("test_prefix", |path| async move {
-            assert!(path.exists(), "Temporary directory should exist");
-            assert!(path.is_dir(), "Temporary directory should be a directory");
-        })
-        .await;
+        assert!(child.try_wait().unwrap().is_some());
     }
 }

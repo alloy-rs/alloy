@@ -1,4 +1,6 @@
 mod builder;
+mod delegate;
+use delegate::delegate_transaction;
 mod either;
 
 pub mod error;
@@ -6,8 +8,7 @@ pub mod error;
 use alloy_consensus::{
     Sealed, Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
 };
-use alloy_eips::{eip7702::SignedAuthorization, Typed2718};
-use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
+use alloy_eips::Typed2718;
 pub use either::{AnyTxEnvelope, AnyTypedTransaction};
 use std::error::Error;
 
@@ -23,7 +24,7 @@ use alloy_consensus::{
 };
 use alloy_network_primitives::{BlockResponse, TransactionResponse};
 pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
-use alloy_rpc_types_eth::{AccessList, Block, BlockTransactions, Transaction, TransactionRequest};
+use alloy_rpc_types_eth::{Block, BlockTransactions, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use derive_more::From;
 use serde::{Deserialize, Serialize};
@@ -45,10 +46,9 @@ use std::ops::{Deref, DerefMut};
 ///   transaction types. It will successfully decode an Ethereum [`TxEnvelope`], but will decode
 ///   only the type for any unknown transaction type. It will also leave the buffer unconsumed,
 ///   which will cause further deserialization to produce erroneous results.
-/// - The implementation of [`Encodable2718`] for [`AnyTypedTransaction`] will not work for
-///   non-Ethereum transaction types. It will encode the type for any unknown transaction type, but
-///   will not encode any other fields. This is symmetric with the decoding behavior, but still
-///   erroneous.
+/// - The implementation of [`Encodable2718`] for [`AnyTxEnvelope`] will panic for non-Ethereum
+///   transaction types. Unknown transaction types cannot be re-encoded through [`AnyNetwork`]; use
+///   a custom transaction type and network implementation instead.
 /// - The [`TransactionRequest`] will build ONLY Ethereum types. It will error when attempting to
 ///   build any unknown type.
 /// - The [`Network::TransactionResponse`] may deserialize unknown metadata fields into the inner
@@ -101,6 +101,12 @@ impl AnyRpcBlock {
     /// Consumes the type and returns the wrapped rpc block.
     pub fn into_inner(self) -> Block<AnyRpcTransaction, AnyRpcHeader> {
         self.0.into_inner()
+    }
+
+    /// Consumes the type and returns the block header with the block's additional fields.
+    pub fn into_header_with_other(self) -> WithOtherFields<AnyRpcHeader> {
+        let WithOtherFields { inner, other } = self.0;
+        WithOtherFields { inner: inner.header, other }
     }
 
     /// Attempts to convert the inner RPC [`Block`] into a consensus block.
@@ -369,7 +375,7 @@ impl AnyRpcTransaction {
     where
         U: From<AnyTxEnvelope>,
     {
-        self.into_inner().map(U::from)
+        self.map(U::from)
     }
 
     /// Converts the transaction to the given alternative that is `TryFrom<T>`
@@ -381,7 +387,7 @@ impl AnyRpcTransaction {
     where
         U: TryFrom<AnyTxEnvelope>,
     {
-        self.into_inner().try_map(U::try_from)
+        self.try_map(U::try_from)
     }
 }
 
@@ -436,6 +442,17 @@ impl From<AnyRpcTransaction> for Recovered<AnyTxEnvelope> {
     }
 }
 
+impl From<AnyRpcTransaction> for WithOtherFields<TransactionRequest> {
+    fn from(tx: AnyRpcTransaction) -> Self {
+        let (inner, other) = tx.into_parts();
+        let (envelope, from) = inner.into_recovered().into_parts();
+        let mut req: Self = envelope.into();
+        req.inner.from = Some(from);
+        req.other.extend(other);
+        req
+    }
+}
+
 impl TryFrom<AnyRpcTransaction> for TxEnvelope {
     type Error = ValueError<AnyTxEnvelope>;
 
@@ -445,73 +462,7 @@ impl TryFrom<AnyRpcTransaction> for TxEnvelope {
 }
 
 impl alloy_consensus::Transaction for AnyRpcTransaction {
-    fn chain_id(&self) -> Option<ChainId> {
-        self.inner.chain_id()
-    }
-
-    fn nonce(&self) -> u64 {
-        self.inner.nonce()
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.inner.gas_limit()
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        alloy_consensus::Transaction::gas_price(&self.0.inner)
-    }
-
-    fn max_fee_per_gas(&self) -> u128 {
-        alloy_consensus::Transaction::max_fee_per_gas(&self.inner)
-    }
-
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.inner.max_priority_fee_per_gas()
-    }
-
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.inner.max_fee_per_blob_gas()
-    }
-
-    fn priority_fee_or_price(&self) -> u128 {
-        self.inner.priority_fee_or_price()
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        self.inner.effective_gas_price(base_fee)
-    }
-
-    fn is_dynamic_fee(&self) -> bool {
-        self.inner.is_dynamic_fee()
-    }
-
-    fn kind(&self) -> TxKind {
-        self.inner.kind()
-    }
-
-    fn is_create(&self) -> bool {
-        self.inner.is_create()
-    }
-
-    fn value(&self) -> U256 {
-        self.inner.value()
-    }
-
-    fn input(&self) -> &Bytes {
-        self.inner.input()
-    }
-
-    fn access_list(&self) -> Option<&AccessList> {
-        self.inner.access_list()
-    }
-
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        self.inner.blob_versioned_hashes()
-    }
-
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.inner.authorization_list()
-    }
+    delegate_transaction!(self => &self.0.inner);
 }
 
 impl TransactionResponse for AnyRpcTransaction {
@@ -549,7 +500,7 @@ impl Typed2718 for AnyRpcTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::B64;
+    use alloy_primitives::{B256, B64};
 
     #[test]
     fn convert_any_block() {
@@ -570,5 +521,96 @@ mod tests {
 
         let _block: alloy_consensus::Block<TxEnvelope, alloy_consensus::Header> =
             block.try_into().unwrap();
+    }
+
+    #[test]
+    fn preserves_other_fields_when_converting_any_block_into_header() {
+        let mut block = AnyRpcBlock::new(
+            Block::new(
+                AnyRpcHeader::from_sealed(AnyHeader::default().seal(B256::ZERO)),
+                BlockTransactions::Full(vec![]),
+            )
+            .into(),
+        );
+        block.other.insert("timestampMillis".to_owned(), serde_json::json!(1_234_567));
+
+        let header = block.into_header_with_other();
+
+        assert_eq!(header.hash, B256::ZERO);
+        assert_eq!(header.other.get("timestampMillis"), Some(&serde_json::json!(1_234_567)));
+    }
+
+    #[test]
+    fn preserves_other_fields_when_converting_to_transaction_request() {
+        let tx: AnyRpcTransaction = serde_json::from_value(serde_json::json!({
+            "blockHash": "0x8e38b4dbf6b11fcc3b9dee84fb7986e29ca0a02cecd8977c161ff7333329681e",
+            "blockNumber": "0xf4240",
+            "hash": "0xe9e91f1ee4b56c0df2e9f06c2b8c27c6076195a88a7b8537ba8313d80e6f124e",
+            "transactionIndex": "0x1",
+            "type": "0x0",
+            "nonce": "0x43eb",
+            "input": "0x",
+            "r": "0x3b08715b4403c792b8c7567edea634088bedcd7f60d9352b1f16c69830f3afd5",
+            "s": "0x10b9afb67d2ec8b956f0e1dbc07eb79152904f3a7bf789fc869db56320adfe09",
+            "chainId": "0x0",
+            "v": "0x1c",
+            "gas": "0xc350",
+            "from": "0x32be343b94f860124dc4fee278fdcbd38c102d88",
+            "to": "0xdf190dc7190dfba737d7777a163445b7fff16133",
+            "value": "0x6113a84987be800",
+            "gasPrice": "0xdf8475800",
+            "tempoFeePayer": "0x1234",
+        }))
+        .unwrap();
+
+        let req: WithOtherFields<TransactionRequest> = tx.into();
+
+        assert_eq!(
+            req.other.get("tempoFeePayer").and_then(serde_json::Value::as_str),
+            Some("0x1234")
+        );
+        assert_eq!(
+            req.inner.from,
+            Some("0x32be343b94f860124dc4fee278fdcbd38c102d88".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn preserves_unknown_fields_when_converting_to_transaction_request() {
+        let tx: AnyRpcTransaction = serde_json::from_value(serde_json::json!({
+            "blockHash": "0xef664d656f841b5ad6a2b527b963f1eb48b97d7889d742f6cbff6950388e24cd",
+            "blockNumber": "0x73a78fd",
+            "from": "0x36bde71c97b33cc4729cf772ae268934f7ab70b2",
+            "gas": "0xc27a8",
+            "gasPrice": "0x521",
+            "hash": "0x0bf1845c5d7a82ec92365d5027f7310793d53004f3c86aa80965c67bf7e7dc80",
+            "input": "0x",
+            "nonce": "0x74060",
+            "to": "0x4200000000000000000000000000000000000007",
+            "transactionIndex": "0x1",
+            "type": "0x7e",
+            "value": "0x0",
+            "sourceHash": "0x074adb22f2e6ed9bdd31c52eefc1f050e5db56eb85056450bccd79a6649520b3",
+            "mint": "0x0",
+            "tempoFeePayer": "0x1234",
+        }))
+        .unwrap();
+
+        let req: WithOtherFields<TransactionRequest> = tx.into();
+
+        assert_eq!(req.other.get("type").and_then(serde_json::Value::as_u64), Some(0x7e));
+        assert_eq!(
+            req.other.get("sourceHash").and_then(serde_json::Value::as_str),
+            Some("0x074adb22f2e6ed9bdd31c52eefc1f050e5db56eb85056450bccd79a6649520b3")
+        );
+        assert_eq!(
+            req.other.get("tempoFeePayer").and_then(serde_json::Value::as_str),
+            Some("0x1234")
+        );
+        assert_eq!(
+            req.inner.from,
+            Some("0x36bde71c97b33cc4729cf772ae268934f7ab70b2".parse().unwrap())
+        );
+        assert!(!req.other.contains_key("from"));
     }
 }

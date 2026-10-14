@@ -1,0 +1,22 @@
+{
+  "currentBlockNumber": "0x14a0bdb",
+  "baseFeePerGas": "0xbcdd3e0f",
+  "price": {
+    "low": {
+      "maxPriorityFeePerGas": "0x27f840a",
+      "maxFeePerGas": "0x1097c5d8b",
+      "waitTime": 36000
+    },
+    "medium": {
+      "maxPriorityFeePerGas": "0x9b4c5bb",
+      "maxFeePerGas": "0x1137c6003",
+      "waitTime": 24000
+    },
+    "high": {
+      "maxPriorityFeePerGas": "0x10128f8e",
+      "maxFeePerGas": "0x11c5174a8",
+      "waitTime": 12000
+    }
+  }
+}
+

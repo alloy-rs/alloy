@@ -6,6 +6,7 @@ use crate::{
     },
     layers::{BlockIdLayer, CallBatchLayer, ChainLayer},
     provider::SendableTx,
+    utils::Eip1559Estimator,
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
@@ -113,6 +114,33 @@ where
 /// enabled, whereas `ProviderBuilder::default()` will instantiate it in its vanilla
 /// [`ProviderBuilder`] form i.e with no fillers enabled.
 ///
+/// # Filler ordering
+///
+/// For Ethereum, `new()` already includes gas, blob-gas, cached-nonce, and chain-ID fillers.
+/// Methods such as [`with_gas_estimation`](Self::with_gas_estimation) append another filler; they
+/// do not replace one from the recommended set. Start with
+/// [`disable_recommended_fillers`](Self::disable_recommended_fillers) (or `default()`) when
+/// assembling those fillers explicitly.
+///
+/// [`network`](Self::network) replaces the entire filler stack with the target network's
+/// recommended fillers, so select the network before adding custom fillers or a wallet. Fillers
+/// that modify a transaction request should be added before [`wallet`](Self::wallet), which signs
+/// the request and turns it into an envelope.
+///
+/// ```
+/// use alloy_provider::ProviderBuilder;
+///
+/// // Use the complete recommended set as-is.
+/// let _recommended = ProviderBuilder::new();
+///
+/// // Or opt out before assembling an explicit set; these calls append in order.
+/// let _custom = ProviderBuilder::new()
+///     .disable_recommended_fillers()
+///     .with_gas_estimation()
+///     .with_cached_nonce_management()
+///     .fetch_chain_id();
+/// ```
+///
 /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 #[derive(Debug)]
 pub struct ProviderBuilder<L, F, N = Ethereum> {
@@ -130,8 +158,8 @@ impl
 {
     /// Create a new [`ProviderBuilder`] with the recommended filler enabled.
     ///
-    /// Recommended fillers are preconfigured set of fillers that handle gas estimation, nonce
-    /// management, and chain-id fetching.
+    /// For Ethereum, the recommended set handles gas and blob-gas estimation, cached nonce
+    /// management, and chain-ID fetching.
     ///
     /// Building a provider with this setting enabled will return a [`crate::fillers::FillProvider`]
     /// with [`crate::utils::JoinedRecommendedFillers`].
@@ -170,8 +198,7 @@ impl ProviderBuilder<Identity, Identity, Ethereum> {
 }
 
 impl<L, N: Network> ProviderBuilder<L, Identity, N> {
-    /// Add preconfigured set of layers handling gas estimation, nonce
-    /// management, and chain-id fetching.
+    /// Add the network's preconfigured set of transaction fillers.
     pub fn with_recommended_fillers(
         self,
     ) -> ProviderBuilder<L, JoinFill<Identity, N::RecommendedFillers>, N>
@@ -183,6 +210,28 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
 }
 
 impl<L, F, N> ProviderBuilder<L, F, N> {
+    /// Apply a function to this builder.
+    ///
+    /// This is useful for extracting reusable builder-style helper functions without manually
+    /// reconstructing the [`ProviderBuilder`].
+    pub fn apply<T>(self, f: impl FnOnce(Self) -> T) -> T {
+        f(self)
+    }
+
+    /// Map the layer stack to a new type.
+    ///
+    /// This is useful for customizing or replacing the accumulated layers in a reusable helper.
+    pub fn map_layer<L2>(self, f: impl FnOnce(L) -> L2) -> ProviderBuilder<L2, F, N> {
+        ProviderBuilder { layer: f(self.layer), filler: self.filler, network: PhantomData }
+    }
+
+    /// Map the filler stack to a new type.
+    ///
+    /// This is useful for customizing or replacing the accumulated fillers in a reusable helper.
+    pub fn map_filler<F2>(self, f: impl FnOnce(F) -> F2) -> ProviderBuilder<L, F2, N> {
+        ProviderBuilder { layer: self.layer, filler: f(self.filler), network: PhantomData }
+    }
+
     /// Add a layer to the stack being built. This is similar to
     /// [`tower::ServiceBuilder::layer`].
     ///
@@ -195,22 +244,14 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// [`tower::ServiceBuilder::layer`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html#method.layer
     /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
     pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>, F, N> {
-        ProviderBuilder {
-            layer: Stack::new(layer, self.layer),
-            filler: self.filler,
-            network: PhantomData,
-        }
+        self.map_layer(|current| Stack::new(layer, current))
     }
 
     /// Add a transaction filler to the stack being built. Transaction fillers
     /// are used to fill in missing fields on transactions before they are sent,
     /// and are all joined to form the outermost layer of the stack.
     pub fn filler<F2>(self, filler: F2) -> ProviderBuilder<L, JoinFill<F, F2>, N> {
-        ProviderBuilder {
-            layer: self.layer,
-            filler: JoinFill::new(self.filler, filler),
-            network: PhantomData,
-        }
+        self.map_filler(|current| JoinFill::new(current, filler))
     }
 
     /// Change the network.
@@ -218,11 +259,20 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// By default, the network is `Ethereum`. This method must be called to configure a different
     /// network.
     ///
+    /// This replaces the filler stack with the target network's recommended fillers. Any custom
+    /// fillers should be added **after** calling `.network()`.
+    ///
     /// ```ignore
     /// builder.network::<Arbitrum>()
     /// ```
-    pub fn network<Net: Network>(self) -> ProviderBuilder<L, F, Net> {
-        ProviderBuilder { layer: self.layer, filler: self.filler, network: PhantomData }
+    pub fn network<Net: RecommendedFillers>(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<Identity, Net::RecommendedFillers>, Net> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: JoinFill::new(Identity, Net::recommended_fillers()),
+            network: PhantomData,
+        }
     }
 
     /// Add a chain layer to the stack being built. The layer will set
@@ -256,7 +306,25 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     ///
     /// See [`GasFiller`] for more information.
     pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
-        self.filler(GasFiller)
+        self.filler(GasFiller::default())
+    }
+
+    /// Add EIP-1559 gas estimation to the stack being built, using the provided estimator.
+    ///
+    /// See [`GasFiller`] and [`Eip1559Estimator`] for more information.
+    pub fn with_eip1559_estimator(
+        self,
+        estimator: Eip1559Estimator,
+    ) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
+        self.filler(GasFiller::new(estimator))
+    }
+
+    /// Add legacy gas estimation to the stack being built.
+    ///
+    /// The filler always populates `gas_price` instead of the EIP-1559 fee fields, see
+    /// [`GasFiller::legacy`] for more information.
+    pub fn with_legacy_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
+        self.filler(GasFiller::legacy())
     }
 
     /// Add nonce management to the stack being built.
@@ -358,6 +426,9 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Set a default [`BlockId`] for `eth_call` and `eth_estimateGas`.
     ///
+    /// When combined with [`with_call_batching`](Self::with_call_batching), this must be added
+    /// first, otherwise the batching layer bypasses the default.
+    ///
     /// [`BlockId`]: alloy_eips::BlockId
     pub fn with_default_block(
         self,
@@ -386,7 +457,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// the final [`Provider`] type with all stack components.
     ///
     /// This is a convenience function for
-    /// `ProviderBuilder::on_provider(RootProvider::new(client))`.
+    /// `ProviderBuilder::connect_provider(RootProvider::new(client))`.
     pub fn connect_client(self, client: RpcClient) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,
@@ -400,7 +471,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// the final [`Provider`] type with all stack components.
     ///
     /// This is a convenience function for
-    /// `ProviderBuilder::on_client(RpcClient::mocked(asserter))`.
+    /// `ProviderBuilder::connect_client(RpcClient::mocked(asserter))`.
     pub fn connect_mocked_client(self, asserter: alloy_transport::mock::Asserter) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,
@@ -494,7 +565,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with a websocket connection.
-    #[cfg(feature = "ws")]
+    #[cfg(feature = "ws-base")]
     pub async fn connect_ws(
         self,
         connect: alloy_transport_ws::WsConnect,
@@ -525,7 +596,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with an Reqwest HTTP transport.
-    #[cfg(any(test, feature = "reqwest"))]
+    #[cfg(any(test, all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))))]
     pub fn connect_http(self, url: reqwest::Url) -> F::Provider
     where
         L: ProviderLayer<crate::RootProvider<N>, N>,
@@ -537,7 +608,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with a pre-built Reqwest client.
-    #[cfg(any(test, feature = "reqwest"))]
+    #[cfg(any(test, all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))))]
     pub fn connect_reqwest<C>(self, client: C, url: reqwest::Url) -> F::Provider
     where
         L: ProviderLayer<crate::RootProvider<N>, N>,
@@ -550,7 +621,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with a provided Reqwest client builder.
-    #[cfg(any(test, feature = "reqwest"))]
+    #[cfg(any(test, all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))))]
     pub fn with_reqwest<B>(self, url: reqwest::Url, builder: B) -> F::Provider
     where
         L: ProviderLayer<crate::RootProvider<N>, N>,
@@ -582,7 +653,12 @@ type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 
 #[cfg(any(test, feature = "anvil-node"))]
 impl<L, F, N: Network> ProviderBuilder<L, F, N> {
-    /// Build this provider with anvil, using the BoxTransport.
+    /// Build this provider with anvil.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     pub fn connect_anvil(self) -> F::Provider
     where
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
@@ -594,9 +670,13 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         self.connect_anvil_with_config(std::convert::identity)
     }
 
-    /// Build this provider with anvil, using the BoxTransport. This
-    /// function configures a wallet backed by anvil keys, and is intended for
-    /// use in tests.
+    /// Build this provider with anvil. This function configures a wallet backed by anvil keys, and
+    /// is intended for use in tests.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     pub fn connect_anvil_with_wallet(
         self,
     ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider, N>>::Provider
@@ -612,8 +692,12 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             .expect("failed to build provider")
     }
 
-    /// Build this provider with anvil, using the BoxTransport. The
-    /// given function is used to configure the anvil instance.
+    /// Build this provider with anvil. The given function is used to configure the anvil instance.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     pub fn connect_anvil_with_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
@@ -633,8 +717,12 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         self.layer(anvil_layer).connect_client(rpc_client)
     }
 
-    /// Build this provider with anvil, using the BoxTransport. The
-    /// given function is used to configure the anvil instance.
+    /// Build this provider with anvil. The given function is used to configure the anvil instance.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     #[deprecated(since = "0.12.6", note = "use `connect_anvil_with_config` instead")]
     pub fn on_anvil_with_config(
         self,
@@ -644,16 +732,16 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         L: ProviderLayer<crate::layers::AnvilProvider<RootProvider<N>, N>, N>,
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
     {
-        let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
-        let url = anvil_layer.endpoint_url();
-
-        let rpc_client = ClientBuilder::default().http(url);
-
-        self.layer(anvil_layer).connect_client(rpc_client)
+        self.connect_anvil_with_config(f)
     }
 
-    /// Build this provider with anvil, using the BoxTransport.
-    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    /// Build this provider with anvil and a wallet backed by anvil keys. The given function is
+    /// used to configure the anvil instance.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     pub fn connect_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
@@ -681,8 +769,13 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         Ok(self.wallet(wallet).layer(anvil_layer).connect_client(rpc_client))
     }
 
-    /// Build this provider with anvil, using the BoxTransport.
-    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    /// Build this provider with anvil and a wallet backed by anvil keys. The given function is
+    /// used to configure the anvil instance.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     #[deprecated(since = "0.12.6", note = "use `connect_anvil_with_wallet_and_config` instead")]
     pub fn on_anvil_with_wallet_and_config(
         self,
@@ -698,17 +791,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         >,
         alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
-        let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
-        let url = anvil_layer.endpoint_url();
-
-        let wallet = anvil_layer
-            .instance()
-            .wallet()
-            .ok_or(alloy_node_bindings::NodeError::NoKeysAvailable)?;
-
-        let rpc_client = ClientBuilder::default().http(url);
-
-        Ok(self.wallet(wallet).layer(anvil_layer).connect_client(rpc_client))
+        self.connect_anvil_with_wallet_and_config(f)
     }
 }
 
@@ -767,5 +850,41 @@ mod tests {
         let p = ProviderBuilder::new_with_network::<AnyNetwork>().connect_anvil();
         let num = p.get_block_number().await.unwrap();
         assert_eq!(num, 0);
+    }
+
+    // Ensures `.network()` replaces fillers rather than keeping the old ones.
+    #[test]
+    fn network_replaces_fillers() {
+        // Add an extra filler before swapping, it should be dropped.
+        let builder = ProviderBuilder::new().filler(GasFiller::default()).network::<AnyNetwork>();
+
+        let _: ProviderBuilder<
+            Identity,
+            JoinFill<Identity, <AnyNetwork as RecommendedFillers>::RecommendedFillers>,
+            AnyNetwork,
+        > = builder;
+    }
+
+    #[test]
+    fn apply_transforms_builder() {
+        let builder = ProviderBuilder::new()
+            .apply(|builder| builder.disable_recommended_fillers().with_gas_estimation());
+
+        let _: ProviderBuilder<Identity, JoinFill<Identity, GasFiller>, Ethereum> = builder;
+    }
+
+    #[test]
+    fn map_filler_replaces_fillers() {
+        let builder = ProviderBuilder::new().map_filler(|_| GasFiller::default());
+
+        let _: ProviderBuilder<Identity, GasFiller, Ethereum> = builder;
+    }
+
+    #[test]
+    fn map_layer_replaces_layers() {
+        let builder = ProviderBuilder::<Identity, Identity>::default()
+            .map_layer(|_| ChainLayer::new(NamedChain::Mainnet));
+
+        let _: ProviderBuilder<ChainLayer, Identity, Ethereum> = builder;
     }
 }

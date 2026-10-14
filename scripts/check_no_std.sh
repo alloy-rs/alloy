@@ -7,13 +7,14 @@ crates=(
     alloy-genesis
     alloy-serde
     alloy-consensus
+    alloy-consensus-any
     alloy-network-primitives
     alloy-rpc-types-eth
     alloy-rpc-types-debug
     alloy-rpc-types-engine
 )
 
-cmd=(cargo +stable hack check --no-default-features --target "$target")
+cmd=(cargo +stable hack check --locked --no-default-features --target "$target")
 for crate in "${crates[@]}"; do
     cmd+=(-p "$crate")
 done

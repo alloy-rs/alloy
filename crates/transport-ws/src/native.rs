@@ -26,7 +26,9 @@ pub struct WsConnect {
     /// Max number of retries before failing and exiting the connection.
     /// Default is 10.
     max_retries: u32,
-    /// The interval between retries.
+    /// The base interval between retries.
+    ///
+    /// Reconnect retries use capped exponential backoff from this base interval.
     /// Default is 3 seconds.
     retry_interval: Duration,
     /// The interval between keepalive pings.
@@ -95,7 +97,9 @@ impl WsConnect {
         self
     }
 
-    /// Sets the interval between retries.
+    /// Sets the base interval between retries.
+    ///
+    /// Reconnect retries use capped exponential backoff from this base interval.
     /// Default is 3 seconds.
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = retry_interval;
@@ -135,11 +139,8 @@ impl PubSubConnect for WsConnect {
     }
 
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
-        // Install the default rustls crypto provider if not already set.
-        // Required since rustls 0.23+ no longer auto-installs a provider.
-        let _ = rustls::crypto::CryptoProvider::install_default(
-            rustls::crypto::aws_lc_rs::default_provider(),
-        );
+        #[cfg(any(feature = "aws-lc-rs", feature = "ring"))]
+        install_default_crypto_provider();
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
@@ -154,6 +155,23 @@ impl PubSubConnect for WsConnect {
 
         Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
     }
+}
+
+/// Install a default rustls crypto provider if none is set.
+///
+/// Required since rustls 0.23+ no longer auto-installs one.
+#[cfg(any(feature = "aws-lc-rs", feature = "ring"))]
+fn install_default_crypto_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_some() {
+        return;
+    }
+    #[cfg(feature = "aws-lc-rs")]
+    let provider = rustls::crypto::aws_lc_rs::default_provider();
+    #[cfg(all(feature = "ring", not(feature = "aws-lc-rs")))]
+    let provider = rustls::crypto::ring::default_provider();
+    // install_default returns Err if a concurrent caller raced us past the get_default check;
+    // either provider is valid.
+    let _ = rustls::crypto::CryptoProvider::install_default(provider);
 }
 
 impl WsBackend<TungsteniteStream> {
@@ -279,24 +297,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_basic_auth_from_url() {
-        let ws = WsConnect::new("wss://user:pass@example.com/path");
-        assert_eq!(ws.url(), "wss://user:pass@example.com/path");
-        assert_eq!(ws.auth(), Some(&Authorization::basic("user", "pass")));
-    }
-
-    #[test]
-    fn parse_username_only_from_url() {
-        let ws = WsConnect::new("ws://user@example.com");
-        assert_eq!(ws.url(), "ws://user@example.com");
-        assert_eq!(ws.auth(), Some(&Authorization::basic("user", "")));
-    }
-
-    #[test]
-    fn no_auth_when_url_has_no_credentials() {
-        let ws = WsConnect::new("wss://example.com/rpc");
-        assert_eq!(ws.url(), "wss://example.com/rpc");
-        assert!(ws.auth().is_none());
+    fn auth_from_url() {
+        for (url, auth) in [
+            ("wss://user:pass@example.com/path", Some(Authorization::basic("user", "pass"))),
+            ("ws://user@example.com", Some(Authorization::basic("user", ""))),
+            ("wss://example.com/rpc", None),
+            ("ws://localhost:8545", None),
+        ] {
+            let ws = WsConnect::new(url);
+            assert_eq!(ws.url(), url);
+            assert_eq!(ws.auth(), auth.as_ref(), "{url}");
+        }
     }
 
     #[test]
@@ -304,11 +315,5 @@ mod tests {
         let ws =
             WsConnect::new("wss://user:pass@example.com").with_auth(Authorization::bearer("tok"));
         assert_eq!(ws.auth(), Some(&Authorization::bearer("tok")));
-    }
-
-    #[test]
-    fn no_auth_for_localhost_username() {
-        let ws = WsConnect::new("ws://localhost:8545");
-        assert!(ws.auth().is_none());
     }
 }

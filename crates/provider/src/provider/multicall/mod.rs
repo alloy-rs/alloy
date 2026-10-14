@@ -656,7 +656,7 @@ where
     ) -> Result<M::Return> {
         let tx = self.build_request(call_type, value);
 
-        let mut eth_call = self.provider.root().call(tx);
+        let mut eth_call = self.provider.call(tx);
 
         if let Some(block) = self.block {
             eth_call = eth_call.block(block);

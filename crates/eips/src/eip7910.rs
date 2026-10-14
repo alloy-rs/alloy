@@ -1,9 +1,12 @@
 //! Implementation of [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
 
-use crate::{eip2935, eip4788, eip6110, eip7002, eip7251, eip7840::BlobParams};
-use alloc::{borrow::ToOwned, collections::BTreeMap, string::String};
+use crate::{eip2935, eip4788, eip6110, eip7002, eip7251, eip7840::BlobParams, eip8282};
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+};
 use alloy_primitives::{Address, Bytes};
-use core::{fmt, str};
+use core::{cmp::Ordering, convert::Infallible, fmt, str};
 
 /// Response type for `eth_config`
 #[derive(Clone, Debug, PartialEq)]
@@ -70,16 +73,23 @@ pub struct EthForkConfig {
     /// `CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS`, `DEPOSIT_CONTRACT_ADDRESS`,
     /// `HISTORY_STORAGE_ADDRESS`, and `WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS`.
     ///
+    /// For Amsterdam the added system contracts are (in order) `BUILDER_DEPOSIT_CONTRACT_ADDRESS`
+    /// and `BUILDER_EXIT_CONTRACT_ADDRESS`.
+    ///
     /// Future forks MUST define the list of system contracts in their meta-EIPs.
     pub system_contracts: BTreeMap<SystemContract, Address>,
 }
 
 /// System-level contracts for [`EthForkConfig`].
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr))]
 pub enum SystemContract {
     /// Beacon roots system contract.
     BeaconRoots,
+    /// Builder deposit system contract.
+    BuilderDepositContract,
+    /// Builder exit system contract.
+    BuilderExitContract,
     /// Consolidation requests predeploy system contract.
     ConsolidationRequestPredeploy,
     /// Deposit system contract.
@@ -88,32 +98,51 @@ pub enum SystemContract {
     HistoryStorage,
     /// Withdrawal requests predeploy system contract.
     WithdrawalRequestPredeploy,
+    /// A custom system contract not defined by a known EIP.
+    Other(String),
+}
+
+impl PartialOrd for SystemContract {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SystemContract {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.to_string().cmp(&other.to_string())
+    }
 }
 
 impl fmt::Display for SystemContract {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let str = match self {
             Self::BeaconRoots => "BEACON_ROOTS",
+            Self::BuilderDepositContract => "BUILDER_DEPOSIT_CONTRACT",
+            Self::BuilderExitContract => "BUILDER_EXIT_CONTRACT",
             Self::ConsolidationRequestPredeploy => "CONSOLIDATION_REQUEST_PREDEPLOY",
             Self::DepositContract => "DEPOSIT_CONTRACT",
             Self::HistoryStorage => "HISTORY_STORAGE",
             Self::WithdrawalRequestPredeploy => "WITHDRAWAL_REQUEST_PREDEPLOY",
+            Self::Other(name) => return write!(f, "{name}"),
         };
         write!(f, "{str}_ADDRESS")
     }
 }
 
 impl str::FromStr for SystemContract {
-    type Err = ParseSystemContractError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let system_contract = match s {
             "BEACON_ROOTS_ADDRESS" => Self::BeaconRoots,
+            "BUILDER_DEPOSIT_CONTRACT_ADDRESS" => Self::BuilderDepositContract,
+            "BUILDER_EXIT_CONTRACT_ADDRESS" => Self::BuilderExitContract,
             "CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS" => Self::ConsolidationRequestPredeploy,
             "DEPOSIT_CONTRACT_ADDRESS" => Self::DepositContract,
             "HISTORY_STORAGE_ADDRESS" => Self::HistoryStorage,
             "WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS" => Self::WithdrawalRequestPredeploy,
-            _ => return Err(ParseSystemContractError::Unknown(s.to_owned())),
+            _ => Self::Other(s.into()),
         };
         Ok(system_contract)
     }
@@ -121,8 +150,10 @@ impl str::FromStr for SystemContract {
 
 impl SystemContract {
     /// Enumeration of all [`SystemContract`] variants.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::BeaconRoots,
+        Self::BuilderDepositContract,
+        Self::BuilderExitContract,
         Self::ConsolidationRequestPredeploy,
         Self::DepositContract,
         Self::HistoryStorage,
@@ -148,14 +179,15 @@ impl SystemContract {
             ),
         ]
     }
-}
 
-/// Parse error for [`SystemContract`].
-#[derive(Debug, thiserror::Error)]
-pub enum ParseSystemContractError {
-    /// System contract unknown.
-    #[error("unknown system contract: {0}")]
-    Unknown(String),
+    /// Returns the system contracts introduced in Amsterdam:
+    /// [EIP-8282](https://eips.ethereum.org/EIPS/eip-8282) builder execution requests.
+    pub const fn amsterdam() -> [(Self, Address); 2] {
+        [
+            (Self::BuilderDepositContract, eip8282::BUILDER_DEPOSIT_CONTRACT_ADDRESS),
+            (Self::BuilderExitContract, eip8282::BUILDER_EXIT_CONTRACT_ADDRESS),
+        ]
+    }
 }
 
 #[cfg(test)]
@@ -165,6 +197,14 @@ mod tests {
     #[test]
     fn system_contract_str() {
         assert_eq!(SystemContract::BeaconRoots.to_string(), "BEACON_ROOTS_ADDRESS");
+        assert_eq!(
+            SystemContract::BuilderDepositContract.to_string(),
+            "BUILDER_DEPOSIT_CONTRACT_ADDRESS"
+        );
+        assert_eq!(
+            SystemContract::BuilderExitContract.to_string(),
+            "BUILDER_EXIT_CONTRACT_ADDRESS"
+        );
         assert_eq!(
             SystemContract::ConsolidationRequestPredeploy.to_string(),
             "CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS"
@@ -180,10 +220,11 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn system_contract_serde_roundtrip() {
-        for contract in SystemContract::ALL {
+        for contract in &SystemContract::ALL {
             assert_eq!(
-                contract,
-                serde_json::from_value(serde_json::to_value(contract).unwrap()).unwrap()
+                *contract,
+                serde_json::from_value::<SystemContract>(serde_json::to_value(contract).unwrap())
+                    .unwrap()
             );
         }
     }

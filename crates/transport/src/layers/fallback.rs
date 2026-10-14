@@ -26,6 +26,21 @@ const DEFAULT_ACTIVE_TRANSPORT_COUNT: usize = 3;
 ///
 /// The service ranks transports based on latency and stability metrics,
 /// and will attempt to always use the best available transports.
+///
+/// # Parallel execution and side effects
+///
+/// Unless a method is in `sequential_methods`, the request is sent to up to
+/// `active_transport_count` transports concurrently. Dropping the remaining
+/// futures after one completes does not undo remote side effects. Add every
+/// non-idempotent method to the sequential set. Sequential mode avoids
+/// concurrent submission, but can still try another transport after an error,
+/// so it does not guarantee at-most-once execution.
+///
+/// "Successful" means that the transport returned `Ok(ResponsePacket)`; a
+/// packet containing a JSON-RPC error still wins the race. Responses are not
+/// compared for equality or consensus. Sequential mode tries only the top
+/// `active_transport_count` transports, and a batch is sequential when any of
+/// its methods is in the sequential set.
 #[derive(Debug, Clone)]
 pub struct FallbackService<S> {
     /// The list of transports to use
@@ -103,7 +118,7 @@ impl<S: Clone> FallbackService<S> {
         let mut ranked: Vec<(usize, f64, String)> =
             self.transports.iter().map(|t| (t.id, t.score(), t.metrics_summary())).collect();
 
-        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        ranked.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         trace!("Current transport rankings:");
         for (idx, (id, _score, summary)) in ranked.iter().enumerate() {
@@ -114,11 +129,10 @@ impl<S: Clone> FallbackService<S> {
     /// Returns the top transports sorted by score (best first), limited by
     /// `active_transport_count`.
     fn top_transports(&self) -> Vec<ScoredTransport<S>> {
-        // Clone the vec, sort it, and keep only the top `self.active_transport_count`.
-        let mut transports_clone = (*self.transports).clone();
-        transports_clone.sort_by(|a, b| b.cmp(a));
-        transports_clone.truncate(self.active_transport_count);
-        transports_clone
+        // Snapshot the scores once, they can change concurrently while sorting.
+        let mut ranked: Vec<_> = self.transports.iter().map(|t| (t.score(), t)).collect();
+        ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+        ranked.into_iter().take(self.active_transport_count).map(|(_, t)| t.clone()).collect()
     }
 }
 
@@ -203,9 +217,7 @@ where
             }
         }
 
-        Err(last_error.unwrap_or_else(|| {
-            TransportErrorKind::custom_str("All transport futures failed to complete")
-        }))
+        Err(last_error.unwrap_or_else(no_transports_available))
     }
 
     /// Make a sequential request for methods with non-deterministic results.
@@ -251,10 +263,15 @@ where
         }
 
         // All transports failed
-        Err(last_error.unwrap_or_else(|| {
-            TransportErrorKind::custom_str("All transports failed for sequential request")
-        }))
+        Err(last_error.unwrap_or_else(no_transports_available))
     }
+}
+
+/// The error returned when there was no transport to send a request to.
+///
+/// Every transport that is tried records its error, so this is only reached with an empty list.
+fn no_transports_available() -> TransportError {
+    TransportErrorKind::custom_str("No transports available for fallback service")
 }
 
 impl<S> Service<RequestPacket> for FallbackService<S>
@@ -288,6 +305,8 @@ where
 /// transports in parallel, and return the first successful response.
 ///
 /// If all transports fail, the fallback service will return an error.
+/// Parallel execution can submit the same operation to several remote nodes;
+/// see [`FallbackService`] for replay-safety and JSON-RPC error semantics.
 ///
 /// # Automatic Transport Ranking
 ///
@@ -369,7 +388,7 @@ impl Default for FallbackLayer {
     }
 }
 
-/// A scored transport that can be ordered in a heap.
+/// A transport together with the metrics used to rank it.
 ///
 /// The transport is scored every time it is used according to
 /// a simple weighted algorithm that favors latency and stability.
@@ -424,49 +443,18 @@ impl<S> ScoredTransport<S> {
     }
 }
 
-impl<S> PartialEq for ScoredTransport<S> {
-    fn eq(&self, other: &Self) -> bool {
-        self.score().eq(&other.score())
-    }
-}
-
-impl<S> Eq for ScoredTransport<S> {}
-
-#[expect(clippy::non_canonical_partial_ord_impl)]
-impl<S> PartialOrd for ScoredTransport<S> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.score().partial_cmp(&other.score())
-    }
-}
-
-impl<S> Ord for ScoredTransport<S> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
-
 /// Represents performance metrics for a transport.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct TransportMetrics {
     // Latency history - tracks last N responses
     latencies: VecDeque<Duration>,
     // Success history - tracks last N successes (true) or failures (false)
     successes: VecDeque<bool>,
-    // Last time this transport was checked/used
-    last_update: Instant,
-    // Total number of requests made to this transport
-    total_requests: u64,
-    // Total number of successful requests
-    successful_requests: u64,
 }
 
 impl TransportMetrics {
     /// Track a successful request and its latency.
     fn track_success(&mut self, duration: Duration) {
-        self.total_requests += 1;
-        self.successful_requests += 1;
-        self.last_update = Instant::now();
-
         // Add to sample windows
         self.latencies.push_back(duration);
         self.successes.push_back(true);
@@ -482,9 +470,6 @@ impl TransportMetrics {
 
     /// Track a failed request.
     fn track_failure(&mut self) {
-        self.total_requests += 1;
-        self.last_update = Instant::now();
-
         // Add to sample windows (no latency for failures)
         self.successes.push_back(false);
 
@@ -494,6 +479,26 @@ impl TransportMetrics {
         }
     }
 
+    /// Share of successful requests in the sample window, `0.0` without samples.
+    fn success_rate(&self) -> f64 {
+        if self.successes.is_empty() {
+            return 0.0;
+        }
+        let success_count = self.successes.iter().filter(|&&s| s).count();
+        success_count as f64 / self.successes.len() as f64
+    }
+
+    /// Average latency in seconds over the sample window, if any request succeeded.
+    fn avg_latency(&self) -> Option<f64> {
+        if self.latencies.is_empty() {
+            return None;
+        }
+        Some(
+            self.latencies.iter().map(|d| d.as_secs_f64()).sum::<f64>()
+                / self.latencies.len() as f64,
+        )
+    }
+
     /// Calculate weighted score based on stability and latency
     fn calculate_score(&self) -> f64 {
         // If no data yet, return initial neutral score
@@ -501,60 +506,28 @@ impl TransportMetrics {
             return 0.0;
         }
 
-        // Calculate stability score (percentage of successful requests)
-        let success_count = self.successes.iter().filter(|&&s| s).count();
-        let stability_score = success_count as f64 / self.successes.len() as f64;
+        // Rank a transport whose recent requests all failed below an untried one, regardless of
+        // the latency of older successes.
+        if !self.successes.contains(&true) {
+            return -1.0;
+        }
 
-        // Calculate latency score (lower is better)
-        let latency_score = if !self.latencies.is_empty() {
-            let avg_latency = self.latencies.iter().map(|d| d.as_secs_f64()).sum::<f64>()
-                / self.latencies.len() as f64;
-
-            // Normalize latency score (1.0 for 0ms, approaches 0.0 as latency increases)
-            1.0 / (1.0 + avg_latency)
-        } else {
-            0.0
-        };
+        // Normalize latency score (1.0 for 0ms, approaches 0.0 as latency increases)
+        let latency_score = self.avg_latency().map_or(0.0, |avg_latency| 1.0 / (1.0 + avg_latency));
 
         // Apply weights to calculate final score
-        (stability_score * STABILITY_WEIGHT) + (latency_score * LATENCY_WEIGHT)
+        (self.success_rate() * STABILITY_WEIGHT) + (latency_score * LATENCY_WEIGHT)
     }
 
     /// Get a summary of metrics for debugging
     fn get_summary(&self) -> String {
-        let success_rate = if !self.successes.is_empty() {
-            let success_count = self.successes.iter().filter(|&&s| s).count();
-            success_count as f64 / self.successes.len() as f64
-        } else {
-            0.0
-        };
-
-        let avg_latency = if !self.latencies.is_empty() {
-            self.latencies.iter().map(|d| d.as_secs_f64()).sum::<f64>()
-                / self.latencies.len() as f64
-        } else {
-            0.0
-        };
-
         format!(
             "success_rate: {:.2}%, avg_latency: {:.2}ms, samples: {}, score: {:.4}",
-            success_rate * 100.0,
-            avg_latency * 1000.0,
+            self.success_rate() * 100.0,
+            self.avg_latency().unwrap_or(0.0) * 1000.0,
             self.successes.len(),
             self.calculate_score()
         )
-    }
-}
-
-impl Default for TransportMetrics {
-    fn default() -> Self {
-        Self {
-            latencies: VecDeque::new(),
-            successes: VecDeque::new(),
-            last_update: Instant::now(),
-            total_requests: 0,
-            successful_requests: 0,
-        }
     }
 }
 
@@ -894,6 +867,28 @@ mod tests {
             elapsed < Duration::from_millis(50),
             "Sequential execution with fast first transport: {:?}",
             elapsed
+        );
+    }
+}
+
+#[cfg(test)]
+mod metrics_tests {
+    use super::*;
+
+    #[test]
+    fn summary_matches_score_inputs() {
+        let mut metrics = TransportMetrics::default();
+        metrics.track_success(Duration::from_secs(1));
+        metrics.track_failure();
+        metrics.track_success(Duration::from_secs(3));
+        metrics.track_failure();
+
+        // Success rate 0.5 and an average latency of 2s.
+        let score = 0.5 * STABILITY_WEIGHT + (1.0 / 3.0) * LATENCY_WEIGHT;
+        assert_eq!(metrics.calculate_score(), score);
+        assert_eq!(
+            metrics.get_summary(),
+            format!("success_rate: 50.00%, avg_latency: 2000.00ms, samples: 4, score: {score:.4}")
         );
     }
 }

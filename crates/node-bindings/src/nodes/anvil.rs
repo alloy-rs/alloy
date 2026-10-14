@@ -1,6 +1,6 @@
 //! Utilities for launching an Anvil instance.
 
-use crate::{NodeError, NODE_STARTUP_TIMEOUT};
+use crate::{utils::GracefulShutdown, NodeError, NODE_STARTUP_TIMEOUT};
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
@@ -124,44 +124,28 @@ impl AnvilInstance {
 
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
-        #[cfg(unix)]
-        {
-            // anvil has settings for dumping thing the state,cache on SIGTERM, so we try to kill it
-            // with sigterm
-            if let Ok(out) =
-                Command::new("kill").arg("-SIGTERM").arg(self.child.id().to_string()).output()
-            {
-                if out.status.success() {
-                    return;
-                }
-            }
-        }
-        if let Err(err) = self.child.kill() {
-            eprintln!("alloy-node-bindings: failed to kill anvil process: {}", err);
-        }
+        GracefulShutdown::shutdown(&mut self.child, 10, "anvil");
     }
 }
 
 /// Builder for launching `anvil`.
 ///
-/// # Panics
-///
-/// If `spawn` is called without `anvil` being available in the user's $PATH
+/// [`Anvil::spawn`] panics on any startup failure; use [`Anvil::try_spawn`] to handle errors.
 ///
 /// # Example
 ///
 /// ```no_run
 /// use alloy_node_bindings::Anvil;
 ///
-/// let port = 8545u16;
-/// let url = format!("http://localhost:{}", port).to_string();
-///
+/// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
 /// let anvil = Anvil::new()
-///     .port(port)
 ///     .mnemonic("abstract vacuum mammal awkward pudding scene penalty purchase dinner depart evoke puzzle")
-///     .spawn();
+///     .try_spawn()?;
+/// println!("Anvil is listening at {}", anvil.endpoint());
 ///
 /// drop(anvil); // this will kill the instance
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug, Default)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
@@ -184,8 +168,10 @@ pub struct Anvil {
 }
 
 impl Anvil {
-    /// Creates an empty Anvil builder.
-    /// The default port and the mnemonic are chosen randomly.
+    /// Creates an Anvil builder.
+    ///
+    /// Unless configured, port zero is passed so the OS chooses an available port, while account
+    /// and mnemonic defaults are left to Anvil.
     ///
     /// # Example
     ///
@@ -205,12 +191,15 @@ impl Anvil {
     ///
     /// # Example
     ///
-    /// ```
-    /// # use alloy_node_bindings::Anvil;
-    /// fn a() {
-    ///  let anvil = Anvil::at("~/.foundry/bin/anvil").spawn();
+    /// Paths are passed directly to [`Command`], so shell expansions such as `~` are not performed.
     ///
-    ///  println!("Anvil running at `{}`", anvil.endpoint());
+    /// ```no_run
+    /// # use alloy_node_bindings::Anvil;
+    /// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
+    /// let anvil = Anvil::at("/path/to/anvil").try_spawn()?;
+    ///
+    /// println!("Anvil running at `{}`", anvil.endpoint());
+    /// # Ok(())
     /// # }
     /// ```
     pub fn at(path: impl Into<PathBuf>) -> Self {
@@ -233,6 +222,9 @@ impl Anvil {
     }
 
     /// Sets the port which will be used when the `anvil` instance is launched.
+    ///
+    /// Port zero asks the OS to choose an available port. Read [`AnvilInstance::port`] or
+    /// [`AnvilInstance::endpoint`] after spawning to obtain the selected value.
     pub fn port<T: Into<u16>>(mut self, port: T) -> Self {
         self.port = Some(port.into());
         self
@@ -289,45 +281,38 @@ impl Anvil {
     }
 
     /// Select the [`EthereumHardfork`] to start anvil with.
-    pub fn hardfork(mut self, hardfork: EthereumHardfork) -> Self {
-        self = self.args(["--hardfork", hardfork.to_string().as_str()]);
-        self
+    pub fn hardfork(self, hardfork: EthereumHardfork) -> Self {
+        self.args(["--hardfork", hardfork.to_string().as_str()])
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Paris`].
-    pub fn paris(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Paris);
-        self
+    pub fn paris(self) -> Self {
+        self.hardfork(EthereumHardfork::Paris)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Cancun`].
-    pub fn cancun(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Cancun);
-        self
+    pub fn cancun(self) -> Self {
+        self.hardfork(EthereumHardfork::Cancun)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Shanghai`].
-    pub fn shanghai(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Shanghai);
-        self
+    pub fn shanghai(self) -> Self {
+        self.hardfork(EthereumHardfork::Shanghai)
     }
 
     /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Prague`].
-    pub fn prague(mut self) -> Self {
-        self = self.hardfork(EthereumHardfork::Prague);
-        self
+    pub fn prague(self) -> Self {
+        self.hardfork(EthereumHardfork::Prague)
     }
 
     /// Instantiate `anvil` with the `--odyssey` flag.
-    pub fn odyssey(mut self) -> Self {
-        self = self.arg("--odyssey");
-        self
+    pub fn odyssey(self) -> Self {
+        self.arg("--odyssey")
     }
 
     /// Instantiate `anvil` with the `--auto-impersonate` flag.
-    pub fn auto_impersonate(mut self) -> Self {
-        self = self.arg("--auto-impersonate");
-        self
+    pub fn auto_impersonate(self) -> Self {
+        self.arg("--auto-impersonate")
     }
 
     /// Adds an argument to pass to the `anvil`.
@@ -412,7 +397,11 @@ impl Anvil {
         self.try_spawn().unwrap()
     }
 
-    /// Consumes the builder and spawns `anvil`. If spawning fails, returns an error.
+    /// Consumes the builder, spawns `anvil`, and waits for it to report its listening address.
+    ///
+    /// Returns an error if the process cannot be started or does not become ready before the
+    /// configured [`Self::timeout`] is observed. The deadline is checked between complete stdout
+    /// lines; a live process that emits no newline can block this call past the deadline.
     pub fn try_spawn(self) -> Result<AnvilInstance, NodeError> {
         let mut cmd = self.program.as_ref().map_or_else(|| Command::new("anvil"), Command::new);
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
@@ -478,7 +467,13 @@ impl Anvil {
             }
 
             let mut line = String::new();
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+                let _ = child.kill();
+                let status = child.wait().map_err(NodeError::WaitError)?;
+                return Err(NodeError::Fatal(format!(
+                    "anvil exited before it was ready ({status})"
+                )));
+            }
             trace!(target: "alloy::node::anvil", line);
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
@@ -555,11 +550,6 @@ mod test {
     }
 
     #[test]
-    fn spawn_and_drop() {
-        let _ = Anvil::new().block_time(12).try_spawn().map(drop);
-    }
-
-    #[test]
     fn can_set_host() {
         let anvil = Anvil::new().host("0.0.0.0").block_time(12).try_spawn();
         if let Ok(anvil) = anvil {
@@ -577,5 +567,22 @@ mod test {
             assert!(anvil.endpoint().starts_with("http://localhost:"));
             assert!(anvil.ws_endpoint().starts_with("ws://localhost:"));
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod early_exit_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn early_exit_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("anvil");
+        std::fs::write(&program, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let err = Anvil::at(&program).try_spawn().unwrap_err();
+        assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
     }
 }

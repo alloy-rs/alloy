@@ -1,13 +1,13 @@
 use crate::{
-    any::AnyNetwork, BuildResult, Network, NetworkWallet, TransactionBuilder,
-    TransactionBuilderError,
+    any::AnyNetwork, BuildResult, Network, NetworkTransactionBuilder, NetworkWallet,
+    TransactionBuilder, TransactionBuilderError,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionInputKind, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use std::ops::{Deref, DerefMut};
 
-impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
+impl TransactionBuilder for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<ChainId> {
         self.deref().chain_id()
     }
@@ -25,7 +25,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     }
 
     fn take_nonce(&mut self) -> Option<u64> {
-        self.deref_mut().nonce.take()
+        self.deref_mut().take_nonce()
     }
 
     fn input(&self) -> Option<&Bytes> {
@@ -100,26 +100,26 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_gas_limit(gas_limit);
     }
 
-    /// Get the EIP-2930 access list for the transaction.
     fn access_list(&self) -> Option<&AccessList> {
         self.deref().access_list()
     }
 
-    /// Sets the EIP-2930 access list.
     fn set_access_list(&mut self, access_list: AccessList) {
         self.deref_mut().set_access_list(access_list)
     }
+}
 
-    fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
-        self.deref().complete_type(ty.try_into().map_err(|_| vec!["unsupported_transaction_type"])?)
-    }
-
+impl NetworkTransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn can_submit(&self) -> bool {
         self.deref().can_submit()
     }
 
     fn can_build(&self) -> bool {
         self.deref().can_build()
+    }
+
+    fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
+        self.deref().complete_type(ty.try_into().map_err(|_| vec!["unsupported_transaction_type"])?)
     }
 
     #[doc(alias = "output_transaction_type")]
