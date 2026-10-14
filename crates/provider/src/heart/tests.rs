@@ -7,7 +7,20 @@ use alloy_rpc_types_eth::Block;
 async fn confirmed_receipt_retries_are_bounded() {
     for (missing, succeeds) in [(0, true), (1, true), (3, true), (4, false)] {
         let asserter = alloy_transport::mock::Asserter::new();
-        let receipt = alloy_rpc_types_eth::TransactionReceipt::default();
+        let receipt = alloy_rpc_types_eth::TransactionReceipt {
+            inner: alloy_consensus::ReceiptEnvelope::Legacy(Default::default()),
+            transaction_hash: B256::ZERO,
+            transaction_index: Some(0),
+            block_hash: Some(B256::ZERO),
+            block_number: Some(1),
+            gas_used: 0,
+            effective_gas_price: 0,
+            blob_gas_used: None,
+            blob_gas_price: None,
+            from: alloy_primitives::Address::ZERO,
+            to: None,
+            contract_address: None,
+        };
         // Registration sees an included receipt and confirms immediately.
         asserter.push_success(&Some(&receipt));
         for _ in 0..missing {
