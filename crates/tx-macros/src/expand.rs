@@ -564,7 +564,9 @@ impl Expander {
         let fallback_decode_arms = self.variants.all.iter().map(|v| {
             let name = &v.name;
             quote! {
-                if let Ok(tx) = #alloy_eips::Decodable2718::fallback_decode(buf) {
+                let mut candidate = *buf;
+                if let Ok(tx) = #alloy_eips::Decodable2718::fallback_decode(&mut candidate) {
+                    *buf = candidate;
                     return Ok(Self::#name(tx))
                 }
             }

@@ -5,7 +5,7 @@ use alloy_consensus::Blob;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
-use alloy_transport::{TransportError, TransportResult};
+use alloy_transport::TransportResult;
 use futures::try_join;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
@@ -97,6 +97,15 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Create a buffer that represents all state on the chain, which can be loaded to separate
     /// process by calling `anvil_loadState`
     async fn anvil_dump_state(&self) -> TransportResult<Bytes>;
+
+    /// Like [`anvil_dump_state`](Self::anvil_dump_state) but also includes historical states of
+    /// accounts and storage at particular block hashes, allowing a reloaded node to serve RPC
+    /// calls for blocks prior to the one at which state was dumped.
+    ///
+    /// Equivalent to running anvil with `--preserve-historical-states` at startup.
+    ///
+    /// The returned buffer can be passed to [`anvil_load_state`](Self::anvil_load_state).
+    async fn anvil_dump_state_with_history(&self) -> TransportResult<Bytes>;
 
     /// Append chain state buffer to current chain. Will overwrite any conflicting addresses or
     /// storage.
@@ -309,6 +318,10 @@ where
         self.client().request_noparams("anvil_dumpState").await
     }
 
+    async fn anvil_dump_state_with_history(&self) -> TransportResult<Bytes> {
+        self.client().request("anvil_dumpState", (true,)).await
+    }
+
     async fn anvil_load_state(&self, buf: Bytes) -> TransportResult<bool> {
         self.client().request("anvil_loadState", (buf,)).await
     }
@@ -441,9 +454,9 @@ where
         config: ImpersonateConfig,
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         let from = request.from().ok_or_else(|| {
-            TransportError::from(alloy_transport::TransportErrorKind::Custom(
-                "TransactionRequest must have a `from` address set.".to_string().into(),
-            ))
+            alloy_transport::TransportErrorKind::custom_str(
+                "TransactionRequest must have a `from` address set.",
+            )
         })?;
 
         let impersonate_future = self.anvil_impersonate_account(from);
@@ -899,6 +912,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_anvil_dump_state_with_history() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let state = provider.anvil_dump_state_with_history().await.unwrap();
+
+        assert!(!state.is_empty());
+
+        let res = provider.anvil_load_state(state).await.unwrap();
+
+        assert!(res);
+    }
+
+    #[tokio::test]
     async fn test_anvil_node_info() {
         let provider = ProviderBuilder::new().connect_anvil();
 
@@ -1204,7 +1230,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_anvil_rollback() {
         let provider = ProviderBuilder::new().connect_anvil();
 

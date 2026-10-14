@@ -30,8 +30,20 @@ use tokio::time::{sleep, Sleep};
 /// channel size of 16, and no limit on the number of successful polls. This is all configurable.
 ///
 /// The builder is consumed using the [`spawn`](Self::spawn) method, which returns a channel to
-/// receive the responses. The task will continue to poll until either the client or the channel is
-/// dropped.
+/// receive the responses. A spawned task normally stops when it observes that the client or every
+/// receiving channel has been dropped, or when another configured terminal condition is reached.
+///
+/// The configured interval is a delay after each request finishes, not a
+/// fixed-rate schedule. The limit counts successful responses. Request,
+/// response, and transport errors are logged rather than yielded, then retried
+/// after the interval unless a configured terminal error is received. With no
+/// configured terminal codes, a JSON-RPC error response whose message contains
+/// `filter not found` also terminates the poller.
+///
+/// Pollers hold a [`WeakClient`] between attempts. Each in-flight request temporarily upgrades it
+/// and keeps the client alive until that request completes. Receiver closure is observed when a
+/// successful response is sent, so repeated failures or a request that never completes can delay
+/// task shutdown after all channels are dropped.
 ///
 /// The channel can be converted into a stream using the [`into_stream`](PollChannel::into_stream)
 /// method.
@@ -137,6 +149,8 @@ where
     }
 
     /// Sets the error codes this poller will terminate on.
+    ///
+    /// A non-empty set replaces the default `filter not found` message check.
     pub fn set_terminal_error_codes<I>(&mut self, error_codes: I)
     where
         I: IntoIterator<Item = i64>,
@@ -145,6 +159,8 @@ where
     }
 
     /// Sets the error codes this poller will terminate on.
+    ///
+    /// A non-empty set replaces the default `filter not found` message check.
     pub fn with_terminal_error_codes<I>(mut self, error_codes: I) -> Self
     where
         I: IntoIterator<Item = i64>,
@@ -229,7 +245,9 @@ enum PollState<Resp> {
 
 /// A stream of responses from polling an RPC method.
 ///
-/// This stream polls the given RPC method at the specified interval and yields the responses.
+/// This stream polls the given RPC method and yields successful responses. It
+/// waits for the configured interval after each attempt completes; errors are
+/// logged and not yielded.
 ///
 /// # Examples
 ///
@@ -452,13 +470,10 @@ where
 
 /// A channel yielding responses from a poller task.
 ///
-/// This stream is backed by a coroutine, and will continue to produce responses
-/// until the poller task is dropped. The poller task is dropped when all
-/// [`RpcClient`] instances are dropped, or when all listening `PollChannel` are
-/// dropped.
-///
-/// The poller task also ignores errors from the server and deserialization
-/// errors, and will continue to poll until the client is dropped.
+/// The background task stops when it observes that the client or all listening `PollChannel`s have
+/// been dropped, the success limit is reached, or a terminal error is received. Channel closure is
+/// checked while forwarding a successful response; repeated failures or a request that never
+/// completes can delay shutdown. Other errors are logged and retried after the configured interval.
 ///
 /// [`RpcClient`]: crate::RpcClient
 #[derive(Debug)]
@@ -495,7 +510,10 @@ where
         Self { rx: self.rx.resubscribe() }
     }
 
-    /// Converts the poll channel into a stream.
+    /// Converts the poll channel into a stream, skipping broadcast lag errors.
+    ///
+    /// Use [`Self::into_stream_raw`] to observe when a slow receiver loses
+    /// responses.
     pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
         self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok()))
     }

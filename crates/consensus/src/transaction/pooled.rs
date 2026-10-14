@@ -3,11 +3,15 @@
 
 use super::EthereumTxEnvelope;
 use crate::{error::ValueError, Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
-use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, Encodable7594};
+use alloy_eips::eip7594::{
+    BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, Encodable7594,
+};
 
-/// All possible transactions that can be included in a response to `GetPooledTransactions`.
-/// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
-/// non-4844 signed transaction.
+/// Pooled transaction format for Osaka and later.
+///
+/// This can contain an [EIP-7594] blob transaction with its cell-proof sidecar or any non-blob
+/// signed Ethereum transaction. For cross-fork [EIP-4844]/[EIP-7594] handling, use
+/// `EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>>` instead.
 ///
 /// The difference between this and the [`EthereumTxEnvelope<TxEip4844Variant<T>>`] is that this
 /// type always requires the [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only
@@ -16,8 +20,39 @@ use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, Encodable7594};
 /// After the Osaka upgrade (EIP-7594), the blob sidecar uses
 /// [`BlobTransactionSidecarEip7594`] which replaces single KZG proofs with cell proofs
 /// for PeerDAS data availability sampling.
+///
+/// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
+/// [EIP-7594]: https://eips.ethereum.org/EIPS/eip-7594
 pub type PooledTransaction =
     EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>>;
+
+impl EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarEip7594>> {
+    /// Clears EIP-7594 blob payloads while retaining commitments and cell proofs.
+    ///
+    /// This prepares the transaction for inclusion in an eth/72 `PooledTransactions` response as
+    /// specified by [EIP-8070]. This has no effect on non-blob transactions.
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    pub fn clear_eip7594_blobs(&mut self) {
+        if let Self::Eip4844(tx) = self {
+            tx.tx_mut().sidecar.clear_eip7594_blobs();
+        }
+    }
+}
+
+impl EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>> {
+    /// Clears EIP-7594 blob payloads while retaining commitments and cell proofs.
+    ///
+    /// This prepares the transaction for inclusion in an eth/72 `PooledTransactions` response as
+    /// specified by [EIP-8070]. This has no effect on non-blob transactions or EIP-4844 sidecars.
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    pub fn clear_eip7594_blobs(&mut self) {
+        if let Self::Eip4844(tx) = self {
+            tx.tx_mut().sidecar.clear_eip7594_blobs();
+        }
+    }
+}
 
 impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844WithSidecar<T>> {
     /// Converts the transaction into [`EthereumTxEnvelope<TxEip4844Variant<T>>`].
@@ -83,10 +118,55 @@ impl<T: Encodable7594> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>>
 mod tests {
     use super::*;
     use crate::Transaction;
-    use alloy_eips::{Decodable2718, Encodable2718};
-    use alloy_primitives::{address, hex, Bytes};
+    use alloy_eips::{
+        eip4844::{Blob, Bytes48},
+        eip7594::CELLS_PER_EXT_BLOB,
+        Decodable2718, Encodable2718,
+    };
+    use alloy_primitives::{address, hex, Bytes, Signature, U256};
     use alloy_rlp::Decodable;
     use std::path::PathBuf;
+
+    fn eip7594_sidecar() -> BlobTransactionSidecarEip7594 {
+        BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0x01)],
+            vec![Bytes48::repeat_byte(0x02)],
+            vec![Bytes48::repeat_byte(0x03); CELLS_PER_EXT_BLOB],
+        )
+    }
+
+    fn signature() -> Signature {
+        Signature::new(U256::from(1), U256::from(2), false)
+    }
+
+    #[test]
+    fn clear_eip7594_blobs_from_pooled_envelopes() {
+        let sidecar = eip7594_sidecar();
+        let commitments = sidecar.commitments.clone();
+        let cell_proofs = sidecar.cell_proofs.clone();
+        let tx = TxEip4844WithSidecar::from_tx_and_sidecar(TxEip4844::default(), sidecar);
+        let mut pooled: PooledTransaction = Signed::new_unhashed(tx, signature()).into();
+
+        pooled.clear_eip7594_blobs();
+
+        let sidecar = &pooled.as_eip4844().unwrap().tx().sidecar;
+        assert!(sidecar.blobs.is_empty());
+        assert_eq!(sidecar.commitments, commitments);
+        assert_eq!(sidecar.cell_proofs, cell_proofs);
+
+        let tx = TxEip4844WithSidecar::from_tx_and_sidecar(
+            TxEip4844::default(),
+            BlobTransactionSidecarVariant::Eip7594(eip7594_sidecar()),
+        );
+        let mut pooled = EthereumTxEnvelope::Eip4844(Signed::new_unhashed(tx, signature()));
+
+        pooled.clear_eip7594_blobs();
+
+        let sidecar = pooled.as_eip4844().unwrap().tx().sidecar.as_eip7594().unwrap();
+        assert!(sidecar.blobs.is_empty());
+        assert_eq!(sidecar.commitments, commitments);
+        assert_eq!(sidecar.cell_proofs, cell_proofs);
+    }
 
     #[test]
     fn invalid_legacy_pooled_decoding_input_too_short() {

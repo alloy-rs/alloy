@@ -17,8 +17,12 @@ pub mod utils;
 pub use alloy_primitives::Signature;
 pub use k256;
 
-/// Utility to get and set the chain ID on a transaction and the resulting signature within a
-/// signer's `sign_transaction`.
+/// Implements chain-ID validation for a signer's `sign_transaction` method.
+///
+/// When the signer has a chain ID, this fills an unset transaction chain ID or returns
+/// [`Error::TransactionChainIdMismatch`] before the signing expression is evaluated. A signer
+/// without a chain ID leaves the transaction unchanged. Errors from the signing expression are
+/// wrapped with [`Error::other`].
 #[macro_export]
 macro_rules! sign_transaction_with_chain_id {
     // async (

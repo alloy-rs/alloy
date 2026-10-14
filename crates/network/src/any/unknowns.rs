@@ -1,6 +1,7 @@
 use core::fmt;
 use std::sync::OnceLock;
 
+use super::delegate_transaction;
 use alloy_consensus::{TxType, Typed2718};
 use alloy_eips::{eip2718::Eip2718Error, eip7702::SignedAuthorization};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U128, U256, U64, U8};
@@ -93,7 +94,9 @@ pub struct DeserMemo {
 }
 
 /// A typed transaction of an unknown Network
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+///
+/// Equality compares the transaction type and fields, ignoring the deserialization cache.
+#[derive(Debug, Clone, Eq, serde::Serialize, serde::Deserialize)]
 #[doc(alias = "UnknownTypedTx")]
 pub struct UnknownTypedTransaction {
     #[serde(rename = "type")]
@@ -107,6 +110,12 @@ pub struct UnknownTypedTransaction {
     /// Memoization for deserialization.
     #[serde(skip, default)]
     pub memo: DeserMemo,
+}
+
+impl PartialEq for UnknownTypedTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty && self.fields == other.fields
+    }
 }
 
 impl alloy_consensus::Transaction for UnknownTypedTransaction {
@@ -179,23 +188,16 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn is_dynamic_fee(&self) -> bool {
-        self.fields.get_deserialized::<U128>("maxFeePerGas").is_some()
-            || self.fields.get_deserialized::<U128>("maxFeePerBlobGas").is_some()
+        self.fields.contains_key("maxFeePerGas") || self.fields.contains_key("maxFeePerBlobGas")
     }
 
     #[inline]
     fn kind(&self) -> TxKind {
         self.fields
             .get("to")
-            .or(Some(&serde_json::Value::Null))
-            .and_then(|v| {
-                if v.is_null() {
-                    Some(TxKind::Create)
-                } else {
-                    v.as_str().and_then(|v| v.parse::<Address>().ok().map(Into::into))
-                }
-            })
-            .unwrap_or_default()
+            .and_then(|v| v.as_str())
+            .and_then(|v| v.parse::<Address>().ok())
+            .map_or(TxKind::Create, TxKind::Call)
     }
 
     #[inline]
@@ -286,89 +288,7 @@ impl AsRef<UnknownTypedTransaction> for UnknownTxEnvelope {
 }
 
 impl alloy_consensus::Transaction for UnknownTxEnvelope {
-    #[inline]
-    fn chain_id(&self) -> Option<ChainId> {
-        self.inner.chain_id()
-    }
-
-    #[inline]
-    fn nonce(&self) -> u64 {
-        self.inner.nonce()
-    }
-
-    #[inline]
-    fn gas_limit(&self) -> u64 {
-        self.inner.gas_limit()
-    }
-
-    #[inline]
-    fn gas_price(&self) -> Option<u128> {
-        self.inner.gas_price()
-    }
-
-    #[inline]
-    fn max_fee_per_gas(&self) -> u128 {
-        self.inner.max_fee_per_gas()
-    }
-
-    #[inline]
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.inner.max_priority_fee_per_gas()
-    }
-
-    #[inline]
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.inner.max_fee_per_blob_gas()
-    }
-
-    #[inline]
-    fn priority_fee_or_price(&self) -> u128 {
-        self.inner.priority_fee_or_price()
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        self.inner.effective_gas_price(base_fee)
-    }
-
-    #[inline]
-    fn is_dynamic_fee(&self) -> bool {
-        self.inner.is_dynamic_fee()
-    }
-
-    #[inline]
-    fn kind(&self) -> TxKind {
-        self.inner.kind()
-    }
-
-    #[inline]
-    fn is_create(&self) -> bool {
-        self.inner.is_create()
-    }
-
-    #[inline]
-    fn value(&self) -> U256 {
-        self.inner.value()
-    }
-
-    #[inline]
-    fn input(&self) -> &Bytes {
-        self.inner.input()
-    }
-
-    #[inline]
-    fn access_list(&self) -> Option<&AccessList> {
-        self.inner.access_list()
-    }
-
-    #[inline]
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        self.inner.blob_versioned_hashes()
-    }
-
-    #[inline]
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.inner.authorization_list()
-    }
+    delegate_transaction!(self => &self.inner);
 }
 
 #[cfg(test)]
@@ -378,6 +298,56 @@ mod tests {
     use crate::{AnyRpcTransaction, AnyTxEnvelope};
 
     use super::*;
+
+    #[test]
+    fn equality_ignores_deserialization_cache() {
+        let tx: UnknownTypedTransaction = serde_json::from_value(serde_json::json!({
+            "type": "0x7e",
+            "input": "0x1234",
+            "accessList": [],
+            "blobVersionedHashes": [],
+            "authorizationList": [],
+        }))
+        .unwrap();
+        let cold = tx.clone();
+
+        assert_eq!(tx.input().as_ref(), &[0x12, 0x34]);
+        assert_eq!(tx, cold);
+        assert!(tx.access_list().is_some());
+        assert_eq!(tx, cold);
+        assert!(tx.blob_versioned_hashes().is_some());
+        assert_eq!(tx, cold);
+        assert!(tx.authorization_list().is_some());
+        assert_eq!(tx, cold);
+
+        let decoded: UnknownTypedTransaction =
+            serde_json::from_str(&serde_json::to_string(&tx).unwrap()).unwrap();
+        assert_eq!(tx, decoded);
+        assert_eq!(
+            crate::AnyTypedTransaction::Unknown(tx.clone()),
+            crate::AnyTypedTransaction::Unknown(cold.clone()),
+        );
+        assert_eq!(
+            AnyTxEnvelope::Unknown(UnknownTxEnvelope { hash: B256::ZERO, inner: tx }),
+            AnyTxEnvelope::Unknown(UnknownTxEnvelope { hash: B256::ZERO, inner: cold }),
+        );
+    }
+
+    #[test]
+    fn equality_compares_type_and_fields() {
+        let tx = UnknownTypedTransaction {
+            ty: AnyTxType(0x7e),
+            fields: Default::default(),
+            memo: Default::default(),
+        };
+        let mut different_type = tx.clone();
+        different_type.ty = AnyTxType(0x7f);
+        assert_ne!(tx, different_type);
+
+        let mut different_fields = tx.clone();
+        different_fields.fields.insert("nonce".into(), serde_json::json!("0x1"));
+        assert_ne!(tx, different_fields);
+    }
 
     #[test]
     fn test_serde_anytype() {

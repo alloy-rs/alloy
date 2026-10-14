@@ -1,8 +1,13 @@
 //! Serde functions for encoding primitive numbers using the Ethereum JSON-RPC "quantity" format.
 //!
-//! This is defined as a "hex encoded unsigned integer", with a special case of 0 being `0x0`.
+//! Serializers emit a "hex encoded unsigned integer", with the special case of zero being `0x0`.
+//! Deserializers also accept decimal strings for compatibility with existing RPC payloads.
 //!
 //! A regex for this format is: `^0x([1-9a-f]+[0-9a-f]*|0)$`.
+//!
+//! The helpers support [`bool`], `u8` through `u128`, and their [`core::num::NonZeroU8`] through
+//! [`core::num::NonZeroU128`] counterparts. Booleans are encoded as the quantities `0x0` and
+//! `0x1`.
 //!
 //! This is only valid for human-readable [`serde`] implementations.
 //! For non-human-readable implementations, the format is unspecified.
@@ -75,7 +80,7 @@ pub mod vec {
         Deserializer, Serializer,
     };
 
-    /// Serializes a vector of primitive numbers as a "quantity" hex string.
+    /// Serializes each primitive number in a vector as a "quantity" hex string.
     pub fn serialize<T, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
     where
         T: ConvertRuint,
@@ -88,7 +93,7 @@ pub mod vec {
         seq.end()
     }
 
-    /// Deserializes a vector of primitive numbers from a "quantity" hex string.
+    /// Deserializes a vector of primitive numbers from "quantity" hex strings.
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
     where
         T: ConvertRuint,
@@ -140,14 +145,9 @@ pub mod u128_vec_vec_opt {
     where
         D: Deserializer<'de>,
     {
-        Option::<Vec<Vec<U128>>>::deserialize(deserializer)?.map_or_else(
-            || Ok(None),
-            |vec| {
-                Ok(Some(
-                    vec.into_iter().map(|v| v.into_iter().map(|val| val.to()).collect()).collect(),
-                ))
-            },
-        )
+        Ok(Option::<Vec<Vec<U128>>>::deserialize(deserializer)?.map(|vec| {
+            vec.into_iter().map(|v| v.into_iter().map(|val| val.to()).collect()).collect()
+        }))
     }
 
     /// Serializes u128 as hex string
@@ -182,7 +182,7 @@ pub mod hashmap {
         Deserialize, Deserializer, Serialize, Serializer,
     };
 
-    /// Serializes a `HashMap` of primitive numbers as a "quantity" hex string.
+    /// Serializes each primitive-number key in a `HashMap` as a "quantity" hex string.
     pub fn serialize<K, V, S, H>(map: &HashMap<K, V, H>, serializer: S) -> Result<S::Ok, S::Error>
     where
         K: ConvertRuint,
@@ -197,7 +197,7 @@ pub mod hashmap {
         map_ser.end()
     }
 
-    /// Deserializes a `HashMap` of primitive numbers from a "quantity" hex string.
+    /// Deserializes a `HashMap` whose primitive-number keys are "quantity" hex strings.
     pub fn deserialize<'de, K, V, D, H>(deserializer: D) -> Result<HashMap<K, V, H>, D::Error>
     where
         K: ConvertRuint + Eq + core::hash::Hash,
