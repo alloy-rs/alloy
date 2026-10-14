@@ -31,6 +31,8 @@ alloy-signer.workspace = true
 async-trait.workspace = true
 aws-config = { version = "1", default-features = false }
 aws-sdk-kms = { version = "1", default-features = false }
+# Keep aws-smithy-json 0.63 compatible with the Document representation.
+aws-smithy-types = "=1.6.1"
 k256.workspace = true
 spki = { workspace = true, features = ["std"] }
 thiserror.workspace = true

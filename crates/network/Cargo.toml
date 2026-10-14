@@ -46,4 +46,9 @@ thiserror.workspace = true
 [dev-dependencies]
 
 [features]
-k256 = ["alloy-primitives/k256", "alloy-consensus/k256"]
+k256 = [
+    "alloy-primitives/k256",
+    "alloy-consensus/k256",
+    "alloy-eips/k256",
+    "alloy-rpc-types-eth/k256",
+]

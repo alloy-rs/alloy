@@ -5,12 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.5](https://github.com/alloy-rs/alloy/releases/tag/v2.0.5) - 2026-05-18
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
 
 ### Bug Fixes
 
+- [provider] Revert five recent RPC compatibility changes ([#4225](https://github.com/alloy-rs/alloy/issues/4225))
+- [provider] Accept nullable raw debug results ([#4223](https://github.com/alloy-rs/alloy/issues/4223))
+- [provider] Handle nullable trace collection results ([#4219](https://github.com/alloy-rs/alloy/issues/4219))
+- [provider] Preserve individual replay transaction hashes
+- [provider] Accept nullable uncle counts
+- [provider] Accept tree paths in trace_get
+- [trace] Decode regularGasUsed and explain gas ([#4195](https://github.com/alloy-rs/alloy/issues/4195))
+- [provider] Call eth_getBlockAccessList ([#4208](https://github.com/alloy-rs/alloy/issues/4208))
+
+### Testing
+
+- Allow slow Geth startup in Windows integration tests ([#4213](https://github.com/alloy-rs/alloy/issues/4213))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Features
+
+- [provider] Add CCIP Read (ERC-3668) support ([#4184](https://github.com/alloy-rs/alloy/issues/4184))
+- [provider] Expose request metadata and header helpers ([#4144](https://github.com/alloy-rs/alloy/issues/4144))
+- [provider] Add bogota engine api methods ([#4142](https://github.com/alloy-rs/alloy/issues/4142))
+
+### Other
+
+- Add block_opt method for optional block setting ([#4187](https://github.com/alloy-rs/alloy/issues/4187))
+
+### Styling
+
+- Fmt ([#4177](https://github.com/alloy-rs/alloy/issues/4177))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Bug Fixes
+
+- [provider] Skip cache for requireCanonical block hash queries ([#4075](https://github.com/alloy-rs/alloy/issues/4075))
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Features
+
+- [contract] Add call timeout futures ([#4119](https://github.com/alloy-rs/alloy/issues/4119))
+- [provider] Add trace chain subscription ([#4116](https://github.com/alloy-rs/alloy/issues/4116))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Bug Fixes
+
+- [provider] Preserve pending block miner ([#4094](https://github.com/alloy-rs/alloy/issues/4094))
+
+### Documentation
+
+- Clarify block ID check comment in should_batch_call ([#4037](https://github.com/alloy-rs/alloy/issues/4037))
+
+### Features
+
+- [provider-ext-mev] Add sim_mev_bundle call ([#4108](https://github.com/alloy-rs/alloy/issues/4108))
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+
+## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
+
+### Bug Fixes
+
+- Address Rust 1.97 clippy lints ([#4074](https://github.com/alloy-rs/alloy/issues/4074))
 - [provider] Clean up failed impersonated sends ([#3944](https://github.com/alloy-rs/alloy/issues/3944))
 - [ci] Stabilize main red tests ([#3942](https://github.com/alloy-rs/alloy/issues/3942))
+
+### Dependencies
+
+- [deps] Bump the ci-weekly group with 3 updates ([#4078](https://github.com/alloy-rs/alloy/issues/4078))
+
+### Features
+
+- [engine] Add testing build block params helper ([#4047](https://github.com/alloy-rs/alloy/issues/4047))
+- Provider::watch_canonical_logs_from ([#4022](https://github.com/alloy-rs/alloy/issues/4022))
+- [provider] Add anvil_dump_state_with_history to AnvilApi ([#4025](https://github.com/alloy-rs/alloy/issues/4025))
+- `Provider::watch_blocks_from` and `Provider::watch_canonical_blocks_from` ([#3722](https://github.com/alloy-rs/alloy/issues/3722))
+
+### Miscellaneous Tasks
+
+- Release 2.2.0
+- Release 2.2.0
+- Release 2.1.1
+- Expand zepter feature checks ([#4063](https://github.com/alloy-rs/alloy/issues/4063))
+- Release 2.1.0
+- Release 2.0.5
+
+### Other
+
+- Avoid caching pending tx snapshots by hash ([#4001](https://github.com/alloy-rs/alloy/issues/4001))
 
 ## [2.0.4](https://github.com/alloy-rs/alloy/releases/tag/v2.0.4) - 2026-04-29
 

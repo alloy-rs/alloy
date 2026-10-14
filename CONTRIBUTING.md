@@ -61,10 +61,10 @@ PR that helps others avoid the problems that you encountered.
 ### Submitting a Bug Report
 
 When opening a new issue in the Alloy issue tracker, users will be presented
-with a [basic template][template] that should be filled in. If you believe that
-you have uncovered a bug, please fill out this form, following the template to
-the best of your ability. Do not worry if you cannot answer every detail, just
-fill in what you can.
+with a [bug report form][bug-template] that should be filled in. If you believe
+that you have uncovered a bug, please fill out this form, following the template
+to the best of your ability. Do not worry if you cannot answer every detail,
+just fill in what you can.
 
 The two most important pieces of information we need in order to properly
 evaluate the report is a description of the behavior you are seeing and a simple
@@ -77,7 +77,7 @@ cases should be limited, as much as possible, to using only Alloy APIs.
 See [How to create a Minimal, Complete, and Verifiable example][mcve].
 
 [mcve]: https://stackoverflow.com/help/mcve
-[template]: .github/PULL_REQUEST_TEMPLATE.md
+[bug-template]: .github/ISSUE_TEMPLATE/BUG-FORM.yml
 
 ### Triaging a Bug Report
 
@@ -140,6 +140,16 @@ cargo +nightly clippy --all-features
 ```
 
 > You need to have [geth](https://geth.ethereum.org/downloads) and [Anvil](https://book.getfoundry.sh/getting-started/installation) to be able to run the tests
+
+### Dependency updates
+
+The workspace `Cargo.lock` is committed, and CI builds, tests, and dependency checks
+use `--locked`. When intentionally updating dependencies, use
+`cargo update -p <package>` (optionally with `--precise <version>`) and include the
+lockfile diff in the PR. Verify that the selected versions pass the package policy and the CI
+toolchain/feature matrix. A lockfile does not exempt dependencies from security checks.
+Dependabot opens a single grouped Cargo lockfile and GitHub Actions update each week when
+updates have passed the configured cooldown.
 
 ### Tests
 

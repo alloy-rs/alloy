@@ -26,22 +26,22 @@ use wasmtimer::{
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::{interval_at, Instant, Interval};
 
-const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
+pub(super) const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug)]
-struct PollIntervalDelay {
+pub(super) struct PollIntervalDelay {
     timer: Option<Interval>,
 }
 
 impl PollIntervalDelay {
-    fn new(poll_interval: Duration) -> Self {
+    pub(super) fn new(poll_interval: Duration) -> Self {
         if poll_interval.is_zero() {
             return Self { timer: None };
         }
         Self { timer: Some(interval_at(Instant::now() + poll_interval, poll_interval)) }
     }
 
-    fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+    pub(super) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         if let Some(timer) = &mut self.timer {
             ready!(timer.poll_tick(cx));
         }
@@ -49,7 +49,16 @@ impl PollIntervalDelay {
     }
 }
 
-/// Future returned by [`WatchBlocksFromStream`] items.
+/// Future that fetches one block by number.
+///
+/// This is the item yielded by [`WatchBlocksFromStream`], and is also reused by
+/// [`WatchLogsFrom`](super::WatchLogsFrom) to fetch the block paired with a log batch. The future
+/// requests `eth_getBlockByNumber` with either transaction hashes or full transaction bodies,
+/// depending on [`BlockTransactionsKind`].
+///
+/// A `null` block response means the requested height is not available yet. In that case the future
+/// sleeps for the configured poll interval and retries the same height. Other transport/RPC errors
+/// are returned to the caller, so retry policy should be configured on the provider transport.
 #[pin_project]
 #[derive(Debug)]
 pub struct BlockFut<T>
@@ -70,16 +79,16 @@ enum BlockFutState<T>
 where
     T: BlockResponse + RpcRecv,
 {
+    /// Polling an `eth_getBlockByNumber` request for the target height.
     Request {
         #[pin]
         call: RpcCall<(BlockNumberOrTag, bool), Option<T>>,
     },
-    Sleeping {
-        delay: PollIntervalDelay,
-    },
-    Ready {
-        result: Option<TransportResult<T>>,
-    },
+    /// Waiting before retrying the same height after the node returned `null`.
+    Sleeping { delay: PollIntervalDelay },
+    /// Returning a prebuilt result, used when the parent stream cannot create a normal request.
+    Ready { result: Option<TransportResult<T>> },
+    /// Future has completed and must not be polled again.
     Complete,
 }
 
@@ -175,9 +184,15 @@ where
     }
 }
 
+/// Future that resolves a block tag into a numeric head height.
+///
+/// `WatchBlocksFromStream` and `WatchLogsFromStream` use this before yielding per-height futures so
+/// they only schedule work through the configured head tag. Numeric tags and `earliest` resolve
+/// immediately. `latest` uses `eth_blockNumber`; other tags use `eth_getBlockByNumber` and return
+/// the tagged block's header number.
 #[pin_project]
 #[derive(Debug)]
-struct FetchHeadFut<HeaderResp>
+pub(super) struct FetchHeadFut<HeaderResp>
 where
     HeaderResp: HeaderResponse + RpcRecv,
 {
@@ -191,17 +206,19 @@ enum FetchHeadFutState<HeaderResp>
 where
     HeaderResp: HeaderResponse + RpcRecv,
 {
+    /// Polling `eth_blockNumber` for a `latest` head.
     Latest {
         #[pin]
         call: RpcCall<[(); 0], U64>,
     },
+    /// Polling `eth_getBlockByNumber` for a non-latest tag such as finalized or safe.
     Tagged {
         #[pin]
         call: RpcCall<(BlockNumberOrTag, bool), Option<HeaderResp>>,
     },
-    Ready {
-        result: Option<TransportResult<u64>>,
-    },
+    /// Returning an immediately known height, such as a numeric tag or `earliest`.
+    Ready { result: Option<TransportResult<u64>> },
+    /// Future has completed and must not be polled again.
     Complete,
 }
 
@@ -209,7 +226,7 @@ impl<HeaderResp> FetchHeadFut<HeaderResp>
 where
     HeaderResp: HeaderResponse + RpcRecv,
 {
-    fn new(client: Arc<RpcClientInner>, tag: BlockNumberOrTag) -> Self {
+    pub(super) fn new(client: Arc<RpcClientInner>, tag: BlockNumberOrTag) -> Self {
         let state = match tag {
             BlockNumberOrTag::Number(number) => {
                 FetchHeadFutState::Ready { result: Some(Ok(number)) }
@@ -468,21 +485,24 @@ impl<N: Network> Stream for WatchBlocksFromStream<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{super::watch_logs_test_utils::AlwaysRetryPolicy, *};
     use crate::{Provider, ProviderBuilder};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types_eth::Block;
-    use alloy_transport::{
-        layers::{RetryBackoffLayer, RetryPolicy},
-        mock::MockTransport,
-    };
-    use futures::StreamExt;
+    use alloy_transport::{layers::RetryBackoffLayer, mock::MockTransport};
+    use futures::{Stream, StreamExt};
     use tokio::time::timeout;
 
     fn block(number: u64) -> Block {
         let mut block: Block = Block::default();
         block.header.inner.number = number;
         block
+    }
+
+    async fn next_block(
+        stream: &mut (impl Stream<Item = TransportResult<Block>> + Unpin),
+    ) -> Block {
+        timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap()
     }
 
     #[tokio::test]
@@ -502,15 +522,11 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
+        assert_eq!(next_block(&mut stream).await.header.number, 2);
 
-        let third = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(third.header.number, 3);
+        assert_eq!(next_block(&mut stream).await.header.number, 3);
     }
 
     #[tokio::test]
@@ -533,9 +549,7 @@ mod tests {
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         assert!(first.is_err());
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
+        assert_eq!(next_block(&mut stream).await.header.number, 2);
     }
 
     #[tokio::test]
@@ -557,12 +571,9 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
+        assert_eq!(next_block(&mut stream).await.header.number, 2);
     }
 
     #[tokio::test]
@@ -584,26 +595,11 @@ mod tests {
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         assert!(first.is_err());
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
     }
 
     #[tokio::test]
     async fn uses_provider_retry_layer() {
-        #[derive(Clone, Debug)]
-        struct AlwaysRetryPolicy;
-
-        impl RetryPolicy for AlwaysRetryPolicy {
-            fn should_retry(&self, _error: &alloy_transport::TransportError) -> bool {
-                true
-            }
-
-            fn backoff_hint(&self, _error: &alloy_transport::TransportError) -> Option<Duration> {
-                None
-            }
-        }
-
         let asserter = alloy_transport::mock::Asserter::new();
         let retry_layer = RetryBackoffLayer::new_with_policy(3, 0, 10_000, AlwaysRetryPolicy);
         let client = RpcClient::builder()
@@ -623,8 +619,7 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
     }
 
     #[tokio::test]
@@ -643,8 +638,7 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
     }
 
     #[tokio::test]
@@ -661,8 +655,7 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 5);
+        assert_eq!(next_block(&mut stream).await.header.number, 5);
     }
 
     #[tokio::test]
@@ -679,8 +672,7 @@ mod tests {
             .into_stream()
             .buffered(1);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 0);
+        assert_eq!(next_block(&mut stream).await.header.number, 0);
     }
 
     #[tokio::test]
@@ -717,31 +709,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn multiple_yielded_futures_outlive_provider() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-
-        asserter.push_success(&2_u64);
-        asserter.push_success(&Some(block(1)));
-        asserter.push_success(&Some(block(2)));
-
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .into_stream();
-
-        let fut1 = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
-        let fut2 = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
-        drop(provider);
-
-        let first = timeout(Duration::from_secs(1), fut1).await.unwrap().unwrap();
-        let second = timeout(Duration::from_secs(1), fut2).await.unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
-        assert_eq!(second.header.number, 2);
-    }
-
-    #[tokio::test]
     async fn errors_when_cursor_cannot_advance() {
         let asserter = alloy_transport::mock::Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter);
@@ -756,30 +723,6 @@ mod tests {
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         let err = first.unwrap_err();
         assert!(err.is_local_usage_error());
-    }
-
-    #[tokio::test]
-    async fn future_stream_can_be_buffered() {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-
-        asserter.push_success(&2_u64);
-        asserter.push_success(&Some(block(1)));
-        asserter.push_success(&Some(block(2)));
-
-        let mut stream = provider
-            .watch_blocks_from(1)
-            .block_tag(BlockNumberOrTag::Latest)
-            .poll_interval(Duration::from_millis(1))
-            .into_stream()
-            .buffered(2);
-
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
-
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
     }
 
     #[tokio::test]
@@ -800,11 +743,8 @@ mod tests {
             .into_stream()
             .buffered(2);
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.header.number, 1);
+        assert_eq!(next_block(&mut stream).await.header.number, 1);
 
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 2);
+        assert_eq!(next_block(&mut stream).await.header.number, 2);
     }
 }

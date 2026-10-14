@@ -1,12 +1,10 @@
 use alloy_json_rpc::PubSubItem;
 use alloy_transport::{TransportError, TransportErrorKind};
 use serde_json::value::RawValue;
-use tokio::{
-    sync::{
-        mpsc,
-        oneshot::{self, error::TryRecvError},
-    },
-    time::Duration,
+use std::time::Duration;
+use tokio::sync::{
+    mpsc,
+    oneshot::{self, error::TryRecvError},
 };
 
 /// A handle to a backend. Communicates to a `ConnectionInterface` on the

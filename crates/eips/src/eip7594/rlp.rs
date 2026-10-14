@@ -1,5 +1,22 @@
+//! Field-level sidecar codecs and shared RLP list framing.
+
 use alloc::vec::Vec;
 use alloy_rlp::BufMut;
+
+/// Selects the blob payload representation used when encoding a blob transaction sidecar.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum BlobSidecarEncoding {
+    /// Encode the complete sidecar, including its blob payloads.
+    #[default]
+    WithBlobs,
+    /// Encode an empty blob list while retaining commitments and proofs.
+    ///
+    /// This is the sidecar representation used by eth/72 `PooledTransactions` responses as
+    /// specified by [EIP-8070].
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    WithoutBlobs,
+}
 
 /// A helper trait for encoding [EIP-7594](https://eips.ethereum.org/EIPS/eip-7594) sidecars.
 pub trait Encodable7594 {
@@ -15,6 +32,22 @@ pub trait Encodable7594 {
     ///
     /// [EIP-7594]: https://eips.ethereum.org/EIPS/eip-7594
     fn encode_7594(&self, out: &mut dyn BufMut);
+
+    /// Returns the length of the EIP-7594 encoding for the selected blob representation.
+    ///
+    /// The default delegates to [`Self::encode_7594_len`] because encodings without blob payloads
+    /// only differ for sidecar types that contain blobs.
+    fn encode_7594_len_with(&self, _encoding: BlobSidecarEncoding) -> usize {
+        self.encode_7594_len()
+    }
+
+    /// Encodes the sidecar using the selected blob representation.
+    ///
+    /// The default delegates to [`Self::encode_7594`] because encodings without blob payloads only
+    /// differ for sidecar types that contain blobs.
+    fn encode_7594_with(&self, _encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        self.encode_7594(out);
+    }
 
     /// Encode the sidecar according to [EIP-7594] rules. First a 1-byte
     /// wrapper version (if any), then the body of the sidecar.
@@ -38,4 +71,25 @@ pub trait Decodable7594: Sized {
     ///
     /// [EIP-7594]: https://eips.ethereum.org/EIPS/eip-7594
     fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
+}
+
+#[cfg(feature = "kzg-sidecar")]
+pub(crate) fn decode_sidecar<T>(
+    buf: &mut &[u8],
+    decode_fields: impl FnOnce(&mut &[u8]) -> alloy_rlp::Result<T>,
+) -> alloy_rlp::Result<T> {
+    let header = alloy_rlp::Header::decode(buf)?;
+    if !header.list {
+        return Err(alloy_rlp::Error::UnexpectedString);
+    }
+    if buf.len() < header.payload_length {
+        return Err(alloy_rlp::Error::InputTooShort);
+    }
+    let remaining = buf.len();
+    let sidecar = decode_fields(buf)?;
+    if buf.len() + header.payload_length != remaining {
+        return Err(alloy_rlp::Error::UnexpectedLength);
+    }
+
+    Ok(sidecar)
 }

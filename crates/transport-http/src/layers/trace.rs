@@ -23,7 +23,7 @@ impl<S> Layer<S> for TraceParentLayer {
 ///
 /// This service wraps another service and adds the `traceparent` header to each
 /// outgoing request, allowing for trace context propagation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TraceParentService<S> {
     inner: S,
 }

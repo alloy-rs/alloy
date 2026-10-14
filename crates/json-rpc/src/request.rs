@@ -243,6 +243,54 @@ where
     where
         D: serde::Deserializer<'de>,
     {
+        enum Field {
+            Id,
+            Params,
+            Method,
+            Jsonrpc,
+        }
+
+        // Matches keys without borrowing them, so owned input such as `serde_json::Value` and
+        // keys containing escapes deserialize too.
+        impl<'de> Deserialize<'de> for Field {
+            #[inline]
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl serde::de::Visitor<'_> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        formatter.write_str("`id`, `params`, `method` or `jsonrpc`")
+                    }
+
+                    #[inline]
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "id" => Ok(Field::Id),
+                            "params" => Ok(Field::Params),
+                            "method" => Ok(Field::Method),
+                            "jsonrpc" => Ok(Field::Jsonrpc),
+                            other => {
+                                Err(E::unknown_field(other, &["id", "params", "method", "jsonrpc"]))
+                            }
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
         struct Visitor<Params>(PhantomData<Params>);
         impl<'de, Params> serde::de::Visitor<'de> for Visitor<Params>
         where
@@ -269,25 +317,25 @@ where
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        "id" => {
+                        Field::Id => {
                             if id.is_some() {
                                 return Err(serde::de::Error::duplicate_field("id"));
                             }
                             id = Some(map.next_value()?);
                         }
-                        "params" => {
+                        Field::Params => {
                             if params.is_some() {
                                 return Err(serde::de::Error::duplicate_field("params"));
                             }
                             params = Some(map.next_value()?);
                         }
-                        "method" => {
+                        Field::Method => {
                             if method.is_some() {
                                 return Err(serde::de::Error::duplicate_field("method"));
                             }
                             method = Some(map.next_value()?);
                         }
-                        "jsonrpc" => {
+                        Field::Jsonrpc => {
                             let version: String = map.next_value()?;
                             if version != "2.0" {
                                 return Err(serde::de::Error::custom(format!(
@@ -295,12 +343,6 @@ where
                                 )));
                             }
                             jsonrpc = Some(());
-                        }
-                        other => {
-                            return Err(serde::de::Error::unknown_field(
-                                other,
-                                &["id", "params", "method", "jsonrpc"],
-                            ));
                         }
                     }
                 }
@@ -337,6 +379,13 @@ where
 /// This struct is used to represent a request that has been serialized, but
 /// not yet sent. It is used by RPC clients to build batch requests and manage
 /// in-flight requests.
+///
+/// The metadata is stored separately from the serialized JSON. Mutating the
+/// metadata's ID or method after serialization does not rewrite the JSON that
+/// will be sent, and can make routing metadata disagree with the wire request.
+/// To change a wire field, modify the original [`Request`] and serialize it
+/// again. Extensions, headers, and subscription status are intentionally
+/// metadata-only.
 #[derive(Clone, Debug)]
 pub struct SerializedRequest {
     meta: RequestMeta,
@@ -360,7 +409,9 @@ impl SerializedRequest {
         &self.meta
     }
 
-    /// Returns a mutable reference to the request metadata (ID and Method).
+    /// Returns a mutable reference to the request metadata (ID and method).
+    ///
+    /// Changing the ID or method does not rewrite [`Self::serialized`].
     pub const fn meta_mut(&mut self) -> &mut RequestMeta {
         &mut self.meta
     }
@@ -388,10 +439,7 @@ impl SerializedRequest {
 
     /// Returns the request method.
     pub fn method_clone(&self) -> Cow<'static, str> {
-        match &self.meta.method {
-            Cow::Borrowed(b) => Cow::Borrowed(b),
-            Cow::Owned(o) => Cow::Owned(o.clone()),
-        }
+        self.meta.method.clone()
     }
 
     /// Mark the request as a non-standard subscription (i.e. not

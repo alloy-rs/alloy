@@ -5,20 +5,16 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{Decodable7594, Encodable7594},
+    eip7594::{decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
-use alloy_rlp::{Decodable, Encodable, Header};
+use alloy_rlp::{Decodable, Encodable, Header, EMPTY_LIST_CODE};
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
 #[cfg(feature = "kzg")]
 use crate::eip4844::{AsAlloy, AsCkzg};
-
-/// The versioned hash version for KZG.
-#[cfg(feature = "kzg")]
-pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 
 /// A Blob hash
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -32,7 +28,13 @@ pub struct IndexedBlobHash {
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// For a well-formed sidecar, all three vectors have equal lengths and describe the same blob at
+/// each index. Public fields and [`Self::new`] do not enforce this invariant. With the `kzg`
+/// feature, prefer `try_from_blobs_with_settings` or call `validate` before use. Consuming
+/// iteration uses `zip`, so malformed unequal vectors are truncated to the shortest vector.
+///
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -161,11 +163,7 @@ pub struct BlobTransactionSidecarItem {
 impl BlobTransactionSidecarItem {
     /// `VERSIONED_HASH_VERSION_KZG ++ sha256(commitment)[1..]`
     pub fn to_kzg_versioned_hash(&self) -> [u8; 32] {
-        use sha2::Digest;
-        let commitment = self.kzg_commitment.as_slice();
-        let mut hash: [u8; 32] = sha2::Sha256::digest(commitment).into();
-        hash[0] = VERSIONED_HASH_VERSION_KZG;
-        hash
+        kzg_to_versioned_hash(self.kzg_commitment.as_slice()).0
     }
 
     /// Verifies the KZG proof of a blob to ensure its integrity and correctness.
@@ -235,7 +233,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
 }
 
 impl BlobTransactionSidecar {
-    /// Constructs a new [BlobTransactionSidecar] from a set of blobs, commitments, and proofs.
+    /// Constructs a sidecar without validating vector lengths, commitments, or proofs.
     pub const fn new(blobs: Vec<Blob>, commitments: Vec<Bytes48>, proofs: Vec<Bytes48>) -> Self {
         Self { blobs, commitments, proofs }
     }
@@ -271,9 +269,9 @@ impl BlobTransactionSidecar {
     /// commitments, and proofs. Each blob data element is verified against its commitment and
     /// proof.
     ///
-    /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
-    /// fails to verify, or if the versioned hashes in the transaction do not match the actual
-    /// commitment versioned hashes.
+    /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof fails to
+    /// verify, or [BlobTransactionValidationError::WrongVersionedHash] if a transaction's versioned
+    /// hash does not match its commitment.
     #[cfg(feature = "kzg")]
     pub fn validate(
         &self,
@@ -328,9 +326,7 @@ impl BlobTransactionSidecar {
 
     /// Returns the index of the versioned hash in the commitments vector.
     pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
-        self.commitments
-            .iter()
-            .position(|commitment| kzg_to_versioned_hash(commitment.as_slice()) == *hash)
+        self.versioned_hashes().position(|versioned_hash| versioned_hash == *hash)
     }
 
     /// Returns the blob corresponding to the versioned hash, if it exists.
@@ -462,26 +458,12 @@ impl BlobTransactionSidecar {
 
     /// Decodes the [BlobTransactionSidecar] from RLP bytes.
     pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        if buf.len() < header.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-        let remaining = buf.len();
-        let this = Self::rlp_decode_fields(buf)?;
-
-        if buf.len() + header.payload_length != remaining {
-            return Err(alloy_rlp::Error::UnexpectedLength);
-        }
-
-        Ok(this)
+        decode_sidecar(buf, Self::rlp_decode_fields)
     }
 }
 
 impl Encodable for BlobTransactionSidecar {
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+    /// Encodes the sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -492,7 +474,7 @@ impl Encodable for BlobTransactionSidecar {
 }
 
 impl Decodable for BlobTransactionSidecar {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }
@@ -505,6 +487,23 @@ impl Encodable7594 for BlobTransactionSidecar {
 
     fn encode_7594(&self, out: &mut dyn BufMut) {
         self.rlp_encode_fields(out);
+    }
+
+    fn encode_7594_len_with(&self, encoding: BlobSidecarEncoding) -> usize {
+        let blobs_len = match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.length(),
+            BlobSidecarEncoding::WithoutBlobs => 1,
+        };
+        blobs_len + self.commitments.length() + self.proofs.length()
+    }
+
+    fn encode_7594_with(&self, encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.encode(out),
+            BlobSidecarEncoding::WithoutBlobs => out.put_u8(EMPTY_LIST_CODE),
+        }
+        self.commitments.encode(out);
+        self.proofs.encode(out);
     }
 }
 

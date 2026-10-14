@@ -1,8 +1,10 @@
 //! Misc types related to the 4844
 
+#[cfg(feature = "ssz")]
+use crate::eip7594::CELLS_PER_EXT_BLOB;
 use crate::{
     eip4844::{Blob, Bytes48},
-    eip7594::{Cell, CELLS_PER_EXT_BLOB},
+    eip7594::Cell,
 };
 use alloc::{boxed::Box, vec::Vec};
 
@@ -227,11 +229,11 @@ mod tests {
         );
         assert_eq!(&encoded[..BYTES_PER_BLOB], blob_and_proof.blob.as_slice());
 
-        let mut proof_chunks = encoded[expected_offset..].chunks_exact(48);
-        for (proof, chunk) in blob_and_proof.proofs.iter().zip(&mut proof_chunks) {
+        let (proof_chunks, remainder) = encoded[expected_offset..].as_chunks::<48>();
+        for (proof, chunk) in blob_and_proof.proofs.iter().zip(proof_chunks) {
             assert_eq!(chunk, proof.as_slice());
         }
-        assert!(proof_chunks.remainder().is_empty());
+        assert!(remainder.is_empty());
 
         let decoded = <BlobAndProofV2 as ssz::Decode>::from_ssz_bytes(&encoded).unwrap();
         assert_eq!(decoded, blob_and_proof);

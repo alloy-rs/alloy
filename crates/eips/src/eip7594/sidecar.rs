@@ -7,9 +7,9 @@ use crate::{
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{B128, B256};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header, EMPTY_LIST_CODE};
 
-use super::{Decodable7594, Encodable7594};
+use super::{decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594};
 use crate::eip4844::VersionedHashIter;
 #[cfg(feature = "kzg")]
 use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
@@ -17,7 +17,8 @@ use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, PartialEq, Eq, Hash, Debug, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
@@ -91,6 +92,18 @@ impl BlobTransactionSidecarVariant {
         match self {
             Self::Eip4844(sidecar) => sidecar.blobs,
             Self::Eip7594(sidecar) => sidecar.blobs,
+        }
+    }
+
+    /// Clears EIP-7594 blob payloads while retaining commitments and cell proofs.
+    ///
+    /// This prepares the sidecar for inclusion in an eth/72 `PooledTransactions` response as
+    /// specified by [EIP-8070]. This has no effect on EIP-4844 sidecars.
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    pub fn clear_eip7594_blobs(&mut self) {
+        if let Self::Eip7594(sidecar) = self {
+            sidecar.clear_eip7594_blobs();
         }
     }
 
@@ -182,10 +195,7 @@ impl BlobTransactionSidecarVariant {
         self,
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
-        match self {
-            Self::Eip4844(legacy) => legacy.try_into_7594(settings).map(Self::Eip7594),
-            sidecar @ Self::Eip7594(_) => Ok(sidecar),
-        }
+        self.try_into_eip7594_with_settings(settings).map(Self::Eip7594)
     }
 
     /// Consumes this sidecar and returns a [`BlobTransactionSidecarEip7594`] using default KZG
@@ -310,10 +320,7 @@ impl BlobTransactionSidecarVariant {
 
     /// Returns the index of the versioned hash in the commitments vector.
     pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
-        match self {
-            Self::Eip4844(s) => s.versioned_hash_index(hash),
-            Self::Eip7594(s) => s.versioned_hash_index(hash),
-        }
+        self.versioned_hashes().position(|versioned_hash| versioned_hash == *hash)
     }
 
     /// Returns the blob corresponding to the versioned hash, if it exists.
@@ -361,7 +368,7 @@ impl BlobTransactionSidecarVariant {
 }
 
 impl Encodable for BlobTransactionSidecarVariant {
-    /// Encodes the [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+    /// Encodes the selected sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         match self {
             Self::Eip4844(sidecar) => sidecar.encode(out),
@@ -378,22 +385,9 @@ impl Encodable for BlobTransactionSidecarVariant {
 }
 
 impl Decodable for BlobTransactionSidecarVariant {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        if buf.len() < header.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-        let remaining = buf.len();
-        let this = Self::rlp_decode_fields(buf)?;
-        if buf.len() + header.payload_length != remaining {
-            return Err(alloy_rlp::Error::UnexpectedLength);
-        }
-
-        Ok(this)
+        decode_sidecar(buf, Self::rlp_decode_fields)
     }
 }
 
@@ -404,6 +398,20 @@ impl Encodable7594 for BlobTransactionSidecarVariant {
 
     fn encode_7594(&self, out: &mut dyn BufMut) {
         self.rlp_encode_fields(out);
+    }
+
+    fn encode_7594_len_with(&self, encoding: BlobSidecarEncoding) -> usize {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.encode_7594_len_with(encoding),
+            Self::Eip7594(sidecar) => sidecar.encode_7594_len_with(encoding),
+        }
+    }
+
+    fn encode_7594_with(&self, encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.encode_7594_with(encoding, out),
+            Self::Eip7594(sidecar) => sidecar.encode_7594_with(encoding, out),
+        }
     }
 }
 
@@ -509,7 +517,13 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
 
 /// This represents a set of blobs, and its corresponding commitments and cell proofs.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// A well-formed sidecar has one commitment per blob and `CELLS_PER_EXT_BLOB` cell proofs per
+/// blob. Public fields and [`Self::new`] do not enforce these cardinalities or validate proofs.
+/// With the `kzg` feature, prefer `try_from_blobs_with_settings` or call `validate` before
+/// use.
+///
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -538,14 +552,115 @@ impl core::fmt::Debug for BlobTransactionSidecarEip7594 {
 }
 
 impl BlobTransactionSidecarEip7594 {
-    /// Constructs a new [BlobTransactionSidecarEip7594] from a set of blobs, commitments, and
-    /// cell proofs.
+    /// Constructs a sidecar without validating cardinalities, commitments, or cell proofs.
     pub const fn new(
         blobs: Vec<Blob>,
         commitments: Vec<Bytes48>,
         cell_proofs: Vec<Bytes48>,
     ) -> Self {
         Self { blobs, commitments, cell_proofs }
+    }
+
+    /// Recovers a sidecar from a common set of EIP-7594 cells for every blob.
+    ///
+    /// `cell_mask` identifies the cells supplied for each commitment. `cells` must be flattened in
+    /// blob-major order: all selected cells for `commitments[0]`, followed by all selected cells
+    /// for `commitments[1]`, and so on. At least half of the 128 extended blob cells must be
+    /// selected. The recovered sidecar contains the complete blob data and all 128 cell proofs.
+    ///
+    /// Recovery authenticates each reconstructed blob by recomputing and comparing its
+    /// commitment. It does not verify proofs for the input cells; callers accepting untrusted
+    /// cells and proofs should batch-verify them before recovery when early rejection is useful.
+    ///
+    /// This uses the default KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_recover_from_cells(
+        commitments: Vec<Bytes48>,
+        cell_mask: BlobCellMask,
+        cells: &[crate::eip7594::Cell],
+    ) -> Result<Self, BlobCellRecoveryError> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        Self::try_recover_from_cells_with_settings(
+            commitments,
+            cell_mask,
+            cells,
+            EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Recovers a sidecar from EIP-7594 cells using custom KZG settings.
+    ///
+    /// See [`Self::try_recover_from_cells`] for the expected cell layout and verification
+    /// boundary.
+    #[cfg(feature = "kzg")]
+    pub fn try_recover_from_cells_with_settings(
+        commitments: Vec<Bytes48>,
+        cell_mask: BlobCellMask,
+        cells: &[crate::eip7594::Cell],
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, BlobCellRecoveryError> {
+        let cells_per_blob = cell_mask.count();
+        if !commitments.is_empty() && cells_per_blob < CELLS_PER_EXT_BLOB / 2 {
+            return Err(BlobCellRecoveryError::InsufficientCells {
+                provided: cells_per_blob,
+                required: CELLS_PER_EXT_BLOB / 2,
+            });
+        }
+
+        let expected_cells = commitments
+            .len()
+            .checked_mul(cells_per_blob)
+            .ok_or(BlobCellRecoveryError::CellCountOverflow)?;
+        if cells.len() != expected_cells {
+            return Err(BlobCellRecoveryError::CellCountMismatch {
+                provided: cells.len(),
+                expected: expected_cells,
+            });
+        }
+        if commitments.is_empty() {
+            return Ok(Self::new(Vec::new(), commitments, Vec::new()));
+        }
+
+        let cell_indices =
+            cell_mask.selected_indices().map(|index| index as u64).collect::<Vec<_>>();
+        let mut blobs = Vec::with_capacity(commitments.len());
+        let cell_proof_capacity = commitments
+            .len()
+            .checked_mul(CELLS_PER_EXT_BLOB)
+            .ok_or(BlobCellRecoveryError::CellCountOverflow)?;
+        let mut cell_proofs = Vec::with_capacity(cell_proof_capacity);
+
+        for (blob_index, (blob_cells, expected_commitment)) in
+            cells.chunks_exact(cells_per_blob).zip(&commitments).enumerate()
+        {
+            let ckzg_cells = crate::eip7594::Cell::slice_as_ckzg(blob_cells);
+            let (recovered_cells, recovered_proofs) =
+                settings.recover_cells_and_kzg_proofs(&cell_indices, ckzg_cells)?;
+            let blob = reconstruct_blob(recovered_cells.as_ref());
+
+            let commitment = settings.blob_to_kzg_commitment(blob.as_ckzg())?;
+            let commitment = Bytes48::from_ckzg(commitment.to_bytes());
+            if commitment != *expected_commitment {
+                return Err(BlobCellRecoveryError::CommitmentMismatch { blob_index });
+            }
+
+            blobs.push(blob);
+            cell_proofs
+                .extend_from_slice(c_kzg::KzgProof::slice_as_alloy(recovered_proofs.as_ref()));
+        }
+
+        Ok(Self::new(blobs, commitments, cell_proofs))
+    }
+
+    /// Clears blob payloads while retaining commitments and cell proofs.
+    ///
+    /// This prepares the sidecar for inclusion in an eth/72 `PooledTransactions` response as
+    /// specified by [EIP-8070].
+    ///
+    /// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
+    pub fn clear_eip7594_blobs(&mut self) {
+        self.blobs.clear();
     }
 
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarEip7594].
@@ -722,9 +837,9 @@ impl BlobTransactionSidecarEip7594 {
     /// elements, commitments, and proofs. The cells are constructed from each blob and verified
     /// against the commitments and proofs.
     ///
-    /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
-    /// fails to verify, or if the versioned hashes in the transaction do not match the actual
-    /// commitment versioned hashes.
+    /// Returns [BlobTransactionValidationError::InvalidProof] if any cell KZG proof fails to
+    /// verify, or [BlobTransactionValidationError::WrongVersionedHash] if a transaction's versioned
+    /// hash does not match its commitment.
     #[cfg(feature = "kzg")]
     pub fn validate(
         &self,
@@ -778,22 +893,12 @@ impl BlobTransactionSidecarEip7594 {
             commitments.extend(core::iter::repeat_n(*commitment, CELLS_PER_EXT_BLOB));
         }
 
-        let cells = if let [blob] = self.blobs.as_slice() {
-            let cells: Box<[c_kzg::Cell]> = proof_settings.compute_cells(blob.as_ckzg())?;
-            cells.into()
-        } else {
-            let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
-            for blob in &self.blobs {
-                let blob_cells = proof_settings.compute_cells(blob.as_ckzg())?;
-                cells.extend_from_slice(blob_cells.as_ref());
-            }
-            cells
-        };
+        let cells = self.compute_cells_with_settings(proof_settings)?;
 
         let res = proof_settings.verify_cell_kzg_proof_batch(
             Bytes48::slice_as_ckzg(&commitments),
             &cell_indices,
-            &cells,
+            crate::eip7594::Cell::slice_as_ckzg(&cells),
             Bytes48::slice_as_ckzg(self.cell_proofs.as_slice()),
         )?;
 
@@ -807,9 +912,7 @@ impl BlobTransactionSidecarEip7594 {
 
     /// Returns the index of the versioned hash in the commitments vector.
     pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
-        self.commitments.iter().position(|commitment| {
-            crate::eip4844::kzg_to_versioned_hash(commitment.as_slice()) == *hash
-        })
+        self.versioned_hashes().position(|versioned_hash| versioned_hash == *hash)
     }
 
     /// Returns the blob corresponding to the versioned hash, if it exists.
@@ -1046,26 +1149,85 @@ impl BlobTransactionSidecarEip7594 {
 
     /// Decodes the [BlobTransactionSidecarEip7594] from RLP bytes.
     pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        if buf.len() < header.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-        let remaining = buf.len();
-
-        let this = Self::decode_7594(buf)?;
-        if buf.len() + header.payload_length != remaining {
-            return Err(alloy_rlp::Error::UnexpectedLength);
-        }
-
-        Ok(this)
+        decode_sidecar(buf, Self::decode_7594)
     }
 }
 
+/// An error that can occur while recovering blobs from EIP-7594 cells.
+#[cfg(feature = "kzg")]
+#[derive(Debug)]
+pub enum BlobCellRecoveryError {
+    /// Fewer than half of the extended blob cells were selected.
+    InsufficientCells {
+        /// The number of cells supplied for each blob.
+        provided: usize,
+        /// The minimum number of cells required for recovery.
+        required: usize,
+    },
+    /// The flattened cell slice does not match the commitments and cell mask.
+    CellCountMismatch {
+        /// The number of cells supplied.
+        provided: usize,
+        /// The number of cells implied by the commitments and cell mask.
+        expected: usize,
+    },
+    /// The expected cell count cannot be represented as a `usize`.
+    CellCountOverflow,
+    /// A reconstructed blob does not match its supplied commitment.
+    CommitmentMismatch {
+        /// The index of the blob whose commitment did not match.
+        blob_index: usize,
+    },
+    /// An error returned by [`c_kzg`].
+    Kzg(c_kzg::Error),
+}
+
+#[cfg(feature = "kzg")]
+impl core::fmt::Display for BlobCellRecoveryError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InsufficientCells { provided, required } => {
+                write!(f, "need at least {required} cells per blob for recovery, got {provided}")
+            }
+            Self::CellCountMismatch { provided, expected } => {
+                write!(f, "expected {expected} cells, got {provided}")
+            }
+            Self::CellCountOverflow => f.write_str("the expected cell count overflows usize"),
+            Self::CommitmentMismatch { blob_index } => {
+                write!(f, "reconstructed blob {blob_index} does not match its commitment")
+            }
+            Self::Kzg(err) => write!(f, "KZG error: {err:?}"),
+        }
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl core::error::Error for BlobCellRecoveryError {}
+
+#[cfg(feature = "kzg")]
+impl From<c_kzg::Error> for BlobCellRecoveryError {
+    fn from(source: c_kzg::Error) -> Self {
+        Self::Kzg(source)
+    }
+}
+
+#[cfg(feature = "kzg")]
+fn reconstruct_blob(recovered_cells: &[c_kzg::Cell; CELLS_PER_EXT_BLOB]) -> Blob {
+    // `RecoverCells` returns cells in the canonical EIP-7594 order. The first half is the
+    // original blob data; the remaining cells are the extension used for sampling and proofs.
+    // The KZG backend performs the recovery, while this wrapper only materializes the original
+    // blob cells.
+    let mut blob = [0u8; BYTES_PER_BLOB];
+    for (cell_index, cell) in recovered_cells.iter().take(CELLS_PER_EXT_BLOB / 2).enumerate() {
+        let start = cell_index * crate::eip7594::BYTES_PER_CELL;
+        let end = start + crate::eip7594::BYTES_PER_CELL;
+        blob[start..end].copy_from_slice(cell.as_alloy().as_slice());
+    }
+    Blob::new(blob)
+}
+
 impl Encodable for BlobTransactionSidecarEip7594 {
-    /// Encodes the inner [BlobTransactionSidecarEip7594] fields as RLP bytes, without a RLP header.
+    /// Encodes the sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -1076,8 +1238,7 @@ impl Encodable for BlobTransactionSidecarEip7594 {
 }
 
 impl Decodable for BlobTransactionSidecarEip7594 {
-    /// Decodes the inner [BlobTransactionSidecarEip7594] fields from RLP bytes, without a RLP
-    /// header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }
@@ -1090,6 +1251,24 @@ impl Encodable7594 for BlobTransactionSidecarEip7594 {
 
     fn encode_7594(&self, out: &mut dyn BufMut) {
         self.rlp_encode_fields(out);
+    }
+
+    fn encode_7594_len_with(&self, encoding: BlobSidecarEncoding) -> usize {
+        let blobs_len = match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.length(),
+            BlobSidecarEncoding::WithoutBlobs => 1,
+        };
+        1 + blobs_len + self.commitments.length() + self.cell_proofs.length()
+    }
+
+    fn encode_7594_with(&self, encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        out.put_u8(EIP_7594_WRAPPER_VERSION);
+        match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.encode(out),
+            BlobSidecarEncoding::WithoutBlobs => out.put_u8(EMPTY_LIST_CODE),
+        }
+        self.commitments.encode(out);
+        self.cell_proofs.encode(out);
     }
 }
 
@@ -1110,10 +1289,11 @@ pub struct BlobCellMask {
 }
 
 impl BlobCellMask {
-    /// Creates a mask from the Engine API 16-byte, big-endian bitarray.
+    /// Creates a mask from the Engine API 16-byte, little-endian bitarray.
+    /// Cell `i` is selected by bit `i % 8` of byte `i / 8`.
     #[inline]
-    pub fn new(indices_bitarray: B128) -> Self {
-        Self { value: u128::from(indices_bitarray) }
+    pub const fn new(indices_bitarray: B128) -> Self {
+        Self { value: u128::from_le_bytes(indices_bitarray.0) }
     }
 
     /// Creates a mask from the raw bit representation.
@@ -1168,8 +1348,8 @@ impl BlobCellMask {
         self,
         cells: &[crate::eip7594::Cell],
     ) -> Option<Vec<crate::eip7594::Cell>> {
-        let chunks = cells.chunks_exact(CELLS_PER_EXT_BLOB);
-        if !chunks.remainder().is_empty() {
+        let (chunks, remainder) = cells.as_chunks::<CELLS_PER_EXT_BLOB>();
+        if !remainder.is_empty() {
             return None;
         }
 
@@ -1307,6 +1487,39 @@ mod tests {
     };
 
     #[test]
+    fn clear_eip7594_blobs_preserves_metadata() {
+        let commitments = vec![Bytes48::repeat_byte(0x01)];
+        let cell_proofs = vec![Bytes48::repeat_byte(0x02); CELLS_PER_EXT_BLOB];
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0x03)],
+            commitments.clone(),
+            cell_proofs.clone(),
+        );
+        let mut variant = BlobTransactionSidecarVariant::Eip7594(sidecar);
+
+        variant.clear_eip7594_blobs();
+
+        let sidecar = variant.as_eip7594().unwrap();
+        assert!(sidecar.blobs.is_empty());
+        assert_eq!(sidecar.commitments, commitments);
+        assert_eq!(sidecar.cell_proofs, cell_proofs);
+    }
+
+    #[test]
+    fn clear_eip7594_blobs_ignores_eip4844_variant() {
+        let sidecar = BlobTransactionSidecar::new(
+            vec![Blob::repeat_byte(0x01)],
+            vec![Bytes48::repeat_byte(0x02)],
+            vec![Bytes48::repeat_byte(0x03)],
+        );
+        let mut variant = BlobTransactionSidecarVariant::Eip4844(sidecar.clone());
+
+        variant.clear_eip7594_blobs();
+
+        assert_eq!(variant, BlobTransactionSidecarVariant::Eip4844(sidecar));
+    }
+
+    #[test]
     fn sidecar_variant_rlp_roundtrip() {
         let mut encoded = Vec::new();
 
@@ -1397,6 +1610,54 @@ mod tests {
     }
 
     #[test]
+    fn rlp_7594_encoding_without_blobs_preserves_metadata() {
+        fn encode_without_blobs(sidecar: &impl Encodable7594) -> Vec<u8> {
+            let encoding = BlobSidecarEncoding::WithoutBlobs;
+            let mut encoded = Vec::with_capacity(sidecar.encode_7594_len_with(encoding));
+            sidecar.encode_7594_with(encoding, &mut encoded);
+            assert_eq!(encoded.len(), sidecar.encode_7594_len_with(encoding));
+            encoded
+        }
+
+        let sidecar_4844 = BlobTransactionSidecar::new(
+            vec![Blob::repeat_byte(0x01)],
+            vec![Bytes48::repeat_byte(0x02)],
+            vec![Bytes48::repeat_byte(0x03)],
+        );
+        let encoded_4844 = encode_without_blobs(&sidecar_4844);
+        let decoded_4844 = BlobTransactionSidecar::decode_7594(&mut &encoded_4844[..]).unwrap();
+        assert!(decoded_4844.blobs.is_empty());
+        assert_eq!(decoded_4844.commitments, sidecar_4844.commitments);
+        assert_eq!(decoded_4844.proofs, sidecar_4844.proofs);
+
+        let variant_4844 = BlobTransactionSidecarVariant::Eip4844(sidecar_4844);
+        assert_eq!(encode_without_blobs(&variant_4844), encoded_4844);
+
+        let sidecar_7594 = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0x04)],
+            vec![Bytes48::repeat_byte(0x05)],
+            vec![Bytes48::repeat_byte(0x06); CELLS_PER_EXT_BLOB],
+        );
+        let encoded_7594 = encode_without_blobs(&sidecar_7594);
+        let decoded_7594 =
+            BlobTransactionSidecarEip7594::decode_7594(&mut &encoded_7594[..]).unwrap();
+        assert!(decoded_7594.blobs.is_empty());
+        assert_eq!(decoded_7594.commitments, sidecar_7594.commitments);
+        assert_eq!(decoded_7594.cell_proofs, sidecar_7594.cell_proofs);
+
+        let variant_7594 = BlobTransactionSidecarVariant::Eip7594(sidecar_7594.clone());
+        assert_eq!(encode_without_blobs(&variant_7594), encoded_7594);
+
+        let mut with_blobs = Vec::new();
+        sidecar_7594.encode_7594_with(BlobSidecarEncoding::WithBlobs, &mut with_blobs);
+        assert_eq!(with_blobs, sidecar_7594.encoded_7594());
+        assert_eq!(
+            sidecar_7594.encode_7594_len_with(BlobSidecarEncoding::WithBlobs),
+            sidecar_7594.encode_7594_len()
+        );
+    }
+
+    #[test]
     #[cfg(feature = "kzg")]
     fn validate_7594_sidecar() {
         let sidecar =
@@ -1424,7 +1685,9 @@ mod tests {
         let matching_cells =
             sidecar.compute_matching_cells_with_settings(cell_mask, settings).unwrap();
         let expected_matching_cells = cells
-            .chunks_exact(CELLS_PER_EXT_BLOB)
+            .as_chunks::<CELLS_PER_EXT_BLOB>()
+            .0
+            .iter()
             .flat_map(|blob_cells| [blob_cells[0], blob_cells[7]])
             .collect::<Vec<_>>();
         assert_eq!(
@@ -1446,10 +1709,187 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "kzg")]
+    fn sparse_cells_for_mask(
+        sidecar: &BlobTransactionSidecarEip7594,
+        cell_mask: BlobCellMask,
+        settings: &c_kzg::KzgSettings,
+    ) -> Vec<crate::eip7594::Cell> {
+        let cells = sidecar.compute_cells_with_settings(settings).unwrap();
+        cell_mask.matching_cells_from_computed_cells(&cells).unwrap()
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sidecar_from_complete_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+                Vec::new(),
+                BlobCellMask::default(),
+                &[],
+                settings,
+            )
+            .unwrap(),
+            BlobTransactionSidecarEip7594::default()
+        );
+
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
+            settings,
+        )
+        .unwrap();
+        let cells = sidecar.compute_cells_with_settings(settings).unwrap();
+        let cell_mask = BlobCellMask::from_bits(u128::MAX);
+
+        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            sidecar.commitments.clone(),
+            cell_mask,
+            &cells,
+            settings,
+        )
+        .unwrap();
+        assert_eq!(recovered, sidecar);
+
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_recover_from_cells(
+                recovered.commitments.clone(),
+                cell_mask,
+                &cells,
+            )
+            .unwrap(),
+            recovered
+        );
+    }
+
+    /// Multiple blobs are recovered from a shared, non-contiguous set containing the minimum
+    /// number of cells required for each blob.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_from_minimum_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02), Blob::repeat_byte(0x03)],
+            settings,
+        )
+        .unwrap();
+
+        let cell_mask = BlobCellMask::from_bits(
+            (0..CELLS_PER_EXT_BLOB).step_by(2).fold(0, |mask, index| mask | (1u128 << index)),
+        );
+        assert_eq!(cell_mask.count(), CELLS_PER_EXT_BLOB / 2);
+        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+
+        let recovered = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            sidecar.commitments.clone(),
+            cell_mask,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap();
+
+        assert_eq!(recovered.blobs, sidecar.blobs);
+        assert_eq!(recovered.commitments, sidecar.commitments);
+        assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_insufficient_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2 - 1)) - 1);
+        let cells = vec![crate::eip7594::Cell::repeat_byte(0); cell_mask.count()];
+
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            vec![Bytes48::ZERO],
+            cell_mask,
+            &cells,
+            settings,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            BlobCellRecoveryError::InsufficientCells {
+                provided,
+                required,
+            } if provided == CELLS_PER_EXT_BLOB / 2 - 1
+                && required == CELLS_PER_EXT_BLOB / 2
+        ));
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_mismatched_cell_count() {
+        let settings = EnvKzgSettings::Default.get();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let cells = vec![crate::eip7594::Cell::repeat_byte(0); cell_mask.count() - 1];
+
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            vec![Bytes48::ZERO, Bytes48::ZERO],
+            cell_mask,
+            &cells,
+            settings,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            BlobCellRecoveryError::CellCountMismatch {
+                provided,
+                expected,
+            } if provided == CELLS_PER_EXT_BLOB / 2 - 1 && expected == CELLS_PER_EXT_BLOB
+        ));
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_commitment_mismatch() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01)],
+            settings,
+        )
+        .unwrap();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+
+        let err = BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            vec![Bytes48::ZERO],
+            cell_mask,
+            &sparse_cells,
+            settings,
+        )
+        .unwrap_err();
+        assert!(matches!(err, BlobCellRecoveryError::CommitmentMismatch { blob_index: 0 }));
+    }
+
+    /// A cell that no longer matches the commitment must not produce a sidecar.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_rejects_corrupted_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02), Blob::repeat_byte(0x03)],
+            settings,
+        )
+        .unwrap();
+        let cell_mask = BlobCellMask::from_bits((1u128 << (CELLS_PER_EXT_BLOB / 2)) - 1);
+        let mut sparse_cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+        sparse_cells[0][0] ^= 0xff;
+
+        assert!(BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+            sidecar.commitments,
+            cell_mask,
+            &sparse_cells,
+            settings,
+        )
+        .is_err());
+    }
+
     #[test]
     fn blob_cell_mask_selects_indices() {
         let selected = (1u128 << 0) | (1u128 << 7);
-        let mask = BlobCellMask::new(B128::from(selected));
+        let mask =
+            BlobCellMask::new(B128::new([0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
 
         assert_eq!(mask.bits(), selected);
         assert_eq!(mask.count(), 2);
@@ -1558,5 +1998,16 @@ mod tests {
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(matches, vec![(0, cells_and_proofs)]);
+    }
+
+    #[test]
+    fn blob_cell_mask_decodes_wire_indices() {
+        for index in 0..CELLS_PER_EXT_BLOB {
+            let mut bytes = [0; 16];
+            bytes[index / 8] = 1 << (index % 8);
+            let mask = BlobCellMask::new(B128::new(bytes));
+
+            assert_eq!(mask.selected_indices().collect::<Vec<_>>(), vec![index]);
+        }
     }
 }

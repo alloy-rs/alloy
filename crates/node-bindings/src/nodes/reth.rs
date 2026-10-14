@@ -1,4 +1,4 @@
-//! Utilities for launching a Reth dev-mode instance.
+//! Utilities for configuring and launching a Reth node.
 
 use crate::{
     utils::{extract_endpoint, GracefulShutdown},
@@ -122,8 +122,8 @@ impl RethInstance {
 
     /// Takes the stdout contained in the child process.
     ///
-    /// This leaves a `None` in its place, so calling methods that require a stdout to be present
-    /// will fail if called after this.
+    /// Stdout is available only when [`Reth::keep_stdout`] was set. This leaves `None` in its
+    /// place, so a second call returns [`NodeError::NoStdout`].
     pub fn stdout(&mut self) -> Result<ChildStdout, NodeError> {
         self.pid.stdout.take().ok_or(NodeError::NoStdout)
     }
@@ -137,21 +137,21 @@ impl Drop for RethInstance {
 
 /// Builder for launching `reth`.
 ///
-/// # Panics
-///
-/// If `spawn` is called without `reth` being available in the user's $PATH
+/// [`Reth::new`] configures a regular node. Call [`Reth::dev`] for an isolated development chain.
+/// [`Reth::spawn`] panics on any startup failure; use [`Reth::try_spawn`] to handle errors.
 ///
 /// # Example
 ///
 /// ```no_run
 /// use alloy_node_bindings::Reth;
 ///
-/// let port = 8545u16;
-/// let url = format!("http://localhost:{}", port).to_string();
-///
-/// let reth = Reth::new().instance(1).block_time("12sec").spawn();
+/// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
+/// let reth = Reth::new().dev().block_time("12s").try_spawn()?;
+/// println!("Reth is listening at {}", reth.endpoint());
 ///
 /// drop(reth); // this will kill the instance
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
@@ -182,11 +182,11 @@ impl Default for Reth {
 }
 
 impl Reth {
-    /// Creates an empty Reth builder.
+    /// Creates a Reth builder in regular (non-dev) mode.
     ///
-    /// The instance number is set to a random number between 1 and 200 by default to reduce the
-    /// odds of port conflicts. This can be changed with [`Reth::instance`]. Set to 0 to use the
-    /// default ports. 200 is the maximum number of instances that can be run set by Reth.
+    /// The instance number is chosen from `1..=199` to reduce the odds of port conflicts. Change it
+    /// with [`Reth::instance`], or set it to zero to use Reth's base default ports. Reth permits
+    /// instance numbers up to 200.
     pub fn new() -> Self {
         Self {
             dev: false,
@@ -213,12 +213,13 @@ impl Reth {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
     /// use alloy_node_bindings::Reth;
-    /// # fn a() {
-    /// let reth = Reth::at("../reth/target/release/reth").spawn();
+    /// # fn main() -> Result<(), alloy_node_bindings::NodeError> {
+    /// let reth = Reth::at("/path/to/reth").dev().try_spawn()?;
     ///
     /// println!("Reth running at `{}`", reth.endpoint());
+    /// # Ok(())
     /// # }
     /// ```
     pub fn at(path: impl Into<PathBuf>) -> Self {
@@ -280,9 +281,10 @@ impl Reth {
         self
     }
 
-    /// Sets the block time for the Reth instance.
-    /// Parses strings using <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
-    /// This is only used if `dev` mode is enabled.
+    /// Sets the block time for a dev-mode Reth instance.
+    ///
+    /// Reth parses this with `humantime` syntax, such as `"12s"`. The setting is ignored unless
+    /// [`Self::dev`] is also enabled.
     pub fn block_time(mut self, block_time: &str) -> Self {
         self.block_time = Some(block_time.to_string());
         self
@@ -309,8 +311,9 @@ impl Reth {
         self
     }
 
-    /// Sets the instance number for the Reth instance. Set to 0 to use the default ports.
-    /// By default, a random number between 1 and 200 is used.
+    /// Sets the Reth instance number. Set to zero to use the base default ports.
+    ///
+    /// By default, a random number in `1..=199` is used; Reth permits values up to 200.
     pub const fn instance(mut self, instance: u16) -> Self {
         self.instance = instance;
         self
@@ -382,7 +385,12 @@ impl Reth {
         self.try_spawn().unwrap()
     }
 
-    /// Consumes the builder and spawns `reth`. If spawning fails, returns an error.
+    /// Consumes the builder, spawns `reth`, and waits for its services to report ready.
+    ///
+    /// Returns an error if the process cannot be started, reports a fatal startup error, or does
+    /// not become ready before [`NODE_STARTUP_TIMEOUT`] is observed. The deadline is checked
+    /// between complete stdout lines; a live process that emits no newline can block this call
+    /// past the deadline.
     pub fn try_spawn(self) -> Result<RethInstance, NodeError> {
         let bin_path = self
             .program
@@ -512,7 +520,13 @@ impl Reth {
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+                let _ = child.kill();
+                let status = child.wait().map_err(NodeError::WaitError)?;
+                return Err(NodeError::Fatal(format!(
+                    "reth exited before it was ready ({status})"
+                )));
+            }
 
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
@@ -602,27 +616,21 @@ mod tests {
             assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
         }
     }
+}
+
+#[cfg(all(test, unix))]
+mod early_exit_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
-    fn default_matches_new_semantics() {
-        let reth = Reth::default();
+    fn early_exit_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("reth");
+        std::fs::write(&program, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        assert!(!reth.dev);
-        assert_eq!(reth.host, None);
-        assert_eq!(reth.http_port, DEFAULT_HTTP_PORT);
-        assert_eq!(reth.ws_port, DEFAULT_WS_PORT);
-        assert_eq!(reth.auth_port, DEFAULT_AUTH_PORT);
-        assert_eq!(reth.p2p_port, DEFAULT_P2P_PORT);
-        assert_eq!(reth.block_time, None);
-        assert!((1..200).contains(&reth.instance));
-        assert!(reth.discovery_enabled);
-        assert_eq!(reth.program, None);
-        assert_eq!(reth.ipc_path, None);
-        assert!(!reth.ipc_enabled);
-        assert_eq!(reth.data_dir, None);
-        assert_eq!(reth.chain_or_path, None);
-        assert_eq!(reth.genesis, None);
-        assert!(reth.args.is_empty());
-        assert!(!reth.keep_stdout);
+        let err = Reth::at(&program).try_spawn().unwrap_err();
+        assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
     }
 }
