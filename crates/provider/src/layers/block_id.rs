@@ -43,9 +43,7 @@ use std::{borrow::Cow, marker::PhantomData};
 ///
 /// All other [`Provider`] methods are forwarded to the inner provider unchanged, so that
 /// layers stacked inside this one (for example a [`CacheProvider`](crate::layers::CacheProvider))
-/// keep their overrides. Previously these methods fell back to the trait default, which calls the
-/// root client directly and silently bypassed the inner provider (the same class of bug addressed
-/// for `FillProvider` in #4333 and for `BlockIdLayer` in #4245).
+/// keep their overrides.
 #[derive(Debug, Clone, Copy)]
 pub struct BlockIdLayer {
     block_id: BlockId,
@@ -91,7 +89,8 @@ impl<P: Provider<N>, N: Network> BlockIdProvider<P, N> {
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl<P: Provider<N>, N: Network> Provider<N> for BlockIdProvider<P, N> {
     #[inline(always)]
     fn root(&self) -> &RootProvider<N> {
