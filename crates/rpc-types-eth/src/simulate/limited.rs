@@ -1,7 +1,7 @@
 //! Deserialization of simulation payloads with caller-supplied allocation limits.
 
 use super::{SimBlock, SimulatePayload};
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{fmt, marker::PhantomData};
 use serde::{
     de::{DeserializeSeed, Error as _, IgnoredAny, MapAccess, SeqAccess, Visitor},
@@ -10,6 +10,7 @@ use serde::{
 
 /// The simulation request limit exceeded during deserialization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SimulatePayloadLimitExceeded {
     /// The request contained more explicit blocks than allowed.
     Blocks,
@@ -49,11 +50,28 @@ impl core::error::Error for SimulatePayloadLimitExceeded {}
 /// assert_eq!(payload.block_state_calls[0].calls.len(), 1);
 /// # Ok::<(), Box<dyn core::error::Error>>(())
 /// ```
-#[derive(Clone, Copy, Debug)]
 pub struct SimulatePayloadSeed<TxReq> {
     max_blocks: usize,
     max_calls: usize,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
+}
+
+impl<TxReq> Clone for SimulatePayloadSeed<TxReq> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<TxReq> Copy for SimulatePayloadSeed<TxReq> {}
+
+impl<TxReq> fmt::Debug for SimulatePayloadSeed<TxReq> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SimulatePayloadSeed")
+            .field("max_blocks", &self.max_blocks)
+            .field("max_calls", &self.max_calls)
+            .finish()
+    }
 }
 
 impl<TxReq> SimulatePayloadSeed<TxReq> {
@@ -84,7 +102,18 @@ impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for SimulatePayloadSeed<
 struct PayloadVisitor<TxReq> {
     max_blocks: usize,
     max_calls: usize,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
+}
+
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "camelCase")]
+enum PayloadField {
+    BlockStateCalls,
+    TraceTransfers,
+    Validation,
+    ReturnFullTransactions,
+    #[serde(other)]
+    Other,
 }
 
 impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for PayloadVisitor<TxReq> {
@@ -100,9 +129,9 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for PayloadVisitor<TxReq> {
         let mut validation = None;
         let mut return_full_transactions = None;
 
-        while let Some(key) = map.next_key::<String>()? {
-            match key.as_str() {
-                "blockStateCalls" => {
+        while let Some(key) = map.next_key::<PayloadField>()? {
+            match key {
+                PayloadField::BlockStateCalls => {
                     if blocks.is_some() {
                         return Err(A::Error::duplicate_field("blockStateCalls"));
                     }
@@ -112,25 +141,25 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for PayloadVisitor<TxReq> {
                         marker: self.marker,
                     })?);
                 }
-                "traceTransfers" => {
+                PayloadField::TraceTransfers => {
                     if trace_transfers.is_some() {
                         return Err(A::Error::duplicate_field("traceTransfers"));
                     }
                     trace_transfers = Some(map.next_value()?);
                 }
-                "validation" => {
+                PayloadField::Validation => {
                     if validation.is_some() {
                         return Err(A::Error::duplicate_field("validation"));
                     }
                     validation = Some(map.next_value()?);
                 }
-                "returnFullTransactions" => {
+                PayloadField::ReturnFullTransactions => {
                     if return_full_transactions.is_some() {
                         return Err(A::Error::duplicate_field("returnFullTransactions"));
                     }
                     return_full_transactions = Some(map.next_value()?);
                 }
-                _ => {
+                PayloadField::Other => {
                     map.next_value::<IgnoredAny>()?;
                 }
             }
@@ -183,7 +212,7 @@ fn build_result<TxReq>(
 struct BlocksSeed<TxReq> {
     max_blocks: usize,
     max_calls: usize,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
 }
 
 impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for BlocksSeed<TxReq> {
@@ -201,7 +230,7 @@ impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for BlocksSeed<TxReq> {
 struct BlocksVisitor<TxReq> {
     max_blocks: usize,
     max_calls: usize,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
 }
 
 impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for BlocksVisitor<TxReq> {
@@ -216,13 +245,15 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for BlocksVisitor<TxReq> {
         let mut remaining_calls = self.max_calls;
         let mut too_many_blocks = false;
         let mut too_many_calls = false;
+        let mut num_blocks = 0;
         while let Some(block) = seq.next_element_seed(BlockSeed {
-            allowed: blocks.len() < self.max_blocks,
+            allowed: num_blocks < self.max_blocks,
             remaining_calls: &mut remaining_calls,
             too_many_blocks: &mut too_many_blocks,
             too_many_calls: &mut too_many_calls,
             marker: self.marker,
         })? {
+            num_blocks += 1;
             if let Some(block) = block {
                 blocks.push(block);
             }
@@ -243,7 +274,7 @@ struct BlockSeed<'a, TxReq> {
     remaining_calls: &'a mut usize,
     too_many_blocks: &'a mut bool,
     too_many_calls: &'a mut bool,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
 }
 
 impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for BlockSeed<'_, TxReq> {
@@ -252,6 +283,10 @@ impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for BlockSeed<'_, TxReq>
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         if !self.allowed {
             *self.too_many_blocks = true;
+            IgnoredAny::deserialize(deserializer)?;
+            return Ok(None);
+        }
+        if *self.too_many_calls {
             IgnoredAny::deserialize(deserializer)?;
             return Ok(None);
         }
@@ -272,7 +307,17 @@ impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for BlockSeed<'_, TxReq>
 struct BlockVisitor<'a, TxReq> {
     remaining_calls: &'a mut usize,
     too_many_calls: &'a mut bool,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
+}
+
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "camelCase")]
+enum BlockField {
+    BlockOverrides,
+    StateOverrides,
+    Calls,
+    #[serde(other)]
+    Other,
 }
 
 impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for BlockVisitor<'_, TxReq> {
@@ -286,21 +331,25 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for BlockVisitor<'_, TxReq> {
         let mut block_overrides = None;
         let mut state_overrides = None;
         let mut calls = None;
-        while let Some(key) = map.next_key::<String>()? {
-            match key.as_str() {
-                "blockOverrides" => {
+        while let Some(key) = map.next_key::<BlockField>()? {
+            if *self.too_many_calls {
+                map.next_value::<IgnoredAny>()?;
+                continue;
+            }
+            match key {
+                BlockField::BlockOverrides => {
                     if block_overrides.is_some() {
                         return Err(A::Error::duplicate_field("blockOverrides"));
                     }
                     block_overrides = Some(map.next_value()?);
                 }
-                "stateOverrides" => {
+                BlockField::StateOverrides => {
                     if state_overrides.is_some() {
                         return Err(A::Error::duplicate_field("stateOverrides"));
                     }
                     state_overrides = Some(map.next_value()?);
                 }
-                "calls" => {
+                BlockField::Calls => {
                     if calls.is_some() {
                         return Err(A::Error::duplicate_field("calls"));
                     }
@@ -310,7 +359,7 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for BlockVisitor<'_, TxReq> {
                         marker: self.marker,
                     })?);
                 }
-                _ => {
+                BlockField::Other => {
                     map.next_value::<IgnoredAny>()?;
                 }
             }
@@ -342,7 +391,7 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for BlockVisitor<'_, TxReq> {
 struct CallsSeed<'a, TxReq> {
     remaining_calls: &'a mut usize,
     too_many_calls: &'a mut bool,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
 }
 
 impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for CallsSeed<'_, TxReq> {
@@ -360,7 +409,7 @@ impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for CallsSeed<'_, TxReq>
 struct CallsVisitor<'a, TxReq> {
     remaining_calls: &'a mut usize,
     too_many_calls: &'a mut bool,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
 }
 
 impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for CallsVisitor<'_, TxReq> {
@@ -388,7 +437,7 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for CallsVisitor<'_, TxReq> {
 struct CallSeed<'a, TxReq> {
     remaining_calls: &'a mut usize,
     too_many_calls: &'a mut bool,
-    marker: PhantomData<TxReq>,
+    marker: PhantomData<fn() -> TxReq>,
 }
 
 impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for CallSeed<'_, TxReq> {
@@ -409,6 +458,7 @@ impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for CallSeed<'_, TxReq> 
 mod tests {
     use super::*;
     use crate::TransactionRequest;
+    use alloc::{rc::Rc, string::String};
 
     fn payload_with_calls(counts: &[usize]) -> String {
         let blocks = counts
@@ -449,10 +499,31 @@ mod tests {
     }
 
     #[test]
+    fn seed_traits_do_not_depend_on_transaction_request() {
+        fn assert_traits<T: Copy + Clone + fmt::Debug + Send + Sync>() {}
+        assert_traits::<SimulatePayloadSeed<Rc<()>>>();
+    }
+
+    #[test]
     fn skips_excess_call_without_deserializing_transaction() {
         let input = r#"{"blockStateCalls":[{"calls":[{},123]}]}"#;
         let result = parse(input, 1, 1).unwrap();
         assert!(matches!(result, Err(SimulatePayloadLimitExceeded::Calls)));
+    }
+
+    #[test]
+    fn skips_overrides_after_call_limit() {
+        let input = r#"{"blockStateCalls":[{"calls":[{},{}],"stateOverrides":123},{"stateOverrides":123,"calls":[{}]}]}"#;
+        let result = parse(input, 2, 1).unwrap();
+        assert!(matches!(result, Err(SimulatePayloadLimitExceeded::Calls)));
+    }
+
+    #[test]
+    fn block_limit_takes_precedence_after_call_limit() {
+        let input =
+            r#"{"blockStateCalls":[{"calls":[{},{}]},{"stateOverrides":123},{"calls":[]}]}"#;
+        let result = parse(input, 2, 1).unwrap();
+        assert!(matches!(result, Err(SimulatePayloadLimitExceeded::Blocks)));
     }
 
     #[test]
@@ -474,6 +545,21 @@ mod tests {
         let expected = serde_json::from_str::<SimulatePayload<TransactionRequest>>(input).unwrap();
         let parsed = parse(input, 1, 1).unwrap().unwrap();
         assert_eq!(serde_json::to_value(parsed).unwrap(), serde_json::to_value(expected).unwrap());
+    }
+
+    #[test]
+    fn accepts_payload_and_block_sequence_forms() {
+        let input = r#"[[[null,null,[{}]]],true,false,true]"#;
+        let expected = serde_json::from_str::<SimulatePayload<TransactionRequest>>(input).unwrap();
+        let parsed = parse(input, 1, 1).unwrap().unwrap();
+        assert_eq!(serde_json::to_value(parsed).unwrap(), serde_json::to_value(expected).unwrap());
+    }
+
+    #[test]
+    fn enforces_call_limit_in_sequence_form() {
+        let input = r#"[[[null,null,[{},123]]],false,false,false]"#;
+        let result = parse(input, 1, 1).unwrap();
+        assert!(matches!(result, Err(SimulatePayloadLimitExceeded::Calls)));
     }
 
     #[test]
