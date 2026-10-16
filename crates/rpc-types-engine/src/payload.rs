@@ -1,5 +1,8 @@
 //! Payload types.
 
+#[cfg(feature = "serde")]
+mod strict;
+
 use crate::{CancunPayloadFields, ExecutionPayloadSidecar, PayloadError, PraguePayloadFields};
 use alloc::{
     string::{String, ToString},
@@ -1212,6 +1215,9 @@ impl ssz::Encode for ExecutionPayloadV2 {
 
 /// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec.
 ///
+/// Deserialization rejects unknown non-null fields, as required by `engine_newPayloadV3` and
+/// `engine_newPayloadV4`. When flattened, the enclosing type is responsible for unknown fields.
+///
 /// See also: <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#executionpayloadv3>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -1239,7 +1245,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV3 {
         D: serde::Deserializer<'de>,
     {
         #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
         struct Helper {
             parent_hash: B256,
             fee_recipient: Address,
@@ -1266,7 +1272,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV3 {
             excess_blob_gas: u64,
         }
 
-        let helper = Helper::deserialize(deserializer)?;
+        let helper = Helper::deserialize(strict::StrictFields(deserializer))?;
         Ok(Self {
             payload_inner: ExecutionPayloadV2 {
                 payload_inner: ExecutionPayloadV1 {
@@ -1502,6 +1508,9 @@ impl ssz::Encode for ExecutionPayloadV3 {
 
 /// Execution payload V4 as defined in the Amsterdam fork.
 ///
+/// Deserialization rejects unknown non-null fields. When flattened, the enclosing type is
+/// responsible for unknown fields.
+///
 /// This extends [`ExecutionPayloadV3`] with the `block_access_list` field for [EIP-7928] and the
 /// `slot_number` field for [EIP-7843].
 ///
@@ -1536,7 +1545,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV4 {
         D: serde::Deserializer<'de>,
     {
         #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
         struct Helper {
             parent_hash: B256,
             fee_recipient: Address,
@@ -1566,7 +1575,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV4 {
             slot_number: u64,
         }
 
-        let helper = Helper::deserialize(deserializer)?;
+        let helper = Helper::deserialize(strict::StrictFields(deserializer))?;
         Ok(Self {
             payload_inner: ExecutionPayloadV3 {
                 payload_inner: ExecutionPayloadV2 {
