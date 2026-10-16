@@ -60,7 +60,8 @@ macro_rules! bincode_compat_roundtrip_test {
 
 mod block;
 pub use block::{
-    Block, BlockBody, BlockHeader, EthBlock, GasLimitMismatch, Header, HeaderInfo, HeaderRoots,
+    decode_transactions, Block, BlockBody, BlockHeader, EthBlock, GasLimitMismatch, Header,
+    HeaderInfo, HeaderRoots,
 };
 
 mod indexed;
