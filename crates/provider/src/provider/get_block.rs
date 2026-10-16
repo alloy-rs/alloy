@@ -340,10 +340,8 @@ where
             .then(move |hashes| utils::hashes_to_blocks(hashes, client.clone(), kind.into()))
             .flat_map(|res| {
                 futures::stream::iter(match res {
-                    Ok(blocks) => {
-                        // Ignore `None` responses.
-                        Either::Left(blocks.into_iter().filter_map(|block| block.map(Ok)))
-                    }
+                    // Ignore `None` responses.
+                    Ok(blocks) => Either::Left(blocks.into_iter().filter_map(Result::transpose)),
                     Err(err) => Either::Right(std::iter::once(Err(err))),
                 })
             });
@@ -395,9 +393,7 @@ where
             .then(move |hashes| utils::hashes_to_headers(hashes, client.clone()))
             .flat_map(|res| {
                 futures::stream::iter(match res {
-                    Ok(headers) => {
-                        Either::Left(headers.into_iter().filter_map(|header| header.map(Ok)))
-                    }
+                    Ok(headers) => Either::Left(headers.into_iter().filter_map(Result::transpose)),
                     Err(err) => Either::Right(std::iter::once(Err(err))),
                 })
             });
@@ -496,6 +492,7 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
 mod tests {
     use super::*;
     use crate::{Provider, ProviderBuilder};
+    use alloy_primitives::U256;
     use alloy_rpc_types_eth::Block;
 
     #[tokio::test]
@@ -537,5 +534,79 @@ mod tests {
 
         let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap();
         assert!(block.is_none());
+    }
+
+    fn numbered_block(number: u64) -> Block {
+        let mut block: Block = Block::default();
+        block.header.inner.number = number;
+        block
+    }
+
+    #[tokio::test]
+    async fn watch_full_blocks_keeps_fetched_blocks_when_one_fetch_fails() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&U256::from(1)); // eth_newBlockFilter
+        let mut watch = provider.watch_full_blocks().await.unwrap();
+        watch.set_poll_interval(Duration::from_millis(1));
+        watch.set_limit(Some(2));
+
+        // First eth_getFilterChanges response
+        asserter.push_success(&[1, 2, 3, 4].map(B256::with_last_byte));
+        // Fetch responses for hashes 1-4
+        asserter.push_success(&numbered_block(1));
+        asserter.push_failure_msg("transient");
+        asserter.push_success(&Value::Null);
+        asserter.push_success(&numbered_block(4));
+        // Next eth_getFilterChanges response and its block
+        asserter.push_success(&[B256::with_last_byte(5)]);
+        asserter.push_success(&numbered_block(5));
+
+        let numbers = tokio::time::timeout(
+            Duration::from_secs(1),
+            watch
+                .into_stream()
+                .map(|item| item.map(|b| b.header.number).map_err(|_| ()))
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(numbers, vec![Ok(1), Err(()), Ok(4), Ok(5)]);
+    }
+
+    #[tokio::test]
+    async fn watch_headers_keeps_fetched_headers_when_one_fetch_fails() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&U256::from(1)); // eth_newBlockFilter
+        let mut watch = provider.watch_headers().await.unwrap();
+        watch.set_poll_interval(Duration::from_millis(1));
+        watch.set_limit(Some(2));
+
+        // First eth_getFilterChanges response
+        asserter.push_success(&[1, 2, 3, 4].map(B256::with_last_byte));
+        // Fetch responses for hashes 1-4
+        asserter.push_success(&numbered_block(1).header);
+        asserter.push_failure_msg("transient");
+        asserter.push_success(&Value::Null);
+        asserter.push_success(&numbered_block(4).header);
+        // Next eth_getFilterChanges response and its header
+        asserter.push_success(&[B256::with_last_byte(5)]);
+        asserter.push_success(&numbered_block(5).header);
+
+        let numbers = tokio::time::timeout(
+            Duration::from_secs(1),
+            watch
+                .into_stream()
+                .map(|item| item.map(|h| h.inner.number).map_err(|_| ()))
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(numbers, vec![Ok(1), Err(()), Ok(4), Ok(5)]);
     }
 }

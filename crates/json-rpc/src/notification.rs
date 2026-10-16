@@ -66,6 +66,53 @@ impl<'de> Deserialize<'de> for PubSubItem {
     where
         D: serde::Deserializer<'de>,
     {
+        enum Field {
+            Id,
+            Result,
+            Params,
+            Error,
+            Unknown,
+        }
+
+        // Matches keys without borrowing them, so owned input such as `serde_json::Value` and
+        // keys containing escapes deserialize too.
+        impl<'de> Deserialize<'de> for Field {
+            #[inline]
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl Visitor<'_> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        formatter.write_str("a field identifier")
+                    }
+
+                    #[inline]
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        Ok(match value {
+                            "id" => Field::Id,
+                            "result" => Field::Result,
+                            "params" => Field::Params,
+                            "error" => Field::Error,
+                            _ => Field::Unknown,
+                        })
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
         struct PubSubItemVisitor;
 
         impl<'de> Visitor<'de> for PubSubItemVisitor {
@@ -87,32 +134,32 @@ impl<'de> Deserialize<'de> for PubSubItem {
                 // Drain the map into the appropriate fields.
                 while let Some(key) = map.next_key()? {
                     match key {
-                        "id" => {
+                        Field::Id => {
                             if id.is_some() {
                                 return Err(serde::de::Error::duplicate_field("id"));
                             }
                             id = Some(map.next_value()?);
                         }
-                        "result" => {
+                        Field::Result => {
                             if result.is_some() {
                                 return Err(serde::de::Error::duplicate_field("result"));
                             }
                             result = Some(map.next_value()?);
                         }
-                        "params" => {
+                        Field::Params => {
                             if params.is_some() {
                                 return Err(serde::de::Error::duplicate_field("params"));
                             }
                             params = Some(map.next_value()?);
                         }
-                        "error" => {
+                        Field::Error => {
                             if error.is_some() {
                                 return Err(serde::de::Error::duplicate_field("error"));
                             }
                             error = Some(map.next_value()?);
                         }
                         // Discard unknown fields.
-                        _ => {
+                        Field::Unknown => {
                             let _: serde::de::IgnoredAny = map.next_value()?;
                         }
                     }
