@@ -108,18 +108,11 @@ impl<N: Network> RootProvider<N> {
     }
 }
 
-/// The root provider manages the RPC client and the heartbeat. It is at the
-/// base of every provider stack.
+/// The shared state of a [`RootProvider`]: the RPC client and the lazily started heartbeat.
 pub(crate) struct RootProviderInner<N: Network = Ethereum> {
     client: RpcClient,
     heart: OnceLock<HeartbeatHandle>,
     _network: PhantomData<N>,
-}
-
-impl<N: Network> Clone for RootProviderInner<N> {
-    fn clone(&self) -> Self {
-        Self { client: self.client.clone(), heart: self.heart.clone(), _network: PhantomData }
-    }
 }
 
 impl<N: Network> RootProviderInner<N> {

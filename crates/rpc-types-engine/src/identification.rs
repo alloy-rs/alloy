@@ -6,16 +6,20 @@ use alloc::string::String;
 /// have a code reserved in this list MUST use this code when identifying themselves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
-#[derive(strum::IntoStaticStr)] // Into<&'static str>, AsRef<str>, fmt::Display and serde::Serialize
+#[derive(strum::IntoStaticStr)] // Into<&'static str>
 #[derive(strum::EnumString)] // FromStr, TryFrom<&str>
 #[non_exhaustive]
 pub enum ClientCode {
     /// Besu
     BU,
+    /// Caplin
+    CN,
     /// EthereumJS
     EJ,
     /// Erigon
     EG,
+    /// ethrex
+    EX,
     /// Geth, go-ethereum
     GE,
     /// Grandine
@@ -26,8 +30,10 @@ pub enum ClientCode {
     LS,
     /// Nethermind
     NM,
-    /// Nimbus
+    /// Nimbus consensus layer client
     NB,
+    /// Nimbus execution layer client
+    NE,
     /// Trin Execution
     TE,
     /// Teku
@@ -48,14 +54,17 @@ impl ClientCode {
     pub const fn client_name(&self) -> &'static str {
         match self {
             Self::BU => "Besu",
+            Self::CN => "Caplin",
             Self::EJ => "EthereumJS",
             Self::EG => "Erigon",
+            Self::EX => "ethrex",
             Self::GE => "Geth",
             Self::GR => "Grandine",
             Self::LH => "Lighthouse",
             Self::LS => "Lodestar",
             Self::NM => "Nethermind",
             Self::NB => "Nimbus",
+            Self::NE => "Nimbus EL",
             Self::TE => "Trin Execution",
             Self::TK => "Teku",
             Self::PM => "Prysm",
@@ -106,5 +115,19 @@ mod tests {
         assert_eq!(v.code, ClientCode::RH);
         assert_eq!(v.name, "Reth");
         assert_eq!(serde_json::to_string(&v).unwrap(), s);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn registered_client_codes_serde() {
+        // Codes reserved in the execution-apis client code list.
+        for code in ["CN", "EX", "NE"] {
+            let s = format!(
+                r#"{{"code":"{code}","name":"client","version":"v1.0.0","commit":"fa4ff922"}}"#
+            );
+            let v: ClientVersionV1 = serde_json::from_str(&s).unwrap();
+            assert_eq!(v.code.as_str(), code);
+            assert_eq!(serde_json::to_string(&v).unwrap(), s);
+        }
     }
 }

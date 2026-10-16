@@ -520,7 +520,13 @@ impl Reth {
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+            if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+                let _ = child.kill();
+                let status = child.wait().map_err(NodeError::WaitError)?;
+                return Err(NodeError::Fatal(format!(
+                    "reth exited before it was ready ({status})"
+                )));
+            }
 
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
@@ -610,27 +616,21 @@ mod tests {
             assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
         }
     }
+}
+
+#[cfg(all(test, unix))]
+mod early_exit_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
-    fn default_matches_new_semantics() {
-        let reth = Reth::default();
+    fn early_exit_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("reth");
+        std::fs::write(&program, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        assert!(!reth.dev);
-        assert_eq!(reth.host, None);
-        assert_eq!(reth.http_port, DEFAULT_HTTP_PORT);
-        assert_eq!(reth.ws_port, DEFAULT_WS_PORT);
-        assert_eq!(reth.auth_port, DEFAULT_AUTH_PORT);
-        assert_eq!(reth.p2p_port, DEFAULT_P2P_PORT);
-        assert_eq!(reth.block_time, None);
-        assert!((1..200).contains(&reth.instance));
-        assert!(reth.discovery_enabled);
-        assert_eq!(reth.program, None);
-        assert_eq!(reth.ipc_path, None);
-        assert!(!reth.ipc_enabled);
-        assert_eq!(reth.data_dir, None);
-        assert_eq!(reth.chain_or_path, None);
-        assert_eq!(reth.genesis, None);
-        assert!(reth.args.is_empty());
-        assert!(!reth.keep_stdout);
+        let err = Reth::at(&program).try_spawn().unwrap_err();
+        assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
     }
 }

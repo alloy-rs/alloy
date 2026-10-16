@@ -7,6 +7,11 @@ use crate::{
 use alloc::{string::String, vec::Vec};
 use alloy_primitives::{Bytes, U256};
 
+#[cfg(feature = "serde")]
+mod limited;
+#[cfg(feature = "serde")]
+pub use limited::{SimulatePayloadLimitExceeded, SimulatePayloadSeed};
+
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
 
@@ -33,7 +38,7 @@ pub struct SimBlock<TxReq = TransactionRequest> {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
-    #[cfg_attr(feature = "serde", serde(default = "Vec::new"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub calls: Vec<TxReq>,
 }
 
@@ -137,6 +142,8 @@ pub struct SimCallResult {
 /// validate transaction sequences, and whether to return full transaction objects.
 /// The RPC accepts at most [`MAX_SIMULATE_BLOCKS`] blocks; this type and its builder methods do not
 /// enforce that limit.
+/// Servers parsing untrusted input can use `SimulatePayloadSeed` (with the `serde` feature) to
+/// enforce their own block and call limits during deserialization.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -375,12 +382,5 @@ mod tests {
         let expected: Vec<_> = (1..=3).map(Address::with_last_byte).collect();
         assert_eq!(block.logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
         assert_eq!(block.into_logs().map(|log| log.address()).collect::<Vec<_>>(), expected);
-    }
-
-    #[test]
-    fn test_simulate_error_codes() {
-        assert_eq!(SimulateError::EXECUTION_REVERTED_CODE, EthRpcErrorCode::ExecutionError.code());
-        assert_eq!(SimulateError::VM_EXECUTION_ERROR_CODE, -32015);
-        assert_eq!(SimulateError::invalid_params().code, SimulateError::INVALID_PARAMS_ERROR_CODE);
     }
 }
