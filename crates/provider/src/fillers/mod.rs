@@ -356,10 +356,10 @@ where
             if count >= 20 {
                 const ERROR: &str = "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing this message.";
                 error!(
-                    ?tx, ?self.filler,
+                    ?tx, ?self.filler, loop_iterations = count,
                     ERROR
                 );
-                panic!("{}, {:?}, {:?}", ERROR, tx, self.filler);
+                return Err(TransportError::local_usage_str(ERROR));
             }
         }
         Ok(tx)
@@ -1028,5 +1028,60 @@ mod forwarding_tests {
                 "fill_transaction",
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_rpc_types_eth::TransactionRequest;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    #[derive(Clone, Debug, Default)]
+    struct LoopingFiller(Arc<AtomicUsize>);
+
+    impl TxFiller for LoopingFiller {
+        type Fillable = ();
+
+        fn status(&self, _tx: &TransactionRequest) -> FillerControlFlow {
+            FillerControlFlow::Ready
+        }
+
+        fn fill_sync(&self, _tx: &mut SendableTx<Ethereum>) {}
+
+        async fn prepare<P: Provider>(
+            &self,
+            _provider: &P,
+            _tx: &TransactionRequest,
+        ) -> TransportResult<()> {
+            Ok(())
+        }
+
+        async fn fill(
+            &self,
+            (): (),
+            tx: SendableTx<Ethereum>,
+        ) -> TransportResult<SendableTx<Ethereum>> {
+            self.0.fetch_add(1, Ordering::Relaxed);
+            Ok(tx)
+        }
+    }
+
+    #[tokio::test]
+    async fn looping_filler_returns_local_usage_error() {
+        let filler = LoopingFiller::default();
+        let calls = filler.0.clone();
+        let inner = RootProvider::<Ethereum>::new(alloy_rpc_client::RpcClient::mocked(
+            alloy_transport::mock::Asserter::new(),
+        ));
+        let provider = FillProvider::new(inner, filler);
+        let err = provider.fill(TransactionRequest::default()).await.unwrap_err();
+
+        assert!(matches!(err, RpcError::LocalUsageError(_)));
+        assert!(err.to_string().contains("Tx filler loop detected"));
+        assert_eq!(calls.load(Ordering::Relaxed), 20);
     }
 }
