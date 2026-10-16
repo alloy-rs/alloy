@@ -190,11 +190,12 @@ macro_rules! payload_serde_helper {
 /// that conversion errors carry the deserializer's position.
 ///
 /// Unlike `H::deserialize`, this only accepts a map and rejects the sequence form that a derived
-/// `Deserialize` also accepts.
+/// `Deserialize` also accepts. A field list preserves sibling fields when the payload is flattened.
 #[cfg(feature = "serde")]
 fn deserialize_payload_map<'de, D, H, T>(
     deserializer: D,
     expecting: &'static str,
+    fields: Option<&'static [&'static str]>,
     f: fn(H) -> Result<T, &'static str>,
 ) -> Result<T, D::Error>
 where
@@ -222,7 +223,11 @@ where
         }
     }
 
-    deserializer.deserialize_map(PayloadMapVisitor { expecting, f })
+    let visitor = PayloadMapVisitor { expecting, f };
+    match fields {
+        Some(fields) => deserializer.deserialize_struct("ExecutionPayload", fields, visitor),
+        None => deserializer.deserialize_map(visitor),
+    }
 }
 
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
@@ -264,6 +269,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadFieldV2 {
         deserialize_payload_map(
             deserializer,
             "a valid ExecutionPayload object",
+            None,
             |helper: Helper| {
                 let (payload_inner, (withdrawals,)) = helper.into_parts();
                 Ok(match withdrawals {
@@ -3121,6 +3127,28 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
         D: serde::Deserializer<'de>,
     {
         const INVALID_VARIANT: &str = "invalid enum variant";
+        // Preserve the struct field list so flattening leaves sibling fields to the outer type.
+        const FIELDS: &[&str] = &[
+            "parentHash",
+            "feeRecipient",
+            "stateRoot",
+            "receiptsRoot",
+            "logsBloom",
+            "prevRandao",
+            "blockNumber",
+            "gasLimit",
+            "gasUsed",
+            "timestamp",
+            "extraData",
+            "baseFeePerGas",
+            "blockHash",
+            "transactions",
+            "withdrawals",
+            "blobGasUsed",
+            "excessBlobGas",
+            "blockAccessList",
+            "slotNumber",
+        ];
 
         // Optional fields may be omitted but, unlike a plain `Option`, must not be `null`.
         fn present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
@@ -3157,6 +3185,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
         deserialize_payload_map(
             deserializer,
             "a valid ExecutionPayload object",
+            Some(FIELDS),
             |helper: Helper| {
                 let (
                     v1,
