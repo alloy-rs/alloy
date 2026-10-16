@@ -232,12 +232,32 @@ struct CallBatchProviderInner<N: Network> {
     tx: mpsc::UnboundedSender<CallBatchMsg<N>>,
 }
 
+/// Returns `true` if the serialized transaction request can be represented as a Multicall3
+/// [`Call3`](IMulticall3::Call3), i.e. it is an object made up of nothing but `to`, `data` and
+/// `input`.
+///
+/// Any other shape is rejected. A `Call3` can only carry a target and calldata, so a request we
+/// cannot prove fits that shape must be sent as a regular `eth_call` rather than being silently
+/// stripped of its remaining fields when the multicall is built.
+fn is_multicall_compatible(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Object(obj) => {
+            obj.keys().all(|k| matches!(k.as_str(), "to" | "data" | "input"))
+        }
+        _ => false,
+    }
+}
+
 impl<N: Network> CallBatchProviderInner<N> {
     /// We only want to perform a scheduled multicall if:
     /// - The request has no block ID or state overrides,
     /// - The request has a target address,
-    /// - The request has no other properties (`nonce`, `gas`, etc cannot be sent with a multicall).
+    /// - The request can be represented as a Multicall3 `Call3`.
     ///
+    /// A `Call3` carries nothing but a target and calldata, so requests carrying any other property
+    /// (`nonce`, `gas`, etc.) must be sent as a regular `eth_call`. Requests we cannot inspect at
+    /// all are rejected too: falling back to a plain `eth_call` is always correct, batching them is
+    /// not.
     /// Ref: <https://github.com/wevm/viem/blob/ba8319f71503af8033fd3c77cfb64c7eb235c6a9/src/actions/public/call.ts#L295>
     fn should_batch_call(&self, params: &crate::EthCallParams<N>) -> bool {
         // If a specific block ID is requested (not "latest"), skip batching
@@ -255,10 +275,11 @@ impl<N: Network> CallBatchProviderInner<N> {
         if tx.to().is_none() {
             return false;
         }
-        if let Ok(serde_json::Value::Object(obj)) = serde_json::to_value(tx) {
-            if obj.keys().any(|k| !matches!(k.as_str(), "to" | "data" | "input")) {
-                return false;
-            }
+        // A `Call3` can only carry a target and calldata, so only batch requests that are known to
+        // fit that shape. Anything that cannot be inspected (including a request that fails to
+        // serialize) falls back to a regular `eth_call`, which is always correct.
+        if !serde_json::to_value(tx).is_ok_and(|value| is_multicall_compatible(&value)) {
+            return false;
         }
         true
     }
@@ -604,6 +625,44 @@ mod tests {
                 .with_block_overrides(BlockOverrides::default().with_number(U256::from(1)));
 
         assert!(!inner.should_batch_call(&params));
+    }
+
+    #[test]
+    fn should_not_batch_calls_with_unrepresentable_fields() {
+        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        let inner = CallBatchProviderInner::<Ethereum> { tx };
+
+        // Only `to`/`data`/`input` survive the conversion into a `Call3`.
+        let ok = crate::EthCallParams::new(
+            TransactionRequest::default().with_to(COUNTER_ADDRESS).with_input(hex!("0x8381f58a")),
+        );
+        assert!(inner.should_batch_call(&ok));
+
+        // Anything else has to go out as a regular `eth_call`.
+        let extra = crate::EthCallParams::new(
+            TransactionRequest::default().with_to(COUNTER_ADDRESS).with_gas_limit(1),
+        );
+        assert!(!inner.should_batch_call(&extra));
+    }
+
+    #[test]
+    fn multicall_compatibility_is_fail_closed() {
+        // A `Call3` carries a target and calldata, and nothing else.
+        assert!(is_multicall_compatible(&serde_json::json!({})));
+        assert!(is_multicall_compatible(&serde_json::json!({ "to": COUNTER_ADDRESS })));
+        assert!(is_multicall_compatible(
+            &serde_json::json!({ "to": COUNTER_ADDRESS, "data": "0x8381f58a" })
+        ));
+
+        // Any other field would be dropped when building the multicall.
+        assert!(!is_multicall_compatible(
+            &serde_json::json!({ "to": COUNTER_ADDRESS, "gas": "0x1" })
+        ));
+
+        // Shapes we cannot inspect at all must never be batched.
+        assert!(!is_multicall_compatible(&serde_json::json!([])));
+        assert!(!is_multicall_compatible(&serde_json::json!("0x")));
+        assert!(!is_multicall_compatible(&serde_json::Value::Null));
     }
 
     #[tokio::test]
