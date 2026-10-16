@@ -1,5 +1,8 @@
 //! Payload types.
 
+#[cfg(feature = "serde")]
+mod strict;
+
 use crate::{CancunPayloadFields, ExecutionPayloadSidecar, PayloadError, PraguePayloadFields};
 use alloc::{
     string::{String, ToString},
@@ -1252,6 +1255,9 @@ impl ssz::Encode for ExecutionPayloadV2 {
 
 /// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec.
 ///
+/// Deserialization rejects unknown non-null fields, as required by `engine_newPayloadV3` and
+/// `engine_newPayloadV4`. When flattened, the enclosing type is responsible for unknown fields.
+///
 /// See also: <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#executionpayloadv3>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -1279,6 +1285,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV3 {
         D: serde::Deserializer<'de>,
     {
         payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
             struct Helper {
                 withdrawals: Vec<Withdrawal>,
                 #[serde(with = "alloy_serde::quantity")]
@@ -1289,7 +1296,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV3 {
         }
 
         let (payload_inner, (withdrawals, blob_gas_used, excess_blob_gas)) =
-            Helper::deserialize(deserializer)?.into_parts();
+            Helper::deserialize(strict::StrictFields(deserializer))?.into_parts();
         Ok(Self {
             payload_inner: ExecutionPayloadV2 { payload_inner, withdrawals },
             blob_gas_used,
@@ -1507,6 +1514,9 @@ impl ssz::Encode for ExecutionPayloadV3 {
 
 /// Execution payload V4 as defined in the Amsterdam fork.
 ///
+/// Deserialization rejects unknown non-null fields. When flattened, the enclosing type is
+/// responsible for unknown fields.
+///
 /// This extends [`ExecutionPayloadV3`] with the `block_access_list` field for [EIP-7928] and the
 /// `slot_number` field for [EIP-7843].
 ///
@@ -1541,6 +1551,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV4 {
         D: serde::Deserializer<'de>,
     {
         payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
             struct Helper {
                 withdrawals: Vec<Withdrawal>,
                 #[serde(with = "alloy_serde::quantity")]
@@ -1556,7 +1567,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV4 {
         let (
             payload_inner,
             (withdrawals, blob_gas_used, excess_blob_gas, block_access_list, slot_number),
-        ) = Helper::deserialize(deserializer)?.into_parts();
+        ) = Helper::deserialize(strict::StrictFields(deserializer))?.into_parts();
         Ok(Self {
             payload_inner: ExecutionPayloadV3 {
                 payload_inner: ExecutionPayloadV2 { payload_inner, withdrawals },
