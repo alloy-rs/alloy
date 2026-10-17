@@ -31,6 +31,11 @@ impl RequestManager {
         self.reqs.insert(in_flight.request.id().clone(), in_flight);
     }
 
+    /// Drain all pending requests when the service terminates.
+    pub(crate) fn drain(&mut self) -> impl Iterator<Item = InFlight> + '_ {
+        self.reqs.drain().map(|(_, request)| request)
+    }
+
     /// Handle a response by sending the payload to the waiter.
     ///
     /// If the request created a new subscription, this function returns the
