@@ -1,6 +1,9 @@
 //! Utilities for launching an Anvil instance.
 
-use crate::{utils::GracefulShutdown, NodeError, NODE_STARTUP_TIMEOUT};
+use crate::{
+    utils::{GracefulShutdown, StartupGuard},
+    NodeError, NODE_STARTUP_TIMEOUT,
+};
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
@@ -447,7 +450,7 @@ impl Anvil {
 
         cmd.args(self.args);
 
-        let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
+        let mut child = StartupGuard::new(cmd.spawn().map_err(NodeError::SpawnError)?);
 
         let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
@@ -525,7 +528,7 @@ impl Anvil {
         }
 
         Ok(AnvilInstance {
-            child,
+            child: child.into_child(),
             private_keys,
             addresses,
             wallet,
