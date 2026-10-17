@@ -601,6 +601,24 @@ impl GethDebugTracingOptions {
         self.tracer_config = config.into();
         self
     }
+
+    /// Returns whether call logs are requested by `callTracer`, `erc7562Tracer`, or a
+    /// `callTracer` inside `muxTracer`.
+    ///
+    /// This only checks for `withLog: true`; it does not validate the full tracer configuration.
+    pub fn records_call_logs(&self) -> bool {
+        let config = match &self.tracer {
+            Some(GethDebugTracerType::BuiltInTracer(
+                GethDebugBuiltInTracerType::CallTracer | GethDebugBuiltInTracerType::Erc7562Tracer,
+            )) => Some(&self.tracer_config.0),
+            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::MuxTracer)) => {
+                self.tracer_config.0.get("callTracer")
+            }
+            _ => None,
+        };
+        config.and_then(|config| config.get("withLog")).and_then(serde_json::Value::as_bool)
+            == Some(true)
+    }
 }
 
 /// Default tracing options for the struct logger.
@@ -1054,5 +1072,45 @@ mod tests {
         assert_eq!(config.disable_code, Some(true));
         assert_eq!(config.disable_storage, Some(true));
         assert!(!config.code_enabled());
+    }
+
+    #[test]
+    fn records_call_logs() {
+        for tracer in ["callTracer", "erc7562Tracer", "muxTracer"] {
+            for (config, expected) in [
+                (serde_json::json!({ "withLog": true }), true),
+                (serde_json::json!({ "withLog": false }), false),
+                (serde_json::json!({ "withLog": "true" }), false),
+                (serde_json::json!({}), false),
+                (serde_json::Value::Null, false),
+            ] {
+                let config = if tracer == "muxTracer" {
+                    serde_json::json!({ "callTracer": config })
+                } else {
+                    config
+                };
+                let opts = serde_json::from_value::<GethDebugTracingOptions>(serde_json::json!({
+                    "tracer": tracer,
+                    "tracerConfig": config,
+                }))
+                .unwrap();
+                assert_eq!(opts.records_call_logs(), expected, "{opts:?}");
+            }
+        }
+
+        for options in [
+            serde_json::json!({}),
+            serde_json::json!({ "tracerConfig": { "withLog": true } }),
+            serde_json::json!({ "tracer": "prestateTracer", "tracerConfig": { "withLog": true } }),
+            serde_json::json!({ "tracer": "customTracer", "tracerConfig": { "withLog": true } }),
+            serde_json::json!({ "tracer": "muxTracer" }),
+            serde_json::json!({ "tracer": "muxTracer", "tracerConfig": { "withLog": true } }),
+            serde_json::json!({ "tracer": "muxTracer", "tracerConfig": {
+                "prestateTracer": { "withLog": true }
+            } }),
+        ] {
+            let opts = serde_json::from_value::<GethDebugTracingOptions>(options).unwrap();
+            assert!(!opts.records_call_logs(), "{opts:?}");
+        }
     }
 }
