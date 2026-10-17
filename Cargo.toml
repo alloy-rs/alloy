@@ -175,3 +175,8 @@ criterion = { version = "0.8", default-features = false, features = ["cargo_benc
 similar-asserts = "1.5"
 tempfile = "3.20"
 tower-http = "0.6.1"
+
+[profile.dev.package]
+blst.opt-level = 3
+c-kzg.opt-level = 3
+secp256k1-sys.opt-level = 3
