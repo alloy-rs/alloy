@@ -333,10 +333,7 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     async fn get_logs_chunked(&self) -> TransportResult<Vec<Log>> {
         let (from, to) = self.resolved_block_range().await?;
 
-        let mut resolved: Vec<(u64, Vec<Log>)> = self.chunk_stream(from, to).try_collect().await?;
-
-        resolved.sort_by_key(|(block_num, _)| *block_num);
-        Ok(resolved.into_iter().flat_map(|(_, logs)| logs).collect())
+        self.chunk_stream(from, to).map_ok(|(_, logs)| logs).try_concat().await
     }
 
     async fn resolved_block_range(&self) -> TransportResult<(u64, u64)> {
