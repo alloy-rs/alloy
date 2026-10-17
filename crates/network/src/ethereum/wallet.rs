@@ -41,12 +41,13 @@ impl EthereumWallet {
         this
     }
 
-    /// Register a new signer on this object. This signer will be used to sign
-    /// [`TransactionRequest`] and [`TypedTransaction`] objects that specify the
-    /// signer's address in the `from` field.
+    /// Register a new signer on this object.
+    ///
+    /// This signer is selected when a [`TransactionRequest`] specifies its address in `from`, or
+    /// when its address is passed as the `sender` to [`NetworkWallet::sign_transaction_from`].
+    /// Unsigned consensus transactions do not contain a `from` field.
     ///
     /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
-    /// [`TypedTransaction`]: alloy_consensus::TypedTransaction
     pub fn register_signer<S>(&mut self, signer: S)
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
@@ -55,12 +56,10 @@ impl EthereumWallet {
     }
 
     /// Register a new signer on this object, and set it as the default signer.
-    /// This signer will be used to sign [`TransactionRequest`] and
-    /// [`TypedTransaction`] objects that do not specify a signer address in the
-    /// `from` field.
+    /// This signer is used for [`TransactionRequest`] objects without a `from` address and for
+    /// unsigned consensus transactions signed with [`NetworkWallet::sign_transaction`].
     ///
     /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
-    /// [`TypedTransaction`]: alloy_consensus::TypedTransaction
     pub fn register_default_signer<S>(&mut self, signer: S)
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
@@ -71,8 +70,8 @@ impl EthereumWallet {
 
     /// Sets the default signer to the given address.
     ///
-    /// The default signer is used to sign [`TransactionRequest`] and [`TypedTransaction`] objects
-    /// that do not specify a signer address in the `from` field.
+    /// The default signer is used for [`TransactionRequest`] objects without a `from` address and
+    /// for unsigned consensus transactions signed with [`NetworkWallet::sign_transaction`].
     ///
     /// The provided address must be a registered signer otherwise an error is returned.
     ///
@@ -80,7 +79,6 @@ impl EthereumWallet {
     /// [`EthereumWallet::register_default_signer`].
     ///
     /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
-    /// [`TypedTransaction`]: alloy_consensus::TypedTransaction
     pub fn set_default_signer(&mut self, address: Address) -> alloy_signer::Result<()> {
         if self.signers.contains_key(&address) {
             self.default = address;

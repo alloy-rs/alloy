@@ -240,8 +240,10 @@ impl HttpTransportSettings {
 
     /// Set the maximum size of a response body in bytes.
     ///
-    /// Larger responses are rejected while the body is read, before it is decoded. There is no
-    /// limit by default.
+    /// Larger responses are rejected before JSON decoding. On native targets, the limit is checked
+    /// incrementally while reading the body. The WASM reqwest transport rejects an oversized known
+    /// content length up front, but otherwise reads the full body before checking its size; the
+    /// limit does not bound body accumulation on that path. There is no limit by default.
     pub const fn with_max_response_size(mut self, max_response_size: usize) -> Self {
         self.max_response_size = Some(max_response_size);
         self
