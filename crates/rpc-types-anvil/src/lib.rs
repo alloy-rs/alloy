@@ -36,25 +36,16 @@ impl<'de> serde::Deserialize<'de> for Forking {
             block_number: Option<u64>,
         }
 
-        #[derive(serde::Deserialize)]
-        struct Tagged {
-            forking: ForkOpts,
+        let mut fields = alloy_serde::OtherFields::deserialize(deserializer)?;
+        // A present tag must decode successfully instead of falling back to the root fields.
+        let options = if let Some(forking) = fields.remove_deserialized::<ForkOpts>("forking") {
+            forking
+        } else {
+            fields.deserialize_into::<ForkOpts>()
         }
-        #[derive(serde::Deserialize)]
-        #[serde(untagged)]
-        enum ForkingVariants {
-            Tagged(Tagged),
-            Fork(ForkOpts),
-        }
-        let f = match ForkingVariants::deserialize(deserializer)? {
-            ForkingVariants::Fork(ForkOpts { json_rpc_url, block_number }) => {
-                Self { json_rpc_url, block_number }
-            }
-            ForkingVariants::Tagged(f) => {
-                Self { json_rpc_url: f.forking.json_rpc_url, block_number: f.forking.block_number }
-            }
-        };
-        Ok(f)
+        .map_err(serde::de::Error::custom)?;
+        let ForkOpts { json_rpc_url, block_number } = options;
+        Ok(Self { json_rpc_url, block_number })
     }
 }
 
@@ -249,5 +240,44 @@ mod tests {
             let deserialized: MineOptions = serde_json::from_str(data).unwrap();
             assert_eq!(deserialized, expected, "{data}");
         }
+    }
+
+    #[test]
+    fn test_serde_forking_rejects_invalid_tagged_options() {
+        for data in [
+            r#"{"forking":{"blockNumber":"invalid"}}"#,
+            r#"{"forking":{"jsonRpcUrl":42}}"#,
+            r#"{"forking":null}"#,
+            r#"{"forking":false}"#,
+            r#"{"forking":"invalid"}"#,
+        ] {
+            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
+        }
+    }
+
+    #[test]
+    fn test_serde_forking_untagged_and_empty_options() {
+        for data in [r#"{"blockNumber":"0x11965b1"}"#, r#"{"blockNumber":18441649}"#] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking { json_rpc_url: None, block_number: Some(18441649) }
+            );
+        }
+        for data in
+            [r#"{}"#, r#"{"forking":{}}"#, r#"{"unknown":true}"#, r#"{"forking":{"unknown":true}}"#]
+        {
+            assert_eq!(serde_json::from_str::<Forking>(data).unwrap(), Forking::default());
+        }
+        assert_eq!(
+            serde_json::from_str::<Forking>(r#"{"jsonRpcUrl":"http://localhost:8545"}"#).unwrap(),
+            Forking { json_rpc_url: Some("http://localhost:8545".into()), block_number: None }
+        );
+        assert_eq!(
+            serde_json::from_str::<Forking>(
+                r#"{"forking":{"blockNumber":"0x1"},"blockNumber":"invalid","jsonRpcUrl":42}"#
+            )
+            .unwrap(),
+            Forking { json_rpc_url: None, block_number: Some(1) }
+        );
     }
 }
