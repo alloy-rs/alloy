@@ -114,8 +114,7 @@ impl TempoKeystore {
     /// limits, or authorization metadata. In Keychain mode, recorded key addresses must match the
     /// private key. The returned signer's chain ID is not configured.
     pub fn find_by_from(&self, from: Address) -> Result<TempoLookup, TempoSignerError> {
-        let candidates: Vec<&RawKeyEntry> =
-            self.entries.iter().filter(|e| e.wallet_address == from).collect();
+        let candidates = self.entries.iter().filter(|e| e.wallet_address == from);
         select_one(candidates, from)
     }
 
@@ -124,14 +123,13 @@ impl TempoKeystore {
     /// This has the same validation scope as [`Self::find_by_from`], and the returned signer's
     /// chain ID is not configured.
     pub fn find_by_key(&self, key_address: Address) -> Result<TempoLookup, TempoSignerError> {
-        let candidates: Vec<&RawKeyEntry> =
-            self.entries.iter().filter(|e| e.key_address == Some(key_address)).collect();
+        let candidates = self.entries.iter().filter(|e| e.key_address == Some(key_address));
         select_one(candidates, key_address)
     }
 }
 
-fn select_one(
-    candidates: Vec<&RawKeyEntry>,
+fn select_one<'a>(
+    candidates: impl IntoIterator<Item = &'a RawKeyEntry>,
     from: Address,
 ) -> Result<TempoLookup, TempoSignerError> {
     // Keep only secp256k1 entries with a private key; drop expired ones.
@@ -140,7 +138,7 @@ fn select_one(
     let mut saw_missing_key = false;
     let now = current_unix_seconds();
 
-    let mut usable: Vec<&RawKeyEntry> = Vec::new();
+    let mut usable = None;
     for c in candidates {
         if c.key_type != KeyType::Secp256k1 {
             saw_unsupported.get_or_insert(c.key_type);
@@ -156,12 +154,14 @@ fn select_one(
                 continue;
             }
         }
-        usable.push(c);
+        if usable.replace(c).is_some() {
+            return Err(TempoSignerError::Ambiguous { from });
+        }
     }
 
-    match usable.len() {
-        1 => entry_to_lookup(usable[0]),
-        0 => {
+    match usable {
+        Some(entry) => entry_to_lookup(entry),
+        None => {
             if let Some(exp) = saw_expired {
                 Err(TempoSignerError::Expired { expiry: exp })
             } else if saw_missing_key {
@@ -172,7 +172,6 @@ fn select_one(
                 Err(TempoSignerError::NoMatch { from })
             }
         }
-        _ => Err(TempoSignerError::Ambiguous { from }),
     }
 }
 
@@ -273,5 +272,48 @@ fn parse_keystore(contents: &str, path: &Path) -> Result<Vec<RawKeyEntry>, Tempo
             }
             Ok(entries)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selection_preserves_usable_keys_and_error_precedence() {
+        let entries =
+            parse_keystore(include_str!("../tests/fixtures/keys.toml"), Path::new("keys.toml"))
+                .unwrap();
+        let valid = &entries[0];
+        let unsupported = &entries[2];
+        let expired = &entries[3];
+        let mut missing = valid.clone();
+        missing.key = None;
+        let from = valid.wallet_address;
+
+        for candidates in [
+            vec![unsupported, &missing, expired, valid],
+            vec![valid, expired, &missing, unsupported],
+        ] {
+            assert_eq!(select_one(candidates, from).unwrap().signer().address(), from);
+        }
+        assert!(matches!(
+            select_one([valid, expired, valid], from),
+            Err(TempoSignerError::Ambiguous { .. })
+        ));
+        for candidates in
+            [vec![unsupported, &missing, expired], vec![expired, &missing, unsupported]]
+        {
+            assert!(matches!(select_one(candidates, from), Err(TempoSignerError::Expired { .. })));
+        }
+        assert!(matches!(
+            select_one([unsupported, &missing], from),
+            Err(TempoSignerError::MissingKey { .. })
+        ));
+        assert!(matches!(
+            select_one([unsupported], from),
+            Err(TempoSignerError::UnsupportedKeyType { .. })
+        ));
+        assert!(matches!(select_one([], from), Err(TempoSignerError::NoMatch { .. })));
     }
 }
