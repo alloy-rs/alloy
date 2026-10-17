@@ -10,6 +10,7 @@ use crate::{
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable, Header, EMPTY_LIST_CODE};
+use core::iter::FusedIterator;
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
@@ -123,24 +124,97 @@ impl BlobTransactionSidecar {
 
 impl IntoIterator for BlobTransactionSidecar {
     type Item = BlobTransactionSidecarItem;
-    type IntoIter = alloc::vec::IntoIter<BlobTransactionSidecarItem>;
+    type IntoIter = BlobTransactionSidecarIntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.blobs
-            .into_iter()
-            .zip(self.commitments)
-            .zip(self.proofs)
-            .enumerate()
-            .map(|(index, ((blob, commitment), proof))| BlobTransactionSidecarItem {
-                index: index as u64,
-                blob: Box::new(blob),
-                kzg_commitment: commitment,
-                kzg_proof: proof,
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
+        let remaining = self.blobs.len().min(self.commitments.len()).min(self.proofs.len());
+        BlobTransactionSidecarIntoIter {
+            blobs: self.blobs.into_iter(),
+            commitments: self.commitments.into_iter(),
+            proofs: self.proofs.into_iter(),
+            next_index: 0,
+            remaining,
+        }
     }
 }
+
+/// An owning iterator over a [`BlobTransactionSidecar`].
+///
+/// Blobs are boxed only when their items are yielded. Unequal vectors are truncated to the
+/// shortest vector, matching [`Iterator::zip`].
+#[derive(Clone, Debug)]
+pub struct BlobTransactionSidecarIntoIter {
+    blobs: alloc::vec::IntoIter<Blob>,
+    commitments: alloc::vec::IntoIter<Bytes48>,
+    proofs: alloc::vec::IntoIter<Bytes48>,
+    next_index: usize,
+    remaining: usize,
+}
+
+impl Iterator for BlobTransactionSidecarIntoIter {
+    type Item = BlobTransactionSidecarItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.nth(0)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        if n >= self.remaining {
+            self.remaining = 0;
+            return None;
+        }
+        let index = self.next_index + n;
+        self.next_index = index + 1;
+        self.remaining -= n + 1;
+        Some(BlobTransactionSidecarItem {
+            index: index as u64,
+            blob: Box::new(self.blobs.nth(n)?),
+            kzg_commitment: self.commitments.nth(n)?,
+            kzg_proof: self.proofs.nth(n)?,
+        })
+    }
+
+    fn count(self) -> usize {
+        self.remaining
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+}
+
+impl DoubleEndedIterator for BlobTransactionSidecarIntoIter {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.nth_back(0)
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        if n >= self.remaining {
+            self.remaining = 0;
+            return None;
+        }
+        let index = self.next_index + self.remaining - n - 1;
+        // Skip unmatched trailing values when the sidecar's vectors have unequal lengths.
+        let blob = self.blobs.nth_back(self.blobs.len() - self.remaining + n)?;
+        let commitment = self.commitments.nth_back(self.commitments.len() - self.remaining + n)?;
+        let proof = self.proofs.nth_back(self.proofs.len() - self.remaining + n)?;
+        self.remaining -= n + 1;
+        Some(BlobTransactionSidecarItem {
+            index: index as u64,
+            blob: Box::new(blob),
+            kzg_commitment: commitment,
+            kzg_proof: proof,
+        })
+    }
+}
+
+impl ExactSizeIterator for BlobTransactionSidecarIntoIter {}
+
+impl FusedIterator for BlobTransactionSidecarIntoIter {}
 
 /// A single blob sidecar.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -659,5 +733,30 @@ mod tests {
         let s = serde_json::to_string(&blob_item).unwrap();
         let deserialized: BlobTransactionSidecarItem = serde_json::from_str(&s).unwrap();
         assert_eq!(blob_item, deserialized);
+    }
+
+    #[test]
+    fn sidecar_into_iter_preserves_indices_and_lengths() {
+        let sidecar = BlobTransactionSidecar {
+            blobs: vec![Blob::ZERO; 4],
+            commitments: (0..3).map(|index| Bytes48::new([index; 48])).collect(),
+            proofs: (0..4).map(|index| Bytes48::new([index; 48])).collect(),
+        };
+        let mut iter = sidecar.into_iter();
+        assert_eq!(iter.size_hint(), (3, Some(3)));
+        assert_eq!(iter.len(), 3);
+        let last = iter.next_back().unwrap();
+        assert_eq!(last.index, 2);
+        assert_eq!(last.kzg_commitment, Bytes48::new([2; 48]));
+        assert_eq!(last.kzg_proof, last.kzg_commitment);
+        let first = iter.next().unwrap();
+        assert_eq!(first.index, 0);
+        assert_eq!(first.kzg_commitment, Bytes48::ZERO);
+        let middle = iter.nth(0).unwrap();
+        assert_eq!(middle.index, 1);
+        assert_eq!(middle.kzg_proof, Bytes48::new([1; 48]));
+        assert_eq!(iter.len(), 0);
+        assert!(iter.next().is_none());
+        assert!(iter.next_back().is_none());
     }
 }
