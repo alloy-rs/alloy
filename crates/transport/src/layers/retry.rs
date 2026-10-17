@@ -276,11 +276,15 @@ where
 
     fn call(&mut self, request: RequestPacket) -> Self::Future {
         let inner = self.inner.clone();
-        let this = self.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
+        let policy = self.policy.clone();
+        let max_rate_limit_retries = self.max_rate_limit_retries;
+        let initial_backoff = self.initial_backoff();
+        let compute_units_per_second = self.compute_units_per_second;
+        let requests_enqueued = self.requests_enqueued.clone();
+        let avg_cost = self.avg_cost;
         Box::pin(async move {
-            let (_queued_request, ahead_in_queue) =
-                QueuedRequest::new(this.requests_enqueued.clone());
+            let (_queued_request, ahead_in_queue) = QueuedRequest::new(requests_enqueued.clone());
             let mut rate_limit_retry_number: u32 = 0;
             loop {
                 let res = inner.call(request.clone()).await;
@@ -293,23 +297,23 @@ where
                     Err(e) => (e, None),
                 };
 
-                let should_retry = this.policy.should_retry(&err);
+                let should_retry = policy.should_retry(&err);
                 if should_retry {
                     rate_limit_retry_number += 1;
-                    if rate_limit_retry_number > this.max_rate_limit_retries {
+                    if rate_limit_retry_number > max_rate_limit_retries {
                         return Err(TransportErrorKind::custom(RetryError(err)));
                     }
                     trace!(%err, "retrying request");
 
-                    let current_queued_reqs = this.requests_enqueued.load(Ordering::SeqCst) as u64;
+                    let current_queued_reqs = requests_enqueued.load(Ordering::SeqCst) as u64;
 
                     // use the backoff requested by the error, or fall back to the initial backoff
-                    let backoff_hint = this.policy.backoff_hint(&err);
-                    let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
+                    let backoff_hint = policy.backoff_hint(&err);
+                    let next_backoff = backoff_hint.unwrap_or(initial_backoff);
 
                     let seconds_to_wait_for_compute_budget = compute_unit_offset_in_secs(
-                        this.avg_cost,
-                        this.compute_units_per_second,
+                        avg_cost,
+                        compute_units_per_second,
                         current_queued_reqs,
                         ahead_in_queue,
                     );
@@ -490,5 +494,31 @@ mod tests {
         assert_eq!(source.code, -32005);
         assert_eq!(source.message, "rate limited");
         assert_eq!(source.data.as_ref().unwrap().get(), r#"{"limit":10}"#);
+    }
+
+    #[tokio::test]
+    async fn request_retains_only_one_inner_service_clone() {
+        let state = Arc::new(AtomicU32::new(0));
+        let inner_state = state.clone();
+        let inner = tower::service_fn(move |_| -> TransportFut<'static> {
+            inner_state.fetch_add(1, Ordering::Relaxed);
+            Box::pin(std::future::pending())
+        });
+        let mut service = RetryBackoffLayer::new(1, 0, 10).layer(inner);
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        let mut future = service.call(request);
+        // The observer, replacement service, and in-flight service each own one reference.
+        assert_eq!(Arc::strong_count(&state), 3);
+        assert!(futures::poll!(&mut future).is_pending());
+        assert_eq!(state.load(Ordering::Relaxed), 1);
+        assert_eq!(Arc::strong_count(&state), 3);
+
+        drop(future);
+        assert_eq!(Arc::strong_count(&state), 2);
     }
 }
