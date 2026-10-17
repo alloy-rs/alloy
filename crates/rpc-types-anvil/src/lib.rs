@@ -8,8 +8,11 @@
 
 use alloy_primitives::{BlockHash, Bytes, ChainId, B256, U256};
 use alloy_rpc_types_eth::TransactionRequest;
-use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use serde::{
+    de::{self, IgnoredAny, MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+use std::{collections::BTreeMap, fmt};
 
 /// Represents the params to set forking which can take various forms:
 ///  - untagged
@@ -36,16 +39,58 @@ impl<'de> serde::Deserialize<'de> for Forking {
             block_number: Option<u64>,
         }
 
-        let mut fields = alloy_serde::OtherFields::deserialize(deserializer)?;
-        // A present tag must decode successfully instead of falling back to the root fields.
-        let options = if let Some(forking) = fields.remove_deserialized::<ForkOpts>("forking") {
-            forking
-        } else {
-            fields.deserialize_into::<ForkOpts>()
+        struct ForkingVisitor;
+
+        impl<'de> Visitor<'de> for ForkingVisitor {
+            type Value = Forking;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("fork options or an object containing tagged fork options")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Forking, A::Error> {
+                let mut fields = alloy_serde::OtherFields::default();
+                let mut tagged = None;
+                let mut duplicate = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "forking" => {
+                            if tagged.is_some() {
+                                return Err(de::Error::duplicate_field("forking"));
+                            }
+                            // Decode the tag directly so malformed or duplicate nested options
+                            // cannot be hidden by buffering or untagged fallback.
+                            tagged = Some(map.next_value::<ForkOpts>()?);
+                        }
+                        "jsonRpcUrl" | "blockNumber" => {
+                            let name =
+                                if key == "jsonRpcUrl" { "jsonRpcUrl" } else { "blockNumber" };
+                            if fields.insert(key, map.next_value()?).is_some() {
+                                duplicate = Some(name);
+                            }
+                        }
+                        _ => {
+                            let _ = map.next_value::<IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let options = if let Some(options) = tagged {
+                    options
+                } else {
+                    if let Some(field) = duplicate {
+                        return Err(de::Error::duplicate_field(field));
+                    }
+                    // Root options only apply in the absence of a tag. In particular, malformed
+                    // root options must not prevent a valid tagged configuration from decoding.
+                    fields.deserialize_into::<ForkOpts>().map_err(de::Error::custom)?
+                };
+                let ForkOpts { json_rpc_url, block_number } = options;
+                Ok(Forking { json_rpc_url, block_number })
+            }
         }
-        .map_err(serde::de::Error::custom)?;
-        let ForkOpts { json_rpc_url, block_number } = options;
-        Ok(Self { json_rpc_url, block_number })
+
+        deserializer.deserialize_map(ForkingVisitor)
     }
 }
 
@@ -279,5 +324,34 @@ mod tests {
             .unwrap(),
             Forking { json_rpc_url: None, block_number: Some(1) }
         );
+    }
+
+    #[test]
+    fn test_serde_forking_rejects_duplicate_options() {
+        for data in [
+            r#"{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}"#,
+            r#"{"blockNumber":"0x1","blockNumber":"0x2"}"#,
+            r#"{"jsonRpcUrl":null,"jsonRpcUrl":"http://second:8545"}"#,
+            r#"{"blockNumber":null,"blockNumber":"0x2"}"#,
+            r#"{"forking":{},"forking":{"blockNumber":"0x1"}}"#,
+            r#"{"forking":{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}}"#,
+            r#"{"forking":{"blockNumber":"0x1","blockNumber":"0x2"}}"#,
+        ] {
+            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
+        }
+    }
+
+    #[test]
+    fn test_serde_forking_tag_ignores_duplicate_root_options() {
+        for data in [
+            r#"{"jsonRpcUrl":false,"jsonRpcUrl":42,"blockNumber":false,"forking":{"blockNumber":"0x1"}}"#,
+            r#"{"forking":{"blockNumber":"0x1"},"blockNumber":false,"blockNumber":"invalid","jsonRpcUrl":42}"#,
+        ] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking { json_rpc_url: None, block_number: Some(1) },
+                "{data}"
+            );
+        }
     }
 }
