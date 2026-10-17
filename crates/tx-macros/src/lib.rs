@@ -11,6 +11,7 @@ mod expand;
 mod parse;
 mod serde;
 
+use darling::FromDeriveInput;
 use expand::Expander;
 use parse::{EnvelopeArgs, GroupedVariants};
 use proc_macro::TokenStream;
@@ -89,11 +90,8 @@ pub fn derive_transaction_envelope(input: TokenStream) -> TokenStream {
 
 /// Expand the transaction envelope derive macro.
 fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::TokenStream, Error> {
-    use darling::FromDeriveInput;
-
-    // Parse the input with darling
-    let args = EnvelopeArgs::from_derive_input(&input)
-        .map_err(|e| Error::new_spanned(&input.ident, e.to_string()))?;
+    // Parse the input with darling, preserving all diagnostics and their original spans.
+    let args = EnvelopeArgs::from_derive_input(&input).map_err(Error::from)?;
 
     // Extract config values before consuming args
     let input_type_name = args.ident.clone();
@@ -151,4 +149,38 @@ fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::T
         typed,
     };
     Ok(expander.expand())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::spanned::Spanned;
+
+    #[test]
+    fn parser_preserves_attribute_error_spans() {
+        let input = syn::parse_str::<DeriveInput>(
+            r#"
+                #[envelope(unknown_option)]
+                enum Envelope {
+                    #[envelope(ty = "invalid")]
+                    Transaction(Inner),
+                }
+            "#,
+        )
+        .unwrap();
+        let option_span = input.attrs[0].parse_args::<Ident>().unwrap().span();
+        let syn::Data::Enum(data) = &input.data else { unreachable!() };
+        let syn::Meta::NameValue(ty) = data.variants[0].attrs[0].parse_args().unwrap() else {
+            unreachable!()
+        };
+        let type_span = ty.value.span();
+        let errors =
+            expand_transaction_envelope(input).unwrap_err().into_iter().collect::<Vec<_>>();
+
+        assert_eq!(errors.len(), 2);
+        for (error, expected) in errors.iter().zip([option_span, type_span]) {
+            assert_eq!(error.span().start(), expected.start());
+            assert_eq!(error.span().end(), expected.end());
+        }
+    }
 }

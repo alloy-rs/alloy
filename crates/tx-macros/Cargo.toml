@@ -30,6 +30,9 @@ quote = "1.0"
 proc-macro2 = "1.0"
 darling = "0.23"
 
+[dev-dependencies]
+proc-macro2 = { version = "1.0", features = ["span-locations"] }
+
 [features]
 arbitrary = []
 serde = [
