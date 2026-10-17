@@ -515,13 +515,13 @@ impl Reth {
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
-                let _ = child.kill();
+                let _ = GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Timeout);
             }
 
             let mut line = String::with_capacity(120);
             if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
-                let _ = child.kill();
+                let _ = GracefulShutdown::kill_and_wait(&mut child);
                 let status = child.wait().map_err(NodeError::WaitError)?;
                 return Err(NodeError::Fatal(format!(
                     "reth exited before it was ready ({status})"
@@ -548,7 +548,7 @@ impl Reth {
 
             // Encountered a critical error, exit early.
             if line.contains("ERROR") {
-                let _ = child.kill();
+                let _ = GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Fatal(line));
             }
 

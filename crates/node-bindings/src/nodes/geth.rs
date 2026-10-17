@@ -664,13 +664,13 @@ impl Geth {
 
         loop {
             if start.elapsed() >= timeout {
-                let _ = child.kill();
+                let _ = GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Timeout);
             }
 
             let mut line = String::with_capacity(120);
             if reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
-                let _ = child.kill();
+                let _ = GracefulShutdown::kill_and_wait(&mut child);
                 let status = child.wait().map_err(NodeError::WaitError)?;
                 return Err(NodeError::Fatal(format!(
                     "geth exited before it was ready ({status})"
@@ -707,7 +707,7 @@ impl Geth {
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
             // 127.0.0.1:8545: bind: address already in use
             if line.contains("Fatal:") {
-                let _ = child.kill();
+                let _ = GracefulShutdown::kill_and_wait(&mut child);
                 return Err(NodeError::Fatal(line));
             }
 
