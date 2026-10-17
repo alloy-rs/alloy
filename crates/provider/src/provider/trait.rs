@@ -1945,7 +1945,10 @@ mod tests {
     use std::{
         io::Read,
         str::FromStr,
-        sync::{Arc, Mutex},
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Mutex,
+        },
         time::Duration,
     };
 
@@ -2322,6 +2325,59 @@ mod tests {
             .expect("Watching tx timed out")
             .expect("failed to await pending tx");
         assert_eq!(hash1, hash2);
+    }
+
+    // A load-balanced node can report a transaction's block before the backend serving
+    // `eth_getTransactionReceipt` has indexed it, so the receipt lookup that follows the
+    // confirmation comes back empty.
+    #[tokio::test]
+    async fn test_get_receipt_retries_receipt_missing_after_confirmation() {
+        let anvil = Anvil::new().arg("--no-mining").spawn();
+        let http = alloy_transport_http::Http::new(anvil.endpoint_url());
+
+        // `get_receipt` looks the receipt up once before watching blocks and, with more than one
+        // confirmation, again only after the heartbeat confirmed the transaction. Hide the second.
+        let receipt_lookups = Arc::new(AtomicUsize::new(0));
+        let service = {
+            let receipt_lookups = receipt_lookups.clone();
+            tower::service_fn(move |request: RequestPacket| {
+                let mut http = http.clone();
+                let receipt_lookups = receipt_lookups.clone();
+                Box::pin(async move {
+                    let is_receipt_lookup = matches!(
+                        &request,
+                        RequestPacket::Single(request) if request.method() == "eth_getTransactionReceipt"
+                    );
+                    let mut response = tower::Service::call(&mut http, request).await?;
+                    if is_receipt_lookup && receipt_lookups.fetch_add(1, Ordering::SeqCst) == 1 {
+                        if let ResponsePacket::Single(response) = &mut response {
+                            response.payload = ResponsePayload::Success(
+                                RawValue::from_string("null".to_string()).unwrap(),
+                            );
+                        }
+                    }
+                    Ok(response)
+                }) as TransportFut<'static>
+            })
+        };
+        let provider = RootProvider::<Ethereum>::new(RpcClient::new(service, true));
+
+        let tx = TransactionRequest::default()
+            .from(anvil.addresses()[0])
+            .to(anvil.addresses()[1])
+            .value(U256::from(1));
+        let pending = provider.send_transaction(tx).await.unwrap();
+        let hash = *pending.tx_hash();
+
+        // Mine the transaction and its confirmation only after the first receipt lookup.
+        let (receipt, ()) =
+            tokio::join!(pending.with_required_confirmations(2).get_receipt(), async {
+                while receipt_lookups.load(Ordering::SeqCst) == 0 {
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+                provider.raw_request::<_, ()>("anvil_mine".into(), (U256::from(2),)).await.unwrap();
+            });
+        assert_eq!(receipt.unwrap().transaction_hash, hash);
     }
 
     #[tokio::test]

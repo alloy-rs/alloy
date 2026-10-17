@@ -1,5 +1,6 @@
 use super::*;
 use alloy_network::Ethereum;
+use alloy_primitives::B256;
 use alloy_rpc_types_eth::{Block, BlockTransactions};
 
 struct Harness {
@@ -12,7 +13,9 @@ impl Harness {
     fn new() -> Self {
         let (blocks, stream) = futures::channel::mpsc::unbounded();
         let paused = Arc::<Paused>::default();
-        let heartbeat = Heartbeat::<Ethereum, _>::new(stream, paused.clone()).spawn();
+        let client = alloy_rpc_client::RpcClient::mocked(alloy_transport::mock::Asserter::new());
+        let heartbeat =
+            Heartbeat::<Ethereum, _>::new(stream, paused.clone(), client.get_weak()).spawn();
         Self { blocks, heartbeat, paused }
     }
 
