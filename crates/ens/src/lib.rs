@@ -241,7 +241,7 @@ mod contract {
     pub enum EnsError {
         /// Failed to get the resolver for this name.
         #[error("Failed to get ENS resolver: {0}")]
-        Resolver(alloy_contract::Error),
+        Resolver(#[source] alloy_contract::Error),
         /// No resolver found for the given name.
         #[error("ENS resolver not found for name {0:?}")]
         ResolverNotFound(String),
@@ -255,19 +255,19 @@ mod contract {
         RequiresUniversalResolver(String),
         /// Failed to get the reverse registrar from the ENS registry.
         #[error("Failed to get reverse registrar from the ENS registry: {0}")]
-        RevRegistrar(alloy_contract::Error),
+        RevRegistrar(#[source] alloy_contract::Error),
         /// No reverse registrar found for `addr.reverse`.
         #[error("ENS reverse registrar not found for addr.reverse")]
         ReverseRegistrarNotFound,
         /// Failed to lookup ENS name from an address.
         #[error("Failed to lookup ENS name from an address: {0}")]
-        Lookup(alloy_contract::Error),
+        Lookup(#[source] alloy_contract::Error),
         /// Failed to resolve ENS name to an address.
         #[error("Failed to resolve ENS name to an address: {0}")]
-        Resolve(alloy_contract::Error),
+        Resolve(#[source] alloy_contract::Error),
         /// Failed to get a text record for an ENS name.
         #[error("Failed to resolve text record: {0}")]
-        ResolveTxtRecord(alloy_contract::Error),
+        ResolveTxtRecord(#[source] alloy_contract::Error),
         /// Failed to DNS-encode the ENS name for the Universal Resolver.
         #[error("Failed to DNS-encode ENS name: {0}")]
         DnsEncode(#[from] crate::DnsEncodeError),
@@ -848,6 +848,25 @@ mod tests {
 mod resolver_info_tests {
     use super::*;
     use alloy_primitives::{address, Bytes, B256, U256};
+
+    #[test]
+    fn contract_errors_are_sources() {
+        let variants = [
+            EnsError::Resolver,
+            EnsError::RevRegistrar,
+            EnsError::Lookup,
+            EnsError::Resolve,
+            EnsError::ResolveTxtRecord,
+        ];
+        for wrap in variants {
+            let error = wrap(alloy_contract::Error::NotADeploymentTransaction);
+            let source = std::error::Error::source(&error).expect("contract error source");
+            assert!(matches!(
+                source.downcast_ref::<alloy_contract::Error>(),
+                Some(alloy_contract::Error::NotADeploymentTransaction)
+            ));
+        }
+    }
 
     #[test]
     fn direct_resolver_rejects_extended_and_wildcard_resolvers() {
