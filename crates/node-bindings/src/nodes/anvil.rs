@@ -495,7 +495,7 @@ impl Anvil {
                 let key_str =
                     line.split("0x").last().ok_or(NodeError::ParsePrivateKeyError)?.trim();
                 let key_hex = hex::decode(key_str).map_err(NodeError::FromHexError)?;
-                let key = K256SecretKey::from_bytes((&key_hex[..]).into())
+                let key = K256SecretKey::from_slice(&key_hex)
                     .map_err(|_| NodeError::DeserializePrivateKeyError)?;
                 addresses.push(Address::from_public_key(SigningKey::from(&key).verifying_key()));
                 private_keys.push(key);
@@ -587,5 +587,22 @@ mod early_exit_tests {
 
         let err = Anvil::at(&program).try_spawn().unwrap_err();
         assert!(matches!(err, NodeError::Fatal(_)), "{err:?}");
+    }
+
+    #[test]
+    fn invalid_private_key_lengths_are_reported() {
+        for key in ["01".to_string(), "01".repeat(33)] {
+            let dir = tempfile::tempdir().unwrap();
+            let program = dir.path().join("anvil");
+            std::fs::write(
+                &program,
+                format!("#!/bin/sh\nprintf 'Private Keys\\n(0) 0x{key}\\n'\n"),
+            )
+            .unwrap();
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+            let err = Anvil::at(&program).try_spawn().unwrap_err();
+            assert!(matches!(err, NodeError::DeserializePrivateKeyError), "{err:?}");
+        }
     }
 }
