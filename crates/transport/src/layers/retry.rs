@@ -210,6 +210,9 @@ impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
 /// request whose response was lost. Use this service only for operations that
 /// are safe to execute more than once, or route non-idempotent methods around
 /// this layer.
+///
+/// When retries are exhausted, the returned custom error retains the last
+/// [`TransportError`] as its [`std::error::Error::source`].
 #[derive(Debug, Clone)]
 pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
@@ -294,9 +297,7 @@ where
                 if should_retry {
                     rate_limit_retry_number += 1;
                     if rate_limit_retry_number > this.max_rate_limit_retries {
-                        return Err(TransportErrorKind::custom_str(&format!(
-                            "Max retries exceeded {err}"
-                        )));
+                        return Err(TransportErrorKind::custom(RetryError(err)));
                     }
                     trace!(%err, "retrying request");
 
@@ -334,6 +335,11 @@ where
         })
     }
 }
+
+/// Retains the structured failure when the retry budget is exhausted.
+#[derive(Debug, thiserror::Error)]
+#[error("Max retries exceeded {0}")]
+struct RetryError(#[source] TransportError);
 
 /// Calculates an offset in seconds by taking into account the number of currently queued requests,
 /// number of requests that were ahead in the queue when the request was first issued, the average
@@ -421,5 +427,68 @@ mod tests {
 
         let err = service.call(request).await.unwrap_err();
         assert!(err.to_string().contains("Max retries exceeded"));
+    }
+
+    #[tokio::test]
+    async fn retry_exhaustion_preserves_http_error() {
+        for max_retries in [0, 1] {
+            let inner = tower::service_fn(|_| -> TransportFut<'static> {
+                Box::pin(async {
+                    Err(TransportErrorKind::http_error_with_retry_after(
+                        429,
+                        "rate limited".to_owned(),
+                        Some(Duration::ZERO),
+                    ))
+                })
+            });
+            let mut service = RetryBackoffLayer::new(max_retries, 0, 10).layer(inner);
+            let request = RequestPacket::Single(
+                alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                    .serialize()
+                    .unwrap(),
+            );
+
+            let err = service.call(request).await.unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                "Max retries exceeded HTTP error 429 with body: rate limited"
+            );
+            let TransportError::Transport(kind) = err else { panic!("expected transport error") };
+            let source = kind.as_custom().unwrap().source().unwrap();
+            let source = source.downcast_ref::<TransportError>().unwrap();
+            let TransportError::Transport(source) = source else { panic!("expected HTTP error") };
+            assert_eq!(source.as_http_error().unwrap().status, 429);
+            assert_eq!(source.as_http_error().unwrap().body, "rate limited");
+            assert_eq!(source.retry_after(), Some(Duration::ZERO));
+        }
+    }
+
+    #[tokio::test]
+    async fn retry_exhaustion_preserves_rpc_error() {
+        let inner = tower::service_fn(|_| -> TransportFut<'static> {
+            Box::pin(async {
+                Err(TransportError::ErrorResp(
+                    serde_json::from_str(
+                        r#"{"code":-32005,"message":"rate limited","data":{"limit":10}}"#,
+                    )
+                    .unwrap(),
+                ))
+            })
+        });
+        let mut service = RetryBackoffLayer::new(0, 0, 10).layer(inner);
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        let err = service.call(request).await.unwrap_err();
+        let TransportError::Transport(kind) = err else { panic!("expected transport error") };
+        let source = kind.as_custom().unwrap().source().unwrap();
+        let source = source.downcast_ref::<TransportError>().unwrap();
+        let TransportError::ErrorResp(source) = source else { panic!("expected RPC error") };
+        assert_eq!(source.code, -32005);
+        assert_eq!(source.message, "rate limited");
+        assert_eq!(source.data.as_ref().unwrap().get(), r#"{"limit":10}"#);
     }
 }
