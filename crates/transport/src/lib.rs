@@ -25,6 +25,9 @@ mod error;
 pub use error::TransportErrorKind;
 pub use error::{HttpError, TransportError, TransportResult};
 
+mod shared_error;
+pub use shared_error::SharedTransportError;
+
 mod r#trait;
 pub use r#trait::Transport;
 

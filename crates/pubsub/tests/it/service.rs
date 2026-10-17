@@ -177,7 +177,7 @@ async fn exhausted_reconnects_shut_down_service() {
     backend.close();
 
     let err = within(resp).await.unwrap().unwrap_err();
-    assert!(err.as_transport_err().is_some_and(TransportErrorKind::is_backend_gone), "{err:?}");
+    assert_eq!(err.to_string(), "no backend left");
     assert_eq!(connector.reconnects.load(Ordering::SeqCst), MAX_RETRIES as usize);
 
     let err =
