@@ -68,85 +68,116 @@ pub struct EventHistoryInfo {
 pub struct EventHistory {
     /// The block number of the event's block.
     pub block: u64,
-    /// The timestamp when the event was emitted.
+    /// The Unix timestamp in seconds when the event was emitted.
     pub timestamp: u64,
     /// Hint for the historic block.
     pub hint: Hint,
 }
 
+/// Data shared about a transaction or bundle in the MEV-Share event history.
+///
+/// The shared transaction fields and logs depend on the sender's privacy preferences.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[expect(missing_docs)]
 pub struct Hint {
+    /// Shared transaction details. A JSON `null` is deserialized as an empty list.
     #[serde(with = "null_sequence")]
     pub txs: Vec<EventTransaction>,
+    /// Matching hash used to reference the transaction or bundle in a backrun.
     pub hash: B256,
+    /// Shared execution logs. A JSON `null` is deserialized as an empty list.
     #[serde(with = "null_sequence")]
     pub logs: Vec<EventTransactionLog>,
+    /// Gas used by the transaction or bundle, when shared. This hint may be rounded up.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_used: Option<U256>,
+    /// Simulated coinbase value increase per gas used, in wei per gas, when shared.
+    /// This hint may be rounded up.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mev_gas_price: Option<U256>,
 }
 
-/// Query params for the `history` endpoint
+/// Query parameters for the MEV-Share `history` endpoint.
+///
+/// All fields are optional and omitted from the query when unset. Use [`EventHistoryInfo`] to
+/// discover the available block/timestamp bounds and the server's maximum page size.
+///
+/// This type only constructs query parameters: it does not validate range ordering, clamp limits,
+/// or make block and timestamp filters mutually exclusive. When both are set, all are sent to the
+/// server. Endpoint inclusion and the interpretation of combined filters are determined by the
+/// history server; the builders do not convert the bounds to a Rust range.
+///
+/// See the [MEV-Share client's history examples](https://github.com/flashbots/mev-share-client-ts#geteventhistory).
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
-#[expect(missing_docs)]
 pub struct EventHistoryParams {
+    /// Lower block-number bound requested from the history server.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_start: Option<u64>,
+    /// Upper block-number bound requested from the history server.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_end: Option<u64>,
+    /// Lower event timestamp bound, in Unix seconds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_start: Option<u64>,
+    /// Upper event timestamp bound, in Unix seconds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_end: Option<u64>,
+    /// Maximum number of events requested for this page. The server may impose a lower limit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u64>,
+    /// Number of events to skip for pagination.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<u64>,
 }
 
-#[expect(missing_docs)]
 impl EventHistoryParams {
+    /// Sets the lower block-number bound.
     pub const fn with_block_start(mut self, block_start: u64) -> Self {
         self.block_start = Some(block_start);
         self
     }
 
+    /// Sets the upper block-number bound.
     pub const fn with_block_end(mut self, block_end: u64) -> Self {
         self.block_end = Some(block_end);
         self
     }
 
+    /// Sets both block-number bounds without validating their order or changing timestamp filters.
     pub const fn with_block_range(mut self, block_start: u64, block_end: u64) -> Self {
         self.block_start = Some(block_start);
         self.block_end = Some(block_end);
         self
     }
 
+    /// Sets the lower event timestamp bound, in Unix seconds.
     pub const fn with_timestamp_start(mut self, timestamp_start: u64) -> Self {
         self.timestamp_start = Some(timestamp_start);
         self
     }
 
+    /// Sets the upper event timestamp bound, in Unix seconds.
     pub const fn with_timestamp_end(mut self, timestamp_end: u64) -> Self {
         self.timestamp_end = Some(timestamp_end);
         self
     }
 
+    /// Sets both timestamp bounds in Unix seconds without validating their order or changing block
+    /// filters.
     pub const fn with_timestamp_range(mut self, timestamp_start: u64, timestamp_end: u64) -> Self {
         self.timestamp_start = Some(timestamp_start);
         self.timestamp_end = Some(timestamp_end);
         self
     }
 
+    /// Sets the requested page size without checking the server's maximum limit.
     pub const fn with_limit(mut self, limit: u64) -> Self {
         self.limit = Some(limit);
         self
     }
 
+    /// Sets the number of events to skip for pagination.
     pub const fn with_offset(mut self, offset: u64) -> Self {
         self.offset = Some(offset);
         self

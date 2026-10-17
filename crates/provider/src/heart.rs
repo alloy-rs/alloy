@@ -173,17 +173,25 @@ impl<N: Network> PendingTransactionBuilder<N> {
         self
     }
 
-    /// Returns the timeout.
+    /// Returns the timeout for the background confirmation watch.
     pub const fn timeout(&self) -> Option<Duration> {
         self.config.timeout()
     }
 
-    /// Sets the timeout.
+    /// Sets the timeout for the background confirmation watch.
+    ///
+    /// The timeout starts when the background watcher processes the registration, after the
+    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
+    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
     pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.config.set_timeout(timeout);
     }
 
-    /// Sets the timeout.
+    /// Sets the timeout for the background confirmation watch.
+    ///
+    /// The timeout starts when the background watcher processes the registration, after the
+    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
+    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
     pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.config.timeout = timeout;
         self
@@ -335,17 +343,25 @@ impl PendingTransactionConfig {
         self
     }
 
-    /// Returns the timeout.
+    /// Returns the timeout for the background confirmation watch.
     pub const fn timeout(&self) -> Option<Duration> {
         self.timeout
     }
 
-    /// Sets the timeout.
+    /// Sets the timeout for the background confirmation watch.
+    ///
+    /// The timeout starts when the background watcher processes the registration, after the
+    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
+    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
     pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.timeout = timeout;
     }
 
-    /// Sets the timeout.
+    /// Sets the timeout for the background confirmation watch.
+    ///
+    /// The timeout starts when the background watcher processes the registration, after the
+    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
+    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
     pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.timeout = timeout;
         self

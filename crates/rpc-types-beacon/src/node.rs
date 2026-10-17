@@ -44,10 +44,17 @@ pub struct NodeIdentity {
     pub metadata: IdentityMetadata,
 }
 
+/// Peer metadata advertised by a beacon node in its [`NodeIdentity`].
+///
+/// See the [Beacon API metadata schema](https://github.com/ethereum/beacon-APIs/blob/master/types/p2p.yaml).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityMetadata {
+    /// Decimal-encoded metadata sequence number, incremented whenever the node's metadata changes.
+    /// This is independent of the node's ENR sequence number.
     pub seq_number: String,
+    /// Persistent attestation subnet subscriptions as a `0x`-prefixed hex-encoded SSZ bitvector.
     pub attnets: String,
+    /// Sync committee subnet subscriptions as a `0x`-prefixed hex-encoded SSZ bitvector.
     pub syncnets: String,
 }
 
