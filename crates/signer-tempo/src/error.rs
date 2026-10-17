@@ -51,6 +51,15 @@ pub enum TempoSignerError {
         kind: KeyType,
     },
 
+    /// The recorded access-key address differs from the private key's address.
+    #[error("Tempo access-key address mismatch: recorded {recorded}, derived {derived}")]
+    KeyAddressMismatch {
+        /// The address recorded in the keystore.
+        recorded: Address,
+        /// The address derived from the private key.
+        derived: Address,
+    },
+
     /// A hex-encoded field in the keystore could not be decoded.
     #[error("invalid hex in keystore field `{field}`")]
     BadHex {

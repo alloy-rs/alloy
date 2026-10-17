@@ -111,7 +111,8 @@ impl TempoKeystore {
     /// Find available key material by wallet/EOA address (`from`).
     ///
     /// This checks key type, key presence, and expiry at lookup time; it does not enforce chain ID,
-    /// limits, or authorization metadata. The returned signer's chain ID is not configured.
+    /// limits, or authorization metadata. In Keychain mode, recorded key addresses must match the
+    /// private key. The returned signer's chain ID is not configured.
     pub fn find_by_from(&self, from: Address) -> Result<TempoLookup, TempoSignerError> {
         let candidates: Vec<&RawKeyEntry> =
             self.entries.iter().filter(|e| e.wallet_address == from).collect();
@@ -178,7 +179,10 @@ fn entry_to_lookup(e: &RawKeyEntry) -> Result<TempoLookup, TempoSignerError> {
         return Ok(TempoLookup::Direct(signer));
     }
 
-    let key_address = e.key_address.unwrap_or(signer_addr);
+    if let Some(recorded) = e.key_address.filter(|recorded| *recorded != signer_addr) {
+        return Err(TempoSignerError::KeyAddressMismatch { recorded, derived: signer_addr });
+    }
+    let key_address = signer_addr;
 
     let key_authorization = match &e.key_authorization {
         Some(s) => Some(parse_hex_bytes(s, "key_authorization")?),

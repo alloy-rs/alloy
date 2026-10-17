@@ -2,7 +2,7 @@
 
 use alloy_primitives::{address, Bytes};
 use alloy_signer_tempo::{KeyType, TempoKeystore, TempoSignerError};
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 const FIXTURE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
 
@@ -131,7 +131,6 @@ fn into_signer_works_for_keychain() {
 
 #[test]
 fn entries_with_missing_key_treated_as_unsupported() {
-    use std::fs;
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("keys.toml");
     fs::write(
@@ -149,4 +148,37 @@ key_address = "0x000000000000000000000000000000000000eeee"
     let err =
         store.find_by_from(address!("0x000000000000000000000000000000000000eeee")).unwrap_err();
     assert!(matches!(err, TempoSignerError::UnsupportedKeyType { .. }));
+}
+
+#[test]
+fn mismatched_access_key_address_is_rejected() {
+    let recorded = address!("0x000000000000000000000000000000000000eeee");
+    let derived = address!("0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65");
+    let wallet = address!("0xa0Ee7A142d267C1f36714E4a8F75612F20a79720");
+    let contents = include_str!("fixtures/keys.toml").replace(
+        "key_address = \"0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65\"",
+        &format!("key_address = \"{recorded}\""),
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("keys.toml");
+    fs::write(&path, contents).unwrap();
+    let store = TempoKeystore::load_from(path).unwrap();
+
+    for error in [store.find_by_from(wallet).unwrap_err(), store.find_by_key(recorded).unwrap_err()]
+    {
+        assert!(matches!(error, TempoSignerError::KeyAddressMismatch { recorded: r, derived: d }
+            if r == recorded && d == derived));
+    }
+}
+
+#[test]
+fn missing_access_key_address_is_derived() {
+    let wallet = address!("0xa0Ee7A142d267C1f36714E4a8F75612F20a79720");
+    let contents = include_str!("fixtures/keys.toml")
+        .replace("key_address = \"0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65\"", "");
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("keys.toml");
+    fs::write(&path, contents).unwrap();
+    let lookup = TempoKeystore::load_from(path).unwrap().find_by_from(wallet).unwrap();
+    assert_eq!(lookup.access_key().unwrap().key_address, lookup.signer().address());
 }
