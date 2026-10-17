@@ -51,6 +51,22 @@ pub enum TempoSignerError {
         kind: KeyType,
     },
 
+    /// A matching secp256k1 entry has no private key material.
+    #[error("Tempo entry for {from} has no private key material")]
+    MissingKey {
+        /// The address that was looked up.
+        from: Address,
+    },
+
+    /// The recorded access-key address differs from the private key's address.
+    #[error("Tempo access-key address mismatch: recorded {recorded}, derived {derived}")]
+    KeyAddressMismatch {
+        /// The address recorded in the keystore.
+        recorded: Address,
+        /// The address derived from the private key.
+        derived: Address,
+    },
+
     /// A hex-encoded field in the keystore could not be decoded.
     #[error("invalid hex in keystore field `{field}`")]
     BadHex {
