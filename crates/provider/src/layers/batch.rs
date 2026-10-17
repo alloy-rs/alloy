@@ -8,7 +8,9 @@ use alloy_network::{Ethereum, Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_client::WeakClient;
 use alloy_sol_types::{SolCall, SolType, SolValue};
-use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    utils::Spawnable, SharedTransportError, TransportErrorKind, TransportResult,
+};
 use std::{fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
@@ -399,8 +401,9 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
                 }
             }
             Err(e) => {
+                let error = SharedTransportError::new(e);
                 for msg in pending {
-                    let _ = msg.tx.send(Err(TransportErrorKind::custom_str(&e.to_string())));
+                    let _ = msg.tx.send(Err(error.to_error()));
                 }
             }
         }
@@ -614,6 +617,27 @@ mod tests {
         assert!(block_number_err.contains("response count mismatch"), "{block_number_err}");
         assert!(chain_id_err.contains("response count mismatch"), "{chain_id_err}");
         assert!(asserter.read_q().is_empty(), "only 1 request should've been made");
+    }
+
+    #[tokio::test]
+    async fn batch_preserves_rpc_error_payloads() {
+        let asserter = Asserter::new();
+        let provider =
+            ProviderBuilder::new().with_call_batching().connect_mocked_client(asserter.clone());
+        let payload =
+            serde_json::from_str(r#"{"code":-32005,"message":"rate limited","data":{"retry":5}}"#)
+                .unwrap();
+        asserter.push_failure(payload);
+
+        let (block_number, chain_id) =
+            tokio::join!(provider.get_block_number(), provider.get_chain_id());
+        for error in [block_number.unwrap_err(), chain_id.unwrap_err()] {
+            let payload = error.as_error_resp().unwrap();
+            assert_eq!(payload.code, -32005);
+            assert_eq!(payload.message, "rate limited");
+            assert_eq!(payload.data.as_ref().unwrap().get(), r#"{"retry":5}"#);
+        }
+        assert_eq!(asserter.requests().len(), 1);
     }
 
     #[test]
