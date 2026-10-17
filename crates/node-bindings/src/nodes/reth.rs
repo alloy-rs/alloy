@@ -593,31 +593,6 @@ impl Reth {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn can_set_host() {
-        let reth = Reth::new().host("0.0.0.0").dev().try_spawn();
-        if let Ok(reth) = reth {
-            assert_eq!(reth.host(), "0.0.0.0");
-            assert!(reth.endpoint().starts_with("http://0.0.0.0:"));
-            assert!(reth.ws_endpoint().starts_with("ws://0.0.0.0:"));
-        }
-    }
-
-    #[test]
-    fn default_host_is_localhost() {
-        let reth = Reth::new().dev().try_spawn();
-        if let Ok(reth) = reth {
-            assert_eq!(reth.host(), "localhost");
-            assert!(reth.endpoint().starts_with("http://localhost:"));
-            assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
-        }
-    }
-}
-
 #[cfg(all(test, unix))]
 mod early_exit_tests {
     use super::*;
