@@ -33,9 +33,7 @@ use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Ident};
 /// `ty = 0` receives the macro's legacy JSON handling and should be used only for the legacy
 /// transaction representation.
 ///
-/// EIP-2718 type bytes are in `0x00..=0x7f`. The attribute parser currently accepts any `u8`, but
-/// values above `0x7f` are not valid EIP-2718 envelope types and are not interoperable with
-/// standard raw EIP-2718 decoding, even though generated RLP methods may round-trip them.
+/// EIP-2718 type bytes must be in `0x00..=0x7f`. Values outside this range are rejected.
 ///
 /// A `flatten` variant delegates to an inner `TransactionEnvelope`. Its type IDs must not overlap
 /// any other direct or flattened variant, because overlapping IDs make dispatch order-dependent.

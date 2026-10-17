@@ -172,6 +172,13 @@ impl GroupedVariants {
         for variant in variants {
             let EnvelopeVariant { ident, fields, kind, attrs, typed } = variant;
 
+            if matches!(kind, VariantKind::Typed(128..=255)) {
+                return Err(darling::Error::custom(
+                    "EIP-2718 transaction type must be in 0x00..=0x7f",
+                )
+                .with_span(&ident));
+            }
+
             let mut serde_attrs = None;
             let mut doc_attrs = Vec::new();
 
@@ -244,6 +251,28 @@ impl GroupedVariants {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validates_transaction_type_range() {
+        for ty in [0u8, 1, 127, 128, 255] {
+            let input = syn::parse_quote! {
+                enum Envelope {
+                    #[envelope(ty = #ty)]
+                    Transaction(Inner),
+                }
+            };
+            let args = EnvelopeArgs::from_derive_input(&input).unwrap();
+            let result = GroupedVariants::from_args(args);
+            if ty <= 127 {
+                assert!(result.is_ok(), "valid transaction type {ty}");
+            } else {
+                assert_eq!(
+                    result.err().unwrap().to_string(),
+                    "EIP-2718 transaction type must be in 0x00..=0x7f"
+                );
+            }
+        }
+    }
 
     #[test]
     fn serde_tag() {
