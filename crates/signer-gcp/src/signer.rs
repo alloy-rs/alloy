@@ -13,7 +13,7 @@ use gcloud_sdk::{
     tonic::{self, Request},
     GoogleApi, GoogleAuthMiddleware,
 };
-use k256::ecdsa::{self, VerifyingKey};
+use k256::ecdsa::{self, RecoveryId, VerifyingKey};
 use spki::DecodePublicKey;
 use std::fmt;
 use thiserror::Error;
@@ -305,27 +305,46 @@ fn sig_from_digest_bytes_trial_recovery(
     hash: &B256,
     pubkey: &VerifyingKey,
 ) -> Result<Signature, GcpSignerError> {
-    let signature = Signature::from_signature_and_parity(sig, false);
-    if check_candidate(&signature, hash, pubkey) {
-        return Ok(signature);
-    }
-
-    let signature = signature.with_parity(true);
-    if check_candidate(&signature, hash, pubkey) {
-        return Ok(signature);
-    }
-
-    Err(GcpSignerError::SignatureRecoveryFailed)
-}
-
-/// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.
-fn check_candidate(signature: &Signature, hash: &B256, pubkey: &VerifyingKey) -> bool {
-    signature.recover_from_prehash(hash).map(|key| key == *pubkey).unwrap_or(false)
+    // Ethereum signatures cannot encode x-reduced recovery IDs.
+    let recid = RecoveryId::trial_recovery_from_prehash(pubkey, hash.as_slice(), &sig)
+        .ok()
+        .filter(|recid| !recid.is_x_reduced())
+        .ok_or(GcpSignerError::SignatureRecoveryFailed)?;
+    Ok(Signature::from_signature_and_parity(sig, recid.is_y_odd()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trial_recovery_matches_both_parities() {
+        let key = ecdsa::SigningKey::from_bytes((&[1u8; 32]).into()).unwrap();
+        let mut parities = [false; 2];
+        for byte in 0..32 {
+            let hash = B256::repeat_byte(byte);
+            let (signature, recid) = key.sign_prehash_recoverable(hash.as_slice()).unwrap();
+            let recovered =
+                sig_from_digest_bytes_trial_recovery(signature, &hash, key.verifying_key())
+                    .unwrap();
+            assert_eq!(recovered.recover_from_prehash(&hash).unwrap(), *key.verifying_key());
+            assert_eq!(recovered.v(), recid.is_y_odd());
+            parities[usize::from(recid.is_y_odd())] = true;
+        }
+        assert_eq!(parities, [true, true]);
+    }
+
+    #[test]
+    fn trial_recovery_rejects_wrong_key() {
+        let key = ecdsa::SigningKey::from_bytes((&[1u8; 32]).into()).unwrap();
+        let other = ecdsa::SigningKey::from_bytes((&[2u8; 32]).into()).unwrap();
+        let hash = B256::repeat_byte(3);
+        let (signature, _) = key.sign_prehash_recoverable(hash.as_slice()).unwrap();
+        assert!(matches!(
+            sig_from_digest_bytes_trial_recovery(signature, &hash, other.verifying_key()),
+            Err(GcpSignerError::SignatureRecoveryFailed)
+        ));
+    }
 
     #[tokio::test]
     #[ignore = "requires GOOGLE_APPLICATION_CREDENTIALS and the GOOGLE_* key settings"]
