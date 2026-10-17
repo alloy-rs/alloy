@@ -100,7 +100,7 @@ impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
                     Default::default()
                 } else {
                     // Otherwise, we flatten the array, knowing there are no `None` values
-                    arr.into_iter().flatten().collect::<Vec<T>>().into()
+                    arr.into_iter().flatten().collect()
                 }
             }
         }
@@ -603,7 +603,7 @@ impl Filter {
     /// Each item must include the event name and canonical parameter types.
     #[must_use]
     pub fn events(self, events: impl IntoIterator<Item = impl AsRef<[u8]>>) -> Self {
-        let events = events.into_iter().map(|e| keccak256(e.as_ref())).collect::<Vec<_>>();
+        let events = events.into_iter().map(|e| keccak256(e.as_ref())).collect::<Topic>();
         self.event_signature(events)
     }
 
