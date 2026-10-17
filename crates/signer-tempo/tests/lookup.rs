@@ -130,7 +130,7 @@ fn into_signer_works_for_keychain() {
 }
 
 #[test]
-fn entries_with_missing_key_treated_as_unsupported() {
+fn entries_with_missing_key_report_missing_key() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("keys.toml");
     fs::write(
@@ -147,7 +147,11 @@ key_address = "0x000000000000000000000000000000000000eeee"
     let store = TempoKeystore::load_from(&path).unwrap();
     let err =
         store.find_by_from(address!("0x000000000000000000000000000000000000eeee")).unwrap_err();
-    assert!(matches!(err, TempoSignerError::UnsupportedKeyType { .. }));
+    assert!(matches!(err, TempoSignerError::MissingKey { from }
+        if from == address!("0x000000000000000000000000000000000000eeee")));
+    let err =
+        store.find_by_key(address!("0x000000000000000000000000000000000000eeee")).unwrap_err();
+    assert!(matches!(err, TempoSignerError::MissingKey { .. }));
 }
 
 #[test]

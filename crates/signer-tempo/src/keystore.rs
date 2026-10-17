@@ -137,12 +137,17 @@ fn select_one(
     // Keep only secp256k1 entries with a private key; drop expired ones.
     let mut saw_unsupported: Option<KeyType> = None;
     let mut saw_expired: Option<u64> = None;
+    let mut saw_missing_key = false;
     let now = current_unix_seconds();
 
     let mut usable: Vec<&RawKeyEntry> = Vec::new();
     for c in candidates {
-        if c.key_type != KeyType::Secp256k1 || c.key.is_none() {
+        if c.key_type != KeyType::Secp256k1 {
             saw_unsupported.get_or_insert(c.key_type);
+            continue;
+        }
+        if c.key.is_none() {
+            saw_missing_key = true;
             continue;
         }
         if let Some(exp) = c.expiry {
@@ -159,6 +164,8 @@ fn select_one(
         0 => {
             if let Some(exp) = saw_expired {
                 Err(TempoSignerError::Expired { expiry: exp })
+            } else if saw_missing_key {
+                Err(TempoSignerError::MissingKey { from })
             } else if let Some(kind) = saw_unsupported {
                 Err(TempoSignerError::UnsupportedKeyType { kind })
             } else {
