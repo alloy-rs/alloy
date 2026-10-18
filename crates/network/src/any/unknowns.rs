@@ -77,39 +77,56 @@ impl Typed2718 for AnyTxType {
     }
 }
 
-/// Memoization for deserialization of [`UnknownTxEnvelope`],
-/// [`UnknownTypedTransaction`] [`AnyTxEnvelope`], [`AnyTypedTransaction`].
-/// Setting these manually is discouraged, however the fields are left public
-/// for power users :)
-///
-/// [`AnyTxEnvelope`]: crate::AnyTxEnvelope
-/// [`AnyTypedTransaction`]: crate::AnyTypedTransaction
+/// Memoized deserialization of an unknown transaction's fields.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[expect(unnameable_types)]
-pub struct DeserMemo {
-    pub input: OnceLock<Bytes>,
-    pub access_list: OnceLock<AccessList>,
-    pub blob_versioned_hashes: OnceLock<Vec<B256>>,
-    pub authorization_list: OnceLock<Vec<SignedAuthorization>>,
+struct DeserMemo {
+    input: OnceLock<Bytes>,
+    access_list: OnceLock<AccessList>,
+    blob_versioned_hashes: OnceLock<Vec<B256>>,
+    authorization_list: OnceLock<Vec<SignedAuthorization>>,
 }
 
 /// A typed transaction of an unknown Network
 ///
 /// Equality compares the transaction type and fields, ignoring the deserialization cache.
+/// Use [`Self::fields_mut`] to change fields and invalidate their cached values.
 #[derive(Debug, Clone, Eq, serde::Serialize, serde::Deserialize)]
 #[doc(alias = "UnknownTypedTx")]
 pub struct UnknownTypedTransaction {
-    #[serde(rename = "type")]
     /// Transaction type.
+    #[serde(rename = "type")]
     pub ty: AnyTxType,
 
     /// Additional fields.
     #[serde(flatten)]
-    pub fields: OtherFields,
+    fields: OtherFields,
 
     /// Memoization for deserialization.
     #[serde(skip, default)]
-    pub memo: DeserMemo,
+    memo: DeserMemo,
+}
+
+impl UnknownTypedTransaction {
+    /// Creates an unknown transaction with the given type and fields.
+    pub fn new(ty: AnyTxType, fields: OtherFields) -> Self {
+        Self { ty, fields, memo: DeserMemo::default() }
+    }
+
+    /// Returns the transaction's additional fields.
+    pub const fn fields(&self) -> &OtherFields {
+        &self.fields
+    }
+
+    /// Returns mutable additional fields, invalidating all cached deserialization.
+    pub fn fields_mut(&mut self) -> &mut OtherFields {
+        self.memo = DeserMemo::default();
+        &mut self.fields
+    }
+
+    /// Consumes the transaction, returning its additional fields.
+    pub fn into_fields(self) -> OtherFields {
+        self.fields
+    }
 }
 
 impl PartialEq for UnknownTypedTransaction {
@@ -335,18 +352,65 @@ mod tests {
 
     #[test]
     fn equality_compares_type_and_fields() {
-        let tx = UnknownTypedTransaction {
-            ty: AnyTxType(0x7e),
-            fields: Default::default(),
-            memo: Default::default(),
-        };
+        let tx = UnknownTypedTransaction::new(AnyTxType(0x7e), Default::default());
         let mut different_type = tx.clone();
         different_type.ty = AnyTxType(0x7f);
         assert_ne!(tx, different_type);
 
         let mut different_fields = tx.clone();
-        different_fields.fields.insert("nonce".into(), serde_json::json!("0x1"));
+        different_fields.fields_mut().insert("nonce".into(), serde_json::json!("0x1"));
         assert_ne!(tx, different_fields);
+    }
+
+    #[test]
+    fn field_mutation_invalidates_deserialization_cache() {
+        let mut tx: UnknownTypedTransaction = serde_json::from_value(serde_json::json!({
+            "type": "0x7e",
+            "input": "0x1234",
+            "accessList": [],
+            "blobVersionedHashes": [],
+            "authorizationList": [],
+        }))
+        .unwrap();
+
+        assert_eq!(tx.input().as_ref(), &[0x12, 0x34]);
+        assert!(tx.access_list().unwrap().is_empty());
+        assert!(tx.blob_versioned_hashes().unwrap().is_empty());
+        assert!(tx.authorization_list().unwrap().is_empty());
+
+        let replacement = serde_json::json!({
+            "type": "0x7e",
+            "input": "0x5678",
+            "accessList": [{ "address": Address::ZERO, "storageKeys": [B256::ZERO] }],
+            "blobVersionedHashes": [B256::ZERO],
+            "authorizationList": [{
+                "chainId": "0x1",
+                "address": Address::ZERO,
+                "nonce": "0x0",
+                "yParity": "0x0",
+                "r": "0x1",
+                "s": "0x1"
+            }],
+        });
+        let expected: UnknownTypedTransaction =
+            serde_json::from_value(replacement.clone()).unwrap();
+        *tx.fields_mut() = expected.fields().clone();
+
+        assert_eq!(tx.input().as_ref(), &[0x56, 0x78]);
+        assert_eq!(tx.access_list().unwrap().len(), 1);
+        assert_eq!(tx.blob_versioned_hashes().unwrap().len(), 1);
+        assert_eq!(tx.authorization_list().unwrap().len(), 1);
+        assert_eq!(tx.access_list(), expected.access_list());
+        assert_eq!(tx.blob_versioned_hashes(), expected.blob_versioned_hashes());
+        assert_eq!(tx.authorization_list(), expected.authorization_list());
+        assert_eq!(tx, expected);
+        assert_eq!(serde_json::to_value(&tx).unwrap(), replacement);
+
+        tx.fields_mut().clear();
+        assert!(tx.input().is_empty());
+        assert!(tx.access_list().is_none());
+        assert!(tx.blob_versioned_hashes().is_none());
+        assert!(tx.authorization_list().is_none());
     }
 
     #[test]
@@ -385,9 +449,9 @@ mod tests {
         };
 
         assert_eq!(inner.inner.ty, AnyTxType(126));
-        assert!(inner.inner.fields.contains_key("input"));
-        assert!(inner.inner.fields.contains_key("mint"));
-        assert!(inner.inner.fields.contains_key("sourceHash"));
+        assert!(inner.inner.fields().contains_key("input"));
+        assert!(inner.inner.fields().contains_key("mint"));
+        assert!(inner.inner.fields().contains_key("sourceHash"));
         assert_eq!(inner.gas_limit(), 796584);
         assert_eq!(inner.gas_price(), Some(1313));
         assert_eq!(inner.nonce(), 475232);
