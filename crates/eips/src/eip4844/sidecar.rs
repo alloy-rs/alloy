@@ -752,7 +752,14 @@ mod tests {
         let first = iter.next().unwrap();
         assert_eq!(first.index, 0);
         assert_eq!(first.kzg_commitment, Bytes48::ZERO);
-        let middle = iter.nth(0).unwrap();
+        for (n, expected_index) in [(0, Some(1)), (1, None), (usize::MAX, None)] {
+            let mut remaining = iter.clone();
+            assert_eq!(remaining.nth(n).map(|item| item.index), expected_index);
+            assert_eq!(remaining.len(), 0);
+            assert!(remaining.next().is_none());
+            assert!(remaining.next_back().is_none());
+        }
+        let middle = iter.next().unwrap();
         assert_eq!(middle.index, 1);
         assert_eq!(middle.kzg_proof, Bytes48::new([1; 48]));
         assert_eq!(iter.len(), 0);
