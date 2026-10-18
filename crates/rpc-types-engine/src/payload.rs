@@ -1940,7 +1940,6 @@ impl BlobsBundleV1 {
     /// proofs.
     ///
     /// Returns an empty [`BlobTransactionSidecar`] if the bundle is empty.
-    #[cfg(feature = "kzg")]
     pub fn try_into_sidecar(
         self,
     ) -> Result<BlobTransactionSidecar, alloy_consensus::error::ValueError<Self>> {
@@ -2018,7 +2017,6 @@ impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
     }
 }
 
-#[cfg(feature = "kzg")]
 impl TryFrom<BlobsBundleV1> for BlobTransactionSidecar {
     type Error = alloy_consensus::error::ValueError<BlobsBundleV1>;
 
@@ -2236,7 +2234,6 @@ impl BlobsBundleV2 {
     /// match the blobs length.
     ///
     /// Returns an empty [`BlobTransactionSidecarEip7594`] if the bundle is empty.
-    #[cfg(feature = "kzg")]
     pub fn try_into_sidecar(
         self,
     ) -> Result<BlobTransactionSidecarEip7594, alloy_consensus::error::ValueError<Self>> {
@@ -2316,7 +2313,6 @@ impl FromIterator<BlobTransactionSidecarEip7594> for BlobsBundleV2 {
     }
 }
 
-#[cfg(feature = "kzg")]
 impl TryFrom<BlobsBundleV2> for BlobTransactionSidecarEip7594 {
     type Error = alloy_consensus::error::ValueError<BlobsBundleV2>;
 
@@ -4148,10 +4144,29 @@ mod tests {
     use similar_asserts::assert_eq;
 
     #[test]
-    #[cfg(feature = "kzg")]
     fn convert_empty_bundle() {
-        let bundle = BlobsBundleV1::default();
-        let _sidecar = bundle.try_into_sidecar().unwrap();
+        assert_eq!(
+            BlobTransactionSidecar::try_from(BlobsBundleV1::default()).unwrap(),
+            BlobTransactionSidecar::default()
+        );
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_from(BlobsBundleV2::default()).unwrap(),
+            BlobTransactionSidecarEip7594::default()
+        );
+    }
+
+    #[test]
+    fn convert_bundle_checks_lengths() {
+        let v1 = BlobsBundleV1 { commitments: vec![Bytes48::ZERO], ..Default::default() };
+        assert!(v1.try_into_sidecar().is_err());
+
+        let mut v2 = indexed_v2_bundle();
+        let sidecar = v2.clone().try_into_sidecar().unwrap();
+        assert_eq!(sidecar.blobs, v2.blobs);
+        assert_eq!(sidecar.commitments, v2.commitments);
+        assert_eq!(sidecar.cell_proofs, v2.proofs);
+        v2.proofs.pop();
+        assert!(v2.try_into_sidecar().is_err());
     }
 
     fn indexed_v2_bundle() -> BlobsBundleV2 {
