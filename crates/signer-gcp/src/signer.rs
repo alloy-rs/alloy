@@ -258,9 +258,7 @@ async fn request_get_pubkey(
         // When not specified, the default will be used.
         public_key_format: Default::default(),
     });
-    request
-        .metadata_mut()
-        .insert("x-goog-request-params", format!("name={}", kms_key_name).parse().unwrap());
+    request.metadata_mut().insert("x-goog-request-params", request_params(kms_key_name)?);
     client.get().get_public_key(request).await.map(|r| r.into_inner()).map_err(Into::into)
 }
 
@@ -279,13 +277,20 @@ async fn request_sign_digest(
     });
 
     // Add metadata for request routing: https://cloud.google.com/kms/docs/grpc
-    request
-        .metadata_mut()
-        .insert("x-goog-request-params", format!("name={kms_key_name}").parse().unwrap());
+    request.metadata_mut().insert("x-goog-request-params", request_params(kms_key_name)?);
 
     let response = client.get().asymmetric_sign(request).await?;
     let signature = response.into_inner().signature;
     Ok(signature)
+}
+
+/// Build the routing metadata without panicking on invalid key identifiers.
+fn request_params(
+    kms_key_name: &str,
+) -> Result<tonic::metadata::MetadataValue<tonic::metadata::Ascii>, GcpSignerError> {
+    format!("name={kms_key_name}").parse().map_err(|err| {
+        tonic::Status::invalid_argument(format!("invalid KMS key routing metadata: {err}")).into()
+    })
 }
 
 /// Parse the PEM-encoded public key returned by GCP KMS.
@@ -326,6 +331,22 @@ fn check_candidate(signature: &Signature, hash: &B256, pubkey: &VerifyingKey) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invalid_key_identifiers_return_request_errors() {
+        for invalid in ["project\n", "location\r", "ring\0", "key\u{7f}"] {
+            let name = KeySpecifier::new(GcpKeyRingRef::new(invalid, "global", "ring"), "key", 1).0;
+            let error = request_params(&name).unwrap_err();
+            assert!(matches!(error, GcpSignerError::RequestError(status)
+                if status.code() == tonic::Code::InvalidArgument));
+        }
+    }
+
+    #[test]
+    fn valid_key_identifiers_produce_routing_metadata() {
+        let name = KeySpecifier::new(GcpKeyRingRef::new("project", "global", "ring"), "key", 1).0;
+        assert_eq!(request_params(&name).unwrap().to_str().unwrap(), format!("name={name}"));
+    }
 
     #[tokio::test]
     #[ignore = "requires GOOGLE_APPLICATION_CREDENTIALS and the GOOGLE_* key settings"]
