@@ -22,7 +22,9 @@ pub const EIP_7594_WRAPPER_VERSION: u8 = 1;
 /// Maximum number of blobs per transaction after Fusaka hardfork activation.
 pub const MAX_BLOBS_PER_TX_FUSAKA: u64 = 6;
 
-/// A commitment/proof serialized as 0x-prefixed hex string
+/// A PeerDAS data cell containing [`FIELD_ELEMENTS_PER_CELL`] field elements.
+///
+/// With the `serde` feature, serialized as a `0x`-prefixed hex string.
 pub type Cell = FixedBytes<BYTES_PER_CELL>;
 
 mod rlp;

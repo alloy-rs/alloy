@@ -1,7 +1,7 @@
 //! Utilities for configuring and launching a Reth node.
 
 use crate::{
-    utils::{extract_endpoint, GracefulShutdown},
+    utils::{extract_endpoint, GracefulShutdown, StartupGuard},
     NodeError, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
@@ -498,7 +498,7 @@ impl Reth {
         // Add any additional arguments.
         cmd.args(self.args);
 
-        let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
+        let mut child = StartupGuard::new(cmd.spawn().map_err(NodeError::SpawnError)?);
 
         let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
@@ -579,7 +579,7 @@ impl Reth {
         }
 
         Ok(RethInstance {
-            pid: child,
+            pid: child.into_child(),
             host: self.host.unwrap_or_else(|| "localhost".to_string()),
             instance: self.instance,
             http_port,

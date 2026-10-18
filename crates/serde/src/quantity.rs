@@ -134,7 +134,7 @@ pub mod vec {
 /// serde functions for handling `Vec<Vec<u128>>` via [U128](alloy_primitives::U128)
 pub mod u128_vec_vec_opt {
     use alloy_primitives::U128;
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
@@ -156,14 +156,24 @@ pub mod u128_vec_vec_opt {
         s: S,
     ) -> Result<S::Ok, S::Error> {
         match value {
-            Some(vec) => {
-                let vec = vec
-                    .iter()
-                    .map(|v| v.iter().map(|val| U128::from(*val)).collect::<Vec<_>>())
-                    .collect::<Vec<_>>();
-                s.serialize_some(&vec)
-            }
+            Some(rows) => s.serialize_some(&QuantityRows(rows)),
             None => s.serialize_none(),
+        }
+    }
+
+    struct QuantityRows<'a>(&'a [Vec<u128>]);
+
+    impl Serialize for QuantityRows<'_> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            serializer.collect_seq(self.0.iter().map(|row| QuantityRow(row)))
+        }
+    }
+
+    struct QuantityRow<'a>(&'a [u128]);
+
+    impl Serialize for QuantityRow<'_> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            super::vec::serialize(self.0, serializer)
         }
     }
 }
@@ -582,6 +592,19 @@ mod tests {
 
         let deserialized: Value = serde_json::from_str(&s).unwrap();
         assert_eq!(val, deserialized);
+
+        for (inner, expected) in [
+            (vec![], r#"{"inner":[]}"#),
+            (
+                vec![vec![], vec![0, u128::MAX]],
+                r#"{"inner":[[],["0x0","0xffffffffffffffffffffffffffffffff"]]}"#,
+            ),
+        ] {
+            let val = Value { inner: Some(inner) };
+            let serialized = serde_json::to_string(&val).unwrap();
+            assert_eq!(serialized, expected);
+            assert_eq!(serde_json::from_str::<Value>(&serialized).unwrap(), val);
+        }
 
         let val = Value { inner: None };
         let s = serde_json::to_string(&val).unwrap();
