@@ -25,8 +25,8 @@ pub trait TenderlyApi<N: Network>: Send + Sync {
         block_overrides: Option<BlockOverrides>,
     ) -> TransportResult<TenderlySimulationResult>;
 
-    /// Simulates a transaction as it would execute on the given block, allowing overrides of state
-    /// variables and balances of all accounts
+    /// Simulates a bundle of transactions as it would execute on the given block, allowing
+    /// overrides of state variables and balances of all accounts
     async fn tenderly_simulate_bundle(
         &self,
         txs: &[N::TransactionRequest],

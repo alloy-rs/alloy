@@ -245,7 +245,7 @@ impl AccountChangeKind {
         matches!(self, Self::Modify)
     }
 
-    /// Returns true the account was modified
+    /// Returns true if the account was selfdestructed
     pub const fn is_selfdestruct(&self) -> bool {
         matches!(self, Self::SelfDestruct)
     }
