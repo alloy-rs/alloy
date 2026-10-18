@@ -275,7 +275,9 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
-    /// synchronously
+    /// synchronously.
+    ///
+    /// Errors stop preparation and are returned when the call or gas estimate is awaited.
     fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         let _ = tx;
         // No-op default
@@ -451,7 +453,9 @@ where
 
     fn call<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
         let mut tx = tx;
-        let _ = self.filler.prepare_call_sync(&mut tx);
+        if let Err(error) = self.filler.prepare_call_sync(&mut tx) {
+            return EthCall::error(error);
+        }
         self.inner.call(tx)
     }
 
@@ -482,7 +486,9 @@ where
 
     fn estimate_gas<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         let mut tx = tx;
-        let _ = self.filler.prepare_call_sync(&mut tx);
+        if let Err(error) = self.filler.prepare_call_sync(&mut tx) {
+            return EthCall::error(error).map_resp(crate::utils::convert_u64);
+        }
         self.inner.estimate_gas(tx)
     }
 
@@ -1068,6 +1074,58 @@ mod tests {
             self.0.fetch_add(1, Ordering::Relaxed);
             Ok(tx)
         }
+    }
+
+    #[derive(Clone, Debug)]
+    struct RejectingCallFiller;
+
+    impl TxFiller for RejectingCallFiller {
+        type Fillable = ();
+
+        fn status(&self, _tx: &TransactionRequest) -> FillerControlFlow {
+            FillerControlFlow::Finished
+        }
+
+        fn fill_sync(&self, _tx: &mut SendableTx<Ethereum>) {}
+
+        async fn prepare<P: Provider>(
+            &self,
+            _provider: &P,
+            _tx: &TransactionRequest,
+        ) -> TransportResult<()> {
+            Ok(())
+        }
+
+        async fn fill(
+            &self,
+            (): (),
+            tx: SendableTx<Ethereum>,
+        ) -> TransportResult<SendableTx<Ethereum>> {
+            Ok(tx)
+        }
+
+        fn prepare_call_sync(&self, tx: &mut TransactionRequest) -> TransportResult<()> {
+            tx.gas = Some(123);
+            Err(RpcError::ErrorResp(alloy_json_rpc::ErrorPayload::invalid_request()))
+        }
+    }
+
+    #[tokio::test]
+    async fn call_preparation_errors_prevent_dispatch() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let inner =
+            RootProvider::<Ethereum>::new(alloy_rpc_client::RpcClient::mocked(asserter.clone()));
+        let provider = FillProvider::new(inner, RejectingCallFiller);
+
+        let call = provider.call(TransactionRequest::default()).latest();
+        for error in [
+            call.clone().await.unwrap_err(),
+            call.await.unwrap_err(),
+            provider.estimate_gas(TransactionRequest::default()).await.unwrap_err(),
+        ] {
+            assert_eq!(error.as_error_resp().unwrap().code, -32600);
+        }
+        assert!(asserter.requests().is_empty());
     }
 
     #[tokio::test]
