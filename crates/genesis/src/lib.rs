@@ -848,13 +848,13 @@ impl ChainConfig {
                 "bpo3" => self.bpo3_time,
                 "bpo4" => self.bpo4_time,
                 "bpo5" => self.bpo5_time,
-                "amsterdam" => {
+                "Amsterdam" | "amsterdam" => {
                     if let Some(timestamp) = self.amsterdam_time {
                         amsterdam = Some((timestamp, params));
                     }
                     None
                 }
-                "bogota" => {
+                "Bogota" | "bogota" => {
                     if let Some(timestamp) = self.bogota_time {
                         bogota = Some((timestamp, params));
                     }
@@ -1146,27 +1146,34 @@ mod tests {
 
     #[test]
     fn blob_schedule_includes_amsterdam_and_bogota() {
-        let config: ChainConfig = serde_json::from_value(json!({
-            "chainId": 1,
-            "bpo1Time": 10,
-            "amsterdamTime": 20,
-            "bogotaTime": 30,
-            "blobSchedule": {
-                "bpo1": { "target": 10, "max": 15, "baseFeeUpdateFraction": 8346193 },
-                "amsterdam": { "target": 14, "max": 21, "baseFeeUpdateFraction": 11684671 },
-                "bogota": { "target": 21, "max": 32, "baseFeeUpdateFraction": 20609697 }
-            }
-        }))
-        .unwrap();
+        for (amsterdam, bogota) in [
+            ("amsterdam", "bogota"),
+            ("Amsterdam", "Bogota"),
+            ("Amsterdam", "bogota"),
+            ("amsterdam", "Bogota"),
+        ] {
+            let config: ChainConfig = serde_json::from_value(json!({
+                "chainId": 1,
+                "bpo1Time": 10,
+                "amsterdamTime": 20,
+                "bogotaTime": 30,
+                "blobSchedule": {
+                    "bpo1": { "target": 10, "max": 15, "baseFeeUpdateFraction": 8346193 },
+                    (amsterdam): { "target": 14, "max": 21, "baseFeeUpdateFraction": 11684671 },
+                    (bogota): { "target": 21, "max": 32, "baseFeeUpdateFraction": 20609697 }
+                }
+            }))
+            .unwrap();
 
-        let scheduled = config.blob_schedule_blob_params().scheduled;
-        let entries: Vec<_> = scheduled
-            .iter()
-            .map(|(timestamp, params)| {
-                (*timestamp, params.target_blob_count, params.max_blob_count)
-            })
-            .collect();
-        assert_eq!(entries, vec![(10, 10, 15), (20, 14, 21), (30, 21, 32)]);
+            let scheduled = config.blob_schedule_blob_params().scheduled;
+            let entries: Vec<_> = scheduled
+                .iter()
+                .map(|(timestamp, params)| {
+                    (*timestamp, params.target_blob_count, params.max_blob_count)
+                })
+                .collect();
+            assert_eq!(entries, vec![(10, 10, 15), (20, 14, 21), (30, 21, 32)]);
+        }
     }
 
     #[test]
