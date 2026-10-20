@@ -26,7 +26,7 @@ alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 alloy-rpc-types-eth = { workspace = true, features = ["std", "serde"] }
 alloy-serde.workspace = true
 
-serde.workspace = true
+serde = { workspace = true, features = ["rc"] }
 serde_json.workspace = true
 thiserror.workspace = true
 
