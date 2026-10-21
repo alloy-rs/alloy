@@ -107,7 +107,7 @@ impl Service<RequestPacket> for Http<reqwest::Client> {
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
-        let span = debug_span!("ReqwestTransport", url = %this.url);
+        let span = debug_span!("ReqwestTransport", scheme = %this.url.scheme(), host = ?this.url.host_str());
         Box::pin(this.do_reqwest(req).instrument(span.or_current()))
     }
 }
