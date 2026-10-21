@@ -349,7 +349,9 @@ mod regression_tests {
         let paused = new_blocks.paused.clone();
         let numbers = futures::stream::iter([NO_BLOCK_NUMBER, 1, NO_BLOCK_NUMBER, 2]);
         let stream = Box::pin(new_blocks.into_block_stream(numbers));
-        let heartbeat = Heartbeat::<Ethereum, _>::new(stream, paused).spawn();
+        let heartbeat =
+            Heartbeat::<Ethereum, _>::new(stream, paused, alloy_rpc_client::WeakClient::new())
+                .spawn();
 
         let tx_hash = B256::with_last_byte(1);
         let config = PendingTransactionConfig::new(tx_hash).with_required_confirmations(2);
@@ -385,7 +387,9 @@ mod regression_tests {
         let paused = new_blocks.paused.clone();
         let numbers = futures::stream::iter([1, 2]);
         let stream = Box::pin(new_blocks.into_block_stream(numbers));
-        let heartbeat = Heartbeat::<Ethereum, _>::new(stream, paused).spawn();
+        let heartbeat =
+            Heartbeat::<Ethereum, _>::new(stream, paused, alloy_rpc_client::WeakClient::new())
+                .spawn();
 
         let watch = |tx_hash| {
             let config = PendingTransactionConfig::new(tx_hash).with_required_confirmations(2);
