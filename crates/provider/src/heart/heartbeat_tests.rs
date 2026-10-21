@@ -118,7 +118,7 @@ async fn timeout_reaps_unconfirmed_tx() {
 #[tokio::test(start_paused = true)]
 async fn chain_gap_resets_txs_included_at_or_above_it() {
     // (block number, includes the tx, watcher resolved after this block), 3 confirmations
-    let scenarios: [&[(u64, bool, bool)]; 3] = [
+    let scenarios: [&[(u64, bool, bool)]; 4] = [
         &[(1, true, false), (2, false, false), (2, false, false), (3, false, true)],
         &[
             (1, false, false),
@@ -130,6 +130,20 @@ async fn chain_gap_resets_txs_included_at_or_above_it() {
             (5, false, true),
         ],
         &[(1, true, false), (5, false, true)],
+        // Reincluded higher after a reorg, then reorged out again before the new deadline.
+        &[
+            (1, false, false),
+            (2, true, false),
+            (2, false, false),
+            (3, false, false),
+            (4, true, false),
+            (4, false, false),
+            (5, false, false),
+            (6, false, false),
+            (7, true, false),
+            (8, false, false),
+            (9, false, true),
+        ],
     ];
     for steps in scenarios {
         let harness = Harness::new();
