@@ -572,12 +572,13 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// that were received in blocks affected by the reorg (e.g. >= new_height).
     fn move_reorg_to_unconfirmed(&mut self, new_height: u64) {
         for waiters in self.waiting_confs.values_mut() {
-            *waiters = std::mem::take(waiters).into_iter().filter_map(|watcher| {
+            *waiters = std::mem::take(waiters).into_iter().filter_map(|mut watcher| {
                 if let Some(received_at_block) = watcher.received_at_block {
                     // All blocks after and _including_ the new height are reaped.
                     if received_at_block >= new_height {
                         let hash = watcher.config.tx_hash;
                         debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed after chain gap");
+                        watcher.received_at_block = None;
                         self.unconfirmed.entry(hash).or_default().push(watcher);
                         return None;
                     }
@@ -706,12 +707,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Otherwise add it to the waiting list.
 
             // Set the block at which the transaction was received.
-            if let Some(set_block) = watcher.received_at_block {
-                warn!(tx=%watcher.config.tx_hash, set_block=%set_block, new_block=%block_height, "received_at_block already set");
-                // We don't override the set value.
-            } else {
-                watcher.received_at_block = Some(block_height);
-            }
+            watcher.received_at_block = Some(block_height);
             self.add_to_waiting_list(watcher, block_height);
         }
 
@@ -777,6 +773,72 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
             // Always reap timeouts
             self.reap_timeouts();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_network::Ethereum;
+    use alloy_rpc_types_eth::{Block, BlockTransactions};
+
+    fn block(number: u64, txs: Vec<TxHash>) -> Block {
+        let mut block: Block = Block::default();
+        block.header.inner.number = number;
+        block.transactions = BlockTransactions::Hashes(txs);
+        block
+    }
+
+    #[test]
+    fn confirmation_watch_survives_repeated_reorgs() {
+        // Exercise registration before inclusion, with a receipt, and from lookbehind history.
+        for registration in 0..3 {
+            for confirmations in [2, 3] {
+                let hash = B256::with_last_byte(1);
+                let mut heart = Heartbeat::<Ethereum, _>::new(
+                    futures::stream::empty::<Block>(),
+                    Arc::default(),
+                );
+                if registration == 2 {
+                    heart.handle_new_block(block(10, vec![hash]));
+                }
+                let (tx, rx) = oneshot::channel();
+                heart.handle_watch_ix(TxWatcher {
+                    config: PendingTransactionConfig::new(hash)
+                        .with_required_confirmations(confirmations),
+                    received_at_block: (registration == 1).then_some(10),
+                    reap_at: None,
+                    tx,
+                });
+                let mut pending = PendingTransaction { tx_hash: hash, rx };
+                if registration != 2 {
+                    heart.handle_new_block(block(10, vec![hash]));
+                }
+                assert!((&mut pending).now_or_never().is_none());
+
+                // Remove the first inclusion, then include it at a later height.
+                heart.handle_new_block(block(10, vec![]));
+                heart.handle_new_block(block(11, vec![]));
+                heart.handle_new_block(block(12, vec![hash]));
+                assert!((&mut pending).now_or_never().is_none());
+
+                // Remove it again. Reaching the former deadline must not confirm it.
+                heart.handle_new_block(block(12, vec![]));
+                for number in 13..=12 + confirmations - 1 {
+                    heart.handle_new_block(block(number, vec![]));
+                }
+                assert!((&mut pending).now_or_never().is_none());
+
+                // A fresh inclusion must still complete after the requested confirmations.
+                heart.handle_new_block(block(15, vec![hash]));
+                for number in 16..15 + confirmations - 1 {
+                    heart.handle_new_block(block(number, vec![]));
+                }
+                assert!((&mut pending).now_or_never().is_none());
+                heart.handle_new_block(block(15 + confirmations - 1, vec![]));
+                assert_eq!(pending.now_or_never().unwrap().unwrap(), hash);
+            }
         }
     }
 }
