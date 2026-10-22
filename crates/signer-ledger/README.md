@@ -4,11 +4,12 @@ Asynchronous Ethereum signer for [Ledger] devices.
 
 ## Device setup
 
-Unlock the device and open its Ethereum app before constructing a signer. On native targets,
-`LedgerSigner::new` connects to the first compatible device and keeps an exclusive transport open;
-share that transport through `LedgerSigner::new_with_transport` when using multiple derivation
-paths. Signing requests wait for approval on the device. Address queries do not request on-device
-confirmation.
+Unlock the device and open its Ethereum app before constructing a signer. `LedgerSigner::new`
+connects to the first compatible USB HID device and keeps an exclusive transport open; share that
+transport through `LedgerSigner::new_with_transport` when using multiple derivation paths. The
+signer is generic over the `coins_ledger` transport, so `new_with_transport` also accepts any other
+`LedgerTransport` implementation, such as an emulator. Signing requests wait for approval on the
+device. Address queries do not request on-device confirmation.
 
 ## Supported operations
 
