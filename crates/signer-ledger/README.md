@@ -17,7 +17,8 @@ confirmation.
 - EIP-191 personal messages through `Signer::sign_message`.
 - EIP-712 typed data with the `eip712` feature and Ledger Ethereum app version 1.6.0 or newer. The
   device receives the domain separator and struct hash.
-- EIP-7702 authorizations with the `eip7702` feature.
+- EIP-7702 authorizations with the `eip7702` feature and Ledger Ethereum app version 1.17.0 or
+  newer.
 
 Raw digest signing through `Signer::sign_hash` is not supported. Passing a 32-byte digest to
 `sign_message` signs those bytes as an EIP-191 message; it does not sign the digest directly.

@@ -15,6 +15,18 @@ use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
+/// Minimum Ledger Ethereum app version for EIP-712 typed data signing.
+///
+/// See <https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999>.
+#[cfg(feature = "eip712")]
+const EIP712_MIN_VERSION: &str = ">=1.6.0";
+
+/// Minimum Ledger Ethereum app version for EIP-7702 authorization signing.
+///
+/// The Ethereum app added the instruction in 1.17.0; older builds reject it with status `0x6d00`.
+#[cfg(feature = "eip7702")]
+const EIP7702_MIN_VERSION: &str = ">=1.17.0";
+
 /// A Ledger Ethereum signer.
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
@@ -254,6 +266,18 @@ impl LedgerSigner {
         Ok(version)
     }
 
+    /// Returns [`LedgerError::UnsupportedAppVersion`] if the Ledger Ethereum app does not satisfy
+    /// `min_version`.
+    #[cfg(any(feature = "eip712", feature = "eip7702"))]
+    async fn require_app_version(&self, min_version: &'static str) -> Result<(), LedgerError> {
+        let req = semver::VersionReq::parse(min_version)?;
+        let version = self.version().await?;
+        if !req.matches(&version) {
+            return Err(LedgerError::UnsupportedAppVersion(min_version));
+        }
+        Ok(())
+    }
+
     /// Signs an encoded transaction signing payload and requires confirmation on the Ledger.
     ///
     /// The payload must be legacy RLP or an EIP-2718 transaction type byte followed by its encoded
@@ -273,16 +297,7 @@ impl LedgerSigner {
         hash_struct: &B256,
         separator: &B256,
     ) -> Result<Signature, LedgerError> {
-        // See comment for v1.6.0 requirement
-        // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
-        const EIP712_MIN_VERSION: &str = ">=1.6.0";
-        let req = semver::VersionReq::parse(EIP712_MIN_VERSION)?;
-        let version = self.version().await?;
-
-        // Enforce app version is greater than EIP712_MIN_VERSION
-        if !req.matches(&version) {
-            return Err(LedgerError::UnsupportedAppVersion(EIP712_MIN_VERSION));
-        }
+        self.require_app_version(EIP712_MIN_VERSION).await?;
 
         let mut data = Self::path_to_bytes(&self.derivation)?;
         data.extend_from_slice(separator.as_slice());
@@ -302,11 +317,16 @@ impl LedgerSigner {
 
     /// Sign “auth data” per EIP-7702:
     /// msg = keccak256(0x05 ‖ rlp([chain_id, address, nonce]))
+    ///
+    /// Requires Ledger Ethereum app 1.17.0 or newer; older apps return
+    /// [`LedgerError::UnsupportedAppVersion`].
     #[cfg(feature = "eip7702")]
     pub async fn sign_auth(
         &self,
         auth: &alloy_eip7702::Authorization,
     ) -> Result<Signature, LedgerError> {
+        self.require_app_version(EIP7702_MIN_VERSION).await?;
+
         let path_bytes = Self::path_to_bytes(&self.derivation)?;
         let tlv_payload = crate::utils::make_eip7702_tlv(auth.chain_id, &auth.address, auth.nonce);
 
@@ -503,6 +523,30 @@ mod v_encoding_tests {
         assert_eq!(VEncoding::for_tx(&pre_eip155.encoded_for_signing()), VEncoding::Legacy);
         let typed = TxEip1559 { chain_id: 1, ..Default::default() };
         assert_eq!(VEncoding::for_tx(&typed.encoded_for_signing()), VEncoding::Normalized);
+    }
+}
+
+#[cfg(all(test, any(feature = "eip712", feature = "eip7702")))]
+mod app_version_tests {
+    use super::*;
+
+    fn matches(req: &str, version: &str) -> bool {
+        semver::VersionReq::parse(req).unwrap().matches(&semver::Version::parse(version).unwrap())
+    }
+
+    #[cfg(feature = "eip712")]
+    #[test]
+    fn eip712_min_version() {
+        assert!(!matches(EIP712_MIN_VERSION, "1.5.9"));
+        assert!(matches(EIP712_MIN_VERSION, "1.6.0"));
+    }
+
+    #[cfg(feature = "eip7702")]
+    #[test]
+    fn eip7702_min_version() {
+        assert!(!matches(EIP7702_MIN_VERSION, "1.16.2"));
+        assert!(matches(EIP7702_MIN_VERSION, "1.17.0"));
+        assert!(matches(EIP7702_MIN_VERSION, "1.23.0"));
     }
 }
 
