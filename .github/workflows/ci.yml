@@ -68,6 +68,10 @@ jobs:
           tool: nextest@0.9.140
           checksum: true
           fallback: none
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - name: build
         if: ${{ matrix.rust == '1.94.1' }} # MSRV
         run: cargo build --locked --workspace ${{ matrix.flags }}
@@ -94,6 +98,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - run: cargo test --locked --workspace --doc
       - run: cargo test --locked --all-features --workspace --doc
 
@@ -175,9 +182,6 @@ jobs:
             --exclude alloy-signer-trezor \
             --exclude alloy-signer-turnkey \
             --exclude alloy-transport-ipc
-      # Ledger signer requires one of `browser` or `node` features.
-      - name: build ledger
-        run: cargo build --locked -p alloy-signer-ledger --features browser --target wasm32-wasip1
 
   feature-checks:
     runs-on: ubuntu-latest
@@ -203,6 +207,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - name: cargo hack
         run: cargo hack check --locked --feature-powerset --depth 1
 
@@ -267,6 +274,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - run: cargo +stable clippy --locked --workspace --all-targets --all-features
         env:
           RUSTFLAGS: -Dwarnings
@@ -289,6 +299,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - name: Build documentation
         run: cargo doc --locked --workspace --all-features --no-deps --document-private-items
         env:

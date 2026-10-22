@@ -27,7 +27,7 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-coins-ledger = { version = "0.14", default-features = false }
+coins-ledger = "0.17"
 futures-util.workspace = true
 semver.workspace = true
 thiserror.workspace = true
@@ -55,7 +55,3 @@ eip712 = [
     "alloy-dyn-abi?/eip712",
 ]
 eip7702 = ["alloy-eip7702"]
-
-# WASM support
-browser = ["coins-ledger/browser"]
-node = ["coins-ledger/node"]

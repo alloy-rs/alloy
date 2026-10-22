@@ -7,10 +7,7 @@ use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, SignatureError, B256};
 use alloy_signer::{Result, Signer};
 use async_trait::async_trait;
-use coins_ledger::{
-    common::{APDUCommand, APDUData},
-    transports::{Ledger, LedgerAsync},
-};
+use coins_ledger::{ApduCommand, Ledger};
 use futures_util::lock::Mutex;
 
 #[cfg(feature = "eip712")]
@@ -34,14 +31,7 @@ pub struct LedgerSigner {
     pub(crate) address: Address,
 }
 
-// Required for IntoSigner
-#[cfg(target_family = "wasm")]
-unsafe impl Send for LedgerSigner {}
-#[cfg(target_family = "wasm")]
-unsafe impl Sync for LedgerSigner {}
-
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(not(target_family = "wasm"), async_trait)]
+#[async_trait]
 impl alloy_network::TxSigner<Signature> for LedgerSigner {
     fn address(&self) -> Address {
         self.address
@@ -85,8 +75,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
     }
 }
 
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(not(target_family = "wasm"), async_trait)]
+#[async_trait]
 impl Signer for LedgerSigner {
     async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
@@ -167,8 +156,8 @@ impl LedgerSigner {
         derivation: DerivationType,
         chain_id: Option<ChainId>,
     ) -> Result<Self, LedgerError> {
-        let transport = Ledger::init().await?;
-        let address = Self::get_address_with_path_transport(&transport, &derivation).await?;
+        let mut transport = Ledger::open_first_hid()?;
+        let address = Self::get_address_with_path_transport(&mut transport, &derivation).await?;
         debug!(%address, "Connected to Ledger");
 
         Ok(Self { transport: Mutex::new(transport).into(), derivation, chain_id, address })
@@ -185,8 +174,8 @@ impl LedgerSigner {
         transport: Arc<Mutex<Ledger>>,
     ) -> Result<Self, LedgerError> {
         let address = {
-            let transport_guard = transport.lock().await;
-            Self::get_address_with_path_transport(&transport_guard, &derivation).await?
+            let mut transport_guard = transport.lock().await;
+            Self::get_address_with_path_transport(&mut transport_guard, &derivation).await?
         };
         debug!(%address, "Connected to Ledger");
 
@@ -206,29 +195,30 @@ impl LedgerSigner {
         &self,
         derivation: &DerivationType,
     ) -> Result<Address, LedgerError> {
-        let transport = self.transport.lock().await;
-        Self::get_address_with_path_transport(&transport, derivation).await
+        let mut transport = self.transport.lock().await;
+        Self::get_address_with_path_transport(&mut transport, derivation).await
     }
 
     #[instrument(skip(transport))]
     async fn get_address_with_path_transport(
-        transport: &Ledger,
+        transport: &mut Ledger,
         derivation: &DerivationType,
     ) -> Result<Address, LedgerError> {
-        let data = APDUData::new(&Self::path_to_bytes(derivation)?);
-
-        let command = APDUCommand {
-            cla: 0xe0,
-            ins: INS::GET_PUBLIC_KEY as u8,
-            p1: P1::NON_CONFIRM as u8,
-            p2: P2::NO_CHAINCODE as u8,
-            data,
-            response_len: None,
-        };
+        let path = Self::path_to_bytes(derivation)?;
+        let command = ApduCommand::builder()
+            .cla(0xe0)
+            .ins(INS::GET_PUBLIC_KEY as u8)
+            .p1(P1::NON_CONFIRM as u8)
+            .p2(P2::NO_CHAINCODE as u8)
+            .data(&path)
+            .build()?;
 
         debug!("Dispatching get_address request to ethereum app");
-        let answer = transport.exchange(&command).await?;
-        let result = answer.data().ok_or(LedgerError::UnexpectedNullResponse)?;
+        let answer = transport.exchange(command).await?;
+        let result = answer.data();
+        if result.is_empty() {
+            return Err(LedgerError::UnexpectedNullResponse);
+        }
 
         let address = {
             // extract the address from the response
@@ -244,20 +234,18 @@ impl LedgerSigner {
 
     /// Returns the semantic version of the Ledger Ethereum app.
     pub async fn version(&self) -> Result<semver::Version, LedgerError> {
-        let transport = self.transport.lock().await;
+        let mut transport = self.transport.lock().await;
 
-        let command = APDUCommand {
-            cla: 0xe0,
-            ins: INS::GET_APP_CONFIGURATION as u8,
-            p1: P1::NON_CONFIRM as u8,
-            p2: P2::NO_CHAINCODE as u8,
-            data: APDUData::new(&[]),
-            response_len: None,
-        };
+        let command = ApduCommand::builder()
+            .cla(0xe0)
+            .ins(INS::GET_APP_CONFIGURATION as u8)
+            .p1(P1::NON_CONFIRM as u8)
+            .p2(P2::NO_CHAINCODE as u8)
+            .build()?;
 
         debug!("Dispatching get_version");
-        let answer = transport.exchange(&command).await?;
-        let data = answer.data().ok_or(LedgerError::UnexpectedNullResponse)?;
+        let answer = transport.exchange(command).await?;
+        let data = answer.data();
         let &[_flags, major, minor, patch] = data else {
             return Err(LedgerError::ShortResponse { got: data.len(), expected: 4 });
         };
@@ -343,17 +331,9 @@ impl LedgerSigner {
     ) -> Result<Signature, LedgerError> {
         // @note Because tlv encoding is done on 7702 auth types sig, it checks if chunks are the
         // header or continuations. @note We need to mention the starter chunk first.
-        let p1_first =
+        let mut p1 =
             if command == INS::SIGN_EIP7702_AUTHORIZATION { P1_FIRST_1 } else { P1_FIRST_0 };
-        let transport = self.transport.lock().await;
-        let mut command = APDUCommand {
-            cla: 0xe0,
-            ins: command as u8,
-            p1: p1_first,
-            p2: P2::NO_CHAINCODE as u8,
-            data: APDUData::new(&[]),
-            response_len: None,
-        };
+        let mut transport = self.transport.lock().await;
 
         let mut answer = None;
         // workaround for https://github.com/LedgerHQ/app-ethereum/issues/409
@@ -363,10 +343,16 @@ impl LedgerSigner {
 
         // Iterate in 255 byte chunks
         for chunk in payload.chunks(chunk_size) {
-            command.data = APDUData::new(chunk);
+            let apdu = ApduCommand::builder()
+                .cla(0xe0)
+                .ins(command as u8)
+                .p1(p1)
+                .p2(P2::NO_CHAINCODE as u8)
+                .data(chunk)
+                .build()?;
 
             debug!(chunk = hex::encode(chunk), "Dispatching packet to device");
-            let res = transport.exchange(&command).await;
+            let res = transport.exchange(apdu).await;
             let ans = match res {
                 Ok(ans) => ans,
                 Err(err) => {
@@ -374,17 +360,16 @@ impl LedgerSigner {
                     return Err(err.into());
                 }
             };
-            let data = ans.data().ok_or(LedgerError::UnexpectedNullResponse)?;
-            debug!(response = hex::encode(data), "Received response from device");
+            debug!(response = hex::encode(ans.data()), "Received response from device");
             answer = Some(ans);
 
             // We need more data
-            command.p1 = P1::MORE as u8;
+            p1 = P1::MORE as u8;
         }
         drop(transport);
 
         let answer = answer.unwrap();
-        let data = answer.data().unwrap();
+        let data = answer.data();
         if data.len() != 65 {
             return Err(LedgerError::ShortResponse { got: data.len(), expected: 65 });
         }
