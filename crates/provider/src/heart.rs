@@ -173,17 +173,25 @@ impl<N: Network> PendingTransactionBuilder<N> {
         self
     }
 
-    /// Returns the timeout.
+    /// Returns the timeout for the background confirmation watch.
     pub const fn timeout(&self) -> Option<Duration> {
         self.config.timeout()
     }
 
-    /// Sets the timeout.
+    /// Sets the timeout for the background confirmation watch.
+    ///
+    /// The timeout starts when the background watcher processes the registration, after the
+    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
+    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
     pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.config.set_timeout(timeout);
     }
 
-    /// Sets the timeout.
+    /// Sets the timeout for the background confirmation watch.
+    ///
+    /// The timeout starts when the background watcher processes the registration, after the
+    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
+    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
     pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.config.timeout = timeout;
         self
@@ -335,17 +343,25 @@ impl PendingTransactionConfig {
         self
     }
 
-    /// Returns the timeout.
+    /// Returns the timeout for the background confirmation watch.
     pub const fn timeout(&self) -> Option<Duration> {
         self.timeout
     }
 
-    /// Sets the timeout.
+    /// Sets the timeout for the background confirmation watch.
+    ///
+    /// The timeout starts when the background watcher processes the registration, after the
+    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
+    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
     pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.timeout = timeout;
     }
 
-    /// Sets the timeout.
+    /// Sets the timeout for the background confirmation watch.
+    ///
+    /// The timeout starts when the background watcher processes the registration, after the
+    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
+    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
     pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.timeout = timeout;
         self
@@ -556,12 +572,13 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// that were received in blocks affected by the reorg (e.g. >= new_height).
     fn move_reorg_to_unconfirmed(&mut self, new_height: u64) {
         for waiters in self.waiting_confs.values_mut() {
-            *waiters = std::mem::take(waiters).into_iter().filter_map(|watcher| {
+            *waiters = std::mem::take(waiters).into_iter().filter_map(|mut watcher| {
                 if let Some(received_at_block) = watcher.received_at_block {
                     // All blocks after and _including_ the new height are reaped.
                     if received_at_block >= new_height {
                         let hash = watcher.config.tx_hash;
                         debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed after chain gap");
+                        watcher.received_at_block = None;
                         self.unconfirmed.entry(hash).or_default().push(watcher);
                         return None;
                     }
@@ -690,12 +707,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Otherwise add it to the waiting list.
 
             // Set the block at which the transaction was received.
-            if let Some(set_block) = watcher.received_at_block {
-                warn!(tx=%watcher.config.tx_hash, set_block=%set_block, new_block=%block_height, "received_at_block already set");
-                // We don't override the set value.
-            } else {
-                watcher.received_at_block = Some(block_height);
-            }
+            watcher.received_at_block = Some(block_height);
             self.add_to_waiting_list(watcher, block_height);
         }
 

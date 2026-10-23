@@ -4,6 +4,7 @@ use std::{
     borrow::Cow,
     future::Future,
     net::{SocketAddr, TcpListener},
+    ops::{Deref, DerefMut},
     path::PathBuf,
     process::Child,
     time::{Duration, Instant},
@@ -36,6 +37,43 @@ impl GracefulShutdown {
 
         child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
         let _ = child.wait();
+    }
+}
+
+/// Owns a child until startup succeeds, cleaning it up on every error path.
+pub(crate) struct StartupGuard(Option<Child>);
+
+impl StartupGuard {
+    pub(crate) const fn new(child: Child) -> Self {
+        Self(Some(child))
+    }
+
+    pub(crate) fn into_child(mut self) -> Child {
+        self.0.take().unwrap()
+    }
+}
+
+impl Deref for StartupGuard {
+    type Target = Child;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unwrap()
+    }
+}
+
+impl DerefMut for StartupGuard {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().unwrap()
+    }
+}
+
+impl Drop for StartupGuard {
+    fn drop(&mut self) {
+        let Some(child) = &mut self.0 else { return };
+        if !matches!(child.try_wait(), Ok(Some(_))) && child.kill().is_ok() {
+            // Waiting after a failed kill could block on a process that is still running.
+            let _ = child.wait();
+        }
     }
 }
 
@@ -117,6 +155,11 @@ mod tests {
     use super::*;
     use std::net::SocketAddr;
 
+    #[cfg(unix)]
+    use crate::{Anvil, Geth, NodeError, Reth};
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
     #[test]
     fn test_extract_value_with_equals() {
         let line = "key=value some other text";
@@ -177,5 +220,59 @@ mod tests {
         GracefulShutdown::shutdown(&mut child, 0, "sh");
 
         assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn startup_errors_reap_children() {
+        for (name, output, private_key_error) in [
+            ("anvil", "\\377\\n", false),
+            ("geth", "\\377\\n", false),
+            ("reth", "\\377\\n", false),
+            ("anvil", "Private Keys\\n(0) 0xinvalid\\n", true),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let program = dir.path().join(name);
+            let redirect = if name == "geth" { ">&2" } else { "" };
+            std::fs::write(
+                &program,
+                format!(
+                    "#!/bin/sh\necho $$ > \"$0.pid\"\nprintf '{output}' {redirect}\nwhile :; do :; done\n"
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+            let result = match name {
+                "anvil" => Anvil::at(&program).try_spawn().map(drop),
+                "geth" => Geth::at(&program).try_spawn().map(drop),
+                "reth" => Reth::at(&program).try_spawn().map(drop),
+                _ => unreachable!(),
+            };
+            let pid = std::fs::read_to_string(program.with_extension("pid"))
+                .unwrap()
+                .trim()
+                .parse::<libc::pid_t>()
+                .unwrap();
+            // SAFETY: This only queries the child PID written by our test process.
+            let status = unsafe { libc::waitpid(pid, std::ptr::null_mut(), libc::WNOHANG) };
+            let error = std::io::Error::last_os_error();
+            if status == 0 {
+                // SAFETY: A zero waitpid result confirms this is our live child. Clean it up even
+                // when the assertion below will fail.
+                unsafe {
+                    libc::kill(pid, libc::SIGKILL);
+                    libc::waitpid(pid, std::ptr::null_mut(), 0);
+                }
+            }
+
+            if private_key_error {
+                assert!(matches!(result, Err(NodeError::FromHexError(_))), "{result:?}");
+            } else {
+                assert!(matches!(result, Err(NodeError::ReadLineError(_))), "{name}: {result:?}");
+            }
+            assert_eq!(status, -1, "{name} child was not reaped");
+            assert_eq!(error.raw_os_error(), Some(libc::ECHILD), "{name}: {error}");
+        }
     }
 }

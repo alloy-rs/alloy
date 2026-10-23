@@ -1,8 +1,11 @@
-//! Variant selection of the untagged [`ExecutionPayload`] deserializer.
+//! Deserialization of execution payloads from JSON.
 
 #![cfg(feature = "serde")]
 
-use alloy_rpc_types_engine::ExecutionPayload;
+use alloy_rpc_types_engine::{
+    ExecutionPayload, ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ExecutionPayloadV2,
+};
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{json, Value};
 
 const MAINNET_PAYLOAD: &str = include_str!(
@@ -106,4 +109,180 @@ fn execution_payload_variant_selection() {
         }
     }
     assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
+fn accepts<T: DeserializeOwned>(json: &str) -> bool {
+    serde_json::from_str::<T>(json).is_ok()
+}
+
+#[test]
+fn execution_payload_field_handling() {
+    const V2_FIELDS: [&str; 15] = [
+        "parentHash",
+        "feeRecipient",
+        "stateRoot",
+        "receiptsRoot",
+        "logsBloom",
+        "prevRandao",
+        "blockNumber",
+        "gasLimit",
+        "gasUsed",
+        "timestamp",
+        "extraData",
+        "baseFeePerGas",
+        "blockHash",
+        "transactions",
+        "withdrawals",
+    ];
+
+    let v2 = v1_payload_with(json!({ "withdrawals": [] }));
+    let duplicate_field =
+        v2.to_string().replacen('{', &format!("{{\"blockNumber\":{},", v2["blockNumber"]), 1);
+    let sequence = Value::Array(V2_FIELDS.iter().map(|field| v2[field].clone()).collect());
+
+    // ExecutionPayload, ExecutionPayloadFieldV2, ExecutionPayloadInputV2, ExecutionPayloadV2
+    let cases = [
+        ("v2", v2.to_string(), [true, true, true, true]),
+        (
+            "unknown field",
+            v1_payload_with(json!({ "withdrawals": [], "unknownField": "0x1" })).to_string(),
+            [false, true, false, true],
+        ),
+        (
+            "null withdrawals",
+            v1_payload_with(json!({ "withdrawals": null })).to_string(),
+            [false, true, true, false],
+        ),
+        (
+            "null blobGasUsed",
+            v1_payload_with(json!({ "withdrawals": [], "blobGasUsed": null })).to_string(),
+            [false, true, false, true],
+        ),
+        ("duplicate field", duplicate_field, [false; 4]),
+        ("sequence", sequence.to_string(), [false, false, true, true]),
+    ];
+
+    let mut mismatches = Vec::new();
+    for (name, json, expected) in cases {
+        let accepted = [
+            accepts::<ExecutionPayload>(&json),
+            accepts::<ExecutionPayloadFieldV2>(&json),
+            accepts::<ExecutionPayloadInputV2>(&json),
+            accepts::<ExecutionPayloadV2>(&json),
+        ];
+        if accepted != expected {
+            mismatches.push(format!("{name}: expected {expected:?}, got {accepted:?}"));
+        }
+    }
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
+#[test]
+fn flattened_execution_payload_preserves_siblings() {
+    #[derive(Debug, Deserialize)]
+    struct Extension {
+        metadata: Value,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PayloadFirst {
+        #[serde(flatten)]
+        payload: ExecutionPayload,
+        #[serde(flatten)]
+        extension: Extension,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct PayloadLast {
+        #[serde(flatten)]
+        extension: Extension,
+        #[serde(flatten)]
+        payload: ExecutionPayload,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct StrictOuter {
+        #[serde(flatten)]
+        payload: ExecutionPayload,
+        metadata: Value,
+    }
+
+    for fields in [
+        json!({}),
+        json!({"withdrawals": []}),
+        json!({"withdrawals": [], "blobGasUsed": "0x0", "excessBlobGas": "0x0"}),
+        json!({
+            "withdrawals": [], "blobGasUsed": "0x0", "excessBlobGas": "0x0",
+            "blockAccessList": "0xc0", "slotNumber": "0x7",
+        }),
+    ] {
+        let original = v1_payload_with(fields);
+        let expected = serde_json::from_value::<ExecutionPayload>(original.clone()).unwrap();
+        for metadata in [json!(null), json!(true), json!({"nested": [1, 2]})] {
+            let mut input = original.clone();
+            input["metadata"] = metadata.clone();
+            let first = serde_json::from_value::<PayloadFirst>(input.clone()).unwrap();
+            let last = serde_json::from_str::<PayloadLast>(&input.to_string()).unwrap();
+            assert_eq!(first.payload, expected);
+            assert_eq!(last.payload, expected);
+            assert_eq!(first.extension.metadata, metadata);
+            assert_eq!(last.extension.metadata, metadata);
+            let outer = serde_json::from_value::<StrictOuter>(input.clone()).unwrap();
+            assert_eq!(outer.payload, expected);
+            assert_eq!(outer.metadata, metadata);
+            input["unknown"] = json!(true);
+            assert!(serde_json::from_value::<StrictOuter>(input).is_err());
+        }
+    }
+}
+
+#[test]
+fn execution_payload_fork_field_combinations() {
+    let fork_fields = [
+        ("withdrawals", json!([])),
+        ("blobGasUsed", json!("0x0")),
+        ("excessBlobGas", json!("0x0")),
+        ("blockAccessList", json!("0xc0")),
+        ("slotNumber", json!("0x7")),
+    ];
+    // Each fork field is absent, valid, null, or invalid. Only complete fork prefixes are valid.
+    for combination in 0..4_u32.pow(fork_fields.len() as u32) {
+        let mut input = v1_payload_with(json!({}));
+        let mut states = [0; 5];
+        let mut remaining = combination;
+        for (index, (field, valid)) in fork_fields.iter().enumerate() {
+            let state = remaining % 4;
+            remaining /= 4;
+            states[index] = state;
+            match state {
+                0 => {}
+                1 => input[*field] = valid.clone(),
+                2 => input[*field] = Value::Null,
+                _ => input[*field] = json!(false),
+            }
+        }
+        let expected_version = match states {
+            [0, 0, 0, 0, 0] => Some(1),
+            [1, 0, 0, 0, 0] => Some(2),
+            [1, 1, 1, 0, 0] => Some(3),
+            [1, 1, 1, 1, 1] => Some(4),
+            _ => None,
+        };
+        for result in [
+            serde_json::from_value::<ExecutionPayload>(input.clone()),
+            serde_json::from_str::<ExecutionPayload>(&input.to_string()),
+        ] {
+            let version = result.as_ref().ok().map(|payload| match payload {
+                ExecutionPayload::V1(_) => 1,
+                ExecutionPayload::V2(_) => 2,
+                ExecutionPayload::V3(_) => 3,
+                ExecutionPayload::V4(_) => 4,
+            });
+            assert_eq!(version, expected_version, "fork states: {states:?}");
+            if let Ok(payload) = result {
+                assert_eq!(serde_json::to_value(payload).unwrap(), input);
+            }
+        }
+    }
 }

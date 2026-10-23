@@ -97,8 +97,13 @@ impl<P: Provider<N>, N: Network> ContractInstance<P, N> {
         CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
 
-    /// Returns an [`Event`] builder with the provided filter.
-    pub const fn event<E: SolEvent>(&self, filter: Filter) -> Event<&P, E, N> {
+    /// Returns an [`Event`] builder scoped to this contract and event type.
+    ///
+    /// The contract address and, for non-anonymous events, the event signature override the
+    /// corresponding fields in the provided filter. Other filter settings are preserved.
+    pub fn event<E: SolEvent>(&self, filter: Filter) -> Event<&P, E, N> {
+        let filter = filter.address(self.address);
+        let filter = if E::ANONYMOUS { filter } else { filter.event_signature(E::SIGNATURE_HASH) };
         Event::new(&self.provider, filter)
     }
 }
@@ -124,6 +129,42 @@ mod tests {
     use alloy_primitives::{hex, U256};
     use alloy_provider::ProviderBuilder;
     use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_sol_types::sol;
+
+    sol! {
+        event ScopedEvent(uint256 indexed value);
+        event AnonymousEvent(uint256 indexed value) anonymous;
+    }
+
+    #[test]
+    fn event_scopes_contract_and_signature() {
+        let provider = ProviderBuilder::new().connect_mocked_client(Default::default());
+        let address = Address::repeat_byte(1);
+        let contract = ContractInstance::new(address, provider, Interface::new(JsonAbi::default()));
+        let filter = Filter::new()
+            .address(Address::repeat_byte(2))
+            .event_signature(alloy_primitives::B256::ZERO)
+            .topic1(alloy_primitives::B256::repeat_byte(3))
+            .from_block(42);
+
+        let event = contract.event::<ScopedEvent>(filter.clone());
+        assert_eq!(
+            event.filter,
+            filter.address(address).event_signature(ScopedEvent::SIGNATURE_HASH)
+        );
+    }
+
+    #[test]
+    fn anonymous_event_preserves_indexed_topics() {
+        let provider = ProviderBuilder::new().connect_mocked_client(Default::default());
+        let address = Address::repeat_byte(1);
+        let contract = ContractInstance::new(address, provider, Interface::new(JsonAbi::default()));
+        let filter =
+            Filter::new().event_signature(alloy_primitives::B256::repeat_byte(3)).from_block(42);
+
+        let event = contract.event::<AnonymousEvent>(filter.clone());
+        assert_eq!(event.filter, filter.address(address));
+    }
 
     #[tokio::test]
     async fn contract_interface() {

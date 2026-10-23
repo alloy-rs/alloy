@@ -1,5 +1,8 @@
 //! Payload types.
 
+#[cfg(feature = "serde")]
+mod strict;
+
 use crate::{CancunPayloadFields, ExecutionPayloadSidecar, PayloadError, PraguePayloadFields};
 use alloc::{
     string::{String, ToString},
@@ -125,6 +128,111 @@ impl From<Bytes> for PayloadExtras {
     }
 }
 
+/// Declares a serde helper struct holding the [`ExecutionPayloadV1`] fields followed by the given
+/// fields, with an `into_parts` method that splits it into the [`ExecutionPayloadV1`] and a tuple
+/// of the given fields.
+///
+/// A single flat struct avoids `#[serde(flatten)]`, which buffers every field in an intermediate
+/// map before deserializing it.
+#[cfg(feature = "serde")]
+macro_rules! payload_serde_helper {
+    (
+        $(#[$attr:meta])*
+        struct $name:ident { $($(#[$field_attr:meta])* $field:ident: $ty:ty,)* }
+    ) => {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        $(#[$attr])*
+        struct $name {
+            parent_hash: B256,
+            fee_recipient: Address,
+            state_root: B256,
+            receipts_root: B256,
+            logs_bloom: Bloom,
+            prev_randao: B256,
+            #[serde(with = "alloy_serde::quantity")]
+            block_number: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_limit: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_used: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            timestamp: u64,
+            extra_data: Bytes,
+            base_fee_per_gas: U256,
+            block_hash: B256,
+            transactions: Vec<Bytes>,
+            $($(#[$field_attr])* $field: $ty,)*
+        }
+
+        impl $name {
+            fn into_parts(self) -> (ExecutionPayloadV1, ($($ty,)*)) {
+                let payload = ExecutionPayloadV1 {
+                    parent_hash: self.parent_hash,
+                    fee_recipient: self.fee_recipient,
+                    state_root: self.state_root,
+                    receipts_root: self.receipts_root,
+                    logs_bloom: self.logs_bloom,
+                    prev_randao: self.prev_randao,
+                    block_number: self.block_number,
+                    gas_limit: self.gas_limit,
+                    gas_used: self.gas_used,
+                    timestamp: self.timestamp,
+                    extra_data: self.extra_data,
+                    base_fee_per_gas: self.base_fee_per_gas,
+                    block_hash: self.block_hash,
+                    transactions: self.transactions,
+                };
+                (payload, ($(self.$field,)*))
+            }
+        }
+    };
+}
+
+/// Deserializes the payload helper `H` from a map and converts it with `f` inside the visitor, so
+/// that conversion errors carry the deserializer's position.
+///
+/// Unlike `H::deserialize`, this only accepts a map and rejects the sequence form that a derived
+/// `Deserialize` also accepts. A field list preserves sibling fields when the payload is flattened.
+#[cfg(feature = "serde")]
+fn deserialize_payload_map<'de, D, H, T>(
+    deserializer: D,
+    expecting: &'static str,
+    fields: Option<&'static [&'static str]>,
+    f: fn(H) -> Result<T, &'static str>,
+) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    H: serde::Deserialize<'de>,
+{
+    struct PayloadMapVisitor<H, T> {
+        expecting: &'static str,
+        f: fn(H) -> Result<T, &'static str>,
+    }
+
+    impl<'de, H: serde::Deserialize<'de>, T> serde::de::Visitor<'de> for PayloadMapVisitor<H, T> {
+        type Value = T;
+
+        fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            formatter.write_str(self.expecting)
+        }
+
+        fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            let helper = H::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+            (self.f)(helper).map_err(serde::de::Error::custom)
+        }
+    }
+
+    let visitor = PayloadMapVisitor { expecting, f };
+    match fields {
+        Some(fields) => deserializer.deserialize_struct("ExecutionPayload", fields, visitor),
+        None => deserializer.deserialize_map(visitor),
+    }
+}
+
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
@@ -155,20 +263,26 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadFieldV2 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        struct Helper {
-            #[serde(flatten)]
-            payload_inner: ExecutionPayloadV1,
-            withdrawals: Option<Vec<Withdrawal>>,
+        payload_serde_helper! {
+            struct Helper {
+                withdrawals: Option<Vec<Withdrawal>>,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
-        Ok(match helper.withdrawals {
-            Some(withdrawals) => {
-                Self::V2(ExecutionPayloadV2 { payload_inner: helper.payload_inner, withdrawals })
-            }
-            None => Self::V1(helper.payload_inner),
-        })
+        deserialize_payload_map(
+            deserializer,
+            "a valid ExecutionPayload object",
+            None,
+            |helper: Helper| {
+                let (payload_inner, (withdrawals,)) = helper.into_parts();
+                Ok(match withdrawals {
+                    Some(withdrawals) => {
+                        Self::V2(ExecutionPayloadV2 { payload_inner, withdrawals })
+                    }
+                    None => Self::V1(payload_inner),
+                })
+            },
+        )
     }
 }
 
@@ -283,50 +397,15 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadInputV2 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase", deny_unknown_fields)]
-        struct Helper {
-            parent_hash: B256,
-            fee_recipient: Address,
-            state_root: B256,
-            receipts_root: B256,
-            logs_bloom: Bloom,
-            prev_randao: B256,
-            #[serde(with = "alloy_serde::quantity")]
-            block_number: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            timestamp: u64,
-            extra_data: Bytes,
-            base_fee_per_gas: U256,
-            block_hash: B256,
-            transactions: Vec<Bytes>,
-            withdrawals: Option<Vec<Withdrawal>>,
+        payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
+            struct Helper {
+                withdrawals: Option<Vec<Withdrawal>>,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
-        Ok(Self {
-            execution_payload: ExecutionPayloadV1 {
-                parent_hash: helper.parent_hash,
-                fee_recipient: helper.fee_recipient,
-                state_root: helper.state_root,
-                receipts_root: helper.receipts_root,
-                logs_bloom: helper.logs_bloom,
-                prev_randao: helper.prev_randao,
-                block_number: helper.block_number,
-                gas_limit: helper.gas_limit,
-                gas_used: helper.gas_used,
-                timestamp: helper.timestamp,
-                extra_data: helper.extra_data,
-                base_fee_per_gas: helper.base_fee_per_gas,
-                block_hash: helper.block_hash,
-                transactions: helper.transactions,
-            },
-            withdrawals: helper.withdrawals,
-        })
+        let (execution_payload, (withdrawals,)) = Helper::deserialize(deserializer)?.into_parts();
+        Ok(Self { execution_payload, withdrawals })
     }
 }
 
@@ -946,50 +1025,14 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV2 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Helper {
-            parent_hash: B256,
-            fee_recipient: Address,
-            state_root: B256,
-            receipts_root: B256,
-            logs_bloom: Bloom,
-            prev_randao: B256,
-            #[serde(with = "alloy_serde::quantity")]
-            block_number: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            timestamp: u64,
-            extra_data: Bytes,
-            base_fee_per_gas: U256,
-            block_hash: B256,
-            transactions: Vec<Bytes>,
-            withdrawals: Vec<Withdrawal>,
+        payload_serde_helper! {
+            struct Helper {
+                withdrawals: Vec<Withdrawal>,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
-        Ok(Self {
-            payload_inner: ExecutionPayloadV1 {
-                parent_hash: helper.parent_hash,
-                fee_recipient: helper.fee_recipient,
-                state_root: helper.state_root,
-                receipts_root: helper.receipts_root,
-                logs_bloom: helper.logs_bloom,
-                prev_randao: helper.prev_randao,
-                block_number: helper.block_number,
-                gas_limit: helper.gas_limit,
-                gas_used: helper.gas_used,
-                timestamp: helper.timestamp,
-                extra_data: helper.extra_data,
-                base_fee_per_gas: helper.base_fee_per_gas,
-                block_hash: helper.block_hash,
-                transactions: helper.transactions,
-            },
-            withdrawals: helper.withdrawals,
-        })
+        let (payload_inner, (withdrawals,)) = Helper::deserialize(deserializer)?.into_parts();
+        Ok(Self { payload_inner, withdrawals })
     }
 }
 
@@ -1212,6 +1255,9 @@ impl ssz::Encode for ExecutionPayloadV2 {
 
 /// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec.
 ///
+/// Deserialization rejects unknown non-null fields, as required by `engine_newPayloadV3` and
+/// `engine_newPayloadV4`. When flattened, the enclosing type is responsible for unknown fields.
+///
 /// See also: <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#executionpayloadv3>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -1238,57 +1284,23 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV3 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Helper {
-            parent_hash: B256,
-            fee_recipient: Address,
-            state_root: B256,
-            receipts_root: B256,
-            logs_bloom: Bloom,
-            prev_randao: B256,
-            #[serde(with = "alloy_serde::quantity")]
-            block_number: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            timestamp: u64,
-            extra_data: Bytes,
-            base_fee_per_gas: U256,
-            block_hash: B256,
-            transactions: Vec<Bytes>,
-            withdrawals: Vec<Withdrawal>,
-            #[serde(with = "alloy_serde::quantity")]
-            blob_gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            excess_blob_gas: u64,
+        payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
+            struct Helper {
+                withdrawals: Vec<Withdrawal>,
+                #[serde(with = "alloy_serde::quantity")]
+                blob_gas_used: u64,
+                #[serde(with = "alloy_serde::quantity")]
+                excess_blob_gas: u64,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
+        let (payload_inner, (withdrawals, blob_gas_used, excess_blob_gas)) =
+            Helper::deserialize(strict::StrictFields(deserializer))?.into_parts();
         Ok(Self {
-            payload_inner: ExecutionPayloadV2 {
-                payload_inner: ExecutionPayloadV1 {
-                    parent_hash: helper.parent_hash,
-                    fee_recipient: helper.fee_recipient,
-                    state_root: helper.state_root,
-                    receipts_root: helper.receipts_root,
-                    logs_bloom: helper.logs_bloom,
-                    prev_randao: helper.prev_randao,
-                    block_number: helper.block_number,
-                    gas_limit: helper.gas_limit,
-                    gas_used: helper.gas_used,
-                    timestamp: helper.timestamp,
-                    extra_data: helper.extra_data,
-                    base_fee_per_gas: helper.base_fee_per_gas,
-                    block_hash: helper.block_hash,
-                    transactions: helper.transactions,
-                },
-                withdrawals: helper.withdrawals,
-            },
-            blob_gas_used: helper.blob_gas_used,
-            excess_blob_gas: helper.excess_blob_gas,
+            payload_inner: ExecutionPayloadV2 { payload_inner, withdrawals },
+            blob_gas_used,
+            excess_blob_gas,
         })
     }
 }
@@ -1502,6 +1514,9 @@ impl ssz::Encode for ExecutionPayloadV3 {
 
 /// Execution payload V4 as defined in the Amsterdam fork.
 ///
+/// Deserialization rejects unknown non-null fields. When flattened, the enclosing type is
+/// responsible for unknown fields.
+///
 /// This extends [`ExecutionPayloadV3`] with the `block_access_list` field for [EIP-7928] and the
 /// `slot_number` field for [EIP-7843].
 ///
@@ -1535,64 +1550,32 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV4 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Helper {
-            parent_hash: B256,
-            fee_recipient: Address,
-            state_root: B256,
-            receipts_root: B256,
-            logs_bloom: Bloom,
-            prev_randao: B256,
-            #[serde(with = "alloy_serde::quantity")]
-            block_number: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            timestamp: u64,
-            extra_data: Bytes,
-            base_fee_per_gas: U256,
-            block_hash: B256,
-            transactions: Vec<Bytes>,
-            withdrawals: Vec<Withdrawal>,
-            #[serde(with = "alloy_serde::quantity")]
-            blob_gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            excess_blob_gas: u64,
-            block_access_list: Bytes,
-            #[serde(with = "alloy_serde::quantity")]
-            slot_number: u64,
+        payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
+            struct Helper {
+                withdrawals: Vec<Withdrawal>,
+                #[serde(with = "alloy_serde::quantity")]
+                blob_gas_used: u64,
+                #[serde(with = "alloy_serde::quantity")]
+                excess_blob_gas: u64,
+                block_access_list: Bytes,
+                #[serde(with = "alloy_serde::quantity")]
+                slot_number: u64,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
+        let (
+            payload_inner,
+            (withdrawals, blob_gas_used, excess_blob_gas, block_access_list, slot_number),
+        ) = Helper::deserialize(strict::StrictFields(deserializer))?.into_parts();
         Ok(Self {
             payload_inner: ExecutionPayloadV3 {
-                payload_inner: ExecutionPayloadV2 {
-                    payload_inner: ExecutionPayloadV1 {
-                        parent_hash: helper.parent_hash,
-                        fee_recipient: helper.fee_recipient,
-                        state_root: helper.state_root,
-                        receipts_root: helper.receipts_root,
-                        logs_bloom: helper.logs_bloom,
-                        prev_randao: helper.prev_randao,
-                        block_number: helper.block_number,
-                        gas_limit: helper.gas_limit,
-                        gas_used: helper.gas_used,
-                        timestamp: helper.timestamp,
-                        extra_data: helper.extra_data,
-                        base_fee_per_gas: helper.base_fee_per_gas,
-                        block_hash: helper.block_hash,
-                        transactions: helper.transactions,
-                    },
-                    withdrawals: helper.withdrawals,
-                },
-                blob_gas_used: helper.blob_gas_used,
-                excess_blob_gas: helper.excess_blob_gas,
+                payload_inner: ExecutionPayloadV2 { payload_inner, withdrawals },
+                blob_gas_used,
+                excess_blob_gas,
             },
-            block_access_list: helper.block_access_list,
-            slot_number: helper.slot_number,
+            block_access_list,
+            slot_number,
         })
     }
 }
@@ -1957,7 +1940,6 @@ impl BlobsBundleV1 {
     /// proofs.
     ///
     /// Returns an empty [`BlobTransactionSidecar`] if the bundle is empty.
-    #[cfg(feature = "kzg")]
     pub fn try_into_sidecar(
         self,
     ) -> Result<BlobTransactionSidecar, alloy_consensus::error::ValueError<Self>> {
@@ -2035,7 +2017,6 @@ impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
     }
 }
 
-#[cfg(feature = "kzg")]
 impl TryFrom<BlobsBundleV1> for BlobTransactionSidecar {
     type Error = alloy_consensus::error::ValueError<BlobsBundleV1>;
 
@@ -2253,7 +2234,6 @@ impl BlobsBundleV2 {
     /// match the blobs length.
     ///
     /// Returns an empty [`BlobTransactionSidecarEip7594`] if the bundle is empty.
-    #[cfg(feature = "kzg")]
     pub fn try_into_sidecar(
         self,
     ) -> Result<BlobTransactionSidecarEip7594, alloy_consensus::error::ValueError<Self>> {
@@ -2333,7 +2313,6 @@ impl FromIterator<BlobTransactionSidecarEip7594> for BlobsBundleV2 {
     }
 }
 
-#[cfg(feature = "kzg")]
 impl TryFrom<BlobsBundleV2> for BlobTransactionSidecarEip7594 {
     type Error = alloy_consensus::error::ValueError<BlobsBundleV2>;
 
@@ -3154,213 +3133,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
     where
         D: serde::Deserializer<'de>,
     {
-        use alloy_primitives::U64;
-
-        struct ExecutionPayloadVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for ExecutionPayloadVisitor {
-            type Value = ExecutionPayload;
-
-            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                formatter.write_str("a valid ExecutionPayload object")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                // this currently rejects unknown fields
-                #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
-                #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
-                enum Fields {
-                    ParentHash,
-                    FeeRecipient,
-                    StateRoot,
-                    ReceiptsRoot,
-                    LogsBloom,
-                    PrevRandao,
-                    BlockNumber,
-                    GasLimit,
-                    GasUsed,
-                    Timestamp,
-                    ExtraData,
-                    BaseFeePerGas,
-                    BlockHash,
-                    Transactions,
-                    // V2
-                    Withdrawals,
-                    // V3
-                    BlobGasUsed,
-                    ExcessBlobGas,
-                    // V4
-                    BlockAccessList,
-                    SlotNumber,
-                }
-
-                let mut parent_hash = None;
-                let mut fee_recipient = None;
-                let mut state_root = None;
-                let mut receipts_root = None;
-                let mut logs_bloom = None;
-                let mut prev_randao = None;
-                let mut block_number = None;
-                let mut gas_limit = None;
-                let mut gas_used = None;
-                let mut timestamp = None;
-                let mut extra_data = None;
-                let mut base_fee_per_gas = None;
-                let mut block_hash = None;
-                let mut transactions = None;
-                let mut withdrawals = None;
-                let mut blob_gas_used = None;
-                let mut excess_blob_gas = None;
-                let mut block_access_list = None;
-                let mut slot_number = None;
-
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Fields::ParentHash => parent_hash = Some(map.next_value()?),
-                        Fields::FeeRecipient => fee_recipient = Some(map.next_value()?),
-                        Fields::StateRoot => state_root = Some(map.next_value()?),
-                        Fields::ReceiptsRoot => receipts_root = Some(map.next_value()?),
-                        Fields::LogsBloom => logs_bloom = Some(map.next_value()?),
-                        Fields::PrevRandao => prev_randao = Some(map.next_value()?),
-                        Fields::BlockNumber => {
-                            let raw = map.next_value::<U64>()?;
-                            block_number = Some(raw.to());
-                        }
-                        Fields::GasLimit => {
-                            let raw = map.next_value::<U64>()?;
-                            gas_limit = Some(raw.to());
-                        }
-                        Fields::GasUsed => {
-                            let raw = map.next_value::<U64>()?;
-                            gas_used = Some(raw.to());
-                        }
-                        Fields::Timestamp => {
-                            let raw = map.next_value::<U64>()?;
-                            timestamp = Some(raw.to());
-                        }
-                        Fields::ExtraData => extra_data = Some(map.next_value()?),
-                        Fields::BaseFeePerGas => base_fee_per_gas = Some(map.next_value()?),
-                        Fields::BlockHash => block_hash = Some(map.next_value()?),
-                        Fields::Transactions => transactions = Some(map.next_value()?),
-                        Fields::Withdrawals => withdrawals = Some(map.next_value()?),
-                        Fields::BlobGasUsed => {
-                            let raw = map.next_value::<U64>()?;
-                            blob_gas_used = Some(raw.to());
-                        }
-                        Fields::ExcessBlobGas => {
-                            let raw = map.next_value::<U64>()?;
-                            excess_blob_gas = Some(raw.to());
-                        }
-                        Fields::BlockAccessList => {
-                            block_access_list = Some(map.next_value()?);
-                        }
-                        Fields::SlotNumber => {
-                            let raw = map.next_value::<U64>()?;
-                            slot_number = Some(raw.to());
-                        }
-                    }
-                }
-
-                let parent_hash =
-                    parent_hash.ok_or_else(|| serde::de::Error::missing_field("parentHash"))?;
-                let fee_recipient =
-                    fee_recipient.ok_or_else(|| serde::de::Error::missing_field("feeRecipient"))?;
-                let state_root =
-                    state_root.ok_or_else(|| serde::de::Error::missing_field("stateRoot"))?;
-                let receipts_root =
-                    receipts_root.ok_or_else(|| serde::de::Error::missing_field("receiptsRoot"))?;
-                let logs_bloom =
-                    logs_bloom.ok_or_else(|| serde::de::Error::missing_field("logsBloom"))?;
-                let prev_randao =
-                    prev_randao.ok_or_else(|| serde::de::Error::missing_field("prevRandao"))?;
-                let block_number =
-                    block_number.ok_or_else(|| serde::de::Error::missing_field("blockNumber"))?;
-                let gas_limit =
-                    gas_limit.ok_or_else(|| serde::de::Error::missing_field("gasLimit"))?;
-                let gas_used =
-                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUsed"))?;
-                let timestamp =
-                    timestamp.ok_or_else(|| serde::de::Error::missing_field("timestamp"))?;
-                let extra_data =
-                    extra_data.ok_or_else(|| serde::de::Error::missing_field("extraData"))?;
-                let base_fee_per_gas = base_fee_per_gas
-                    .ok_or_else(|| serde::de::Error::missing_field("baseFeePerGas"))?;
-                let block_hash =
-                    block_hash.ok_or_else(|| serde::de::Error::missing_field("blockHash"))?;
-                let transactions =
-                    transactions.ok_or_else(|| serde::de::Error::missing_field("transactions"))?;
-
-                let v1 = ExecutionPayloadV1 {
-                    parent_hash,
-                    fee_recipient,
-                    state_root,
-                    receipts_root,
-                    logs_bloom,
-                    prev_randao,
-                    block_number,
-                    gas_limit,
-                    gas_used,
-                    timestamp,
-                    extra_data,
-                    base_fee_per_gas,
-                    block_hash,
-                    transactions,
-                };
-
-                let Some(withdrawals) = withdrawals else {
-                    // reject V3 and V4 fields without V2 fields
-                    return if blob_gas_used.is_none()
-                        && excess_blob_gas.is_none()
-                        && block_access_list.is_none()
-                        && slot_number.is_none()
-                    {
-                        Ok(ExecutionPayload::V1(v1))
-                    } else {
-                        Err(serde::de::Error::custom("invalid enum variant"))
-                    };
-                };
-
-                if let (Some(blob_gas_used), Some(excess_blob_gas)) =
-                    (blob_gas_used, excess_blob_gas)
-                {
-                    let v3 = ExecutionPayloadV3 {
-                        payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
-                        blob_gas_used,
-                        excess_blob_gas,
-                    };
-
-                    // Check for V4 fields (block_access_list and slot_number)
-                    return match (block_access_list, slot_number) {
-                        (Some(block_access_list), Some(slot_number)) => {
-                            Ok(ExecutionPayload::V4(ExecutionPayloadV4 {
-                                payload_inner: v3,
-                                block_access_list,
-                                slot_number,
-                            }))
-                        }
-                        // reject incomplete V4 payloads
-                        (None, None) => Ok(ExecutionPayload::V3(v3)),
-                        _ => Err(serde::de::Error::custom("invalid enum variant")),
-                    };
-                }
-
-                // reject incomplete V3 payloads even if they could construct a valid V2
-                if blob_gas_used.is_some() || excess_blob_gas.is_some() {
-                    return Err(serde::de::Error::custom("invalid enum variant"));
-                }
-
-                // reject V4 fields without V3 fields
-                if block_access_list.is_some() || slot_number.is_some() {
-                    return Err(serde::de::Error::custom("invalid enum variant"));
-                }
-
-                Ok(ExecutionPayload::V2(ExecutionPayloadV2 { payload_inner: v1, withdrawals }))
-            }
-        }
-
+        const INVALID_VARIANT: &str = "invalid enum variant";
+        // Preserve the struct field list so flattening leaves sibling fields to the outer type.
         const FIELDS: &[&str] = &[
             "parentHash",
             "feeRecipient",
@@ -3382,7 +3156,88 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             "blockAccessList",
             "slotNumber",
         ];
-        deserializer.deserialize_struct("ExecutionPayload", FIELDS, ExecutionPayloadVisitor)
+
+        // Optional fields may be omitted but, unlike a plain `Option`, must not be `null`.
+        fn present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            T::deserialize(deserializer).map(Some)
+        }
+
+        fn present_quantity<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            alloy_serde::quantity::deserialize(deserializer).map(Some)
+        }
+
+        payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
+            struct Helper {
+                #[serde(default, deserialize_with = "present")]
+                withdrawals: Option<Vec<Withdrawal>>,
+                #[serde(default, deserialize_with = "present_quantity")]
+                blob_gas_used: Option<u64>,
+                #[serde(default, deserialize_with = "present_quantity")]
+                excess_blob_gas: Option<u64>,
+                #[serde(default, deserialize_with = "present")]
+                block_access_list: Option<Bytes>,
+                #[serde(default, deserialize_with = "present_quantity")]
+                slot_number: Option<u64>,
+            }
+        }
+
+        deserialize_payload_map(
+            deserializer,
+            "a valid ExecutionPayload object",
+            Some(FIELDS),
+            |helper: Helper| {
+                let (
+                    v1,
+                    (withdrawals, blob_gas_used, excess_blob_gas, block_access_list, slot_number),
+                ) = helper.into_parts();
+                let no_v3_or_v4_fields = blob_gas_used.is_none()
+                    && excess_blob_gas.is_none()
+                    && block_access_list.is_none()
+                    && slot_number.is_none();
+
+                let Some(withdrawals) = withdrawals else {
+                    // reject V3 and V4 fields without V2 fields
+                    return if no_v3_or_v4_fields {
+                        Ok(Self::V1(v1))
+                    } else {
+                        Err(INVALID_VARIANT)
+                    };
+                };
+                let v2 = ExecutionPayloadV2 { payload_inner: v1, withdrawals };
+
+                let (Some(blob_gas_used), Some(excess_blob_gas)) = (blob_gas_used, excess_blob_gas)
+                else {
+                    // reject incomplete V3 payloads and V4 fields without V3 fields
+                    return if no_v3_or_v4_fields {
+                        Ok(Self::V2(v2))
+                    } else {
+                        Err(INVALID_VARIANT)
+                    };
+                };
+                let v3 = ExecutionPayloadV3 { payload_inner: v2, blob_gas_used, excess_blob_gas };
+
+                match (block_access_list, slot_number) {
+                    (Some(block_access_list), Some(slot_number)) => {
+                        Ok(Self::V4(ExecutionPayloadV4 {
+                            payload_inner: v3,
+                            block_access_list,
+                            slot_number,
+                        }))
+                    }
+                    (None, None) => Ok(Self::V3(v3)),
+                    // reject incomplete V4 payloads
+                    _ => Err(INVALID_VARIANT),
+                }
+            },
+        )
     }
 }
 
@@ -4289,10 +4144,29 @@ mod tests {
     use similar_asserts::assert_eq;
 
     #[test]
-    #[cfg(feature = "kzg")]
     fn convert_empty_bundle() {
-        let bundle = BlobsBundleV1::default();
-        let _sidecar = bundle.try_into_sidecar().unwrap();
+        assert_eq!(
+            BlobTransactionSidecar::try_from(BlobsBundleV1::default()).unwrap(),
+            BlobTransactionSidecar::default()
+        );
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_from(BlobsBundleV2::default()).unwrap(),
+            BlobTransactionSidecarEip7594::default()
+        );
+    }
+
+    #[test]
+    fn convert_bundle_checks_lengths() {
+        let v1 = BlobsBundleV1 { commitments: vec![Bytes48::ZERO], ..Default::default() };
+        assert!(v1.try_into_sidecar().is_err());
+
+        let mut v2 = indexed_v2_bundle();
+        let sidecar = v2.clone().try_into_sidecar().unwrap();
+        assert_eq!(sidecar.blobs, v2.blobs);
+        assert_eq!(sidecar.commitments, v2.commitments);
+        assert_eq!(sidecar.cell_proofs, v2.proofs);
+        v2.proofs.pop();
+        assert!(v2.try_into_sidecar().is_err());
     }
 
     fn indexed_v2_bundle() -> BlobsBundleV2 {

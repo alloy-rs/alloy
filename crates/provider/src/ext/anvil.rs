@@ -1284,7 +1284,7 @@ mod tests {
                 rt.block_on(async {
                     let provider = ProviderBuilder::new()
                         .connect_anvil_with_wallet_and_config(|anvil| {
-                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                            anvil.args(["--hardfork", "cancun"])
                         })
                         .unwrap();
 
@@ -1324,7 +1324,7 @@ mod tests {
                 rt.block_on(async {
                     let provider = ProviderBuilder::new()
                         .connect_anvil_with_wallet_and_config(|anvil| {
-                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                            anvil.args(["--hardfork", "cancun"])
                         })
                         .unwrap();
 
