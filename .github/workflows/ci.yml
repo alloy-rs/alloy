@@ -68,6 +68,10 @@ jobs:
           tool: nextest@0.9.140
           checksum: true
           fallback: none
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - name: build
         if: ${{ matrix.rust == '1.94.1' }} # MSRV
         run: cargo build --locked --workspace ${{ matrix.flags }}
@@ -94,6 +98,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - run: cargo test --locked --workspace --doc
       - run: cargo test --locked --all-features --workspace --doc
 
@@ -175,9 +182,56 @@ jobs:
             --exclude alloy-signer-trezor \
             --exclude alloy-signer-turnkey \
             --exclude alloy-transport-ipc
-      # Ledger signer requires one of `browser` or `node` features.
-      - name: build ledger
-        run: cargo build --locked -p alloy-signer-ledger --features browser --target wasm32-wasip1
+
+  # Drives the Ledger signer against the Ethereum app in the Speculos emulator.
+  speculos:
+    name: speculos ${{ matrix.model }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { model: nanosp, elf: app-1.23.0-nanos2.elf }
+    steps:
+      - name: Secure runner
+        uses: tempoxyz/gh-actions/actions/secure-runner@2ab28a31ae569be9f780c7675b684471060afa40 # 2026-10-09T21-43-19Z-2ab28a31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: tempoxyz/gh-actions/vendor/dtolnay/rust-toolchain@2ab28a31ae569be9f780c7675b684471060afa40 # 2026-10-09T21-43-19Z-2ab28a31
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+      - name: Download the Ethereum app
+        run: gh release download 1.23.0 -R LedgerHQ/app-ethereum -p ${{ matrix.elf }} -D apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # The seed derives the address the tests expect at the Ledger Live path 0.
+      - name: Start Speculos
+        run: >
+          docker run -d --name speculos -v "$PWD/apps":/apps -p 9999:9999 -p 5000:5000
+          ghcr.io/ledgerhq/speculos:v0.27.1@sha256:028d1e368244631578537e7ca50b6f13ca2932b5f3fd220627289b559c07a886
+          --model ${{ matrix.model }} --display headless --apdu-port 9999 --api-port 5000
+          --seed "test test test test test test test test test test test junk"
+          /apps/${{ matrix.elf }}
+      - name: Wait for Speculos
+        run: timeout 60 bash -c 'until curl -sf http://127.0.0.1:5000/events >/dev/null; do sleep 1; done'
+      - run: cargo test --locked -p alloy-signer-ledger --all-features --test speculos
+        env:
+          SPECULOS_APDU_ADDR: 127.0.0.1:9999
+          SPECULOS_API_URL: http://127.0.0.1:5000
+          SPECULOS_MODEL: ${{ matrix.model }}
+      - if: failure()
+        run: docker logs speculos
 
   feature-checks:
     runs-on: ubuntu-latest
@@ -203,6 +257,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - name: cargo hack
         run: cargo hack check --locked --feature-powerset --depth 1
 
@@ -267,6 +324,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - run: cargo +stable clippy --locked --workspace --all-targets --all-features
         env:
           RUSTFLAGS: -Dwarnings
@@ -289,6 +349,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+      # `coins-ledger` builds hidapi's hidraw backend, which links libudev.
+      - name: Install libudev
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - name: Build documentation
         run: cargo doc --locked --workspace --all-features --no-deps --document-private-items
         env:
@@ -387,6 +450,7 @@ jobs:
       - doctest
       - wasm-unknown
       - wasm-wasi
+      - speculos
       - feature-checks
       - check-no-std
       - typos
