@@ -91,7 +91,7 @@ pub mod serde_bincode_compat {
 use alloy_eips::Typed2718;
 
 /// Represents a minimal EVM transaction.
-/// Currently, EIP-1559, EIP-4844, and EIP-7702 support dynamic fees.
+/// Currently, EIP-1559, EIP-4844, EIP-7702, and EIP-8141 support dynamic fees.
 /// We call these transactions "dynamic fee transactions".
 /// We call non dynamic fee transactions(EIP-155, EIP-2930) "legacy fee transactions".
 #[doc(alias = "Tx")]
@@ -119,18 +119,44 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// This is also commonly referred to as the "Gas Fee Cap".
     fn max_fee_per_gas(&self) -> u128;
 
+    /// Returns [`Self::max_fee_per_gas`] without narrowing it to `u128`.
+    ///
+    /// The default implementation widens the `u128` value. Transaction types whose fee fields
+    /// are wider than `u128`, such as EIP-8141, return the full value.
+    #[inline]
+    fn max_fee_per_gas_u256(&self) -> U256 {
+        U256::from(self.max_fee_per_gas())
+    }
+
     /// For dynamic fee transactions returns the Priority fee the caller is paying to the block
     /// author.
     ///
     /// This will return `None` for legacy fee transactions
     fn max_priority_fee_per_gas(&self) -> Option<u128>;
 
-    /// Max fee per blob gas for EIP-4844 transaction.
+    /// Returns [`Self::max_priority_fee_per_gas`] without narrowing it to `u128`.
     ///
-    /// Returns `None` for non-eip4844 transactions.
+    /// The default implementation widens the `u128` value.
+    #[inline]
+    fn max_priority_fee_per_gas_u256(&self) -> Option<U256> {
+        self.max_priority_fee_per_gas().map(U256::from)
+    }
+
+    /// Max fee per blob gas for EIP-4844 transactions, and for EIP-8141 transactions that carry
+    /// blob hashes.
+    ///
+    /// Returns `None` for all other transactions.
     ///
     /// This is also commonly referred to as the "Blob Gas Fee Cap".
     fn max_fee_per_blob_gas(&self) -> Option<u128>;
+
+    /// Returns [`Self::max_fee_per_blob_gas`] without narrowing it to `u128`.
+    ///
+    /// The default implementation widens the `u128` value.
+    #[inline]
+    fn max_fee_per_blob_gas_u256(&self) -> Option<U256> {
+        self.max_fee_per_blob_gas().map(U256::from)
+    }
 
     /// Return the max priority fee per gas if the transaction is a dynamic fee transaction, and
     /// otherwise return the gas price.
@@ -141,10 +167,26 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// legacy fee transactions.
     fn priority_fee_or_price(&self) -> u128;
 
+    /// Returns [`Self::priority_fee_or_price`] without narrowing it to `u128`.
+    ///
+    /// The default implementation widens the `u128` value.
+    #[inline]
+    fn priority_fee_or_price_u256(&self) -> U256 {
+        U256::from(self.priority_fee_or_price())
+    }
+
     /// Returns the effective gas price for the given base fee.
     ///
     /// If the transaction is a legacy fee transaction, the gas price is returned.
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128;
+
+    /// Returns [`Self::effective_gas_price`] without narrowing it to `u128`.
+    ///
+    /// The default implementation widens the `u128` value.
+    #[inline]
+    fn effective_gas_price_u256(&self, base_fee: Option<u64>) -> U256 {
+        U256::from(self.effective_gas_price(base_fee))
+    }
 
     /// Returns the effective tip for this transaction.
     ///
@@ -166,6 +208,14 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
         // Compare the fee with max_priority_fee_per_gas (or gas price for legacy fee transactions)
         self.max_priority_fee_per_gas()
             .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
+    }
+
+    /// Returns [`Self::effective_tip_per_gas`] without narrowing it to `u128`.
+    ///
+    /// The default implementation widens the `u128` value.
+    #[inline]
+    fn effective_tip_per_gas_u256(&self, base_fee: u64) -> Option<U256> {
+        self.effective_tip_per_gas(base_fee).map(U256::from)
     }
 
     /// Returns `true` if the transaction supports dynamic fees.
@@ -242,6 +292,15 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// Returns `None` for non-eip7702 transactions.
     fn authorization_count(&self) -> Option<u64> {
         self.authorization_list().map(|auths| auths.len() as u64)
+    }
+
+    /// Returns the [EIP-8141](https://eips.ethereum.org/EIPS/eip-8141) frame transaction if this
+    /// is one.
+    ///
+    /// Wrappers and envelopes forward this to the transaction they contain, so the frames and
+    /// the full-width fields stay reachable through them.
+    fn frame_transaction(&self) -> Option<&TxEip8141> {
+        None
     }
 }
 
