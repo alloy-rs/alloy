@@ -14,7 +14,8 @@
 //! # Composing fillers
 //!
 //! To layer fillers, a utility filler is provided called [`JoinFill`], which is a composition of
-//! two fillers, left and right. The left filler is called before the right filler.
+//! two fillers, left and right. Ready fillers prepare concurrently, then apply their prepared
+//! values from left to right. Synchronous filling also runs from left to right.
 //!
 //! [`Provider`]: crate::Provider
 
@@ -135,7 +136,8 @@ impl FillerControlFlow {
         Self::Missing(vec![(name, missing)])
     }
 
-    /// Returns true if the filler is missing a required property.
+    /// Returns the filler names and their missing properties if this is [`Self::Missing`],
+    /// or `None` if this is [`Self::Ready`] or [`Self::Finished`].
     pub fn as_missing(&self) -> Option<&[(&'static str, Vec<&'static str>)]> {
         match self {
             Self::Missing(missing) => Some(missing),
