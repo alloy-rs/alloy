@@ -31,6 +31,32 @@ fills a transaction that has no chain ID and rejects a different transaction cha
 device is prompted. `None` leaves the transaction unchanged. The signer setting does not constrain
 messages, EIP-712 domains, or EIP-7702 authorizations.
 
+## Testing against Speculos
+
+The `speculos` feature enables `coins_ledger`'s transport for Ledger's [Speculos] emulator, and the
+crate's `tests/speculos.rs` drives the signer through the Ethereum app in it: address derivation,
+message, transaction and EIP-7702 signing with on-screen approval, and rejection. The tests skip
+unless `SPECULOS_APDU_ADDR` is set.
+
+Ledger publishes the app for each model on the [app-ethereum] releases page; `nanos2` is the Nano S
+Plus. Start Speculos from the directory holding the app, with the seed the tests expect:
+
+```sh
+gh release download 1.23.0 -R LedgerHQ/app-ethereum -p app-1.23.0-nanos2.elf
+docker run -d --rm --name speculos -v "$PWD":/apps -p 9999:9999 -p 5000:5000 \
+  ghcr.io/ledgerhq/speculos:v0.27.1 \
+  --model nanosp --display headless --apdu-port 9999 --api-port 5000 \
+  --seed "test test test test test test test test test test test junk" \
+  /apps/app-1.23.0-nanos2.elf
+SPECULOS_APDU_ADDR=127.0.0.1:9999 SPECULOS_API_URL=http://127.0.0.1:5000 SPECULOS_MODEL=nanosp \
+  cargo test -p alloy-signer-ledger --all-features --test speculos
+docker stop speculos
+```
+
+The tests navigate the button-driven Nano models (`nanosp`, `nanox`); Flex and Stax need touch
+input and are not supported yet. On macOS, AirPlay Receiver holds port 5000: map the API port
+elsewhere, such as `-p 5001:5000`, and point `SPECULOS_API_URL` at it.
+
 ## Example
 
 ```no_run
@@ -48,3 +74,5 @@ assert_eq!(signature.recover_address_from_msg(message)?, signer.address());
 ```
 
 [Ledger]: https://www.ledger.com
+[Speculos]: https://github.com/LedgerHQ/speculos
+[app-ethereum]: https://github.com/LedgerHQ/app-ethereum/releases

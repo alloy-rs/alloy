@@ -27,7 +27,7 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-coins-ledger = "0.17"
+coins-ledger = "0.17.1"
 futures-util.workspace = true
 semver.workspace = true
 thiserror.workspace = true
@@ -44,7 +44,7 @@ alloy-eip7702 = { workspace = true, optional = true }
 [dev-dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-rlp.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 tracing-subscriber.workspace = true
 
 [features]
@@ -55,3 +55,6 @@ eip712 = [
     "alloy-dyn-abi?/eip712",
 ]
 eip7702 = ["alloy-eip7702"]
+
+# Transport for the Speculos emulator, for tests without a device.
+speculos = ["coins-ledger/speculos"]

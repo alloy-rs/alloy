@@ -2500,9 +2500,9 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
 name = "coins-bip32"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e54cd796aae03789fd77871fa4de4e49168eae9c83c7be8db4752480ea4aec9"
+checksum = "cfc8f6b87591355b762ca5eace648c2b403a0a96b72021bcc09dae02a1244fa4"
 dependencies = [
  "bs58",
  "coins-core",
@@ -2519,9 +2519,9 @@ dependencies = [
 
 [[package]]
 name = "coins-bip39"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ce0258054590f5f3f7cef2cec993886e05dec4a306a6b24546a5344b25e98db"
+checksum = "a30335dbf443299d18ad631e1fd2a87a7c4c9fb01d89c726b2ebfd1a145bbb83"
 dependencies = [
  "coins-bip32",
  "hmac 0.13.0",
@@ -2536,9 +2536,9 @@ dependencies = [
 
 [[package]]
 name = "coins-core"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad935161b1997c529d4ef1f90d31582bdb795dd4bdf1d14b708c9c7aa5fa2707"
+checksum = "0f5b1057c839d4bded1b83b9450ca5ecb0356484ec93f77d6675d58aa9d1e54b"
 dependencies = [
  "digest 0.11.3",
  "hybrid-array",
@@ -2548,12 +2548,16 @@ dependencies = [
 
 [[package]]
 name = "coins-ledger"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "813118029db18495a1e80a03c6f2e2a023a4ea119ac184d66be4409c0870edd6"
+checksum = "21a28cdd5e8b32179ff9e3e030a9700e0f9950ef3560928ed6370a355732e033"
 dependencies = [
  "const-hex",
+ "futures-util",
  "hidapi",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
