@@ -3,6 +3,19 @@
 //! [EIP-7906]: <https://eips.ethereum.org/EIPS/eip-7906>
 
 /// A `TXTRACE` selector.
+///
+/// # Examples
+///
+/// ```
+/// use alloy_eips::eip7906::TxTraceParam;
+///
+/// let selector = TxTraceParam::try_from(0x05)?;
+/// assert_eq!(selector, TxTraceParam::BalanceBefore);
+/// assert!(!selector.requires_zero_index());
+/// assert!(TxTraceParam::GasPayerAddress.requires_zero_index());
+/// assert_eq!(TxTraceParam::try_from(0x1b), Err(0x1b));
+/// # Ok::<_, u8>(())
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum TxTraceParam {
