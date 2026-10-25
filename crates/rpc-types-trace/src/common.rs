@@ -148,9 +148,7 @@ where
                 match (result, error) {
                     (Some(result), _) => Ok(TraceResult::Success { result, tx_hash }),
                     (None, Some(error)) => Ok(TraceResult::Error { error, tx_hash }),
-                    (None, None) => Err(de::Error::custom(
-                        "data did not match any variant of untagged enum TraceResult",
-                    )),
+                    (None, None) => Err(de::Error::custom("missing field `result` or `error`")),
                 }
             }
         }
