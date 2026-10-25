@@ -284,6 +284,7 @@ impl<'a> SerdeGenerator<'a> {
     /// Generate custom deserialize implementation for untagged types.
     fn generate_untagged_deserialize(&self, legacy_deserialize: &TokenStream) -> TokenStream {
         let generics = self.generics;
+        let (_, ty_generics, _) = generics.split_for_impl();
         let unwrapped_generics = &generics.params;
         let serde = &self.serde;
         let serde_json = &self.serde_json;
@@ -291,19 +292,19 @@ impl<'a> SerdeGenerator<'a> {
 
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name);
 
+        let type_first = self.generate_type_first_dispatch();
+
         quote! {
-            // Manually modified derived serde(untagged) to preserve the error of the TaggedTxTypes
-            // attempt.
-            impl<'de, #unwrapped_generics> #serde::Deserialize<'de> for UntaggedTxTypes #generics where #serde_bounds {
-                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where
-                    D: #serde::Deserializer<'de>,
-                {
-                    let value = #serde_json::Value::deserialize(deserializer)?;
+            impl #generics UntaggedTxTypes #ty_generics where #serde_bounds {
+                // Manually modified derived serde(untagged) to preserve the error of the
+                // TaggedTxTypes attempt.
+                fn deserialize_value<E: #serde::de::Error>(value: #serde_json::Value) -> Result<Self, E> {
+                    use #serde::Deserialize;
+
                     let deserializer = &value;
 
                     let tagged_res =
-                        TaggedTxTypes::<#unwrapped_generics>::deserialize(deserializer).map(Self::Tagged).map_err(#serde::de::Error::custom);
+                        TaggedTxTypes::<#unwrapped_generics>::deserialize(deserializer).map(Self::Tagged).map_err(E::custom);
 
                     if tagged_res.is_ok() {
                         // return tagged if successful
@@ -323,6 +324,135 @@ impl<'a> SerdeGenerator<'a> {
                     //  > "data did not match any variant of untagged enum UntaggedTxTypes"
                     tagged_res
                 }
+            }
+
+            impl<'de, #unwrapped_generics> #serde::Deserialize<'de> for UntaggedTxTypes #generics where #serde_bounds {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: #serde::Deserializer<'de>,
+                {
+                    #type_first
+
+                    Self::deserialize_value(#serde_json::Value::deserialize(deserializer)?)
+                }
+            }
+        }
+    }
+
+    /// Generate the type-first dispatch used by the untagged deserializer.
+    ///
+    /// When the input object starts with a `type` key holding a known tag, the object is
+    /// deserialized straight into that variant, without buffering it. Everything else is
+    /// buffered into a `serde_json::Value` and goes through the generic path.
+    ///
+    /// The dispatch is only generated if there are no flattened variants, which could accept
+    /// an object that the tagged variant rejects, and only covers typed variants without
+    /// custom serde attributes.
+    fn generate_type_first_dispatch(&self) -> TokenStream {
+        let serde = &self.serde;
+        let serde_json = &self.serde_json;
+        let alloy_consensus = self.alloy_consensus;
+        let generics = self.generics;
+        let (_, ty_generics, _) = generics.split_for_impl();
+        let unwrapped_generics = &generics.params;
+        let serde_bounds = self.generate_deserialize_bounds();
+
+        if !self.variants.flattened.is_empty() {
+            return quote! {};
+        }
+
+        let arms = self.variants.typed.iter().filter(|v| v.serde_attrs.is_none()).map(|v| {
+            let ProcessedVariant { name, ty, kind, .. } = v;
+            let (rename, aliases) = kind.serde_tag_and_aliases();
+            let deserialize = if v.is_legacy() {
+                quote! { #alloy_consensus::transaction::signed_legacy_serde::deserialize(map_deserializer) }
+            } else {
+                quote! { <#ty as #serde::Deserialize>::deserialize(map_deserializer) }
+            };
+
+            quote! {
+                #rename #(| #aliases)* => {
+                    let map_deserializer = #serde::de::value::MapAccessDeserializer::new(map);
+                    return #deserialize.map(|tx| UntaggedTxTypes::Tagged(TaggedTxTypes::#name(tx)));
+                }
+            }
+        });
+
+        quote! {
+            /// A map key, with the `type` key recognized without allocating.
+            enum FirstKey {
+                Type,
+                Other(#serde_json::Value),
+            }
+
+            impl<'de> #serde::Deserialize<'de> for FirstKey {
+                fn deserialize<D: #serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                    struct KeyVisitor;
+
+                    impl<'de> #serde::de::Visitor<'de> for KeyVisitor {
+                        type Value = FirstKey;
+
+                        fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                            f.write_str("a string key")
+                        }
+
+                        fn visit_str<E: #serde::de::Error>(self, key: &str) -> Result<FirstKey, E> {
+                            Ok(if key == "type" { FirstKey::Type } else { FirstKey::Other(key.into()) })
+                        }
+                    }
+
+                    deserializer.deserialize_str(KeyVisitor)
+                }
+            }
+
+            struct TypeFirstVisitor<#unwrapped_generics>(core::marker::PhantomData<fn() -> UntaggedTxTypes #ty_generics>);
+
+            impl<'de, #unwrapped_generics> #serde::de::Visitor<'de> for TypeFirstVisitor #ty_generics where #serde_bounds {
+                type Value = UntaggedTxTypes #ty_generics;
+
+                fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                    f.write_str("a transaction object")
+                }
+
+                fn visit_map<M: #serde::de::MapAccess<'de>>(self, mut map: M) -> Result<Self::Value, M::Error> {
+                    let mut object = #serde_json::Map::new();
+
+                    match map.next_key::<FirstKey>()? {
+                        None => {}
+                        Some(FirstKey::Type) => {
+                            let tag = map.next_value::<#serde_json::Value>()?;
+                            if let #serde_json::Value::String(tag) = &tag {
+                                match tag.as_str() {
+                                    #(#arms)*
+                                    _ => {}
+                                }
+                            }
+                            object.insert("type".into(), tag);
+                        }
+                        Some(FirstKey::Other(#serde_json::Value::String(key))) => {
+                            object.insert(key, map.next_value()?);
+                        }
+                        Some(FirstKey::Other(_)) => unreachable!(),
+                    }
+
+                    while let Some((key, value)) = map.next_entry()? {
+                        object.insert(key, value);
+                    }
+
+                    UntaggedTxTypes::deserialize_value(#serde_json::Value::Object(object))
+                }
+
+                fn visit_seq<A: #serde::de::SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
+                    let value = <#serde_json::Value as #serde::Deserialize>::deserialize(#serde::de::value::SeqAccessDeserializer::new(seq))?;
+
+                    UntaggedTxTypes::deserialize_value(value)
+                }
+            }
+
+            // Non human readable formats deserialize from a `serde_json::Value` buffer, which is
+            // always human readable, so they take the generic path.
+            if deserializer.is_human_readable() {
+                return deserializer.deserialize_any(TypeFirstVisitor::<#unwrapped_generics>(core::marker::PhantomData));
             }
         }
     }
