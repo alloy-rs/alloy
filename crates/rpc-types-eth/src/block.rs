@@ -655,9 +655,11 @@ impl From<Header> for alloy_serde::WithOtherFields<Header> {
 }
 
 /// BlockOverrides is a set of header fields to override.
+///
+/// Unknown keys are rejected, as the execution API requires for `eth_simulateV1`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase"))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase", deny_unknown_fields))]
 pub struct BlockOverrides {
     /// Overrides the block number.
     ///
@@ -1041,6 +1043,30 @@ mod tests {
     fn block_overrides() {
         let s = r#"{"blockNumber": "0xe39dd0"}"#;
         let _overrides = serde_json::from_str::<BlockOverrides>(s).unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn block_overrides_rejects_unknown_fields() {
+        // See the execution-apis test
+        // `eth_simulateV1/ethSimulate-unknown-block-override-key-32602`.
+        let err = serde_json::from_str::<BlockOverrides>(r#"{"bogusField":"0x1"}"#).unwrap_err();
+        assert!(err.to_string().contains("unknown field `bogusField`"), "{err}");
+
+        // Aliases are still accepted.
+        let s = r#"{
+            "blockNumber": "0x1",
+            "feeRecipient": "0x0000000000000000000000000000000000000001",
+            "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000002",
+            "baseFeePerGas": "0x3",
+            "parentBeaconBlockRoot": "0x0000000000000000000000000000000000000000000000000000000000000004"
+        }"#;
+        let overrides = serde_json::from_str::<BlockOverrides>(s).unwrap();
+        assert_eq!(overrides.number, Some(U256::from(1)));
+        assert_eq!(overrides.coinbase, Some(Address::with_last_byte(1)));
+        assert_eq!(overrides.random, Some(B256::with_last_byte(2)));
+        assert_eq!(overrides.base_fee, Some(U256::from(3)));
+        assert_eq!(overrides.beacon_root, Some(B256::with_last_byte(4)));
     }
 
     #[test]

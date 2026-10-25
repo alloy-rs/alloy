@@ -411,4 +411,13 @@ mod tests {
         let actual: SimBundleResponse = serde_json::from_str(expected).unwrap();
         assert!(actual.success);
     }
+
+    #[test]
+    fn sim_bundle_overrides_with_flattened_block_overrides() {
+        let s = r#"{"parentBlock":"latest","blockNumber":"0x1","timeout":"0x5"}"#;
+        let overrides: SimBundleOverrides = serde_json::from_str(s).unwrap();
+        assert_eq!(overrides.parent_block, Some(BlockId::latest()));
+        assert_eq!(overrides.block_overrides.number, Some(U256::from(1)));
+        assert_eq!(overrides.timeout, Some(5));
+    }
 }
