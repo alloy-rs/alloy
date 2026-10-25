@@ -29,12 +29,16 @@ impl<'a> SerdeGenerator<'a> {
 
     /// Generate all serde-related code.
     pub(crate) fn generate(&self) -> TokenStream {
-        let serde_bounds = self.generate_serde_bounds();
-        let serde_bounds_str = serde_bounds.to_string();
+        let serialize_bounds = self.generate_serialize_bounds();
+        let deserialize_bounds = self.generate_deserialize_bounds();
+        let deserialize_bounds_str = deserialize_bounds.to_string();
+        let serialize_bounds_str = serialize_bounds.to_string();
 
-        let tagged_enum = self.generate_tagged_enum(&serde_bounds_str);
-        let untagged_enum = self.generate_untagged_enum(&serde_bounds_str);
-        let impls = self.generate_serde_impls(&serde_bounds);
+        let tagged_enum = self.generate_tagged_enum(&deserialize_bounds_str);
+        let tagged_ref_enum = self.generate_tagged_ref_enum(&serialize_bounds_str);
+        let untagged_enum = self.generate_untagged_enum();
+        let untagged_ref_enum = self.generate_untagged_ref_enum(&serialize_bounds_str);
+        let impls = self.generate_serde_impls(&serialize_bounds, &deserialize_bounds);
 
         let serde_cfg = self.serde_cfg;
 
@@ -42,23 +46,35 @@ impl<'a> SerdeGenerator<'a> {
             #[cfg(#serde_cfg)]
             const _: () = {
                 #tagged_enum
+                #tagged_ref_enum
                 #untagged_enum
+                #untagged_ref_enum
                 #impls
             };
         }
     }
 
-    /// Generate serde bounds.
-    fn generate_serde_bounds(&self) -> TokenStream {
-        let input_type_name = self.input_type_name;
-        let (_, ty_generics, _) = self.generics.split_for_impl();
+    /// Generate serialize bounds.
+    fn generate_serialize_bounds(&self) -> TokenStream {
         let variant_types = self.variants.all.iter().map(|v| &v.ty);
         let serde = &self.serde;
 
-        quote! {
-            #input_type_name #ty_generics: Clone,
-            #(#variant_types: #serde::Serialize + #serde::de::DeserializeOwned),*
-        }
+        quote! { #(#variant_types: #serde::Serialize),* }
+    }
+
+    /// Generate deserialize bounds.
+    fn generate_deserialize_bounds(&self) -> TokenStream {
+        let variant_types = self.variants.all.iter().map(|v| &v.ty);
+        let serde = &self.serde;
+
+        quote! { #(#variant_types: #serde::de::DeserializeOwned),* }
+    }
+
+    /// Returns the generics with a leading `'a` lifetime for the borrowed serialization enums.
+    fn borrowed_generics(&self) -> syn::Generics {
+        let mut generics = self.generics.clone();
+        generics.params.insert(0, syn::parse_quote!('a));
+        generics
     }
 
     /// Generate the tagged transaction types enum.
@@ -71,7 +87,7 @@ impl<'a> SerdeGenerator<'a> {
         let from_tagged_impl = self.generate_from_tagged_impl();
 
         quote! {
-            #[derive(Debug, #serde::Serialize, #serde::Deserialize)]
+            #[derive(Debug, #serde::Deserialize)]
             #[serde(tag = "type", bound = #serde_bounds_str, crate = #serde_str)]
             enum TaggedTxTypes #generics {
                 #(#tagged_variants),*
@@ -81,8 +97,33 @@ impl<'a> SerdeGenerator<'a> {
         }
     }
 
+    /// Generate the borrowed tagged transaction types enum, used to serialize without cloning.
+    fn generate_tagged_ref_enum(&self, serialize_bounds_str: &str) -> TokenStream {
+        let generics = self.borrowed_generics();
+        let serde = &self.serde;
+        let serde_str = serde.to_string();
+
+        let tagged_variants = self.generate_tagged_variants_with(|ty| quote! { &'a #ty });
+
+        quote! {
+            #[derive(#serde::Serialize)]
+            #[serde(tag = "type", bound = #serialize_bounds_str, crate = #serde_str)]
+            enum TaggedTxTypesRef #generics {
+                #(#tagged_variants),*
+            }
+        }
+    }
+
     /// Generate tagged variants for serde.
     fn generate_tagged_variants(&self) -> Vec<TokenStream> {
+        self.generate_tagged_variants_with(|ty| quote! { #ty })
+    }
+
+    /// Generate tagged variants for serde, wrapping each variant's type with `wrap`.
+    fn generate_tagged_variants_with(
+        &self,
+        wrap: impl Fn(&syn::Type) -> TokenStream,
+    ) -> Vec<TokenStream> {
         self.variants
             .typed
             .iter()
@@ -104,6 +145,7 @@ impl<'a> SerdeGenerator<'a> {
                 };
 
                 let maybe_other = serde_attrs.clone().unwrap_or_default();
+                let ty = wrap(ty);
 
                 quote! {
                     #[serde(rename = #rename, #(alias = #aliases,)* #maybe_with #maybe_other)]
@@ -135,19 +177,16 @@ impl<'a> SerdeGenerator<'a> {
     }
 
     /// Generate the untagged transaction types enum.
-    fn generate_untagged_enum(&self, serde_bounds_str: &str) -> TokenStream {
+    fn generate_untagged_enum(&self) -> TokenStream {
         let generics = self.generics;
-        let serde = &self.serde;
-        let serde_str = serde.to_string();
 
         let (legacy_variant, legacy_arm, legacy_deserialize) = self.generate_legacy_handling();
-        let untagged_variants = self.generate_untagged_variants(&legacy_variant);
+        let untagged_variants =
+            self.generate_untagged_variants(&legacy_variant, |ty| quote! { #ty });
         let untagged_conversions = self.generate_untagged_conversions(&legacy_arm);
         let deserialize_impl = self.generate_untagged_deserialize(&legacy_deserialize);
 
         quote! {
-            #[derive(#serde::Serialize)]
-            #[serde(untagged, bound = #serde_bounds_str, crate = #serde_str)]
             pub(crate) enum UntaggedTxTypes #generics {
                 Tagged(TaggedTxTypes #generics),
                 #untagged_variants
@@ -158,11 +197,53 @@ impl<'a> SerdeGenerator<'a> {
         }
     }
 
+    /// Generate the borrowed untagged transaction types enum, used to serialize without cloning.
+    fn generate_untagged_ref_enum(&self, serialize_bounds_str: &str) -> TokenStream {
+        let generics = self.borrowed_generics();
+        let (_, ty_generics, _) = generics.split_for_impl();
+        let serde = &self.serde;
+        let serde_str = serde.to_string();
+        let input_type_name = self.input_type_name;
+        let (_, env_ty_generics, _) = self.generics.split_for_impl();
+        let unwrapped_generics = &self.generics.params;
+
+        let untagged_variants =
+            self.generate_untagged_variants(&quote! {}, |ty| quote! { &'a #ty });
+        let flattened_names = self.variants.flattened.iter().map(|v| &v.name).collect::<Vec<_>>();
+        let typed_names = self.variants.typed.iter().map(|v| &v.name).collect::<Vec<_>>();
+
+        quote! {
+            #[derive(#serde::Serialize)]
+            #[serde(untagged, bound = #serialize_bounds_str, crate = #serde_str)]
+            enum UntaggedTxTypesRef #generics {
+                Tagged(TaggedTxTypesRef #ty_generics),
+                #untagged_variants
+            }
+
+            impl<'a, #unwrapped_generics> From<&'a #input_type_name #env_ty_generics> for UntaggedTxTypesRef #ty_generics {
+                fn from(value: &'a #input_type_name #env_ty_generics) -> Self {
+                    match value {
+                        #(
+                            #input_type_name::<#unwrapped_generics>::#flattened_names(value) => Self::#flattened_names(value),
+                        )*
+                        #(
+                            #input_type_name::<#unwrapped_generics>::#typed_names(value) => Self::Tagged(TaggedTxTypesRef::#typed_names(value)),
+                        )*
+                    }
+                }
+            }
+        }
+    }
+
     /// Generate untagged variants. This includes flattened envelopes and legacy transactions.
-    fn generate_untagged_variants(&self, legacy_variant: &TokenStream) -> TokenStream {
+    fn generate_untagged_variants(
+        &self,
+        legacy_variant: &TokenStream,
+        wrap: impl Fn(&syn::Type) -> TokenStream,
+    ) -> TokenStream {
         let flattened_variants = self.variants.flattened.iter().map(|v| {
             let name = &v.name;
-            let ty = &v.ty;
+            let ty = wrap(&v.ty);
 
             let maybe_attributes = if let Some(attrs) = &v.serde_attrs {
                 quote! { #[serde(#attrs)] }
@@ -206,7 +287,7 @@ impl<'a> SerdeGenerator<'a> {
         let unwrapped_generics = &generics.params;
         let serde = &self.serde;
         let serde_json = &self.serde_json;
-        let serde_bounds = self.generate_serde_bounds();
+        let serde_bounds = self.generate_deserialize_bounds();
 
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name);
 
@@ -250,9 +331,7 @@ impl<'a> SerdeGenerator<'a> {
     fn generate_untagged_conversions(&self, legacy_arm: &TokenStream) -> TokenStream {
         let input_type_name = self.input_type_name;
         let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
-        let unwrapped_generics = &self.generics.params;
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name).collect::<Vec<_>>();
-        let typed_names = self.variants.typed.iter().map(|v| &v.name).collect::<Vec<_>>();
 
         quote! {
             impl #impl_generics From<UntaggedTxTypes #ty_generics> for #input_type_name #ty_generics {
@@ -266,37 +345,28 @@ impl<'a> SerdeGenerator<'a> {
                     }
                 }
             }
-
-            impl #impl_generics From<#input_type_name #ty_generics> for UntaggedTxTypes #ty_generics {
-                fn from(value: #input_type_name #ty_generics) -> Self {
-                    match value {
-                        #(
-                            #input_type_name::<#unwrapped_generics>::#flattened_names(value) => Self::#flattened_names(value),
-                        )*
-                        #(
-                            #input_type_name::<#unwrapped_generics>::#typed_names(value) => Self::Tagged(TaggedTxTypes::#typed_names(value)),
-                        )*
-                    }
-                }
-            }
         }
     }
 
-    /// Generate Deserialize implementation.
-    fn generate_serde_impls(&self, serde_bounds: &TokenStream) -> TokenStream {
+    /// Generate Serialize and Deserialize implementations.
+    fn generate_serde_impls(
+        &self,
+        serialize_bounds: &TokenStream,
+        deserialize_bounds: &TokenStream,
+    ) -> TokenStream {
         let input_type_name = self.input_type_name;
         let serde = &self.serde;
         let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
         let unwrapped_generics = &self.generics.params;
 
         quote! {
-            impl #impl_generics #serde::Serialize for #input_type_name #ty_generics where #serde_bounds {
+            impl #impl_generics #serde::Serialize for #input_type_name #ty_generics where #serialize_bounds {
                 fn serialize<S: #serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                    UntaggedTxTypes::<#unwrapped_generics>::from(self.clone()).serialize(serializer)
+                    UntaggedTxTypesRef::<'_, #unwrapped_generics>::from(self).serialize(serializer)
                 }
             }
 
-            impl <'de, #unwrapped_generics> #serde::Deserialize<'de> for #input_type_name #ty_generics where #serde_bounds {
+            impl <'de, #unwrapped_generics> #serde::Deserialize<'de> for #input_type_name #ty_generics where #deserialize_bounds {
                 fn deserialize<D: #serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
                     UntaggedTxTypes::<#unwrapped_generics>::deserialize(deserializer).map(Into::into)
                 }
