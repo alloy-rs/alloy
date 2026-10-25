@@ -2,15 +2,14 @@
 //! values.
 
 use alloc::{collections::BTreeMap, string::String};
-use core::fmt;
 use serde::{
     ser::{
-        Impossible, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
-        SerializeTuple, SerializeTupleStruct, SerializeTupleVariant, StdError,
+        Error as _, Impossible, SerializeMap, SerializeSeq, SerializeStruct,
+        SerializeStructVariant, SerializeTuple, SerializeTupleStruct, SerializeTupleVariant,
     },
     Serialize, Serializer,
 };
-use serde_json::Value;
+use serde_json::{Error, Value};
 
 /// Removes the top-level keys that `value` serializes to from `map`.
 ///
@@ -22,41 +21,23 @@ use serde_json::Value;
 pub(super) fn remove_keys<T: Serialize>(
     value: &T,
     map: &mut BTreeMap<String, Value>,
-) -> Result<(), UnsupportedKey> {
+) -> Result<(), Error> {
     value.serialize(KeyRemover(map))
-}
-
-/// Error for map keys that are not strings.
-#[derive(Debug)]
-pub(super) struct UnsupportedKey;
-
-impl fmt::Display for UnsupportedKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("map key is not a string")
-    }
-}
-
-impl StdError for UnsupportedKey {}
-
-impl serde::ser::Error for UnsupportedKey {
-    fn custom<T: fmt::Display>(_: T) -> Self {
-        Self
-    }
 }
 
 struct KeyRemover<'a>(&'a mut BTreeMap<String, Value>);
 
 macro_rules! ignore {
     ($($method:ident($($ty:ty)?))*) => {$(
-        fn $method(self, $(_: $ty)?) -> Result<(), UnsupportedKey> {
+        fn $method(self, $(_: $ty)?) -> Result<(), Error> {
             Ok(())
         }
     )*};
 }
 
-impl<'a> Serializer for KeyRemover<'a> {
+impl Serializer for KeyRemover<'_> {
     type Ok = ();
-    type Error = UnsupportedKey;
+    type Error = Error;
     type SerializeSeq = Ignore;
     type SerializeTuple = Ignore;
     type SerializeTupleStruct = Ignore;
@@ -73,20 +54,15 @@ impl<'a> Serializer for KeyRemover<'a> {
         serialize_none() serialize_unit()
     }
 
-    fn serialize_some<T: ?Sized + Serialize>(self, value: &T) -> Result<(), UnsupportedKey> {
+    fn serialize_some<T: ?Sized + Serialize>(self, value: &T) -> Result<(), Error> {
         value.serialize(self)
     }
 
-    fn serialize_unit_struct(self, _: &'static str) -> Result<(), UnsupportedKey> {
+    fn serialize_unit_struct(self, _: &'static str) -> Result<(), Error> {
         Ok(())
     }
 
-    fn serialize_unit_variant(
-        self,
-        _: &'static str,
-        _: u32,
-        _: &'static str,
-    ) -> Result<(), UnsupportedKey> {
+    fn serialize_unit_variant(self, _: &'static str, _: u32, _: &'static str) -> Result<(), Error> {
         Ok(())
     }
 
@@ -94,7 +70,7 @@ impl<'a> Serializer for KeyRemover<'a> {
         self,
         _: &'static str,
         value: &T,
-    ) -> Result<(), UnsupportedKey> {
+    ) -> Result<(), Error> {
         value.serialize(self)
     }
 
@@ -104,20 +80,20 @@ impl<'a> Serializer for KeyRemover<'a> {
         _: u32,
         variant: &'static str,
         _: &T,
-    ) -> Result<(), UnsupportedKey> {
+    ) -> Result<(), Error> {
         self.0.remove(variant);
         Ok(())
     }
 
-    fn serialize_seq(self, _: Option<usize>) -> Result<Ignore, UnsupportedKey> {
+    fn serialize_seq(self, _: Option<usize>) -> Result<Ignore, Error> {
         Ok(Ignore)
     }
 
-    fn serialize_tuple(self, _: usize) -> Result<Ignore, UnsupportedKey> {
+    fn serialize_tuple(self, _: usize) -> Result<Ignore, Error> {
         Ok(Ignore)
     }
 
-    fn serialize_tuple_struct(self, _: &'static str, _: usize) -> Result<Ignore, UnsupportedKey> {
+    fn serialize_tuple_struct(self, _: &'static str, _: usize) -> Result<Ignore, Error> {
         Ok(Ignore)
     }
 
@@ -127,16 +103,16 @@ impl<'a> Serializer for KeyRemover<'a> {
         _: u32,
         variant: &'static str,
         _: usize,
-    ) -> Result<Ignore, UnsupportedKey> {
+    ) -> Result<Ignore, Error> {
         self.0.remove(variant);
         Ok(Ignore)
     }
 
-    fn serialize_map(self, _: Option<usize>) -> Result<Self, UnsupportedKey> {
+    fn serialize_map(self, _: Option<usize>) -> Result<Self, Error> {
         Ok(self)
     }
 
-    fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self, UnsupportedKey> {
+    fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self, Error> {
         Ok(self)
     }
 
@@ -146,7 +122,7 @@ impl<'a> Serializer for KeyRemover<'a> {
         _: u32,
         variant: &'static str,
         _: usize,
-    ) -> Result<Ignore, UnsupportedKey> {
+    ) -> Result<Ignore, Error> {
         self.0.remove(variant);
         Ok(Ignore)
     }
@@ -154,35 +130,35 @@ impl<'a> Serializer for KeyRemover<'a> {
 
 impl SerializeStruct for KeyRemover<'_> {
     type Ok = ();
-    type Error = UnsupportedKey;
+    type Error = Error;
 
     fn serialize_field<T: ?Sized + Serialize>(
         &mut self,
         key: &'static str,
         _: &T,
-    ) -> Result<(), UnsupportedKey> {
+    ) -> Result<(), Error> {
         self.0.remove(key);
         Ok(())
     }
 
-    fn end(self) -> Result<(), UnsupportedKey> {
+    fn end(self) -> Result<(), Error> {
         Ok(())
     }
 }
 
 impl SerializeMap for KeyRemover<'_> {
     type Ok = ();
-    type Error = UnsupportedKey;
+    type Error = Error;
 
-    fn serialize_key<T: ?Sized + Serialize>(&mut self, key: &T) -> Result<(), UnsupportedKey> {
+    fn serialize_key<T: ?Sized + Serialize>(&mut self, key: &T) -> Result<(), Error> {
         key.serialize(KeyCapture(self.0))
     }
 
-    fn serialize_value<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), UnsupportedKey> {
+    fn serialize_value<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), Error> {
         Ok(())
     }
 
-    fn end(self) -> Result<(), UnsupportedKey> {
+    fn end(self) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -192,69 +168,69 @@ struct Ignore;
 
 impl SerializeSeq for Ignore {
     type Ok = ();
-    type Error = UnsupportedKey;
+    type Error = Error;
 
-    fn serialize_element<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), UnsupportedKey> {
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), Error> {
         Ok(())
     }
 
-    fn end(self) -> Result<(), UnsupportedKey> {
+    fn end(self) -> Result<(), Error> {
         Ok(())
     }
 }
 
 impl SerializeTuple for Ignore {
     type Ok = ();
-    type Error = UnsupportedKey;
+    type Error = Error;
 
-    fn serialize_element<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), UnsupportedKey> {
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), Error> {
         Ok(())
     }
 
-    fn end(self) -> Result<(), UnsupportedKey> {
+    fn end(self) -> Result<(), Error> {
         Ok(())
     }
 }
 
 impl SerializeTupleStruct for Ignore {
     type Ok = ();
-    type Error = UnsupportedKey;
+    type Error = Error;
 
-    fn serialize_field<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), UnsupportedKey> {
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), Error> {
         Ok(())
     }
 
-    fn end(self) -> Result<(), UnsupportedKey> {
+    fn end(self) -> Result<(), Error> {
         Ok(())
     }
 }
 
 impl SerializeTupleVariant for Ignore {
     type Ok = ();
-    type Error = UnsupportedKey;
+    type Error = Error;
 
-    fn serialize_field<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), UnsupportedKey> {
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _: &T) -> Result<(), Error> {
         Ok(())
     }
 
-    fn end(self) -> Result<(), UnsupportedKey> {
+    fn end(self) -> Result<(), Error> {
         Ok(())
     }
 }
 
 impl SerializeStructVariant for Ignore {
     type Ok = ();
-    type Error = UnsupportedKey;
+    type Error = Error;
 
     fn serialize_field<T: ?Sized + Serialize>(
         &mut self,
         _: &'static str,
         _: &T,
-    ) -> Result<(), UnsupportedKey> {
+    ) -> Result<(), Error> {
         Ok(())
     }
 
-    fn end(self) -> Result<(), UnsupportedKey> {
+    fn end(self) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -264,24 +240,24 @@ struct KeyCapture<'a>(&'a mut BTreeMap<String, Value>);
 
 macro_rules! reject {
     ($($method:ident($($ty:ty)?))*) => {$(
-        fn $method(self, $(_: $ty)?) -> Result<(), UnsupportedKey> {
-            Err(UnsupportedKey)
+        fn $method(self, $(_: $ty)?) -> Result<(), Error> {
+            Err(Error::custom("map key is not a string"))
         }
     )*};
 }
 
 impl Serializer for KeyCapture<'_> {
     type Ok = ();
-    type Error = UnsupportedKey;
-    type SerializeSeq = Impossible<(), UnsupportedKey>;
-    type SerializeTuple = Impossible<(), UnsupportedKey>;
-    type SerializeTupleStruct = Impossible<(), UnsupportedKey>;
-    type SerializeTupleVariant = Impossible<(), UnsupportedKey>;
-    type SerializeMap = Impossible<(), UnsupportedKey>;
-    type SerializeStruct = Impossible<(), UnsupportedKey>;
-    type SerializeStructVariant = Impossible<(), UnsupportedKey>;
+    type Error = Error;
+    type SerializeSeq = Impossible<(), Error>;
+    type SerializeTuple = Impossible<(), Error>;
+    type SerializeTupleStruct = Impossible<(), Error>;
+    type SerializeTupleVariant = Impossible<(), Error>;
+    type SerializeMap = Impossible<(), Error>;
+    type SerializeStruct = Impossible<(), Error>;
+    type SerializeStructVariant = Impossible<(), Error>;
 
-    fn serialize_str(self, key: &str) -> Result<(), UnsupportedKey> {
+    fn serialize_str(self, key: &str) -> Result<(), Error> {
         self.0.remove(key);
         Ok(())
     }
@@ -294,29 +270,24 @@ impl Serializer for KeyCapture<'_> {
         serialize_none() serialize_unit()
     }
 
-    fn serialize_some<T: ?Sized + Serialize>(self, _: &T) -> Result<(), UnsupportedKey> {
-        Err(UnsupportedKey)
+    fn serialize_some<T: ?Sized + Serialize>(self, _: &T) -> Result<(), Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
     fn serialize_newtype_struct<T: ?Sized + Serialize>(
         self,
         _: &'static str,
         _: &T,
-    ) -> Result<(), UnsupportedKey> {
-        Err(UnsupportedKey)
+    ) -> Result<(), Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
-    fn serialize_unit_struct(self, _: &'static str) -> Result<(), UnsupportedKey> {
-        Err(UnsupportedKey)
+    fn serialize_unit_struct(self, _: &'static str) -> Result<(), Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
-    fn serialize_unit_variant(
-        self,
-        _: &'static str,
-        _: u32,
-        _: &'static str,
-    ) -> Result<(), UnsupportedKey> {
-        Err(UnsupportedKey)
+    fn serialize_unit_variant(self, _: &'static str, _: u32, _: &'static str) -> Result<(), Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
     fn serialize_newtype_variant<T: ?Sized + Serialize>(
@@ -325,24 +296,24 @@ impl Serializer for KeyCapture<'_> {
         _: u32,
         _: &'static str,
         _: &T,
-    ) -> Result<(), UnsupportedKey> {
-        Err(UnsupportedKey)
+    ) -> Result<(), Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
-    fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, UnsupportedKey> {
-        Err(UnsupportedKey)
+    fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
-    fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, UnsupportedKey> {
-        Err(UnsupportedKey)
+    fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
     fn serialize_tuple_struct(
         self,
         _: &'static str,
         _: usize,
-    ) -> Result<Self::SerializeTupleStruct, UnsupportedKey> {
-        Err(UnsupportedKey)
+    ) -> Result<Self::SerializeTupleStruct, Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
     fn serialize_tuple_variant(
@@ -351,20 +322,16 @@ impl Serializer for KeyCapture<'_> {
         _: u32,
         _: &'static str,
         _: usize,
-    ) -> Result<Self::SerializeTupleVariant, UnsupportedKey> {
-        Err(UnsupportedKey)
+    ) -> Result<Self::SerializeTupleVariant, Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
-    fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, UnsupportedKey> {
-        Err(UnsupportedKey)
+    fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
-    fn serialize_struct(
-        self,
-        _: &'static str,
-        _: usize,
-    ) -> Result<Self::SerializeStruct, UnsupportedKey> {
-        Err(UnsupportedKey)
+    fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self::SerializeStruct, Error> {
+        Err(Error::custom("map key is not a string"))
     }
 
     fn serialize_struct_variant(
@@ -373,7 +340,7 @@ impl Serializer for KeyCapture<'_> {
         _: u32,
         _: &'static str,
         _: usize,
-    ) -> Result<Self::SerializeStructVariant, UnsupportedKey> {
-        Err(UnsupportedKey)
+    ) -> Result<Self::SerializeStructVariant, Error> {
+        Err(Error::custom("map key is not a string"))
     }
 }
