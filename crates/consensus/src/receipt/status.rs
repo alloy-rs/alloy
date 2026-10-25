@@ -1,6 +1,9 @@
 use alloy_primitives::B256;
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Error, Header};
 
+#[cfg(feature = "serde")]
+pub(crate) use serde_eip658::Eip658Fields;
+
 const EIP658_STATUS_FAILED_RLP_PAYLOAD: &[u8] = &[];
 const EIP658_STATUS_SUCCESS_RLP_PAYLOAD: &[u8] = &[0x01];
 const PRE_BYZANTIUM_POST_STATE_ROOT_LENGTH: usize = 32;
@@ -96,7 +99,7 @@ mod serde_eip658 {
     //!
     //! If both are present, prefers `status` key.
     //!
-    //! Should be used with `#[serde(flatten)]`.
+    //! Should be used with `#[serde(flatten)]`, or through [`Eip658Fields`] by a map visitor.
     use super::*;
     use serde::{
         de::{Error, MapAccess},
@@ -124,12 +127,12 @@ mod serde_eip658 {
     /// and a valid `status` makes an invalid `root` irrelevant.
     #[derive(Default)]
     pub(crate) struct Eip658Fields {
-        status: Entry,
-        root: Entry,
+        pub(crate) status: Entry,
+        pub(crate) root: Entry,
     }
 
     #[derive(Default)]
-    enum Entry {
+    pub(crate) enum Entry {
         #[default]
         Missing,
         Single(Value),
@@ -137,7 +140,8 @@ mod serde_eip658 {
     }
 
     impl Entry {
-        fn read<'de, A: MapAccess<'de>>(&mut self, map: &mut A) -> Result<(), A::Error> {
+        /// Reads the value of the next key, keeping it only if the key was not seen before.
+        pub(crate) fn read<'de, A: MapAccess<'de>>(&mut self, map: &mut A) -> Result<(), A::Error> {
             *self = match self {
                 Self::Missing => Self::Single(map.next_value()?),
                 _ => {
@@ -150,22 +154,6 @@ mod serde_eip658 {
     }
 
     impl Eip658Fields {
-        /// Reads the value of a `status` key.
-        pub(crate) fn read_status<'de, A: MapAccess<'de>>(
-            &mut self,
-            map: &mut A,
-        ) -> Result<(), A::Error> {
-            self.status.read(map)
-        }
-
-        /// Reads the value of a `root` key.
-        pub(crate) fn read_root<'de, A: MapAccess<'de>>(
-            &mut self,
-            map: &mut A,
-        ) -> Result<(), A::Error> {
-            self.root.read(map)
-        }
-
         /// Resolves the collected entries, preferring `status` over `root`.
         pub(crate) fn finish<E: Error>(self) -> Result<Eip658Value, E> {
             if let Entry::Single(status) = self.status {
@@ -211,9 +199,6 @@ mod serde_eip658 {
         }
     }
 }
-
-#[cfg(feature = "serde")]
-pub(crate) use serde_eip658::Eip658Fields;
 
 impl Encodable for Eip658Value {
     fn encode(&self, buf: &mut dyn BufMut) {

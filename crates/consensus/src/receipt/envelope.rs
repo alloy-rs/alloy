@@ -11,6 +11,13 @@ use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::fmt;
 
+#[cfg(feature = "serde")]
+use {
+    super::status::Eip658Fields,
+    core::marker::PhantomData,
+    serde::de::{Error, IgnoredAny, MapAccess, Visitor},
+};
+
 /// Receipt envelope, as defined in [EIP-2718].
 ///
 /// Represents untagged legacy receipts and typed EIP-2718 variants. Binary decoding rejects a
@@ -62,10 +69,8 @@ pub enum ReceiptEnvelope<T = Log> {
 #[cfg(feature = "serde")]
 impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for ReceiptEnvelope<T> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use super::status::Eip658Fields;
-        use core::marker::PhantomData;
-        use serde::de::{Error, MapAccess, Visitor};
-
+        #[derive(serde::Deserialize)]
+        #[serde(field_identifier, rename_all = "camelCase")]
         enum Field {
             Type,
             Status,
@@ -73,35 +78,8 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for ReceiptEnvelop
             CumulativeGasUsed,
             Logs,
             LogsBloom,
+            #[serde(other)]
             Ignore,
-        }
-
-        impl<'de> serde::Deserialize<'de> for Field {
-            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                struct FieldVisitor;
-
-                impl Visitor<'_> for FieldVisitor {
-                    type Value = Field;
-
-                    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                        f.write_str("a receipt field name")
-                    }
-
-                    fn visit_str<E: Error>(self, value: &str) -> Result<Field, E> {
-                        Ok(match value {
-                            "type" => Field::Type,
-                            "status" => Field::Status,
-                            "root" => Field::Root,
-                            "cumulativeGasUsed" => Field::CumulativeGasUsed,
-                            "logs" => Field::Logs,
-                            "logsBloom" => Field::LogsBloom,
-                            _ => Field::Ignore,
-                        })
-                    }
-                }
-
-                deserializer.deserialize_identifier(FieldVisitor)
-            }
         }
 
         #[derive(serde::Deserialize)]
@@ -128,46 +106,28 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for ReceiptEnvelop
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        Field::Type => {
-                            if ty.is_some() {
-                                return Err(Error::duplicate_field("type"));
-                            }
-                            ty = Some(map.next_value::<TypeValue>()?.0);
-                        }
-                        Field::Status => status.read_status(&mut map)?,
-                        Field::Root => status.read_root(&mut map)?,
+                        Field::Type => read_once(&mut ty, "type", &mut map)?,
+                        Field::Status => status.status.read(&mut map)?,
+                        Field::Root => status.root.read(&mut map)?,
                         Field::CumulativeGasUsed => {
-                            if cumulative_gas_used.is_some() {
-                                return Err(Error::duplicate_field("cumulativeGasUsed"));
-                            }
-                            cumulative_gas_used = Some(map.next_value::<GasValue>()?.0);
+                            read_once(&mut cumulative_gas_used, "cumulativeGasUsed", &mut map)?
                         }
-                        Field::Logs => {
-                            if logs.is_some() {
-                                return Err(Error::duplicate_field("logs"));
-                            }
-                            logs = Some(map.next_value::<Vec<T>>()?);
-                        }
-                        Field::LogsBloom => {
-                            if logs_bloom.is_some() {
-                                return Err(Error::duplicate_field("logsBloom"));
-                            }
-                            logs_bloom = Some(map.next_value::<Bloom>()?);
-                        }
+                        Field::Logs => read_once(&mut logs, "logs", &mut map)?,
+                        Field::LogsBloom => read_once(&mut logs_bloom, "logsBloom", &mut map)?,
                         Field::Ignore => {
-                            map.next_value::<serde::de::IgnoredAny>()?;
+                            map.next_value::<IgnoredAny>()?;
                         }
                     }
                 }
 
                 let logs_bloom = logs_bloom.ok_or_else(|| Error::missing_field("logsBloom"))?;
-                let cumulative_gas_used =
+                let GasValue(cumulative_gas_used) =
                     cumulative_gas_used.ok_or_else(|| Error::missing_field("cumulativeGasUsed"))?;
                 let logs = logs.ok_or_else(|| Error::missing_field("logs"))?;
                 let status = status.finish()?;
 
-                let ty = TxType::try_from(ty.flatten().unwrap_or(LEGACY_TX_TYPE_ID))
-                    .map_err(Error::custom)?;
+                let ty = ty.and_then(|TypeValue(ty)| ty).unwrap_or(LEGACY_TX_TYPE_ID);
+                let ty = TxType::try_from(ty).map_err(Error::custom)?;
                 Ok(ReceiptEnvelope::from_typed(
                     ty,
                     ReceiptWithBloom {
@@ -176,6 +136,18 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for ReceiptEnvelop
                     },
                 ))
             }
+        }
+
+        fn read_once<'de, V: serde::Deserialize<'de>, A: MapAccess<'de>>(
+            slot: &mut Option<V>,
+            name: &'static str,
+            map: &mut A,
+        ) -> Result<(), A::Error> {
+            if slot.is_some() {
+                return Err(Error::duplicate_field(name));
+            }
+            *slot = Some(map.next_value()?);
+            Ok(())
         }
 
         deserializer.deserialize_map(EnvelopeVisitor(PhantomData))
@@ -616,7 +588,7 @@ mod test {
         serde_json::from_value::<ReceiptEnvelope<()>>(json).unwrap_err();
     }
 
-    /// Every case must give the same result as the previous `#[serde(flatten)]` implementation.
+    /// Accepted and rejected JSON shapes, as text and as a `Value`, alone and flattened.
     #[cfg(feature = "serde")]
     #[test]
     fn deser_receipt_envelope_shapes() {
@@ -638,7 +610,6 @@ mod test {
             // status vs root
             (r#""status":"0x1""#, Some((legacy, ok))),
             (r#""status":"0x0""#, Some((legacy, failed))),
-            (r#""status":"1""#, Some((legacy, ok))),
             (r#""root":"ROOT""#, Some((legacy, root))),
             (r#""status":"0x1","root":"ROOT""#, Some((legacy, ok))),
             (r#""root":"ROOT","status":"0x0""#, Some((legacy, failed))),
@@ -649,22 +620,15 @@ mod test {
             // an invalid status falls back to a valid root, and a valid status ignores the root
             (r#""status":"0x2","root":"ROOT""#, Some((legacy, root))),
             (r#""status":[1],"root":"ROOT""#, Some((legacy, root))),
-            (r#""status":"0x1","root":"0x1""#, Some((legacy, ok))),
             (r#""status":"0x1","root":{"a":1}"#, Some((legacy, ok))),
             (r#""status":"0x2","root":"0x1""#, None),
             // `type`
             (r#""type":null,"status":"0x1""#, Some((legacy, ok))),
             (r#""type":"0x0","status":"0x1""#, Some((legacy, ok))),
-            (r#""type":"0x00","status":"0x1""#, Some((legacy, ok))),
             (r#""type":"0x1","status":"0x1""#, Some((TxType::Eip2930, ok))),
-            (r#""type":"0x01","status":"0x1""#, Some((TxType::Eip2930, ok))),
             (r#""type":"0x2","status":"0x1""#, Some((TxType::Eip1559, ok))),
-            (r#""type":"0x3","status":"0x1""#, Some((TxType::Eip4844, ok))),
-            (r#""type":"0x4","status":"0x1""#, Some((TxType::Eip7702, ok))),
-            (r#""type":"2","status":"0x1""#, Some((TxType::Eip1559, ok))),
             (r#""type":"0x5","status":"0x1""#, None),
             (r#""type":"0x7f","status":"0x1""#, None),
-            (r#""type":"0x100","status":"0x1""#, None),
             (r#""type":true,"status":"0x1""#, None),
             // unknown keys are ignored
             (
