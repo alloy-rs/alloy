@@ -15,7 +15,7 @@ use core::slice;
 /// an empty JSON array deserializes as `Full([])`, so that ambiguous case does not preserve which
 /// request form produced it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum BlockTransactions<T> {
     /// Full transactions
@@ -371,6 +371,170 @@ impl From<BlockTransactionsKind> for bool {
         match kind {
             BlockTransactionsKind::Full => true,
             BlockTransactionsKind::Hashes => false,
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use super::BlockTransactions;
+    use alloc::vec::Vec;
+    use alloy_primitives::B256;
+    use core::{fmt, marker::PhantomData};
+    use serde::{
+        de::{
+            value::{MapAccessDeserializer, SeqAccessDeserializer, StrDeserializer},
+            DeserializeSeed, Error, MapAccess, SeqAccess, Visitor,
+        },
+        Deserialize, Deserializer,
+    };
+
+    /// Deserializes without buffering the `transactions` array: the first element decides whether
+    /// the array holds full transactions or hashes, and the remaining elements must match.
+    impl<'de, T: Deserialize<'de>> Deserialize<'de> for BlockTransactions<T> {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            deserializer.deserialize_any(TransactionsVisitor(PhantomData))
+        }
+    }
+
+    struct TransactionsVisitor<T>(PhantomData<T>);
+
+    impl<'de, T: Deserialize<'de>> Visitor<'de> for TransactionsVisitor<T> {
+        type Value = BlockTransactions<T>;
+
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("a sequence of transactions or transaction hashes, or null")
+        }
+
+        fn visit_unit<E: Error>(self) -> Result<Self::Value, E> {
+            Ok(BlockTransactions::Uncle)
+        }
+
+        fn visit_none<E: Error>(self) -> Result<Self::Value, E> {
+            Ok(BlockTransactions::Uncle)
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let capacity = seq.size_hint().unwrap_or(0).min(4096);
+            match seq.next_element_seed(FirstElement(PhantomData))? {
+                None => Ok(BlockTransactions::Full(Vec::new())),
+                Some(First::Tx(first)) => {
+                    let mut txs = Vec::with_capacity(capacity);
+                    txs.push(first);
+                    while let Some(tx) = seq.next_element()? {
+                        txs.push(tx);
+                    }
+                    Ok(BlockTransactions::Full(txs))
+                }
+                Some(First::Hash(first)) => {
+                    let mut hashes = Vec::with_capacity(capacity);
+                    hashes.push(first);
+                    while let Some(hash) = seq.next_element()? {
+                        hashes.push(hash);
+                    }
+                    Ok(BlockTransactions::Hashes(hashes))
+                }
+            }
+        }
+    }
+
+    enum First<T> {
+        Tx(T),
+        Hash(B256),
+    }
+
+    struct FirstElement<T>(PhantomData<T>);
+
+    impl<'de, T: Deserialize<'de>> DeserializeSeed<'de> for FirstElement<T> {
+        type Value = First<T>;
+
+        fn deserialize<D: Deserializer<'de>>(
+            self,
+            deserializer: D,
+        ) -> Result<Self::Value, D::Error> {
+            deserializer.deserialize_any(self)
+        }
+    }
+
+    impl<'de, T: Deserialize<'de>> Visitor<'de> for FirstElement<T> {
+        type Value = First<T>;
+
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("a transaction object or a transaction hash")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+            T::deserialize(MapAccessDeserializer::new(map)).map(First::Tx)
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
+            T::deserialize(SeqAccessDeserializer::new(seq)).map(First::Tx)
+        }
+
+        fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+            B256::deserialize(StrDeserializer::<E>::new(v)).map(First::Hash)
+        }
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+    use alloc::{
+        format,
+        string::{String, ToString},
+    };
+    use alloy_primitives::b256;
+
+    #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
+    struct Tx {
+        hash: B256,
+        #[serde(flatten)]
+        rest: serde_json::Map<String, serde_json::Value>,
+    }
+
+    const H1: &str = "0x1111111111111111111111111111111111111111111111111111111111111111";
+    const H2: &str = "0x2222222222222222222222222222222222222222222222222222222222222222";
+
+    fn tx(hash: &str) -> String {
+        format!(r#"{{"hash":"{hash}","nonce":"0x1"}}"#)
+    }
+
+    #[test]
+    fn deserializes_shapes() {
+        let hashes = BlockTransactions::<Tx>::Hashes(vec![
+            b256!("1111111111111111111111111111111111111111111111111111111111111111"),
+            b256!("2222222222222222222222222222222222222222222222222222222222222222"),
+        ]);
+        let json = format!(r#"["{H1}","{H2}"]"#);
+        assert_eq!(serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap(), hashes);
+
+        let json = format!("[{},{}]", tx(H1), tx(H2));
+        let full = serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap();
+        assert_eq!(full.len(), 2);
+        assert!(full.is_full());
+
+        let empty = serde_json::from_str::<BlockTransactions<Tx>>("[]").unwrap();
+        assert_eq!(empty, BlockTransactions::Full(vec![]));
+
+        let uncle = serde_json::from_str::<BlockTransactions<Tx>>("null").unwrap();
+        assert_eq!(uncle, BlockTransactions::Uncle);
+    }
+
+    #[test]
+    fn rejects_invalid_shapes() {
+        let bad_tx = r#"{"hash":"0x12"}"#;
+        for json in [
+            format!("[{},\"{H2}\"]", tx(H1)),
+            format!("[\"{H1}\",{}]", tx(H2)),
+            format!("[{}, {bad_tx}]", tx(H1)),
+            format!("[{bad_tx}]"),
+            r#"["0x12"]"#.to_string(),
+            format!("[\"{H1}\",\"0x12\"]"),
+            "{}".to_string(),
+            format!("\"{H1}\""),
+        ] {
+            serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap_err();
         }
     }
 }
