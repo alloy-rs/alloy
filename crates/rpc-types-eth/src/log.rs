@@ -214,7 +214,7 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Log<T> {
     /// whole object a second time to flatten `data: T`.
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
+        #[serde(rename = "Log", rename_all = "camelCase")]
         struct Helper<T> {
             address: Address,
             #[serde(flatten)]
