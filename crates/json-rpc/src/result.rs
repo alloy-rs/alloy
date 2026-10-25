@@ -114,7 +114,7 @@ fn trace_deserialized(response: &dyn Debug) {
 }
 
 #[inline(never)]
-fn trace_deserialize_failed(err: &dyn Debug) {
+fn trace_deserialize_failed(err: &serde_json::Error) {
     trace!(?err, "failed to deserialize");
 }
 
