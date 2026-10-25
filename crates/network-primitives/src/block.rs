@@ -378,12 +378,14 @@ impl From<BlockTransactionsKind> for bool {
 #[cfg(feature = "serde")]
 mod serde_impl {
     use super::BlockTransactions;
-    use alloc::vec::Vec;
+    use alloc::{vec, vec::Vec};
     use alloy_primitives::B256;
     use core::{fmt, marker::PhantomData};
     use serde::{
         de::{
-            value::{MapAccessDeserializer, SeqAccessDeserializer, StrDeserializer},
+            value::{
+                BytesDeserializer, MapAccessDeserializer, SeqAccessDeserializer, StrDeserializer,
+            },
             DeserializeSeed, Error, MapAccess, SeqAccess, Visitor,
         },
         Deserialize, Deserializer,
@@ -415,20 +417,17 @@ mod serde_impl {
         }
 
         fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-            let capacity = seq.size_hint().unwrap_or(0).min(4096);
             match seq.next_element_seed(FirstElement(PhantomData))? {
                 None => Ok(BlockTransactions::Full(Vec::new())),
                 Some(First::Tx(first)) => {
-                    let mut txs = Vec::with_capacity(capacity);
-                    txs.push(first);
+                    let mut txs = vec![first];
                     while let Some(tx) = seq.next_element()? {
                         txs.push(tx);
                     }
                     Ok(BlockTransactions::Full(txs))
                 }
                 Some(First::Hash(first)) => {
-                    let mut hashes = Vec::with_capacity(capacity);
-                    hashes.push(first);
+                    let mut hashes = vec![first];
                     while let Some(hash) = seq.next_element()? {
                         hashes.push(hash);
                     }
@@ -474,6 +473,10 @@ mod serde_impl {
         fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
             B256::deserialize(StrDeserializer::<E>::new(v)).map(First::Hash)
         }
+
+        fn visit_bytes<E: Error>(self, v: &[u8]) -> Result<Self::Value, E> {
+            B256::deserialize(BytesDeserializer::<E>::new(v)).map(First::Hash)
+        }
     }
 }
 
@@ -489,8 +492,6 @@ mod tests {
     #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
     struct Tx {
         hash: B256,
-        #[serde(flatten)]
-        rest: serde_json::Map<String, serde_json::Value>,
     }
 
     const H1: &str = "0x1111111111111111111111111111111111111111111111111111111111111111";
@@ -511,8 +512,17 @@ mod tests {
 
         let json = format!("[{},{}]", tx(H1), tx(H2));
         let full = serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap();
-        assert_eq!(full.len(), 2);
-        assert!(full.is_full());
+        assert_eq!(
+            full,
+            BlockTransactions::Full(vec![
+                Tx { hash: B256::repeat_byte(0x11) },
+                Tx { hash: B256::repeat_byte(0x22) }
+            ])
+        );
+
+        let json = format!(r#"[["{H1}"]]"#);
+        let tuples = serde_json::from_str::<BlockTransactions<(B256,)>>(&json).unwrap();
+        assert_eq!(tuples, BlockTransactions::Full(vec![(B256::repeat_byte(0x11),)]));
 
         let empty = serde_json::from_str::<BlockTransactions<Tx>>("[]").unwrap();
         assert_eq!(empty, BlockTransactions::Full(vec![]));
