@@ -170,15 +170,13 @@ impl Iterator for BlobTransactionSidecarIntoIter {
         }
         let index = self.next_index + n;
         self.next_index = index + 1;
+        // Copy from the slice, then advance, to avoid a second copy through the stack.
+        let blob = box_blob(self.blobs.as_slice().get(n)?);
+        self.blobs.nth(n);
         self.remaining -= n + 1;
         Some(BlobTransactionSidecarItem {
             index: index as u64,
-            blob: {
-                // Copy from the slice, then advance, to avoid a second copy through the stack.
-                let blob = box_blob(self.blobs.as_slice().get(n)?);
-                self.blobs.nth(n);
-                blob
-            },
+            blob,
             kzg_commitment: self.commitments.nth(n)?,
             kzg_proof: self.proofs.nth(n)?,
         })
