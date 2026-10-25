@@ -1,10 +1,14 @@
 //! Types used by tracing backends.
 
 use alloy_primitives::TxHash;
-use serde::{Deserialize, Serialize};
+use core::{fmt, marker::PhantomData};
+use serde::{
+    de::{self, MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
 
 /// The result of a single transaction trace.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum TraceResult<Ok, Err> {
     /// Untagged success variant
@@ -70,5 +74,116 @@ impl<Ok, Err> TraceResult<Ok, Err> {
     /// Creates a new error trace result.
     pub const fn new_error(error: Err, tx_hash: Option<TxHash>) -> Self {
         Self::Error { error, tx_hash }
+    }
+}
+
+impl<'de, Ok, Err> Deserialize<'de> for TraceResult<Ok, Err>
+where
+    Ok: Deserialize<'de>,
+    Err: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(field_identifier)]
+        enum Field {
+            #[serde(rename = "result")]
+            Result,
+            #[serde(rename = "error")]
+            Error,
+            #[serde(rename = "txHash")]
+            TxHash,
+            #[serde(other)]
+            Unknown,
+        }
+
+        struct TraceResultVisitor<Ok, Err>(PhantomData<fn() -> (Ok, Err)>);
+
+        impl<'de, Ok, Err> Visitor<'de> for TraceResultVisitor<Ok, Err>
+        where
+            Ok: Deserialize<'de>,
+            Err: Deserialize<'de>,
+        {
+            type Value = TraceResult<Ok, Err>;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a trace result with a `result` or `error` field")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut result = None;
+                let mut error = None;
+                let mut tx_hash = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Result => {
+                            if result.is_some() {
+                                return Err(de::Error::duplicate_field("result"));
+                            }
+                            result = Some(map.next_value()?);
+                        }
+                        Field::Error => {
+                            if error.is_some() {
+                                return Err(de::Error::duplicate_field("error"));
+                            }
+                            error = Some(map.next_value()?);
+                        }
+                        Field::TxHash => {
+                            if tx_hash.is_some() {
+                                return Err(de::Error::duplicate_field("txHash"));
+                            }
+                            tx_hash = Some(map.next_value()?);
+                        }
+                        Field::Unknown => {
+                            map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let tx_hash = tx_hash.flatten();
+                match (result, error) {
+                    (Some(result), _) => Ok(TraceResult::Success { result, tx_hash }),
+                    (None, Some(error)) => Ok(TraceResult::Error { error, tx_hash }),
+                    (None, None) => Err(de::Error::custom(
+                        "data did not match any variant of untagged enum TraceResult",
+                    )),
+                }
+            }
+        }
+
+        deserializer.deserialize_map(TraceResultVisitor(PhantomData))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    type Result = TraceResult<serde_json::Value, String>;
+
+    #[test]
+    fn deserialize_trace_result() {
+        let hash = TxHash::repeat_byte(1);
+        let value = json!({"txHash": hash, "result": {"a": 1}, "extra": [1, 2]});
+        let expected = Result::new_success(json!({"a": 1}), Some(hash));
+        assert_eq!(serde_json::from_value::<Result>(value.clone()).unwrap(), expected);
+        assert_eq!(serde_json::from_str::<Result>(&value.to_string()).unwrap(), expected);
+
+        let escaped = r#"{"\u0065rror": "boom"}"#;
+        assert_eq!(
+            serde_json::from_str::<Result>(escaped).unwrap(),
+            Result::new_error("boom".to_string(), None)
+        );
+    }
+
+    #[test]
+    fn deserialize_trace_result_invalid() {
+        assert!(serde_json::from_str::<Result>(r#"{"txHash": null}"#).is_err());
+        assert!(serde_json::from_str::<Result>(r#"{"result": 1, "result": 2}"#).is_err());
     }
 }
