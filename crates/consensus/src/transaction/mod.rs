@@ -363,6 +363,27 @@ mod tests {
     use alloy_primitives::Signature;
 
     #[test]
+    fn test_flatten_only_envelope() {
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = WrapperTxType)]
+        enum Wrapper {
+            #[envelope(flatten)]
+            Ethereum(TxEnvelope),
+        }
+
+        let tx: TxEnvelope = Signed::new_unhashed(
+            TxEip1559 { chain_id: 1, gas_limit: 21000, ..Default::default() },
+            Signature::new(Default::default(), Default::default(), Default::default()),
+        )
+        .into();
+
+        let json = serde_json::to_string(&tx).unwrap();
+        assert_eq!(serde_json::to_string(&Wrapper::Ethereum(tx.clone())).unwrap(), json);
+        let Wrapper::Ethereum(decoded) = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, tx);
+    }
+
+    #[test]
     fn test_custom_envelope() {
         use serde::{Serialize, Serializer};
         fn serialize_with<S: Serializer>(

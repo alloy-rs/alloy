@@ -106,11 +106,25 @@ impl<'a> SerdeGenerator<'a> {
 
         let tagged_variants = self.generate_tagged_variants_with(|ty| quote! { &'__alloy_ref #ty });
 
+        // Without typed variants nothing else uses the lifetime.
+        let maybe_marker = if tagged_variants.is_empty() {
+            quote! {
+                #[serde(skip)]
+                Marker {
+                    lifetime: core::marker::PhantomData<&'__alloy_ref ()>,
+                    never: core::convert::Infallible,
+                }
+            }
+        } else {
+            quote! {}
+        };
+
         quote! {
             #[derive(#serde::Serialize)]
             #[serde(tag = "type", bound = #serialize_bounds_str, crate = #serde_str)]
             enum TaggedTxTypesRef #generics {
-                #(#tagged_variants),*
+                #(#tagged_variants,)*
+                #maybe_marker
             }
         }
     }
