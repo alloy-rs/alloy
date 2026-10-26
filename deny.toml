@@ -12,6 +12,9 @@ ignore = [
     # https://rustsec.org/advisories/RUSTSEC-2026-0173 proc-macro-error2 is unmaintained
     # and is pulled in transitively by upstream crates with no safe upgrade available.
     "RUSTSEC-2026-0173",
+    # https://rustsec.org/advisories/RUSTSEC-2026-0387 crypto-bigint 0.4.9 and 0.5.5 come from the
+    # k256 0.11 and 0.13 stacks, and the fix is only available in >=0.7.6.
+    "RUSTSEC-2026-0387",
 ]
 
 [bans]
