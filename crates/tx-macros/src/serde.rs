@@ -70,10 +70,11 @@ impl<'a> SerdeGenerator<'a> {
         quote! { #(#variant_types: #serde::de::DeserializeOwned),* }
     }
 
-    /// Returns the generics with a leading `'a` lifetime for the borrowed serialization enums.
+    /// Returns the generics with a leading `'__alloy_ref` lifetime for the borrowed serialization
+    /// enums.
     fn borrowed_generics(&self) -> syn::Generics {
         let mut generics = self.generics.clone();
-        generics.params.insert(0, syn::parse_quote!('a));
+        generics.params.insert(0, syn::parse_quote!('__alloy_ref));
         generics
     }
 
@@ -103,7 +104,7 @@ impl<'a> SerdeGenerator<'a> {
         let serde = &self.serde;
         let serde_str = serde.to_string();
 
-        let tagged_variants = self.generate_tagged_variants_with(|ty| quote! { &'a #ty });
+        let tagged_variants = self.generate_tagged_variants_with(|ty| quote! { &'__alloy_ref #ty });
 
         quote! {
             #[derive(#serde::Serialize)]
@@ -208,7 +209,7 @@ impl<'a> SerdeGenerator<'a> {
         let unwrapped_generics = &self.generics.params;
 
         let untagged_variants =
-            self.generate_untagged_variants(&quote! {}, true, |ty| quote! { &'a #ty });
+            self.generate_untagged_variants(&quote! {}, true, |ty| quote! { &'__alloy_ref #ty });
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name).collect::<Vec<_>>();
         let typed_names = self.variants.typed.iter().map(|v| &v.name).collect::<Vec<_>>();
 
@@ -220,8 +221,8 @@ impl<'a> SerdeGenerator<'a> {
                 #untagged_variants
             }
 
-            impl<'a, #unwrapped_generics> From<&'a #input_type_name #env_ty_generics> for UntaggedTxTypesRef #ty_generics {
-                fn from(value: &'a #input_type_name #env_ty_generics) -> Self {
+            impl<'__alloy_ref, #unwrapped_generics> From<&'__alloy_ref #input_type_name #env_ty_generics> for UntaggedTxTypesRef #ty_generics {
+                fn from(value: &'__alloy_ref #input_type_name #env_ty_generics) -> Self {
                     match value {
                         #(
                             #input_type_name::<#unwrapped_generics>::#flattened_names(value) => Self::#flattened_names(value),
