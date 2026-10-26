@@ -536,6 +536,7 @@ mod tests {
     use alloy_network::{AnyNetwork, TransactionBuilder, TransactionBuilder4844};
     use alloy_network_primitives::BlockResponse as _;
     use alloy_primitives::{address, B256};
+    use alloy_rpc_types_anvil::TransactionData;
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::{sol, SolCall};
     use alloy_transport::mock::Asserter;
@@ -1221,7 +1222,19 @@ mod tests {
         provider.anvil_mine(Some(2), None).await.unwrap();
 
         let reorged_block = provider.get_block_by_number(2.into()).await.unwrap().unwrap();
-        provider.anvil_reorg(ReorgOptions { depth: 1, tx_block_pairs: Vec::new() }).await.unwrap();
+
+        // An empty replacement block can be identical to the original, so mine a transaction.
+        let tx = TransactionRequest::default()
+            .with_from(provider.get_accounts().await.unwrap()[0])
+            .with_to(Address::ZERO)
+            .with_value(U256::from(1));
+        provider
+            .anvil_reorg(ReorgOptions {
+                depth: 1,
+                tx_block_pairs: vec![(TransactionData::JSON(tx), 0)],
+            })
+            .await
+            .unwrap();
 
         let new_block = provider.get_block_by_number(2.into()).await.unwrap().unwrap();
 
