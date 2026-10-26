@@ -106,7 +106,7 @@ impl Serialize for TxpoolInspectSummary {
         S: serde::Serializer,
     {
         let formatted_to =
-            self.to.map_or_else(|| "contract creation".to_string(), |to| format!("{to:?}"));
+            self.to.map_or_else(|| "contract creation".to_string(), |to| to.to_checksum(None));
         let formatted = format!(
             "{}: {} wei + {} gas × {} wei",
             formatted_to, self.value, self.gas, self.gas_price
@@ -499,6 +499,17 @@ mod tests {
         let checksum = "0x0c2c51a0990AeE1d73C1228de158688341557508";
         assert!(serialized["pending"].get(checksum).is_some());
         assert!(serialized["queued"].get(checksum).is_some());
+    }
+
+    #[test]
+    fn txpool_inspect_summary_serializes_checksum_recipient() {
+        // geth formats the recipient with `Address.Hex()`, which is EIP-55 checksummed
+        let summary =
+            "0xd10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF: 0 wei + 65792 gas × 2000000000 wei";
+        let deserialized: TxpoolInspectSummary =
+            serde_json::from_value(serde_json::Value::from(summary)).unwrap();
+
+        assert_eq!(serde_json::to_value(deserialized).unwrap(), summary);
     }
 
     #[test]
