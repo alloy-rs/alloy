@@ -182,7 +182,7 @@ impl<'a> SerdeGenerator<'a> {
 
         let (legacy_variant, legacy_arm, legacy_deserialize) = self.generate_legacy_handling();
         let untagged_variants =
-            self.generate_untagged_variants(&legacy_variant, |ty| quote! { #ty });
+            self.generate_untagged_variants(&legacy_variant, false, |ty| quote! { #ty });
         let untagged_conversions = self.generate_untagged_conversions(&legacy_arm);
         let deserialize_impl = self.generate_untagged_deserialize(&legacy_deserialize);
 
@@ -208,7 +208,7 @@ impl<'a> SerdeGenerator<'a> {
         let unwrapped_generics = &self.generics.params;
 
         let untagged_variants =
-            self.generate_untagged_variants(&quote! {}, |ty| quote! { &'a #ty });
+            self.generate_untagged_variants(&quote! {}, true, |ty| quote! { &'a #ty });
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name).collect::<Vec<_>>();
         let typed_names = self.variants.typed.iter().map(|v| &v.name).collect::<Vec<_>>();
 
@@ -236,19 +236,21 @@ impl<'a> SerdeGenerator<'a> {
     }
 
     /// Generate untagged variants. This includes flattened envelopes and legacy transactions.
+    ///
+    /// The variants' `#[serde(...)]` attributes are only forwarded to enums that derive serde.
     fn generate_untagged_variants(
         &self,
         legacy_variant: &TokenStream,
+        forward_serde_attrs: bool,
         wrap: impl Fn(&syn::Type) -> TokenStream,
     ) -> TokenStream {
         let flattened_variants = self.variants.flattened.iter().map(|v| {
             let name = &v.name;
             let ty = wrap(&v.ty);
 
-            let maybe_attributes = if let Some(attrs) = &v.serde_attrs {
-                quote! { #[serde(#attrs)] }
-            } else {
-                quote! {}
+            let maybe_attributes = match &v.serde_attrs {
+                Some(attrs) if forward_serde_attrs => quote! { #[serde(#attrs)] },
+                _ => quote! {},
             };
 
             quote! { #maybe_attributes #name(#ty) }
