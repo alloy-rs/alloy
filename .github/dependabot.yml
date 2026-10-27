@@ -15,13 +15,3 @@ updates:
     cooldown:
       # Buffer the scanner's seven-day minimum: Dependabot reads date-only tag metadata.
       default-days: 8
-  - package-ecosystem: cargo
-    directory: /
-    allow:
-      - dependency-type: all
-    patterns:
-      - '*'
-    multi-ecosystem-group: weekly-dependencies
-    versioning-strategy: lockfile-only
-    cooldown:
-      default-days: 7
