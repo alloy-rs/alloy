@@ -3,7 +3,7 @@
 use alloy_primitives::TxHash;
 use core::{fmt, marker::PhantomData};
 use serde::{
-    de::{self, MapAccess, Visitor},
+    de::{self, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 
@@ -145,9 +145,13 @@ where
                     }
                 }
                 let tx_hash = tx_hash.flatten();
-                match (result, error.flatten()) {
+                match (result, error) {
                     (Some(result), _) => Ok(TraceResult::Success { result, tx_hash }),
-                    (None, Some(error)) => Ok(TraceResult::Error { error, tx_hash }),
+                    (None, Some(Some(error))) => Ok(TraceResult::Error { error, tx_hash }),
+                    (None, Some(None)) => {
+                        let error = Err::deserialize(().into_deserializer())?;
+                        Ok(TraceResult::Error { error, tx_hash })
+                    }
                     (None, None) => Err(de::Error::custom("missing field `result` or `error`")),
                 }
             }
@@ -182,6 +186,16 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<Result>(escaped).unwrap(),
             Result::new_error("boom".to_string(), None)
+        );
+    }
+
+    #[test]
+    fn deserialize_nullable_error() {
+        let result = TraceResult::<u64, Option<String>>::new_error(None, None);
+        let json = serde_json::to_string(&result).unwrap();
+        assert_eq!(
+            serde_json::from_str::<TraceResult<u64, Option<String>>>(&json).unwrap(),
+            result
         );
     }
 
