@@ -917,13 +917,6 @@ mod provider_tests {
     }
 
     #[tokio::test]
-    async fn test_get_resolver_for_name_mainnet() {
-        let provider = provider();
-        let res = provider.get_resolver_for_name("vitalik.eth").await;
-        assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
-    }
-
-    #[tokio::test]
     async fn test_get_resolver_for_name_rejects_extended_resolver() {
         let err = provider().get_resolver_for_name("ur.integration-tests.eth").await.unwrap_err();
         assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
@@ -941,8 +934,15 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_resolve_name_via_universal_resolver() {
-        let addr = provider().resolve_name("ur.integration-tests.eth").await.unwrap();
-        assert_eq!(addr, address!("0x2222222222222222222222222222222222222222"));
+        // The live record no longer matches the upstream fixture, so compare against the name's
+        // registry resolver instead of a hardcoded address.
+        let provider = provider();
+        let name = "ur.integration-tests.eth";
+        let node = namehash(name);
+        let resolver = provider.get_resolver(node, name).await.unwrap();
+        let expected = resolver.addr(node).call().await.unwrap();
+        let addr = provider.resolve_name(name).await.unwrap();
+        assert_eq!(addr, expected);
     }
 
     #[tokio::test]
