@@ -1,6 +1,6 @@
 use alloy_json_rpc::{
     transform_response, try_deserialize_ok, Request, RequestMeta, RequestPacket, ResponsePacket,
-    RpcRecv, RpcResult, RpcSend,
+    RpcRecv, RpcResult, RpcSend, SerializedRequest,
 };
 use alloy_transport::{
     BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportErrorKind, TransportResult,
@@ -29,7 +29,7 @@ where
     },
     AwaitingResponse {
         #[pin]
-        fut: <BoxTransport as Service<RequestPacket>>::Future,
+        fut: ResponseFuture,
     },
     Complete,
 }
@@ -79,19 +79,11 @@ where
                     }
 
                     let request = request.take().expect("no request");
-                    if tracing::enabled!(tracing::Level::TRACE) {
-                        trace!(?request, "sending request");
-                    } else {
-                        debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
-                    }
-                    let request = request.serialize();
-                    let fut = match request {
-                        Ok(request) => {
-                            trace!(request=%request.serialized(), "serialized request");
-                            connection.call(request.into())
-                        }
+                    trace_request(&request.meta, &request);
+                    let fut = match request.serialize() {
+                        Ok(request) => dispatch(connection, request),
                         Err(err) => {
-                            trace!(?err, "failed to serialize request");
+                            trace_serialize_failed(&err);
                             self.set(Self::Complete);
                             return Ready(RpcResult::Err(TransportError::ser_err(err)));
                         }
@@ -99,17 +91,9 @@ where
                     self.set(Self::AwaitingResponse { fut });
                 }
                 CallStateProj::AwaitingResponse { fut } => {
-                    let res = match task::ready!(fut.poll(cx)) {
-                        Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
-                        Err(e) => Ready(RpcResult::Err(e)),
-                        Ok(ResponsePacket::Batch(_)) => {
-                            Ready(RpcResult::Err(TransportErrorKind::custom_str(
-                                "received batch response from single request",
-                            )))
-                        }
-                    };
+                    let res = task::ready!(poll_response(fut, cx));
                     self.set(Self::Complete);
-                    return res;
+                    return Ready(res);
                 }
                 CallStateProj::Complete => {
                     panic!("Polled after completion");
@@ -117,6 +101,42 @@ where
             }
         }
     }
+}
+
+type ResponseFuture = <BoxTransport as Service<RequestPacket>>::Future;
+
+#[inline(never)]
+fn trace_request(meta: &RequestMeta, request: &dyn fmt::Debug) {
+    if tracing::enabled!(tracing::Level::TRACE) {
+        trace!(?request, "sending request");
+    } else {
+        debug!(method=%meta.method, id=%meta.id, "sending request");
+    }
+}
+
+#[inline(never)]
+fn trace_serialize_failed(err: &serde_json::Error) {
+    trace!(?err, "failed to serialize request");
+}
+
+#[inline(never)]
+fn dispatch(connection: &mut BoxTransport, request: SerializedRequest) -> ResponseFuture {
+    trace!(request=%request.serialized(), "serialized request");
+    connection.call(request.into())
+}
+
+#[inline(never)]
+fn poll_response(
+    fut: Pin<&mut ResponseFuture>,
+    cx: &mut task::Context<'_>,
+) -> task::Poll<TransportResult<Box<RawValue>>> {
+    Ready(match task::ready!(fut.poll(cx)) {
+        Ok(ResponsePacket::Single(res)) => transform_response(res),
+        Err(e) => RpcResult::Err(e),
+        Ok(ResponsePacket::Batch(_)) => RpcResult::Err(TransportErrorKind::custom_str(
+            "received batch response from single request",
+        )),
+    })
 }
 
 /// A prepared, but unsent, RPC call.

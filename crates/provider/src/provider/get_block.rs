@@ -184,24 +184,9 @@ where
                         return Ok(None);
                     }
 
-                    // Ref: <https://github.com/alloy-rs/alloy/issues/2117>
-                    // Geth ref: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
-                    tracing::trace!(pending_block = ?block.to_string());
-                    if block.get("hash").is_none_or(|v| v.is_null()) {
-                        block["hash"] = Value::String(format!("{}", B256::ZERO));
-                    }
+                    patch_pending_block(&mut block);
 
-                    if block.get("nonce").is_none_or(|v| v.is_null()) {
-                        block["nonce"] = Value::String(format!("{}", B64::ZERO));
-                    }
-
-                    if block.get("miner").is_none_or(|v| v.is_null())
-                        && block.get("beneficiary").is_none_or(|v| v.is_null())
-                    {
-                        block["miner"] = Value::String(format!("{}", Address::ZERO));
-                    }
-
-                    let block = serde_json::from_value(block.clone())
+                    let block = BlockResp::deserialize(&block)
                         .map_err(|e| TransportError::deser_err(e, block.to_string()))?;
 
                     let block = if self.kind.is_hashes() {
@@ -217,6 +202,28 @@ where
             }
             GetBlockInner::ProviderCall(producer) => producer(self.kind),
         }
+    }
+}
+
+/// Fills in the `hash`, `nonce` and `miner` fields of a pending block when they are missing or
+/// null.
+///
+/// Ref: <https://github.com/alloy-rs/alloy/issues/2117>
+/// Geth ref: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
+fn patch_pending_block(block: &mut Value) {
+    tracing::trace!(pending_block = ?block.to_string());
+    if block.get("hash").is_none_or(|v| v.is_null()) {
+        block["hash"] = Value::String(format!("{}", B256::ZERO));
+    }
+
+    if block.get("nonce").is_none_or(|v| v.is_null()) {
+        block["nonce"] = Value::String(format!("{}", B64::ZERO));
+    }
+
+    if block.get("miner").is_none_or(|v| v.is_null())
+        && block.get("beneficiary").is_none_or(|v| v.is_null())
+    {
+        block["miner"] = Value::String(format!("{}", Address::ZERO));
     }
 }
 
