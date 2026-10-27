@@ -919,8 +919,8 @@ mod provider_tests {
     #[tokio::test]
     async fn test_get_resolver_for_name_mainnet() {
         let provider = provider();
-        // The Universal Resolver routes every `.eth` name through the extended `ENSV1Resolver`
-        // since its upgrade at block 26284289, so no direct resolver is returned anymore.
+        // Since the Universal Resolver upgrade at block 26284289, `vitalik.eth` resolves through an
+        // extended resolver, so no direct resolver is returned.
         let err = provider.get_resolver_for_name("vitalik.eth").await.unwrap_err();
         assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
     }
@@ -943,6 +943,8 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_resolve_name_via_universal_resolver() {
+        // The Universal Resolver upgrade at block 26284289 changed this from the `0x2222...` that
+        // the upstream ENS fixture expects.
         let addr = provider().resolve_name("ur.integration-tests.eth").await.unwrap();
         assert_eq!(addr, address!("0x1111111111111111111111111111111111111111"));
     }
