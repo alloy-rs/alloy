@@ -10,13 +10,13 @@
 
 use alloy_consensus::{SignableTransaction, TxEip1559, TxEip2930, TxLegacy};
 use alloy_network::TxSigner;
-use alloy_primitives::{address, bytes, hex, Address, Signature, U256};
+use alloy_primitives::{address, bytes, hex, Address, Bytes, Signature, U256};
 use alloy_rlp::Decodable;
 use alloy_signer::Signer;
 use alloy_signer_ledger::{
     coins_ledger::{
         transports::speculos::{Action, Button, ScreenEvent, SpeculosClient, SpeculosTransport},
-        Ledger, LedgerError as CoinsLedgerError, Model, StatusWord,
+        ApduCommand, Ledger, LedgerError as CoinsLedgerError, Model, StatusWord,
     },
     HDPath, LedgerError, LedgerSigner,
 };
@@ -73,13 +73,19 @@ impl Speculos {
         Some(this)
     }
 
-    /// A signer over a fresh APDU connection.
-    async fn signer(&self, chain_id: Option<u64>) -> LedgerSigner<SpeculosTransport> {
+    /// A fresh APDU connection.
+    async fn ledger(&self) -> Ledger<SpeculosTransport> {
         let mut ledger = timeout(STEP, Ledger::connect_speculos(self.addr.as_str(), self.model))
             .await
             .expect("connecting to Speculos timed out")
             .expect("Speculos APDU port is reachable");
         ledger.set_timeout(Some(EXCHANGE));
+        ledger
+    }
+
+    /// A signer over a fresh APDU connection.
+    async fn signer(&self, chain_id: Option<u64>) -> LedgerSigner<SpeculosTransport> {
+        let ledger = self.ledger().await;
         LedgerSigner::new_with_transport(PATH, chain_id, Arc::new(Mutex::new(ledger)))
             .await
             .expect("address query")
@@ -218,6 +224,32 @@ fn is_home(screen: &str) -> bool {
     ["Ethereum", "App settings", "App info", "Quit app"].iter().any(|s| screen.starts_with(s))
 }
 
+/// The encoded derivation path for [`PATH`]: a depth byte and five indices.
+const PATH_BYTES: usize = 21;
+
+/// A legacy transaction whose signing payload, path included, is 3 bytes past a multiple of 255,
+/// so that 255-byte chunks leave the EIP-155 tail `chain_id, 0, 0` alone in the last chunk.
+fn trailing_chain_id_tx() -> TxLegacy {
+    let mut tx = TxLegacy {
+        chain_id: Some(1),
+        nonce: 0,
+        gas_price: 1,
+        gas_limit: 21_000,
+        to: address!("2ed7afa17473e17ac59908f088b4371d28585476").into(),
+        value: U256::ZERO,
+        input: Bytes::new(),
+    };
+    for len in 0..600 {
+        tx.input = vec![0xaa; len].into();
+        let encoded = tx.encoded_for_signing();
+        if (PATH_BYTES + encoded.len()) % 255 == 3 {
+            assert!(encoded.ends_with(&[0x01, 0x80, 0x80]));
+            return tx;
+        }
+    }
+    panic!("no calldata length puts the chain ID in a trailing 3-byte chunk");
+}
+
 /// Signs `tx` with on-screen approval and checks the signature recovers to [`ADDRESS`].
 async fn sign_tx(spec: &Speculos, tx: &mut dyn SignableTransaction<Signature>) {
     let signer = spec.signer(None).await;
@@ -322,4 +354,54 @@ async fn sign_auth() {
     let (sig, ()) = tokio::join!(signer.sign_auth(&auth), spec.approve());
     let sig = sig.expect("sign_auth should succeed");
     assert_eq!(sig.recover_address_from_prehash(&auth.signature_hash()).unwrap(), ADDRESS);
+}
+
+/// Regression test for <https://github.com/LedgerHQ/app-ethereum/issues/409>. Apps before 1.13.0
+/// treated the RLP as complete when a chunk boundary fell right before the EIP-155 chain ID, and
+/// started the review with chain ID 0 before the last chunk arrived. This sends the 255-byte
+/// chunks that `LedgerSigner` deliberately avoids, straight to the app.
+#[tokio::test]
+async fn app_waits_for_trailing_chain_id_chunk() {
+    let Some(spec) = Speculos::from_env().await else { return };
+    spec.enable("Blind signing").await;
+    let tx = trailing_chain_id_tx();
+    let mut payload = hex!("058000002c8000003c800000000000000000000000").to_vec();
+    payload.extend_from_slice(&tx.encoded_for_signing());
+    let chunks: Vec<&[u8]> = payload.chunks(255).collect();
+    let (last, body) = chunks.split_last().unwrap();
+    assert_eq!(*last, [0x01, 0x80, 0x80]);
+
+    let mut ledger = spec.ledger().await;
+    // A fixed app acknowledges each partial chunk at once; a buggy one starts the review instead
+    // and only answers after approval, so keep the timeout short.
+    ledger.set_timeout(Some(STEP));
+    let mut p1 = 0x00;
+    for chunk in body {
+        let apdu = ApduCommand::builder().cla(0xe0).ins(0x04).p1(p1).data(chunk).build().unwrap();
+        let answer = ledger.exchange(apdu).await.expect("the app should wait for the chain ID");
+        assert!(answer.data().is_empty());
+        p1 = 0x80;
+    }
+    let screen = spec.screen().await;
+    assert!(is_home(&screen), "review started before the chain ID arrived; screen is {screen:?}");
+
+    ledger.set_timeout(Some(EXCHANGE));
+    let apdu = ApduCommand::builder().cla(0xe0).ins(0x04).p1(p1).data(last).build().unwrap();
+    let (answer, ()) = tokio::join!(ledger.exchange(apdu), spec.approve());
+    let answer = answer.unwrap();
+    let data = answer.data();
+    assert_eq!(data.len(), 65);
+    // Legacy `v` is `2 * chain_id + 35 + parity`, so an even byte means an odd y-parity.
+    let sig = Signature::from_bytes_and_parity(&data[1..], data[0] % 2 == 0);
+    assert_eq!(sig.recover_address_from_prehash(&tx.signature_hash()).unwrap(), ADDRESS);
+}
+
+/// `LedgerSigner` sizes its chunks so the chain ID never ends up alone in a trailing 3-byte chunk,
+/// the workaround for issue 409. Exercise that path on a payload that would otherwise hit it.
+#[tokio::test]
+async fn sign_tx_legacy_with_trailing_chain_id() {
+    let Some(spec) = Speculos::from_env().await else { return };
+    spec.enable("Blind signing").await;
+    let mut tx = trailing_chain_id_tx();
+    sign_tx(&spec, &mut tx).await;
 }

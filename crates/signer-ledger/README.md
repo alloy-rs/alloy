@@ -35,8 +35,8 @@ messages, EIP-712 domains, or EIP-7702 authorizations.
 
 The `speculos` feature enables `coins_ledger`'s transport for Ledger's [Speculos] emulator, and the
 crate's `tests/speculos.rs` drives the signer through the Ethereum app in it: address derivation,
-message, transaction and EIP-7702 signing with on-screen approval, and rejection. The tests skip
-unless `SPECULOS_APDU_ADDR` is set.
+message, transaction and EIP-7702 signing with on-screen approval, rejection, and the APDU chunking
+regression from [app-ethereum#409]. The tests skip unless `SPECULOS_APDU_ADDR` is set.
 
 Ledger publishes the app for each model on the [app-ethereum] releases page; `nanos2` is the Nano S
 Plus. Start Speculos from the directory holding the app, with the seed the tests expect:
@@ -76,3 +76,4 @@ assert_eq!(signature.recover_address_from_msg(message)?, signer.address());
 [Ledger]: https://www.ledger.com
 [Speculos]: https://github.com/LedgerHQ/speculos
 [app-ethereum]: https://github.com/LedgerHQ/app-ethereum/releases
+[app-ethereum#409]: https://github.com/LedgerHQ/app-ethereum/issues/409

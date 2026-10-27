@@ -362,8 +362,10 @@ impl<T: LedgerTransport> LedgerSigner<T> {
         let mut transport = self.transport.lock().await;
 
         let mut answer = None;
-        // workaround for https://github.com/LedgerHQ/app-ethereum/issues/409
-        // TODO: remove in future version
+        // Workaround for https://github.com/LedgerHQ/app-ethereum/issues/409: apps before 1.13.0
+        // treated the RLP as complete when a chunk boundary fell right before the EIP-155 chain
+        // ID, and signed with chain ID 0. Keep the chain ID out of a trailing 3-byte chunk until
+        // those apps are gone. `tests/speculos.rs` covers both the raw and the worked-around path.
         let chunk_size =
             (0..=255).rev().find(|i| payload.len() % i != 3).expect("true for any length");
 
