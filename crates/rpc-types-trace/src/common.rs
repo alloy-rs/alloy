@@ -131,7 +131,7 @@ where
                             if error.is_some() {
                                 return Err(de::Error::duplicate_field("error"));
                             }
-                            error = Some(map.next_value()?);
+                            error = Some(map.next_value::<Option<Err>>()?);
                         }
                         Field::TxHash => {
                             if tx_hash.is_some() {
@@ -145,7 +145,7 @@ where
                     }
                 }
                 let tx_hash = tx_hash.flatten();
-                match (result, error) {
+                match (result, error.flatten()) {
                     (Some(result), _) => Ok(TraceResult::Success { result, tx_hash }),
                     (None, Some(error)) => Ok(TraceResult::Error { error, tx_hash }),
                     (None, None) => Err(de::Error::custom("missing field `result` or `error`")),
@@ -171,6 +171,12 @@ mod tests {
         let expected = Result::new_success(json!({"a": 1}), Some(hash));
         assert_eq!(serde_json::from_value::<Result>(value.clone()).unwrap(), expected);
         assert_eq!(serde_json::from_str::<Result>(&value.to_string()).unwrap(), expected);
+
+        let null_error = r#"{"result": 1, "error": null}"#;
+        assert_eq!(
+            serde_json::from_str::<Result>(null_error).unwrap(),
+            Result::new_success(json!(1), None)
+        );
 
         let escaped = r#"{"\u0065rror": "boom"}"#;
         assert_eq!(
