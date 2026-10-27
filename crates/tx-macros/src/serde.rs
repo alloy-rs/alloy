@@ -70,10 +70,11 @@ impl<'a> SerdeGenerator<'a> {
         quote! { #(#variant_types: #serde::de::DeserializeOwned),* }
     }
 
-    /// Returns the generics with a leading `'a` lifetime for the borrowed serialization enums.
+    /// Returns the generics with a leading `'__alloy_ref` lifetime for the borrowed serialization
+    /// enums.
     fn borrowed_generics(&self) -> syn::Generics {
         let mut generics = self.generics.clone();
-        generics.params.insert(0, syn::parse_quote!('a));
+        generics.params.insert(0, syn::parse_quote!('__alloy_ref));
         generics
     }
 
@@ -103,13 +104,27 @@ impl<'a> SerdeGenerator<'a> {
         let serde = &self.serde;
         let serde_str = serde.to_string();
 
-        let tagged_variants = self.generate_tagged_variants_with(|ty| quote! { &'a #ty });
+        let tagged_variants = self.generate_tagged_variants_with(|ty| quote! { &'__alloy_ref #ty });
+
+        // Without typed variants nothing else uses the lifetime.
+        let maybe_marker = if tagged_variants.is_empty() {
+            quote! {
+                #[serde(skip)]
+                Marker {
+                    lifetime: core::marker::PhantomData<&'__alloy_ref ()>,
+                    never: core::convert::Infallible,
+                }
+            }
+        } else {
+            quote! {}
+        };
 
         quote! {
             #[derive(#serde::Serialize)]
             #[serde(tag = "type", bound = #serialize_bounds_str, crate = #serde_str)]
             enum TaggedTxTypesRef #generics {
-                #(#tagged_variants),*
+                #(#tagged_variants,)*
+                #maybe_marker
             }
         }
     }
@@ -182,7 +197,7 @@ impl<'a> SerdeGenerator<'a> {
 
         let (legacy_variant, legacy_arm, legacy_deserialize) = self.generate_legacy_handling();
         let untagged_variants =
-            self.generate_untagged_variants(&legacy_variant, |ty| quote! { #ty });
+            self.generate_untagged_variants(&legacy_variant, false, |ty| quote! { #ty });
         let untagged_conversions = self.generate_untagged_conversions(&legacy_arm);
         let deserialize_impl = self.generate_untagged_deserialize(&legacy_deserialize);
 
@@ -208,7 +223,7 @@ impl<'a> SerdeGenerator<'a> {
         let unwrapped_generics = &self.generics.params;
 
         let untagged_variants =
-            self.generate_untagged_variants(&quote! {}, |ty| quote! { &'a #ty });
+            self.generate_untagged_variants(&quote! {}, true, |ty| quote! { &'__alloy_ref #ty });
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name).collect::<Vec<_>>();
         let typed_names = self.variants.typed.iter().map(|v| &v.name).collect::<Vec<_>>();
 
@@ -220,8 +235,8 @@ impl<'a> SerdeGenerator<'a> {
                 #untagged_variants
             }
 
-            impl<'a, #unwrapped_generics> From<&'a #input_type_name #env_ty_generics> for UntaggedTxTypesRef #ty_generics {
-                fn from(value: &'a #input_type_name #env_ty_generics) -> Self {
+            impl<'__alloy_ref, #unwrapped_generics> From<&'__alloy_ref #input_type_name #env_ty_generics> for UntaggedTxTypesRef #ty_generics {
+                fn from(value: &'__alloy_ref #input_type_name #env_ty_generics) -> Self {
                     match value {
                         #(
                             #input_type_name::<#unwrapped_generics>::#flattened_names(value) => Self::#flattened_names(value),
@@ -236,19 +251,21 @@ impl<'a> SerdeGenerator<'a> {
     }
 
     /// Generate untagged variants. This includes flattened envelopes and legacy transactions.
+    ///
+    /// The variants' `#[serde(...)]` attributes are only forwarded to enums that derive serde.
     fn generate_untagged_variants(
         &self,
         legacy_variant: &TokenStream,
+        forward_serde_attrs: bool,
         wrap: impl Fn(&syn::Type) -> TokenStream,
     ) -> TokenStream {
         let flattened_variants = self.variants.flattened.iter().map(|v| {
             let name = &v.name;
             let ty = wrap(&v.ty);
 
-            let maybe_attributes = if let Some(attrs) = &v.serde_attrs {
-                quote! { #[serde(#attrs)] }
-            } else {
-                quote! {}
+            let maybe_attributes = match &v.serde_attrs {
+                Some(attrs) if forward_serde_attrs => quote! { #[serde(#attrs)] },
+                _ => quote! {},
             };
 
             quote! { #maybe_attributes #name(#ty) }

@@ -1899,7 +1899,6 @@ impl<N: Network> Provider<N> for RootProvider<N> {
         self.inner.weak_client()
     }
 
-    #[inline]
     async fn watch_pending_transaction(
         &self,
         config: PendingTransactionConfig,

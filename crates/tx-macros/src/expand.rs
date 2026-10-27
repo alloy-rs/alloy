@@ -854,13 +854,13 @@ impl Expander {
 
                 quote! {
                     #[serde(rename = #rename, #(alias = #aliases,)*)]
-                    #name(&'a #inner_type)
+                    #name(&'__alloy_ref #inner_type)
                 }
             })
             .collect();
 
         let mut ref_generics = self.generics.clone();
-        ref_generics.params.insert(0, syn::parse_quote!('a));
+        ref_generics.params.insert(0, syn::parse_quote!('__alloy_ref));
         let (ref_impl_generics, ref_ty_generics, _) = ref_generics.split_for_impl();
 
         // Legacy variant for untagged handling
@@ -944,7 +944,7 @@ impl Expander {
 
                 impl #impl_generics #serde::Serialize for #typed_name #ty_generics
                 where
-                    for<'a> #tagged_ref_enum_name #ref_ty_generics: #serde::Serialize,
+                    for<'__alloy_ref> #tagged_ref_enum_name #ref_ty_generics: #serde::Serialize,
                 {
                     fn serialize<S: #serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
                         match self {
