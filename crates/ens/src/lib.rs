@@ -325,6 +325,15 @@ mod provider {
         /// resolver or a parent/wildcard resolver: direct `addr`/`text`/`name` calls on such
         /// resolvers are not equivalent to Universal Resolver resolution, so use
         /// [`Self::resolve_name`], [`Self::lookup_txt`], or the other helpers instead.
+        ///
+        /// With ENSv2 the Universal Resolver reports an extended resolver for effectively every
+        /// mainnet name: unmigrated v1 names resolve through a read-only mirror of the v1
+        /// registry, and v2 names through their own resolver. Both only support ENSIP-10
+        /// `resolve`, so this returns [`EnsError::RequiresUniversalResolver`] for most names.
+        #[deprecated(
+            note = "ENSv2 resolvers only support Universal Resolver resolution; use `resolve_name`, \
+                    `lookup_txt`, or the other Universal Resolver helpers"
+        )]
         async fn get_resolver_for_name(
             &self,
             name: &str,
@@ -334,7 +343,7 @@ mod provider {
         ///
         /// This looks up the resolver in the ENS registry, which does not account for ENSIP-10
         /// extended or wildcard resolvers.
-        #[deprecated(note = "use `get_resolver_for_name` or the Universal Resolver helpers")]
+        #[deprecated(note = "use the Universal Resolver helpers")]
         async fn get_resolver(
             &self,
             node: B256,
