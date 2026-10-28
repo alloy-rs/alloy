@@ -903,8 +903,16 @@ mod provider_tests {
     #![allow(deprecated)]
 
     use super::*;
-    use alloy_primitives::address;
+    use alloy_primitives::{address, Bytes};
     use alloy_provider::{Provider, ProviderBuilder};
+    use alloy_sol_types::{SolCall, SolValue};
+
+    alloy_sol_types::sol! {
+        #[sol(rpc)]
+        interface ExtendedResolver {
+            function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory);
+        }
+    }
 
     fn provider() -> impl Provider {
         ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap())
@@ -928,8 +936,10 @@ mod provider_tests {
     #[tokio::test]
     async fn test_get_resolver_for_name_mainnet() {
         let provider = provider();
-        let res = provider.get_resolver_for_name("vitalik.eth").await;
-        assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
+        // Since the Universal Resolver upgrade at block 26284289, `vitalik.eth` resolves through an
+        // extended resolver, so no direct resolver is returned.
+        let err = provider.get_resolver_for_name("vitalik.eth").await.unwrap_err();
+        assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
     }
 
     #[tokio::test]
@@ -950,8 +960,25 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_resolve_name_via_universal_resolver() {
-        let addr = provider().resolve_name("ur.integration-tests.eth").await.unwrap();
-        assert_eq!(addr, address!("0x2222222222222222222222222222222222222222"));
+        // Compare against ENSIP-10 resolution: a direct `addr` call on the registry resolver can
+        // return a different address for this name.
+        let provider = provider();
+        let name = "ur.integration-tests.eth";
+        let dns = Bytes::from(dns_encode(name));
+        let info = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, &provider)
+            .requireResolver(dns.clone())
+            .call()
+            .await
+            .unwrap();
+        let data = EnsResolver::addrCall { node: namehash(name) }.abi_encode();
+        let expected = ExtendedResolver::new(info.resolver, &provider)
+            .resolve(dns, data.into())
+            .call()
+            .await
+            .unwrap();
+        let expected = Address::abi_decode(&expected).unwrap();
+        let addr = provider.resolve_name(name).await.unwrap();
+        assert_eq!(addr, expected);
     }
 
     #[tokio::test]

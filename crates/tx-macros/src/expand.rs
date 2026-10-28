@@ -843,10 +843,32 @@ impl Expander {
             })
             .collect();
 
+        let ref_typed_variants: Vec<_> = self
+            .variants
+            .typed
+            .iter()
+            .map(|v| {
+                let name = &v.name;
+                let inner_type = v.inner_type();
+                let (rename, aliases) = v.kind.serde_tag_and_aliases();
+
+                quote! {
+                    #[serde(rename = #rename, #(alias = #aliases,)*)]
+                    #name(&'__alloy_ref #inner_type)
+                }
+            })
+            .collect();
+
+        let mut ref_generics = self.generics.clone();
+        ref_generics.params.insert(0, syn::parse_quote!('__alloy_ref));
+        let (ref_impl_generics, ref_ty_generics, _) = ref_generics.split_for_impl();
+
         // Legacy variant for untagged handling
         let legacy_variant = self.variants.all.iter().find(|v| v.is_legacy());
 
         let tagged_enum_name = syn::Ident::new(&format!("Tagged{}", typed_name), typed_name.span());
+        let tagged_ref_enum_name =
+            syn::Ident::new(&format!("Tagged{}Ref", typed_name), typed_name.span());
         let maybe_tagged_enum_name =
             syn::Ident::new(&format!("MaybeTagged{}", typed_name), typed_name.span());
 
@@ -884,6 +906,15 @@ impl Expander {
                     ),*
                 }
 
+                /// Borrowed tagged variant used to serialize without cloning
+                #[derive(#serde::Serialize)]
+                #[serde(tag = "type", crate = #serde_str)]
+                enum #tagged_ref_enum_name #ref_impl_generics {
+                    #(
+                        #ref_typed_variants
+                    ),*
+                }
+
                 /// Maybe tagged variant to handle untagged legacy transactions
                 #[derive(Debug, #serde::Deserialize)]
                 #[serde(untagged, crate = #serde_str)]
@@ -911,23 +942,17 @@ impl Expander {
                     }
                 }
 
-                impl #impl_generics From<#typed_name #ty_generics> for #tagged_enum_name #ty_generics {
-                    fn from(value: #typed_name #ty_generics) -> Self {
-                        match value {
-                            #(
-                                #typed_name::#typed_names(tx) => Self::#typed_names(tx),
-                            )*
-                        }
-                    }
-                }
-
                 impl #impl_generics #serde::Serialize for #typed_name #ty_generics
                 where
-                    #tagged_enum_name #ty_generics: #serde::Serialize,
-                    Self: Clone,
+                    for<'__alloy_ref> #tagged_ref_enum_name #ref_ty_generics: #serde::Serialize,
                 {
                     fn serialize<S: #serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                        #tagged_enum_name::from(self.clone()).serialize(serializer)
+                        match self {
+                            #(
+                                Self::#typed_names(tx) => #tagged_ref_enum_name::#typed_names(tx),
+                            )*
+                        }
+                        .serialize(serializer)
                     }
                 }
 
