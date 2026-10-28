@@ -112,6 +112,8 @@ pub enum CallFrameType {
     Create,
     /// The create2 frame type.
     Create2,
+    /// The selfdestruct frame type.
+    SelfDestruct,
 }
 
 /// The configuration for the ERC-7562 tracer.
@@ -355,5 +357,11 @@ mod tests {
         assert_eq!(trace.calls[1].calls.len(), 1);
 
         assert_eq!(trace.used_opcodes[&53], 43);
+    }
+
+    #[test]
+    fn test_deserialize_erc7562_selfdestruct_frame() {
+        let frame: CallFrameType = serde_json::from_str(r#""SELFDESTRUCT""#).unwrap();
+        assert_eq!(frame, CallFrameType::SelfDestruct);
     }
 }
