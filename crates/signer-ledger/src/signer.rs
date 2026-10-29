@@ -1,6 +1,6 @@
 //! Ledger Ethereum app wrapper.
 
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST_0, P1_FIRST_1, P2};
 use alloy_consensus::SignableTransaction;
@@ -8,8 +8,8 @@ use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, SignatureE
 use alloy_signer::{Result, Signer};
 use async_trait::async_trait;
 use coins_ledger::{
-    common::{APDUCommand, APDUData},
-    transports::{Ledger, LedgerAsync},
+    transports::{HidTransport, LedgerTransport},
+    ApduCommand, Ledger,
 };
 use futures_util::lock::Mutex;
 
@@ -18,31 +18,38 @@ use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
+/// Minimum Ledger Ethereum app version for EIP-712 typed data signing.
+///
+/// See <https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999>.
+#[cfg(feature = "eip712")]
+const EIP712_MIN_VERSION: &str = ">=1.6.0";
+
+/// Minimum Ledger Ethereum app version for EIP-7702 authorization signing.
+///
+/// The Ethereum app added the instruction in 1.17.0; older builds reject it with status `0x6d00`.
+#[cfg(feature = "eip7702")]
+const EIP7702_MIN_VERSION: &str = ">=1.17.0";
+
 /// A Ledger Ethereum signer.
 ///
-/// This is a simple wrapper around the [Ledger transport](Ledger).
+/// This is a simple wrapper around a [`Ledger`] handle. It is generic over the
+/// [`LedgerTransport`] that carries APDUs to the device and defaults to the USB HID transport;
+/// [`Self::new_with_transport`] accepts any other transport, such as an emulator.
 ///
 /// Device operations are available through the asynchronous [`Signer`] and
 /// [`alloy_network::TxSigner`] traits; [`alloy_signer::SignerSync`] is not implemented. Raw digest
 /// signing is unsupported, while [`Signer::sign_message`] performs EIP-191 personal-message
 /// signing and requires confirmation on the device.
 #[derive(Debug)]
-pub struct LedgerSigner {
-    transport: Arc<Mutex<Ledger>>,
+pub struct LedgerSigner<T = HidTransport> {
+    transport: Arc<Mutex<Ledger<T>>>,
     derivation: DerivationType,
     pub(crate) chain_id: Option<ChainId>,
     pub(crate) address: Address,
 }
 
-// Required for IntoSigner
-#[cfg(target_family = "wasm")]
-unsafe impl Send for LedgerSigner {}
-#[cfg(target_family = "wasm")]
-unsafe impl Sync for LedgerSigner {}
-
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(not(target_family = "wasm"), async_trait)]
-impl alloy_network::TxSigner<Signature> for LedgerSigner {
+#[async_trait]
+impl<T: LedgerTransport + Debug + Send> alloy_network::TxSigner<Signature> for LedgerSigner<T> {
     fn address(&self) -> Address {
         self.address
     }
@@ -53,7 +60,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        let encoded = Self::signing_payload(self.chain_id, tx)?;
+        let encoded = signing_payload(self.chain_id, tx)?;
 
         match encoded.as_slice() {
             // Ledger requires passing EIP712 data to a separate instruction
@@ -85,9 +92,8 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
     }
 }
 
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
-#[cfg_attr(not(target_family = "wasm"), async_trait)]
-impl Signer for LedgerSigner {
+#[async_trait]
+impl<T: LedgerTransport + Debug + Send> Signer for LedgerSigner<T> {
     async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
@@ -96,8 +102,7 @@ impl Signer for LedgerSigner {
 
     #[inline]
     async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
-        let mut payload =
-            Self::path_to_bytes(&self.derivation).map_err(alloy_signer::Error::other)?;
+        let mut payload = path_to_bytes(&self.derivation).map_err(alloy_signer::Error::other)?;
         // Ensure message length fits into u32 as required by Ledger APDU format.
         let msg_len_u32 = u32::try_from(message.len())
             .map_err(|_| alloy_signer::Error::other("message too long (>4GiB)"))?;
@@ -111,9 +116,9 @@ impl Signer for LedgerSigner {
 
     #[cfg(feature = "eip712")]
     #[inline]
-    async fn sign_typed_data<T: SolStruct + Send + Sync>(
+    async fn sign_typed_data<S: SolStruct + Send + Sync>(
         &self,
-        payload: &T,
+        payload: &S,
         domain: &Eip712Domain,
     ) -> Result<Signature> {
         self.sign_typed_data_(&payload.eip712_hash_struct(), domain)
@@ -145,7 +150,7 @@ impl Signer for LedgerSigner {
     }
 }
 
-alloy_network::impl_into_wallet!(LedgerSigner);
+alloy_network::impl_into_wallet!(@[T: LedgerTransport + Debug + Send + 'static] LedgerSigner<T>);
 
 impl LedgerSigner {
     /// Connects to the first compatible Ledger device and reads the derived address.
@@ -167,13 +172,15 @@ impl LedgerSigner {
         derivation: DerivationType,
         chain_id: Option<ChainId>,
     ) -> Result<Self, LedgerError> {
-        let transport = Ledger::init().await?;
-        let address = Self::get_address_with_path_transport(&transport, &derivation).await?;
+        let mut transport = Ledger::open_first_hid()?;
+        let address = Self::get_address_with_path_transport(&mut transport, &derivation).await?;
         debug!(%address, "Connected to Ledger");
 
         Ok(Self { transport: Mutex::new(transport).into(), derivation, chain_id, address })
     }
+}
 
+impl<T: LedgerTransport> LedgerSigner<T> {
     /// Creates a signer using an existing shared transport.
     ///
     /// The transport mutex serializes device operations and can be shared by signers using
@@ -182,11 +189,11 @@ impl LedgerSigner {
     pub async fn new_with_transport(
         derivation: DerivationType,
         chain_id: Option<ChainId>,
-        transport: Arc<Mutex<Ledger>>,
+        transport: Arc<Mutex<Ledger<T>>>,
     ) -> Result<Self, LedgerError> {
         let address = {
-            let transport_guard = transport.lock().await;
-            Self::get_address_with_path_transport(&transport_guard, &derivation).await?
+            let mut transport_guard = transport.lock().await;
+            Self::get_address_with_path_transport(&mut transport_guard, &derivation).await?
         };
         debug!(%address, "Connected to Ledger");
 
@@ -206,29 +213,30 @@ impl LedgerSigner {
         &self,
         derivation: &DerivationType,
     ) -> Result<Address, LedgerError> {
-        let transport = self.transport.lock().await;
-        Self::get_address_with_path_transport(&transport, derivation).await
+        let mut transport = self.transport.lock().await;
+        Self::get_address_with_path_transport(&mut transport, derivation).await
     }
 
     #[instrument(skip(transport))]
     async fn get_address_with_path_transport(
-        transport: &Ledger,
+        transport: &mut Ledger<T>,
         derivation: &DerivationType,
     ) -> Result<Address, LedgerError> {
-        let data = APDUData::new(&Self::path_to_bytes(derivation)?);
-
-        let command = APDUCommand {
-            cla: 0xe0,
-            ins: INS::GET_PUBLIC_KEY as u8,
-            p1: P1::NON_CONFIRM as u8,
-            p2: P2::NO_CHAINCODE as u8,
-            data,
-            response_len: None,
-        };
+        let path = path_to_bytes(derivation)?;
+        let command = ApduCommand::builder()
+            .cla(0xe0)
+            .ins(INS::GET_PUBLIC_KEY as u8)
+            .p1(P1::NON_CONFIRM as u8)
+            .p2(P2::NO_CHAINCODE as u8)
+            .data(&path)
+            .build()?;
 
         debug!("Dispatching get_address request to ethereum app");
-        let answer = transport.exchange(&command).await?;
-        let result = answer.data().ok_or(LedgerError::UnexpectedNullResponse)?;
+        let answer = transport.exchange(command).await?;
+        let result = answer.data();
+        if result.is_empty() {
+            return Err(LedgerError::UnexpectedNullResponse);
+        }
 
         let address = {
             // extract the address from the response
@@ -244,26 +252,36 @@ impl LedgerSigner {
 
     /// Returns the semantic version of the Ledger Ethereum app.
     pub async fn version(&self) -> Result<semver::Version, LedgerError> {
-        let transport = self.transport.lock().await;
+        let mut transport = self.transport.lock().await;
 
-        let command = APDUCommand {
-            cla: 0xe0,
-            ins: INS::GET_APP_CONFIGURATION as u8,
-            p1: P1::NON_CONFIRM as u8,
-            p2: P2::NO_CHAINCODE as u8,
-            data: APDUData::new(&[]),
-            response_len: None,
-        };
+        let command = ApduCommand::builder()
+            .cla(0xe0)
+            .ins(INS::GET_APP_CONFIGURATION as u8)
+            .p1(P1::NON_CONFIRM as u8)
+            .p2(P2::NO_CHAINCODE as u8)
+            .build()?;
 
         debug!("Dispatching get_version");
-        let answer = transport.exchange(&command).await?;
-        let data = answer.data().ok_or(LedgerError::UnexpectedNullResponse)?;
+        let answer = transport.exchange(command).await?;
+        let data = answer.data();
         let &[_flags, major, minor, patch] = data else {
             return Err(LedgerError::ShortResponse { got: data.len(), expected: 4 });
         };
         let version = semver::Version::new(major as u64, minor as u64, patch as u64);
         debug!(%version, "Retrieved version from device");
         Ok(version)
+    }
+
+    /// Returns [`LedgerError::UnsupportedAppVersion`] if the Ledger Ethereum app does not satisfy
+    /// `min_version`.
+    #[cfg(any(feature = "eip712", feature = "eip7702"))]
+    async fn require_app_version(&self, min_version: &'static str) -> Result<(), LedgerError> {
+        let req = semver::VersionReq::parse(min_version)?;
+        let version = self.version().await?;
+        if !req.matches(&version) {
+            return Err(LedgerError::UnsupportedAppVersion(min_version));
+        }
+        Ok(())
     }
 
     /// Signs an encoded transaction signing payload and requires confirmation on the Ledger.
@@ -274,7 +292,7 @@ impl LedgerSigner {
     /// [`SignableTransaction`] is available.
     #[doc(alias = "sign_transaction_rlp")]
     pub async fn sign_tx_rlp(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
-        let mut payload = Self::path_to_bytes(&self.derivation)?;
+        let mut payload = path_to_bytes(&self.derivation)?;
         payload.extend_from_slice(tx_rlp);
         self.sign_payload(INS::SIGN, &payload, VEncoding::for_tx(tx_rlp)).await
     }
@@ -285,18 +303,9 @@ impl LedgerSigner {
         hash_struct: &B256,
         separator: &B256,
     ) -> Result<Signature, LedgerError> {
-        // See comment for v1.6.0 requirement
-        // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
-        const EIP712_MIN_VERSION: &str = ">=1.6.0";
-        let req = semver::VersionReq::parse(EIP712_MIN_VERSION)?;
-        let version = self.version().await?;
+        self.require_app_version(EIP712_MIN_VERSION).await?;
 
-        // Enforce app version is greater than EIP712_MIN_VERSION
-        if !req.matches(&version) {
-            return Err(LedgerError::UnsupportedAppVersion(EIP712_MIN_VERSION));
-        }
-
-        let mut data = Self::path_to_bytes(&self.derivation)?;
+        let mut data = path_to_bytes(&self.derivation)?;
         data.extend_from_slice(separator.as_slice());
         data.extend_from_slice(hash_struct.as_slice());
 
@@ -314,12 +323,17 @@ impl LedgerSigner {
 
     /// Sign “auth data” per EIP-7702:
     /// msg = keccak256(0x05 ‖ rlp([chain_id, address, nonce]))
+    ///
+    /// Requires Ledger Ethereum app 1.17.0 or newer; older apps return
+    /// [`LedgerError::UnsupportedAppVersion`].
     #[cfg(feature = "eip7702")]
     pub async fn sign_auth(
         &self,
         auth: &alloy_eip7702::Authorization,
     ) -> Result<Signature, LedgerError> {
-        let path_bytes = Self::path_to_bytes(&self.derivation)?;
+        self.require_app_version(EIP7702_MIN_VERSION).await?;
+
+        let path_bytes = path_to_bytes(&self.derivation)?;
         let tlv_payload = crate::utils::make_eip7702_tlv(auth.chain_id, &auth.address, auth.nonce);
 
         let tlv_length = (tlv_payload.len() as u16).to_be_bytes();
@@ -343,30 +357,30 @@ impl LedgerSigner {
     ) -> Result<Signature, LedgerError> {
         // @note Because tlv encoding is done on 7702 auth types sig, it checks if chunks are the
         // header or continuations. @note We need to mention the starter chunk first.
-        let p1_first =
+        let mut p1 =
             if command == INS::SIGN_EIP7702_AUTHORIZATION { P1_FIRST_1 } else { P1_FIRST_0 };
-        let transport = self.transport.lock().await;
-        let mut command = APDUCommand {
-            cla: 0xe0,
-            ins: command as u8,
-            p1: p1_first,
-            p2: P2::NO_CHAINCODE as u8,
-            data: APDUData::new(&[]),
-            response_len: None,
-        };
+        let mut transport = self.transport.lock().await;
 
         let mut answer = None;
-        // workaround for https://github.com/LedgerHQ/app-ethereum/issues/409
-        // TODO: remove in future version
+        // Workaround for https://github.com/LedgerHQ/app-ethereum/issues/409: apps before 1.13.0
+        // treated the RLP as complete when a chunk boundary fell right before the EIP-155 chain
+        // ID, and signed with chain ID 0. Keep the chain ID out of a trailing 3-byte chunk until
+        // those apps are gone. `tests/speculos.rs` covers both the raw and the worked-around path.
         let chunk_size =
             (0..=255).rev().find(|i| payload.len() % i != 3).expect("true for any length");
 
         // Iterate in 255 byte chunks
         for chunk in payload.chunks(chunk_size) {
-            command.data = APDUData::new(chunk);
+            let apdu = ApduCommand::builder()
+                .cla(0xe0)
+                .ins(command as u8)
+                .p1(p1)
+                .p2(P2::NO_CHAINCODE as u8)
+                .data(chunk)
+                .build()?;
 
             debug!(chunk = hex::encode(chunk), "Dispatching packet to device");
-            let res = transport.exchange(&command).await;
+            let res = transport.exchange(apdu).await;
             let ans = match res {
                 Ok(ans) => ans,
                 Err(err) => {
@@ -374,17 +388,16 @@ impl LedgerSigner {
                     return Err(err.into());
                 }
             };
-            let data = ans.data().ok_or(LedgerError::UnexpectedNullResponse)?;
-            debug!(response = hex::encode(data), "Received response from device");
+            debug!(response = hex::encode(ans.data()), "Received response from device");
             answer = Some(ans);
 
             // We need more data
-            command.p1 = P1::MORE as u8;
+            p1 = P1::MORE as u8;
         }
         drop(transport);
 
         let answer = answer.unwrap();
-        let data = answer.data().unwrap();
+        let data = answer.data();
         if data.len() != 65 {
             return Err(LedgerError::ShortResponse { got: data.len(), expected: 65 });
         }
@@ -394,43 +407,43 @@ impl LedgerSigner {
         debug!(?sig, "Received signature from device");
         Ok(sig)
     }
+}
 
-    /// Applies the signer's `chain_id` to `tx` and returns the payload to send to the device.
-    fn signing_payload(
-        chain_id: Option<ChainId>,
-        tx: &mut dyn SignableTransaction<Signature>,
-    ) -> Result<Vec<u8>> {
-        if let Some(chain_id) = chain_id {
-            if !tx.set_chain_id_checked(chain_id) {
-                return Err(alloy_signer::Error::TransactionChainIdMismatch {
-                    signer: chain_id,
-                    // we can only end up here if the tx has a chain id
-                    tx: tx.chain_id().unwrap(),
-                });
-            }
+/// Applies the signer's `chain_id` to `tx` and returns the payload to send to the device.
+fn signing_payload(
+    chain_id: Option<ChainId>,
+    tx: &mut dyn SignableTransaction<Signature>,
+) -> Result<Vec<u8>> {
+    if let Some(chain_id) = chain_id {
+        if !tx.set_chain_id_checked(chain_id) {
+            return Err(alloy_signer::Error::TransactionChainIdMismatch {
+                signer: chain_id,
+                // we can only end up here if the tx has a chain id
+                tx: tx.chain_id().unwrap(),
+            });
         }
-        Ok(tx.encoded_for_signing())
     }
+    Ok(tx.encoded_for_signing())
+}
 
-    // helper which converts a derivation path to bytes
-    fn path_to_bytes(derivation: &DerivationType) -> Result<Vec<u8>, LedgerError> {
-        let derivation = derivation.to_string();
-        let elements = derivation.split('/').skip(1).collect::<Vec<_>>();
-        let depth = elements.len();
+/// Encodes a derivation path as the device expects it: the depth, then each big-endian index.
+fn path_to_bytes(derivation: &DerivationType) -> Result<Vec<u8>, LedgerError> {
+    let derivation = derivation.to_string();
+    let elements = derivation.split('/').skip(1).collect::<Vec<_>>();
+    let depth = elements.len();
 
-        let mut bytes = vec![depth as u8];
-        for derivation_index in elements {
-            let hardened = derivation_index.contains('\'');
-            let mut index = derivation_index.replace('\'', "").parse::<u32>()?;
-            if hardened {
-                index |= 0x80000000;
-            }
-
-            bytes.extend(index.to_be_bytes());
+    let mut bytes = vec![depth as u8];
+    for derivation_index in elements {
+        let hardened = derivation_index.contains('\'');
+        let mut index = derivation_index.replace('\'', "").parse::<u32>()?;
+        if hardened {
+            index |= 0x80000000;
         }
 
-        Ok(bytes)
+        bytes.extend(index.to_be_bytes());
     }
+
+    Ok(bytes)
 }
 
 /// How the device encodes the signature parity in the first byte of its response.
@@ -521,6 +534,30 @@ mod v_encoding_tests {
     }
 }
 
+#[cfg(all(test, any(feature = "eip712", feature = "eip7702")))]
+mod app_version_tests {
+    use super::*;
+
+    fn matches(req: &str, version: &str) -> bool {
+        semver::VersionReq::parse(req).unwrap().matches(&semver::Version::parse(version).unwrap())
+    }
+
+    #[cfg(feature = "eip712")]
+    #[test]
+    fn eip712_min_version() {
+        assert!(!matches(EIP712_MIN_VERSION, "1.5.9"));
+        assert!(matches(EIP712_MIN_VERSION, "1.6.0"));
+    }
+
+    #[cfg(feature = "eip7702")]
+    #[test]
+    fn eip7702_min_version() {
+        assert!(!matches(EIP7702_MIN_VERSION, "1.16.2"));
+        assert!(matches(EIP7702_MIN_VERSION, "1.17.0"));
+        assert!(matches(EIP7702_MIN_VERSION, "1.23.0"));
+    }
+}
+
 #[cfg(test)]
 mod signing_payload_tests {
     use super::*;
@@ -529,7 +566,7 @@ mod signing_payload_tests {
     #[test]
     fn signer_chain_id_is_applied_before_encoding() {
         let mut tx = TxLegacy::default();
-        let payload = LedgerSigner::signing_payload(Some(1), &mut tx).unwrap();
+        let payload = signing_payload(Some(1), &mut tx).unwrap();
         assert_eq!(tx.chain_id, Some(1));
         assert_eq!(payload, tx.encoded_for_signing());
     }
@@ -537,7 +574,7 @@ mod signing_payload_tests {
     #[test]
     fn conflicting_chain_id_is_rejected() {
         let mut tx = TxLegacy { chain_id: Some(2), ..Default::default() };
-        let err = LedgerSigner::signing_payload(Some(1), &mut tx).unwrap_err();
+        let err = signing_payload(Some(1), &mut tx).unwrap_err();
         assert!(matches!(
             err,
             alloy_signer::Error::TransactionChainIdMismatch { signer: 1, tx: 2 }
@@ -549,142 +586,10 @@ mod signing_payload_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::TxSigner;
-    use alloy_primitives::{address, bytes, U256};
-    use alloy_rlp::Decodable;
-    use std::sync::OnceLock;
-
-    const DTYPE: DerivationType = DerivationType::LedgerLive(0);
-
-    fn my_address() -> Address {
-        static ADDRESS: OnceLock<Address> = OnceLock::new();
-        *ADDRESS.get_or_init(|| {
-            let var = "LEDGER_ADDRESS";
-            std::env::var(var).expect(var).parse().expect(var)
-        })
-    }
-
-    async fn init_ledger() -> LedgerSigner {
-        let _ = tracing_subscriber::fmt::try_init();
-        match LedgerSigner::new(DTYPE, None).await {
-            Ok(ledger) => ledger,
-            Err(e) => panic!("{e:?}\n{e}"),
-        }
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_get_address() {
-        let ledger = init_ledger().await;
-        assert_eq!(ledger.get_address().await.unwrap(), my_address());
-        assert_eq!(ledger.get_address_with_path(&DTYPE).await.unwrap(), my_address());
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_version() {
-        let ledger = init_ledger().await;
-        let version = ledger.version().await.unwrap();
-        eprintln!("{version}");
-        assert!(version.major >= 1);
-    }
 
     #[test]
     fn invalid_derivation_path_returns_error() {
-        let err = LedgerSigner::path_to_bytes(&DerivationType::Other("m/44'/invalid/0".into()))
-            .unwrap_err();
+        let err = path_to_bytes(&DerivationType::Other("m/44'/invalid/0".into())).unwrap_err();
         assert!(matches!(err, LedgerError::InvalidDerivationPath(_)));
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_sign_tx_legacy() {
-        // https://github.com/gakonst/ethers-rs/blob/90b87bd85be98caa8bb592b67f3f9acbc8a409cf/ethers-signers/src/ledger/app.rs#L321
-        let mut tx = alloy_consensus::TxLegacy {
-            nonce: 5,
-            gas_price: 400e9 as u128,
-            gas_limit: 1000000,
-            to: address!("2ed7afa17473e17ac59908f088b4371d28585476").into(),
-            // TODO: this fails for some reason with 6a80 APDU_CODE_BAD_KEY_HANDLE
-            // approve uni v2 router 0xff
-            // input: bytes!("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
-            input: bytes!("01020304"),
-            value: U256::from(100e18 as u128),
-            chain_id: Some(69420),
-        };
-        /*
-        assert_eq!(tx.encoded_for_signing(), hex!("f87005855d21dba000830f4240942ed7afa17473e17ac59908f088b4371d2858547689056bc75e2d63100000b844095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
-        */
-        test_sign_tx_generic(&mut tx).await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_sign_tx_eip2930() {
-        // From the Ledger Ethereum app example: https://github.com/LedgerHQ/app-ethereum/blob/2264f677568cbc1e3177f9eccb3c14a229ab3255/examples/signTx.py#L104-L106
-        /*
-        let tx_rlp = hex!("01f8e60380018402625a0094cccccccccccccccccccccccccccccccccccccccc830186a0a4693c61390000000000000000000000000000000000000000000000000000000000000002f85bf859940000000000000000000000000000000000000102f842a00000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000060a780a09b8adcd2a4abd34b42d56fcd90b949f74ca9696dfe2b427bc39aa280bbf1924ca029af4a471bb2953b4e7933ea95880648552a9345424a1ac760189655ceb1832a");
-        */
-        // Skip signature.
-        let tx_rlp = hex!("01f8a30380018402625a0094cccccccccccccccccccccccccccccccccccccccc830186a0a4693c61390000000000000000000000000000000000000000000000000000000000000002f85bf859940000000000000000000000000000000000000102f842a00000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000060a7");
-        let mut untyped_rlp = &tx_rlp[1..];
-        let mut tx = alloy_consensus::TxEip2930::decode(&mut untyped_rlp).unwrap();
-        assert_eq!(hex::encode(tx.encoded_for_signing()), hex::encode(tx_rlp));
-        test_sign_tx_generic(&mut tx).await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_sign_tx_eip1559() {
-        // From the Ledger Ethereum app example: https://github.com/LedgerHQ/app-ethereum/blob/2264f677568cbc1e3177f9eccb3c14a229ab3255/examples/signTx.py#L100-L102
-        let tx_rlp = hex!("02ef0306843b9aca008504a817c80082520894b2bb2b958afa2e96dab3f3ce7162b87daea39017872386f26fc1000080c0");
-        let mut untyped_rlp = &tx_rlp[1..];
-        let mut tx = alloy_consensus::TxEip1559::decode(&mut untyped_rlp).unwrap();
-        assert_eq!(hex::encode(tx.encoded_for_signing()), hex::encode(tx_rlp));
-        test_sign_tx_generic(&mut tx).await;
-    }
-
-    async fn test_sign_tx_generic(tx: &mut dyn SignableTransaction<Signature>) {
-        let sighash = tx.signature_hash();
-        let ledger = init_ledger().await;
-        let sig = match ledger.sign_transaction(tx).await {
-            Ok(sig) => sig,
-            Err(e) => panic!("Failed signing transaction: {e}"),
-        };
-        assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), my_address());
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_sign_message() {
-        let ledger = init_ledger().await;
-        let message = "hello world";
-        let sig = ledger.sign_message(message.as_bytes()).await.unwrap();
-        let addr = ledger.get_address().await.unwrap();
-        assert_eq!(addr, my_address());
-        assert_eq!(sig.recover_address_from_msg(message.as_bytes()).unwrap(), my_address());
-    }
-
-    #[tokio::test]
-    #[ignore]
-    #[cfg(feature = "eip7702")]
-    async fn test_sign_auth() {
-        let ledger = init_ledger().await;
-
-        let chain_id: ChainId = 11155111;
-        let delegate: Address = address!("0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9");
-        let nonce: u64 = 72;
-
-        let auth: alloy_eip7702::Authorization = alloy_eip7702::Authorization {
-            chain_id: U256::from(chain_id),
-            address: delegate,
-            nonce,
-        };
-        let sig = ledger.sign_auth(&auth).await.expect("sign_auth should succeed");
-
-        let hash: B256 = auth.signature_hash();
-
-        let addr = ledger.get_address().await.unwrap();
-        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), addr);
     }
 }
