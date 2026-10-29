@@ -4,6 +4,7 @@ use crate::parity::{
     Action, CallAction, CreateAction, CreateOutput, RewardAction, SelfdestructAction, TraceOutput,
     TransactionTrace,
 };
+use alloy_eips::{eip1898::lenient_block_number_or_tag, BlockNumberOrTag};
 use alloy_primitives::{map::AddressHashSet, Address, BlockHash};
 use alloy_rpc_types_eth::FilterBlockOption;
 use serde::{Deserialize, Serialize};
@@ -12,16 +13,28 @@ use serde::{Deserialize, Serialize};
 ///
 /// Selects blocks either by the `from_block`..=`to_block` range or by `block_hash`, which selects
 /// exactly one block. See [`TraceFilter::block_option`].
+///
+/// Range bounds are block numbers or the `earliest`, `latest`, `safe` and `finalized` tags.
+/// Numbers are serialized as hex quantities and also deserialize from JSON integers and decimal
+/// strings. `pending` deserializes, but [`TraceFilter::block_option`] rejects it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct TraceFilter {
     /// From block
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub from_block: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "lenient_block_number_or_tag::opt::deserialize"
+    )]
+    pub from_block: Option<BlockNumberOrTag>,
     /// To block
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub to_block: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "lenient_block_number_or_tag::opt::deserialize"
+    )]
+    pub to_block: Option<BlockNumberOrTag>,
     /// From address
     #[serde(default, deserialize_with = "alloy_serde::null_as_default")]
     pub from_address: Vec<Address>,
@@ -48,14 +61,14 @@ pub struct TraceFilter {
 
 impl TraceFilter {
     /// Sets the `from_block` field of the struct
-    pub const fn from_block(mut self, block: u64) -> Self {
-        self.from_block = Some(block);
+    pub fn from_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
+        self.from_block = Some(block.into());
         self
     }
 
     /// Sets the `to_block` field of the struct
-    pub const fn to_block(mut self, block: u64) -> Self {
-        self.to_block = Some(block);
+    pub fn to_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
+        self.to_block = Some(block.into());
         self
     }
 
@@ -97,11 +110,14 @@ impl TraceFilter {
 
     /// Returns the blocks this filter selects.
     ///
-    /// Returns an error if `block_hash` is combined with `from_block` or `to_block`.
-    pub const fn block_option(&self) -> Result<TraceFilterBlockOption, TraceFilterBlockConflict> {
+    /// Returns an error if `block_hash` is combined with `from_block` or `to_block`, or if either
+    /// bound is the `pending` tag.
+    pub const fn block_option(&self) -> Result<TraceFilterBlockOption, TraceFilterBlockError> {
         match (self.block_hash, self.from_block, self.to_block) {
             (Some(hash), None, None) => Ok(TraceFilterBlockOption::AtBlockHash(hash)),
-            (Some(_), _, _) => Err(TraceFilterBlockConflict),
+            (Some(_), _, _) => Err(TraceFilterBlockError::BlockHashWithRange),
+            (None, Some(BlockNumberOrTag::Pending), _)
+            | (None, _, Some(BlockNumberOrTag::Pending)) => Err(TraceFilterBlockError::Pending),
             (None, from_block, to_block) => {
                 Ok(TraceFilterBlockOption::Range { from_block, to_block })
             }
@@ -120,11 +136,13 @@ impl TraceFilter {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TraceFilterBlockOption {
     /// Blocks from `from_block` to `to_block`, inclusive.
+    ///
+    /// When returned by [`TraceFilter::block_option`], neither bound is the `pending` tag.
     Range {
         /// From block
-        from_block: Option<u64>,
+        from_block: Option<BlockNumberOrTag>,
         /// To block
-        to_block: Option<u64>,
+        to_block: Option<BlockNumberOrTag>,
     },
     /// Exactly the block with this hash.
     AtBlockHash(BlockHash),
@@ -133,20 +151,24 @@ pub enum TraceFilterBlockOption {
 impl From<TraceFilterBlockOption> for FilterBlockOption {
     fn from(option: TraceFilterBlockOption) -> Self {
         match option {
-            TraceFilterBlockOption::Range { from_block, to_block } => Self::Range {
-                from_block: from_block.map(Into::into),
-                to_block: to_block.map(Into::into),
-            },
+            TraceFilterBlockOption::Range { from_block, to_block } => {
+                Self::Range { from_block, to_block }
+            }
             TraceFilterBlockOption::AtBlockHash(hash) => Self::AtBlockHash(hash),
         }
     }
 }
 
-/// Error returned by [`TraceFilter::block_option`] when `block_hash` is combined with
-/// `from_block` or `to_block`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, thiserror::Error)]
-#[error("cannot specify both blockHash and fromBlock/toBlock, choose one or the other")]
-pub struct TraceFilterBlockConflict;
+/// Error returned by [`TraceFilter::block_option`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum TraceFilterBlockError {
+    /// `block_hash` is combined with `from_block` or `to_block`.
+    #[error("cannot specify both blockHash and fromBlock/toBlock, choose one or the other")]
+    BlockHashWithRange,
+    /// `from_block` or `to_block` is the `pending` tag.
+    #[error("fromBlock and toBlock cannot be pending")]
+    Pending,
+}
 
 /// How to apply `from_address` and `to_address` filters.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -356,8 +378,108 @@ mod tests {
             json!({ "blockHash": "0x1234" }),
             json!({ "blockHash": { "blockHash": B256::ZERO } }),
             json!({ "blockHash": 1 }),
+            json!({ "fromBlock": B256::repeat_byte(0xab) }),
+            json!({ "toBlock": B256::repeat_byte(0xab) }),
+            json!({ "fromBlock": { "blockHash": B256::repeat_byte(0xab) } }),
+            json!({ "toBlock": { "blockHash": B256::repeat_byte(0xab) } }),
+            json!({ "toBlock": { "blockNumber": "0x1" } }),
+            json!({ "fromBlock": "0x10000000000000000" }),
+            json!({ "fromBlock": "18446744073709551616" }),
+            json!({ "fromBlock": -1 }),
+            json!({ "fromBlock": "0x" }),
+            json!({ "fromBlock": "" }),
+            json!({ "fromBlock": "0b10" }),
+            json!({ "fromBlock": "0o2" }),
+            json!({ "fromBlock": "1_000" }),
+            json!({ "fromBlock": "0x1_0" }),
+            json!({ "toBlock": "unknown" }),
         ] {
             assert!(serde_json::from_value::<TraceFilter>(filter.clone()).is_err(), "{filter}");
+        }
+        assert!(serde_json::from_str::<TraceFilter>(r#"{"toBlock":18446744073709551616}"#).is_err());
+    }
+
+    #[test]
+    fn block_tags_select_range() {
+        for (filter, from_block, to_block) in [
+            (
+                json!({ "fromBlock": "earliest", "toBlock": "0x2" }),
+                BlockNumberOrTag::Earliest,
+                BlockNumberOrTag::Number(2),
+            ),
+            (
+                json!({ "fromBlock": "safe", "toBlock": "safe" }),
+                BlockNumberOrTag::Safe,
+                BlockNumberOrTag::Safe,
+            ),
+            (
+                json!({ "fromBlock": "finalized", "toBlock": "latest" }),
+                BlockNumberOrTag::Finalized,
+                BlockNumberOrTag::Latest,
+            ),
+        ] {
+            let filter: TraceFilter = serde_json::from_value(filter).unwrap();
+            assert_eq!(filter, TraceFilter::default().from_block(from_block).to_block(to_block));
+            assert_eq!(
+                filter.block_option(),
+                Ok(TraceFilterBlockOption::Range {
+                    from_block: Some(from_block),
+                    to_block: Some(to_block),
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn block_numbers_are_quantities() {
+        for (number, expected) in [
+            (json!("0x2"), 2),
+            (json!(2), 2),
+            (json!("2"), 2),
+            (json!("0x0"), 0),
+            (json!(0), 0),
+            (json!("0xffffffffffffffff"), u64::MAX),
+            (json!(u64::MAX), u64::MAX),
+            (json!("18446744073709551615"), u64::MAX),
+        ] {
+            let filter: TraceFilter =
+                serde_json::from_value(json!({ "fromBlock": number, "toBlock": number })).unwrap();
+            assert_eq!(
+                filter,
+                TraceFilter::default().from_block(expected).to_block(expected),
+                "{number}"
+            );
+        }
+
+        let filter = TraceFilter::default().from_block(2).to_block(BlockNumberOrTag::Safe);
+        let json = serde_json::to_value(&filter).unwrap();
+        assert_eq!((&json["fromBlock"], &json["toBlock"]), (&json!("0x2"), &json!("safe")));
+        assert_eq!(serde_json::from_value::<TraceFilter>(json).unwrap(), filter);
+    }
+
+    #[test]
+    fn pending_bounds_are_rejected() {
+        let hash = B256::with_last_byte(0xab);
+        for (filter, expected) in [
+            (json!({ "fromBlock": "pending" }), TraceFilterBlockError::Pending),
+            (json!({ "toBlock": "pending" }), TraceFilterBlockError::Pending),
+            (json!({ "fromBlock": "0x1", "toBlock": "pending" }), TraceFilterBlockError::Pending),
+            (json!({ "fromBlock": "pending", "toBlock": "0x1" }), TraceFilterBlockError::Pending),
+            (
+                json!({ "fromBlock": "pending", "toBlock": "pending" }),
+                TraceFilterBlockError::Pending,
+            ),
+            (
+                json!({ "blockHash": hash, "fromBlock": "pending" }),
+                TraceFilterBlockError::BlockHashWithRange,
+            ),
+            (
+                json!({ "blockHash": hash, "toBlock": "pending" }),
+                TraceFilterBlockError::BlockHashWithRange,
+            ),
+        ] {
+            let filter: TraceFilter = serde_json::from_value(filter).unwrap();
+            assert_eq!(filter.block_option(), Err(expected), "{filter:?}");
         }
     }
 
@@ -396,7 +518,11 @@ mod tests {
             json!({ "blockHash": hash, "fromBlock": "0x2", "toBlock": "0x2" }),
         ] {
             let filter: TraceFilter = serde_json::from_value(filter).unwrap();
-            assert_eq!(filter.block_option(), Err(TraceFilterBlockConflict), "{filter:?}");
+            assert_eq!(
+                filter.block_option(),
+                Err(TraceFilterBlockError::BlockHashWithRange),
+                "{filter:?}"
+            );
         }
 
         for (filter, expected) in [
@@ -406,7 +532,10 @@ mod tests {
             ),
             (
                 json!({ "blockHash": null, "fromBlock": "0x2", "toBlock": "0x5" }),
-                TraceFilterBlockOption::Range { from_block: Some(2), to_block: Some(5) },
+                TraceFilterBlockOption::Range {
+                    from_block: Some(BlockNumberOrTag::Number(2)),
+                    to_block: Some(BlockNumberOrTag::Number(5)),
+                },
             ),
             (json!({}), TraceFilterBlockOption::Range { from_block: None, to_block: None }),
         ] {
@@ -424,10 +553,13 @@ mod tests {
         );
         assert_eq!(
             FilterBlockOption::from(TraceFilterBlockOption::Range {
-                from_block: Some(2),
-                to_block: None
+                from_block: Some(BlockNumberOrTag::Number(2)),
+                to_block: Some(BlockNumberOrTag::Safe),
             }),
-            FilterBlockOption::Range { from_block: Some(2u64.into()), to_block: None }
+            FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Number(2)),
+                to_block: Some(BlockNumberOrTag::Safe),
+            }
         );
     }
 
