@@ -37,6 +37,9 @@ pub use root::{builder, RootProvider};
 mod sendable;
 pub use sendable::{SendableTx, SendableTxErr};
 
+mod send_raw_transaction_sync;
+pub use send_raw_transaction_sync::SendRawTransactionSync;
+
 mod r#trait;
 pub use r#trait::{FilterPollerBuilder, Provider};
 
