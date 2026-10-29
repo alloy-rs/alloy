@@ -2083,31 +2083,52 @@ impl ssz::Decode for BlobsBundleV2 {
     }
 
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        use alloy_eips::eip4844::BYTES_PER_BLOB;
+
+        // `List<Blob>` and a byte list share container offsets and a contiguous fixed-size
+        // payload. Decoding `Vec<Blob>` directly materializes each 128 KiB element on the stack.
+        // The byte list is one extra heap buffer of the blob payload; each chunk is then copied
+        // once into the output vector.
         #[derive(ssz_derive::Decode)]
         struct BlobsBundleRaw {
             commitments: Vec<alloy_consensus::Bytes48>,
             proofs: Vec<alloy_consensus::Bytes48>,
-            blobs: Vec<alloy_consensus::Blob>,
+            blobs: Vec<u8>,
         }
 
         let raw = BlobsBundleRaw::from_ssz_bytes(bytes)?;
-
-        if raw.proofs.len() == raw.blobs.len() * CELLS_PER_EXT_BLOB
-            && raw.commitments.len() == raw.blobs.len()
-        {
-            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
-        } else {
-            Err(ssz::DecodeError::BytesInvalid(
-                format!(
-                    "Invalid BlobsBundleV2: expected {} proofs and {} commitments for {} blobs, got {} proofs and {} commitments",
-                    raw.blobs.len() * CELLS_PER_EXT_BLOB,
-                    raw.blobs.len(),
-                    raw.blobs.len(),
-                    raw.proofs.len(),
-                    raw.commitments.len()
-                )
-            ))
+        let blob_bytes_len = raw.blobs.len();
+        if !blob_bytes_len.is_multiple_of(BYTES_PER_BLOB) {
+            return Err(ssz::DecodeError::InvalidByteLength {
+                len: blob_bytes_len,
+                expected: BYTES_PER_BLOB,
+            });
         }
+
+        let blob_count = blob_bytes_len / BYTES_PER_BLOB;
+        if raw.proofs.len() != blob_count * CELLS_PER_EXT_BLOB
+            || raw.commitments.len() != blob_count
+        {
+            return Err(ssz::DecodeError::BytesInvalid(format!(
+                "Invalid BlobsBundleV2: expected {} proofs and {} commitments for {} blobs, got {} proofs and {} commitments",
+                blob_count * CELLS_PER_EXT_BLOB,
+                blob_count,
+                blob_count,
+                raw.proofs.len(),
+                raw.commitments.len()
+            )));
+        }
+
+        let BlobsBundleRaw { commitments, proofs, blobs: blob_bytes } = raw;
+        let mut blobs = Vec::with_capacity(blob_count);
+        for chunk in blob_bytes.chunks_exact(BYTES_PER_BLOB) {
+            // Copy straight into the blob. Keep the 128 KiB value out of `Result`/`Option`.
+            let mut blob = Blob::ZERO;
+            blob.as_mut_slice().copy_from_slice(chunk);
+            blobs.push(blob);
+        }
+
+        Ok(Self { commitments, proofs, blobs })
     }
 }
 
@@ -4314,33 +4335,53 @@ mod tests {
         assert!(deserialized.is_err());
     }
 
-    /// SSZ decoding blobs needs more than the default test thread stack in debug builds.
+    #[test]
     #[cfg(feature = "ssz")]
-    fn ssz_decode_blobsbundlev2(encoded: Vec<u8>) -> Result<BlobsBundleV2, ssz::DecodeError> {
-        std::thread::Builder::new()
-            .stack_size(8 * 1024 * 1024)
-            .spawn(move || <BlobsBundleV2 as ssz::Decode>::from_ssz_bytes(&encoded))
-            .unwrap()
-            .join()
-            .unwrap()
+    fn ssz_blobsbundlev2_nonzero_blob_roundtrip() {
+        let blobs_bundle_v2 = BlobsBundleV2 {
+            commitments: vec![Bytes48::repeat_byte(0x10)],
+            proofs: vec![Bytes48::repeat_byte(0x20); CELLS_PER_EXT_BLOB],
+            blobs: vec![Blob::repeat_byte(0x30)],
+        };
+
+        let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
+        let decoded: BlobsBundleV2 = ssz::Decode::from_ssz_bytes(&encoded).unwrap();
+
+        assert_eq!(decoded.commitments, blobs_bundle_v2.commitments);
+        assert_eq!(decoded.proofs, blobs_bundle_v2.proofs);
+        assert_eq!(decoded.blobs, blobs_bundle_v2.blobs);
+        assert_eq!(decoded.blobs[0][0], 0x30);
+        assert_eq!(decoded.blobs[0][decoded.blobs[0].len() - 1], 0x30);
     }
 
     #[test]
     #[cfg(feature = "ssz")]
     fn ssz_blobsbundlev2_roundtrip() {
-        let commitments = vec![Bytes48::default(), Bytes48::default()];
-        let num_blobs = commitments.len();
+        let mut blobs = Vec::with_capacity(2);
+        blobs.push(Blob::repeat_byte(0x11));
+        blobs.push(Blob::repeat_byte(0x22));
+        let commitments = vec![Bytes48::repeat_byte(0x31), Bytes48::repeat_byte(0x32)];
+        let mut proofs = vec![Bytes48::repeat_byte(0x41); CELLS_PER_EXT_BLOB];
+        proofs.extend(vec![Bytes48::repeat_byte(0x42); CELLS_PER_EXT_BLOB]);
 
-        let blobs_bundle_v2 = BlobsBundleV2 {
-            commitments,
-            proofs: vec![Bytes48::default(); num_blobs * CELLS_PER_EXT_BLOB],
-            blobs: vec![Blob::default(); num_blobs],
-        };
+        let blobs_bundle_v2 = BlobsBundleV2 { commitments, proofs, blobs };
 
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
-        let decoded = ssz_decode_blobsbundlev2(encoded).unwrap();
+        let decoded: BlobsBundleV2 = ssz::Decode::from_ssz_bytes(&encoded).unwrap();
 
         assert_eq!(decoded, blobs_bundle_v2);
+        assert_eq!(decoded.blobs.len(), 2);
+        assert_eq!(decoded.blobs[0][0], 0x11);
+        assert_eq!(decoded.blobs[1][0], 0x22);
+        assert_eq!(decoded.blobs[0].as_slice(), blobs_bundle_v2.blobs[0].as_slice());
+        assert_eq!(decoded.blobs[1].as_slice(), blobs_bundle_v2.blobs[1].as_slice());
+
+        let cloned = blobs_bundle_v2.clone();
+        let decoded_clone: BlobsBundleV2 =
+            ssz::Decode::from_ssz_bytes(&ssz::Encode::as_ssz_bytes(&cloned)).unwrap();
+        assert_eq!(decoded_clone, cloned);
+        assert_eq!(decoded_clone.blobs[0][0], 0x11);
+        assert_eq!(decoded_clone.blobs[1][decoded_clone.blobs[1].len() - 1], 0x22);
     }
 
     #[test]
@@ -4348,16 +4389,17 @@ mod tests {
     fn ssz_blobsbundlev2_invalid_proofs_length() {
         let commitments = vec![Bytes48::default()];
 
+        // One proof per blob is the pre-7594 shape and is not a valid V2 bundle.
         let blobs_bundle_v2 = BlobsBundleV2 {
             commitments,
-            proofs: vec![Bytes48::default(); 2],
+            proofs: vec![Bytes48::default()],
             blobs: vec![Blob::default()],
         };
 
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
 
         // Attempt to decode - should fail due to mismatched proofs length
-        let result = ssz_decode_blobsbundlev2(encoded);
+        let result: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
         assert!(result.is_err());
     }
 
@@ -4373,8 +4415,47 @@ mod tests {
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
 
         // Attempt to decode - should fail due to wrong number of commitments
-        let result = ssz_decode_blobsbundlev2(encoded);
+        let result: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
         assert!(result.is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_blobsbundlev2_malformed_blob_bytes() {
+        use alloy_eips::eip4844::BYTES_PER_BLOB;
+
+        #[derive(ssz_derive::Encode)]
+        struct BlobsBundleRaw {
+            commitments: Vec<Bytes48>,
+            proofs: Vec<Bytes48>,
+            blobs: Vec<u8>,
+        }
+
+        let commitments = vec![Bytes48::repeat_byte(0x01)];
+        let proofs = vec![Bytes48::repeat_byte(0x02); CELLS_PER_EXT_BLOB];
+        let bundle = BlobsBundleV2 {
+            commitments: commitments.clone(),
+            proofs: proofs.clone(),
+            blobs: vec![Blob::repeat_byte(0x03)],
+        };
+        let raw =
+            BlobsBundleRaw { commitments, proofs, blobs: bundle.blobs[0].as_slice().to_vec() };
+        assert_eq!(ssz::Encode::as_ssz_bytes(&raw), ssz::Encode::as_ssz_bytes(&bundle));
+
+        for blob_len in [BYTES_PER_BLOB - 1, BYTES_PER_BLOB + 1] {
+            let encoded = ssz::Encode::as_ssz_bytes(&BlobsBundleRaw {
+                commitments: raw.commitments.clone(),
+                proofs: raw.proofs.clone(),
+                blobs: vec![0xab; blob_len],
+            });
+            let decoded: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
+            assert!(decoded.is_err());
+        }
+
+        let mut encoded = ssz::Encode::as_ssz_bytes(&bundle);
+        encoded[..ssz::BYTES_PER_LENGTH_OFFSET].fill(0);
+        let decoded: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
+        assert!(decoded.is_err());
     }
 
     #[test]
