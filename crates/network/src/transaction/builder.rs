@@ -316,6 +316,16 @@ pub trait NetworkTransactionBuilder<N: Network>: TransactionBuilder {
     /// a valid transaction.
     fn can_build(&self) -> bool;
 
+    /// True if gas fillers may estimate and set the top-level gas limit and fee fields, including
+    /// the blob fee.
+    ///
+    /// Builders for transaction formats that do not take their gas budget from those fields, for
+    /// example because gas is budgeted per frame, should return `false` and are then expected to
+    /// carry all gas and fee values they need themselves.
+    fn should_fill_gas(&self) -> bool {
+        true
+    }
+
     /// Check if all necessary keys are present to build the specified type,
     /// returning a list of missing keys.
     fn complete_type(&self, ty: N::TxType) -> Result<(), Vec<&'static str>>;
