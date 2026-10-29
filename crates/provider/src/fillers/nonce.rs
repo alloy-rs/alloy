@@ -59,6 +59,50 @@ pub struct CachedNonceManager {
     nonces: Arc<DashMap<Address, Arc<Mutex<u64>>>>,
 }
 
+impl CachedNonceManager {
+    /// Creates a new [`CachedNonceManager`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Clears all cached nonces across all accounts.
+    ///
+    /// The next transaction for any address will fetch fresh pending nonce state from the
+    /// provider.
+    pub fn clear(&self) {
+        self.nonces.clear();
+    }
+
+    /// Clears the cached nonce for a specific account.
+    ///
+    /// Useful for recovering from chain reorganizations, rollbacks, dropped transactions,
+    /// or manual nonce overrides. The next transaction for this address will re-fetch the
+    /// nonce from the provider.
+    pub fn clear_account(&self, address: Address) {
+        self.nonces.remove(&address);
+    }
+
+    /// Explicitly sets or overrides the cached nonce for an address.
+    ///
+    /// Subsequent transactions for this address will increment from this value.
+    pub async fn set_account_nonce(&self, address: Address, nonce: u64) {
+        let entry = self.nonces.entry(address).or_insert_with(|| Arc::new(Mutex::new(nonce)));
+        let mut guard = entry.value().lock().await;
+        *guard = nonce;
+    }
+
+    /// Returns the currently cached nonce for an address, if any.
+    pub async fn get_cached_nonce(&self, address: Address) -> Option<u64> {
+        if let Some(entry) = self.nonces.get(&address) {
+            let guard = entry.value().lock().await;
+            if *guard != u64::MAX {
+                return Some(*guard);
+            }
+        }
+        None
+    }
+}
+
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl NonceManager for CachedNonceManager {
@@ -164,6 +208,18 @@ impl<M: NonceManager> NonceFiller<M> {
     }
 }
 
+impl NonceFiller<CachedNonceManager> {
+    /// Clears all cached nonces in the underlying [`CachedNonceManager`].
+    pub fn clear_cache(&self) {
+        self.nonce_manager.clear();
+    }
+
+    /// Clears the cached nonce for a specific account in the underlying [`CachedNonceManager`].
+    pub fn clear_account_cache(&self, address: Address) {
+        self.nonce_manager.clear_account(address);
+    }
+}
+
 impl<M: NonceManager, N: Network> TxFiller<N> for NonceFiller<M> {
     type Fillable = u64;
 
@@ -237,7 +293,7 @@ mod tests {
         #[cfg(feature = "anvil-api")]
         {
             use crate::ext::AnvilApi;
-            filler.nonce_manager.nonces.clear();
+            filler.clear_cache();
             provider.anvil_set_nonce(address, 69).await.unwrap();
             check_nonces(&filler, &provider, address, 69).await;
         }
@@ -317,5 +373,57 @@ mod tests {
         assert_eq!(cnm2.get_next_nonce(&provider, address).await.unwrap(), 1);
         assert_eq!(cnm1.get_next_nonce(&provider, address).await.unwrap(), 2);
         assert_eq!(cnm2.get_next_nonce(&provider, address).await.unwrap(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_cached_nonce_manager_direct() {
+        let manager = CachedNonceManager::default();
+        let addr1 = Address::repeat_byte(1);
+        let addr2 = Address::repeat_byte(2);
+
+        // Initially empty
+        assert_eq!(manager.get_cached_nonce(addr1).await, None);
+        assert_eq!(manager.get_cached_nonce(addr2).await, None);
+
+        // Set account nonce explicitly
+        manager.set_account_nonce(addr1, 10).await;
+        manager.set_account_nonce(addr2, 20).await;
+
+        assert_eq!(manager.get_cached_nonce(addr1).await, Some(10));
+        assert_eq!(manager.get_cached_nonce(addr2).await, Some(20));
+
+        // Increment after explicit set without hitting network
+        let provider =
+            ProviderBuilder::new().connect_http("http://localhost:8545".parse().unwrap());
+        assert_eq!(manager.get_next_nonce(&provider, addr1).await.unwrap(), 11);
+        assert_eq!(manager.get_next_nonce(&provider, addr1).await.unwrap(), 12);
+
+        // Clear account 1
+        manager.clear_account(addr1);
+        assert_eq!(manager.get_cached_nonce(addr1).await, None);
+        assert_eq!(manager.get_cached_nonce(addr2).await, Some(20));
+
+        // Clear all
+        manager.clear();
+        assert_eq!(manager.get_cached_nonce(addr1).await, None);
+        assert_eq!(manager.get_cached_nonce(addr2).await, None);
+    }
+
+    #[tokio::test]
+    async fn test_nonce_filler_helpers() {
+        let filler = NonceFiller::<CachedNonceManager>::default();
+        let addr = Address::repeat_byte(4);
+
+        assert_eq!(filler.nonce_manager().get_cached_nonce(addr).await, None);
+
+        filler.nonce_manager().set_account_nonce(addr, 5).await;
+        assert_eq!(filler.nonce_manager().get_cached_nonce(addr).await, Some(5));
+
+        filler.clear_account_cache(addr);
+        assert_eq!(filler.nonce_manager().get_cached_nonce(addr).await, None);
+
+        filler.nonce_manager().set_account_nonce(addr, 10).await;
+        filler.clear_cache();
+        assert_eq!(filler.nonce_manager().get_cached_nonce(addr).await, None);
     }
 }
