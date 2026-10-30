@@ -11,18 +11,22 @@ pub const NONCE_MANAGER_CODE: [u8; 5] = [0x60, 0x00, 0x60, 0x00, 0xfd];
 /// Maximum number of nonce domains selected by one transaction.
 pub const MAX_NONCE_KEYS: usize = 16;
 
+/// Execution gas charged per keyed nonce access in both intrinsic gas and the calldata floor.
+pub const KEYED_NONCE_ACCESS_COST: u64 = 12_100;
+
+/// State gas charged on first use of a keyed nonce storage slot.
+pub const KEYED_NONCE_FIRST_USE_STATE_GAS: u64 = 97_920;
+
 /// Exhausted EIP-8250 sequence value.
 ///
-/// Transaction validity requires `nonce_seq < MAX_NONCE_SEQ`, independently of state.
+/// For nonempty nonce keys, this sequence selects a single-use nonce consumed by storing
+/// `MAX_NONCE_SEQ`. The legacy account nonce cannot use this sequence.
 pub const MAX_NONCE_SEQ: u64 = u64::MAX;
 
-/// Validates the canonical set of nonce keys, including the legacy singleton `[0]`.
+/// Validates the canonical set of nonce keys, where an empty set selects the legacy account nonce.
 pub fn validate_nonce_keys(keys: &[U256]) -> Result<(), &'static str> {
-    if keys.is_empty() || keys.len() > MAX_NONCE_KEYS {
-        return Err("EIP-8250 requires between 1 and 16 nonce keys");
-    }
-    if keys.len() > 1 && keys[0].is_zero() {
-        return Err("EIP-8250 nonce key zero must be the only key");
+    if keys.len() > MAX_NONCE_KEYS {
+        return Err("EIP-8250 requires at most 16 nonce keys");
     }
     if keys.windows(2).any(|pair| pair[0] >= pair[1]) {
         return Err("EIP-8250 nonce keys must be strictly increasing");
@@ -30,7 +34,7 @@ pub fn validate_nonce_keys(keys: &[U256]) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// Returns the storage slot for a sender's nonzero nonce key.
+/// Returns the storage slot for a sender's nonce key.
 pub fn nonce_slot(sender: Address, key: U256) -> U256 {
     let mut input = [0u8; 64];
     input[12..32].copy_from_slice(sender.as_slice());
@@ -52,7 +56,9 @@ pub fn nonce_keys_hash(keys: &[U256]) -> B256 {
 pub fn nonce_calldata(keys: &[U256], nonce: u64) -> Vec<u8> {
     let mut encoded = Vec::new();
     alloy_rlp::encode_list(keys, &mut encoded);
-    nonce.encode(&mut encoded);
+    if keys.is_empty() || nonce != MAX_NONCE_SEQ {
+        nonce.encode(&mut encoded);
+    }
     encoded
 }
 
@@ -62,12 +68,16 @@ mod tests {
 
     #[test]
     fn canonical_nonce_sets() {
-        for keys in [vec![U256::ZERO], vec![U256::MAX], (1..=16).map(U256::from).collect()] {
-            assert!(validate_nonce_keys(&keys).is_ok());
-        }
         for keys in [
             vec![],
             vec![U256::ZERO, U256::from(1)],
+            vec![U256::ZERO],
+            vec![U256::MAX],
+            (1..=16).map(U256::from).collect(),
+        ] {
+            assert!(validate_nonce_keys(&keys).is_ok());
+        }
+        for keys in [
             vec![U256::from(1), U256::from(1)],
             vec![U256::from(2), U256::from(1)],
             vec![U256::from(1), U256::ZERO],
@@ -115,10 +125,17 @@ mod tests {
 
     #[test]
     fn canonical_nonce_calldata() {
+        assert_eq!(nonce_calldata(&[], 0), [0xc0, 0x80]);
         assert_eq!(nonce_calldata(&[U256::ZERO], 0), [0xc1, 0x80, 0x80]);
         assert_eq!(
             nonce_calldata(&[U256::from(1), U256::from(128)], 128),
             [0xc3, 0x01, 0x81, 0x80, 0x81, 0x80]
+        );
+        assert_eq!(nonce_calldata(&[U256::ZERO], MAX_NONCE_SEQ), [0xc1, 0x80]);
+        assert_eq!(nonce_calldata(&[U256::from(1)], MAX_NONCE_SEQ), [0xc1, 0x01]);
+        assert_eq!(
+            nonce_calldata(&[], MAX_NONCE_SEQ),
+            [0xc0, 0x88, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
         );
     }
 }
