@@ -180,6 +180,10 @@ where
     }
 
     /// Converts a consensus `tx` with an additional context `tx_info` into an RPC [`Transaction`].
+    ///
+    /// The gas price is derived from the transaction's fee helpers. For shared fee budgets
+    /// (EIP-8141), this is a compatibility estimate: this context lacks the blob base fee and
+    /// charged gas needed for protocol `GASPRICE` and realized receipt pricing, respectively.
     pub fn from_transaction(tx: Recovered<T>, tx_info: TransactionInfo) -> Self {
         let TransactionInfo {
             block_hash,
@@ -191,7 +195,9 @@ where
         } = tx_info;
         let effective_gas_price = base_fee
             .map(|base_fee| {
-                tx.effective_tip_per_gas(base_fee).unwrap_or_default() + base_fee as u128
+                tx.effective_tip_per_gas(base_fee)
+                    .unwrap_or_default()
+                    .saturating_add(base_fee as u128)
             })
             .unwrap_or_else(|| tx.max_fee_per_gas());
 
@@ -410,6 +416,10 @@ impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
         self.inner.effective_gas_price(base_fee)
     }
 
+    fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128> {
+        self.inner.effective_tip_per_gas(base_fee)
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         self.inner.is_dynamic_fee()
     }
@@ -587,6 +597,57 @@ mod tx_serde {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn from_transaction_saturates_full_width_frame_fee_estimate() {
+        use alloy_consensus::TxEip8141;
+        use alloy_eips::eip8141::Frame;
+        use alloy_primitives::U256;
+
+        let mut tx = TxEip8141 { frames: vec![Frame::default()], ..Default::default() };
+        tx.fees.max_fee = (U256::from(u128::MAX) + U256::from(1)) * U256::from(tx.gas_limit());
+        tx.fees.max_priority_fee_per_gas = U256::MAX;
+        let expected = tx.effective_gas_price(Some(1));
+        assert_eq!(tx.effective_tip_per_gas(1), Some(u128::MAX));
+        let rpc = Transaction::from_transaction(
+            Recovered::new_unchecked(tx, Address::ZERO),
+            TransactionInfo::default().with_base_fee(1),
+        );
+        assert_eq!(rpc.effective_gas_price, Some(expected));
+        assert_eq!(expected, u128::MAX);
+        assert_eq!(rpc.effective_tip_per_gas(1), Some(u128::MAX));
+    }
+
+    #[test]
+    fn from_transaction_preserves_ordinary_fee_prices() {
+        use alloy_consensus::{TxEip1559, TxLegacy};
+
+        for (base, expected) in [(None, 100), (Some(80), 90), (Some(95), 100), (Some(101), 101)] {
+            let info = TransactionInfo { base_fee: base, ..Default::default() };
+            let tx = TxEip1559 {
+                max_fee_per_gas: 100,
+                max_priority_fee_per_gas: 10,
+                ..Default::default()
+            };
+            let rpc =
+                Transaction::from_transaction(Recovered::new_unchecked(tx, Address::ZERO), info);
+            assert_eq!(rpc.effective_gas_price, Some(expected));
+            let tx = TxLegacy { gas_price: 100, ..Default::default() };
+            let rpc =
+                Transaction::from_transaction(Recovered::new_unchecked(tx, Address::ZERO), info);
+            assert_eq!(rpc.effective_gas_price, Some(base.map_or(100, |b| u128::from(b).max(100))));
+        }
+        let tx = TxEip1559 {
+            max_fee_per_gas: u128::MAX,
+            max_priority_fee_per_gas: u128::MAX,
+            ..Default::default()
+        };
+        let rpc = Transaction::from_transaction(
+            Recovered::new_unchecked(tx, Address::ZERO),
+            TransactionInfo::default().with_base_fee(u64::MAX),
+        );
+        assert_eq!(rpc.effective_gas_price, Some(u128::MAX));
+    }
 
     #[allow(unused)]
     fn assert_convert_into_envelope(tx: Transaction) -> TxEnvelope {

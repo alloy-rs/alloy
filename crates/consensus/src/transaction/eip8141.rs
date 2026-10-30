@@ -31,10 +31,20 @@ use super::Transaction;
 ///
 /// The [`Transaction`] implementation represents the transaction as a call to [`Self::sender`],
 /// with zero value and empty input. Individual call targets, values, and inputs belong to the
-/// frames. The maximum gas price is derived from the total fee budget and gas reservation;
-/// fee accessors saturate at [`u128::MAX`]. Blob gas shares that budget, so actual affordability
-/// also requires the execution client's blob base fee. This type is not a variant of
-/// [`super::TxEnvelope`] or [`super::TypedTransaction`].
+/// frames. Its derived per-gas fee accessors are compatibility estimates: they divide the total fee
+/// budget by the execution and state gas reservation, ignoring the budget consumed by blobs.
+/// Arithmetic uses [`U256`] and results saturate at [`u128::MAX`].
+///
+/// These estimates do not generally give the protocol `GASPRICE` or the realized receipt price.
+/// For an affordable transaction with reservation `G`, base fee `b`, priority cap `p`, total
+/// budget `F`, and blob charge `B`, the reserved tip is `min(p * G, F - (G * b + B))`.
+/// `GASPRICE` is `b + reserved_tip / G`, rounded down. At settlement, unused gas can back a
+/// larger tip per unit of charged gas, so the receipt price can exceed `GASPRICE`; blob charges
+/// are reported separately. Exact pricing requires the block's blob base fee and, for receipts,
+/// charged gas and the escrowed budget. Affordability is checked by the execution client, not
+/// by decoding or [`Self::validate`].
+///
+/// This type is not a variant of [`super::TxEnvelope`] or [`super::TypedTransaction`].
 ///
 /// ```
 /// use alloy_consensus::TxEip8141;
@@ -367,23 +377,35 @@ impl Transaction for TxEip8141 {
         None
     }
 
+    /// Compatibility cap: `max_fee / max(gas_limit, 1)`, rounded down and saturated to `u128`.
+    /// This allocates the entire shared budget to non-blob gas, ignoring blob charges.
     fn max_fee_per_gas(&self) -> u128 {
         (self.fees.max_fee / U256::from(self.gas_limit().max(1))).saturating_to()
     }
 
+    /// Returns the signed priority cap saturated to `u128`, not the tip actually paid.
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         Some(self.fees.max_priority_fee_per_gas.saturating_to())
     }
 
+    /// Returns `Some(u128::MAX)` for blob-bearing transactions as a compatibility sentinel.
+    /// There is no signed per-blob cap; this value does not establish blob affordability.
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         // Blobs share the total fee budget; there is no independent blob fee cap.
         (!self.blob_versioned_hashes.is_empty()).then_some(u128::MAX)
     }
 
+    /// Returns the signed priority cap saturated to `u128`, not the tip actually paid.
     fn priority_fee_or_price(&self) -> u128 {
         self.fees.max_priority_fee_per_gas.saturating_to()
     }
 
+    /// Compatibility estimate ignoring blob charges and settlement gas usage.
+    ///
+    /// With a base fee, returns `min(base_fee + priority_cap, max_fee / max(gas_limit, 1))`,
+    /// saturated to `u128`. Without one, returns the compatibility cap. For affordable no-blob
+    /// transactions this agrees with reserved `GASPRICE` before saturation, but the realized
+    /// receipt price can still differ. This method does not check affordability.
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         let max_fee_per_gas = self.fees.max_fee / U256::from(self.gas_limit().max(1));
         base_fee
@@ -393,6 +415,17 @@ impl Transaction for TxEip8141 {
                     .min(max_fee_per_gas)
             })
             .saturating_to()
+    }
+
+    /// Compatibility tip ignoring blob charges and settlement gas usage.
+    ///
+    /// Subtracts the base fee from the full-width compatibility cap before applying the priority
+    /// cap and saturating to `u128`. Returns `None` if that cap cannot cover the base fee;
+    /// `Some` does not establish affordability when blobs share the budget.
+    fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128> {
+        let cap = self.fees.max_fee / U256::from(self.gas_limit().max(1));
+        let available = cap.checked_sub(U256::from(base_fee))?;
+        Some(available.min(self.fees.max_priority_fee_per_gas).saturating_to())
     }
 
     fn is_dynamic_fee(&self) -> bool {
@@ -1108,6 +1141,117 @@ mod tests {
         assert_eq!(json["chainId"], "0x1", "serialized {json}");
         assert_eq!(json["nonce"], "0x0");
         assert_eq!(json["blobVersionedHashes"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn fee_estimates_ignore_blob_budget_and_settlement() {
+        let mut tx = valid_tx();
+        // A funded sender contract can approve execution and payment in this frame.
+        tx.sender = Address::repeat_byte(0x11);
+        tx.frames[0].mode = FrameMode::Verify;
+        tx.frames[0].flags = ApprovalScope::ExecutionAndPayment as u8;
+        // Include intrinsic gas in G, and reserve both execution and state gas.
+        tx.frames[0].limits.state = 10_000;
+        tx.frames[0].limits.execution = 100_000 - tx.gas_limit();
+        tx.fees = TransactionFees {
+            max_fee: U256::from(300_000),
+            max_priority_fee_per_gas: U256::from(2),
+        };
+        let mut hash = B256::ZERO;
+        hash[0] = VERSIONED_HASH_VERSION_KZG;
+        tx.blob_versioned_hashes.push(hash);
+        assert_eq!(tx.validate(), Ok(()));
+        assert_eq!(tx.gas_limit(), 100_000);
+
+        // EIP-8141 devnet-2 / EELS: escrow first, then settle using charged gas.
+        let gas = U256::from(tx.gas_limit());
+        let base = U256::from(1);
+        let blob_fee = U256::from(tx.blob_gas_used().unwrap()); // blob base fee = 1
+        assert_eq!(blob_fee, U256::from(131_072));
+        let required = gas * base + blob_fee;
+        let reserved_tip = (tx.fees.max_priority_fee_per_gas * gas).min(tx.fees.max_fee - required);
+        let escrow = required + reserved_tip;
+        let gasprice = base + reserved_tip / gas;
+        assert_eq!(required, U256::from(231_072));
+        assert_eq!(reserved_tip, U256::from(68_928));
+        assert_eq!(escrow, tx.fees.max_fee);
+        assert_eq!(gasprice, U256::from(1));
+
+        let used = U256::from(20_000);
+        let actual_tip =
+            (tx.fees.max_priority_fee_per_gas * used).min(escrow - (used * base + blob_fee));
+        let realized_price = base + actual_tip / used;
+        assert_eq!(realized_price, U256::from(3));
+        assert_ne!(gasprice, realized_price);
+
+        // The transaction-only compatibility estimate has neither missing input.
+        assert_eq!(tx.effective_gas_price(Some(1)), 3);
+        assert_eq!(tx.effective_tip_per_gas(1), Some(2));
+        // At full gas usage, the realized price instead agrees with GASPRICE.
+        assert_eq!(base + (escrow - required) / gas, gasprice);
+    }
+
+    #[test]
+    fn fee_estimates_without_blobs_match_reserved_price() {
+        let mut tx = valid_tx();
+        let gas = U256::from(tx.gas_limit());
+        tx.fees.max_priority_fee_per_gas = U256::from(2);
+        for (budget_per_gas, price, tip) in [(1, 1, 0), (2, 2, 1), (3, 3, 2), (4, 3, 2)] {
+            tx.fees.max_fee = gas * U256::from(budget_per_gas);
+            assert_eq!(tx.validate(), Ok(()));
+            let reserved_tip = (tx.fees.max_priority_fee_per_gas * gas).min(tx.fees.max_fee - gas);
+            assert_eq!(U256::from(price), U256::from(1) + reserved_tip / gas);
+            assert_eq!(tx.effective_gas_price(Some(1)), price);
+            assert_eq!(tx.effective_tip_per_gas(1), Some(tip));
+            assert_eq!(tx.effective_gas_price(None), budget_per_gas);
+        }
+        // Division rounds down even when the signed budget is not a multiple of G.
+        tx.fees.max_fee = gas * U256::from(2) - U256::from(1);
+        assert_eq!(tx.effective_gas_price(Some(1)), 1);
+        assert_eq!(tx.effective_tip_per_gas(1), Some(0));
+    }
+
+    #[test]
+    fn effective_tip_keeps_full_width_until_return() {
+        let mut tx = valid_tx();
+        let gas = U256::from(tx.gas_limit());
+        tx.fees.max_fee = (U256::from(u128::MAX) + U256::from(1)) * gas;
+        tx.fees.max_priority_fee_per_gas = U256::MAX;
+        // A priority product would overflow U256 before the signed budget caps it.
+        assert!(tx.fees.max_priority_fee_per_gas.checked_mul(gas).is_none());
+        assert_eq!(tx.validate(), Ok(()));
+        assert_eq!(tx.max_fee_per_gas(), u128::MAX);
+        assert_eq!(tx.effective_gas_price(Some(1)), u128::MAX);
+        assert_eq!(tx.effective_tip_per_gas(1), Some(u128::MAX));
+        tx.fees.max_fee = U256::MAX;
+        assert_eq!(tx.effective_tip_per_gas(u64::MAX), Some(u128::MAX));
+        tx.fees.max_fee = U256::from(100) * gas;
+        assert_eq!(tx.effective_tip_per_gas(1), Some(99));
+    }
+
+    #[test]
+    fn fee_estimates_do_not_validate_affordability() {
+        let mut tx = valid_tx();
+        tx.fees.max_priority_fee_per_gas = U256::MAX;
+        assert_eq!(tx.effective_gas_price(Some(1)), 0);
+        assert_eq!(tx.effective_tip_per_gas(1), None);
+        assert_eq!(tx.effective_tip_per_gas(0), Some(0));
+        assert_eq!(tx.validate(), Ok(()));
+        assert_eq!(TxEip8141::decode_2718_exact(&tx.encoded_2718()).unwrap(), tx);
+        let mut hash = B256::ZERO;
+        hash[0] = VERSIONED_HASH_VERSION_KZG;
+        tx.blob_versioned_hashes.push(hash);
+        tx.fees.max_fee = U256::from(tx.gas_limit());
+        // Covers execution at base fee 1, but cannot also pay any positive blob fee.
+        assert_eq!(tx.effective_tip_per_gas(1), Some(0));
+        assert_eq!(tx.validate(), Ok(()));
+        assert_eq!(TxEip8141::decode_2718_exact(&tx.encoded_2718()).unwrap(), tx);
+        // Even an invalid empty frame list still reserves intrinsic gas; no zero divisor.
+        tx.frames.clear();
+        tx.fees.max_fee = U256::ZERO;
+        assert!(tx.gas_limit() > 0);
+        assert_eq!(tx.effective_gas_price(None), 0);
+        assert_eq!(tx.effective_tip_per_gas(1), None);
     }
 
     #[test]
