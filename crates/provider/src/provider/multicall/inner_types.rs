@@ -199,7 +199,11 @@ pub enum MulticallError {
     #[error("could not decode: {0}")]
     DecodeError(alloy_sol_types::Error),
     /// No return data was found.
-    #[error("no return data")]
+    ///
+    /// Also returned when the multicall `eth_call` returns empty output, which happens when no
+    /// contract is deployed at the multicall address (for example, a dev node without
+    /// Multicall3).
+    #[error("no return data; is a Multicall3 contract deployed at the multicall address?")]
     NoReturnData,
     /// Call failed.
     #[error("call failed when success was assured, this occurs when try_into_success is called on a failed call")]

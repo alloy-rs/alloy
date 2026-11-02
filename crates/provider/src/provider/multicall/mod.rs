@@ -667,6 +667,13 @@ where
         }
 
         let res = eth_call.await.map_err(MulticallError::TransportError)?;
+
+        // `eth_call` to an address without code succeeds with empty output. A Multicall3 call
+        // always returns ABI-encoded data, so empty output means no contract at `self.address`.
+        if res.is_empty() {
+            return Err(MulticallError::NoReturnData);
+        }
+
         M::abi_decode_returns(&res).map_err(MulticallError::DecodeError)
     }
 
@@ -843,5 +850,30 @@ where
     /// Get the input kind for this builder
     pub const fn input_kind(&self) -> TransactionInputKind {
         self.input_kind
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ProviderBuilder;
+    use alloy_transport::mock::Asserter;
+
+    #[tokio::test]
+    async fn empty_call_output_is_no_return_data() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .connect_mocked_client(asserter.clone());
+
+        // `eth_call` to an address without code returns `0x`.
+        asserter.push_success(&Bytes::new());
+        let err = provider.multicall().get_chain_id().aggregate().await.unwrap_err();
+        assert!(matches!(err, MulticallError::NoReturnData), "{err:?}");
+        assert!(err.to_string().contains("Multicall3"), "{err}");
+
+        asserter.push_success(&Bytes::new());
+        let err = provider.multicall().get_chain_id().aggregate3().await.unwrap_err();
+        assert!(matches!(err, MulticallError::NoReturnData), "{err:?}");
     }
 }
