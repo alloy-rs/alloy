@@ -125,7 +125,7 @@ impl FromStr for NameOrAddress {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use alloy_primitives::Address;
+    use alloy_primitives::{Address, Bytes};
     use alloy_sol_types::sol;
 
     sol! {
@@ -268,6 +268,19 @@ mod contract {
         /// Failed to get a text record for an ENS name.
         #[error("Failed to resolve text record: {0}")]
         ResolveTxtRecord(#[source] alloy_contract::Error),
+        /// The name's resolver reverted, reported by the Universal Resolver as
+        /// `ResolverError(bytes)`.
+        ///
+        /// `data` is the resolver's revert data. The error message decodes ENSIP-21
+        /// `HttpError(uint16,string)` (a failed CCIP Read gateway request), `Error(string)`, and
+        /// `Panic(uint256)`, and shows other data as hex.
+        #[error("ENS resolver for {name:?} reverted: {}", resolver_revert_reason(data))]
+        ResolverReverted {
+            /// The name being resolved, or `<address>.addr.reverse` for reverse resolution.
+            name: String,
+            /// The resolver's revert data.
+            data: Bytes,
+        },
         /// Failed to DNS-encode the ENS name for the Universal Resolver.
         #[error("Failed to DNS-encode ENS name: {0}")]
         DnsEncode(#[from] crate::DnsEncodeError),
@@ -282,6 +295,26 @@ mod contract {
         #[cfg(feature = "provider")]
         #[error("Failed to perform CCIP Read: {0}")]
         CcipRead(#[source] alloy_provider::CcipReadError),
+    }
+
+    mod gateway {
+        alloy_sol_types::sol! {
+            /// A failed gateway request, as encoded by an ENSIP-21 batch gateway.
+            error HttpError(uint16 status, string message);
+        }
+    }
+
+    /// Returns a readable reason for the revert data of a resolver.
+    fn resolver_revert_reason(data: &Bytes) -> String {
+        use alloy_sol_types::SolError;
+
+        if data.is_empty() {
+            return "no revert data".to_string();
+        }
+        if let Ok(error) = gateway::HttpError::abi_decode(data) {
+            return format!("gateway returned HTTP {}: {}", error.status, error.message);
+        }
+        alloy_sol_types::decode_revert_reason(data).unwrap_or_else(|| data.to_string())
     }
 }
 
@@ -576,7 +609,8 @@ mod provider {
         }
     }
 
-    /// Maps Universal Resolver contract errors, preserving [`EnsError::ResolverNotFound`].
+    /// Maps Universal Resolver contract errors to [`EnsError::ResolverNotFound`] and
+    /// [`EnsError::ResolverReverted`].
     fn map_ur_error(
         error: alloy_contract::Error,
         name: &str,
@@ -584,6 +618,8 @@ mod provider {
     ) -> EnsError {
         if error.as_decoded_error::<UniversalResolver::ResolverNotFound>().is_some() {
             EnsError::ResolverNotFound(name.to_string())
+        } else if let Some(error) = error.as_decoded_error::<UniversalResolver::ResolverError>() {
+            EnsError::ResolverReverted { name: name.to_string(), data: error.errorData }
         } else {
             fallback(error)
         }
@@ -609,6 +645,8 @@ mod provider {
                 bytes4 callbackFunction,
                 bytes extraData
             );
+
+            error HttpError(uint16 status, string message);
 
             struct BatchGatewayRequest {
                 address sender;
@@ -707,6 +745,62 @@ mod provider {
                     map_ccip_error(error, "test.eth", EnsError::Resolve),
                     EnsError::CcipRead(_)
                 ));
+            }
+        }
+
+        /// Resolver revert data wrapped by the Universal Resolver as `ResolverError(bytes)`.
+        fn resolver_error(data: Bytes) -> ErrorPayload {
+            revert(&UniversalResolver::ResolverError { errorData: data }.abi_encode().into())
+        }
+
+        #[tokio::test]
+        async fn resolve_name_decodes_gateway_http_error() {
+            // Revert data from `brantly.cb.id` on mainnet (2026-11-02): the gateway answered 404
+            // and the ENSIP-21 batch gateway reported it as `HttpError(uint16,string)`.
+            let message = r#"{"error":{"code":5,"message":"subdomain not found"}}"#;
+            let http_error: Bytes =
+                HttpError { status: 404, message: message.into() }.abi_encode().into();
+            let asserter = Asserter::new();
+            asserter.push_failure(resolver_error(http_error.clone()));
+            let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+            let err = provider.resolve_name("brantly.cb.id").await.unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                format!(
+                    "ENS resolver for \"brantly.cb.id\" reverted: gateway returned HTTP 404: \
+                     {message}"
+                )
+            );
+            assert!(matches!(
+                err,
+                EnsError::ResolverReverted { name, data } if name == "brantly.cb.id" && data == http_error
+            ));
+        }
+
+        #[tokio::test]
+        async fn resolver_error_reason_is_decoded() {
+            for (data, reason) in [
+                (
+                    alloy_sol_types::Revert::from("no record").abi_encode().into(),
+                    "revert: no record",
+                ),
+                (
+                    alloy_sol_types::Panic { code: U256::from(0x11) }.abi_encode().into(),
+                    "panic: arithmetic underflow or overflow (0x11)",
+                ),
+                (Bytes::new(), "no revert data"),
+                (bytes!("deadbeef"), "0xdeadbeef"),
+            ] {
+                let asserter = Asserter::new();
+                asserter.push_failure(resolver_error(data));
+                let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+                let err = provider.lookup_txt("foo.eth", "avatar").await.unwrap_err();
+                assert_eq!(
+                    err.to_string(),
+                    format!("ENS resolver for \"foo.eth\" reverted: {reason}")
+                );
             }
         }
 
