@@ -281,6 +281,9 @@ mod contract {
             /// The resolver's revert data.
             data: Bytes,
         },
+        /// The address has no primary ENS name, or its reverse record is empty.
+        #[error("no primary ENS name set for {0}")]
+        NoPrimaryName(Address),
         /// Failed to DNS-encode the ENS name for the Universal Resolver.
         #[error("Failed to DNS-encode ENS name: {0}")]
         DnsEncode(#[from] crate::DnsEncodeError),
@@ -421,11 +424,11 @@ mod provider {
 
         /// Performs a reverse lookup of an address to its primary ENS name.
         ///
-        /// The Universal Resolver verifies that the raw primary name resolves back to `address`,
-        /// and returns an empty string if no primary name is set. Neither the Universal Resolver
-        /// nor this helper performs ENSIP-15 normalization of the returned name.
+        /// The Universal Resolver verifies that the raw primary name resolves back to `address`.
+        /// Returns [`EnsError::NoPrimaryName`] if no primary name is set. Neither the Universal
+        /// Resolver nor this helper performs ENSIP-15 normalization of the returned name.
         ///
-        /// Before using a non-empty result as an authenticated identity, normalize it according to
+        /// Before using the result as an authenticated identity, normalize it according to
         /// ENSIP-15 and reject it if normalization fails or changes the name. Normalizing and using
         /// a changed name is insufficient: the address check applied to the original name.
         async fn lookup_address(&self, address: &Address) -> Result<String, EnsError>;
@@ -555,6 +558,9 @@ mod provider {
             })?;
             let ret = UniversalResolver::reverseCall::abi_decode_returns(&output)
                 .map_err(|_| EnsError::InvalidResponse)?;
+            if ret.name.is_empty() {
+                return Err(EnsError::NoPrimaryName(*address));
+            }
             Ok(ret.name)
         }
 
@@ -802,6 +808,26 @@ mod provider {
                     format!("ENS resolver for \"foo.eth\" reverted: {reason}")
                 );
             }
+        }
+
+        #[tokio::test]
+        async fn lookup_address_without_primary_name_is_an_error() {
+            let addr = address!("0x0000000000000000000000000000000000000001");
+            let output: Bytes = UniversalResolver::reverseCall::abi_encode_returns(
+                &UniversalResolver::reverseReturn {
+                    name: String::new(),
+                    resolver: Address::ZERO,
+                    reverseResolver: Address::ZERO,
+                },
+            )
+            .into();
+            let asserter = Asserter::new();
+            asserter.push_success(&output);
+            let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+            let err = provider.lookup_address(&addr).await.unwrap_err();
+            assert_eq!(err.to_string(), format!("no primary ENS name set for {addr}"));
+            assert!(matches!(err, EnsError::NoPrimaryName(a) if a == addr));
         }
 
         /// Checks the DNS gateway request without contacting a live DNSSEC service.
