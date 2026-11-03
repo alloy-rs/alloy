@@ -5,6 +5,7 @@ use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, B256, U256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockId, TransactionInputKind};
 use alloy_sol_types::SolCall;
+use alloy_transport::TransportErrorKind;
 use bindings::IMulticall3::{
     blockAndAggregateCall, blockAndAggregateReturn, tryBlockAndAggregateCall,
     tryBlockAndAggregateReturn, Call, Call3, Call3Value,
@@ -671,7 +672,10 @@ where
         // `eth_call` to an address without code succeeds with empty output. A Multicall3 call
         // always returns ABI-encoded data, so empty output means no contract at `self.address`.
         if res.is_empty() {
-            return Err(MulticallError::NoReturnData);
+            return Err(MulticallError::TransportError(TransportErrorKind::custom_str(&format!(
+                "Multicall3 not deployed at {}",
+                self.address
+            ))));
         }
 
         M::abi_decode_returns(&res).map_err(MulticallError::DecodeError)
@@ -860,7 +864,7 @@ mod tests {
     use alloy_transport::mock::Asserter;
 
     #[tokio::test]
-    async fn empty_call_output_is_no_return_data() {
+    async fn empty_call_output_is_not_deployed() {
         let asserter = Asserter::new();
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
@@ -869,11 +873,11 @@ mod tests {
         // `eth_call` to an address without code returns `0x`.
         asserter.push_success(&Bytes::new());
         let err = provider.multicall().get_chain_id().aggregate().await.unwrap_err();
-        assert!(matches!(err, MulticallError::NoReturnData), "{err:?}");
-        assert!(err.to_string().contains("Multicall3"), "{err}");
+        assert!(matches!(err, MulticallError::TransportError(_)), "{err:?}");
+        assert!(err.to_string().contains("Multicall3 not deployed at"), "{err}");
 
         asserter.push_success(&Bytes::new());
         let err = provider.multicall().get_chain_id().aggregate3().await.unwrap_err();
-        assert!(matches!(err, MulticallError::NoReturnData), "{err:?}");
+        assert!(err.to_string().contains("Multicall3 not deployed at"), "{err}");
     }
 }

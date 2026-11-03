@@ -287,9 +287,6 @@ mod tests {
         let error = Error::from(MulticallError::NoReturnData);
 
         assert!(matches!(error, Error::TransportError(_)));
-        assert_eq!(
-            error.to_string(),
-            "no return data; is a Multicall3 contract deployed at the multicall address?"
-        );
+        assert_eq!(error.to_string(), "no return data");
     }
 }
