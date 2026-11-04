@@ -251,7 +251,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
             let mut confirmed = false;
 
             // If more than 1 block confirmations is specified then we can rely on the regular
-            // watch_pending_transaction and dont need this workaround for the above mentioned race
+            // watch_pending_transaction and don't need this workaround for the above mentioned race
             // condition
             let tick_fut = if let Some(interval) = interval.as_mut() {
                 interval.tick().map(|_| ()).left_future()
