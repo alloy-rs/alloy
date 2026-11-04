@@ -12,6 +12,7 @@ use alloy_rpc_types_eth::pubsub::SubscriptionKind;
 use alloy_transport::{TransportError, TransportResult};
 use either::Either;
 use futures::{Stream, StreamExt};
+use serde::ser::SerializeTuple;
 use serde_json::Value;
 use std::time::Duration;
 
@@ -31,8 +32,6 @@ impl serde::Serialize for EthGetBlockParams {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeTuple;
-
         let mut tuple = serializer.serialize_tuple(2)?;
         match self.block {
             BlockId::Hash(hash) => tuple.serialize_element(&hash.block_hash)?,

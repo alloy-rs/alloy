@@ -559,7 +559,10 @@ pub(crate) mod serde_bincode_compat {
 #[cfg(test)]
 mod test {
     use crate::{Receipt, ReceiptEnvelope, TxType};
+    use alloc::{vec, vec::Vec};
+    use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
     use alloy_primitives::Log;
+    use alloy_rlp::{Decodable, Header};
 
     #[cfg(feature = "serde")]
     #[test]
@@ -705,10 +708,6 @@ mod test {
 
     #[test]
     fn tagged_legacy_receipt_envelope_is_rejected() {
-        use alloc::{vec, vec::Vec};
-        use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
-        use alloy_rlp::{Decodable, Header};
-
         let envelope = ReceiptEnvelope::<Log>::Legacy(Default::default());
         let encoded = envelope.encoded_2718();
         assert!(encoded[0] >= 0xc0, "sanity: legacy receipts are encoded as a bare RLP list");

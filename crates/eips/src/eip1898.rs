@@ -1,5 +1,6 @@
 //! [EIP-1898]: https://eips.ethereum.org/EIPS/eip-1898
 
+use alloc::string::ToString;
 use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, B256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
 use core::{
@@ -957,8 +958,6 @@ impl FromStr for HashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use alloc::string::ToString;
-
         match u64::from_str(s) {
             Ok(val) => Ok(val.into()),
             Err(parse_int_error) => match B256::from_str(s) {
@@ -976,7 +975,7 @@ impl FromStr for HashOrNumber {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::{string::ToString, vec::Vec};
+    use alloc::vec::Vec;
     use alloy_primitives::b256;
 
     const HASH: B256 = b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");

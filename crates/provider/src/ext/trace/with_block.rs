@@ -5,6 +5,7 @@ use alloy_primitives::{map::HashSet, B256};
 use alloy_rpc_client::RpcCall;
 use alloy_rpc_types_trace::parity::TraceType;
 use alloy_transport::TransportResult;
+use serde::ser::SerializeTuple;
 use std::future::IntoFuture;
 
 /// A builder for trace_* api calls.
@@ -198,7 +199,6 @@ impl<Params: RpcSend> serde::Serialize for TraceParams<Params> {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeTuple;
         let len = 1 + self.trace_types.is_some() as usize + self.block_id.is_some() as usize;
 
         let mut tup = serializer.serialize_tuple(len)?;

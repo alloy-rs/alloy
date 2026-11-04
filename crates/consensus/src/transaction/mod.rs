@@ -361,6 +361,7 @@ impl<T: TxHashRef + Clone> TxHashRef for Cow<'_, T> {
 mod tests {
     use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
     use alloy_primitives::Signature;
+    use serde::{Serialize, Serializer};
 
     #[test]
     fn test_flatten_only_envelope() {
@@ -385,7 +386,6 @@ mod tests {
 
     #[test]
     fn test_custom_envelope() {
-        use serde::{Serialize, Serializer};
         fn serialize_with<S: Serializer>(
             tx: &Signed<TxEip1559>,
             serializer: S,
