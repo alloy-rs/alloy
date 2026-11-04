@@ -169,11 +169,10 @@ impl ExecutionPayloadSidecar {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_consensus::{BlockBody, Header, TxEnvelope};
 
     #[test]
     fn with_inclusion_list() {
-        use alloy_consensus::{BlockBody, Header, TxEnvelope};
-
         let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
         let transactions = vec![Bytes::from_static(&[0x01, 0x02])];
         let sidecar =

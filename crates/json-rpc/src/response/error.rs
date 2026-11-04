@@ -375,11 +375,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use alloy_primitives::U256;
+    use alloy_primitives::{B256, U256};
     use alloy_sol_types::sol;
+    use serde_json::value::RawValue;
 
     use super::BorrowedErrorPayload;
-    use crate::ErrorPayload;
+    use crate::{ErrorPayload, RpcError};
 
     #[test]
     fn smooth_borrowing() {
@@ -447,10 +448,6 @@ mod test {
 
     #[test]
     fn extract_transaction_hash_box_raw_value() {
-        use crate::RpcError;
-        use alloy_primitives::B256;
-        use serde_json::value::RawValue;
-
         let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         let json = format!(r#"{{"code":5,"message":"insufficient funds","data":"{}"}}"#, tx_hash);
 
