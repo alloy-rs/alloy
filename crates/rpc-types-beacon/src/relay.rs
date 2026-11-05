@@ -346,15 +346,8 @@ pub struct BuilderBlockValidationRequestV2 {
     pub registered_gas_limit: u64,
 }
 
-/// Selects which transaction filter a validation request is checked against.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum TransactionFilter {
-    /// Skip the node's disallow list for this request.
-    None,
-    /// Reject the block if it touches an address on the node's disallow list.
-    #[default]
-    Ofac,
+const fn default_true() -> bool {
+    true
 }
 
 /// A Request to validate a [`SignedBidSubmissionV3`]
@@ -371,9 +364,9 @@ pub struct BuilderBlockValidationRequestV3 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
-    /// The transaction filter to apply. Defaults to [`TransactionFilter::Ofac`] when omitted.
-    #[serde(default)]
-    pub transaction_filter: TransactionFilter,
+    /// Whether the node's disallow list applies to this request. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub apply_blacklist: bool,
 }
 
 /// A Request to validate a [`SignedBidSubmissionV4`]
@@ -388,9 +381,9 @@ pub struct BuilderBlockValidationRequestV4 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
-    /// The transaction filter to apply. Defaults to [`TransactionFilter::Ofac`] when omitted.
-    #[serde(default)]
-    pub transaction_filter: TransactionFilter,
+    /// Whether the node's disallow list applies to this request. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub apply_blacklist: bool,
 }
 
 impl BuilderBlockValidationRequestV4 {
@@ -429,9 +422,9 @@ pub struct BuilderBlockValidationRequestV5 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
-    /// The transaction filter to apply. Defaults to [`TransactionFilter::Ofac`] when omitted.
-    #[serde(default)]
-    pub transaction_filter: TransactionFilter,
+    /// Whether the node's disallow list applies to this request. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub apply_blacklist: bool,
 }
 
 impl BuilderBlockValidationRequestV5 {
@@ -470,9 +463,9 @@ pub struct BuilderBlockValidationRequestV6 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
-    /// The transaction filter to apply. Defaults to [`TransactionFilter::Ofac`] when omitted.
-    #[serde(default)]
-    pub transaction_filter: TransactionFilter,
+    /// Whether the node's disallow list applies to this request. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub apply_blacklist: bool,
 }
 
 impl BuilderBlockValidationRequestV6 {
@@ -959,33 +952,28 @@ mod tests {
         .unwrap()
     }
 
-    fn assert_transaction_filter_serde<T>(request: T, filter: impl Fn(&T) -> TransactionFilter)
+    fn assert_apply_blacklist_serde<T>(request: T, apply_blacklist: impl Fn(&T) -> bool)
     where
         T: Serialize + serde::de::DeserializeOwned + PartialEq + core::fmt::Debug,
     {
         let mut json = serde_json::to_value(&request).unwrap();
-        assert_eq!(json["transaction_filter"], "none");
+        assert_eq!(json["apply_blacklist"], false);
         assert_eq!(serde_json::from_value::<T>(json.clone()).unwrap(), request);
 
-        json["transaction_filter"] = "ofac".into();
-        assert_eq!(filter(&serde_json::from_value(json.clone()).unwrap()), TransactionFilter::Ofac);
+        json["apply_blacklist"] = true.into();
+        let parsed = serde_json::from_value::<T>(json.clone()).unwrap();
+        assert!(apply_blacklist(&parsed));
+        assert_eq!(serde_json::to_value(&parsed).unwrap(), json);
 
-        json.as_object_mut().unwrap().remove("transaction_filter");
-        assert_eq!(filter(&serde_json::from_value(json.clone()).unwrap()), TransactionFilter::Ofac);
+        json.as_object_mut().unwrap().remove("apply_blacklist");
+        assert!(apply_blacklist(&serde_json::from_value(json.clone()).unwrap()));
 
-        json["transaction_filter"] = "unknown".into();
+        json["apply_blacklist"] = "false".into();
         assert!(serde_json::from_value::<T>(json).is_err());
     }
 
     #[test]
-    fn transaction_filter_serde() {
-        assert_eq!(TransactionFilter::default(), TransactionFilter::Ofac);
-        assert_eq!(serde_json::to_string(&TransactionFilter::None).unwrap(), r#""none""#);
-        assert_eq!(serde_json::to_string(&TransactionFilter::Ofac).unwrap(), r#""ofac""#);
-    }
-
-    #[test]
-    fn validation_request_v3_transaction_filter_serde() {
+    fn validation_request_v3_apply_blacklist_serde() {
         let bid = electra_bid_submission_v4();
         let request = BuilderBlockValidationRequestV3 {
             request: SignedBidSubmissionV3 {
@@ -996,24 +984,24 @@ mod tests {
             },
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::repeat_byte(0x12),
-            transaction_filter: TransactionFilter::None,
+            apply_blacklist: false,
         };
-        assert_transaction_filter_serde(request, |request| request.transaction_filter);
+        assert_apply_blacklist_serde(request, |request| request.apply_blacklist);
     }
 
     #[test]
-    fn validation_request_v4_transaction_filter_serde() {
+    fn validation_request_v4_apply_blacklist_serde() {
         let request = BuilderBlockValidationRequestV4 {
             request: electra_bid_submission_v4(),
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::repeat_byte(0x12),
-            transaction_filter: TransactionFilter::None,
+            apply_blacklist: false,
         };
-        assert_transaction_filter_serde(request, |request| request.transaction_filter);
+        assert_apply_blacklist_serde(request, |request| request.apply_blacklist);
     }
 
     #[test]
-    fn validation_request_v5_transaction_filter_serde() {
+    fn validation_request_v5_apply_blacklist_serde() {
         let bid = electra_bid_submission_v4();
         let request = BuilderBlockValidationRequestV5 {
             request: SignedBidSubmissionV5 {
@@ -1029,20 +1017,20 @@ mod tests {
             },
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::repeat_byte(0x13),
-            transaction_filter: TransactionFilter::None,
+            apply_blacklist: false,
         };
-        assert_transaction_filter_serde(request, |request| request.transaction_filter);
+        assert_apply_blacklist_serde(request, |request| request.apply_blacklist);
     }
 
     #[test]
-    fn validation_request_v6_transaction_filter_serde() {
+    fn validation_request_v6_apply_blacklist_serde() {
         let request = BuilderBlockValidationRequestV6 {
             request: amsterdam_bid_submission_v6(),
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::repeat_byte(0x14),
-            transaction_filter: TransactionFilter::None,
+            apply_blacklist: false,
         };
-        assert_transaction_filter_serde(request, |request| request.transaction_filter);
+        assert_apply_blacklist_serde(request, |request| request.apply_blacklist);
     }
 
     #[test]
@@ -1079,7 +1067,7 @@ mod tests {
             request: bid_submission,
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::from_slice(&[0x12; 32]),
-            transaction_filter: TransactionFilter::default(),
+            apply_blacklist: true,
         };
 
         let expected_payload = request.request.execution_payload.clone();
@@ -1137,7 +1125,7 @@ mod tests {
             request: bid_submission_v5,
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::from_slice(&[0x13; 32]),
-            transaction_filter: TransactionFilter::default(),
+            apply_blacklist: true,
         };
 
         // Store references before calling to_execution_data() which consumes self
@@ -1180,7 +1168,7 @@ mod tests {
             request: bid_submission_v6,
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::from_slice(&[0x14; 32]),
-            transaction_filter: TransactionFilter::default(),
+            apply_blacklist: true,
         };
 
         let expected_payload = request.request.execution_payload.clone();
