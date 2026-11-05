@@ -116,7 +116,8 @@ async-trait = "0.1"
 futures = "0.3"
 futures-util = "0.3"
 futures-utils-wasm = "0.1"
-wasmtimer = "0.4.0"
+gloo-timers = { version = "0.3", features = ["futures"] }
+web-time = "1.1"
 
 gcloud-sdk = { version = "0.29.0", default-features = false }
 hyper = { version = "1.2", default-features = false }
