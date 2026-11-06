@@ -15,7 +15,7 @@ use alloy_sol_types::SolCall;
 use tokio::time::{timeout as timeout_future, Timeout};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::tokio::{timeout as timeout_future, Timeout};
+use alloy_transport::time::{timeout as timeout_future, Timeout};
 
 /// Raw coder.
 const RAW_CODER: () = ();

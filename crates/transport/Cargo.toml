@@ -43,6 +43,10 @@ auto_impl.workspace = true
 
 # Test-only dependencies
 [dev-dependencies]
+futures-timer.workspace = true
+web-time.workspace = true
+pin-project.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
 alloy-primitives.workspace = true
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
@@ -51,8 +55,13 @@ tokio = { workspace = true, features = ["rt", "time", "sync", "macros"] }
 # wasm32-unknown-unknown (Browser)
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
-wasmtimer.workspace = true
+futures-timer.workspace = true
+web-time.workspace = true
+pin-project.workspace = true
 
 [features]
 wasm-bindgen = ["dep:wasm-bindgen-futures"]
 throttle = ["dep:governor"]
+
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = "0.3"

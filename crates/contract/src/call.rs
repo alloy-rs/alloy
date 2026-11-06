@@ -28,7 +28,7 @@ use std::{
 use tokio::time::{timeout as timeout_future, Timeout};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::tokio::{timeout as timeout_future, Timeout};
+use alloy_transport::time::{timeout as timeout_future, Timeout};
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.

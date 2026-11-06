@@ -18,7 +18,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::Span;
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::tokio::{sleep, Sleep};
+use alloy_transport::time::{sleep, Sleep};
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::{sleep, Sleep};
