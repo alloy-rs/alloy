@@ -424,10 +424,12 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         self.with_caching(100)
     }
 
-    /// Set a default [`BlockId`] for `eth_call` and `eth_estimateGas`.
+    /// Set a default [`BlockId`] for RPC methods that support block parameters.
     ///
-    /// When combined with [`with_call_batching`](Self::with_call_batching), this must be added
-    /// first, otherwise the batching layer bypasses the default.
+    /// When combined with [`with_call_batching`](Self::with_call_batching), add this first to
+    /// apply the default to `eth_call` and `eth_getBalance`. With batching outermost, those
+    /// methods ignore an inner default block; other RPC methods, including `eth_estimateGas`,
+    /// preserve it. See [`CallBatchLayer`] for batching and call fallback behavior.
     ///
     /// [`BlockId`]: alloy_eips::BlockId
     pub fn with_default_block(
