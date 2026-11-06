@@ -28,10 +28,12 @@ pub trait Erc4337Api<N>: Send + Sync {
     /// Returns the receipt for any user operation.
     ///
     /// Hash is the same returned by any user operation.
+    ///
+    /// Returns `None` if the user operation is unknown or not yet included in a block.
     async fn get_user_operation_receipt(
         &self,
         user_op_hash: Bytes,
-    ) -> TransportResult<UserOperationReceipt>;
+    ) -> TransportResult<Option<UserOperationReceipt>>;
 
     /// Estimates the gas for a user operation.
     ///
@@ -72,7 +74,7 @@ where
     async fn get_user_operation_receipt(
         &self,
         user_op_hash: Bytes,
-    ) -> TransportResult<UserOperationReceipt> {
+    ) -> TransportResult<Option<UserOperationReceipt>> {
         self.client().request("eth_getUserOperationReceipt", (user_op_hash,)).await
     }
 
@@ -91,5 +93,28 @@ where
                     .await
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ProviderBuilder;
+    use alloy_primitives::bytes;
+    use alloy_transport::mock::Asserter;
+
+    #[tokio::test]
+    async fn get_user_operation_receipt_null() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        asserter.push_success(&serde_json::Value::Null);
+
+        let receipt = provider
+            .get_user_operation_receipt(bytes!(
+                "77c0b560eb0b042902abc5e4c3fb0bfbef2f86c6d3ec9fdbc5ac0bd2d4eb1d4c"
+            ))
+            .await
+            .unwrap();
+        assert!(receipt.is_none());
     }
 }
