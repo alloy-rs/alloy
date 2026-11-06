@@ -284,8 +284,7 @@ dependencies = [
 [[package]]
 name = "alloy-eip8141"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36422c14bd57dcd638e276c8c9d7ac09eb16598e3a9dbd34e4b55267d4565b5e"
+source = "git+https://github.com/Rimeeeeee/eips?rev=e7b4f2017b5dee1f828b37292e576ddcc3f28efe#e7b4f2017b5dee1f828b37292e576ddcc3f28efe"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
