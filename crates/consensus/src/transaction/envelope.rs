@@ -1784,6 +1784,47 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_type_first() {
+        let legacy_fields = r#""nonce":"0x1","gasPrice":"0x4a817c800","gas":"0x15f90","to":"0x8fbeb4488a08d60979b5aa9e13dd00b2726320b2","value":"0x0","input":"0x","r":"0x5d71a4a548503f2916d10c6b1a1557a0e7352eb041acb2bac99d1ad6bb49fd45","s":"0x2627bf6d35be48b0e56c61733f63944c0ebcaa85cb4ed6bc7cba3161ba85e0e8","hash":"0x97efb58d2b42df8d68ab5899ff42b16c7e0af35ed86ae4adb8acaad7e444220c""#;
+        let from_str = |json: String| serde_json::from_str::<TxEnvelope>(&json);
+
+        // Type `0x0` first, `v` carries the EIP-155 parity.
+        let legacy = from_str(format!(r#"{{"type":"0x0","v":"0x1c",{legacy_fields}}}"#)).unwrap();
+        assert!(matches!(legacy, TxEnvelope::Legacy(_)));
+        assert!(from_str(format!(r#"{{"type":"0x00","v":"0x1c",{legacy_fields}}}"#)).is_ok());
+        // Legacy transactions need `v`; an untagged object without it is no fallback for a tagged
+        // one.
+        assert!(from_str(format!(r#"{{"type":"0x0",{legacy_fields}}}"#)).is_err());
+
+        // A null `type` is the untagged legacy fallback.
+        assert!(from_str(format!(r#"{{"type":null,"v":"0x1c",{legacy_fields}}}"#)).is_ok());
+        assert!(from_str(format!(r#"{{"v":"0x1c",{legacy_fields}}}"#)).is_ok());
+
+        // Unknown tags and tags that do not fit the fields are rejected.
+        assert!(from_str(format!(r#"{{"type":"0x12","v":"0x1c",{legacy_fields}}}"#)).is_err());
+        assert!(from_str(format!(r#"{{"type":"0x2","v":"0x1c",{legacy_fields}}}"#)).is_err());
+        assert!(from_str(format!(r#"{{"type":"0x1","v":"0x1c",{legacy_fields}}}"#)).is_err());
+
+        // Aliases, extra fields and a `type` that is not first.
+        let tx = TxEip1559 { chain_id: 1, gas_limit: 21_000, ..Default::default() };
+        let envelope: TxEnvelope = tx.into_signed(Signature::test_signature()).into();
+        let json = serde_json::to_string(&envelope).unwrap();
+        assert!(json.starts_with(r#"{"type":"0x2","#));
+        assert_eq!(from_str(json.clone()).unwrap(), envelope);
+        assert_eq!(from_str(json.replacen("0x2", "0x02", 1)).unwrap(), envelope);
+        assert_eq!(from_str(json.replacen("{", r#"{"gasPrice":"0x1","#, 1)).unwrap(), envelope);
+        let (type_field, rest) = json[1..].split_once(',').unwrap();
+        let rest = rest.strip_suffix('}').unwrap();
+        assert_eq!(from_str(format!("{{{rest},{type_field}}}")).unwrap(), envelope);
+
+        // Not an object.
+        assert!(from_str(r#"["0x2"]"#.to_string()).is_err());
+        assert!(from_str(r#""0x2""#.to_string()).is_err());
+        assert!(from_str("{}".to_string()).is_err());
+    }
+
+    #[test]
     fn test_tx_type_try_from_u8() {
         assert_eq!(TxType::try_from(0u8).unwrap(), TxType::Legacy);
         assert_eq!(TxType::try_from(1u8).unwrap(), TxType::Eip2930);
