@@ -467,6 +467,10 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         crate::EthCall::call(CallBatchCaller::new(self), tx)
     }
 
+    fn get_code_at(&self, address: Address) -> crate::RpcWithBlock<Address, Bytes> {
+        self.provider.get_code_at(address)
+    }
+
     fn get_block_number(
         &self,
     ) -> crate::ProviderCall<
@@ -550,7 +554,10 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{
+        layers::{BlockIdLayer, CacheLayer},
+        ProviderBuilder,
+    };
     use alloy_network::{Ethereum, TransactionBuilder};
     use alloy_primitives::{address, hex};
     use alloy_rpc_types_eth::{BlockOverrides, TransactionRequest};
@@ -572,6 +579,90 @@ mod tests {
                 .collect::<Vec<_>>()
                 .abi_encode(),
         )
+    }
+
+    #[tokio::test]
+    async fn call_batch_should_preserve_inner_default_block() {
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::from_static(&[0x01]));
+        asserter.push_success(&Bytes::from_static(&[0x02]));
+
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        historical.get_code_at(Address::ZERO).await.unwrap();
+
+        let batched = CallBatchLayer::new().layer(historical);
+        batched.get_code_at(Address::ZERO).await.unwrap();
+
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 2);
+        for request in &requests {
+            assert_eq!(request.method(), "eth_getCode");
+        }
+        let before: serde_json::Value =
+            serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+        let after: serde_json::Value =
+            serde_json::from_str(requests[1].params().unwrap().get()).unwrap();
+        println!("eth_getCode blocks: before = {}, after = {}", before[1], after[1]);
+        assert_eq!(before[1], "0x7b");
+        assert_eq!(after[1], before[1]);
+    }
+
+    #[tokio::test]
+    async fn non_batched_code_preserves_explicit_blocks() {
+        let asserter = Asserter::new();
+        let code = Bytes::from_static(&[0x01]);
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        let provider = CallBatchLayer::new().layer(historical);
+
+        for block in [BlockId::number(456), BlockId::latest()] {
+            asserter.push_success(&code);
+            assert_eq!(provider.get_code_at(Address::ZERO).block_id(block).await.unwrap(), code);
+            let requests = asserter.take_requests();
+            assert_eq!(requests.len(), 1);
+            assert_eq!(requests[0].method(), "eth_getCode");
+            let params: serde_json::Value =
+                serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+            assert_eq!(params, serde_json::json!([Address::ZERO, block]));
+        }
+    }
+
+    #[tokio::test]
+    async fn non_batched_code_defaults_to_latest_without_block_layer() {
+        let asserter = Asserter::new();
+        let code = Bytes::from_static(&[0x01]);
+        asserter.push_success(&code);
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let provider = CallBatchLayer::new().layer(root);
+
+        assert_eq!(provider.get_code_at(Address::ZERO).await.unwrap(), code);
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method(), "eth_getCode");
+        let params: serde_json::Value =
+            serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+        assert_eq!(params, serde_json::json!([Address::ZERO, "latest"]));
+    }
+
+    #[tokio::test]
+    async fn non_batched_code_preserves_inner_cache() {
+        let asserter = Asserter::new();
+        let code = Bytes::from_static(&[0x01]);
+        asserter.push_success(&code);
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        let cached = CacheLayer::new(10).layer(historical);
+        let provider = CallBatchLayer::new().layer(cached);
+
+        assert_eq!(provider.get_code_at(Address::ZERO).await.unwrap(), code);
+        assert_eq!(provider.get_code_at(Address::ZERO).await.unwrap(), code);
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 1, "the second request should be served by the inner cache");
+        assert_eq!(requests[0].method(), "eth_getCode");
+        let params: serde_json::Value =
+            serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+        assert_eq!(params, serde_json::json!([Address::ZERO, "0x7b"]));
     }
 
     #[tokio::test]
