@@ -11,7 +11,7 @@ use k256::ecdsa::{
     RecoveryId, Signature as K256Signature,
 };
 use rand::{CryptoRng, Rng};
-use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
+use secp256k1::{ecdsa::RecoverableSignature, Message, PublicKey, SecretKey};
 use std::str::FromStr;
 
 #[cfg(feature = "keystore")]
@@ -50,7 +50,7 @@ impl Secp256k1Credential {
     /// Returns the public key for this credential.
     #[inline]
     pub fn public_key(&self) -> PublicKey {
-        self.0.public_key(SECP256K1)
+        self.0.public_key()
     }
 }
 
@@ -62,7 +62,7 @@ impl std::fmt::Debug for Secp256k1Credential {
 
 impl PartialEq for Secp256k1Credential {
     fn eq(&self, other: &Self) -> bool {
-        self.0.secret_bytes() == other.0.secret_bytes()
+        self.0.to_secret_bytes() == other.0.to_secret_bytes()
     }
 }
 
@@ -75,15 +75,15 @@ impl From<SecretKey> for Secp256k1Credential {
 impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
     fn sign_prehash(&self, prehash: &[u8]) -> Result<(K256Signature, RecoveryId), SignatureError> {
         let msg =
-            Message::from_digest_slice(prehash).map_err(|_| SignatureError::from_source(""))?;
+            Message::from_digest(prehash.try_into().map_err(|_| SignatureError::from_source(""))?);
 
-        let sig = SECP256K1.sign_ecdsa_recoverable(&msg, &self.0);
+        let sig = RecoverableSignature::sign_ecdsa_recoverable(msg, &self.0);
         let (rec_id, data) = sig.serialize_compact();
 
         // Convert secp256k1 signature to k256 signature
         let k256_sig = K256Signature::from_slice(&data).map_err(SignatureError::from_source)?;
 
-        let k256_rec_id = RecoveryId::from_byte(i32::from(rec_id) as u8)
+        let k256_rec_id = RecoveryId::from_byte(rec_id.to_u8())
             .ok_or_else(|| SignatureError::from_source("invalid recovery id"))?;
 
         Ok((k256_sig, k256_rec_id))
@@ -94,7 +94,7 @@ impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
 #[inline]
 fn secret_key_to_address(secret_key: &SecretKey) -> Address {
     // Strip out the first byte (0x04 tag for uncompressed public key)
-    raw_public_key_to_address(&secret_key.public_key(SECP256K1).serialize_uncompressed()[1..])
+    raw_public_key_to_address(&secret_key.public_key().serialize_uncompressed()[1..])
 }
 
 impl LocalSigner<Secp256k1Credential> {
@@ -118,7 +118,8 @@ impl LocalSigner<Secp256k1Credential> {
     /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a byte slice.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, secp256k1::Error> {
-        SecretKey::from_slice(bytes).map(Self::from_secp256k1)
+        let bytes = bytes.try_into().map_err(|_| secp256k1::Error::InvalidSecretKey)?;
+        SecretKey::from_secret_bytes(bytes).map(Self::from_secp256k1)
     }
 
     /// Creates a new random keypair seeded with [`rand::thread_rng()`].
@@ -130,8 +131,14 @@ impl LocalSigner<Secp256k1Credential> {
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        let (secret_key, _) = SECP256K1.generate_keypair(rng);
-        Self::from_secp256k1(secret_key)
+        // Preserve the rand 0.8 API shared with the k256 signer and keystore helpers.
+        loop {
+            let mut bytes = [0; 32];
+            rng.fill_bytes(&mut bytes);
+            if let Ok(secret_key) = SecretKey::from_secret_bytes(bytes) {
+                return Self::from_secp256k1(secret_key);
+            }
+        }
     }
 
     /// Serializes this [`LocalSigner`]'s [`SecretKey`] as a [`B256`] byte array.
@@ -142,7 +149,7 @@ impl LocalSigner<Secp256k1Credential> {
     /// clear copies as soon as practical.
     #[inline]
     pub fn to_bytes(&self) -> B256 {
-        B256::from_slice(&self.credential.0.secret_bytes())
+        B256::from_slice(&self.credential.0.to_secret_bytes())
     }
 
     /// Convenience function that returns this signer's ethereum public key as a [`B512`] byte
@@ -160,7 +167,7 @@ impl LocalSigner<Secp256k1Credential> {
     /// The resulting signer will have the same address, private key, and chain ID.
     #[inline]
     pub fn to_k256(&self) -> crate::PrivateKeySigner {
-        let mut signer = crate::PrivateKeySigner::from_slice(&self.credential.0.secret_bytes())
+        let mut signer = crate::PrivateKeySigner::from_slice(&self.credential.0.to_secret_bytes())
             .expect("valid secp256k1 key bytes should be valid k256 key bytes");
         signer.set_chain_id(self.chain_id);
         signer
@@ -539,4 +546,64 @@ mod tests {
             sig2.recover_address_from_msg(message).unwrap()
         );
     }
+
+    #[test]
+    fn rejects_invalid_secret_keys() {
+        for bytes in [&[0; 31][..], &[0; 32], &[0; 33], &[0xff; 32]] {
+            assert_eq!(
+                Secp256k1Signer::from_slice(bytes).unwrap_err(),
+                secp256k1::Error::InvalidSecretKey
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_prehash_lengths() {
+        let signer = Secp256k1Signer::from_bytes(&B256::with_last_byte(1)).unwrap();
+        for prehash in [&[0; 31][..], &[0; 33]] {
+            let err = signer.credential.sign_prehash(prehash).unwrap_err();
+            assert_eq!(err.to_string(), "signature error: ");
+        }
+    }
+
+    #[test]
+    fn random_with_retries_invalid_scalars() {
+        let mut rng = ScalarRng { attempts: 0 };
+        let signer = Secp256k1Signer::random_with(&mut rng);
+        assert_eq!(rng.attempts, 3);
+        assert_eq!(signer.to_bytes(), B256::with_last_byte(1));
+        assert_eq!(signer.address(), address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
+    }
+
+    struct ScalarRng {
+        attempts: usize,
+    }
+
+    impl rand::RngCore for ScalarRng {
+        fn next_u32(&mut self) -> u32 {
+            panic!("the signer requests complete scalar bytes");
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            panic!("the signer requests complete scalar bytes");
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            let bytes = match self.attempts {
+                0 => B256::ZERO,
+                1 => B256::repeat_byte(0xff),
+                2 => B256::with_last_byte(1),
+                _ => panic!("the third scalar is valid"),
+            };
+            dest.copy_from_slice(bytes.as_slice());
+            self.attempts += 1;
+        }
+
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+
+    impl CryptoRng for ScalarRng {}
 }
