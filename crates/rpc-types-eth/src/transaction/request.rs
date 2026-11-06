@@ -371,6 +371,14 @@ impl TransactionRequest {
         self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
     }
 
+    /// Returns true if `gas_price` is set together with `max_fee_per_gas` or
+    /// `max_priority_fee_per_gas`.
+    ///
+    /// Checks field presence, so zero-valued fee fields also conflict.
+    pub const fn has_conflicting_fee_fields(&self) -> bool {
+        self.gas_price.is_some() && self.has_eip1559_fields()
+    }
+
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
     /// effect otherwise.
     pub fn populate_blob_hashes(&mut self) {
