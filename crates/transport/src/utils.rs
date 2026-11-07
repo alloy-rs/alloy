@@ -2,7 +2,7 @@ use crate::{TransportError, TransportResult};
 use serde::Serialize;
 use serde_json::value::{to_raw_value, RawValue};
 use std::future::Future;
-use url::Url;
+use url::{Host, Url};
 
 /// Convert to a `Box<RawValue>` from a `Serialize` type, mapping the error
 /// to a `TransportError`.
@@ -16,12 +16,14 @@ where
 /// Guess whether the URL is local, based on the hostname or IP.
 ///
 /// Best-effort heuristic: returns `true` if the connection has no hostname, or
-/// the host is `localhost`, `127.0.0.1`, or the IPv6 loopback `::1`.
+/// the host is `localhost` or an IPv4/IPv6 loopback address.
 pub fn guess_local_url(s: impl AsRef<str>) -> bool {
     fn _guess_local_url(url: &str) -> bool {
-        url.parse::<Url>().is_ok_and(|url| {
-            url.host_str()
-                .is_none_or(|host| host == "localhost" || host == "127.0.0.1" || host == "[::1]")
+        url.parse::<Url>().is_ok_and(|url| match url.host() {
+            None | Some(Host::Domain("localhost")) => true,
+            Some(Host::Ipv4(address)) => address.is_loopback(),
+            Some(Host::Ipv6(address)) => address.is_loopback(),
+            Some(Host::Domain(_)) => false,
         })
     }
     _guess_local_url(s.as_ref())
@@ -80,6 +82,11 @@ mod tests {
         for (url, local) in [
             ("http://localhost:8545", true),
             ("http://127.0.0.1:8545", true),
+            ("http://127.0.0.2:8545", true),
+            ("http://127.255.255.254:8545", true),
+            ("http://126.255.255.255:8545", false),
+            ("http://128.0.0.1:8545", false),
+            ("http://[::2]:8545", false),
             ("ws://[::1]:8546", true),
             ("http://[0:0:0:0:0:0:0:1]:8545", true),
             ("https://eth.example.com", false),
