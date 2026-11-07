@@ -11,6 +11,56 @@ use std::{
 };
 use tempfile::TempDir;
 
+/// Startup milestones a node must log before `try_spawn` hands it out.
+///
+/// Every node waits for its RPC server; nodes with P2P networking also wait for it to start. The
+/// two milestones may be logged in either order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Startup {
+    /// Waiting for both the RPC server and P2P networking.
+    RpcAndP2p,
+    /// Waiting for the RPC server only.
+    Rpc,
+    /// Waiting for P2P networking only.
+    P2p,
+    /// Every milestone was logged: the node can be queried.
+    Ready,
+}
+
+impl Startup {
+    /// Starts waiting for the RPC server, and for P2P networking when `p2p` is set.
+    pub(crate) const fn new(p2p: bool) -> Self {
+        if p2p {
+            Self::RpcAndP2p
+        } else {
+            Self::Rpc
+        }
+    }
+
+    /// Records that the RPC server started.
+    pub(crate) const fn rpc_started(&mut self) {
+        *self = match *self {
+            Self::RpcAndP2p => Self::P2p,
+            Self::Rpc | Self::Ready => Self::Ready,
+            Self::P2p => Self::P2p,
+        };
+    }
+
+    /// Records that P2P networking started. Does nothing for a node that does not wait for it.
+    pub(crate) const fn p2p_started(&mut self) {
+        *self = match *self {
+            Self::RpcAndP2p => Self::Rpc,
+            Self::P2p | Self::Ready => Self::Ready,
+            Self::Rpc => Self::Rpc,
+        };
+    }
+
+    /// Whether every milestone was logged.
+    pub(crate) const fn is_ready(self) -> bool {
+        matches!(self, Self::Ready)
+    }
+}
+
 /// Helper for graceful process shutdown.
 pub(crate) struct GracefulShutdown;
 
@@ -159,6 +209,29 @@ mod tests {
     use crate::{Anvil, Geth, NodeError, Reth};
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn startup_waits_for_every_milestone_in_any_order() {
+        let mut startup = Startup::new(false);
+        startup.p2p_started();
+        assert_eq!(startup, Startup::Rpc);
+        startup.rpc_started();
+        assert!(startup.is_ready());
+
+        let mut startup = Startup::new(true);
+        startup.rpc_started();
+        assert_eq!(startup, Startup::P2p);
+        startup.rpc_started();
+        assert!(!startup.is_ready());
+        startup.p2p_started();
+        assert!(startup.is_ready());
+
+        let mut startup = Startup::new(true);
+        startup.p2p_started();
+        assert_eq!(startup, Startup::Rpc);
+        startup.rpc_started();
+        assert!(startup.is_ready());
+    }
 
     #[test]
     fn test_extract_value_with_equals() {
