@@ -25,6 +25,15 @@ pub use wasm::WsConnect;
 /// The default keepalive interval in seconds.
 const DEFAULT_KEEPALIVE: u64 = 10;
 
+/// Why a backend task's run loop ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BackendExit {
+    /// The frontend went away or asked for shutdown; the connection closes quietly.
+    Shutdown,
+    /// The connection failed; the frontend is told so it can reconnect.
+    Errored,
+}
+
 /// An ongoing connection to a backend.
 ///
 /// Users should NEVER instantiate a backend directly. Instead, they should use
