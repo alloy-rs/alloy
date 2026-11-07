@@ -1,7 +1,9 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    utils::{extract_endpoint, extract_value, unused_port, GracefulShutdown, StartupGuard},
+    utils::{
+        extract_endpoint, extract_value, unused_port, GracefulShutdown, Startup, StartupGuard,
+    },
     NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
@@ -659,8 +661,7 @@ impl Geth {
 
         // we shouldn't need to wait for p2p to start if geth is in dev mode - p2p is disabled in
         // dev mode
-        let mut p2p_started = matches!(self.mode, NodeMode::Dev(_));
-        let mut ports_started = false;
+        let mut startup = Startup::new(matches!(self.mode, NodeMode::NonDev(_)));
 
         loop {
             if start.elapsed() >= timeout {
@@ -677,8 +678,8 @@ impl Geth {
                 )));
             }
 
-            if matches!(self.mode, NodeMode::NonDev(_)) && line.contains("Started P2P networking") {
-                p2p_started = true;
+            if line.contains("Started P2P networking") {
+                startup.p2p_started();
             }
 
             if !matches!(self.mode, NodeMode::Dev(_)) {
@@ -701,7 +702,7 @@ impl Geth {
                     port = addr.port();
                 }
 
-                ports_started = true;
+                startup.rpc_started();
             }
 
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
@@ -712,7 +713,7 @@ impl Geth {
             }
 
             // If all ports have started we are ready to be queried.
-            if ports_started && p2p_started {
+            if startup.is_ready() {
                 break;
             }
         }
