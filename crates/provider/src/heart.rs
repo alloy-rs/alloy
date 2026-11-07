@@ -11,7 +11,7 @@ use alloy_primitives::{
 use alloy_transport::{utils::Spawnable, TransportError};
 use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
     future::Future,
     sync::Arc,
@@ -390,13 +390,20 @@ pub enum WatchTxError {
     Timeout,
 }
 
-/// The type sent by the [`HeartbeatHandle`] to the [`Heartbeat`] background task.
+/// The instruction sent by the [`HeartbeatHandle`] to the [`Heartbeat`] background task.
+struct WatchTx {
+    watcher: TxWatcher,
+    /// The block the caller already saw the transaction included in, if any.
+    received_at_block: Option<u64>,
+}
+
+/// A waiter for one transaction, owned by the [`Heartbeat`] background task.
+///
+/// Where the heartbeat keeps it encodes its state: in `unconfirmed` while the transaction has not
+/// been seen in a block, and wrapped in a [`ConfirmingTx`] in `waiting_confs` once it has.
 #[doc(alias = "TransactionWatcher")]
 struct TxWatcher {
     config: PendingTransactionConfig,
-    /// The block at which the transaction was received. To be filled once known.
-    /// Invariant: any confirmed transaction in `Heart` has this value set.
-    received_at_block: Option<u64>,
     /// When the watcher times out. Set by the heartbeat if a timeout is configured.
     reap_at: Option<Instant>,
     tx: oneshot::Sender<Result<(), WatchTxError>>,
@@ -408,6 +415,19 @@ impl TxWatcher {
         debug!(tx=%self.config.tx_hash, "notifying");
         let _ = self.tx.send(result);
     }
+
+    /// Returns `true` if the watcher's timeout has passed at `now`.
+    fn is_expired(&self, now: Instant) -> bool {
+        self.reap_at.is_some_and(|at| at < now)
+    }
+}
+
+/// A watcher whose transaction was included in a block and that waits for more confirmations.
+struct ConfirmingTx {
+    /// The block the transaction was included in. A chain gap at or below this height returns
+    /// the watcher to the unconfirmed set.
+    received_at_block: u64,
+    watcher: TxWatcher,
 }
 
 /// Represents a transaction that is yet to be confirmed a specified number of times.
@@ -463,7 +483,7 @@ impl Future for PendingTransaction {
 /// A handle to the heartbeat task.
 #[derive(Clone, Debug)]
 pub(crate) struct HeartbeatHandle {
-    tx: mpsc::Sender<TxWatcher>,
+    tx: mpsc::Sender<WatchTx>,
 }
 
 impl HeartbeatHandle {
@@ -476,9 +496,10 @@ impl HeartbeatHandle {
     ) -> Result<PendingTransaction, PendingTransactionConfig> {
         let (tx, rx) = oneshot::channel();
         let tx_hash = config.tx_hash;
-        match self.tx.send(TxWatcher { config, received_at_block, reap_at: None, tx }).await {
+        let watcher = TxWatcher { config, reap_at: None, tx };
+        match self.tx.send(WatchTx { watcher, received_at_block }).await {
             Ok(()) => Ok(PendingTransaction { tx_hash, rx }),
-            Err(e) => Err(e.0.config),
+            Err(e) => Err(e.0.watcher.config),
         }
     }
 }
@@ -491,14 +512,15 @@ pub(crate) struct Heartbeat<N, S> {
     /// Lookbehind blocks in form of mapping block number -> vector of transaction hashes.
     past_blocks: VecDeque<(u64, B256HashSet)>,
 
-    /// Transactions to watch for.
+    /// Transactions to watch for, not yet seen in a block.
     unconfirmed: B256HashMap<Vec<TxWatcher>>,
 
-    /// Ordered map of transactions waiting for confirmations.
-    waiting_confs: BTreeMap<u64, Vec<TxWatcher>>,
+    /// Included transactions waiting for confirmations, keyed by the height that confirms them.
+    waiting_confs: BTreeMap<u64, Vec<ConfirmingTx>>,
 
-    /// Ordered map of transactions to reap at a certain time.
-    reap_at: BTreeMap<Instant, B256>,
+    /// Ordered set of transactions to reap at a certain time. Keyed by both so that watchers
+    /// whose timeouts fall on the same instant each keep their entry.
+    reap_at: BTreeSet<(Instant, B256)>,
 
     /// Whether the heartbeat is currently paused.
     paused: Arc<Paused>,
@@ -524,8 +546,8 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     fn check_confirmations(&mut self, current_height: u64) {
         let to_keep = self.waiting_confs.split_off(&(current_height + 1));
         let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
-        for watcher in to_notify.into_values().flatten() {
-            watcher.notify(Ok(()));
+        for confirming in to_notify.into_values().flatten() {
+            confirming.watcher.notify(Ok(()));
         }
     }
 
@@ -533,20 +555,21 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// long time from now (i.e. will not be woken).
     fn next_reap(&self) -> Instant {
         self.reap_at
-            .first_key_value()
-            .map(|(k, _)| *k)
+            .first()
+            .map(|(at, _)| *at)
             .unwrap_or_else(|| Instant::now() + Duration::from_secs(60_000))
     }
 
     /// Reap any timeout
     fn reap_timeouts(&mut self) {
         let now = Instant::now();
-        let to_keep = self.reap_at.split_off(&now);
+        // Everything at or after now is kept, as no hash sorts below the zero hash.
+        let to_keep = self.reap_at.split_off(&(now, B256::ZERO));
         let to_reap = std::mem::replace(&mut self.reap_at, to_keep);
 
-        for tx_hash in to_reap.values() {
+        for (_, tx_hash) in &to_reap {
             let Some(watchers) = self.unconfirmed.get_mut(tx_hash) else { continue };
-            for watcher in watchers.extract_if(.., |w| w.reap_at.is_some_and(|at| at < now)) {
+            for watcher in watchers.extract_if(.., |w| w.is_expired(now)) {
                 debug!(tx=%tx_hash, "reaped");
                 watcher.notify(Err(WatchTxError::Timeout));
             }
@@ -559,7 +582,9 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             return;
         }
         for watchers in self.waiting_confs.values_mut() {
-            for watcher in watchers.extract_if(.., |w| w.reap_at.is_some_and(|at| at < now)) {
+            for ConfirmingTx { watcher, .. } in
+                watchers.extract_if(.., |c| c.watcher.is_expired(now))
+            {
                 debug!(tx=%watcher.config.tx_hash, "reaped while waiting for confirmations");
                 watcher.notify(Err(WatchTxError::Timeout));
             }
@@ -572,19 +597,14 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// that were received in blocks affected by the reorg (e.g. >= new_height).
     fn move_reorg_to_unconfirmed(&mut self, new_height: u64) {
         for waiters in self.waiting_confs.values_mut() {
-            *waiters = std::mem::take(waiters).into_iter().filter_map(|mut watcher| {
-                if let Some(received_at_block) = watcher.received_at_block {
-                    // All blocks after and _including_ the new height are reaped.
-                    if received_at_block >= new_height {
-                        let hash = watcher.config.tx_hash;
-                        debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed after chain gap");
-                        watcher.received_at_block = None;
-                        self.unconfirmed.entry(hash).or_default().push(watcher);
-                        return None;
-                    }
-                }
-                Some(watcher)
-            }).collect();
+            // All blocks after and _including_ the new height are reaped.
+            for ConfirmingTx { received_at_block, watcher } in
+                waiters.extract_if(.., |c| c.received_at_block >= new_height)
+            {
+                let hash = watcher.config.tx_hash;
+                debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed after chain gap");
+                self.unconfirmed.entry(hash).or_default().push(watcher);
+            }
         }
     }
 
@@ -604,16 +624,22 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
     /// Handle a watch instruction by adding it to the watch list, and
     /// potentially adding it to our `reap_at` list.
-    fn handle_watch_ix(&mut self, mut to_watch: TxWatcher) {
+    fn handle_watch_ix(&mut self, ix: WatchTx) {
+        self.handle_watch_ix_at(ix, Instant::now());
+    }
+
+    /// [`Self::handle_watch_ix`], with timeouts measured from `now`.
+    fn handle_watch_ix_at(&mut self, ix: WatchTx, now: Instant) {
+        let WatchTx { watcher: mut to_watch, received_at_block } = ix;
         // Start watching for the transaction.
         debug!(tx=%to_watch.config.tx_hash, "watching");
-        trace!(?to_watch.config, ?to_watch.received_at_block);
+        trace!(?to_watch.config, ?received_at_block);
         if let Some(timeout) = to_watch.config.timeout {
-            let reap_at = Instant::now() + timeout;
+            let reap_at = now + timeout;
             to_watch.reap_at = Some(reap_at);
-            self.reap_at.insert(reap_at, to_watch.config.tx_hash);
+            self.reap_at.insert((reap_at, to_watch.config.tx_hash));
         }
-        if let Some(received_at_block) = to_watch.received_at_block {
+        if let Some(received_at_block) = received_at_block {
             // Transaction is already confirmed, we just need to wait for the required
             // confirmations.
             let confirmations = to_watch.config.required_confirmations;
@@ -624,7 +650,10 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             if confirmed_at <= current_height {
                 to_watch.notify(Ok(()));
             } else {
-                self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
+                self.waiting_confs
+                    .entry(confirmed_at)
+                    .or_default()
+                    .push(ConfirmingTx { received_at_block, watcher: to_watch });
             }
             return;
         }
@@ -641,11 +670,11 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                     to_watch.notify(Ok(()));
                 } else {
                     debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-                    // Ensure reorg handling can move this watcher back if needed.
-                    if to_watch.received_at_block.is_none() {
-                        to_watch.received_at_block = Some(*block_height);
-                    }
-                    self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
+                    // Record the inclusion height so reorg handling can move this watcher back.
+                    self.waiting_confs
+                        .entry(confirmed_at)
+                        .or_default()
+                        .push(ConfirmingTx { received_at_block: *block_height, watcher: to_watch });
                 }
                 return;
             }
@@ -657,7 +686,10 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     fn add_to_waiting_list(&mut self, watcher: TxWatcher, block_height: u64) {
         let confirmations = watcher.config.required_confirmations;
         debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-        self.waiting_confs.entry(block_height + confirmations - 1).or_default().push(watcher);
+        self.waiting_confs
+            .entry(block_height + confirmations - 1)
+            .or_default()
+            .push(ConfirmingTx { received_at_block: block_height, watcher });
     }
 
     /// Handle a new block by checking if any of the transactions we're
@@ -697,17 +729,14 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             .filter_map(|tx_hash| self.unconfirmed.remove(&tx_hash))
             .flatten()
             .collect();
-        for mut watcher in to_check {
+        for watcher in to_check {
             // If `confirmations` is not more than 1 we can notify the watcher immediately.
             let confirmations = watcher.config.required_confirmations;
             if confirmations <= 1 {
                 watcher.notify(Ok(()));
                 continue;
             }
-            // Otherwise add it to the waiting list.
-
-            // Set the block at which the transaction was received.
-            watcher.received_at_block = Some(block_height);
+            // Otherwise add it to the waiting list, recording the block it was received in.
             self.add_to_waiting_list(watcher, block_height);
         }
 
@@ -741,7 +770,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         (self.into_future(ixns), HeartbeatHandle { tx: ix_tx })
     }
 
-    async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
+    async fn into_future(mut self, mut ixns: mpsc::Receiver<WatchTx>) {
         'shutdown: loop {
             {
                 self.update_pause_state();

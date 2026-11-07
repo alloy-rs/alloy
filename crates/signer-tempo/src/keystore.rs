@@ -133,24 +133,22 @@ fn select_one<'a>(
     from: Address,
 ) -> Result<TempoLookup, TempoSignerError> {
     // Keep only secp256k1 entries with a private key; drop expired ones.
-    let mut saw_unsupported: Option<KeyType> = None;
-    let mut saw_expired: Option<u64> = None;
-    let mut saw_missing_key = false;
+    let mut rejected = Rejected::Nothing;
     let now = current_unix_seconds();
 
     let mut usable = None;
     for c in candidates {
         if c.key_type != KeyType::Secp256k1 {
-            saw_unsupported.get_or_insert(c.key_type);
+            rejected.unsupported(c.key_type);
             continue;
         }
         if c.key.is_none() {
-            saw_missing_key = true;
+            rejected.missing_key();
             continue;
         }
         if let Some(exp) = c.expiry {
             if exp <= now {
-                saw_expired = Some(exp);
+                rejected.expired(exp);
                 continue;
             }
         }
@@ -161,16 +159,49 @@ fn select_one<'a>(
 
     match usable {
         Some(entry) => entry_to_lookup(entry),
-        None => {
-            if let Some(exp) = saw_expired {
-                Err(TempoSignerError::Expired { expiry: exp })
-            } else if saw_missing_key {
-                Err(TempoSignerError::MissingKey { from })
-            } else if let Some(kind) = saw_unsupported {
-                Err(TempoSignerError::UnsupportedKeyType { kind })
-            } else {
-                Err(TempoSignerError::NoMatch { from })
-            }
+        None => Err(rejected.into_error(from)),
+    }
+}
+
+/// The most relevant reason a candidate was rejected, reported when none is usable.
+///
+/// Reasons take precedence in this order: an expired key (the last one seen), a missing private
+/// key, then an unsupported key type (the first one seen).
+#[derive(Clone, Copy, Debug)]
+enum Rejected {
+    /// No candidate was rejected.
+    Nothing,
+    /// A candidate has a key type other than secp256k1.
+    UnsupportedKeyType(KeyType),
+    /// A candidate has no private key.
+    MissingKey,
+    /// A candidate's key expired at this unix timestamp.
+    Expired(u64),
+}
+
+impl Rejected {
+    const fn unsupported(&mut self, kind: KeyType) {
+        if let Self::Nothing = self {
+            *self = Self::UnsupportedKeyType(kind);
+        }
+    }
+
+    const fn missing_key(&mut self) {
+        if let Self::Nothing | Self::UnsupportedKeyType(_) = self {
+            *self = Self::MissingKey;
+        }
+    }
+
+    const fn expired(&mut self, expiry: u64) {
+        *self = Self::Expired(expiry);
+    }
+
+    const fn into_error(self, from: Address) -> TempoSignerError {
+        match self {
+            Self::Nothing => TempoSignerError::NoMatch { from },
+            Self::UnsupportedKeyType(kind) => TempoSignerError::UnsupportedKeyType { kind },
+            Self::MissingKey => TempoSignerError::MissingKey { from },
+            Self::Expired(expiry) => TempoSignerError::Expired { expiry },
         }
     }
 }

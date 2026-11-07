@@ -1,10 +1,10 @@
-use crate::{WsBackend, DEFAULT_KEEPALIVE};
+use crate::{BackendExit, WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
-use tokio::time::sleep;
+use tokio::time::{sleep, Instant};
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
@@ -157,6 +157,16 @@ impl PubSubConnect for WsConnect {
     }
 }
 
+/// Keepalive state of a native websocket backend.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PongState {
+    /// No ping is outstanding.
+    Idle,
+    /// A ping was sent and nothing, not even its pong, has arrived since. If the keepalive timer
+    /// fires again in this state, the connection is considered dead.
+    Awaiting,
+}
+
 /// Install a default rustls crypto provider if none is set.
 ///
 /// Required since rustls 0.23+ no longer auto-installs one.
@@ -198,26 +208,26 @@ impl WsBackend<TungsteniteStream> {
 
     /// Send a message to the server.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), tungstenite::Error> {
-        self.socket.send(Message::Text(msg.get().to_owned().into())).await
+        // Reuse the request's allocation instead of copying the payload.
+        self.socket.send(Message::Text(String::from(Box::<str>::from(msg)).into())).await
     }
 
     /// Spawn a new backend task.
     pub fn spawn(mut self) {
         let fut = async move {
-            let mut errored = false;
-            let mut expecting_pong = false;
+            let mut pong = PongState::Idle;
             let keepalive = sleep(self.keepalive_interval);
             tokio::pin!(keepalive);
-            loop {
+            let exit = loop {
                 // We bias the loop as follows
                 // 1. New dispatch to server.
                 // 2. Keepalive.
                 // 3. Response or notification from server.
-                // This ensures that keepalive is sent only if no other messages
-                // have been sent in the keepalive interval. And prioritizes new
-                // dispatches over responses from the server. This will fail if
-                // the client saturates the task with dispatches, but that's
-                // probably not a big deal.
+                // This prioritizes new dispatches over responses from the
+                // server. A ping is sent only if nothing has been received
+                // from the server in the keepalive interval: outbound traffic
+                // does not prove the server is alive, so it must not postpone
+                // the ping or the missed-pong check.
                 tokio::select! {
                     biased;
                     // we've received a new dispatch, so we send it via
@@ -226,65 +236,57 @@ impl WsBackend<TungsteniteStream> {
                     inst = self.interface.recv_from_frontend() => {
                         match inst {
                             Some(msg) => {
-                                // Reset the keepalive timer.
-                                keepalive.set(sleep(self.keepalive_interval));
                                 if let Err(err) = self.send(msg).await {
                                     error!(%err, "WS connection error");
-                                    errored = true;
-                                    break
+                                    break BackendExit::Errored;
                                 }
                             },
                             // dispatcher has gone away, or shutdown was received
-                            None => {
-                                break
-                            },
+                            None => break BackendExit::Shutdown,
                         }
                     },
-                    // Send a ping to the server, if no other messages have been
-                    // sent within the keepalive interval.
+                    // Send a ping to the server, if no messages have been
+                    // received within the keepalive interval.
                     _ = &mut keepalive => {
                         // Still expecting a pong from the previous ping,
                         // meaning connection is errored.
-                        if expecting_pong {
+                        if pong == PongState::Awaiting {
                             error!("WS server missed a pong");
-                            errored = true;
-                            break
+                            break BackendExit::Errored;
                         }
                         // Reset the keepalive timer.
                         keepalive.set(sleep(self.keepalive_interval));
                         if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
                             error!(%err, "WS connection error");
-                            errored = true;
-                            break
+                            break BackendExit::Errored;
                         }
                         // Expecting to receive a pong before the next
                         // keepalive timer resolves.
-                        expecting_pong = true;
+                        pong = PongState::Awaiting;
                     }
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
-                                if item.is_pong() {
-                                    expecting_pong = false;
+                                // Any message from the server shows the connection is alive.
+                                pong = PongState::Idle;
+                                keepalive.as_mut().reset(Instant::now() + self.keepalive_interval);
+                                if self.handle(item).is_err() {
+                                    break BackendExit::Errored;
                                 }
-                                errored = self.handle(item).is_err();
-                                if errored { break }
                             },
                             Some(Err(err)) => {
                                 error!(%err, "WS connection error");
-                                errored = true;
-                                break
+                                break BackendExit::Errored;
                             }
                             None => {
                                 error!("WS server has gone away");
-                                errored = true;
-                                break
+                                break BackendExit::Errored;
                             },
                         }
                     }
                 }
-            }
-            if errored {
+            };
+            if exit == BackendExit::Errored {
                 self.interface.close_with_error();
             }
         };
@@ -308,6 +310,55 @@ mod tests {
             assert_eq!(ws.url(), url);
             assert_eq!(ws.auth(), auth.as_ref(), "{url}");
         }
+    }
+
+    /// A server that completes the handshake and then stops reading looks alive to a client that
+    /// keeps sending: writes land in socket buffers and no pong ever comes back. The keepalive
+    /// must still notice the missing pong and reconnect.
+    #[tokio::test]
+    async fn missed_pong_detected_under_steady_outbound_traffic() {
+        use alloy_json_rpc::{Id, Request};
+        use alloy_pubsub::PubSubConnect;
+        use tokio::{net::TcpListener, sync::mpsc, time::timeout};
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (accepted_tx, mut accepted) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            let mut silent = Vec::new();
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+                // Hold the socket open without ever reading from it.
+                silent.push(ws);
+                let _ = accepted_tx.send(());
+            }
+        });
+
+        let frontend = WsConnect::new(format!("ws://{addr}"))
+            .with_keepalive_interval(Duration::from_millis(100))
+            .into_service()
+            .await
+            .unwrap();
+        accepted.recv().await.unwrap();
+
+        // Dispatch requests more often than the keepalive interval.
+        let sender = tokio::spawn(async move {
+            let mut id = 0;
+            loop {
+                id += 1;
+                let req = Request::new("eth_blockNumber", Id::Number(id), ()).serialize().unwrap();
+                tokio::spawn(frontend.send(req));
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        });
+
+        let reconnected = timeout(Duration::from_secs(2), accepted.recv()).await;
+        sender.abort();
+        assert!(
+            matches!(reconnected, Ok(Some(()))),
+            "a server that never answers pings must be detected as dead"
+        );
     }
 
     #[test]
