@@ -1,4 +1,4 @@
-use crate::{WsBackend, DEFAULT_KEEPALIVE};
+use crate::{BackendExit, WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
 use futures::{SinkExt, StreamExt};
@@ -157,6 +157,16 @@ impl PubSubConnect for WsConnect {
     }
 }
 
+/// Keepalive state of a native websocket backend.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PongState {
+    /// No ping is outstanding.
+    Idle,
+    /// A ping was sent and its pong has not arrived yet. If the keepalive timer fires again in
+    /// this state, the connection is considered dead.
+    Awaiting,
+}
+
 /// Install a default rustls crypto provider if none is set.
 ///
 /// Required since rustls 0.23+ no longer auto-installs one.
@@ -204,11 +214,10 @@ impl WsBackend<TungsteniteStream> {
     /// Spawn a new backend task.
     pub fn spawn(mut self) {
         let fut = async move {
-            let mut errored = false;
-            let mut expecting_pong = false;
+            let mut pong = PongState::Idle;
             let keepalive = sleep(self.keepalive_interval);
             tokio::pin!(keepalive);
-            loop {
+            let exit = loop {
                 // We bias the loop as follows
                 // 1. New dispatch to server.
                 // 2. Keepalive.
@@ -230,14 +239,11 @@ impl WsBackend<TungsteniteStream> {
                                 keepalive.set(sleep(self.keepalive_interval));
                                 if let Err(err) = self.send(msg).await {
                                     error!(%err, "WS connection error");
-                                    errored = true;
-                                    break
+                                    break BackendExit::Errored;
                                 }
                             },
                             // dispatcher has gone away, or shutdown was received
-                            None => {
-                                break
-                            },
+                            None => break BackendExit::Shutdown,
                         }
                     },
                     // Send a ping to the server, if no other messages have been
@@ -245,46 +251,43 @@ impl WsBackend<TungsteniteStream> {
                     _ = &mut keepalive => {
                         // Still expecting a pong from the previous ping,
                         // meaning connection is errored.
-                        if expecting_pong {
+                        if pong == PongState::Awaiting {
                             error!("WS server missed a pong");
-                            errored = true;
-                            break
+                            break BackendExit::Errored;
                         }
                         // Reset the keepalive timer.
                         keepalive.set(sleep(self.keepalive_interval));
                         if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
                             error!(%err, "WS connection error");
-                            errored = true;
-                            break
+                            break BackendExit::Errored;
                         }
                         // Expecting to receive a pong before the next
                         // keepalive timer resolves.
-                        expecting_pong = true;
+                        pong = PongState::Awaiting;
                     }
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
                                 if item.is_pong() {
-                                    expecting_pong = false;
+                                    pong = PongState::Idle;
                                 }
-                                errored = self.handle(item).is_err();
-                                if errored { break }
+                                if self.handle(item).is_err() {
+                                    break BackendExit::Errored;
+                                }
                             },
                             Some(Err(err)) => {
                                 error!(%err, "WS connection error");
-                                errored = true;
-                                break
+                                break BackendExit::Errored;
                             }
                             None => {
                                 error!("WS server has gone away");
-                                errored = true;
-                                break
+                                break BackendExit::Errored;
                             },
                         }
                     }
                 }
-            }
-            if errored {
+            };
+            if exit == BackendExit::Errored {
                 self.interface.close_with_error();
             }
         };
