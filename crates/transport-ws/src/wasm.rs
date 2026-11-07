@@ -1,4 +1,4 @@
-use super::{WsBackend, DEFAULT_KEEPALIVE};
+use super::{BackendExit, WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
 use futures::{
@@ -107,8 +107,7 @@ impl WsBackend<Fuse<WsStream>> {
     /// Spawn this backend on a loop.
     pub fn spawn(mut self) {
         let fut = async move {
-            let mut errored = false;
-            loop {
+            let exit = loop {
                 // We bias the loop as follows
                 // 1. New dispatch to server.
                 // 2. Response or notification from server.
@@ -125,32 +124,29 @@ impl WsBackend<Fuse<WsStream>> {
                             Some(msg) => {
                                 if let Err(err) = self.send(msg).await {
                                     error!(%err, "WS connection error");
-                                    errored = true;
-                                    break
+                                    break BackendExit::Errored;
                                 }
                             },
                             // dispatcher has gone away
-                            None => {
-                                break
-                            },
+                            None => break BackendExit::Shutdown,
                         }
                     },
                     resp = self.socket.next() => {
                         match resp {
                             Some(item) => {
-                                errored = self.handle(item).is_err();
-                                if errored { break }
+                                if self.handle(item).is_err() {
+                                    break BackendExit::Errored;
+                                }
                             },
                             None => {
                                 error!("WS server has gone away");
-                                errored = true;
-                                break
+                                break BackendExit::Errored;
                             },
                         }
                     }
                 }
-            }
-            if errored {
+            };
+            if exit == BackendExit::Errored {
                 self.interface.close_with_error();
             }
         };
