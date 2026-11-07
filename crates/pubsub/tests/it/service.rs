@@ -158,6 +158,10 @@ async fn unsubscribe_during_resubscribe_keeps_service_alive() {
     frontend.unsubscribe(local_id).unwrap();
     assert!(frontend.get_subscription(local_id).await.is_err());
     second.respond(1, json!("0xbbb"));
+    // The server-side subscription created by the resubscription is cancelled.
+    let unsubscribe = second.recv().await;
+    assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+    assert_eq!(unsubscribe["params"], json!(["0xbbb"]));
 
     let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 2, json!([]))));
     assert_eq!(second.recv().await["method"], "eth_blockNumber");
