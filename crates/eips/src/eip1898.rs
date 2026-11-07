@@ -641,54 +641,83 @@ impl<'de> serde::Deserialize<'de> for BlockId {
             where
                 A: serde::de::MapAccess<'de>,
             {
-                let mut number = None;
-                let mut block_hash = None;
-                let mut require_canonical = None;
+                /// Which fields of an EIP-1898 block identifier object have been read so far.
+                ///
+                /// `requireCanonical` may come before or after `blockHash`, but never with
+                /// `blockNumber`.
+                enum Fields {
+                    /// No field read yet.
+                    Empty,
+                    /// Only `requireCanonical` read; waiting for `blockHash`.
+                    RequireCanonical(bool),
+                    /// `blockNumber` read; no other field may follow.
+                    Number(BlockNumberOrTag),
+                    /// `blockHash` read, with `requireCanonical` if it was given.
+                    Hash { block_hash: B256, require_canonical: Option<bool> },
+                }
+
+                let mut fields = Fields::Empty;
                 while let Some(key) = map.next_key::<alloc::string::String>()? {
-                    match key.as_str() {
-                        "blockNumber" => {
-                            if number.is_some() || block_hash.is_some() {
-                                return Err(serde::de::Error::duplicate_field("blockNumber"));
-                            }
-                            if require_canonical.is_some() {
-                                return Err(serde::de::Error::custom(
-                                    "Non-valid require_canonical field",
-                                ));
-                            }
-                            number = Some(map.next_value::<BlockNumberOrTag>()?)
+                    fields = match (key.as_str(), fields) {
+                        ("blockNumber", Fields::Empty) => {
+                            Fields::Number(map.next_value::<BlockNumberOrTag>()?)
                         }
-                        "blockHash" => {
-                            if number.is_some() || block_hash.is_some() {
-                                return Err(serde::de::Error::duplicate_field("blockHash"));
-                            }
-
-                            block_hash = Some(map.next_value::<B256>()?);
+                        ("blockNumber", Fields::RequireCanonical(_)) => {
+                            return Err(serde::de::Error::custom(
+                                "Non-valid require_canonical field",
+                            ));
                         }
-                        "requireCanonical" => {
-                            if number.is_some() || require_canonical.is_some() {
-                                return Err(serde::de::Error::duplicate_field("requireCanonical"));
-                            }
-
-                            require_canonical = Some(map.next_value::<bool>()?)
+                        ("blockNumber", Fields::Number(_) | Fields::Hash { .. }) => {
+                            return Err(serde::de::Error::duplicate_field("blockNumber"));
                         }
-                        key => {
+                        ("blockHash", Fields::Empty) => Fields::Hash {
+                            block_hash: map.next_value::<B256>()?,
+                            require_canonical: None,
+                        },
+                        ("blockHash", Fields::RequireCanonical(require_canonical)) => {
+                            Fields::Hash {
+                                block_hash: map.next_value::<B256>()?,
+                                require_canonical: Some(require_canonical),
+                            }
+                        }
+                        ("blockHash", Fields::Number(_) | Fields::Hash { .. }) => {
+                            return Err(serde::de::Error::duplicate_field("blockHash"));
+                        }
+                        ("requireCanonical", Fields::Empty) => {
+                            Fields::RequireCanonical(map.next_value::<bool>()?)
+                        }
+                        (
+                            "requireCanonical",
+                            Fields::Hash { block_hash, require_canonical: None },
+                        ) => Fields::Hash {
+                            block_hash,
+                            require_canonical: Some(map.next_value::<bool>()?),
+                        },
+                        (
+                            "requireCanonical",
+                            Fields::Number(_)
+                            | Fields::RequireCanonical(_)
+                            | Fields::Hash { require_canonical: Some(_), .. },
+                        ) => {
+                            return Err(serde::de::Error::duplicate_field("requireCanonical"));
+                        }
+                        (key, _) => {
                             return Err(serde::de::Error::unknown_field(
                                 key,
                                 &["blockNumber", "blockHash", "requireCanonical"],
                             ))
                         }
-                    }
+                    };
                 }
 
-                #[expect(clippy::option_if_let_else)]
-                if let Some(number) = number {
-                    Ok(number.into())
-                } else if let Some(block_hash) = block_hash {
-                    Ok((block_hash, require_canonical).into())
-                } else {
-                    Err(serde::de::Error::custom(
+                match fields {
+                    Fields::Number(number) => Ok(number.into()),
+                    Fields::Hash { block_hash, require_canonical } => {
+                        Ok((block_hash, require_canonical).into())
+                    }
+                    Fields::Empty | Fields::RequireCanonical(_) => Err(serde::de::Error::custom(
                         "Expected `blockNumber` or `blockHash` with `requireCanonical` optionally",
-                    ))
+                    )),
                 }
             }
         }
@@ -1164,6 +1193,39 @@ mod tests {
         let num =
             serde_json::json!({"blockNumber": 1, "requireCanonical": true, "blockNumber": 23});
         assert!(serde_json::from_value::<BlockId>(num).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn block_id_object_field_order() {
+        let hash = B256::with_last_byte(1);
+        let expected = BlockId::Hash(RpcBlockHash::from_hash(hash, Some(true)));
+        for json in [
+            format!(r#"{{"blockHash":"{hash}","requireCanonical":true}}"#),
+            format!(r#"{{"requireCanonical":true,"blockHash":"{hash}"}}"#),
+        ] {
+            assert_eq!(serde_json::from_str::<BlockId>(&json).unwrap(), expected);
+        }
+
+        for (json, err) in [
+            (r#"{"requireCanonical":true,"blockNumber":"0x1"}"#.to_string(), "Non-valid"),
+            (r#"{"blockNumber":"0x1","requireCanonical":true}"#.to_string(), "duplicate field"),
+            (r#"{"requireCanonical":true}"#.to_string(), "Expected"),
+            ("{}".to_string(), "Expected"),
+            (
+                format!(
+                    r#"{{"blockHash":"{hash}","requireCanonical":true,"requireCanonical":false}}"#
+                ),
+                "duplicate field `requireCanonical`",
+            ),
+            (
+                format!(r#"{{"blockHash":"{hash}","blockNumber":"0x1"}}"#),
+                "duplicate field `blockNumber`",
+            ),
+        ] {
+            let actual = serde_json::from_str::<BlockId>(&json).unwrap_err().to_string();
+            assert!(actual.contains(err), "{json}: {actual}");
+        }
     }
 
     /// Serde tests
