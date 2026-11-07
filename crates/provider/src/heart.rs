@@ -11,7 +11,7 @@ use alloy_primitives::{
 use alloy_transport::{utils::Spawnable, TransportError};
 use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
     future::Future,
     sync::Arc,
@@ -518,8 +518,9 @@ pub(crate) struct Heartbeat<N, S> {
     /// Included transactions waiting for confirmations, keyed by the height that confirms them.
     waiting_confs: BTreeMap<u64, Vec<ConfirmingTx>>,
 
-    /// Ordered map of transactions to reap at a certain time.
-    reap_at: BTreeMap<Instant, B256>,
+    /// Ordered set of transactions to reap at a certain time. Keyed by both so that watchers
+    /// whose timeouts fall on the same instant each keep their entry.
+    reap_at: BTreeSet<(Instant, B256)>,
 
     /// Whether the heartbeat is currently paused.
     paused: Arc<Paused>,
@@ -554,18 +555,19 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// long time from now (i.e. will not be woken).
     fn next_reap(&self) -> Instant {
         self.reap_at
-            .first_key_value()
-            .map(|(k, _)| *k)
+            .first()
+            .map(|(at, _)| *at)
             .unwrap_or_else(|| Instant::now() + Duration::from_secs(60_000))
     }
 
     /// Reap any timeout
     fn reap_timeouts(&mut self) {
         let now = Instant::now();
-        let to_keep = self.reap_at.split_off(&now);
+        // Everything at or after now is kept, as no hash sorts below the zero hash.
+        let to_keep = self.reap_at.split_off(&(now, B256::ZERO));
         let to_reap = std::mem::replace(&mut self.reap_at, to_keep);
 
-        for tx_hash in to_reap.values() {
+        for (_, tx_hash) in &to_reap {
             let Some(watchers) = self.unconfirmed.get_mut(tx_hash) else { continue };
             for watcher in watchers.extract_if(.., |w| w.is_expired(now)) {
                 debug!(tx=%tx_hash, "reaped");
@@ -623,14 +625,19 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// Handle a watch instruction by adding it to the watch list, and
     /// potentially adding it to our `reap_at` list.
     fn handle_watch_ix(&mut self, ix: WatchTx) {
+        self.handle_watch_ix_at(ix, Instant::now());
+    }
+
+    /// [`Self::handle_watch_ix`], with timeouts measured from `now`.
+    fn handle_watch_ix_at(&mut self, ix: WatchTx, now: Instant) {
         let WatchTx { watcher: mut to_watch, received_at_block } = ix;
         // Start watching for the transaction.
         debug!(tx=%to_watch.config.tx_hash, "watching");
         trace!(?to_watch.config, ?received_at_block);
         if let Some(timeout) = to_watch.config.timeout {
-            let reap_at = Instant::now() + timeout;
+            let reap_at = now + timeout;
             to_watch.reap_at = Some(reap_at);
-            self.reap_at.insert(reap_at, to_watch.config.tx_hash);
+            self.reap_at.insert((reap_at, to_watch.config.tx_hash));
         }
         if let Some(received_at_block) = received_at_block {
             // Transaction is already confirmed, we just need to wait for the required
