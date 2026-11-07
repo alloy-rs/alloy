@@ -137,12 +137,8 @@ pub struct ReadJsonStream<T, Item = alloy_json_rpc::PubSubItem> {
     /// Incremental object/array framer. Survives across polls so a large
     /// response is scanned once, not re-parsed from byte zero on every read.
     scanner: FrameScanner,
-    /// `true` while the current value is incomplete. Small frames that
-    /// arrive in one read take the `serde_json` fast path; a partial parse
-    /// flips this so subsequent polls skip the wasted probe and only scan.
-    partial: bool,
-    /// Whether EOF or a terminal error has been observed.
-    finished: bool,
+    /// Where the stream is in its read cycle.
+    state: ReadState,
 
     /// PhantomData marking the item type this stream will yield.
     _pd: std::marker::PhantomData<Item>,
@@ -154,8 +150,7 @@ impl<T: AsyncRead, U> ReadJsonStream<T, U> {
             reader,
             buf: BytesMut::with_capacity(CAPACITY),
             scanner: FrameScanner::default(),
-            partial: false,
-            finished: false,
+            state: ReadState::Probing,
             _pd: core::marker::PhantomData,
         }
     }
@@ -165,6 +160,19 @@ impl<T: AsyncRead, U> ReadJsonStream<T, U> {
     const fn bytes_examined(&self) -> usize {
         self.scanner.examined
     }
+}
+
+/// Read state of a [`ReadJsonStream`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ReadState {
+    /// The next value starts at the front of the buffer. Small frames that
+    /// arrive in one read take the `serde_json` fast path.
+    Probing,
+    /// The current value is incomplete. Subsequent polls skip the wasted
+    /// `serde_json` probe and only scan, until a frame completes.
+    Scanning,
+    /// EOF or a terminal error has been observed; the stream yields nothing more.
+    Finished,
 }
 
 impl<T: AsyncRead, U> From<T> for ReadJsonStream<T, U> {
@@ -184,15 +192,15 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let mut this = self.project();
-        if *this.finished {
+        if *this.state == ReadState::Finished {
             return Ready(None);
         }
 
         loop {
             // Complete small frames: one serde pass.
-            // A partial value flips `partial` so we do not re-parse the
+            // A partial value moves to `Scanning` so we do not re-parse the
             // growing buffer on every subsequent read.
-            if !*this.partial && !this.buf.is_empty() {
+            if *this.state == ReadState::Probing && !this.buf.is_empty() {
                 let mut de = serde_json::Deserializer::from_slice(this.buf.as_ref()).into_iter();
                 match de.next() {
                     Some(Ok(item)) => {
@@ -203,10 +211,12 @@ where
                     }
                     // Incomplete, or complete but not an `Item`. Either way hand
                     // the buffer to the framer instead of re-parsing it.
-                    Some(Err(err)) if err.is_eof() || err.is_data() => *this.partial = true,
+                    Some(Err(err)) if err.is_eof() || err.is_data() => {
+                        *this.state = ReadState::Scanning;
+                    }
                     Some(Err(err)) => {
                         log_invalid_json(&err, this.buf.as_ref());
-                        *this.finished = true;
+                        *this.state = ReadState::Finished;
                         return Ready(Some(Err(json_error(err))));
                     }
                     None => {}
@@ -221,12 +231,12 @@ where
                         Ok(item) => {
                             this.buf.advance(end);
                             this.scanner.reset();
-                            *this.partial = false;
+                            *this.state = ReadState::Probing;
                             return Ready(Some(Ok(item)));
                         }
                         Err(err) => {
                             log_invalid_json(&err, frame);
-                            *this.finished = true;
+                            *this.state = ReadState::Finished;
                             return Ready(Some(Err(json_error(err))));
                         }
                     }
@@ -237,7 +247,7 @@ where
                     this.buf.reserve(CAPACITY);
                     match ready!(poll_read_buf(this.reader.as_mut(), cx, this.buf)) {
                         Ok(0) => {
-                            *this.finished = true;
+                            *this.state = ReadState::Finished;
                             if this.scanner.depth != 0 {
                                 let err = serde_json::from_slice::<serde_json::Value>(this.buf)
                                     .unwrap_err();
@@ -252,7 +262,7 @@ where
                         }
                         Err(err) => {
                             error!(%err, "Failed to read from IPC socket, shutting down");
-                            *this.finished = true;
+                            *this.state = ReadState::Finished;
                             return Ready(Some(Err(err)));
                         }
                     }
@@ -263,7 +273,7 @@ where
                         buffer = %String::from_utf8_lossy(this.buf.as_ref()),
                         "IPC stream contained a non-object, non-array JSON value. NOTE: Buffer contents do not include invalid utf8.",
                     );
-                    *this.finished = true;
+                    *this.state = ReadState::Finished;
                     let err = serde_json::from_slice::<Item>(this.buf).err().map_or_else(
                         || {
                             std::io::Error::new(
