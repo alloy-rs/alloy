@@ -139,10 +139,8 @@ where
         let access_list_result = provider.create_access_list(&tx).await?;
         let access_list = access_list_result.access_list;
 
-        // Track whether any call succeeded and capture the first error for diagnostics.
         // If all overridden calls fail, we propagate the first error instead of returning Ok(None).
-        let mut any_call_succeeded = false;
-        let mut first_call_err: Option<TransportError> = None;
+        let mut calls = OverrideCalls::NoCall;
 
         // iterate over all the accessed slots and try to find the one that contains the
         // target value by overriding the slot and checking the function call result
@@ -160,11 +158,11 @@ where
 
                 let result = match provider.call(tx.clone()).overrides(state_override).await {
                     Ok(res) => {
-                        any_call_succeeded = true;
+                        calls.succeeded();
                         res
                     }
                     Err(err) => {
-                        first_call_err.get_or_insert(err);
+                        calls.failed(err);
                         continue;
                     }
                 };
@@ -180,15 +178,41 @@ where
             }
         }
 
-        // If no call succeeded and we have an error, propagate it rather than silently returning
-        // None
-        if !any_call_succeeded {
-            if let Some(err) = first_call_err {
-                return Err(err);
-            }
-        }
+        calls.into_not_found()
+    }
+}
 
-        Ok(None)
+/// The outcome of the overridden calls [`StorageSlotFinder::find_slot`] made so far.
+#[derive(Debug)]
+enum OverrideCalls {
+    /// No call was made.
+    NoCall,
+    /// Every call failed; holds the first error for diagnostics.
+    AllFailed(TransportError),
+    /// At least one call succeeded.
+    SomeSucceeded,
+}
+
+impl OverrideCalls {
+    /// Records a call that returned.
+    fn succeeded(&mut self) {
+        *self = Self::SomeSucceeded;
+    }
+
+    /// Records a call that failed, keeping the first error while no call has succeeded.
+    fn failed(&mut self, err: TransportError) {
+        if matches!(self, Self::NoCall) {
+            *self = Self::AllFailed(err);
+        }
+    }
+
+    /// The result when no slot matched: the first error if every call failed, rather than
+    /// silently returning `None`.
+    fn into_not_found(self) -> Result<Option<B256>, TransportError> {
+        match self {
+            Self::AllFailed(err) => Err(err),
+            Self::NoCall | Self::SomeSucceeded => Ok(None),
+        }
     }
 }
 
@@ -229,6 +253,26 @@ mod tests {
         let balance = balanceOfCall::abi_decode_returns(&result).unwrap();
 
         assert_eq!(balance, amount);
+    }
+
+    #[test]
+    fn not_found_propagates_error_only_when_every_call_failed() {
+        use super::OverrideCalls;
+        use alloy_transport::TransportErrorKind;
+
+        assert!(matches!(OverrideCalls::NoCall.into_not_found(), Ok(None)));
+
+        let mut calls = OverrideCalls::NoCall;
+        calls.failed(TransportErrorKind::custom_str("first"));
+        calls.failed(TransportErrorKind::custom_str("second"));
+        let err = calls.into_not_found().unwrap_err();
+        assert!(err.to_string().contains("first"), "{err}");
+
+        let mut calls = OverrideCalls::NoCall;
+        calls.failed(TransportErrorKind::custom_str("first"));
+        calls.succeeded();
+        calls.failed(TransportErrorKind::custom_str("second"));
+        assert!(matches!(calls.into_not_found(), Ok(None)));
     }
 
     #[tokio::test]
