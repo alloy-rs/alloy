@@ -3,6 +3,7 @@
 use std::{
     borrow::Cow,
     future::Future,
+    io::{self, BufRead, BufReader, Read},
     net::{SocketAddr, TcpListener},
     ops::{Deref, DerefMut},
     path::PathBuf,
@@ -59,6 +60,72 @@ impl Startup {
     pub(crate) const fn is_ready(self) -> bool {
         matches!(self, Self::Ready)
     }
+}
+
+/// Reads a node's output line by line.
+///
+/// A [`BufReader`] reads ahead past the line it returns, so its spare bytes are lost once the
+/// handle is handed back to the caller. Output that is handed back is therefore read one byte at
+/// a time, leaving every byte after the last line read in the handle.
+#[derive(Debug)]
+pub(crate) enum LineReader<R> {
+    /// Output that is not handed back, read through a buffer.
+    Buffered(BufReader<R>),
+    /// Output that is handed back, read without reading ahead.
+    Unbuffered(R),
+}
+
+impl<R: Read> LineReader<R> {
+    /// Reads `inner`, without reading ahead when it will be handed back (`keep`).
+    pub(crate) fn new(inner: R, keep: bool) -> Self {
+        if keep {
+            Self::Unbuffered(inner)
+        } else {
+            Self::Buffered(BufReader::new(inner))
+        }
+    }
+
+    /// Appends the next line to `buf`, like [`BufRead::read_line`]; returns 0 at EOF.
+    pub(crate) fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
+        match self {
+            Self::Buffered(reader) => reader.read_line(buf),
+            Self::Unbuffered(reader) => read_line_unbuffered(reader, buf),
+        }
+    }
+
+    /// Returns the handle. Only an unbuffered reader keeps every byte not read yet.
+    pub(crate) fn into_inner(self) -> R {
+        match self {
+            Self::Buffered(reader) => reader.into_inner(),
+            Self::Unbuffered(reader) => reader,
+        }
+    }
+}
+
+/// Appends the next line of `reader` to `buf`, reading one byte at a time so that nothing past
+/// the newline is consumed. Returns the number of bytes read, 0 at EOF.
+pub(crate) fn read_line_unbuffered(reader: &mut impl Read, buf: &mut String) -> io::Result<usize> {
+    let mut line = Vec::new();
+    let mut byte = [0; 1];
+    loop {
+        match reader.read(&mut byte) {
+            Ok(0) => break,
+            Ok(_) => {
+                line.push(byte[0]);
+                if byte[0] == b'\n' {
+                    break;
+                }
+            }
+            Err(err) if err.kind() == io::ErrorKind::Interrupted => {}
+            Err(err) => return Err(err),
+        }
+    }
+    let read = line.len();
+    let line = String::from_utf8(line).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidData, "stream did not contain valid UTF-8")
+    })?;
+    buf.push_str(&line);
+    Ok(read)
 }
 
 /// Helper for graceful process shutdown.
@@ -209,6 +276,74 @@ mod tests {
     use crate::{Anvil, Geth, NodeError, Reth};
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+
+    /// Writes an executable shell script at `dir/name`.
+    #[cfg(unix)]
+    fn script(dir: &std::path::Path, name: &str, body: &str) -> PathBuf {
+        let program = dir.join(name);
+        std::fs::write(&program, format!("#!/bin/sh\n{body}")).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        program
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kept_geth_stderr_keeps_lines_read_ahead_during_startup() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // Each `printf` is one write, so startup's first read gets the line after readiness too.
+        let geth = script(
+            dir.path(),
+            "geth",
+            "printf 'HTTP server started endpoint=127.0.0.1:8545 auth=false\\nAdding p2p peer id=0123456789abcdef\\n' >&2\nsleep 5\n",
+        );
+        let mut geth = Geth::at(&geth).keep_stderr().try_spawn().unwrap();
+        geth.wait_to_add_peer("0123456789abcdef00").unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kept_anvil_stdout_keeps_lines_read_ahead_during_startup() {
+        let dir = tempfile::tempdir().unwrap();
+        let anvil = script(
+            dir.path(),
+            "anvil",
+            "printf 'Listening on 127.0.0.1:8545\\nafter readiness\\n'\n",
+        );
+        let mut anvil = Anvil::at(&anvil).keep_stdout().try_spawn().unwrap();
+        let mut rest = String::new();
+        anvil.child_mut().stdout.take().unwrap().read_to_string(&mut rest).unwrap();
+        assert_eq!(rest, "after readiness\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kept_reth_stdout_keeps_lines_read_ahead_during_startup() {
+        let dir = tempfile::tempdir().unwrap();
+        let reth = script(
+            dir.path(),
+            "reth",
+            "printf 'RPC HTTP server started url=127.0.0.1:8545\\nRPC WS server started url=127.0.0.1:8546\\nRPC auth server started url=127.0.0.1:8551\\nafter readiness\\n'\n",
+        );
+        let mut reth = Reth::at(&reth).disable_discovery().keep_stdout().try_spawn().unwrap();
+        let mut rest = String::new();
+        reth.stdout().unwrap().read_to_string(&mut rest).unwrap();
+        assert_eq!(rest, "after readiness\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_to_add_peer_keeps_lines_read_ahead() {
+        let dir = tempfile::tempdir().unwrap();
+        let geth = script(
+            dir.path(),
+            "geth",
+            "echo 'HTTP server started endpoint=127.0.0.1:8545 auth=false' >&2\nsleep 1\nprintf 'Adding p2p peer id=aaaaaaaaaaaaaaaa\\nAdding p2p peer id=bbbbbbbbbbbbbbbb\\n' >&2\nsleep 5\n",
+        );
+        let mut geth = Geth::at(&geth).keep_stderr().try_spawn().unwrap();
+        geth.wait_to_add_peer("aaaaaaaaaaaaaaaa00").unwrap();
+        geth.wait_to_add_peer("bbbbbbbbbbbbbbbb00").unwrap();
+    }
 
     #[test]
     fn startup_waits_for_every_milestone_in_any_order() {
