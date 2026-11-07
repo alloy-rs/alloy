@@ -140,17 +140,21 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // A string id keeps the reply from matching a request issued by `RpcClient`,
-            // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
-            // dropped on arrival.
-            let id = Id::String(format!("unsubscribe-{local_id}"));
-            let req = Request::new("eth_unsubscribe", id, [server_id]);
-            let brv = req.serialize().expect("no ser error").take_request();
-
-            self.dispatch_request(brv)?;
+            self.dispatch_unsubscribe(local_id, server_id)?;
         }
         self.subs.remove_sub(local_id);
         Ok(())
+    }
+
+    /// Ask the server to cancel its subscription `server_id`, known locally as `local_id`.
+    fn dispatch_unsubscribe(&self, local_id: B256, server_id: &SubId) -> TransportResult<()> {
+        // A string id keeps the reply from matching a request issued by `RpcClient`,
+        // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
+        // dropped on arrival.
+        let id = Id::String(format!("unsubscribe-{local_id}"));
+        let req = Request::new("eth_unsubscribe", id, [server_id]);
+        let brv = req.serialize().expect("no ser error").take_request();
+        self.dispatch_request(brv)
     }
 
     /// Service an instruction
@@ -190,9 +194,11 @@ impl<T: PubSubConnect> PubSubService<T> {
         let id = request.id().clone();
 
         // Nobody waits for the response and the subscription is gone, e.g. it was unsubscribed
-        // while being re-issued after a reconnect. Don't re-create it without a consumer.
-        if in_flight.tx.is_closed() && !self.subs.contains(&request.params_hash()) {
-            return Ok(());
+        // while being re-issued after a reconnect. Don't re-create it without a consumer, and
+        // cancel it on the server, which would otherwise keep sending its notifications.
+        let local_id = request.params_hash();
+        if in_flight.tx.is_closed() && !self.subs.contains(&local_id) {
+            return self.dispatch_unsubscribe(local_id, &server_id);
         }
 
         let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
@@ -577,6 +583,47 @@ mod tests {
             Err(mpsc::error::TryRecvError::Empty)
         ));
         assert_eq!(service.in_flights.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn unsubscribed_during_reconnect_cancels_server_subscription() {
+        let (handle, _interface) = ConnectionHandle::new();
+        let (replacement, mut replacement_interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        let request =
+            Request::new("eth_subscribe", Id::Number(3), ["newHeads"]).serialize().unwrap();
+        let local_id = request.params_hash();
+        let _sub = service.subs.upsert(request, SubId::Number(alloy_primitives::U256::from(1)), 16);
+
+        service.reconnect().await.unwrap();
+        let resubscribe = replacement_interface.from_frontend.try_recv().unwrap();
+        assert!(resubscribe.get().contains("eth_subscribe"), "{resubscribe}");
+
+        // The consumer unsubscribes before the new server acknowledges the resubscription, so no
+        // server id is known yet and no eth_unsubscribe can be sent.
+        service.service_unsubscribe(local_id).unwrap();
+        assert!(replacement_interface.from_frontend.try_recv().is_err());
+
+        service
+            .handle_item(
+                serde_json::from_str(r#"{"jsonrpc":"2.0","id":3,"result":"0x2a"}"#).unwrap(),
+            )
+            .unwrap();
+        assert!(!service.subs.contains(&local_id));
+        let unsubscribe = replacement_interface
+            .from_frontend
+            .try_recv()
+            .expect("the orphaned server subscription must be cancelled");
+        let unsubscribe: serde_json::Value = serde_json::from_str(unsubscribe.get()).unwrap();
+        assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+        assert_eq!(unsubscribe["params"], serde_json::json!(["0x2a"]));
     }
 
     #[tokio::test]
