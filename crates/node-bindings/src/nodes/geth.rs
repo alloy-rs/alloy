@@ -2,7 +2,8 @@
 
 use crate::{
     utils::{
-        extract_endpoint, extract_value, unused_port, GracefulShutdown, Startup, StartupGuard,
+        extract_endpoint, extract_value, read_line_unbuffered, unused_port, GracefulShutdown,
+        LineReader, Startup, StartupGuard,
     },
     NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
@@ -12,7 +13,6 @@ use k256::ecdsa::SigningKey;
 use std::{
     ffi::OsString,
     fs::{create_dir_all, File},
-    io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStderr, Command, Stdio},
     time::{Duration, Instant},
@@ -160,8 +160,9 @@ impl GethInstance {
     ///
     /// Returns [`NodeError::Fatal`] if geth closes stderr, i.e. exits, before the peer is added.
     pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeError> {
-        let mut stderr = self.pid.stderr.as_mut().ok_or(NodeError::NoStderr)?;
-        let mut err_reader = BufReader::new(&mut stderr);
+        // Read without a buffer: one would swallow the lines after the peer's, which a later call
+        // or the caller of `Self::stderr` must still see.
+        let stderr = self.pid.stderr.as_mut().ok_or(NodeError::NoStderr)?;
         let mut line = String::new();
         let start = Instant::now();
 
@@ -171,7 +172,7 @@ impl GethInstance {
             }
 
             line.clear();
-            if err_reader.read_line(&mut line).map_err(NodeError::ReadLineError)? == 0 {
+            if read_line_unbuffered(stderr, &mut line).map_err(NodeError::ReadLineError)? == 0 {
                 break;
             }
 
@@ -657,7 +658,7 @@ impl Geth {
 
         let timeout = self.timeout.map(Duration::from_millis).unwrap_or(NODE_STARTUP_TIMEOUT);
         let start = Instant::now();
-        let mut reader = BufReader::new(stderr);
+        let mut reader = LineReader::new(stderr, self.keep_err);
 
         // we shouldn't need to wait for p2p to start if geth is in dev mode - p2p is disabled in
         // dev mode
