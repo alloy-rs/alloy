@@ -1,7 +1,7 @@
 //! Utilities for configuring and launching a Reth node.
 
 use crate::{
-    utils::{extract_endpoint, GracefulShutdown, StartupGuard},
+    utils::{extract_endpoint, GracefulShutdown, Startup, StartupGuard},
     NodeError, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
@@ -510,8 +510,7 @@ impl Reth {
         let mut auth_port = 0;
         let mut p2p_port = 0;
 
-        let mut ports_started = false;
-        let mut p2p_started = !self.discovery_enabled;
+        let mut startup = Startup::new(self.discovery_enabled);
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
@@ -553,22 +552,18 @@ impl Reth {
             }
 
             if http_port != 0 && ws_port != 0 && auth_port != 0 {
-                ports_started = true;
+                startup.rpc_started();
             }
 
-            if self.discovery_enabled {
-                if line.contains("Updated local ENR") {
-                    if let Some(port) = extract_endpoint("IpV4 UDP Socket", &line) {
-                        p2p_port = port.port();
-                        p2p_started = true;
-                    }
+            if self.discovery_enabled && line.contains("Updated local ENR") {
+                if let Some(port) = extract_endpoint("IpV4 UDP Socket", &line) {
+                    p2p_port = port.port();
+                    startup.p2p_started();
                 }
-            } else {
-                p2p_started = true;
             }
 
             // If all ports have started we are ready to be queried.
-            if ports_started && p2p_started {
+            if startup.is_ready() {
                 break;
             }
         }
