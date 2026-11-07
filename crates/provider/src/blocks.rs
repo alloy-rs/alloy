@@ -29,8 +29,8 @@ const MAX_REORG_DEPTH: usize = 64;
 /// Maximum number of retries for fetching a block.
 const MAX_RETRIES: usize = 3;
 
-/// Default block number for when we don't have a block yet.
-const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
+/// A block number no node reports for a real tip. Tips equal to it are ignored.
+const INVALID_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
 
 #[derive(Default)]
 pub(crate) struct Paused {
@@ -74,10 +74,9 @@ impl Paused {
 /// Streams new blocks from the client.
 pub(crate) struct NewBlocks<N: Network = Ethereum> {
     client: WeakClient,
-    /// The next block to yield.
-    /// [`NO_BLOCK_NUMBER`] indicates that it will be updated on the first poll.
-    /// Only used by the polling task.
-    next_yield: BlockNumber,
+    /// The next block to yield, or `None` until the first tip after creation or after a pause
+    /// sets it. Only used by the polling task.
+    next_yield: Option<BlockNumber>,
     /// LRU cache of known blocks. Only used by the polling task.
     known_blocks: LruCache<BlockNumber, N::BlockResponse>,
     /// Numbers and hashes of the most recently yielded blocks, used to detect reorgs.
@@ -91,7 +90,7 @@ impl<N: Network> NewBlocks<N> {
     pub(crate) fn new(client: WeakClient) -> Self {
         Self {
             client,
-            next_yield: NO_BLOCK_NUMBER,
+            next_yield: None,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
             yielded: VecDeque::new(),
             paused: Arc::default(),
@@ -101,7 +100,7 @@ impl<N: Network> NewBlocks<N> {
 
     #[cfg(test)]
     const fn with_next_yield(mut self, next_yield: u64) -> Self {
-        self.next_yield = next_yield;
+        self.next_yield = Some(next_yield);
         self
     }
 
@@ -173,15 +172,17 @@ impl<N: Network> NewBlocks<N> {
         stream! {
         'task: loop {
             // Clear any buffered blocks.
-            while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
+            while let Some((next_yield, known_block)) =
+                self.next_yield.and_then(|n| Some((n, self.known_blocks.pop(&n)?)))
+            {
                 // A block that doesn't build on the last yielded one means the chain reorged,
                 // possibly at the same height, which block numbers alone don't reveal. Step back
                 // and yield the new canonical blocks instead, so consumers see the reorg.
                 if let Some(&(number, hash)) = self.yielded.back() {
-                    if number + 1 == self.next_yield && hash != known_block.header().parent_hash() {
+                    if number + 1 == next_yield && hash != known_block.header().parent_hash() {
                         debug!(number, "reorg detected, refetching block");
                         self.yielded.pop_back();
-                        self.next_yield = number;
+                        self.next_yield = Some(number);
                         // If this fails, the next tip refills from `number`.
                         if let Some(client) = self.client.upgrade() {
                             let block: Result<Option<N::BlockResponse>, _> = client
@@ -201,19 +202,19 @@ impl<N: Network> NewBlocks<N> {
                     }
                 }
 
-                debug!(number=self.next_yield, "yielding block");
+                debug!(number = next_yield, "yielding block");
                 if self.yielded.len() == MAX_REORG_DEPTH {
                     self.yielded.pop_front();
                 }
-                self.yielded.push_back((self.next_yield, known_block.header().hash()));
-                self.next_yield += 1;
+                self.yielded.push_back((next_yield, known_block.header().hash()));
+                self.next_yield = Some(next_yield + 1);
                 yield known_block;
             }
 
             // If we're paused, wait until we're unpaused.
             // Once unpaused, reset `self.next_yield` to ignore the blocks that were included while we were paused.
             if self.paused.wait().await {
-                self.next_yield = NO_BLOCK_NUMBER;
+                self.next_yield = None;
                 self.yielded.clear();
             }
 
@@ -223,19 +224,21 @@ impl<N: Network> NewBlocks<N> {
                 break 'task;
             };
             trace!(%block_number, "got block number");
-            if block_number == NO_BLOCK_NUMBER {
+            if block_number == INVALID_BLOCK_NUMBER {
                 warn!("ignoring invalid block number");
                 continue 'task;
             }
-            if self.next_yield == NO_BLOCK_NUMBER {
+            let next_yield = match self.next_yield {
                 // this stream can be initialized after the first tx was sent,
                 // to avoid the edge case where the tx is mined immediately, we should apply an
                 // offset to the initial fetch so that we fetch tip - 1
-                self.next_yield = block_number.saturating_sub(1);
-            } else if block_number < self.next_yield {
-                debug!(block_number, self.next_yield, "not advanced yet");
-                continue 'task;
-            }
+                None => *self.next_yield.insert(block_number.saturating_sub(1)),
+                Some(next_yield) if block_number < next_yield => {
+                    debug!(block_number, next_yield, "not advanced yet");
+                    continue 'task;
+                }
+                Some(next_yield) => next_yield,
+            };
 
             // Upgrade the provider.
             let Some(client) = self.client.upgrade() else {
@@ -245,7 +248,7 @@ impl<N: Network> NewBlocks<N> {
 
             // Then try to fill as many blocks as possible.
             // TODO: Maybe use `join_all`
-            for number in self.next_yield..=block_number {
+            for number in next_yield..=block_number {
                 debug!(number, "fetching block");
                 let mut retries = MAX_RETRIES;
                 let block = loop {
@@ -347,7 +350,7 @@ mod regression_tests {
 
         let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client());
         let paused = new_blocks.paused.clone();
-        let numbers = futures::stream::iter([NO_BLOCK_NUMBER, 1, NO_BLOCK_NUMBER, 2]);
+        let numbers = futures::stream::iter([INVALID_BLOCK_NUMBER, 1, INVALID_BLOCK_NUMBER, 2]);
         let stream = Box::pin(new_blocks.into_block_stream(numbers));
         let heartbeat = Heartbeat::<Ethereum, _>::new(stream, paused).spawn();
 
