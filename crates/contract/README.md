@@ -15,40 +15,37 @@ that returns a `CallBuilder` for that function. See its documentation for more d
 ```rust,no_run
 # async fn test() -> Result<(), Box<dyn std::error::Error>> {
 use alloy_contract::SolCallBuilder;
-use alloy_network::Ethereum;
 use alloy_primitives::{Address, U256};
 use alloy_provider::ProviderBuilder;
+use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::sol;
 
 sol! {
     #[sol(rpc)] // <-- Important! Generates the necessary `MyContract` struct and function methods.
-    #[sol(bytecode = "0x1234")] // <-- Generates the `BYTECODE` static and the `deploy` method.
     contract MyContract {
-        constructor(address) {} // The `deploy` method will also include any constructor arguments.
-
         #[derive(Debug)]
         function doStuff(uint a, bool b) public payable returns(address c, bytes32 d);
     }
 }
 
-// Build a provider.
-let provider = ProviderBuilder::new().connect("http://localhost:8545").await?;
+// Configure a funded sender. `PRIVATE_KEY` must belong to an account funded on this node.
+let signer: PrivateKeySigner = std::env::var("PRIVATE_KEY")?.parse()?;
+let sender = signer.address();
+let provider = ProviderBuilder::new()
+    .wallet(signer)
+    .connect("http://localhost:8545")
+    .await?;
 
-// If `#[sol(bytecode = "0x...")]` is provided, the contract can be deployed with `MyContract::deploy`,
-// and a new instance will be created.
-let constructor_arg = Address::ZERO;
-let contract = MyContract::deploy(&provider, constructor_arg).await?;
-
-// Otherwise, or if already deployed, a new contract instance can be created with `MyContract::new`.
-let address = Address::ZERO;
+// Connect to an existing deployment.
+let address: Address = std::env::var("CONTRACT_ADDRESS")?.parse()?;
 let contract = MyContract::new(address, &provider);
 
 // Build a call to the `doStuff` function and configure it.
 let a = U256::from(123);
 let b = true;
-let call_builder = contract.doStuff(a, b).value(U256::from(50e18 as u64));
+let call_builder = contract.doStuff(a, b).from(sender);
 
-// Send the call. Note that this is not broadcasted as a transaction.
+// Simulate the call with `eth_call`. This does not broadcast a transaction.
 let call_return = call_builder.call().await?;
 println!("{call_return:?}"); // doStuffReturn { c: 0x..., d: 0x... }
 
@@ -57,3 +54,7 @@ let _pending_tx = call_builder.send().await?;
 # Ok(())
 # }
 ```
+
+When the `sol!` contract has real creation bytecode through `#[sol(bytecode = "0x...")]`, it also
+generates a `deploy` method. Payable calls can attach wei with `CallBuilder::value`; set a deliberate
+amount only when broadcasting.

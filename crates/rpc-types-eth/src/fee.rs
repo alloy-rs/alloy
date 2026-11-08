@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 pub struct TxGasAndReward {
     /// Gas used by the transaction
     pub gas_used: u64,
-    /// The effective gas tip by the transaction
+    /// The effective gas tip paid by the transaction, in wei per gas.
     pub reward: u128,
 }
 
@@ -25,12 +25,18 @@ impl Ord for TxGasAndReward {
     }
 }
 
-/// Response type for `eth_feeHistory`
+/// Response type for `eth_feeHistory`.
+///
+/// For a response covering N blocks, each populated base-fee array contains N+1 entries: one for
+/// every returned block plus a final prediction for the next block. Populated gas-used ratio
+/// arrays contain N entries. When present, `reward` contains one row per block, with columns in the
+/// same order as the requested percentiles. Execution fee and reward values are in wei per gas;
+/// blob base fees are in wei per blob gas.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct FeeHistory {
-    /// An array of block base fees per gas.
+    /// An array of block base fees, in wei per gas.
     /// This includes the next block after the newest of the returned range,
     /// because this value can be derived from the newest block. Zeroes are
     /// returned for pre-EIP-1559 blocks.
@@ -47,9 +53,9 @@ pub struct FeeHistory {
     /// of `gasUsed` and `gasLimit`.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub gas_used_ratio: Vec<f64>,
-    /// An array of block base fees per blob gas. This includes the next block after the newest
-    /// of the returned range, because this value can be derived from the newest block. Zeroes
-    /// are returned for pre-EIP-4844 blocks.
+    /// An array of block base fees per blob gas, in wei per blob gas. This includes the next block
+    /// after the newest of the returned range, because this value can be derived from the newest
+    /// block. Zeroes are returned for pre-EIP-4844 blocks.
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty", with = "alloy_serde::quantity::vec")
@@ -62,8 +68,9 @@ pub struct FeeHistory {
     /// Lowest number block of the returned range.
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub oldest_block: u64,
-    /// An (optional) array of effective priority fee per gas data points from a single
-    /// block. All zeroes are returned if the block is empty.
+    /// An optional array of effective priority fees, in wei per gas, grouped by block.
+    ///
+    /// Columns follow the requested percentile order. All zeroes are returned if a block is empty.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -100,7 +107,7 @@ impl FeeHistory {
 
     /// Returns the blob fee of the latest block in the `eth_feeHistory` request.
     ///
-    /// If the next block is pre-EIP-4844, this will return `None`.
+    /// If the latest requested block is pre-EIP-4844, this will return `None`.
     pub fn latest_block_blob_base_fee(&self) -> Option<u128> {
         // The blob fee requested block is the second last element in the list.
         self.base_fee_per_blob_gas

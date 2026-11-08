@@ -7,7 +7,6 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
@@ -37,9 +36,12 @@ serde.workspace = true
 
 bytes = "1.5.0"
 interprocess = { version = "2", features = ["tokio"] }
+memchr = "2.7"
 tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "time"] }
 tokio-test.workspace = true
 
 [features]

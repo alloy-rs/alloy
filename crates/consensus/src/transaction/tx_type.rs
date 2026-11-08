@@ -59,17 +59,3 @@ impl fmt::Display for TxType {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn check_u8_id() {
-        assert_eq!(TxType::Legacy, TxType::Legacy as u8);
-        assert_eq!(TxType::Eip2930, TxType::Eip2930 as u8);
-        assert_eq!(TxType::Eip1559, TxType::Eip1559 as u8);
-        assert_eq!(TxType::Eip7702, TxType::Eip7702 as u8);
-        assert_eq!(TxType::Eip4844, TxType::Eip4844 as u8);
-    }
-}

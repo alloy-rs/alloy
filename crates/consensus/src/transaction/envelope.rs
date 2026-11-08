@@ -14,11 +14,8 @@ use alloy_primitives::{Bytes, Signature, B256};
 ///
 /// # Note:
 ///
-/// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
-/// Therefore we must ensure that encoding returns the precise byte-array that
-/// was decoded, preserving the presence or absence of the `TransactionType`
-/// flag.
+/// Represents untagged legacy transactions and typed [EIP-2718] variants. Binary decoding rejects
+/// a literal `0x00` type prefix; legacy transactions use the untagged fallback encoding.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub type TxEnvelope = EthereumTxEnvelope<TxEip4844Variant>;
@@ -468,11 +465,8 @@ impl TryFrom<EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransa
 ///
 /// # Note:
 ///
-/// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
-/// Therefore we must ensure that encoding returns the precise byte-array that
-/// was decoded, preserving the presence or absence of the `TransactionType`
-/// flag.
+/// Represents untagged legacy transactions and typed [EIP-2718] variants. Binary decoding rejects
+/// a literal `0x00` type prefix; legacy transactions use the untagged fallback encoding.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, TransactionEnvelope)]
@@ -748,7 +742,7 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
-    /// Consumes the type and returns the [`TxEip4844`] variant if the transaction is an EIP-4844
+    /// Consumes the type and returns the EIP-4844 variant if the transaction is an EIP-4844
     /// transaction. Returns an error otherwise.
     pub fn try_into_eip4844(self) -> Result<Signed<Eip4844>, ValueError<Self>> {
         match self {
@@ -1023,35 +1017,11 @@ pub mod serde_bincode_compat {
     mod tests {
         use super::super::{serde_bincode_compat, EthereumTxEnvelope};
         use crate::TxEip4844;
-        use arbitrary::Arbitrary;
-        use bincode::config;
-        use rand::Rng;
-        use serde::{Deserialize, Serialize};
-        use serde_with::serde_as;
-
-        #[test]
-        fn test_typed_tx_envelope_bincode_roundtrip() {
-            #[serde_as]
-            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-            struct Data {
-                #[serde_as(as = "serde_bincode_compat::EthereumTxEnvelope<'_>")]
-                transaction: EthereumTxEnvelope<TxEip4844>,
-            }
-
-            let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
-                transaction: EthereumTxEnvelope::arbitrary(&mut arbitrary::Unstructured::new(
-                    &bytes,
-                ))
-                .unwrap(),
-            };
-
-            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            let (decoded, _) =
-                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
-            assert_eq!(decoded, data);
-        }
+        bincode_compat_roundtrip_test!(
+            test_typed_tx_envelope_bincode_roundtrip,
+            EthereumTxEnvelope<TxEip4844>,
+            "serde_bincode_compat::EthereumTxEnvelope<'_>"
+        );
     }
 }
 
@@ -1059,11 +1029,12 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{Recovered, SignableTransaction, SignerRecoverable},
+        transaction::{PooledTransaction, Recovered, SignableTransaction, SignerRecoverable},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
     use alloy_eips::{
+        eip2718::{Decodable2718, Eip2718Error},
         eip2930::{AccessList, AccessListItem},
         eip4844::BlobTransactionSidecar,
         eip7594::BlobTransactionSidecarVariant,
@@ -1262,25 +1233,9 @@ mod tests {
             input: vec![8].into(),
             access_list: Default::default(),
         };
-        test_encode_decode_roundtrip(tx, None);
-    }
-
-    #[test]
-    fn test_encode_decode_eip1559_parity_eip155() {
-        let tx = TxEip1559 {
-            chain_id: 1u64,
-            nonce: 2,
-            max_fee_per_gas: 3,
-            max_priority_fee_per_gas: 4,
-            gas_limit: 5,
-            to: Address::left_padding_from(&[6]).into(),
-            value: U256::from(7_u64),
-            input: vec![8].into(),
-            access_list: Default::default(),
-        };
-        let signature = Signature::test_signature().with_parity(true);
-
-        test_encode_decode_roundtrip(tx, Some(signature));
+        for signature in [None, Some(Signature::test_signature().with_parity(true))] {
+            test_encode_decode_roundtrip(tx.clone(), signature);
+        }
     }
 
     #[test]
@@ -1544,6 +1499,141 @@ mod tests {
         );
     }
 
+    #[test]
+    fn legacy_tx_roundtrips_untagged_on_all_decode_paths() {
+        let legacy = TxLegacy {
+            chain_id: None,
+            nonce: 2,
+            gas_limit: 1_000_000,
+            gas_price: 10_000_000_000,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            ..Default::default()
+        }
+        .into_signed(Signature::test_signature().with_parity(true));
+        let envelope: TxEnvelope = legacy.clone().into();
+
+        let encoded = envelope.encoded_2718();
+        assert!(encoded[0] >= 0xc0, "sanity: legacy txs are encoded as a bare RLP list");
+        // The network encoding of a legacy tx is the bare list as well, without a string header.
+        let mut network = Vec::new();
+        envelope.network_encode(&mut network);
+        assert_eq!(network, encoded);
+
+        assert_eq!(TxEnvelope::decode_2718_exact(&encoded).unwrap(), envelope);
+        assert_eq!(TxEnvelope::network_decode(&mut encoded.as_slice()).unwrap(), envelope);
+        assert_eq!(TxEnvelope::decode(&mut encoded.as_slice()).unwrap(), envelope);
+        assert_eq!(Signed::<TxLegacy>::decode_2718_exact(&encoded).unwrap(), legacy);
+        assert_eq!(
+            <Signed<TxLegacy> as Decodable2718>::network_decode(&mut encoded.as_slice()).unwrap(),
+            legacy
+        );
+    }
+
+    #[test]
+    fn tagged_legacy_tx_is_rejected_on_all_decode_paths() {
+        // Per EIP-2718, legacy transactions are untagged and `0x00` is not an assigned
+        // `TransactionType`. `encode_2718` never emits a `0x00` prefix, so accepting one on
+        // decode would re-encode the transaction differently from the bytes that were decoded.
+        // geth, erigon, nethermind and besu all reject the type byte at decode.
+        let legacy = TxLegacy {
+            chain_id: None,
+            nonce: 2,
+            gas_limit: 1_000_000,
+            gas_price: 10_000_000_000,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            ..Default::default()
+        }
+        .into_signed(Signature::test_signature().with_parity(true));
+        let envelope: TxEnvelope = legacy.into();
+
+        let mut tagged = vec![0x00];
+        tagged.extend_from_slice(&envelope.encoded_2718());
+        // Network framing of a typed payload: an RLP string header followed by the payload.
+        let mut tagged_network = Vec::new();
+        alloy_rlp::Header { list: false, payload_length: tagged.len() }.encode(&mut tagged_network);
+        tagged_network.extend_from_slice(&tagged);
+
+        assert!(matches!(
+            TxEnvelope::decode_2718_exact(&tagged),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            TxEnvelope::decode_2718(&mut tagged.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            TxEnvelope::network_decode(&mut tagged_network.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(TxEnvelope::decode(&mut tagged_network.as_slice()).is_err());
+
+        // The guard lives in `Signed<T>`, so the same holds for the bare signed transaction.
+        assert!(matches!(
+            Signed::<TxLegacy>::decode_2718_exact(&tagged),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+        assert!(matches!(
+            <Signed<TxLegacy> as Decodable2718>::network_decode(&mut tagged_network.as_slice()),
+            Err(Eip2718Error::UnexpectedType(0))
+        ));
+    }
+
+    #[test]
+    fn network_decode_rejects_mismatched_wrapper_lengths() {
+        let tx: TxEnvelope = TxEip1559::default().into_signed(Signature::test_signature()).into();
+        let payload = tx.encoded_2718();
+
+        // Cover empty, short and long RLP string headers, with both understated and overstated
+        // lengths. Supply the extra bytes so overstated lengths pass Header::decode.
+        for payload_length in [0, 2, 55, 56, payload.len() - 3, payload.len() + 4] {
+            let mut encoded = Vec::new();
+            alloy_rlp::Header { list: false, payload_length }.encode(&mut encoded);
+            encoded.extend_from_slice(&payload);
+            if payload_length > payload.len() {
+                encoded.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+            }
+
+            assert!(matches!(
+                TxEnvelope::network_decode(&mut encoded.as_slice()),
+                Err(Eip2718Error::RlpError(alloy_rlp::Error::UnexpectedLength))
+            ));
+            assert_eq!(
+                PooledTransaction::decode(&mut encoded.as_slice()).unwrap_err(),
+                alloy_rlp::Error::UnexpectedLength
+            );
+
+            let mut list = Vec::new();
+            alloy_rlp::Header { list: true, payload_length: encoded.len() }.encode(&mut list);
+            list.extend_from_slice(&encoded);
+            assert_eq!(
+                Vec::<TxEnvelope>::decode(&mut list.as_slice()).unwrap_err(),
+                alloy_rlp::Error::UnexpectedLength
+            );
+        }
+    }
+
+    #[test]
+    fn network_decode_preserves_unwrapped_transactions() {
+        // Exercise both short and long canonical RLP string headers.
+        for signature in
+            [Signature::new(U256::ZERO, U256::ZERO, false), Signature::test_signature()]
+        {
+            let tx: TxEnvelope = TxEip1559::default().into_signed(signature).into();
+            for mut encoded in [alloy_rlp::encode(&tx), tx.encoded_2718()] {
+                let mut buf = encoded.as_slice();
+                assert_eq!(TxEnvelope::network_decode(&mut buf).unwrap(), tx);
+                assert!(buf.is_empty());
+
+                encoded.extend_from_slice(&[0x80, 0xc0]);
+                let mut buf = encoded.as_slice();
+                assert_eq!(TxEnvelope::decode(&mut buf).unwrap(), tx);
+                assert_eq!(buf, &[0x80, 0xc0]);
+            }
+        }
+    }
+
     #[cfg(feature = "serde")]
     fn test_serde_roundtrip<T: SignableTransaction<Signature>>(tx: T)
     where
@@ -1768,273 +1858,59 @@ mod tests {
     }
 
     #[test]
-    fn test_tx_type_from_conversions() {
-        let legacy_tx = Signed::new_unchecked(
-            TxLegacy::default(),
-            Signature::test_signature(),
-            Default::default(),
+    fn test_try_into_variants() {
+        fn envelope<T>(tx: T) -> TxEnvelope
+        where
+            TxEnvelope: From<Signed<T>>,
+        {
+            Signed::new_unchecked(tx, Signature::test_signature(), Default::default()).into()
+        }
+
+        fn assert_mismatch<T: core::fmt::Debug>(
+            result: Result<T, ValueError<TxEnvelope>>,
+            message: &str,
+            original: TxType,
+        ) {
+            let error = result.unwrap_err();
+            assert!(error.to_string().contains(message), "{error}");
+            assert_eq!(error.into_value().tx_type(), original);
+        }
+
+        let legacy = envelope(TxLegacy::default());
+        let eip2930 = envelope(TxEip2930::default());
+        let eip1559 = envelope(TxEip1559::default());
+        let eip4844 = envelope(TxEip4844Variant::<BlobTransactionSidecarVariant>::TxEip4844(
+            TxEip4844::default(),
+        ));
+        let eip7702 = envelope(TxEip7702::default());
+
+        assert!(legacy.clone().try_into_legacy().is_ok());
+        assert!(eip2930.clone().try_into_eip2930().is_ok());
+        assert!(eip1559.clone().try_into_eip1559().is_ok());
+        assert!(eip4844.clone().try_into_eip4844().is_ok());
+        assert!(eip7702.try_into_eip7702().is_ok());
+
+        assert_mismatch(
+            eip1559.clone().try_into_legacy(),
+            "Expected legacy transaction",
+            TxType::Eip1559,
         );
-        let eip2930_tx = Signed::new_unchecked(
-            TxEip2930::default(),
-            Signature::test_signature(),
-            Default::default(),
+        assert_mismatch(legacy.try_into_eip2930(), "Expected EIP-2930 transaction", TxType::Legacy);
+        assert_mismatch(
+            eip2930.try_into_eip1559(),
+            "Expected EIP-1559 transaction",
+            TxType::Eip2930,
         );
-        let eip1559_tx = Signed::new_unchecked(
-            TxEip1559::default(),
-            Signature::test_signature(),
-            Default::default(),
+        assert_mismatch(
+            eip1559.try_into_eip4844(),
+            "Expected EIP-4844 transaction",
+            TxType::Eip1559,
         );
-        let eip4844_variant = Signed::new_unchecked(
-            TxEip4844Variant::<BlobTransactionSidecarVariant>::TxEip4844(TxEip4844::default()),
-            Signature::test_signature(),
-            Default::default(),
+        assert_mismatch(
+            eip4844.try_into_eip7702(),
+            "Expected EIP-7702 transaction",
+            TxType::Eip4844,
         );
-        let eip7702_tx = Signed::new_unchecked(
-            TxEip7702::default(),
-            Signature::test_signature(),
-            Default::default(),
-        );
-
-        assert!(matches!(TxEnvelope::from(legacy_tx), TxEnvelope::Legacy(_)));
-        assert!(matches!(TxEnvelope::from(eip2930_tx), TxEnvelope::Eip2930(_)));
-        assert!(matches!(TxEnvelope::from(eip1559_tx), TxEnvelope::Eip1559(_)));
-        assert!(matches!(TxEnvelope::from(eip4844_variant), TxEnvelope::Eip4844(_)));
-        assert!(matches!(TxEnvelope::from(eip7702_tx), TxEnvelope::Eip7702(_)));
-    }
-
-    #[test]
-    fn test_tx_type_is_methods() {
-        let legacy_tx = TxEnvelope::Legacy(Signed::new_unchecked(
-            TxLegacy::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-        let eip2930_tx = TxEnvelope::Eip2930(Signed::new_unchecked(
-            TxEip2930::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
-            TxEip1559::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-        let eip4844_tx = TxEnvelope::Eip4844(Signed::new_unchecked(
-            TxEip4844Variant::TxEip4844(TxEip4844::default()),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-        let eip7702_tx = TxEnvelope::Eip7702(Signed::new_unchecked(
-            TxEip7702::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        assert!(legacy_tx.is_legacy());
-        assert!(!legacy_tx.is_eip2930());
-        assert!(!legacy_tx.is_eip1559());
-        assert!(!legacy_tx.is_eip4844());
-        assert!(!legacy_tx.is_eip7702());
-
-        assert!(eip2930_tx.is_eip2930());
-        assert!(!eip2930_tx.is_legacy());
-        assert!(!eip2930_tx.is_eip1559());
-        assert!(!eip2930_tx.is_eip4844());
-        assert!(!eip2930_tx.is_eip7702());
-
-        assert!(eip1559_tx.is_eip1559());
-        assert!(!eip1559_tx.is_legacy());
-        assert!(!eip1559_tx.is_eip2930());
-        assert!(!eip1559_tx.is_eip4844());
-        assert!(!eip1559_tx.is_eip7702());
-
-        assert!(eip4844_tx.is_eip4844());
-        assert!(!eip4844_tx.is_legacy());
-        assert!(!eip4844_tx.is_eip2930());
-        assert!(!eip4844_tx.is_eip1559());
-        assert!(!eip4844_tx.is_eip7702());
-
-        assert!(eip7702_tx.is_eip7702());
-        assert!(!eip7702_tx.is_legacy());
-        assert!(!eip7702_tx.is_eip2930());
-        assert!(!eip7702_tx.is_eip1559());
-        assert!(!eip7702_tx.is_eip4844());
-    }
-
-    #[test]
-    fn test_tx_type() {
-        let legacy_tx = TxEnvelope::Legacy(Signed::new_unchecked(
-            TxLegacy::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-        let eip2930_tx = TxEnvelope::Eip2930(Signed::new_unchecked(
-            TxEip2930::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
-            TxEip1559::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-        let eip4844_tx = TxEnvelope::Eip4844(Signed::new_unchecked(
-            TxEip4844Variant::TxEip4844(TxEip4844::default()),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-        let eip7702_tx = TxEnvelope::Eip7702(Signed::new_unchecked(
-            TxEip7702::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        assert_eq!(legacy_tx.tx_type(), TxType::Legacy);
-        assert_eq!(eip2930_tx.tx_type(), TxType::Eip2930);
-        assert_eq!(eip1559_tx.tx_type(), TxType::Eip1559);
-        assert_eq!(eip4844_tx.tx_type(), TxType::Eip4844);
-        assert_eq!(eip7702_tx.tx_type(), TxType::Eip7702);
-    }
-
-    #[test]
-    fn test_try_into_legacy_success() {
-        let legacy_tx = TxEnvelope::Legacy(Signed::new_unchecked(
-            TxLegacy::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = legacy_tx.try_into_legacy();
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_try_into_legacy_failure() {
-        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
-            TxEip1559::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = eip1559_tx.try_into_legacy();
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert!(error.to_string().contains("Expected legacy transaction"));
-        // Test that we can recover the original envelope
-        let recovered_envelope = error.into_value();
-        assert!(recovered_envelope.is_eip1559());
-    }
-
-    #[test]
-    fn test_try_into_eip2930_success() {
-        let eip2930_tx = TxEnvelope::Eip2930(Signed::new_unchecked(
-            TxEip2930::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = eip2930_tx.try_into_eip2930();
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_try_into_eip2930_failure() {
-        let legacy_tx = TxEnvelope::Legacy(Signed::new_unchecked(
-            TxLegacy::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = legacy_tx.try_into_eip2930();
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert!(error.to_string().contains("Expected EIP-2930 transaction"));
-        let recovered_envelope = error.into_value();
-        assert!(recovered_envelope.is_legacy());
-    }
-
-    #[test]
-    fn test_try_into_eip1559_success() {
-        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
-            TxEip1559::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = eip1559_tx.try_into_eip1559();
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_try_into_eip1559_failure() {
-        let eip2930_tx = TxEnvelope::Eip2930(Signed::new_unchecked(
-            TxEip2930::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = eip2930_tx.try_into_eip1559();
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert!(error.to_string().contains("Expected EIP-1559 transaction"));
-        let recovered_envelope = error.into_value();
-        assert!(recovered_envelope.is_eip2930());
-    }
-
-    #[test]
-    fn test_try_into_eip4844_success() {
-        let eip4844_tx = TxEnvelope::Eip4844(Signed::new_unchecked(
-            TxEip4844Variant::TxEip4844(TxEip4844::default()),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = eip4844_tx.try_into_eip4844();
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_try_into_eip4844_failure() {
-        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
-            TxEip1559::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = eip1559_tx.try_into_eip4844();
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert!(error.to_string().contains("Expected EIP-4844 transaction"));
-        let recovered_envelope = error.into_value();
-        assert!(recovered_envelope.is_eip1559());
-    }
-
-    #[test]
-    fn test_try_into_eip7702_success() {
-        let eip7702_tx = TxEnvelope::Eip7702(Signed::new_unchecked(
-            TxEip7702::default(),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = eip7702_tx.try_into_eip7702();
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_try_into_eip7702_failure() {
-        let eip4844_tx = TxEnvelope::Eip4844(Signed::new_unchecked(
-            TxEip4844Variant::TxEip4844(TxEip4844::default()),
-            Signature::test_signature(),
-            Default::default(),
-        ));
-
-        let result = eip4844_tx.try_into_eip7702();
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert!(error.to_string().contains("Expected EIP-7702 transaction"));
-        let recovered_envelope = error.into_value();
-        assert!(recovered_envelope.is_eip4844());
     }
 
     // <https://sepolia.etherscan.io/getRawTx?tx=0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6>
@@ -2221,5 +2097,87 @@ mod tests {
 
         // Verify that the buffer was properly reused (no allocation needed between calls)
         assert!(!buf.is_empty());
+    }
+}
+
+#[cfg(all(test, feature = "arbitrary"))]
+mod fuzz_tests {
+    use super::*;
+    use alloy_eips::eip2718::Decodable2718;
+    use alloy_rlp::{Decodable, Header};
+    use arbitrary::{Arbitrary, Unstructured};
+    use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+
+    fn arbitrary_envelope(seed: u64) -> EthereumTxEnvelope<TxEip4844> {
+        let mut bytes = [0u8; 16 * 1024];
+        StdRng::seed_from_u64(seed).fill_bytes(&mut bytes);
+        EthereumTxEnvelope::arbitrary(&mut Unstructured::new(&bytes)).unwrap()
+    }
+
+    #[test]
+    fn fuzz_network_decode_roundtrip() {
+        for seed in 0..256 {
+            let tx = arbitrary_envelope(seed);
+            let network = alloy_rlp::encode(&tx);
+
+            for mut encoded in [network.clone(), tx.encoded_2718()] {
+                let mut buf = encoded.as_slice();
+                let decoded = EthereumTxEnvelope::<TxEip4844>::network_decode(&mut buf).unwrap();
+                assert_eq!(decoded, tx, "seed {seed}");
+                assert!(buf.is_empty(), "seed {seed}");
+                assert_eq!(alloy_rlp::encode(&decoded), network, "seed {seed}");
+
+                // Both wrapped and unwrapped inputs must leave the next transaction untouched.
+                encoded.extend_from_slice(&network);
+                let mut buf = encoded.as_slice();
+                assert_eq!(
+                    EthereumTxEnvelope::<TxEip4844>::decode(&mut buf).unwrap(),
+                    tx,
+                    "seed {seed}"
+                );
+                assert_eq!(buf, network, "seed {seed}");
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_network_decode_rejects_mismatched_wrapper_lengths() {
+        for seed in 0..256 {
+            let tx = arbitrary_envelope(seed);
+            if tx.is_legacy() {
+                continue;
+            }
+
+            let payload = tx.encoded_2718();
+            let mut rng = StdRng::seed_from_u64(seed);
+            // A one-byte wrapper around the type byte is already rejected as non-canonical RLP.
+            let short = rng.gen_range(2..payload.len());
+            let long = payload.len() + rng.gen_range(1..=32);
+            for payload_length in [short, long] {
+                let mut encoded = Vec::new();
+                Header { list: false, payload_length }.encode(&mut encoded);
+                encoded.extend_from_slice(&payload);
+                if payload_length > payload.len() {
+                    encoded.resize(encoded.len() + payload_length - payload.len(), 0x80);
+                }
+
+                assert_eq!(
+                    EthereumTxEnvelope::<TxEip4844>::decode(&mut encoded.as_slice()).unwrap_err(),
+                    alloy_rlp::Error::UnexpectedLength,
+                    "seed {seed}, declared {payload_length}, actual {}",
+                    payload.len()
+                );
+
+                let mut list = Vec::new();
+                Header { list: true, payload_length: encoded.len() }.encode(&mut list);
+                list.extend_from_slice(&encoded);
+                assert_eq!(
+                    Vec::<EthereumTxEnvelope<TxEip4844>>::decode(&mut list.as_slice()).unwrap_err(),
+                    alloy_rlp::Error::UnexpectedLength,
+                    "seed {seed}, declared {payload_length}, actual {}",
+                    payload.len()
+                );
+            }
+        }
     }
 }

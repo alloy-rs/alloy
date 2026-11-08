@@ -15,6 +15,11 @@ pub enum LocalSignerError {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 
+    /// [`yubihsm`] client error.
+    #[cfg(feature = "yubihsm")]
+    #[error(transparent)]
+    YubiHsmError(#[from] yubihsm::client::Error),
+
     /// [`secp256k1`] error.
     #[error(transparent)]
     #[cfg(feature = "secp256k1")]

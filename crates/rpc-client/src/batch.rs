@@ -28,8 +28,18 @@ pub(crate) type ChannelMap = HashMap<Id, Channel>;
 
 /// A batch JSON-RPC request, used to bundle requests into a single transport
 /// call.
+///
+/// Calls are serialized when they are added. Sending the batch is still lazy:
+/// [`Self::send`] returns a future, and the transport is not called until that
+/// future is polled. Await the batch before awaiting its [`Waiter`]s.
+///
+/// Empty batches complete successfully without accessing the transport.
+///
+/// Responses are matched to waiters by JSON-RPC ID, not response order.
+/// Missing IDs produce a per-waiter error; responses with unknown IDs are
+/// ignored.
 #[derive(Debug)]
-#[must_use = "A BatchRequest does nothing unless sent via `send_batch` and `.await`"]
+#[must_use = "a BatchRequest does nothing unless it is awaited or `send()` is awaited"]
 pub struct BatchRequest<'a> {
     /// The transport via which the batch will be sent.
     transport: ClientRef<'a>,
@@ -42,7 +52,10 @@ pub struct BatchRequest<'a> {
 }
 
 /// Awaits a single response for a request that has been included in a batch.
-#[must_use = "A Waiter does nothing unless the corresponding BatchRequest is sent via `send_batch` and `.await`, AND the Waiter is awaited."]
+///
+/// Await the corresponding [`BatchRequest`] first so transport-level failures
+/// are observed and the response channels are populated.
+#[must_use = "a Waiter requires its BatchRequest to be sent and the Waiter to be awaited"]
 #[pin_project]
 #[derive(Debug)]
 pub struct Waiter<Resp, Output = Resp, Map = fn(Resp) -> Output> {
@@ -144,6 +157,9 @@ impl<'a> BatchRequest<'a> {
 
     /// Add a call to the batch.
     ///
+    /// Unlike [`RpcCall`](crate::RpcCall), this serializes the parameters
+    /// immediately so calls with different parameter types can share a batch.
+    ///
     /// ### Errors
     ///
     /// If the request cannot be serialized, this will return an error.
@@ -156,7 +172,9 @@ impl<'a> BatchRequest<'a> {
         self.push(request)
     }
 
-    /// Send the batch future via its connection.
+    /// Return a future that sends the batch when polled.
+    ///
+    /// This method alone does not dispatch anything; await the returned future.
     pub fn send(self) -> BatchFuture {
         BatchFuture::Prepared {
             transport: self.transport.transport.clone(),
@@ -184,6 +202,11 @@ impl BatchFuture {
         else {
             unreachable!("Called poll_prepared in incorrect state")
         };
+
+        if requests.is_empty() {
+            self.set(Self::Complete);
+            return Poll::Ready(Ok(()));
+        }
 
         if let Err(e) = task::ready!(transport.poll_ready(cx)) {
             self.set(Self::Complete);
@@ -258,5 +281,57 @@ impl Future for BatchFuture {
         }
 
         panic!("Called poll on BatchFuture in invalid state")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RpcClient;
+    use alloy_transport::mock::Asserter;
+
+    #[derive(Clone, Debug)]
+    struct UnusedTransport;
+
+    impl Service<RequestPacket> for UnusedTransport {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(&mut self, _: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+            panic!("empty batches must not poll transport readiness");
+        }
+
+        fn call(&mut self, _: RequestPacket) -> Self::Future {
+            panic!("empty batches must not call the transport");
+        }
+    }
+
+    #[tokio::test]
+    async fn empty_batch_does_not_access_transport() {
+        let client = RpcClient::new(UnusedTransport, true);
+
+        client.new_batch().await.unwrap();
+        client.new_batch().send().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn non_empty_batch_sends_requests() {
+        let asserter = Asserter::new();
+        asserter.push_success(&1_u64);
+        asserter.push_success(&2_u64);
+        let client = RpcClient::mocked(asserter.clone());
+        let mut batch = client.new_batch();
+        let first = batch.add_call::<_, u64>("first", &()).unwrap();
+        let second = batch.add_call::<_, u64>("second", &()).unwrap();
+
+        batch.await.unwrap();
+
+        assert_eq!(first.await.unwrap(), 1);
+        assert_eq!(second.await.unwrap(), 2);
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].method(), "first");
+        assert_eq!(requests[1].method(), "second");
     }
 }

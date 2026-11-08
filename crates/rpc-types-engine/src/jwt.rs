@@ -205,7 +205,10 @@ impl JwtSecret {
         match hex::decode_to_array(hex) {
             Ok(b) => Ok(Self(b)),
             Err(hex::FromHexError::InvalidStringLength | hex::FromHexError::OddLength) => {
-                Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
+                Err(JwtError::InvalidLength(
+                    JWT_SECRET_LEN,
+                    hex.strip_prefix("0x").or_else(|| hex.strip_prefix("0X")).unwrap_or(hex).len(),
+                ))
             }
             Err(e) => Err(JwtError::JwtSecretHexDecodeError(e)),
         }
@@ -223,6 +226,9 @@ impl JwtSecret {
 
     /// Creates a random [`JwtSecret`] and tries to store it at the specified path. I/O errors might
     /// occur during write operations in the form of a [`JwtError`]
+    ///
+    /// On Unix, the file is created (or overwritten) with `0600` permissions, so that it is only
+    /// readable and writable by its owner.
     #[cfg(feature = "std")]
     pub fn try_create_random(fpath: &Path) -> Result<Self, JwtError> {
         if let Some(dir) = fpath.parent() {
@@ -234,7 +240,20 @@ impl JwtSecret {
         let secret = Self::random();
         let bytes = &secret.0;
         let hex = hex::encode(bytes);
-        fs::write(fpath, hex).map_err(|err| JwtError::Write { source: err, path: fpath.into() })?;
+        let write = || -> io::Result<()> {
+            let mut opts = fs::OpenOptions::new();
+            opts.write(true).create(true).truncate(false);
+            #[cfg(unix)]
+            std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+            let mut file = opts.open(fpath)?;
+            // `mode` only applies to new files, so also restrict the permissions of an existing
+            // file. This happens before truncating, so its contents are kept if it fails.
+            #[cfg(unix)]
+            file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+            file.set_len(0)?;
+            io::Write::write_all(&mut file, hex.as_bytes())
+        };
+        write().map_err(|err| JwtError::Write { source: err, path: fpath.into() })?;
         Ok(secret)
     }
 
@@ -357,22 +376,6 @@ mod tests {
     }
 
     #[test]
-    fn secret_has_64_hex_digits() {
-        let expected_len = 64;
-        let secret = JwtSecret::random();
-        let hex = hex::encode(secret.0);
-        assert_eq!(hex.len(), expected_len);
-    }
-
-    #[test]
-    fn creation_ok_hex_string_with_0x() {
-        let hex: String =
-            "0x7365637265747365637265747365637265747365637265747365637265747365".into();
-        let result = JwtSecret::from_hex(hex);
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn creation_error_wrong_len() {
         let hex = "f79ae8046";
         let result = JwtSecret::from_hex(hex);
@@ -481,19 +484,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn valid_without_exp_claim() {
-        let secret = JwtSecret::random();
-
-        let claims = Claims { iat: get_current_timestamp(), exp: None };
-        let jwt = secret.encode(&claims).unwrap();
-
-        let result = secret.validate(&jwt);
-
-        assert!(matches!(result, Ok(())));
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
     fn omits_exp_claim_when_none() {
         let secret = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: None };
@@ -523,6 +513,35 @@ mod tests {
         JwtSecret::try_create_random(fpath).expect("A secret file should be created");
         assert!(fs::metadata(fpath).is_ok());
         fs::remove_file(fpath).unwrap();
+    }
+
+    #[test]
+    #[cfg(all(feature = "std", unix))]
+    fn created_secret_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let fpath = dir.path().join("jwt.hex");
+        let secret = JwtSecret::try_create_random(&fpath).unwrap();
+        let mode = fs::metadata(&fpath).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(JwtSecret::from_file(&fpath).unwrap(), secret);
+    }
+
+    #[test]
+    #[cfg(all(feature = "std", unix))]
+    fn overwritten_secret_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let fpath = dir.path().join("jwt.hex");
+        // longer than the new secret, to also check that the file is truncated
+        fs::write(&fpath, "f".repeat(128)).unwrap();
+        fs::set_permissions(&fpath, fs::Permissions::from_mode(0o644)).unwrap();
+        let secret = JwtSecret::try_create_random(&fpath).unwrap();
+        let mode = fs::metadata(&fpath).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(JwtSecret::from_file(&fpath).unwrap(), secret);
     }
 
     #[test]

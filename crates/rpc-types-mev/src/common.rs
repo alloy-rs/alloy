@@ -176,51 +176,39 @@ impl PrivacyHint {
         self.tx_hash
     }
 
-    /// Calculates the number of hints set within the `PrivacyHint` instance.
-    const fn num_hints(&self) -> usize {
-        let mut num_hints = 0;
-        if self.calldata {
-            num_hints += 1;
-        }
-        if self.contract_address {
-            num_hints += 1;
-        }
-        if self.logs {
-            num_hints += 1;
-        }
-        if self.function_selector {
-            num_hints += 1;
-        }
-        if self.hash {
-            num_hints += 1;
-        }
-        if self.tx_hash {
-            num_hints += 1;
-        }
-        num_hints
+    /// Returns the hint flags in [`PRIVACY_HINT_VARIANTS`] order.
+    const fn flags(&self) -> [bool; 6] {
+        [
+            self.calldata,
+            self.contract_address,
+            self.logs,
+            self.function_selector,
+            self.hash,
+            self.tx_hash,
+        ]
+    }
+
+    /// Returns mutable references to the hint flags in [`PRIVACY_HINT_VARIANTS`] order.
+    const fn flags_mut(&mut self) -> [&mut bool; 6] {
+        [
+            &mut self.calldata,
+            &mut self.contract_address,
+            &mut self.logs,
+            &mut self.function_selector,
+            &mut self.hash,
+            &mut self.tx_hash,
+        ]
     }
 }
 
 impl Serialize for PrivacyHint {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut seq = serializer.serialize_seq(Some(self.num_hints()))?;
-        if self.calldata {
-            seq.serialize_element("calldata")?;
-        }
-        if self.contract_address {
-            seq.serialize_element("contract_address")?;
-        }
-        if self.logs {
-            seq.serialize_element("logs")?;
-        }
-        if self.function_selector {
-            seq.serialize_element("function_selector")?;
-        }
-        if self.hash {
-            seq.serialize_element("hash")?;
-        }
-        if self.tx_hash {
-            seq.serialize_element("tx_hash")?;
+        let flags = self.flags();
+        let mut seq = serializer.serialize_seq(Some(flags.iter().filter(|set| **set).count()))?;
+        for (name, set) in PRIVACY_HINT_VARIANTS.iter().zip(flags) {
+            if set {
+                seq.serialize_element(name)?;
+            }
         }
         seq.end()
     }
@@ -235,17 +223,10 @@ impl<'de> Deserialize<'de> for PrivacyHint {
         let hints = Vec::<String>::deserialize(deserializer)?;
         let mut privacy_hint = Self::default();
         for hint in hints {
-            match hint.as_str() {
-                "calldata" => privacy_hint.calldata = true,
-                "contract_address" => privacy_hint.contract_address = true,
-                "logs" => privacy_hint.logs = true,
-                "function_selector" => privacy_hint.function_selector = true,
-                "hash" => privacy_hint.hash = true,
-                "tx_hash" => privacy_hint.tx_hash = true,
-                _ => {
-                    return Err(serde::de::Error::unknown_variant(&hint, PRIVACY_HINT_VARIANTS));
-                }
-            }
+            let Some(idx) = PRIVACY_HINT_VARIANTS.iter().position(|name| *name == hint) else {
+                return Err(serde::de::Error::unknown_variant(&hint, PRIVACY_HINT_VARIANTS));
+            };
+            *privacy_hint.flags_mut()[idx] = true;
         }
         Ok(privacy_hint)
     }

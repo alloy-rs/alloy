@@ -25,7 +25,7 @@ impl TransactionBuilder for WithOtherFields<TransactionRequest> {
     }
 
     fn take_nonce(&mut self) -> Option<u64> {
-        self.deref_mut().nonce.take()
+        self.deref_mut().take_nonce()
     }
 
     fn input(&self) -> Option<&Bytes> {
@@ -100,12 +100,10 @@ impl TransactionBuilder for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_gas_limit(gas_limit);
     }
 
-    /// Get the EIP-2930 access list for the transaction.
     fn access_list(&self) -> Option<&AccessList> {
         self.deref().access_list()
     }
 
-    /// Sets the EIP-2930 access list.
     fn set_access_list(&mut self, access_list: AccessList) {
         self.deref_mut().set_access_list(access_list)
     }

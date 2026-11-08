@@ -27,13 +27,25 @@ pub struct EthCallBundle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coinbase: Option<Address>,
     /// the timestamp to use for this bundle simulation, in seconds since the unix epoch
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timestamp: Option<u64>,
     /// the timeout to apply to execution of this bundle, in milliseconds
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timeout: Option<u64>,
     /// gas limit of the block to use for this simulation
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub gas_limit: Option<u64>,
     /// difficulty of the block to use for this simulation
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -459,6 +471,35 @@ pub struct EthSendEndOfBlockBundle {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn call_bundle_serializes_plain_integers_and_accepts_legacy_quantities() {
+        let bundle = super::EthCallBundle {
+            timestamp: Some(1000),
+            timeout: Some(500),
+            gas_limit: Some(30_000_000),
+            ..Default::default()
+        };
+        let numeric = serde_json::to_value(&bundle).unwrap();
+        assert_eq!(numeric["timestamp"], 1000);
+        assert_eq!(numeric["timeout"], 500);
+        assert_eq!(numeric["gasLimit"], 30_000_000);
+        assert_eq!(
+            serde_json::from_value::<super::EthCallBundle>(numeric.clone()).unwrap(),
+            bundle
+        );
+
+        let mut legacy = numeric;
+        legacy["timestamp"] = "0x3e8".into();
+        legacy["timeout"] = "0x1f4".into();
+        legacy["gasLimit"] = "0x1c9c380".into();
+        assert_eq!(serde_json::from_value::<super::EthCallBundle>(legacy).unwrap(), bundle);
+
+        let omitted = serde_json::to_value(super::EthCallBundle::default()).unwrap();
+        for field in ["timestamp", "timeout", "gasLimit"] {
+            assert!(omitted.get(field).is_none());
+        }
+    }
     use super::EthCallBundleResponse;
     use crate::EthSendBundle;
     use alloy_primitives::{address, b256, bytes};

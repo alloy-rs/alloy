@@ -7,7 +7,6 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
@@ -40,3 +39,6 @@ tracing.workspace = true
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasmtimer.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "test-util"] }

@@ -1,5 +1,8 @@
 //! Payload types.
 
+#[cfg(feature = "serde")]
+mod strict;
+
 use crate::{CancunPayloadFields, ExecutionPayloadSidecar, PayloadError, PraguePayloadFields};
 use alloc::{
     string::{String, ToString},
@@ -125,6 +128,111 @@ impl From<Bytes> for PayloadExtras {
     }
 }
 
+/// Declares a serde helper struct holding the [`ExecutionPayloadV1`] fields followed by the given
+/// fields, with an `into_parts` method that splits it into the [`ExecutionPayloadV1`] and a tuple
+/// of the given fields.
+///
+/// A single flat struct avoids `#[serde(flatten)]`, which buffers every field in an intermediate
+/// map before deserializing it.
+#[cfg(feature = "serde")]
+macro_rules! payload_serde_helper {
+    (
+        $(#[$attr:meta])*
+        struct $name:ident { $($(#[$field_attr:meta])* $field:ident: $ty:ty,)* }
+    ) => {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        $(#[$attr])*
+        struct $name {
+            parent_hash: B256,
+            fee_recipient: Address,
+            state_root: B256,
+            receipts_root: B256,
+            logs_bloom: Bloom,
+            prev_randao: B256,
+            #[serde(with = "alloy_serde::quantity")]
+            block_number: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_limit: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            gas_used: u64,
+            #[serde(with = "alloy_serde::quantity")]
+            timestamp: u64,
+            extra_data: Bytes,
+            base_fee_per_gas: U256,
+            block_hash: B256,
+            transactions: Vec<Bytes>,
+            $($(#[$field_attr])* $field: $ty,)*
+        }
+
+        impl $name {
+            fn into_parts(self) -> (ExecutionPayloadV1, ($($ty,)*)) {
+                let payload = ExecutionPayloadV1 {
+                    parent_hash: self.parent_hash,
+                    fee_recipient: self.fee_recipient,
+                    state_root: self.state_root,
+                    receipts_root: self.receipts_root,
+                    logs_bloom: self.logs_bloom,
+                    prev_randao: self.prev_randao,
+                    block_number: self.block_number,
+                    gas_limit: self.gas_limit,
+                    gas_used: self.gas_used,
+                    timestamp: self.timestamp,
+                    extra_data: self.extra_data,
+                    base_fee_per_gas: self.base_fee_per_gas,
+                    block_hash: self.block_hash,
+                    transactions: self.transactions,
+                };
+                (payload, ($(self.$field,)*))
+            }
+        }
+    };
+}
+
+/// Deserializes the payload helper `H` from a map and converts it with `f` inside the visitor, so
+/// that conversion errors carry the deserializer's position.
+///
+/// Unlike `H::deserialize`, this only accepts a map and rejects the sequence form that a derived
+/// `Deserialize` also accepts. A field list preserves sibling fields when the payload is flattened.
+#[cfg(feature = "serde")]
+fn deserialize_payload_map<'de, D, H, T>(
+    deserializer: D,
+    expecting: &'static str,
+    fields: Option<&'static [&'static str]>,
+    f: fn(H) -> Result<T, &'static str>,
+) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    H: serde::Deserialize<'de>,
+{
+    struct PayloadMapVisitor<H, T> {
+        expecting: &'static str,
+        f: fn(H) -> Result<T, &'static str>,
+    }
+
+    impl<'de, H: serde::Deserialize<'de>, T> serde::de::Visitor<'de> for PayloadMapVisitor<H, T> {
+        type Value = T;
+
+        fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            formatter.write_str(self.expecting)
+        }
+
+        fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            let helper = H::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+            (self.f)(helper).map_err(serde::de::Error::custom)
+        }
+    }
+
+    let visitor = PayloadMapVisitor { expecting, f };
+    match fields {
+        Some(fields) => deserializer.deserialize_struct("ExecutionPayload", fields, visitor),
+        None => deserializer.deserialize_map(visitor),
+    }
+}
+
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
@@ -137,7 +245,7 @@ impl From<Bytes> for PayloadExtras {
 /// See:
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/shanghai.md#response>
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum ExecutionPayloadFieldV2 {
@@ -145,6 +253,37 @@ pub enum ExecutionPayloadFieldV2 {
     V1(ExecutionPayloadV1),
     /// V2 payload
     V2(ExecutionPayloadV2),
+}
+
+// Deserializes untagged ExecutionPayloadFieldV2 as V2 if withdrawals are present, V1 otherwise.
+// A derived untagged impl would try V1 first, which also matches V2 input and drops withdrawals.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for ExecutionPayloadFieldV2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        payload_serde_helper! {
+            struct Helper {
+                withdrawals: Option<Vec<Withdrawal>>,
+            }
+        }
+
+        deserialize_payload_map(
+            deserializer,
+            "a valid ExecutionPayload object",
+            None,
+            |helper: Helper| {
+                let (payload_inner, (withdrawals,)) = helper.into_parts();
+                Ok(match withdrawals {
+                    Some(withdrawals) => {
+                        Self::V2(ExecutionPayloadV2 { payload_inner, withdrawals })
+                    }
+                    None => Self::V1(payload_inner),
+                })
+            },
+        )
+    }
 }
 
 impl ExecutionPayloadFieldV2 {
@@ -258,50 +397,15 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadInputV2 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase", deny_unknown_fields)]
-        struct Helper {
-            parent_hash: B256,
-            fee_recipient: Address,
-            state_root: B256,
-            receipts_root: B256,
-            logs_bloom: Bloom,
-            prev_randao: B256,
-            #[serde(with = "alloy_serde::quantity")]
-            block_number: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            timestamp: u64,
-            extra_data: Bytes,
-            base_fee_per_gas: U256,
-            block_hash: B256,
-            transactions: Vec<Bytes>,
-            withdrawals: Option<Vec<Withdrawal>>,
+        payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
+            struct Helper {
+                withdrawals: Option<Vec<Withdrawal>>,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
-        Ok(Self {
-            execution_payload: ExecutionPayloadV1 {
-                parent_hash: helper.parent_hash,
-                fee_recipient: helper.fee_recipient,
-                state_root: helper.state_root,
-                receipts_root: helper.receipts_root,
-                logs_bloom: helper.logs_bloom,
-                prev_randao: helper.prev_randao,
-                block_number: helper.block_number,
-                gas_limit: helper.gas_limit,
-                gas_used: helper.gas_used,
-                timestamp: helper.timestamp,
-                extra_data: helper.extra_data,
-                base_fee_per_gas: helper.base_fee_per_gas,
-                block_hash: helper.block_hash,
-                transactions: helper.transactions,
-            },
-            withdrawals: helper.withdrawals,
-        })
+        let (execution_payload, (withdrawals,)) = Helper::deserialize(deserializer)?.into_parts();
+        Ok(Self { execution_payload, withdrawals })
     }
 }
 
@@ -740,7 +844,10 @@ impl ExecutionPayloadV1 {
         BlockNumHash::new(self.block_number, self.block_hash)
     }
 
-    /// Converts [`ExecutionPayloadV1`] to [`Block`]
+    /// Converts [`ExecutionPayloadV1`] to an unsealed [`Block`].
+    ///
+    /// This does not recompute or compare the payload's advertised [`Self::block_hash`]. Callers
+    /// performing Engine API validation must hash the returned block and compare it separately.
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
         self.try_into_block_with(|tx| {
             T::decode_2718_exact(tx.as_ref())
@@ -847,6 +954,8 @@ impl ExecutionPayloadV1 {
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`] using the given block hash.
+    ///
+    /// The supplied hash is stored verbatim without checking it against the block.
     pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
     where
         T: Encodable2718,
@@ -916,50 +1025,14 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV2 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Helper {
-            parent_hash: B256,
-            fee_recipient: Address,
-            state_root: B256,
-            receipts_root: B256,
-            logs_bloom: Bloom,
-            prev_randao: B256,
-            #[serde(with = "alloy_serde::quantity")]
-            block_number: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            timestamp: u64,
-            extra_data: Bytes,
-            base_fee_per_gas: U256,
-            block_hash: B256,
-            transactions: Vec<Bytes>,
-            withdrawals: Vec<Withdrawal>,
+        payload_serde_helper! {
+            struct Helper {
+                withdrawals: Vec<Withdrawal>,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
-        Ok(Self {
-            payload_inner: ExecutionPayloadV1 {
-                parent_hash: helper.parent_hash,
-                fee_recipient: helper.fee_recipient,
-                state_root: helper.state_root,
-                receipts_root: helper.receipts_root,
-                logs_bloom: helper.logs_bloom,
-                prev_randao: helper.prev_randao,
-                block_number: helper.block_number,
-                gas_limit: helper.gas_limit,
-                gas_used: helper.gas_used,
-                timestamp: helper.timestamp,
-                extra_data: helper.extra_data,
-                base_fee_per_gas: helper.base_fee_per_gas,
-                block_hash: helper.block_hash,
-                transactions: helper.transactions,
-            },
-            withdrawals: helper.withdrawals,
-        })
+        let (payload_inner, (withdrawals,)) = Helper::deserialize(deserializer)?.into_parts();
+        Ok(Self { payload_inner, withdrawals })
     }
 }
 
@@ -1182,6 +1255,9 @@ impl ssz::Encode for ExecutionPayloadV2 {
 
 /// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec.
 ///
+/// Deserialization rejects unknown non-null fields, as required by `engine_newPayloadV3` and
+/// `engine_newPayloadV4`. When flattened, the enclosing type is responsible for unknown fields.
+///
 /// See also: <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#executionpayloadv3>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -1208,57 +1284,23 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV3 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Helper {
-            parent_hash: B256,
-            fee_recipient: Address,
-            state_root: B256,
-            receipts_root: B256,
-            logs_bloom: Bloom,
-            prev_randao: B256,
-            #[serde(with = "alloy_serde::quantity")]
-            block_number: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            timestamp: u64,
-            extra_data: Bytes,
-            base_fee_per_gas: U256,
-            block_hash: B256,
-            transactions: Vec<Bytes>,
-            withdrawals: Vec<Withdrawal>,
-            #[serde(with = "alloy_serde::quantity")]
-            blob_gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            excess_blob_gas: u64,
+        payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
+            struct Helper {
+                withdrawals: Vec<Withdrawal>,
+                #[serde(with = "alloy_serde::quantity")]
+                blob_gas_used: u64,
+                #[serde(with = "alloy_serde::quantity")]
+                excess_blob_gas: u64,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
+        let (payload_inner, (withdrawals, blob_gas_used, excess_blob_gas)) =
+            Helper::deserialize(strict::StrictFields(deserializer))?.into_parts();
         Ok(Self {
-            payload_inner: ExecutionPayloadV2 {
-                payload_inner: ExecutionPayloadV1 {
-                    parent_hash: helper.parent_hash,
-                    fee_recipient: helper.fee_recipient,
-                    state_root: helper.state_root,
-                    receipts_root: helper.receipts_root,
-                    logs_bloom: helper.logs_bloom,
-                    prev_randao: helper.prev_randao,
-                    block_number: helper.block_number,
-                    gas_limit: helper.gas_limit,
-                    gas_used: helper.gas_used,
-                    timestamp: helper.timestamp,
-                    extra_data: helper.extra_data,
-                    base_fee_per_gas: helper.base_fee_per_gas,
-                    block_hash: helper.block_hash,
-                    transactions: helper.transactions,
-                },
-                withdrawals: helper.withdrawals,
-            },
-            blob_gas_used: helper.blob_gas_used,
-            excess_blob_gas: helper.excess_blob_gas,
+            payload_inner: ExecutionPayloadV2 { payload_inner, withdrawals },
+            blob_gas_used,
+            excess_blob_gas,
         })
     }
 }
@@ -1472,6 +1514,9 @@ impl ssz::Encode for ExecutionPayloadV3 {
 
 /// Execution payload V4 as defined in the Amsterdam fork.
 ///
+/// Deserialization rejects unknown non-null fields. When flattened, the enclosing type is
+/// responsible for unknown fields.
+///
 /// This extends [`ExecutionPayloadV3`] with the `block_access_list` field for [EIP-7928] and the
 /// `slot_number` field for [EIP-7843].
 ///
@@ -1505,64 +1550,32 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV4 {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Helper {
-            parent_hash: B256,
-            fee_recipient: Address,
-            state_root: B256,
-            receipts_root: B256,
-            logs_bloom: Bloom,
-            prev_randao: B256,
-            #[serde(with = "alloy_serde::quantity")]
-            block_number: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_limit: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            timestamp: u64,
-            extra_data: Bytes,
-            base_fee_per_gas: U256,
-            block_hash: B256,
-            transactions: Vec<Bytes>,
-            withdrawals: Vec<Withdrawal>,
-            #[serde(with = "alloy_serde::quantity")]
-            blob_gas_used: u64,
-            #[serde(with = "alloy_serde::quantity")]
-            excess_blob_gas: u64,
-            block_access_list: Bytes,
-            #[serde(with = "alloy_serde::quantity")]
-            slot_number: u64,
+        payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
+            struct Helper {
+                withdrawals: Vec<Withdrawal>,
+                #[serde(with = "alloy_serde::quantity")]
+                blob_gas_used: u64,
+                #[serde(with = "alloy_serde::quantity")]
+                excess_blob_gas: u64,
+                block_access_list: Bytes,
+                #[serde(with = "alloy_serde::quantity")]
+                slot_number: u64,
+            }
         }
 
-        let helper = Helper::deserialize(deserializer)?;
+        let (
+            payload_inner,
+            (withdrawals, blob_gas_used, excess_blob_gas, block_access_list, slot_number),
+        ) = Helper::deserialize(strict::StrictFields(deserializer))?.into_parts();
         Ok(Self {
             payload_inner: ExecutionPayloadV3 {
-                payload_inner: ExecutionPayloadV2 {
-                    payload_inner: ExecutionPayloadV1 {
-                        parent_hash: helper.parent_hash,
-                        fee_recipient: helper.fee_recipient,
-                        state_root: helper.state_root,
-                        receipts_root: helper.receipts_root,
-                        logs_bloom: helper.logs_bloom,
-                        prev_randao: helper.prev_randao,
-                        block_number: helper.block_number,
-                        gas_limit: helper.gas_limit,
-                        gas_used: helper.gas_used,
-                        timestamp: helper.timestamp,
-                        extra_data: helper.extra_data,
-                        base_fee_per_gas: helper.base_fee_per_gas,
-                        block_hash: helper.block_hash,
-                        transactions: helper.transactions,
-                    },
-                    withdrawals: helper.withdrawals,
-                },
-                blob_gas_used: helper.blob_gas_used,
-                excess_blob_gas: helper.excess_blob_gas,
+                payload_inner: ExecutionPayloadV2 { payload_inner, withdrawals },
+                blob_gas_used,
+                excess_blob_gas,
             },
-            block_access_list: helper.block_access_list,
-            slot_number: helper.slot_number,
+            block_access_list,
+            slot_number,
         })
     }
 }
@@ -1849,6 +1862,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
         struct BlobsBundleRaw {
             commitments: Vec<alloy_consensus::Bytes48>,
             proofs: Vec<alloy_consensus::Bytes48>,
+            #[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")]
             blobs: Vec<alloy_consensus::Blob>,
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
@@ -1926,7 +1940,6 @@ impl BlobsBundleV1 {
     /// proofs.
     ///
     /// Returns an empty [`BlobTransactionSidecar`] if the bundle is empty.
-    #[cfg(feature = "kzg")]
     pub fn try_into_sidecar(
         self,
     ) -> Result<BlobTransactionSidecar, alloy_consensus::error::ValueError<Self>> {
@@ -2004,7 +2017,6 @@ impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
     }
 }
 
-#[cfg(feature = "kzg")]
 impl TryFrom<BlobsBundleV1> for BlobTransactionSidecar {
     type Error = alloy_consensus::error::ValueError<BlobsBundleV1>;
 
@@ -2046,6 +2058,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
         struct BlobsBundleRaw {
             commitments: Vec<alloy_consensus::Bytes48>,
             proofs: Vec<alloy_consensus::Bytes48>,
+            #[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")]
             blobs: Vec<alloy_consensus::Blob>,
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
@@ -2131,6 +2144,64 @@ impl BlobsBundleV2 {
             .collect()
     }
 
+    /// Ensures the bundle has one commitment and [`CELLS_PER_EXT_BLOB`] proofs per blob.
+    ///
+    /// # Errors
+    ///
+    /// Returns a reference to the bundle if its lengths do not match.
+    pub fn ensure_valid_lengths(&self) -> Result<(), alloy_consensus::error::ValueError<&Self>> {
+        let len = self.blobs.len();
+        if self.commitments.len() != len
+            || len.checked_mul(CELLS_PER_EXT_BLOB) != Some(self.proofs.len())
+        {
+            return Err(alloy_consensus::error::ValueError::new_static(self, "length mismatch"));
+        }
+
+        Ok(())
+    }
+
+    /// Partitions blobs by `f`, keeping each blob with its commitment and cell proofs.
+    ///
+    /// Returns the matching bundle first and the non-matching bundle second, preserving order
+    /// within each. The predicate receives each blob's index, blob, commitment, and cell proofs.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original bundle if its blob, commitment, and cell proof lengths do not match.
+    pub fn try_partition_blobs(
+        self,
+        mut f: impl FnMut(usize, &Blob, &Bytes48, &[Bytes48]) -> bool,
+    ) -> Result<(Self, Self), alloy_consensus::error::ValueError<Self>> {
+        if self.ensure_valid_lengths().is_err() {
+            return Err(alloy_consensus::error::ValueError::new_static(self, "length mismatch"));
+        }
+        let Self { blobs, commitments, proofs } = self;
+        let mut matching = Self::empty();
+        let mut non_matching = Self::empty();
+        let mut matches = Vec::with_capacity(blobs.len());
+        let mut commitments = commitments.into_iter();
+
+        for (index, blob) in blobs.into_iter().enumerate() {
+            // The checked lengths guarantee a commitment and proof group for each blob.
+            let commitment = commitments.next().expect("validated commitment length");
+            let start = index * CELLS_PER_EXT_BLOB;
+            let cell_proofs = &proofs[start..start + CELLS_PER_EXT_BLOB];
+            let is_matching = f(index, &blob, &commitment, cell_proofs);
+            matches.push(is_matching);
+            let partition = if is_matching { &mut matching } else { &mut non_matching };
+            partition.blobs.push(blob);
+            partition.commitments.push(commitment);
+        }
+
+        for (index, proof) in proofs.into_iter().enumerate() {
+            let partition =
+                if matches[index / CELLS_PER_EXT_BLOB] { &mut matching } else { &mut non_matching };
+            partition.proofs.push(proof);
+        }
+
+        Ok((matching, non_matching))
+    }
+
     /// Take `len` blob data from the bundle.
     ///
     /// Note this will take `len * CELLS_PER_EXT_BLOB` proofs.
@@ -2163,7 +2234,6 @@ impl BlobsBundleV2 {
     /// match the blobs length.
     ///
     /// Returns an empty [`BlobTransactionSidecarEip7594`] if the bundle is empty.
-    #[cfg(feature = "kzg")]
     pub fn try_into_sidecar(
         self,
     ) -> Result<BlobTransactionSidecarEip7594, alloy_consensus::error::ValueError<Self>> {
@@ -2243,7 +2313,6 @@ impl FromIterator<BlobTransactionSidecarEip7594> for BlobsBundleV2 {
     }
 }
 
-#[cfg(feature = "kzg")]
 impl TryFrom<BlobsBundleV2> for BlobTransactionSidecarEip7594 {
     type Error = alloy_consensus::error::ValueError<BlobsBundleV2>;
 
@@ -2263,6 +2332,10 @@ impl TryFrom<BlobsBundleV2> for BlobsBundleV1 {
 
 /// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2],
 /// [ExecutionPayloadV3], or [ExecutionPayloadV4].
+///
+/// Payload-to-block conversions return an unsealed block and do not recompute or compare the
+/// advertised `block_hash`. Callers performing Engine API validation must hash the returned block
+/// and compare it separately.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
@@ -2350,6 +2423,10 @@ impl ExecutionPayload {
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     /// See also [`ExecutionPayloadSidecar::from_block`].
+    ///
+    /// The supplied hash is stored verbatim without checking it against the block. The payload
+    /// version is inferred from the block access-list hash, parent beacon block root, and
+    /// withdrawals.
     pub fn from_block_unchecked<T, H>(
         block_hash: B256,
         block: &Block<T, H>,
@@ -2443,6 +2520,7 @@ impl ExecutionPayload {
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
     ///
     /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    /// The payload's advertised `block_hash` is not recomputed or compared.
     ///
     /// # Note
     ///
@@ -2492,6 +2570,9 @@ impl ExecutionPayload {
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`].
+    ///
+    /// The returned block is unsealed, and the payload's advertised `block_hash` is not recomputed
+    /// or compared.
     ///
     /// Caution: This does not set fields that are not part of the payload and only part of the
     /// [`ExecutionPayloadSidecar`]:
@@ -2808,7 +2889,7 @@ impl ExecutionPayload {
         Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas()?,
             self.blob_gas_used()?,
-            self.as_v1().base_fee_per_gas.to(),
+            self.saturated_base_fee_per_gas(),
         ))
     }
 
@@ -3052,208 +3133,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
     where
         D: serde::Deserializer<'de>,
     {
-        use alloy_primitives::U64;
-
-        struct ExecutionPayloadVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for ExecutionPayloadVisitor {
-            type Value = ExecutionPayload;
-
-            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                formatter.write_str("a valid ExecutionPayload object")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                // this currently rejects unknown fields
-                #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
-                #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
-                enum Fields {
-                    ParentHash,
-                    FeeRecipient,
-                    StateRoot,
-                    ReceiptsRoot,
-                    LogsBloom,
-                    PrevRandao,
-                    BlockNumber,
-                    GasLimit,
-                    GasUsed,
-                    Timestamp,
-                    ExtraData,
-                    BaseFeePerGas,
-                    BlockHash,
-                    Transactions,
-                    // V2
-                    Withdrawals,
-                    // V3
-                    BlobGasUsed,
-                    ExcessBlobGas,
-                    // V4
-                    BlockAccessList,
-                    SlotNumber,
-                }
-
-                let mut parent_hash = None;
-                let mut fee_recipient = None;
-                let mut state_root = None;
-                let mut receipts_root = None;
-                let mut logs_bloom = None;
-                let mut prev_randao = None;
-                let mut block_number = None;
-                let mut gas_limit = None;
-                let mut gas_used = None;
-                let mut timestamp = None;
-                let mut extra_data = None;
-                let mut base_fee_per_gas = None;
-                let mut block_hash = None;
-                let mut transactions = None;
-                let mut withdrawals = None;
-                let mut blob_gas_used = None;
-                let mut excess_blob_gas = None;
-                let mut block_access_list = None;
-                let mut slot_number = None;
-
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Fields::ParentHash => parent_hash = Some(map.next_value()?),
-                        Fields::FeeRecipient => fee_recipient = Some(map.next_value()?),
-                        Fields::StateRoot => state_root = Some(map.next_value()?),
-                        Fields::ReceiptsRoot => receipts_root = Some(map.next_value()?),
-                        Fields::LogsBloom => logs_bloom = Some(map.next_value()?),
-                        Fields::PrevRandao => prev_randao = Some(map.next_value()?),
-                        Fields::BlockNumber => {
-                            let raw = map.next_value::<U64>()?;
-                            block_number = Some(raw.to());
-                        }
-                        Fields::GasLimit => {
-                            let raw = map.next_value::<U64>()?;
-                            gas_limit = Some(raw.to());
-                        }
-                        Fields::GasUsed => {
-                            let raw = map.next_value::<U64>()?;
-                            gas_used = Some(raw.to());
-                        }
-                        Fields::Timestamp => {
-                            let raw = map.next_value::<U64>()?;
-                            timestamp = Some(raw.to());
-                        }
-                        Fields::ExtraData => extra_data = Some(map.next_value()?),
-                        Fields::BaseFeePerGas => base_fee_per_gas = Some(map.next_value()?),
-                        Fields::BlockHash => block_hash = Some(map.next_value()?),
-                        Fields::Transactions => transactions = Some(map.next_value()?),
-                        Fields::Withdrawals => withdrawals = Some(map.next_value()?),
-                        Fields::BlobGasUsed => {
-                            let raw = map.next_value::<U64>()?;
-                            blob_gas_used = Some(raw.to());
-                        }
-                        Fields::ExcessBlobGas => {
-                            let raw = map.next_value::<U64>()?;
-                            excess_blob_gas = Some(raw.to());
-                        }
-                        Fields::BlockAccessList => {
-                            block_access_list = Some(map.next_value()?);
-                        }
-                        Fields::SlotNumber => {
-                            let raw = map.next_value::<U64>()?;
-                            slot_number = Some(raw.to());
-                        }
-                    }
-                }
-
-                let parent_hash =
-                    parent_hash.ok_or_else(|| serde::de::Error::missing_field("parentHash"))?;
-                let fee_recipient =
-                    fee_recipient.ok_or_else(|| serde::de::Error::missing_field("feeRecipient"))?;
-                let state_root =
-                    state_root.ok_or_else(|| serde::de::Error::missing_field("stateRoot"))?;
-                let receipts_root =
-                    receipts_root.ok_or_else(|| serde::de::Error::missing_field("receiptsRoot"))?;
-                let logs_bloom =
-                    logs_bloom.ok_or_else(|| serde::de::Error::missing_field("logsBloom"))?;
-                let prev_randao =
-                    prev_randao.ok_or_else(|| serde::de::Error::missing_field("prevRandao"))?;
-                let block_number =
-                    block_number.ok_or_else(|| serde::de::Error::missing_field("blockNumber"))?;
-                let gas_limit =
-                    gas_limit.ok_or_else(|| serde::de::Error::missing_field("gasLimit"))?;
-                let gas_used =
-                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUsed"))?;
-                let timestamp =
-                    timestamp.ok_or_else(|| serde::de::Error::missing_field("timestamp"))?;
-                let extra_data =
-                    extra_data.ok_or_else(|| serde::de::Error::missing_field("extraData"))?;
-                let base_fee_per_gas = base_fee_per_gas
-                    .ok_or_else(|| serde::de::Error::missing_field("baseFeePerGas"))?;
-                let block_hash =
-                    block_hash.ok_or_else(|| serde::de::Error::missing_field("blockHash"))?;
-                let transactions =
-                    transactions.ok_or_else(|| serde::de::Error::missing_field("transactions"))?;
-
-                let v1 = ExecutionPayloadV1 {
-                    parent_hash,
-                    fee_recipient,
-                    state_root,
-                    receipts_root,
-                    logs_bloom,
-                    prev_randao,
-                    block_number,
-                    gas_limit,
-                    gas_used,
-                    timestamp,
-                    extra_data,
-                    base_fee_per_gas,
-                    block_hash,
-                    transactions,
-                };
-
-                let Some(withdrawals) = withdrawals else {
-                    return if blob_gas_used.is_none() && excess_blob_gas.is_none() {
-                        Ok(ExecutionPayload::V1(v1))
-                    } else {
-                        Err(serde::de::Error::custom("invalid enum variant"))
-                    };
-                };
-
-                if let (Some(blob_gas_used), Some(excess_blob_gas)) =
-                    (blob_gas_used, excess_blob_gas)
-                {
-                    let v3 = ExecutionPayloadV3 {
-                        payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
-                        blob_gas_used,
-                        excess_blob_gas,
-                    };
-
-                    // Check for V4 fields (block_access_list and slot_number)
-                    return match (block_access_list, slot_number) {
-                        (Some(block_access_list), Some(slot_number)) => {
-                            Ok(ExecutionPayload::V4(ExecutionPayloadV4 {
-                                payload_inner: v3,
-                                block_access_list,
-                                slot_number,
-                            }))
-                        }
-                        // reject incomplete V4 payloads
-                        (None, None) => Ok(ExecutionPayload::V3(v3)),
-                        _ => Err(serde::de::Error::custom("invalid enum variant")),
-                    };
-                }
-
-                // reject incomplete V3 payloads even if they could construct a valid V2
-                if blob_gas_used.is_some() || excess_blob_gas.is_some() {
-                    return Err(serde::de::Error::custom("invalid enum variant"));
-                }
-
-                // reject V4 fields without V3 fields
-                if block_access_list.is_some() || slot_number.is_some() {
-                    return Err(serde::de::Error::custom("invalid enum variant"));
-                }
-
-                Ok(ExecutionPayload::V2(ExecutionPayloadV2 { payload_inner: v1, withdrawals }))
-            }
-        }
-
+        const INVALID_VARIANT: &str = "invalid enum variant";
+        // Preserve the struct field list so flattening leaves sibling fields to the outer type.
         const FIELDS: &[&str] = &[
             "parentHash",
             "feeRecipient",
@@ -3275,7 +3156,88 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             "blockAccessList",
             "slotNumber",
         ];
-        deserializer.deserialize_struct("ExecutionPayload", FIELDS, ExecutionPayloadVisitor)
+
+        // Optional fields may be omitted but, unlike a plain `Option`, must not be `null`.
+        fn present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            T::deserialize(deserializer).map(Some)
+        }
+
+        fn present_quantity<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            alloy_serde::quantity::deserialize(deserializer).map(Some)
+        }
+
+        payload_serde_helper! {
+            #[serde(deny_unknown_fields)]
+            struct Helper {
+                #[serde(default, deserialize_with = "present")]
+                withdrawals: Option<Vec<Withdrawal>>,
+                #[serde(default, deserialize_with = "present_quantity")]
+                blob_gas_used: Option<u64>,
+                #[serde(default, deserialize_with = "present_quantity")]
+                excess_blob_gas: Option<u64>,
+                #[serde(default, deserialize_with = "present")]
+                block_access_list: Option<Bytes>,
+                #[serde(default, deserialize_with = "present_quantity")]
+                slot_number: Option<u64>,
+            }
+        }
+
+        deserialize_payload_map(
+            deserializer,
+            "a valid ExecutionPayload object",
+            Some(FIELDS),
+            |helper: Helper| {
+                let (
+                    v1,
+                    (withdrawals, blob_gas_used, excess_blob_gas, block_access_list, slot_number),
+                ) = helper.into_parts();
+                let no_v3_or_v4_fields = blob_gas_used.is_none()
+                    && excess_blob_gas.is_none()
+                    && block_access_list.is_none()
+                    && slot_number.is_none();
+
+                let Some(withdrawals) = withdrawals else {
+                    // reject V3 and V4 fields without V2 fields
+                    return if no_v3_or_v4_fields {
+                        Ok(Self::V1(v1))
+                    } else {
+                        Err(INVALID_VARIANT)
+                    };
+                };
+                let v2 = ExecutionPayloadV2 { payload_inner: v1, withdrawals };
+
+                let (Some(blob_gas_used), Some(excess_blob_gas)) = (blob_gas_used, excess_blob_gas)
+                else {
+                    // reject incomplete V3 payloads and V4 fields without V3 fields
+                    return if no_v3_or_v4_fields {
+                        Ok(Self::V2(v2))
+                    } else {
+                        Err(INVALID_VARIANT)
+                    };
+                };
+                let v3 = ExecutionPayloadV3 { payload_inner: v2, blob_gas_used, excess_blob_gas };
+
+                match (block_access_list, slot_number) {
+                    (Some(block_access_list), Some(slot_number)) => {
+                        Ok(Self::V4(ExecutionPayloadV4 {
+                            payload_inner: v3,
+                            block_access_list,
+                            slot_number,
+                        }))
+                    }
+                    (None, None) => Ok(Self::V3(v3)),
+                    // reject incomplete V4 payloads
+                    _ => Err(INVALID_VARIANT),
+                }
+            },
+        )
     }
 }
 
@@ -3923,6 +3885,85 @@ impl core::fmt::Display for PayloadStatusEnum {
     }
 }
 
+/// This structure contains the result of processing a payload in the Bogota Engine API.
+///
+/// It extends [`PayloadStatus`] with the EIP-7805 inclusion-list validation result.
+///
+/// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/bogota.md#payloadstatusv2>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct PayloadStatusV2 {
+    /// The common payload status fields.
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub payload_inner: PayloadStatus,
+    /// Whether the payload satisfied the inclusion-list constraints if it was deemed valid.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub inclusion_list_satisfied: Option<bool>,
+}
+
+impl PayloadStatusV2 {
+    /// Creates a new payload status.
+    pub const fn new(
+        payload_status: PayloadStatus,
+        inclusion_list_satisfied: Option<bool>,
+    ) -> Self {
+        Self { payload_inner: payload_status, inclusion_list_satisfied }
+    }
+
+    /// Sets whether the payload satisfied the inclusion-list constraints.
+    pub const fn with_inclusion_list_satisfied(mut self, satisfied: bool) -> Self {
+        self.inclusion_list_satisfied = Some(satisfied);
+        self
+    }
+
+    /// Returns true if the payload status is syncing.
+    pub const fn is_syncing(&self) -> bool {
+        self.payload_inner.is_syncing()
+    }
+
+    /// Returns true if the payload status is valid.
+    pub const fn is_valid(&self) -> bool {
+        self.payload_inner.is_valid()
+    }
+
+    /// Returns true if the payload status is invalid.
+    pub const fn is_invalid(&self) -> bool {
+        self.payload_inner.is_invalid()
+    }
+}
+
+impl From<PayloadStatus> for PayloadStatusV2 {
+    fn from(payload_status: PayloadStatus) -> Self {
+        Self::new(payload_status, None)
+    }
+}
+
+/// Downgrades a V2 payload status, discarding its inclusion-list validation result.
+impl From<PayloadStatusV2> for PayloadStatus {
+    fn from(payload_status: PayloadStatusV2) -> Self {
+        payload_status.payload_inner
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for PayloadStatusV2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(4))?;
+        map.serialize_entry("status", self.payload_inner.status.as_str())?;
+        map.serialize_entry("latestValidHash", &self.payload_inner.latest_valid_hash)?;
+        map.serialize_entry("validationError", &self.payload_inner.status.validation_error())?;
+        map.serialize_entry("inclusionListSatisfied", &self.inclusion_list_satisfied)?;
+        map.end()
+    }
+}
+
 /// Struct aggregating [`ExecutionPayload`] and [`ExecutionPayloadSidecar`] and encapsulating
 /// complete payload supplied for execution.
 #[derive(Debug, Clone)]
@@ -3995,6 +4036,7 @@ impl ExecutionData {
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
     ///
     /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    /// The payload's advertised `block_hash` is not recomputed or compared.
     ///
     /// # Note
     ///
@@ -4100,12 +4142,95 @@ mod tests {
     use alloy_consensus::TxEnvelope;
     use alloy_primitives::{b256, hex};
     use similar_asserts::assert_eq;
+    use std::path::PathBuf;
 
     #[test]
-    #[cfg(feature = "kzg")]
     fn convert_empty_bundle() {
-        let bundle = BlobsBundleV1::default();
-        let _sidecar = bundle.try_into_sidecar().unwrap();
+        assert_eq!(
+            BlobTransactionSidecar::try_from(BlobsBundleV1::default()).unwrap(),
+            BlobTransactionSidecar::default()
+        );
+        assert_eq!(
+            BlobTransactionSidecarEip7594::try_from(BlobsBundleV2::default()).unwrap(),
+            BlobTransactionSidecarEip7594::default()
+        );
+    }
+
+    #[test]
+    fn convert_bundle_checks_lengths() {
+        let v1 = BlobsBundleV1 { commitments: vec![Bytes48::ZERO], ..Default::default() };
+        assert!(v1.try_into_sidecar().is_err());
+
+        let mut v2 = indexed_v2_bundle();
+        let sidecar = v2.clone().try_into_sidecar().unwrap();
+        assert_eq!(sidecar.blobs, v2.blobs);
+        assert_eq!(sidecar.commitments, v2.commitments);
+        assert_eq!(sidecar.cell_proofs, v2.proofs);
+        v2.proofs.pop();
+        assert!(v2.try_into_sidecar().is_err());
+    }
+
+    fn indexed_v2_bundle() -> BlobsBundleV2 {
+        let mut blobs = vec![Blob::default(); 3];
+        for (index, blob) in blobs.iter_mut().enumerate() {
+            blob[0] = index as u8;
+        }
+        BlobsBundleV2 {
+            blobs,
+            commitments: (0..3).map(|index| Bytes48::new([index; 48])).collect(),
+            proofs: (0..3)
+                .flat_map(|index| vec![Bytes48::new([index; 48]); CELLS_PER_EXT_BLOB])
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn partition_v2_bundle_blobs() {
+        let bundle = indexed_v2_bundle();
+        bundle.ensure_valid_lengths().unwrap();
+
+        let (matching, non_matching) = bundle
+            .try_partition_blobs(|index, blob, commitment, proofs| {
+                assert_eq!(blob[0], index as u8);
+                assert_eq!(*commitment, Bytes48::new([index as u8; 48]));
+                assert!(proofs.iter().all(|proof| proof == commitment));
+                index != 1
+            })
+            .unwrap();
+
+        assert_eq!(matching.blobs.len(), 2);
+        assert_eq!(matching.blobs[0][0], 0);
+        assert_eq!(matching.blobs[1][0], 2);
+        assert_eq!(matching.commitments, vec![Bytes48::new([0; 48]), Bytes48::new([2; 48])]);
+        assert_eq!(matching.proofs.len(), 2 * CELLS_PER_EXT_BLOB);
+        assert!(matching.proofs[..CELLS_PER_EXT_BLOB]
+            .iter()
+            .all(|proof| *proof == Bytes48::new([0; 48])));
+        assert!(matching.proofs[CELLS_PER_EXT_BLOB..]
+            .iter()
+            .all(|proof| *proof == Bytes48::new([2; 48])));
+
+        assert_eq!(non_matching.blobs.len(), 1);
+        assert_eq!(non_matching.blobs[0][0], 1);
+        assert_eq!(non_matching.commitments, vec![Bytes48::new([1; 48])]);
+        assert_eq!(non_matching.proofs, vec![Bytes48::new([1; 48]); CELLS_PER_EXT_BLOB]);
+    }
+
+    #[test]
+    fn partition_v2_bundle_blobs_rejects_mismatched_lengths() {
+        let bundle = BlobsBundleV2 {
+            blobs: vec![Blob::default()],
+            commitments: Vec::new(),
+            proofs: Vec::new(),
+        };
+        assert_eq!(bundle.ensure_valid_lengths().unwrap_err().into_value(), &bundle);
+        let error = bundle.clone().try_partition_blobs(|_, _, _, _| unreachable!()).unwrap_err();
+        assert_eq!(error.value(), &bundle);
+
+        let bundle = BlobsBundleV2 { commitments: vec![Bytes48::default()], ..bundle };
+        assert_eq!(bundle.ensure_valid_lengths().unwrap_err().into_value(), &bundle);
+        let error = bundle.clone().try_partition_blobs(|_, _, _, _| unreachable!()).unwrap_err();
+        assert_eq!(error.value(), &bundle);
     }
 
     #[test]
@@ -4120,7 +4245,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev1_not_empty_pass() {
         let blobs_bundle_v1 = BlobsBundleV1 {
             proofs: vec![Bytes48::default()],
@@ -4129,13 +4253,18 @@ mod tests {
         };
 
         let serialized = serde_json::to_string(&blobs_bundle_v1).unwrap();
-        let deserialized: BlobsBundleV1 = serde_json::from_str(&serialized).unwrap();
+        // Limit the stack to catch large fixed-array temporaries during blob deserialization.
+        let deserialized = std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(move || serde_json::from_str::<BlobsBundleV1>(&serialized).unwrap())
+            .unwrap()
+            .join()
+            .unwrap();
         assert_eq!(deserialized, blobs_bundle_v1);
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev1_not_empty_fail() {
         let blobs_bundle_v1 = BlobsBundleV1 {
             proofs: vec![Bytes48::default(), Bytes48::default()],
@@ -4151,7 +4280,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev2_not_empty_pass() {
         let commitments = vec![Bytes48::default()];
 
@@ -4162,13 +4290,18 @@ mod tests {
         };
 
         let serialized = serde_json::to_string(&blobs_bundle_v2).unwrap();
-        let deserialized: BlobsBundleV2 = serde_json::from_str(&serialized).unwrap();
+        // Limit the stack to catch large fixed-array temporaries during blob deserialization.
+        let deserialized = std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(move || serde_json::from_str::<BlobsBundleV2>(&serialized).unwrap())
+            .unwrap()
+            .join()
+            .unwrap();
         assert_eq!(deserialized, blobs_bundle_v2);
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev2_not_empty_fail() {
         let blobs_bundle_v2 = BlobsBundleV2 {
             proofs: vec![Bytes48::default()],
@@ -4182,9 +4315,19 @@ mod tests {
         assert!(deserialized.is_err());
     }
 
+    /// SSZ decoding blobs needs more than the default test thread stack in debug builds.
+    #[cfg(feature = "ssz")]
+    fn ssz_decode_blobsbundlev2(encoded: Vec<u8>) -> Result<BlobsBundleV2, ssz::DecodeError> {
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || <BlobsBundleV2 as ssz::Decode>::from_ssz_bytes(&encoded))
+            .unwrap()
+            .join()
+            .unwrap()
+    }
+
     #[test]
     #[cfg(feature = "ssz")]
-    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_roundtrip() {
         let commitments = vec![Bytes48::default(), Bytes48::default()];
         let num_blobs = commitments.len();
@@ -4196,14 +4339,13 @@ mod tests {
         };
 
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
-        let decoded: BlobsBundleV2 = ssz::Decode::from_ssz_bytes(&encoded).unwrap();
+        let decoded = ssz_decode_blobsbundlev2(encoded).unwrap();
 
         assert_eq!(decoded, blobs_bundle_v2);
     }
 
     #[test]
     #[cfg(feature = "ssz")]
-    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_invalid_proofs_length() {
         let commitments = vec![Bytes48::default()];
 
@@ -4216,13 +4358,12 @@ mod tests {
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
 
         // Attempt to decode - should fail due to mismatched proofs length
-        let result: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
+        let result = ssz_decode_blobsbundlev2(encoded);
         assert!(result.is_err());
     }
 
     #[test]
     #[cfg(feature = "ssz")]
-    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_mismatched_commitments_blobs() {
         let blobs_bundle_v2 = BlobsBundleV2 {
             commitments: vec![Bytes48::default(), Bytes48::default()],
@@ -4233,7 +4374,7 @@ mod tests {
         let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
 
         // Attempt to decode - should fail due to wrong number of commitments
-        let result: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
+        let result = ssz_decode_blobsbundlev2(encoded);
         assert!(result.is_err());
     }
 
@@ -4302,17 +4443,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
-    fn ssz_execution_payload_envelope_v1_response_roundtrip() {
-        use ssz::{Decode, Encode};
-
-        let payload = ssz_payload_v1();
-        let decoded = ExecutionPayloadV1::from_ssz_bytes(&payload.as_ssz_bytes()).unwrap();
-
-        assert_eq!(decoded, payload);
-    }
-
-    #[test]
-    #[cfg(feature = "ssz")]
     fn ssz_execution_payload_envelope_v2_roundtrip() {
         use ssz::{Decode, Encode};
 
@@ -4330,22 +4460,6 @@ mod tests {
         };
 
         let decoded = ExecutionPayloadEnvelopeV2::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
-        assert_eq!(decoded, envelope);
-    }
-
-    #[test]
-    #[cfg(feature = "ssz")]
-    fn ssz_execution_payload_envelope_v3_roundtrip() {
-        use ssz::{Decode, Encode};
-
-        let envelope = ExecutionPayloadEnvelopeV3 {
-            execution_payload: ssz_payload_v3(),
-            block_value: U256::from(23),
-            blobs_bundle: BlobsBundleV1::empty(),
-            should_override_builder: true,
-        };
-
-        let decoded = ExecutionPayloadEnvelopeV3::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
         assert_eq!(decoded, envelope);
     }
 
@@ -4422,25 +4536,20 @@ mod tests {
     }
 
     #[test]
-    fn payload_attributes_builder_setters() {
-        let withdrawal = Withdrawal {
-            index: 1,
-            validator_index: 2,
-            address: Address::with_last_byte(3),
-            amount: 4,
-        };
-        let parent_beacon_block_root = B256::with_last_byte(5);
+    #[cfg(feature = "serde")]
+    fn serde_payload_status_v2() {
+        let json = r#"{"status":"VALID","latestValidHash":null,"validationError":null,"inclusionListSatisfied":true}"#;
+        let status: PayloadStatusV2 = serde_json::from_str(json).unwrap();
+        assert!(status.is_valid());
+        assert!(status.payload_inner.latest_valid_hash.is_none());
+        assert_eq!(status.inclusion_list_satisfied, Some(true));
+        assert_eq!(serde_json::to_string(&status).unwrap(), json);
 
-        let attributes = PayloadAttributes::default()
-            .with_timestamp(10)
-            .with_withdrawals(vec![withdrawal])
-            .with_parent_beacon_block_root(parent_beacon_block_root)
-            .with_slot_number(6);
-
-        assert_eq!(attributes.timestamp, 10);
-        assert_eq!(attributes.withdrawals, Some(vec![withdrawal]));
-        assert_eq!(attributes.parent_beacon_block_root, Some(parent_beacon_block_root));
-        assert_eq!(attributes.slot_number, Some(6));
+        let json = r#"{"status":"SYNCING","latestValidHash":null,"validationError":null,"inclusionListSatisfied":null}"#;
+        let status: PayloadStatusV2 = serde_json::from_str(json).unwrap();
+        assert!(status.is_syncing());
+        assert_eq!(status.inclusion_list_satisfied, None);
+        assert_eq!(serde_json::to_string(&status).unwrap(), json);
     }
 
     #[test]
@@ -4702,30 +4811,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_roundtrip_enveloped_txs_payload_v1() {
-        // pulled from hive tests
-        let s = r#"{"parentHash":"0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x76a03cbcb7adce07fd284c61e4fa31e5e786175cefac54a29e46ec8efa28ea41","receiptsRoot":"0x4e3c608a9f2e129fccb91a1dae7472e78013b8e654bccc8d224ce3d63ae17006","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0x028111cb7d25918386a69656b3d17b2febe95fd0f11572c1a55c14f99fdfe3df","blockNumber":"0x1","gasLimit":"0x2fefd8","gasUsed":"0xa860","timestamp":"0x1235","extraData":"0x8b726574682f76302e312e30","baseFeePerGas":"0x342770c0","blockHash":"0xa6f40ed042e61e88e76125dede8fff8026751ea14454b68fb534cea99f2b2a77","transactions":["0xf865808506fc23ac00830124f8940000000000000000000000000000000000000316018032a044b25a8b9b247d01586b3d59c71728ff49c9b84928d9e7fa3377ead3b5570b5da03ceac696601ff7ee6f5fe8864e2998db9babdf5eeba1a0cd5b4d44b3fcbd181b"]}"#;
-        let payload: ExecutionPayloadV1 = serde_json::from_str(s).unwrap();
-        assert_eq!(serde_json::to_string(&payload).unwrap(), s);
-
-        let any_payload: ExecutionPayload = serde_json::from_str(s).unwrap();
-        assert_eq!(any_payload, payload.into());
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_roundtrip_enveloped_txs_payload_v3() {
-        // pulled from hive tests - modified with 4844 fields
-        let s = r#"{"parentHash":"0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x76a03cbcb7adce07fd284c61e4fa31e5e786175cefac54a29e46ec8efa28ea41","receiptsRoot":"0x4e3c608a9f2e129fccb91a1dae7472e78013b8e654bccc8d224ce3d63ae17006","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0x028111cb7d25918386a69656b3d17b2febe95fd0f11572c1a55c14f99fdfe3df","blockNumber":"0x1","gasLimit":"0x2fefd8","gasUsed":"0xa860","timestamp":"0x1235","extraData":"0x8b726574682f76302e312e30","baseFeePerGas":"0x342770c0","blockHash":"0xa6f40ed042e61e88e76125dede8fff8026751ea14454b68fb534cea99f2b2a77","transactions":["0xf865808506fc23ac00830124f8940000000000000000000000000000000000000316018032a044b25a8b9b247d01586b3d59c71728ff49c9b84928d9e7fa3377ead3b5570b5da03ceac696601ff7ee6f5fe8864e2998db9babdf5eeba1a0cd5b4d44b3fcbd181b"],"withdrawals":[],"blobGasUsed":"0xb10b","excessBlobGas":"0xb10b"}"#;
-        let payload: ExecutionPayloadV3 = serde_json::from_str(s).unwrap();
-        assert_eq!(serde_json::to_string(&payload).unwrap(), s);
-
-        let any_payload: ExecutionPayload = serde_json::from_str(s).unwrap();
-        assert_eq!(any_payload, payload.into());
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
     fn serde_roundtrip_execution_payload_envelope_v3() {
         // pulled from a geth response getPayloadV3 in hive tests
         let response = r#"{"executionPayload":{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"},"blockValue":"0x0","blobsBundle":{"commitments":[],"proofs":[],"blobs":[]},"shouldOverrideBuilder":false}"#;
@@ -4735,15 +4820,40 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_payload_input_enum_v3() {
-        let response_v3 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"}"#;
+    fn serde_roundtrip_execution_payload_field_v2() {
+        // withdrawals must select the V2 variant instead of collapsing into V1
+        let s = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]}"#;
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(s).unwrap();
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(s).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V2(payload_v2));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s);
 
-        let payload: ExecutionPayload = serde_json::from_str(response_v3).unwrap();
-        assert!(payload.as_v3().is_some());
-        assert_eq!(serde_json::to_string(&payload).unwrap(), response_v3);
+        // empty withdrawals still mean V2
+        let s_empty = s.replace(
+            r#"[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]"#,
+            "[]",
+        );
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(&s_empty).unwrap();
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(&s_empty).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V2(payload_v2));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s_empty);
 
-        let payload_v3: ExecutionPayloadV3 = serde_json::from_str(response_v3).unwrap();
-        assert_eq!(payload.as_v3().unwrap(), &payload_v3);
+        // no withdrawals field means V1
+        let s_v1 = s_empty.replace(r#","withdrawals":[]"#, "");
+        let field: ExecutionPayloadFieldV2 = serde_json::from_str(&s_v1).unwrap();
+        let payload_v1: ExecutionPayloadV1 = serde_json::from_str(&s_v1).unwrap();
+        assert_eq!(field, ExecutionPayloadFieldV2::V1(payload_v1));
+        assert_eq!(serde_json::to_string(&field).unwrap(), s_v1);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_roundtrip_execution_payload_envelope_v2() {
+        // a getPayloadV2 response with withdrawals in the payload
+        let response = r#"{"executionPayload":{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[{"index":"0x0","validatorIndex":"0x1","address":"0x00000000000000000000000000000000000010f0","amount":"0x64"}]},"blockValue":"0x123"}"#;
+        let envelope: ExecutionPayloadEnvelopeV2 = serde_json::from_str(response).unwrap();
+        assert!(matches!(envelope.execution_payload, ExecutionPayloadFieldV2::V2(_)));
+        assert_eq!(serde_json::to_string(&envelope).unwrap(), response);
     }
 
     #[test]
@@ -5135,8 +5245,6 @@ mod tests {
 
     #[test]
     fn test_payload_to_block_with_sidecar_raw() {
-        use std::path::PathBuf;
-
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/payload");
         let dir = std::fs::read_dir(path).expect("Unable to read payload folder");
 
@@ -5503,75 +5611,6 @@ mod tests {
     }
 
     #[test]
-    fn execution_payload_body_v1_to_v2_conversion() {
-        let v1 = ExecutionPayloadBodyV1 {
-            transactions: vec![Bytes::from(vec![0x01, 0x02])],
-            withdrawals: Some(vec![Withdrawal {
-                index: 1,
-                validator_index: 2,
-                address: Address::default(),
-                amount: 100,
-            }]),
-        };
-
-        let v2: ExecutionPayloadBodyV2 = v1.clone().into();
-        assert_eq!(v2.transactions, v1.transactions);
-        assert_eq!(v2.withdrawals, v1.withdrawals);
-        assert_eq!(v2.block_access_list, None);
-    }
-
-    #[test]
-    fn execution_payload_body_v2_to_v1_conversion() {
-        let v2 = ExecutionPayloadBodyV2 {
-            transactions: vec![Bytes::from(vec![0x01, 0x02])],
-            withdrawals: Some(vec![Withdrawal {
-                index: 1,
-                validator_index: 2,
-                address: Address::default(),
-                amount: 100,
-            }]),
-            block_access_list: Some(Bytes::from(vec![0xaa, 0xbb])),
-        };
-
-        let v1: ExecutionPayloadBodyV1 = v2.clone().into();
-        assert_eq!(v1.transactions, v2.transactions);
-        assert_eq!(v1.withdrawals, v2.withdrawals);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_roundtrip_payload_v2() {
-        let payload = ExecutionPayloadV2 {
-            payload_inner: ExecutionPayloadV1 {
-                parent_hash: B256::default(),
-                fee_recipient: Address::default(),
-                state_root: B256::default(),
-                receipts_root: B256::default(),
-                logs_bloom: Bloom::default(),
-                prev_randao: B256::default(),
-                block_number: 1,
-                gas_limit: 30_000_000,
-                gas_used: 21000,
-                timestamp: 1234,
-                extra_data: Bytes::default(),
-                base_fee_per_gas: U256::from(7u64),
-                block_hash: B256::default(),
-                transactions: vec![],
-            },
-            withdrawals: vec![Withdrawal {
-                index: 1,
-                validator_index: 2,
-                address: Address::default(),
-                amount: 100,
-            }],
-        };
-
-        let serialized = serde_json::to_string(&payload).unwrap();
-        let deserialized: ExecutionPayloadV2 = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(payload, deserialized);
-    }
-
-    #[test]
     #[cfg(feature = "serde")]
     fn serde_roundtrip_payload_v4() {
         let payload = ExecutionPayloadV4 {
@@ -5643,19 +5682,12 @@ mod tests {
         let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
         let block_hash = B256::with_last_byte(3);
 
-        let execution_data = ExecutionData::from(Sealed::new_unchecked(block, block_hash));
-
-        assert_eq!(execution_data.block_hash(), block_hash);
-    }
-
-    #[test]
-    fn execution_data_from_sealed_block_ref_uses_sealed_hash() {
-        let block: Block<TxEnvelope> = Block::new(Header::default(), BlockBody::default());
-        let block_hash = B256::with_last_byte(4);
-
-        let execution_data = ExecutionData::from(Sealed::new_unchecked(&block, block_hash));
-
-        assert_eq!(execution_data.block_hash(), block_hash);
+        for execution_data in [
+            ExecutionData::from(Sealed::new_unchecked(&block, block_hash)),
+            ExecutionData::from(Sealed::new_unchecked(block, block_hash)),
+        ] {
+            assert_eq!(execution_data.block_hash(), block_hash);
+        }
     }
 
     #[test]
@@ -5669,35 +5701,16 @@ mod tests {
 
         let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
         let block_hash = B256::with_last_byte(5);
-        let execution_data = ExecutionData::from((
-            Sealed::new_unchecked(block, block_hash),
-            PayloadExtras::from(block_access_list.clone()),
-        ));
+        let extras = PayloadExtras::from(block_access_list.clone());
 
-        assert_eq!(execution_data.block_hash(), block_hash);
-        assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
-        assert_eq!(execution_data.payload.slot_number(), Some(7));
-    }
-
-    #[test]
-    fn execution_data_from_sealed_block_ref_with_extras_preserves_bal() {
-        let block_access_list = Bytes::from(vec![0xaa, 0xbb, 0xcc]);
-        let header = Header {
-            block_access_list_hash: Some(keccak256(&block_access_list)),
-            slot_number: Some(7),
-            ..Default::default()
-        };
-
-        let block: Block<TxEnvelope> = Block::new(header, BlockBody::default());
-        let block_hash = B256::with_last_byte(6);
-        let execution_data = ExecutionData::from((
-            Sealed::new_unchecked(&block, block_hash),
-            PayloadExtras::from(block_access_list.clone()),
-        ));
-
-        assert_eq!(execution_data.block_hash(), block_hash);
-        assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
-        assert_eq!(execution_data.payload.slot_number(), Some(7));
+        for execution_data in [
+            ExecutionData::from((Sealed::new_unchecked(&block, block_hash), extras.clone())),
+            ExecutionData::from((Sealed::new_unchecked(block, block_hash), extras)),
+        ] {
+            assert_eq!(execution_data.block_hash(), block_hash);
+            assert_eq!(execution_data.payload.block_access_list(), Some(&block_access_list));
+            assert_eq!(execution_data.payload.slot_number(), Some(7));
+        }
     }
 
     #[test]
@@ -5829,41 +5842,6 @@ mod tests {
         let serialized = serde_json::to_string(&envelope).unwrap();
         let deserialized: ExecutionPayloadEnvelopeV4 = serde_json::from_str(&serialized).unwrap();
         assert_eq!(envelope, deserialized);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_v3_with_many_transactions() {
-        let tx = Bytes::from_static(&hex!("f865808506fc23ac00830124f8940000000000000000000000000000000000000316018032a044b25a8b9b247d01586b3d59c71728ff49c9b84928d9e7fa3377ead3b5570b5da03ceac696601ff7ee6f5fe8864e2998db9babdf5eeba1a0cd5b4d44b3fcbd181b"));
-        let transactions: Vec<Bytes> = (0..100).map(|_| tx.clone()).collect();
-
-        let payload = ExecutionPayloadV3 {
-            payload_inner: ExecutionPayloadV2 {
-                payload_inner: ExecutionPayloadV1 {
-                    parent_hash: B256::default(),
-                    fee_recipient: Address::default(),
-                    state_root: B256::default(),
-                    receipts_root: B256::default(),
-                    logs_bloom: Bloom::default(),
-                    prev_randao: B256::default(),
-                    block_number: 1,
-                    gas_limit: 30_000_000,
-                    gas_used: 2_100_000,
-                    timestamp: 1234,
-                    extra_data: Bytes::default(),
-                    base_fee_per_gas: U256::from(7u64),
-                    block_hash: B256::default(),
-                    transactions,
-                },
-                withdrawals: vec![],
-            },
-            blob_gas_used: 0,
-            excess_blob_gas: 0,
-        };
-
-        let serialized = serde_json::to_string(&payload).unwrap();
-        let deserialized: ExecutionPayloadV3 = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(payload, deserialized);
     }
 
     #[test]

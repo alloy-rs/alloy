@@ -5,20 +5,19 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{Decodable7594, Encodable7594},
+    eip7594::{
+        decode_fixed_list, decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594,
+    },
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
-use alloy_rlp::{Decodable, Encodable, Header};
+use alloy_rlp::{Decodable, Encodable, Header, EMPTY_LIST_CODE};
+use core::iter::FusedIterator;
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
 #[cfg(feature = "kzg")]
 use crate::eip4844::{AsAlloy, AsCkzg};
-
-/// The versioned hash version for KZG.
-#[cfg(feature = "kzg")]
-pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 
 /// A Blob hash
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -32,7 +31,13 @@ pub struct IndexedBlobHash {
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
-/// This type encodes and decodes the fields without an rlp header.
+/// For a well-formed sidecar, all three vectors have equal lengths and describe the same blob at
+/// each index. Public fields and [`Self::new`] do not enforce this invariant. With the `kzg`
+/// feature, prefer `try_from_blobs_with_settings` or call `validate` before use. Consuming
+/// iteration uses `zip`, so malformed unequal vectors are truncated to the shortest vector.
+///
+/// Its [`Encodable`] and [`Decodable`] implementations include an outer RLP list header. The
+/// field-level [`Encodable7594`] and [`Decodable7594`] codecs omit that header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -71,10 +76,9 @@ impl BlobTransactionSidecar {
         self.versioned_hashes().enumerate().flat_map(move |(i, blob_versioned_hash)| {
             versioned_hashes.iter().enumerate().filter_map(move |(j, target_hash)| {
                 if blob_versioned_hash == *target_hash {
-                    if let Some((blob, proof)) =
-                        self.blobs.get(i).copied().zip(self.proofs.get(i).copied())
+                    if let Some((blob, proof)) = self.blobs.get(i).zip(self.proofs.get(i).copied())
                     {
-                        return Some((j, BlobAndProofV1 { blob: Box::new(blob), proof }));
+                        return Some((j, BlobAndProofV1 { blob: box_blob(blob), proof }));
                     }
                 }
                 None
@@ -121,24 +125,102 @@ impl BlobTransactionSidecar {
 
 impl IntoIterator for BlobTransactionSidecar {
     type Item = BlobTransactionSidecarItem;
-    type IntoIter = alloc::vec::IntoIter<BlobTransactionSidecarItem>;
+    type IntoIter = BlobTransactionSidecarIntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.blobs
-            .into_iter()
-            .zip(self.commitments)
-            .zip(self.proofs)
-            .enumerate()
-            .map(|(index, ((blob, commitment), proof))| BlobTransactionSidecarItem {
-                index: index as u64,
-                blob: Box::new(blob),
-                kzg_commitment: commitment,
-                kzg_proof: proof,
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
+        let remaining = self.blobs.len().min(self.commitments.len()).min(self.proofs.len());
+        BlobTransactionSidecarIntoIter {
+            blobs: self.blobs.into_iter(),
+            commitments: self.commitments.into_iter(),
+            proofs: self.proofs.into_iter(),
+            next_index: 0,
+            remaining,
+        }
     }
 }
+
+/// An owning iterator over a [`BlobTransactionSidecar`].
+///
+/// Blobs are boxed only when their items are yielded. Unequal vectors are truncated to the
+/// shortest vector, matching [`Iterator::zip`].
+#[derive(Clone, Debug)]
+pub struct BlobTransactionSidecarIntoIter {
+    blobs: alloc::vec::IntoIter<Blob>,
+    commitments: alloc::vec::IntoIter<Bytes48>,
+    proofs: alloc::vec::IntoIter<Bytes48>,
+    next_index: usize,
+    remaining: usize,
+}
+
+impl Iterator for BlobTransactionSidecarIntoIter {
+    type Item = BlobTransactionSidecarItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.nth(0)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        if n >= self.remaining {
+            self.remaining = 0;
+            return None;
+        }
+        let index = self.next_index + n;
+        self.next_index = index + 1;
+        // Copy from the slice, then advance, to avoid a second copy through the stack.
+        let blob = box_blob(self.blobs.as_slice().get(n)?);
+        self.blobs.nth(n);
+        self.remaining -= n + 1;
+        Some(BlobTransactionSidecarItem {
+            index: index as u64,
+            blob,
+            kzg_commitment: self.commitments.nth(n)?,
+            kzg_proof: self.proofs.nth(n)?,
+        })
+    }
+
+    fn count(self) -> usize {
+        self.remaining
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+}
+
+impl DoubleEndedIterator for BlobTransactionSidecarIntoIter {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.nth_back(0)
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        if n >= self.remaining {
+            self.remaining = 0;
+            return None;
+        }
+        let index = self.next_index + self.remaining - n - 1;
+        // Skip unmatched trailing values when the sidecar's vectors have unequal lengths.
+        let back = self.blobs.len() - self.remaining + n;
+        let blob = box_blob(self.blobs.as_slice().iter().nth_back(back)?);
+        self.blobs.nth_back(back);
+        let commitment = self.commitments.nth_back(self.commitments.len() - self.remaining + n)?;
+        let proof = self.proofs.nth_back(self.proofs.len() - self.remaining + n)?;
+        self.remaining -= n + 1;
+        Some(BlobTransactionSidecarItem {
+            index: index as u64,
+            blob,
+            kzg_commitment: commitment,
+            kzg_proof: proof,
+        })
+    }
+}
+
+impl ExactSizeIterator for BlobTransactionSidecarIntoIter {}
+
+impl FusedIterator for BlobTransactionSidecarIntoIter {}
 
 /// A single blob sidecar.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -161,11 +243,7 @@ pub struct BlobTransactionSidecarItem {
 impl BlobTransactionSidecarItem {
     /// `VERSIONED_HASH_VERSION_KZG ++ sha256(commitment)[1..]`
     pub fn to_kzg_versioned_hash(&self) -> [u8; 32] {
-        use sha2::Digest;
-        let commitment = self.kzg_commitment.as_slice();
-        let mut hash: [u8; 32] = sha2::Sha256::digest(commitment).into();
-        hash[0] = VERSIONED_HASH_VERSION_KZG;
-        hash
+        kzg_to_versioned_hash(self.kzg_commitment.as_slice()).0
     }
 
     /// Verifies the KZG proof of a blob to ensure its integrity and correctness.
@@ -235,7 +313,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
 }
 
 impl BlobTransactionSidecar {
-    /// Constructs a new [BlobTransactionSidecar] from a set of blobs, commitments, and proofs.
+    /// Constructs a sidecar without validating vector lengths, commitments, or proofs.
     pub const fn new(blobs: Vec<Blob>, commitments: Vec<Bytes48>, proofs: Vec<Bytes48>) -> Self {
         Self { blobs, commitments, proofs }
     }
@@ -271,9 +349,9 @@ impl BlobTransactionSidecar {
     /// commitments, and proofs. Each blob data element is verified against its commitment and
     /// proof.
     ///
-    /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
-    /// fails to verify, or if the versioned hashes in the transaction do not match the actual
-    /// commitment versioned hashes.
+    /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof fails to
+    /// verify, or [BlobTransactionValidationError::WrongVersionedHash] if a transaction's versioned
+    /// hash does not match its commitment.
     #[cfg(feature = "kzg")]
     pub fn validate(
         &self,
@@ -328,9 +406,7 @@ impl BlobTransactionSidecar {
 
     /// Returns the index of the versioned hash in the commitments vector.
     pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
-        self.commitments
-            .iter()
-            .position(|commitment| kzg_to_versioned_hash(commitment.as_slice()) == *hash)
+        self.versioned_hashes().position(|versioned_hash| versioned_hash == *hash)
     }
 
     /// Returns the blob corresponding to the versioned hash, if it exists.
@@ -454,34 +530,20 @@ impl BlobTransactionSidecar {
     #[doc(hidden)]
     pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
-            blobs: Decodable::decode(buf)?,
-            commitments: Decodable::decode(buf)?,
-            proofs: Decodable::decode(buf)?,
+            blobs: decode_fixed_list(buf)?,
+            commitments: decode_fixed_list(buf)?,
+            proofs: decode_fixed_list(buf)?,
         })
     }
 
     /// Decodes the [BlobTransactionSidecar] from RLP bytes.
     pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        if buf.len() < header.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-        let remaining = buf.len();
-        let this = Self::rlp_decode_fields(buf)?;
-
-        if buf.len() + header.payload_length != remaining {
-            return Err(alloy_rlp::Error::UnexpectedLength);
-        }
-
-        Ok(this)
+        decode_sidecar(buf, Self::rlp_decode_fields)
     }
 }
 
 impl Encodable for BlobTransactionSidecar {
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+    /// Encodes the sidecar as an RLP list, including its outer header.
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -492,7 +554,7 @@ impl Encodable for BlobTransactionSidecar {
 }
 
 impl Decodable for BlobTransactionSidecar {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+    /// Decodes an RLP list, including its outer header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }
@@ -506,12 +568,34 @@ impl Encodable7594 for BlobTransactionSidecar {
     fn encode_7594(&self, out: &mut dyn BufMut) {
         self.rlp_encode_fields(out);
     }
+
+    fn encode_7594_len_with(&self, encoding: BlobSidecarEncoding) -> usize {
+        let blobs_len = match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.length(),
+            BlobSidecarEncoding::WithoutBlobs => 1,
+        };
+        blobs_len + self.commitments.length() + self.proofs.length()
+    }
+
+    fn encode_7594_with(&self, encoding: BlobSidecarEncoding, out: &mut dyn BufMut) {
+        match encoding {
+            BlobSidecarEncoding::WithBlobs => self.blobs.encode(out),
+            BlobSidecarEncoding::WithoutBlobs => out.put_u8(EMPTY_LIST_CODE),
+        }
+        self.commitments.encode(out);
+        self.proofs.encode(out);
+    }
 }
 
 impl Decodable7594 for BlobTransactionSidecar {
     fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode_fields(buf)
     }
+}
+
+/// Boxes a copy of `blob`, copying the 128 KiB once instead of through the stack.
+pub(crate) fn box_blob(blob: &Blob) -> Box<Blob> {
+    Box::write(Box::new_uninit(), *blob)
 }
 
 /// Helper function to deserialize boxed blobs from an existing [`MapAccess`]
@@ -660,5 +744,37 @@ mod tests {
         let s = serde_json::to_string(&blob_item).unwrap();
         let deserialized: BlobTransactionSidecarItem = serde_json::from_str(&s).unwrap();
         assert_eq!(blob_item, deserialized);
+    }
+
+    #[test]
+    fn sidecar_into_iter_preserves_indices_and_lengths() {
+        let sidecar = BlobTransactionSidecar {
+            blobs: vec![Blob::ZERO; 4],
+            commitments: (0..3).map(|index| Bytes48::new([index; 48])).collect(),
+            proofs: (0..4).map(|index| Bytes48::new([index; 48])).collect(),
+        };
+        let mut iter = sidecar.into_iter();
+        assert_eq!(iter.size_hint(), (3, Some(3)));
+        assert_eq!(iter.len(), 3);
+        let last = iter.next_back().unwrap();
+        assert_eq!(last.index, 2);
+        assert_eq!(last.kzg_commitment, Bytes48::new([2; 48]));
+        assert_eq!(last.kzg_proof, last.kzg_commitment);
+        let first = iter.next().unwrap();
+        assert_eq!(first.index, 0);
+        assert_eq!(first.kzg_commitment, Bytes48::ZERO);
+        for (n, expected_index) in [(0, Some(1)), (1, None), (usize::MAX, None)] {
+            let mut remaining = iter.clone();
+            assert_eq!(remaining.nth(n).map(|item| item.index), expected_index);
+            assert_eq!(remaining.len(), 0);
+            assert!(remaining.next().is_none());
+            assert!(remaining.next_back().is_none());
+        }
+        let middle = iter.next().unwrap();
+        assert_eq!(middle.index, 1);
+        assert_eq!(middle.kzg_proof, Bytes48::new([1; 48]));
+        assert_eq!(iter.len(), 0);
+        assert!(iter.next().is_none());
+        assert!(iter.next_back().is_none());
     }
 }

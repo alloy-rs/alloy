@@ -414,7 +414,7 @@ impl_ckzg_conversions!(Bytes48, c_kzg::Bytes48);
 #[cfg(feature = "kzg")]
 impl_ckzg_conversions!(reverse Bytes48, c_kzg::KzgProof);
 #[cfg(feature = "kzg")]
-impl_ckzg_conversions!(reverse crate::eip7594::Cell, c_kzg::Cell);
+impl_ckzg_conversions!(crate::eip7594::Cell, c_kzg::Cell);
 
 /// Returns blobs as c-kzg blobs.
 #[cfg(feature = "kzg")]
@@ -656,6 +656,33 @@ mod tests {
             fake_exponential(u128::MAX - 1, 0, BLOB_GASPRICE_UPDATE_FRACTION),
             u128::MAX - 1
         );
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_with_zero_blob_capacity() {
+        let params = crate::eip7840::BlobParams {
+            target_blob_count: 0,
+            max_blob_count: 0,
+            max_blobs_per_tx: 0,
+            ..crate::eip7840::BlobParams::osaka()
+        };
+
+        for t @ &(base_fee, excess, expected) in &[
+            (0, 0, 0),
+            (0, 1, 1),
+            // Blob fee is 1 for these inputs. At base fee 16,
+            // the reserve-price comparison is equal; at 17 it is exceeded.
+            (16, 0, 0),
+            (16, 1, 1),
+            (17, 0, 0),
+            (17, 1, 1),
+            (1_000_000_000, 0, 0),
+            (1_000_000_000, 1, 1),
+        ] {
+            let actual = params.next_block_excess_blob_gas_osaka(excess, 0, base_fee);
+
+            assert_eq!(actual, expected, "test: {t:?}");
+        }
     }
 
     #[test]

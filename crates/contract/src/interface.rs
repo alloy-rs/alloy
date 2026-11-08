@@ -43,17 +43,40 @@ impl Interface {
         self.get_from_selector(selector)?.abi_encode_input(args).map_err(Into::into)
     }
 
-    /// ABI-decodes the given data according to the function's types.
+    /// ABI-decodes argument data according to the function's input types.
+    ///
+    /// `data` must not include the four-byte function selector. To decode full calldata, pass the
+    /// bytes after the selector.
     ///
     /// # Note
     ///
     /// If the function exists multiple times and you want to use one of the overloaded versions,
     /// consider using [`Self::decode_input_with_selector`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use alloy_contract::Interface;
+    /// use alloy_dyn_abi::DynSolValue;
+    /// use alloy_json_abi::JsonAbi;
+    /// use alloy_primitives::U256;
+    ///
+    /// let interface = Interface::new(JsonAbi::parse(["function setValue(uint256 value)"])?);
+    /// let args = [DynSolValue::Uint(U256::from(42), 256)];
+    /// let calldata = interface.encode_input("setValue", &args)?;
+    ///
+    /// let decoded = interface.decode_input("setValue", &calldata[4..])?;
+    /// assert_eq!(decoded, args);
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
     pub fn decode_input(&self, name: &str, data: &[u8]) -> Result<Vec<DynSolValue>> {
         self.get_from_name(name)?.abi_decode_input(data).map_err(Into::into)
     }
 
-    /// Decode the provided ABI encoded bytes as the input of the provided function selector.
+    /// Decodes argument data using the function identified by `selector`.
+    ///
+    /// `data` must not include the four-byte function selector. The `selector` argument selects the
+    /// function from the ABI; it is not decoded from or validated against `data`.
     pub fn decode_input_with_selector(
         &self,
         selector: &Selector,

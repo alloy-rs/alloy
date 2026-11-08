@@ -12,6 +12,7 @@ use alloy_rpc_types_eth::pubsub::SubscriptionKind;
 use alloy_transport::{TransportError, TransportResult};
 use either::Either;
 use futures::{Stream, StreamExt};
+use serde::ser::SerializeTuple;
 use serde_json::Value;
 use std::time::Duration;
 
@@ -31,8 +32,6 @@ impl serde::Serialize for EthGetBlockParams {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeTuple;
-
         let mut tuple = serializer.serialize_tuple(2)?;
         match self.block {
             BlockId::Hash(hash) => tuple.serialize_element(&hash.block_hash)?,
@@ -54,12 +53,14 @@ impl EthGetBlockParams {
     }
 }
 
-/// A builder for an `"eth_getBlockByHash"` request. This type is returned by the
-/// [`Provider::call`] method.
+/// A builder for an `"eth_getBlockByHash"` or `"eth_getBlockByNumber"` request. This type is
+/// returned by the [`Provider::get_block`], [`Provider::get_block_by_hash`] and
+/// [`Provider::get_block_by_number`] methods.
 ///
-/// [`Provider::call`]: crate::Provider::call
-#[must_use = "EthGetBlockBy must be awaited to execute the request"]
-//#[derive(Clone, Debug)]
+/// [`Provider::get_block`]: crate::Provider::get_block
+/// [`Provider::get_block_by_hash`]: crate::Provider::get_block_by_hash
+/// [`Provider::get_block_by_number`]: crate::Provider::get_block_by_number
+#[must_use = "EthGetBlock must be awaited to execute the request"]
 pub struct EthGetBlock<BlockResp>
 where
     BlockResp: alloy_network::BlockResponse + RpcRecv,
@@ -182,24 +183,9 @@ where
                         return Ok(None);
                     }
 
-                    // Ref: <https://github.com/alloy-rs/alloy/issues/2117>
-                    // Geth ref: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
-                    tracing::trace!(pending_block = ?block.to_string());
-                    if block.get("hash").is_none_or(|v| v.is_null()) {
-                        block["hash"] = Value::String(format!("{}", B256::ZERO));
-                    }
+                    patch_pending_block(&mut block);
 
-                    if block.get("nonce").is_none_or(|v| v.is_null()) {
-                        block["nonce"] = Value::String(format!("{}", B64::ZERO));
-                    }
-
-                    if block.get("miner").is_none_or(|v| v.is_null())
-                        || block.get("beneficiary").is_none_or(|v| v.is_null())
-                    {
-                        block["miner"] = Value::String(format!("{}", Address::ZERO));
-                    }
-
-                    let block = serde_json::from_value(block.clone())
+                    let block = BlockResp::deserialize(&block)
                         .map_err(|e| TransportError::deser_err(e, block.to_string()))?;
 
                     let block = if self.kind.is_hashes() {
@@ -215,6 +201,28 @@ where
             }
             GetBlockInner::ProviderCall(producer) => producer(self.kind),
         }
+    }
+}
+
+/// Fills in the `hash`, `nonce` and `miner` fields of a pending block when they are missing or
+/// null.
+///
+/// Ref: <https://github.com/alloy-rs/alloy/issues/2117>
+/// Geth ref: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
+fn patch_pending_block(block: &mut Value) {
+    tracing::trace!(pending_block = ?block.to_string());
+    if block.get("hash").is_none_or(|v| v.is_null()) {
+        block["hash"] = Value::String(format!("{}", B256::ZERO));
+    }
+
+    if block.get("nonce").is_none_or(|v| v.is_null()) {
+        block["nonce"] = Value::String(format!("{}", B64::ZERO));
+    }
+
+    if block.get("miner").is_none_or(|v| v.is_null())
+        && block.get("beneficiary").is_none_or(|v| v.is_null())
+    {
+        block["miner"] = Value::String(format!("{}", Address::ZERO));
     }
 }
 
@@ -338,10 +346,8 @@ where
             .then(move |hashes| utils::hashes_to_blocks(hashes, client.clone(), kind.into()))
             .flat_map(|res| {
                 futures::stream::iter(match res {
-                    Ok(blocks) => {
-                        // Ignore `None` responses.
-                        Either::Left(blocks.into_iter().filter_map(|block| block.map(Ok)))
-                    }
+                    // Ignore `None` responses.
+                    Ok(blocks) => Either::Left(blocks.into_iter().filter_map(Result::transpose)),
                     Err(err) => Either::Right(std::iter::once(Err(err))),
                 })
             });
@@ -393,9 +399,7 @@ where
             .then(move |hashes| utils::hashes_to_headers(hashes, client.clone()))
             .flat_map(|res| {
                 futures::stream::iter(match res {
-                    Ok(headers) => {
-                        Either::Left(headers.into_iter().filter_map(|header| header.map(Ok)))
-                    }
+                    Ok(headers) => Either::Left(headers.into_iter().filter_map(Result::transpose)),
                     Err(err) => Either::Right(std::iter::once(Err(err))),
                 })
             });
@@ -452,9 +456,6 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     pub async fn into_stream(
         self,
     ) -> TransportResult<impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin> {
-        use alloy_network_primitives::HeaderResponse;
-        use futures::StreamExt;
-
         let sub = self.sub.await?;
 
         let stream = sub
@@ -497,22 +498,121 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
 mod tests {
     use super::*;
     use crate::{Provider, ProviderBuilder};
+    use alloy_primitives::U256;
+    use alloy_rpc_types_eth::Block;
+
+    #[tokio::test]
+    async fn pending_block_preserves_non_null_miner() {
+        let miner = Address::with_last_byte(1);
+        let pending_block_response: Block = Block::default();
+        let mut pending_block = serde_json::to_value(pending_block_response).unwrap();
+        pending_block["miner"] = Value::String(miner.to_string());
+        pending_block.as_object_mut().unwrap().remove("beneficiary");
+
+        let asserter = alloy_transport::mock::Asserter::new();
+        asserter.push_success(&pending_block);
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+        let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap().unwrap();
+
+        assert_eq!(block.header.beneficiary, miner);
+    }
 
     // <https://github.com/alloy-rs/alloy/issues/2117>
     #[tokio::test]
-    async fn test_pending_block_deser() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://binance.llamarpc.com".parse().unwrap());
+    async fn pending_block_fills_null_fields() {
+        let pending_block_response: Block = Block::default();
+        let mut pending_block = serde_json::to_value(pending_block_response).unwrap();
+        pending_block["hash"] = Value::Null;
+        pending_block["nonce"] = Value::Null;
+        pending_block["miner"] = Value::Null;
+        pending_block.as_object_mut().unwrap().remove("beneficiary");
 
-        let res = provider.get_block_by_number(BlockNumberOrTag::Pending).full().await;
-        if let Err(err) = &res {
-            let err_str = err.to_string();
-            if err_str.contains("no response") || err.is_transport_error() {
-                // response can be flaky due to network issues
-                eprintln!("skipping flaky response: {err:?}");
-                return;
-            }
-        }
-        let _block = res.unwrap();
+        let asserter = alloy_transport::mock::Asserter::new();
+        asserter.push_success(&pending_block);
+        asserter.push_success(&Value::Null);
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+        let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap().unwrap();
+        assert_eq!(block.header.hash, B256::ZERO);
+        assert_eq!(block.header.nonce, B64::ZERO);
+        assert_eq!(block.header.beneficiary, Address::ZERO);
+
+        let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap();
+        assert!(block.is_none());
+    }
+
+    fn numbered_block(number: u64) -> Block {
+        let mut block: Block = Block::default();
+        block.header.inner.number = number;
+        block
+    }
+
+    #[tokio::test]
+    async fn watch_full_blocks_keeps_fetched_blocks_when_one_fetch_fails() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&U256::from(1)); // eth_newBlockFilter
+        let mut watch = provider.watch_full_blocks().await.unwrap();
+        watch.set_poll_interval(Duration::from_millis(1));
+        watch.set_limit(Some(2));
+
+        // First eth_getFilterChanges response
+        asserter.push_success(&[1, 2, 3, 4].map(B256::with_last_byte));
+        // Fetch responses for hashes 1-4
+        asserter.push_success(&numbered_block(1));
+        asserter.push_failure_msg("transient");
+        asserter.push_success(&Value::Null);
+        asserter.push_success(&numbered_block(4));
+        // Next eth_getFilterChanges response and its block
+        asserter.push_success(&[B256::with_last_byte(5)]);
+        asserter.push_success(&numbered_block(5));
+
+        let numbers = tokio::time::timeout(
+            Duration::from_secs(1),
+            watch
+                .into_stream()
+                .map(|item| item.map(|b| b.header.number).map_err(|_| ()))
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(numbers, vec![Ok(1), Err(()), Ok(4), Ok(5)]);
+    }
+
+    #[tokio::test]
+    async fn watch_headers_keeps_fetched_headers_when_one_fetch_fails() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&U256::from(1)); // eth_newBlockFilter
+        let mut watch = provider.watch_headers().await.unwrap();
+        watch.set_poll_interval(Duration::from_millis(1));
+        watch.set_limit(Some(2));
+
+        // First eth_getFilterChanges response
+        asserter.push_success(&[1, 2, 3, 4].map(B256::with_last_byte));
+        // Fetch responses for hashes 1-4
+        asserter.push_success(&numbered_block(1).header);
+        asserter.push_failure_msg("transient");
+        asserter.push_success(&Value::Null);
+        asserter.push_success(&numbered_block(4).header);
+        // Next eth_getFilterChanges response and its header
+        asserter.push_success(&[B256::with_last_byte(5)]);
+        asserter.push_success(&numbered_block(5).header);
+
+        let numbers = tokio::time::timeout(
+            Duration::from_secs(1),
+            watch
+                .into_stream()
+                .map(|item| item.map(|h| h.inner.number).map_err(|_| ()))
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(numbers, vec![Ok(1), Err(()), Ok(4), Ok(5)]);
     }
 }

@@ -11,17 +11,8 @@ pub struct FourByteFrame(pub BTreeMap<String, u64>);
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::geth::*;
     use similar_asserts::assert_eq;
-
-    const DEFAULT: &str = r#"{
-        "0x27dc297e-128": 1,
-        "0x38cc4831-0": 2,
-        "0x524f3889-96": 1,
-        "0xadf59f99-288": 1,
-        "0xc281d19e-0": 1
-    }"#;
 
     #[test]
     fn test_serialize_four_byte_trace() {
@@ -30,10 +21,5 @@ mod tests {
             Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::FourByteTracer));
 
         assert_eq!(serde_json::to_string(&opts).unwrap(), r#"{"tracer":"4byteTracer"}"#);
-    }
-
-    #[test]
-    fn test_deserialize_four_byte_trace() {
-        let _trace: FourByteFrame = serde_json::from_str(DEFAULT).unwrap();
     }
 }

@@ -150,14 +150,14 @@ pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
     hashes: Vec<B256>,
     client: WeakClient,
     full: bool,
-) -> TransportResult<Vec<Option<BlockResp>>> {
+) -> TransportResult<Vec<TransportResult<Option<BlockResp>>>> {
     let client = client.upgrade().ok_or(TransportError::local_usage_str("client dropped"))?;
-    let blocks = futures::future::try_join_all(hashes.into_iter().map(|hash| {
+    let blocks = futures::future::join_all(hashes.into_iter().map(|hash| {
         client
             .request::<_, Option<BlockResp>>("eth_getBlockByHash", (hash, full))
             .map_resp(|resp| if !full { convert_to_hashes(resp) } else { resp })
     }))
-    .await?;
+    .await;
     Ok(blocks)
 }
 
@@ -167,14 +167,14 @@ pub(crate) async fn hashes_to_headers<
 >(
     hashes: Vec<B256>,
     client: WeakClient,
-) -> TransportResult<Vec<Option<HeaderResp>>> {
+) -> TransportResult<Vec<TransportResult<Option<HeaderResp>>>> {
     let client = client.upgrade().ok_or(TransportError::local_usage_str("client dropped"))?;
-    let headers = futures::future::try_join_all(
+    let headers = futures::future::join_all(
         hashes
             .into_iter()
             .map(|hash| client.request::<_, Option<HeaderResp>>("eth_getHeaderByHash", (hash,))),
     )
-    .await?;
+    .await;
     Ok(headers)
 }
 

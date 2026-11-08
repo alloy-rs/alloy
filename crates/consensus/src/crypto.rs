@@ -30,16 +30,17 @@ impl RecoveryError {
 
     /// Create a new error with an associated source.
     ///
-    /// **NOTE:** The "source" should **NOT** be used to propagate cryptographic
-    /// errors e.g. signature parsing or verification errors.
+    /// The source may describe backend-independent validation failures, such as
+    /// [`InvalidSignatureS`], or application errors. It must not propagate backend-specific
+    /// cryptographic parsing or verification errors; discard those with [`Self::new`] instead.
     pub fn from_source<E: core::error::Error + Send + Sync + 'static>(err: E) -> Self {
         Self { source: Some(Box::new(err)) }
     }
 }
 
 impl From<alloy_primitives::SignatureError> for RecoveryError {
-    fn from(err: alloy_primitives::SignatureError) -> Self {
-        Self::from_source(err)
+    fn from(_: alloy_primitives::SignatureError) -> Self {
+        Self::new()
     }
 }
 
@@ -363,7 +364,7 @@ mod impl_k256 {
 
     use super::*;
     use alloy_primitives::{keccak256, Address, B256};
-    use k256::ecdsa::{RecoveryId, SigningKey, VerifyingKey};
+    use k256::ecdsa::{signature::hazmat::PrehashVerifier, RecoveryId, SigningKey, VerifyingKey};
 
     /// Recovers the address of the sender using secp256k1 pubkey recovery.
     ///
@@ -396,8 +397,6 @@ mod impl_k256 {
         sig: &[u8; 64],
         msg: &[u8; 32],
     ) -> Result<Address, Error> {
-        use k256::ecdsa::signature::hazmat::PrehashVerifier;
-
         let vk = VerifyingKey::from_sec1_bytes(pubkey)?;
 
         let mut signature = k256::ecdsa::Signature::from_slice(&sig[0..64])?;
@@ -529,6 +528,52 @@ mod tests {
         use alloc::sync::Arc;
         use alloy_primitives::{Address, Signature, B256};
 
+        /// Synthetic (r=123, s=456) vector used by `test_crypto_backend_basic_functionality`.
+        ///
+        /// Deviation: the original mock returned `return_address` for every call. That dummy
+        /// (`0x1111…`) is process-global via `OnceLock` and broke other signer-recovery tests
+        /// under `cargo test --all-features`. Dummy addresses are now used only for this
+        /// vector; every other signature falls through to secp256k1/k256.
+        fn is_backend_test_signature(sig: &[u8]) -> bool {
+            let mut expected = [0u8; 64];
+            expected[31] = 123;
+            expected[62] = 0x01;
+            expected[63] = 0xc8; // 456
+            sig.len() >= 64 && sig[..64] == expected
+        }
+
+        fn builtin_recover(sig: &[u8; 65], msg: &[u8; 32]) -> Result<Address, RecoveryError> {
+            #[cfg(feature = "secp256k1")]
+            let result = super::super::impl_secp256k1::recover_signer_unchecked(sig, msg);
+            #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+            let result = super::super::impl_k256::recover_signer_unchecked(sig, msg);
+            #[cfg(not(any(feature = "secp256k1", feature = "k256")))]
+            let result = {
+                let _ = (sig, msg);
+                Err::<Address, RecoveryError>(RecoveryError::new())
+            };
+            result.map_err(|_| RecoveryError::new())
+        }
+
+        fn builtin_verify(
+            pubkey: &[u8; 65],
+            sig: &[u8; 64],
+            msg: &[u8; 32],
+        ) -> Result<Address, RecoveryError> {
+            #[cfg(feature = "secp256k1")]
+            let result =
+                super::super::impl_secp256k1::verify_and_compute_signer_unchecked(pubkey, sig, msg);
+            #[cfg(all(feature = "k256", not(feature = "secp256k1")))]
+            let result =
+                super::super::impl_k256::verify_and_compute_signer_unchecked(pubkey, sig, msg);
+            #[cfg(not(any(feature = "secp256k1", feature = "k256")))]
+            let result = {
+                let _ = (pubkey, sig, msg);
+                Err::<Address, RecoveryError>(RecoveryError::new())
+            };
+            result.map_err(|_| RecoveryError::new())
+        }
+
         /// Mock crypto provider for testing
         struct MockCryptoProvider {
             should_fail: bool,
@@ -543,8 +588,10 @@ mod tests {
             ) -> Result<Address, RecoveryError> {
                 if self.should_fail {
                     Err(RecoveryError::new())
-                } else {
+                } else if is_backend_test_signature(_sig) {
                     Ok(self.return_address)
+                } else {
+                    builtin_recover(_sig, _msg)
                 }
             }
 
@@ -556,8 +603,10 @@ mod tests {
             ) -> Result<Address, RecoveryError> {
                 if self.should_fail {
                     Err(RecoveryError::new())
-                } else {
+                } else if is_backend_test_signature(_sig) {
                     Ok(self.return_address)
+                } else {
+                    builtin_verify(_pubkey, _sig, _msg)
                 }
             }
         }
@@ -622,5 +671,40 @@ mod tests {
                 let _provider_ref = err.provider.as_ref();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod recovery_error_tests {
+    use super::*;
+    use core::error::Error;
+
+    #[test]
+    fn signature_errors_do_not_expose_sources() {
+        let err = RecoveryError::from(alloy_primitives::SignatureError::InvalidParity(2));
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    fn backend_signature_errors_do_not_expose_sources() {
+        let err =
+            RecoveryError::from(alloy_primitives::SignatureError::K256(k256::ecdsa::Error::new()));
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    #[cfg(any(feature = "secp256k1", feature = "k256"))]
+    fn high_s_errors_preserve_validation_source() {
+        let signature = Signature::new(U256::from(1), SECP256K1N_HALF + U256::from(1), false);
+        let err = secp256k1::recover_signer(&signature, alloy_primitives::B256::ZERO).unwrap_err();
+        assert!(err.source().unwrap().is::<InvalidSignatureS>());
+        let err = secp256k1::verify_and_compute_signer(
+            &[0; 65],
+            &signature,
+            alloy_primitives::B256::ZERO,
+        )
+        .unwrap_err();
+        assert!(err.source().unwrap().is::<InvalidSignatureS>());
     }
 }

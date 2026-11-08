@@ -33,7 +33,8 @@ fn explicit_p2p_port() {
 
     run_with_tempdir_sync("geth-test-", |temp_dir_path| {
         // if a p2p port is explicitly set, it should be used
-        let geth = Geth::new().p2p_port(1234).data_dir(temp_dir_path).spawn();
+        // Fresh Geth databases can take more than 10s to initialize on Windows CI.
+        let geth = Geth::new().p2p_port(1234).data_dir(temp_dir_path).timeout(60_000).spawn();
         let p2p_port = geth.p2p_port();
         assert_eq!(p2p_port, Some(1234));
     });
@@ -47,7 +48,9 @@ fn dev_mode() {
 
     run_with_tempdir_sync("geth-test-", |temp_dir_path| {
         // dev mode should not have a p2p port, and dev should be the default
-        let geth = Geth::new().data_dir(temp_dir_path).spawn();
+        // Initializing a fresh dev chain can exceed the default 10s startup timeout on Windows
+        // CI. Allow startup to finish instead of retrying the same expensive initialization.
+        let geth = Geth::new().data_dir(temp_dir_path).timeout(60_000).spawn();
         let p2p_port = geth.p2p_port();
         assert!(p2p_port.is_none(), "{p2p_port:?}");
     })

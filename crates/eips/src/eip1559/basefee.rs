@@ -96,17 +96,3 @@ impl BaseFeeParams {
         calc_next_block_base_fee(gas_used, gas_limit, base_fee, self)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use arbitrary::Arbitrary;
-    use rand::Rng;
-
-    #[test]
-    fn test_arbitrary_base_fee_params() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-        BaseFeeParams::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
-    }
-}

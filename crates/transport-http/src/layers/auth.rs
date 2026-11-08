@@ -122,7 +122,9 @@ where
         let mut req = req;
         let res = if self.validate() {
             // Encodes the most recent claim into a token.
-            self.secret.encode(self.most_recent_claim.as_ref().unwrap())
+            self.secret
+                .encode(self.most_recent_claim.as_ref().unwrap())
+                .map(|token| format!("Bearer {token}"))
         } else {
             // Creates a new Claim and encodes it into a token.
             self.create_token_from_secret()

@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 /// A `muxTracer` config that contains the configuration for running multiple tracers in one go.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct MuxConfig(pub HashMap<GethDebugTracerType, Option<GethDebugTracerConfig>>);
 
 /// A `muxTracer` frame response that contains the results of multiple tracers

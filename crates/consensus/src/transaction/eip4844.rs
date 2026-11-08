@@ -1,4 +1,4 @@
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, TxEip4844Sidecar};
+use super::{delegate_transaction, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, TxEip4844Sidecar};
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
@@ -460,133 +460,9 @@ impl<T> Transaction for TxEip4844Variant<T>
 where
     T: fmt::Debug + Send + Sync + 'static,
 {
-    #[inline]
-    fn chain_id(&self) -> Option<ChainId> {
-        match self {
-            Self::TxEip4844(tx) => Some(tx.chain_id),
-            Self::TxEip4844WithSidecar(tx) => Some(tx.tx().chain_id),
-        }
-    }
-
-    #[inline]
-    fn nonce(&self) -> u64 {
-        match self {
-            Self::TxEip4844(tx) => tx.nonce,
-            Self::TxEip4844WithSidecar(tx) => tx.tx().nonce,
-        }
-    }
-
-    #[inline]
-    fn gas_limit(&self) -> u64 {
-        match self {
-            Self::TxEip4844(tx) => tx.gas_limit,
-            Self::TxEip4844WithSidecar(tx) => tx.tx().gas_limit,
-        }
-    }
-
-    #[inline]
-    fn gas_price(&self) -> Option<u128> {
-        None
-    }
-
-    #[inline]
-    fn max_fee_per_gas(&self) -> u128 {
-        match self {
-            Self::TxEip4844(tx) => tx.max_fee_per_gas(),
-            Self::TxEip4844WithSidecar(tx) => tx.max_fee_per_gas(),
-        }
-    }
-
-    #[inline]
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        match self {
-            Self::TxEip4844(tx) => tx.max_priority_fee_per_gas(),
-            Self::TxEip4844WithSidecar(tx) => tx.max_priority_fee_per_gas(),
-        }
-    }
-
-    #[inline]
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        match self {
-            Self::TxEip4844(tx) => tx.max_fee_per_blob_gas(),
-            Self::TxEip4844WithSidecar(tx) => tx.max_fee_per_blob_gas(),
-        }
-    }
-
-    #[inline]
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::TxEip4844(tx) => tx.priority_fee_or_price(),
-            Self::TxEip4844WithSidecar(tx) => tx.priority_fee_or_price(),
-        }
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        match self {
-            Self::TxEip4844(tx) => tx.effective_gas_price(base_fee),
-            Self::TxEip4844WithSidecar(tx) => tx.effective_gas_price(base_fee),
-        }
-    }
-
-    #[inline]
-    fn is_dynamic_fee(&self) -> bool {
-        match self {
-            Self::TxEip4844(tx) => tx.is_dynamic_fee(),
-            Self::TxEip4844WithSidecar(tx) => tx.is_dynamic_fee(),
-        }
-    }
-
-    #[inline]
-    fn kind(&self) -> TxKind {
-        match self {
-            Self::TxEip4844(tx) => tx.to,
-            Self::TxEip4844WithSidecar(tx) => tx.tx.to,
-        }
-        .into()
-    }
-
-    #[inline]
-    fn is_create(&self) -> bool {
-        false
-    }
-
-    #[inline]
-    fn value(&self) -> U256 {
-        match self {
-            Self::TxEip4844(tx) => tx.value,
-            Self::TxEip4844WithSidecar(tx) => tx.tx.value,
-        }
-    }
-
-    #[inline]
-    fn input(&self) -> &Bytes {
-        match self {
-            Self::TxEip4844(tx) => tx.input(),
-            Self::TxEip4844WithSidecar(tx) => tx.tx().input(),
-        }
-    }
-
-    #[inline]
-    fn access_list(&self) -> Option<&AccessList> {
-        match self {
-            Self::TxEip4844(tx) => tx.access_list(),
-            Self::TxEip4844WithSidecar(tx) => tx.access_list(),
-        }
-    }
-
-    #[inline]
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        match self {
-            Self::TxEip4844(tx) => tx.blob_versioned_hashes(),
-            Self::TxEip4844WithSidecar(tx) => tx.blob_versioned_hashes(),
-        }
-    }
-
-    #[inline]
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        None
-    }
+    delegate_transaction!(self => self.tx());
 }
+
 impl Typed2718 for TxEip4844 {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
@@ -682,6 +558,10 @@ impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844Variant<
             }
         }
         TxEip4844::rlp_decode_with_signature(buf).map(|(tx, signature)| (tx.into(), signature))
+    }
+
+    fn encoding_is_hash_preimage(&self) -> bool {
+        matches!(self, Self::TxEip4844(_))
     }
 }
 
@@ -1185,89 +1065,7 @@ impl<T> Transaction for TxEip4844WithSidecar<T>
 where
     T: fmt::Debug + Send + Sync + 'static,
 {
-    #[inline]
-    fn chain_id(&self) -> Option<ChainId> {
-        self.tx.chain_id()
-    }
-
-    #[inline]
-    fn nonce(&self) -> u64 {
-        self.tx.nonce()
-    }
-
-    #[inline]
-    fn gas_limit(&self) -> u64 {
-        self.tx.gas_limit()
-    }
-
-    #[inline]
-    fn gas_price(&self) -> Option<u128> {
-        self.tx.gas_price()
-    }
-
-    #[inline]
-    fn max_fee_per_gas(&self) -> u128 {
-        self.tx.max_fee_per_gas()
-    }
-
-    #[inline]
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.tx.max_priority_fee_per_gas()
-    }
-
-    #[inline]
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.tx.max_fee_per_blob_gas()
-    }
-
-    #[inline]
-    fn priority_fee_or_price(&self) -> u128 {
-        self.tx.priority_fee_or_price()
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        self.tx.effective_gas_price(base_fee)
-    }
-
-    #[inline]
-    fn is_dynamic_fee(&self) -> bool {
-        self.tx.is_dynamic_fee()
-    }
-
-    #[inline]
-    fn kind(&self) -> TxKind {
-        self.tx.kind()
-    }
-
-    #[inline]
-    fn is_create(&self) -> bool {
-        false
-    }
-
-    #[inline]
-    fn value(&self) -> U256 {
-        self.tx.value()
-    }
-
-    #[inline]
-    fn input(&self) -> &Bytes {
-        self.tx.input()
-    }
-
-    #[inline]
-    fn access_list(&self) -> Option<&AccessList> {
-        Some(&self.tx.access_list)
-    }
-
-    #[inline]
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        self.tx.blob_versioned_hashes()
-    }
-
-    #[inline]
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        None
-    }
+    delegate_transaction!(self => &self.tx);
 }
 
 impl<T> Typed2718 for TxEip4844WithSidecar<T> {
@@ -1329,6 +1127,10 @@ impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844WithSide
 
         Ok((Self { tx, sidecar }, signature))
     }
+
+    fn encoding_is_hash_preimage(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
@@ -1339,8 +1141,12 @@ mod tests {
         SignableTransaction, TxEnvelope,
     };
     use alloy_eips::{
-        eip2930::AccessList, eip4844::env_settings::EnvKzgSettings,
-        eip7594::BlobTransactionSidecarVariant, Encodable2718 as _,
+        eip2930::AccessList,
+        eip4844::env_settings::EnvKzgSettings,
+        eip7594::{
+            BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant, CELLS_PER_EXT_BLOB,
+        },
+        Encodable2718 as _,
     };
     use alloy_primitives::{address, b256, bytes, hex, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
@@ -1405,6 +1211,51 @@ mod tests {
         // now decode the transaction and check the values
         let decoded = TxEnvelope::decode(&mut &buf[..]).unwrap();
         assert_eq!(decoded, expected_envelope);
+    }
+
+    #[test]
+    fn decoded_sidecar_hash_excludes_sidecar() {
+        type WithSidecar = TxEip4844WithSidecar<BlobTransactionSidecarVariant>;
+        type Variant = TxEip4844Variant<BlobTransactionSidecarVariant>;
+
+        let tx = TxEip4844 {
+            chain_id: 1,
+            nonce: 1,
+            gas_limit: 21_000,
+            blob_versioned_hashes: vec![Default::default()],
+            ..Default::default()
+        };
+        let signature = Signature::test_signature();
+        let expected = *tx.clone().into_signed(signature).hash();
+
+        let sidecars = [
+            BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
+                blobs: vec![[2; 131072].into()],
+                commitments: vec![[3; 48].into()],
+                proofs: vec![[4; 48].into()],
+            }),
+            BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
+                blobs: vec![[2; 131072].into()],
+                commitments: vec![[3; 48].into()],
+                cell_proofs: vec![[4; 48].into(); CELLS_PER_EXT_BLOB],
+            }),
+        ];
+        for sidecar in sidecars {
+            let signed = TxEip4844WithSidecar { tx: tx.clone(), sidecar }.into_signed(signature);
+            assert_eq!(*signed.hash(), expected);
+
+            let encoded = signed.encoded_2718();
+            let mut network = Vec::new();
+            signed.network_encode(&mut network);
+
+            let hashes = [
+                *WithSidecar::eip2718_decode(&mut encoded.as_slice()).unwrap().hash(),
+                *WithSidecar::network_decode(&mut network.as_slice()).unwrap().hash(),
+                *Variant::eip2718_decode(&mut encoded.as_slice()).unwrap().hash(),
+                *Variant::network_decode(&mut network.as_slice()).unwrap().hash(),
+            ];
+            assert_eq!(hashes, [expected; 4]);
+        }
     }
 
     #[test]

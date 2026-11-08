@@ -17,7 +17,7 @@ pub const BLOB_BASE_COST: u64 = 2_u64.pow(13);
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
-    serde(from = "serde_impl::SerdeHelper", into = "serde_impl::SerdeHelper")
+    serde(try_from = "serde_impl::SerdeHelper", into = "serde_impl::SerdeHelper")
 )]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct BlobParams {
@@ -26,6 +26,9 @@ pub struct BlobParams {
     /// Max blob count for the block.
     pub max_blob_count: u64,
     /// Update fraction for excess blob gas calculation.
+    ///
+    /// Must be nonzero. Serde deserialization rejects zero; direct construction and field updates
+    /// must preserve this precondition.
     pub update_fraction: u128,
     /// Minimum gas price for a data blob.
     ///
@@ -128,6 +131,8 @@ impl BlobParams {
 
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas`, `blob_gas_used` and `base_fee_per_gas`.
+    ///
+    /// When `max_blob_count` is zero, falls back to the pre-Osaka excess blob gas calculation.
     #[inline]
     pub fn next_block_excess_blob_gas_osaka(
         &self,
@@ -143,6 +148,7 @@ impl BlobParams {
 
         if U256::from(self.blob_base_cost) * U256::from(base_fee_per_gas)
             > U256::from(DATA_GAS_PER_BLOB) * U256::from(self.calc_blob_fee(excess_blob_gas))
+            && self.max_blob_count > 0
         {
             let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
                 / self.max_blob_count;
@@ -153,6 +159,10 @@ impl BlobParams {
     }
 
     /// Calculates the blob fee for block based on its `excess_blob_gas`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `update_fraction` is zero.
     #[inline]
     pub fn calc_blob_fee(&self, excess_blob_gas: u64) -> u128 {
         eip4844::fake_exponential(self.min_blob_fee, excess_blob_gas as u128, self.update_fraction)
@@ -164,7 +174,6 @@ mod serde_impl {
     use crate::{eip4844, eip7840::BlobParams};
 
     #[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
-    #[serde(rename_all = "camelCase")]
     pub(crate) struct SerdeHelper {
         #[serde(rename = "baseFeeUpdateFraction")]
         update_fraction: u128,
@@ -172,8 +181,6 @@ mod serde_impl {
         max_blob_count: u64,
         #[serde(rename = "target")]
         target_blob_count: u64,
-        #[serde(skip)]
-        min_blob_fee: Option<u128>,
     }
 
     impl From<BlobParams> for SerdeHelper {
@@ -182,34 +189,57 @@ mod serde_impl {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
-                min_blob_fee,
+                min_blob_fee: _,
                 max_blobs_per_tx: _,
                 blob_base_cost: _,
             } = params;
 
-            Self {
-                target_blob_count,
-                max_blob_count,
-                update_fraction,
-                min_blob_fee: (min_blob_fee != eip4844::BLOB_TX_MIN_BLOB_GASPRICE)
-                    .then_some(min_blob_fee),
-            }
+            Self { target_blob_count, max_blob_count, update_fraction }
         }
     }
 
-    impl From<SerdeHelper> for BlobParams {
-        fn from(helper: SerdeHelper) -> Self {
-            let SerdeHelper { target_blob_count, max_blob_count, update_fraction, min_blob_fee } =
-                helper;
+    impl TryFrom<SerdeHelper> for BlobParams {
+        type Error = &'static str;
 
-            Self {
+        fn try_from(helper: SerdeHelper) -> Result<Self, Self::Error> {
+            let SerdeHelper { target_blob_count, max_blob_count, update_fraction } = helper;
+            if update_fraction == 0 {
+                return Err("blob base fee update fraction must be nonzero");
+            }
+
+            Ok(Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
-                min_blob_fee: min_blob_fee.unwrap_or(eip4844::BLOB_TX_MIN_BLOB_GASPRICE),
+                min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
                 max_blobs_per_tx: max_blob_count,
                 blob_base_cost: 0,
-            }
+            })
         }
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_zero_update_fraction() {
+        let err = serde_json::from_value::<BlobParams>(serde_json::json!({
+            "baseFeeUpdateFraction": 0,
+            "max": 6,
+            "target": 3,
+        }))
+        .unwrap_err();
+        assert_eq!(err.to_string(), "blob base fee update fraction must be nonzero");
+    }
+
+    #[test]
+    fn accepts_nonzero_update_fraction() {
+        let params = BlobParams::cancun();
+        let decoded =
+            serde_json::from_value::<BlobParams>(serde_json::to_value(params).unwrap()).unwrap();
+        assert_eq!(decoded, params);
+        assert_eq!(decoded.calc_blob_fee(0), params.min_blob_fee);
     }
 }

@@ -3,7 +3,7 @@ use crate::ProviderCall;
 use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_network::Network;
 use alloy_rpc_client::WeakClient;
-use alloy_transport::{TransportErrorKind, TransportResult};
+use alloy_transport::{SharedTransportError, TransportErrorKind, TransportResult};
 
 /// Trait that helps convert `EthCall` into a `ProviderCall`.
 pub trait Caller<N, Resp>: Send + Sync
@@ -69,4 +69,31 @@ fn provider_rpc_call<Req: RpcSend, Resp: RpcRecv>(
     let client = client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
     let rpc_call = client.request(method, params);
     Ok(ProviderCall::RpcCall(rpc_call))
+}
+
+/// A caller that reports a preparation failure without dispatching a request.
+#[derive(Debug)]
+pub(super) struct ErrorCaller(pub(super) SharedTransportError);
+
+impl<N: Network, Resp: RpcRecv> Caller<N, Resp> for ErrorCaller {
+    fn call(
+        &self,
+        _params: EthCallParams<N>,
+    ) -> TransportResult<ProviderCall<EthCallParams<N>, Resp>> {
+        Err(self.0.to_error())
+    }
+
+    fn estimate_gas(
+        &self,
+        _params: EthCallParams<N>,
+    ) -> TransportResult<ProviderCall<EthCallParams<N>, Resp>> {
+        Err(self.0.to_error())
+    }
+
+    fn call_many(
+        &self,
+        _params: EthCallManyParams<'_>,
+    ) -> TransportResult<ProviderCall<EthCallManyParams<'static>, Resp>> {
+        Err(self.0.to_error())
+    }
 }
