@@ -4,7 +4,7 @@ use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, Trans
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::{io, time::Duration};
-use tokio::time::{sleep, timeout, Instant};
+use tokio::time::{sleep, timeout};
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
@@ -251,7 +251,7 @@ impl WsBackend<TungsteniteStream> {
                             Some(Ok(item)) => {
                                 // Any message from the server shows the connection is alive.
                                 expecting_pong = false;
-                                keepalive.as_mut().reset(Instant::now() + self.keepalive_interval);
+                                keepalive.set(sleep(self.keepalive_interval));
                                 errored = self.handle(item).is_err();
                                 if errored { break }
                             },
