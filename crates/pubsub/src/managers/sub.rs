@@ -2,11 +2,12 @@ use crate::{managers::ActiveSubscription, RawSubscription};
 use alloy_json_rpc::{EthNotification, SerializedRequest, SubId};
 use alloy_primitives::B256;
 use bimap::BiBTreeMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Default)]
 pub(crate) struct SubscriptionManager {
     /// The subscriptions.
-    local_to_sub: BiBTreeMap<B256, ActiveSubscription>,
+    local_to_sub: BTreeMap<B256, ActiveSubscription>,
     /// Tracks the CURRENT server id for a subscription.
     local_to_server: BiBTreeMap<B256, SubId>,
 }
@@ -24,42 +25,44 @@ impl SubscriptionManager {
 
     /// Returns true if a subscription with this local_id exists.
     pub(crate) fn contains(&self, local_id: &B256) -> bool {
-        self.local_to_sub.contains_left(local_id)
+        self.local_to_sub.contains_key(local_id)
     }
 
-    /// Insert a subscription.
-    fn insert(
+    /// Insert a new subscription routed via `server_id`, returning its local id.
+    pub(crate) fn insert(
         &mut self,
         request: SerializedRequest,
         server_id: SubId,
         channel_size: usize,
-    ) -> RawSubscription {
+    ) -> B256 {
         let active = ActiveSubscription::new(request, channel_size);
-        let sub = active.subscribe();
-
         let local_id = active.local_id;
         self.local_to_server.insert(local_id, server_id);
         self.local_to_sub.insert(local_id, active);
-
-        sub
+        local_id
     }
 
-    /// Insert or update the server_id for a subscription.
-    pub(crate) fn upsert(
-        &mut self,
-        request: SerializedRequest,
-        server_id: SubId,
-        channel_size: usize,
-    ) -> RawSubscription {
-        let local_id = request.params_hash();
+    /// Route an existing subscription via `server_id`, unless it is already routed via another
+    /// server id.
+    ///
+    /// The current server id is never overwritten: that would orphan the server-side
+    /// subscription behind it. Instead, the rejected `server_id` is returned so that the caller can
+    /// cancel it.
+    pub(crate) fn set_server_id(&mut self, local_id: B256, server_id: SubId) -> Result<(), SubId> {
+        match self.local_to_server.get_by_left(&local_id) {
+            Some(current) if *current == server_id => Ok(()),
+            Some(_) => Err(server_id),
+            None => {
+                self.local_to_server.insert(local_id, server_id);
+                Ok(())
+            }
+        }
+    }
 
-        // If we already know a subscription with the exact params,
-        // we can just update the server_id and get a new listener.
-        if self.local_to_sub.contains_left(&local_id) {
-            self.change_server_id(local_id, server_id);
-            self.get_subscription(local_id).expect("checked existence")
-        } else {
-            self.insert(request, server_id, channel_size)
+    /// Record that a caller was handed the local id and is expected to fetch a receiver.
+    pub(crate) fn add_pending_claim(&mut self, local_id: B256) {
+        if let Some(sub) = self.local_to_sub.get_mut(&local_id) {
+            sub.pending_claims += 1;
         }
     }
 
@@ -68,25 +71,32 @@ impl SubscriptionManager {
         self.local_to_server.get_by_right(server_id).copied()
     }
 
-    /// De-alias an alias, getting the original ID.
-    pub(crate) fn server_id_for(&self, local_id: &B256) -> Option<&SubId> {
-        self.local_to_server.get_by_left(local_id)
-    }
-
     /// Drop all server_ids.
     pub(crate) fn drop_server_ids(&mut self) {
         self.local_to_server.clear();
     }
 
-    /// Change the server_id of a subscription.
-    fn change_server_id(&mut self, local_id: B256, server_id: SubId) {
-        self.local_to_server.insert(local_id, server_id);
+    /// Remove all subscriptions that nobody consumes.
+    pub(crate) fn retain_consumed(&mut self) {
+        let unconsumed = self
+            .local_to_sub
+            .iter()
+            .filter(|(_, sub)| !sub.has_consumers())
+            .map(|(local_id, _)| *local_id)
+            .collect::<Vec<_>>();
+        for local_id in unconsumed {
+            debug!(%local_id, "Dropping subscription without consumers");
+            self.remove_sub(local_id);
+        }
     }
 
-    /// Remove a subscription by its local_id.
-    pub(crate) fn remove_sub(&mut self, local_id: B256) {
-        let _ = self.local_to_sub.remove_by_left(&local_id);
-        let _ = self.local_to_server.remove_by_left(&local_id);
+    /// Remove a subscription by its local_id, returning it and its current server id.
+    pub(crate) fn remove_sub(
+        &mut self,
+        local_id: B256,
+    ) -> Option<(ActiveSubscription, Option<SubId>)> {
+        let server_id = self.local_to_server.remove_by_left(&local_id).map(|(_, id)| id);
+        self.local_to_sub.remove(&local_id).map(|sub| (sub, server_id))
     }
 
     /// Notify the subscription channel of a new value, if the sub is known,
@@ -94,14 +104,16 @@ impl SubscriptionManager {
     /// exists, the notification is dropped.
     pub(crate) fn notify(&mut self, notification: EthNotification) {
         if let Some(local_id) = self.local_id_for(&notification.subscription) {
-            if let Some(sub) = self.local_to_sub.get_by_left(&local_id) {
+            if let Some(sub) = self.local_to_sub.get(&local_id) {
                 sub.notify(notification.result);
             }
         }
     }
 
     /// Get a receiver for a subscription.
-    pub(crate) fn get_subscription(&self, local_id: B256) -> Option<RawSubscription> {
-        self.local_to_sub.get_by_left(&local_id).map(ActiveSubscription::subscribe)
+    pub(crate) fn get_subscription(&mut self, local_id: B256) -> Option<RawSubscription> {
+        let sub = self.local_to_sub.get_mut(&local_id)?;
+        sub.pending_claims = sub.pending_claims.saturating_sub(1);
+        Some(sub.subscribe())
     }
 }

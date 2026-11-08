@@ -1,5 +1,5 @@
 use crate::managers::InFlight;
-use alloy_json_rpc::{Id, Response, SubId};
+use alloy_json_rpc::Id;
 use alloy_primitives::map::HashMap;
 
 /// Manages in-flight requests.
@@ -19,11 +19,9 @@ impl RequestManager {
         self.reqs.iter()
     }
 
-    /// Discard ordinary requests whose callers are no longer waiting.
-    pub(crate) fn remove_cancelled(&mut self) {
-        // Internal resubscriptions have no response receiver, but still need
-        // their acknowledgement to restore subscription delivery.
-        self.reqs.retain(|_, req| req.is_subscription() || !req.tx.is_closed());
+    /// Keep only the requests for which `keep` returns `true`.
+    pub(crate) fn retain(&mut self, mut keep: impl FnMut(&InFlight) -> bool) {
+        self.reqs.retain(|_, req| keep(req));
     }
 
     /// Insert a new in-flight request.
@@ -31,20 +29,13 @@ impl RequestManager {
         self.reqs.insert(in_flight.request.id().clone(), in_flight);
     }
 
+    /// Remove the request with the given id, e.g. because its response arrived.
+    pub(crate) fn remove(&mut self, id: &Id) -> Option<InFlight> {
+        self.reqs.remove(id)
+    }
+
     /// Drain all pending requests when the service terminates.
     pub(crate) fn drain(&mut self) -> impl Iterator<Item = InFlight> + '_ {
         self.reqs.drain().map(|(_, request)| request)
-    }
-
-    /// Handle a response by sending the payload to the waiter.
-    ///
-    /// If the request created a new subscription, this function returns the
-    /// subscription ID and the in-flight request for conversion to an
-    /// `ActiveSubscription`.
-    pub(crate) fn handle_response(&mut self, resp: Response) -> Option<(SubId, InFlight)> {
-        if let Some(in_flight) = self.reqs.remove(&resp.id) {
-            return in_flight.fulfill(resp);
-        }
-        None
     }
 }

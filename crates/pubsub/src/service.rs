@@ -1,17 +1,17 @@
 use crate::{
     handle::ConnectionHandle,
     ix::PubSubInstruction,
-    managers::{InFlight, RequestManager, SubscriptionManager},
+    managers::{subscription_local_id, InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
 use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, RpcError, SubId};
-use alloy_primitives::B256;
+use alloy_primitives::{map::B256Map, B256};
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
     SharedTransportError, TransportError, TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
@@ -21,6 +21,15 @@ use wasmtimer::tokio::sleep;
 use tokio::time::sleep;
 
 const MAX_RECONNECT_RETRY_INTERVAL: Duration = Duration::from_secs(30);
+
+/// A subscribe request on the wire, and the callers waiting for the same subscription.
+#[derive(Debug)]
+struct PendingSubscription {
+    /// The id of the request on the wire.
+    id: Id,
+    /// Callers that asked for the same subscription while the request was in flight.
+    waiters: Vec<InFlight>,
+}
 
 /// The service contains the backend handle, a subscription manager, and the
 /// configuration details required to reconnect.
@@ -40,22 +49,35 @@ pub(crate) struct PubSubService<T> {
 
     /// The request manager.
     pub(crate) in_flights: RequestManager,
+
+    /// Subscribe requests on the wire, by local id. Identical subscribe requests wait for these
+    /// instead of creating another subscription on the server.
+    pending_subs: B256Map<PendingSubscription>,
 }
 
 impl<T: PubSubConnect> PubSubService<T> {
-    /// Create a new service from a connector.
-    pub(crate) async fn connect(connector: T) -> TransportResult<PubSubFrontend> {
-        let handle = connector.connect().await?;
-
-        let (tx, reqs) = mpsc::unbounded_channel();
-        let this = Self {
+    /// Create a new service from a connected backend.
+    pub(crate) fn new(
+        handle: ConnectionHandle,
+        connector: T,
+        reqs: mpsc::UnboundedReceiver<PubSubInstruction>,
+    ) -> Self {
+        Self {
             handle,
             connector,
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: Default::default(),
-        };
-        this.spawn();
+            pending_subs: Default::default(),
+        }
+    }
+
+    /// Create a new service from a connector.
+    pub(crate) async fn connect(connector: T) -> TransportResult<PubSubFrontend> {
+        let handle = connector.connect().await?;
+
+        let (tx, reqs) = mpsc::unbounded_channel();
+        Self::new(handle, connector, reqs).spawn();
         Ok(PubSubFrontend::new(tx))
     }
 
@@ -82,8 +104,12 @@ impl<T: PubSubConnect> PubSubService<T> {
 
         old_handle.shutdown();
 
+        // Subscriptions nobody consumes are not restored: their server-side counterparts closed
+        // with the old connection.
+        self.subs.retain_consumed();
+
         // Re-issue pending requests.
-        self.in_flights.remove_cancelled();
+        self.remove_cancelled();
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
         for (_, in_flight) in self.in_flights.iter() {
             let msg = in_flight.request.serialized().to_owned();
@@ -109,6 +135,40 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
+    /// Discard the pending requests that must not be replayed on a new backend.
+    ///
+    /// Requests are discarded once nobody waits for their response, with two exceptions for
+    /// subscribe requests: pending resubscriptions are always discarded because they are re-issued
+    /// from their subscriptions, and a subscribe request is kept while another caller waits for
+    /// the same subscription.
+    fn remove_cancelled(&mut self) {
+        let Self { in_flights, subs, pending_subs, .. } = self;
+        in_flights.retain(|in_flight| {
+            if !in_flight.tx.is_closed() {
+                return true;
+            }
+            if !in_flight.is_subscription() {
+                return false;
+            }
+            let local_id = subscription_local_id(in_flight.request());
+            if subs.contains(&local_id) {
+                return false;
+            }
+            let Some(pending) = pending_subs
+                .get_mut(&local_id)
+                .filter(|pending| pending.id == *in_flight.request.id())
+            else {
+                return false;
+            };
+            pending.waiters.retain(|waiter| !waiter.tx.is_closed());
+            if pending.waiters.is_empty() {
+                pending_subs.remove(&local_id);
+                return false;
+            }
+            true
+        });
+    }
+
     /// Dispatch a request to the socket.
     fn dispatch_request(&self, brv: Box<RawValue>) -> TransportResult<()> {
         self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportErrorKind::backend_gone())
@@ -117,8 +177,24 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service a request.
     fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
         // A caller may have stopped waiting while reconnect blocked this queue.
-        if !in_flight.is_subscription() && in_flight.tx.is_closed() {
+        if in_flight.tx.is_closed() {
             return Ok(());
+        }
+        if in_flight.is_subscription() {
+            // Identical subscribe requests share one subscription, instead of each creating
+            // another one on the server.
+            let local_id = subscription_local_id(in_flight.request());
+            if self.subs.contains(&local_id) {
+                let id = in_flight.request.id().clone();
+                self.deliver_local_id(local_id, id, in_flight.tx)?;
+                return Ok(());
+            }
+            if let Some(pending) = self.pending_subs.get_mut(&local_id) {
+                pending.waiters.push(in_flight);
+                return Ok(());
+            }
+            let id = in_flight.request.id().clone();
+            self.pending_subs.insert(local_id, PendingSubscription { id, waiters: Vec::new() });
         }
         let brv = in_flight.request().serialized().to_owned();
         // Retain the waiter before dispatch: a backend failure must either replay the request
@@ -129,28 +205,54 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
+    /// Send the local id of a subscription to a caller waiting for it, returning whether the
+    /// caller received it.
+    fn deliver_local_id(
+        &mut self,
+        local_id: B256,
+        id: Id,
+        tx: oneshot::Sender<TransportResult<Response>>,
+    ) -> TransportResult<bool> {
+        // Serialized B256 is always a valid serialized U256 too.
+        let ser_alias = to_json_raw_value(&local_id)?;
+        let delivered =
+            tx.send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) })).is_ok();
+        if delivered {
+            self.subs.add_pending_claim(local_id);
+        }
+        Ok(delivered)
+    }
+
     /// Service a GetSub instruction.
     ///
     /// If the subscription exists, the waiter is sent `Some` broadcast receiver. If
     /// the subscription does not exist, the waiter is sent `None`.
-    fn service_get_sub(&self, local_id: B256, tx: oneshot::Sender<Option<RawSubscription>>) {
+    fn service_get_sub(&mut self, local_id: B256, tx: oneshot::Sender<Option<RawSubscription>>) {
         let _ = tx.send(self.subs.get_subscription(local_id));
     }
 
     /// Service an unsubscribe instruction.
-    fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
-        if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // A string id keeps the reply from matching a request issued by `RpcClient`,
-            // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
-            // dropped on arrival.
-            let id = Id::String(format!("unsubscribe-{local_id}"));
-            let req = Request::new("eth_unsubscribe", id, [server_id]);
-            let brv = req.serialize().expect("no ser error").take_request();
-
-            self.dispatch_request(brv)?;
+    fn service_unsubscribe(&mut self, local_id: B256) {
+        if let Some((sub, Some(server_id))) = self.subs.remove_sub(local_id) {
+            self.dispatch_unsubscribe(sub.request().method(), local_id, &server_id);
         }
-        self.subs.remove_sub(local_id);
-        Ok(())
+    }
+
+    /// Ask the server to cancel the subscription `server_id`, which a `subscribe_method` request
+    /// created.
+    ///
+    /// This is best effort and never fails: if the backend is gone, so is the server-side
+    /// subscription.
+    fn dispatch_unsubscribe(&self, subscribe_method: &str, local_id: B256, server_id: &SubId) {
+        // A string id keeps the reply from matching a request issued by `RpcClient`,
+        // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
+        // dropped on arrival.
+        let id = Id::String(format!("unsubscribe-{local_id}"));
+        let req = Request::new(unsubscribe_method(subscribe_method), id, [server_id]);
+        let brv = req.serialize().expect("no ser error").take_request();
+        if self.dispatch_request(brv).is_err() {
+            debug!(%local_id, ?server_id, "Backend gone, not sending unsubscribe");
+        }
     }
 
     /// Service an instruction
@@ -162,15 +264,24 @@ impl<T: PubSubConnect> PubSubService<T> {
                 self.service_get_sub(alias, tx);
                 Ok(())
             }
-            PubSubInstruction::Unsubscribe(alias) => self.service_unsubscribe(alias),
+            PubSubInstruction::Unsubscribe(alias) => {
+                self.service_unsubscribe(alias);
+                Ok(())
+            }
         }
     }
 
     /// Handle an item from the backend.
     fn handle_item(&mut self, item: PubSubItem) -> TransportResult<()> {
         match item {
-            PubSubItem::Response(resp) => match self.in_flights.handle_response(resp) {
-                Some((server_id, in_flight)) => self.handle_sub_response(in_flight, server_id),
+            PubSubItem::Response(resp) => match self.in_flights.remove(&resp.id) {
+                Some(in_flight) if in_flight.is_subscription() => {
+                    self.handle_sub_response(in_flight, resp)
+                }
+                Some(in_flight) => {
+                    let _ = in_flight.fulfill(resp);
+                    Ok(())
+                }
                 None => Ok(()),
             },
             PubSubItem::Notification(notification) => {
@@ -180,30 +291,62 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
     }
 
-    /// Rewrite the subscription id and insert into the subscriptions manager
-    fn handle_sub_response(
-        &mut self,
-        in_flight: InFlight,
-        server_id: SubId,
-    ) -> TransportResult<()> {
-        let request = in_flight.request;
-        let id = request.id().clone();
+    /// Handle the response to a subscribe request.
+    ///
+    /// On success, the subscription is created or restored, and its local id is sent to every
+    /// caller waiting for it. A server id that won't be routed, because nobody waits for the
+    /// subscription anymore or because the subscription is already routed via another server id,
+    /// is cancelled on the server.
+    fn handle_sub_response(&mut self, in_flight: InFlight, resp: Response) -> TransportResult<()> {
+        let local_id = subscription_local_id(in_flight.request());
 
-        // Nobody waits for the response and the subscription is gone, e.g. it was unsubscribed
-        // while being re-issued after a reconnect. Don't re-create it without a consumer.
-        if in_flight.tx.is_closed() && !self.subs.contains(&request.params_hash()) {
+        // Callers that asked for the same subscription while this request was in flight.
+        let waiters = match self.pending_subs.get(&local_id) {
+            Some(pending) if pending.id == resp.id => {
+                self.pending_subs.remove(&local_id).map(|pending| pending.waiters)
+            }
+            _ => None,
+        }
+        .unwrap_or_default();
+        let payload = (!waiters.is_empty()).then(|| resp.payload.clone());
+
+        let Some((server_id, in_flight)) = in_flight.fulfill(resp) else {
+            // The subscription failed for every caller waiting for it.
+            if let Some(payload) = payload {
+                for waiter in waiters {
+                    let id = waiter.request.id().clone();
+                    let _ = waiter.fulfill(Response { id, payload: payload.clone() });
+                }
+            }
             return Ok(());
+        };
+
+        let InFlight { request, channel_size, tx } = in_flight;
+        let id = request.id().clone();
+        let created = !self.subs.contains(&local_id);
+        if created {
+            // Nobody waits for the subscription, e.g. because its caller was cancelled, or because
+            // it was unsubscribed while being re-issued after a reconnect.
+            if tx.is_closed() && waiters.iter().all(|waiter| waiter.tx.is_closed()) {
+                self.dispatch_unsubscribe(request.method(), local_id, &server_id);
+                return Ok(());
+            }
+            self.subs.insert(request, server_id, channel_size);
+        } else if let Err(server_id) = self.subs.set_server_id(local_id, server_id) {
+            // The subscription is already routed via another server id.
+            self.dispatch_unsubscribe(request.method(), local_id, &server_id);
         }
 
-        let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
+        let mut delivered = self.deliver_local_id(local_id, id, tx)?;
+        for waiter in waiters {
+            let id = waiter.request.id().clone();
+            delivered |= self.deliver_local_id(local_id, id, waiter.tx)?;
+        }
 
-        // Serialized B256 is always a valid serialized U256 too.
-        let ser_alias = to_json_raw_value(sub.local_id())?;
-
-        // We send back a success response with the new subscription ID.
-        // We don't care if the channel is dead.
-        let _ =
-            in_flight.tx.send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) }));
+        // Every caller stopped waiting while the subscription was being created.
+        if created && !delivered {
+            self.service_unsubscribe(local_id);
+        }
 
         Ok(())
     }
@@ -330,6 +473,9 @@ impl<T: PubSubConnect> PubSubService<T> {
         for request in self.in_flights.drain() {
             let _ = request.tx.send(Err(error.to_error()));
         }
+        for waiter in self.pending_subs.drain().flat_map(|(_, pending)| pending.waiters) {
+            let _ = waiter.tx.send(Err(error.to_error()));
+        }
         // Requests queued while reconnecting have not entered `in_flights` yet.
         self.reqs.close();
         while let Some(instruction) = self.reqs.recv().await {
@@ -353,11 +499,29 @@ fn reconnect_retry_interval(base_interval: Duration, retry_count: u32) -> Durati
     base_interval.saturating_mul(backoff_multiplier).min(max_interval)
 }
 
+/// Returns the method that cancels a subscription created by `subscribe_method`.
+///
+/// The namespace is taken from the subscribe method, e.g. `eth_subscribe` maps to
+/// `eth_unsubscribe` and `admin_peerEvents` to `admin_unsubscribe`. Methods named
+/// `{namespace}_subscribe{Name}` map to `{namespace}_unsubscribe{Name}`, e.g.
+/// `reth_subscribeChainNotifications` to `reth_unsubscribeChainNotifications`. Methods without a
+/// namespace fall back to `eth_unsubscribe`.
+fn unsubscribe_method(subscribe_method: &str) -> Cow<'static, str> {
+    match subscribe_method.split_once('_') {
+        None | Some(("eth", "subscribe")) => Cow::Borrowed("eth_unsubscribe"),
+        Some((namespace, name)) => {
+            let suffix = name.strip_prefix("subscribe").unwrap_or_default();
+            Cow::Owned(format!("{namespace}_unsubscribe{suffix}"))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ConnectionInterface;
     use alloy_json_rpc::Request;
+    use alloy_primitives::U256;
     use std::{
         sync::{
             atomic::{AtomicUsize, Ordering},
@@ -475,13 +639,8 @@ mod tests {
         let (replacement, mut replacement_interface) = ConnectionHandle::new();
         let (tx, reqs) = mpsc::unbounded_channel();
         let frontend = PubSubFrontend::new(tx);
-        let mut service = PubSubService {
-            handle,
-            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let mut service =
+            PubSubService::new(handle, MockConnect(Arc::new(Mutex::new(Some(replacement)))), reqs);
 
         let cancelled = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
         let mut cancelled = Box::pin(frontend.send(cancelled));
@@ -525,13 +684,8 @@ mod tests {
         let (replacement, mut replacement_interface) = ConnectionHandle::new();
         let (tx, reqs) = mpsc::unbounded_channel();
         let frontend = PubSubFrontend::new(tx);
-        let mut service = PubSubService {
-            handle,
-            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let mut service =
+            PubSubService::new(handle, MockConnect(Arc::new(Mutex::new(Some(replacement)))), reqs);
         let request = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
         let mut request = Box::pin(frontend.send(request));
         assert!(futures::poll!(&mut request).is_pending());
@@ -553,16 +707,15 @@ mod tests {
         let (handle, _interface) = ConnectionHandle::new();
         let (replacement, mut replacement_interface) = ConnectionHandle::new();
         let (_tx, reqs) = mpsc::unbounded_channel();
-        let mut service = PubSubService {
-            handle,
-            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let mut service =
+            PubSubService::new(handle, MockConnect(Arc::new(Mutex::new(Some(replacement)))), reqs);
         let request =
             Request::new("eth_subscribe", Id::Number(3), ["newHeads"]).serialize().unwrap();
         let expected = request.serialized().get().to_owned();
+        // A consumed subscription whose resubscription after an earlier reconnect is pending.
+        let local_id = service.subs.insert(request.clone(), SubId::Number(U256::from(1)), 16);
+        let _sub = service.subs.get_subscription(local_id).unwrap();
+        service.subs.drop_server_ids();
         // Internal resubscription requests have no oneshot receiver: delivery
         // uses the subscription's broadcast channel instead.
         let (pending, response) = InFlight::new(request, 16);
@@ -571,12 +724,71 @@ mod tests {
 
         service.reconnect().await.unwrap();
 
+        // The resubscription is issued exactly once.
         assert_eq!(replacement_interface.from_frontend.try_recv().unwrap().get(), expected);
         assert!(matches!(
             replacement_interface.from_frontend.try_recv(),
             Err(mpsc::error::TryRecvError::Empty)
         ));
         assert_eq!(service.in_flights.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn duplicate_subscribe_response_is_unsubscribed() {
+        let (handle, mut interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService::new(handle, MockConnect::default(), reqs);
+        let request =
+            Request::new("eth_subscribe", Id::Number(1), ["newHeads"]).serialize().unwrap();
+        let local_id = service.subs.insert(request, SubId::Number(U256::from(0xaaa)), 16);
+        let mut sub = service.subs.get_subscription(local_id).unwrap();
+
+        // An identical subscribe request raced the first one onto the wire.
+        let raced = Request::new("eth_subscribe", Id::Number(2), ["newHeads"]).serialize().unwrap();
+        let (in_flight, mut raced_response) = InFlight::new(raced, 16);
+        service.in_flights.insert(in_flight);
+        service
+            .handle_item(
+                serde_json::from_str(r#"{"jsonrpc":"2.0","id":2,"result":"0xbbb"}"#).unwrap(),
+            )
+            .unwrap();
+
+        // The raced caller shares the existing subscription.
+        let response = raced_response.try_recv().unwrap().unwrap();
+        let alias: B256 =
+            serde_json::from_str(response.payload.as_success().unwrap().get()).unwrap();
+        assert_eq!(alias, local_id);
+
+        // The second server-side subscription is cancelled instead of replacing the first.
+        let unsubscribe = interface.from_frontend.try_recv().unwrap();
+        let unsubscribe: serde_json::Value = serde_json::from_str(unsubscribe.get()).unwrap();
+        assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+        assert_eq!(unsubscribe["id"], format!("unsubscribe-{local_id}"));
+        assert_eq!(unsubscribe["params"], serde_json::json!(["0xbbb"]));
+
+        service
+            .handle_item(
+                serde_json::from_str(
+                    r#"{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0xaaa","result":1}}"#,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(sub.try_recv().unwrap().get(), "1");
+    }
+
+    #[test]
+    fn unsubscribe_method_uses_subscribe_namespace() {
+        for (subscribe, unsubscribe) in [
+            ("eth_subscribe", "eth_unsubscribe"),
+            ("debug_subscribe", "debug_unsubscribe"),
+            ("admin_peerEvents", "admin_unsubscribe"),
+            ("reth_subscribeChainNotifications", "reth_unsubscribeChainNotifications"),
+            ("reth_subscribePersistedBlock", "reth_unsubscribePersistedBlock"),
+            ("subscribe", "eth_unsubscribe"),
+        ] {
+            assert_eq!(unsubscribe_method(subscribe), unsubscribe, "{subscribe}");
+        }
     }
 
     #[tokio::test]
@@ -589,13 +801,7 @@ mod tests {
         let (reconnected_handle, mut reconnected_interface) = ConnectionHandle::new();
         let connector = MockConnect(Arc::new(Mutex::new(Some(reconnected_handle))));
         let (tx, reqs) = mpsc::unbounded_channel();
-        let service = PubSubService {
-            handle: dead_handle,
-            connector,
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let service = PubSubService::new(dead_handle, connector, reqs);
         service.spawn();
 
         let first = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
@@ -632,13 +838,7 @@ mod tests {
         let connector = NonRetryableConnect::default();
         let counter = connector.0.clone();
         let (tx, reqs) = mpsc::unbounded_channel();
-        let service = PubSubService {
-            handle: dead_handle,
-            connector,
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let service = PubSubService::new(dead_handle, connector, reqs);
         service.spawn();
 
         let req = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
@@ -672,13 +872,7 @@ mod tests {
         let calls = connector.calls.clone();
 
         let (_tx, reqs) = mpsc::unbounded_channel();
-        let service = PubSubService {
-            handle: live_handle,
-            connector,
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let service = PubSubService::new(live_handle, connector, reqs);
         service.spawn();
 
         // Backend signals a deterministic, non-retryable failure.
@@ -701,13 +895,7 @@ mod tests {
         let (handle, mut interface) = ConnectionHandle::new();
         let (tx, reqs) = mpsc::unbounded_channel();
         let frontend = PubSubFrontend::new(tx);
-        let service = PubSubService {
-            handle,
-            connector: NonRetryableConnect::default(),
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let service = PubSubService::new(handle, NonRetryableConnect::default(), reqs);
         service.spawn();
 
         let request = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
@@ -727,13 +915,7 @@ mod tests {
     async fn shutdown_error_reaches_tracked_and_queued_requests() {
         let (handle, _interface) = ConnectionHandle::new();
         let (tx, reqs) = mpsc::unbounded_channel();
-        let mut service = PubSubService {
-            handle,
-            connector: NonRetryableConnect::default(),
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let mut service = PubSubService::new(handle, NonRetryableConnect::default(), reqs);
         let request = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
         let (tracked, tracked_response) = InFlight::new(request, 16);
         service.in_flights.insert(tracked);
@@ -765,13 +947,7 @@ mod tests {
         let calls = connector.calls.clone();
 
         let (tx, reqs) = mpsc::unbounded_channel();
-        let service = PubSubService {
-            handle: live_handle,
-            connector,
-            reqs,
-            subs: SubscriptionManager::default(),
-            in_flights: RequestManager::default(),
-        };
+        let service = PubSubService::new(live_handle, connector, reqs);
         service.spawn();
 
         // Trigger the legacy close path.

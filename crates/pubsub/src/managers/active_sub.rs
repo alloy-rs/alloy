@@ -1,10 +1,25 @@
 use crate::RawSubscription;
 use alloy_json_rpc::SerializedRequest;
-use alloy_primitives::B256;
+use alloy_primitives::{Keccak256, B256};
 use parking_lot::Mutex;
 use serde_json::value::RawValue;
 use std::{fmt, hash::Hash, ops::DerefMut};
 use tokio::sync::broadcast;
+
+/// Returns the local id of a subscription request.
+///
+/// The id commits to the method as well as the params, so that subscriptions with identical params
+/// on different methods (e.g. `admin_peerEvents` and `reth_subscribePersistedBlock`) stay distinct.
+pub(crate) fn subscription_local_id(request: &SerializedRequest) -> B256 {
+    let method = request.method();
+    let mut hasher = Keccak256::new();
+    hasher.update((method.len() as u64).to_be_bytes());
+    hasher.update(method);
+    if let Some(params) = request.params() {
+        hasher.update(params.get());
+    }
+    hasher.finalize()
+}
 
 /// An active subscription.
 pub(crate) struct ActiveSubscription {
@@ -22,6 +37,8 @@ pub(crate) struct ActiveSubscription {
     /// This is wrapped in a [`Mutex`] to allow for mutable access to the receiver without making
     /// [`ActiveSubscription::subscribe`] require mutable self.
     pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
+    /// The number of callers that were handed the local id but have not fetched a receiver yet.
+    pub(crate) pending_claims: usize,
 }
 
 // NB: We implement this to prevent any incorrect future implementations.
@@ -58,6 +75,7 @@ impl fmt::Debug for ActiveSubscription {
             .field("local_id", &self.local_id)
             .field("request", &self.request)
             .field("subscribers", &self.tx.receiver_count())
+            .field("pending_claims", &self.pending_claims)
             .finish()
     }
 }
@@ -65,9 +83,17 @@ impl fmt::Debug for ActiveSubscription {
 impl ActiveSubscription {
     /// Create a new active subscription.
     pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
-        let local_id = request.params_hash();
+        let local_id = subscription_local_id(&request);
         let (tx, rx) = broadcast::channel(channel_size);
-        Self { request, local_id, tx, rx: Mutex::new(Some(rx)) }
+        Self { request, local_id, tx, rx: Mutex::new(Some(rx)), pending_claims: 0 }
+    }
+
+    /// Returns `true` if anyone holds a receiver for this subscription, or is about to fetch one.
+    ///
+    /// The stored initial receiver does not count.
+    pub(crate) fn has_consumers(&self) -> bool {
+        let initial = usize::from(self.rx.lock().is_some());
+        self.pending_claims > 0 || self.tx.receiver_count() > initial
     }
 
     /// Serialize the request as a boxed [`RawValue`].

@@ -62,11 +62,12 @@ For a normal request, the user sends a request to the **frontend**, and
 later receives a response via a tokio oneshot channel. This is straightforward
 and easy to reason about. Subscriptions, however, are side-effects of other
 requests, and are long-lived. They are managed by the **service** and
-identified locally by a `B256`. This value is a params-derived alias: it is the
-Keccak-256 hash of the serialized parameters and does not include the method.
-Requests with identical parameters therefore share an alias, including custom
-subscription methods with different names. The service uses this ID to manage
-the subscription lifecycle and dispatch notifications to receivers.
+identified locally by a `B256`. This value is a request-derived alias: it is the
+Keccak-256 hash of the method and the serialized parameters. Identical
+subscription requests share an alias and a single server-side subscription: a
+request for a subscription that exists, or is being created, is answered with
+its alias without another request to the server. The service uses this ID to
+manage the subscription lifecycle and dispatch notifications to receivers.
 
 ### Server & Local IDs
 
@@ -87,19 +88,26 @@ server ID changes across reconnections.
 After a retryable established-backend failure, the service attempts reconnection under its
 configured retry policy; non-retryable failures terminate it immediately. Following a successful
 reconnect, it re-sends every
-request still awaiting a response and re-creates active subscriptions. If the
+request still awaiting a response and re-creates active subscriptions that still
+have consumers: a receiver, or a caller that was handed the local ID but has not
+fetched a receiver yet. If the
 server processed a request but its response was lost, that request may execute
 more than once. Do not rely on at-most-once execution for non-idempotent methods.
 
 Dropping a request future stops waiting locally, but does not cancel a request
 already accepted by the service. Likewise, dropping a [`RawSubscription`] or
-[`Subscription`] only drops that receiver; it does not send
-`eth_unsubscribe`. Call [`PubSubFrontend::unsubscribe`] with the local ID when
-the server-side subscription is no longer needed. `unsubscribe` only queues
-the instruction and does not wait for the server's response. It is best effort:
-an unsubscribe processed while reconnection is re-creating the subscription can
-race with the replacement response, so it is not confirmation of server-side
-teardown.
+[`Subscription`] only drops that receiver; it does not cancel the server-side
+subscription. Call [`PubSubFrontend::unsubscribe`] with the local ID when the
+server-side subscription is no longer needed. It sends
+`{namespace}_unsubscribe`, with the namespace of the subscribe method, e.g.
+`eth_unsubscribe` or `admin_unsubscribe`, and `{namespace}_unsubscribe{Name}`
+for methods named `{namespace}_subscribe{Name}`. `unsubscribe` only queues the
+instruction and does not wait for the server's response.
+
+The service also cancels server-side subscriptions it would not route: those
+acknowledged after their caller stopped waiting, or after an unsubscribe while
+reconnection was re-creating them, and duplicates of a subscription that is
+already routed.
 
 ### What is a subscription request?
 
