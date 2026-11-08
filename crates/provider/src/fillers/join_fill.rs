@@ -4,7 +4,8 @@ use crate::{
     Provider, ProviderLayer,
 };
 use alloy_network::Network;
-use alloy_transport::TransportResult;
+use alloy_primitives::Address;
+use alloy_transport::{TransportError, TransportResult};
 use futures::try_join;
 
 /// A filler that can fill in a [`TransactionRequest`] with additional information by joining two
@@ -163,6 +164,11 @@ where
         self.left.prepare_call_sync(tx)?;
         self.right.prepare_call_sync(tx)?;
         Ok(())
+    }
+
+    async fn on_send_failure(&self, from: Address, nonce: u64, error: &TransportError) {
+        self.left.on_send_failure(from, nonce, error).await;
+        self.right.on_send_failure(from, nonce, error).await;
     }
 }
 

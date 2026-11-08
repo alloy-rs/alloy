@@ -56,7 +56,7 @@ use crate::{
     SendableTxErr,
 };
 use alloy_json_rpc::{RpcError, RpcRecv};
-use alloy_network::{AnyNetwork, Ethereum, Network};
+use alloy_network::{AnyNetwork, Ethereum, Network, TransactionBuilder};
 use alloy_primitives::{Bytes, U64};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
@@ -285,6 +285,21 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         // No-op default
         Ok(())
     }
+
+    /// Called after sending a transaction fails, with its sender and the nonce the fillers filled
+    /// in, so that fillers that reserved state for it can release it.
+    ///
+    /// This is not called if the caller supplied the nonce.
+    fn on_send_failure(
+        &self,
+        from: Address,
+        nonce: u64,
+        error: &TransportError,
+    ) -> impl_future!(<Output = ()>) {
+        let _ = (from, nonce, error);
+        // This is a no-op by default
+        futures::future::ready(())
+    }
 }
 
 /// A [`Provider`] that applies one or more [`TxFiller`]s.
@@ -349,11 +364,20 @@ where
         self.filler.join_with(other).layer(self.inner)
     }
 
-    async fn fill_inner(&self, mut tx: SendableTx<N>) -> TransportResult<SendableTx<N>> {
+    /// Runs the fillers on the transaction until they are finished.
+    ///
+    /// Also returns the sender, read from the request while filling, since a signed envelope no
+    /// longer carries it.
+    async fn fill_inner(
+        &self,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<(SendableTx<N>, Option<Address>)> {
+        let mut from = None;
         let mut count = 0;
 
         while self.filler.continue_filling(&tx) {
             self.filler.fill_sync(&mut tx);
+            from = tx.as_builder().and_then(|tx| tx.from()).or(from);
             tx = self.filler.prepare_and_fill(&self.inner, tx).await?;
 
             count += 1;
@@ -366,7 +390,40 @@ where
                 return Err(TransportError::local_usage_str(ERROR));
             }
         }
-        Ok(tx)
+        Ok((tx, from))
+    }
+
+    /// Fills a transaction that is about to be sent.
+    ///
+    /// Also returns its sender and nonce if the fillers filled in the nonce, rather than the
+    /// caller, so that a failed send can be reported to [`TxFiller::on_send_failure`].
+    async fn fill_for_send(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<(SendableTx<N>, Option<(Address, u64)>)> {
+        let caller_nonce = tx.as_builder().is_none_or(|tx| tx.nonce().is_some());
+        let (tx, from) = self.fill_inner(tx).await?;
+        if caller_nonce {
+            return Ok((tx, None));
+        }
+
+        let nonce = match &tx {
+            SendableTx::Builder(tx) => tx.nonce(),
+            SendableTx::Envelope(tx) => Some(alloy_consensus::Transaction::nonce(tx)),
+        };
+        Ok((tx, from.zip(nonce)))
+    }
+
+    /// Reports a failed send to the fillers if they filled in the nonce, then returns the result.
+    async fn report_send_result<T>(
+        &self,
+        result: TransportResult<T>,
+        filled: Option<(Address, u64)>,
+    ) -> TransportResult<T> {
+        if let (Err(err), Some((from, nonce))) = (&result, filled) {
+            self.filler.on_send_failure(from, nonce, err).await;
+        }
+        result
     }
 
     /// Fills the transaction request, using the configured fillers
@@ -416,7 +473,7 @@ where
     /// # fn example() {}
     /// ```
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
-        self.fill_inner(SendableTx::Builder(tx)).await
+        self.fill_inner(SendableTx::Builder(tx)).await.map(|(tx, _)| tx)
     }
 
     /// Prepares a transaction request for eth_call operations using the configured fillers
@@ -779,38 +836,42 @@ where
 
     async fn send_transaction_internal(
         &self,
-        mut tx: SendableTx<N>,
+        tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<N>> {
-        tx = self.fill_inner(tx).await?;
+        let (tx, filled) = self.fill_for_send(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
                 // TODO: improve this.
                 // blocked by #431
                 let message = format!("missing properties: {missing:?}");
-                return Err(RpcError::local_usage_str(&message));
+                let err = RpcError::local_usage_str(&message);
+                return self.report_send_result(Err(err), filled).await;
             }
         }
 
         // Errors in tx building happen further down the stack.
-        self.inner.send_transaction_internal(tx).await
+        let result = self.inner.send_transaction_internal(tx).await;
+        self.report_send_result(result, filled).await
     }
 
     async fn send_transaction_sync_internal(
         &self,
-        mut tx: SendableTx<N>,
+        tx: SendableTx<N>,
     ) -> TransportResult<N::ReceiptResponse> {
-        tx = self.fill_inner(tx).await?;
+        let (tx, filled) = self.fill_for_send(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
                 let message = format!("missing properties: {missing:?}");
-                return Err(RpcError::local_usage_str(&message));
+                let err = RpcError::local_usage_str(&message);
+                return self.report_send_result(Err(err), filled).await;
             }
         }
 
         // Errors in tx building happen further down the stack.
-        self.inner.send_transaction_sync_internal(tx).await
+        let result = self.inner.send_transaction_sync_internal(tx).await;
+        self.report_send_result(result, filled).await
     }
 
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
