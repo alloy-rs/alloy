@@ -132,7 +132,8 @@ async fn subscribe_blocks_with_server_subscription_ids() -> Result<(), Box<dyn s
             timeout(Duration::from_secs(5), client),
             timeout(Duration::from_secs(5), server)
         );
-        // Inspect the server first so assertion and socket failures are not hidden by client timeouts.
+        // Inspect the server first so assertion and socket failures are not hidden by client
+        // timeouts.
         server_result.expect("local WebSocket server timed out")?;
         client_result.unwrap_or_else(|_| panic!("subscription timed out for {server_id}"))?;
     }
