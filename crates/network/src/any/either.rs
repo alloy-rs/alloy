@@ -60,7 +60,9 @@ impl From<AnyTypedTransaction> for WithOtherFields<TransactionRequest> {
     fn from(value: AnyTypedTransaction) -> Self {
         match value {
             AnyTypedTransaction::Ethereum(tx) => Self::new(tx.into()),
-            AnyTypedTransaction::Unknown(UnknownTypedTransaction { ty, mut fields, .. }) => {
+            AnyTypedTransaction::Unknown(tx) => {
+                let ty = tx.ty;
+                let mut fields = tx.into_fields();
                 fields.insert("type".to_string(), serde_json::Value::Number(ty.0.into()));
                 Self { inner: Default::default(), other: fields }
             }
@@ -379,11 +381,7 @@ mod tests {
     use std::str::FromStr;
 
     fn unknown_inner_tx() -> UnknownTypedTransaction {
-        UnknownTypedTransaction {
-            ty: AnyTxType(0x7e),
-            fields: Default::default(),
-            memo: Default::default(),
-        }
+        UnknownTypedTransaction::new(AnyTxType(0x7e), Default::default())
     }
 
     fn unknown_tx() -> AnyTypedTransaction {

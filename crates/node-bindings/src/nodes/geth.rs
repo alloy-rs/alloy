@@ -1,7 +1,7 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    utils::{extract_endpoint, extract_value, unused_port, GracefulShutdown},
+    utils::{extract_endpoint, extract_value, unused_port, GracefulShutdown, StartupGuard},
     NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
@@ -649,7 +649,7 @@ impl Geth {
 
         cmd.args(self.args);
 
-        let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
+        let mut child = StartupGuard::new(cmd.spawn().map_err(NodeError::SpawnError)?);
 
         let stderr = child.stderr.take().ok_or(NodeError::NoStderr)?;
 
@@ -737,7 +737,7 @@ impl Geth {
         }
 
         Ok(GethInstance {
-            pid: child,
+            pid: child.into_child(),
             host: self.host.unwrap_or_else(|| "localhost".to_string()),
             port,
             ipc: self.ipc_path,

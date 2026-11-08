@@ -191,7 +191,12 @@ where
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
-        let span = debug_span!("HyperTransport", url = %this.url);
+        let span = debug_span!(
+            "HyperTransport",
+            scheme = this.url.scheme(),
+            host = this.url.host_str().unwrap_or_default(),
+            port = this.url.port_or_known_default(),
+        );
         Box::pin(this.do_hyper(req).instrument(span.or_current()))
     }
 }

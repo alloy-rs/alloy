@@ -136,8 +136,9 @@ pub struct EIP1186AccountProofResponse {
 
 #[cfg(feature = "serde")]
 impl EIP1186AccountProofResponse {
-    /// After `SpuriousDragon` empty account is defined as account with nonce == 0 && balance == 0
-    /// && bytecode = None (or hash is [`KECCAK_EMPTY`](alloy_consensus::constants::KECCAK_EMPTY)).
+    /// Returns whether the proof describes an account with zero nonce and balance, the empty
+    /// storage trie root ([`EMPTY_ROOT_HASH`](alloy_consensus::constants::EMPTY_ROOT_HASH)), and
+    /// the empty code hash ([`KECCAK_EMPTY`](alloy_consensus::constants::KECCAK_EMPTY)).
     pub fn is_empty(&self) -> bool {
         self.nonce == 0
             && self.balance.is_zero()

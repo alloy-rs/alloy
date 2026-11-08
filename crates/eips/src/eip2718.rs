@@ -4,7 +4,7 @@
 
 use alloc::{borrow::Cow, vec::Vec};
 use alloy_primitives::{keccak256, Bytes, Sealable, Sealed, B256};
-use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
+use alloy_rlp::{Buf, BufMut, Header};
 use auto_impl::auto_impl;
 use core::fmt;
 
@@ -26,6 +26,9 @@ pub const EIP4844_TX_TYPE_ID: u8 = 3;
 
 /// Identifier for an EIP7702 transaction.
 pub const EIP7702_TX_TYPE_ID: u8 = 4;
+
+/// Identifier for an EIP8141 transaction.
+pub const EIP8141_TX_TYPE_ID: u8 = crate::eip8141::FRAME_TX_TYPE;
 
 /// [EIP-2718] decoding errors.
 ///
@@ -173,6 +176,10 @@ pub trait Decodable2718: Sized {
         if h.list {
             return Self::fallback_decode(buf);
         }
+
+        // Header::decode leaves a bare type byte in the buffer. Preserve unwrapped envelopes by
+        // enforcing the payload length only when an actual string header was consumed.
+        let has_string_header = h_decode.len() < buf.len();
         *buf = h_decode;
 
         let remaining_len = buf.len();
@@ -184,10 +191,7 @@ pub trait Decodable2718: Sized {
         let tx = Self::typed_decode(ty, buf)?;
 
         let bytes_consumed = remaining_len - buf.len();
-        // Header::decode also accepts a bare type byte as a one-byte RLP string. Preserve
-        // acceptance of these unwrapped typed envelopes for backwards compatibility; rejecting
-        // them here would be a breaking change.
-        if bytes_consumed != h.payload_length && h_decode[0] > EMPTY_STRING_CODE {
+        if has_string_header && bytes_consumed != h.payload_length {
             return Err(alloy_rlp::Error::UnexpectedLength.into());
         }
 
@@ -393,6 +397,11 @@ pub trait Typed2718 {
     /// Returns true if the type is an EIP-7702 transaction.
     fn is_eip7702(&self) -> bool {
         self.ty() == EIP7702_TX_TYPE_ID
+    }
+
+    /// Returns true if the type is an EIP-8141 transaction.
+    fn is_eip8141(&self) -> bool {
+        self.ty() == EIP8141_TX_TYPE_ID
     }
 }
 

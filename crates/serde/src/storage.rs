@@ -1,27 +1,29 @@
 use alloc::collections::BTreeMap;
 use alloy_primitives::{
+    hex::FromHex,
     ruint::{BaseConvertError, ParseError},
     Bytes, B256, U256,
 };
 use core::{fmt, str::FromStr};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 /// A storage key that accepts hex strings up to 32 bytes for `eth_getStorageAt` and `eth_getProof`.
 ///
-/// A full-width, 32-byte input is stored as [`Hash`](Self::Hash) and serializes at full width.
-/// Shorter inputs are stored as [`Number`](Self::Number) and serialize as canonical quantities, so
-/// their original prefix, letter case, and leading zeroes are not preserved. [`Self::as_b256`]
-/// returns either representation left-padded to 32 bytes.
+/// A full-width input of 63 or 64 hex digits is stored as [`Hash`](Self::Hash) and serializes at
+/// full width. Shorter inputs are stored as [`Number`](Self::Number) and serialize as canonical
+/// quantities, so their original prefix, letter case, and leading zeroes are not preserved.
+/// [`Self::as_b256`] returns either representation left-padded to 32 bytes.
 ///
-/// This distinction mirrors geth's treatment of `eth_getProof` storage keys. See how input
-/// `storageKey`s populate the returned `StorageResult`:
+/// This distinction mirrors geth's treatment of `eth_getProof` storage keys. As in geth, the `0x`
+/// prefix is optional when deserializing and keys with more than 64 hex digits are rejected. See
+/// how input `storageKey`s populate the returned `StorageResult`:
 /// <https://github.com/ethereum/go-ethereum/blob/00a73fbcce3250b87fc4160f3deddc44390848f4/internal/ethapi/api.go#L658-L690>
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum JsonStorageKey {
-    /// A full 32-byte key (tried first during deserialization)
+    /// A full-width key of 63 or 64 hex digits.
     Hash(B256),
-    /// A number (fallback if B256 deserialization fails)
+    /// A shorter key.
     Number(U256),
 }
 
@@ -79,6 +81,50 @@ impl fmt::Display for JsonStorageKey {
         match self {
             Self::Hash(hash) => hash.fmt(f),
             Self::Number(num) => write!(f, "{num:#x}"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for JsonStorageKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct JsonStorageKeyVisitor;
+
+        impl de::Visitor<'_> for JsonStorageKeyVisitor {
+            type Value = JsonStorageKey;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a hex string of at most 64 digits")
+            }
+
+            fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
+                Ok(JsonStorageKey::Number(U256::from(v)))
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                let digits = v.strip_prefix("0x").or_else(|| v.strip_prefix("0X")).unwrap_or(v);
+                if digits.len() > 64 {
+                    return Err(E::invalid_length(digits.len(), &self));
+                }
+                let mut padded = [b'0'; 64];
+                padded[64 - digits.len()..].copy_from_slice(digits.as_bytes());
+                let key = B256::from_hex(padded)
+                    .map_err(|_| E::invalid_value(de::Unexpected::Str(v), &self))?;
+                Ok(if digits.len() >= 63 {
+                    JsonStorageKey::Hash(key)
+                } else {
+                    JsonStorageKey::Number(key.into())
+                })
+            }
+        }
+
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_any(JsonStorageKeyVisitor)
+        } else {
+            // Both variants serialize as 32 bytes, so binary input is always a full-width key.
+            B256::deserialize(deserializer).map(Self::Hash)
         }
     }
 }
@@ -155,8 +201,6 @@ mod tests {
             "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",   // Number
             "0xabc",                                                              // Number
             "0xabcd",                                                             // Number
-            // 0x + 63 hex chars (U256 value, total len = 65)
-            "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Number
             // 0x + 64 hex chars (max U256, total len = 66)
             "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Hash
         ];
@@ -190,9 +234,26 @@ mod tests {
 
     #[test]
     fn test_deserialize_too_long_storage_key() {
-        let key = "0x".to_string() + &"f".repeat(68);
-        let result: Result<JsonStorageKey, _> = serde_json::from_str(&json!(key).to_string());
-        assert!(result.is_err(), "storage key with 68 hex chars should fail deserialization");
+        for key in ["0x".to_string() + &"f".repeat(68), "0x".to_string() + &"0".repeat(65)] {
+            let result: Result<JsonStorageKey, _> = serde_json::from_str(&json!(key).to_string());
+            assert!(result.is_err(), "{key} should fail deserialization");
+        }
+    }
+
+    #[test]
+    fn test_deserialize_storage_key() {
+        let parse = |s: &str| serde_json::from_str::<JsonStorageKey>(&json!(s).to_string());
+
+        let key = parse(&("0x".to_string() + &"f".repeat(63))).unwrap();
+        assert_eq!(key, JsonStorageKey::Hash(B256::from(U256::MAX >> 4)));
+        assert_eq!(key.to_string(), "0x0".to_string() + &"f".repeat(63));
+
+        assert_eq!(parse("0x").unwrap(), JsonStorageKey::Number(U256::ZERO));
+        assert_eq!(parse("123").unwrap(), JsonStorageKey::Number(U256::from(0x123)));
+        assert!(parse("0x_1").is_err());
+
+        let key: JsonStorageKey = serde_json::from_str("123").unwrap();
+        assert_eq!(key, JsonStorageKey::Number(U256::from(123)));
     }
 
     #[test]

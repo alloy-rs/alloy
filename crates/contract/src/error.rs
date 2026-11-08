@@ -51,7 +51,7 @@ impl From<MulticallError> for Error {
         match error {
             MulticallError::TransportError(error) => Self::TransportError(error),
             MulticallError::DecodeError(error) => error.into(),
-            error => Self::TransportError(TransportErrorKind::custom_str(&error.to_string())),
+            error => Self::TransportError(TransportErrorKind::custom(error)),
         }
     }
 }
@@ -69,6 +69,13 @@ impl Error {
     /// Return the revert data in case the call reverted.
     pub fn as_revert_data(&self) -> Option<Bytes> {
         if let Self::TransportError(e) = self {
+            if let Some(MulticallError::CallFailed(data)) = e
+                .as_transport_err()
+                .and_then(TransportErrorKind::as_custom)
+                .and_then(|error| error.downcast_ref::<MulticallError>())
+            {
+                return Some(data.clone());
+            }
             return e.as_error_resp().and_then(|e| e.as_revert_data());
         }
 
@@ -228,6 +235,15 @@ impl TransportErrorExt for TransportError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_sol_types::sol;
+    use std::error::Error as StdError;
+
+    sol! {
+        #[derive(Debug, PartialEq, Eq)]
+        interface Reverts {
+            error Failed(uint256 value);
+        }
+    }
 
     #[test]
     fn converts_multicall_transport_error() {
@@ -241,6 +257,29 @@ mod tests {
         let error = MulticallError::DecodeError(alloy_sol_types::Error::Overrun);
 
         assert!(matches!(Error::from(error), Error::AbiError(_)));
+    }
+
+    #[test]
+    fn converts_multicall_revert_data() {
+        let expected = Reverts::Failed { value: alloy_primitives::U256::from(42) };
+        let data = Bytes::from(expected.abi_encode());
+        let error = Error::from(MulticallError::CallFailed(data.clone()));
+
+        assert_eq!(error.as_revert_data(), Some(data));
+        assert_eq!(error.as_decoded_error::<Reverts::Failed>(), Some(expected));
+        assert!(matches!(
+            error.as_decoded_interface_error::<Reverts::RevertsErrors>(),
+            Some(Reverts::RevertsErrors::Failed(_))
+        ));
+        let mut source = error.source();
+        while let Some(error) = source {
+            if matches!(error.downcast_ref::<MulticallError>(), Some(MulticallError::CallFailed(_)))
+            {
+                return;
+            }
+            source = error.source();
+        }
+        panic!("multicall error missing from source chain");
     }
 
     #[test]

@@ -100,7 +100,7 @@ impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
                     Default::default()
                 } else {
                     // Otherwise, we flatten the array, knowing there are no `None` values
-                    arr.into_iter().flatten().collect::<Vec<T>>().into()
+                    arr.into_iter().flatten().collect()
                 }
             }
         }
@@ -603,7 +603,7 @@ impl Filter {
     /// Each item must include the event name and canonical parameter types.
     #[must_use]
     pub fn events(self, events: impl IntoIterator<Item = impl AsRef<[u8]>>) -> Self {
-        let events = events.into_iter().map(|e| keccak256(e.as_ref())).collect::<Vec<_>>();
+        let events = events.into_iter().map(|e| keccak256(e.as_ref())).collect::<Topic>();
         self.event_signature(events)
     }
 
@@ -1584,7 +1584,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{bloom, map::DefaultHashBuilder, LogData};
+    use alloy_consensus::Receipt;
+    use alloy_primitives::{bloom, map::DefaultHashBuilder, Bytes, LogData};
     use core::hash::BuildHasher;
     #[cfg(feature = "serde")]
     use serde_json::json;
@@ -2086,9 +2087,6 @@ mod tests {
 
     #[test]
     fn test_append_matching_block_logs() {
-        use alloy_consensus::Receipt;
-        use alloy_primitives::Bytes;
-
         // Create test addresses and topics
         let addr1 = Address::from([0x11; 20]);
         let addr2 = Address::from([0x22; 20]);
@@ -2229,9 +2227,6 @@ mod tests {
 
     #[test]
     fn test_filter_receipts_iterator() {
-        use alloy_consensus::Receipt;
-        use alloy_primitives::Bytes;
-
         // Create test addresses and topics
         let addr1 = Address::from([0x11; 20]);
         let addr2 = Address::from([0x22; 20]);

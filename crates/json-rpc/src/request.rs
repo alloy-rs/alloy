@@ -380,12 +380,10 @@ where
 /// not yet sent. It is used by RPC clients to build batch requests and manage
 /// in-flight requests.
 ///
-/// The metadata is stored separately from the serialized JSON. Mutating the
-/// metadata's ID or method after serialization does not rewrite the JSON that
-/// will be sent, and can make routing metadata disagree with the wire request.
-/// To change a wire field, modify the original [`Request`] and serialize it
-/// again. Extensions, headers, and subscription status are intentionally
-/// metadata-only.
+/// The metadata is stored separately from the serialized JSON. The ID and method
+/// cannot be mutated after serialization. To change a wire field, modify the
+/// original [`Request`] and serialize it again. Extensions, headers, and
+/// subscription status can still be changed because they are metadata-only.
 #[derive(Clone, Debug)]
 pub struct SerializedRequest {
     meta: RequestMeta,
@@ -409,11 +407,14 @@ impl SerializedRequest {
         &self.meta
     }
 
-    /// Returns a mutable reference to the request metadata (ID and method).
-    ///
-    /// Changing the ID or method does not rewrite [`Self::serialized`].
-    pub const fn meta_mut(&mut self) -> &mut RequestMeta {
-        &mut self.meta
+    /// Returns a reference to the request extensions.
+    pub const fn extensions(&self) -> &Extensions {
+        self.meta.extensions()
+    }
+
+    /// Returns a mutable reference to the request extensions.
+    pub const fn extensions_mut(&mut self) -> &mut Extensions {
+        self.meta.extensions_mut()
     }
 
     /// Returns a reference to the request headers, if any.
@@ -446,6 +447,11 @@ impl SerializedRequest {
     /// `eth_subscribe`)
     pub const fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription();
+    }
+
+    /// Sets whether the request triggers a stream of notifications.
+    pub const fn set_subscription_status(&mut self, sub: bool) {
+        self.meta.set_subscription_status(sub);
     }
 
     /// Returns `true` if the request is a subscription.
@@ -526,5 +532,24 @@ mod test {
         test_inner(Request::<u64>::new("test", "hello".to_string().into(), 1));
         test_inner(Request::<String>::new("test", Id::None, "test".to_string()));
         test_inner(Request::<Vec<u64>>::new("test", u64::MAX.into(), vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn serialized_metadata_updates_preserve_wire_fields() {
+        let mut request = Request::new("test", 1.into(), ()).serialize().unwrap();
+        let serialized = request.serialized().get().to_owned();
+
+        request.extensions_mut().insert(42u64);
+        request.headers_mut().insert("x-test", http::HeaderValue::from_static("value"));
+        request.set_subscription_status(true);
+        assert!(request.is_subscription());
+        request.set_subscription_status(false);
+        assert!(!request.is_subscription());
+
+        assert_eq!(request.extensions().get::<u64>(), Some(&42));
+        assert_eq!(request.headers().unwrap()["x-test"], "value");
+        assert_eq!(request.id(), &Id::Number(1));
+        assert_eq!(request.method(), "test");
+        assert_eq!(request.serialized().get(), serialized);
     }
 }

@@ -592,6 +592,7 @@ pub fn execution_payload_from_beacon_str(val: &str) -> Result<ExecutionPayload, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_rpc_types_engine::PayloadAttributes;
     use similar_asserts::assert_eq;
 
     #[test]
@@ -799,8 +800,6 @@ mod tests {
 
     #[test]
     fn serde_beacon_payload_attributes_without_slot_number() {
-        use alloy_rpc_types_engine::PayloadAttributes;
-
         let json = r#"{
             "timestamp": "1234",
             "prev_randao": "0x0000000000000000000000000000000000000000000000000000000000000000",

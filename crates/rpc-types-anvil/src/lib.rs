@@ -8,8 +8,11 @@
 
 use alloy_primitives::{BlockHash, Bytes, ChainId, B256, U256};
 use alloy_rpc_types_eth::TransactionRequest;
-use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use serde::{
+    de::{self, IgnoredAny, MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+use std::{collections::BTreeMap, fmt};
 
 /// Represents the params to set forking which can take various forms:
 ///  - untagged
@@ -36,25 +39,58 @@ impl<'de> serde::Deserialize<'de> for Forking {
             block_number: Option<u64>,
         }
 
-        #[derive(serde::Deserialize)]
-        struct Tagged {
-            forking: ForkOpts,
-        }
-        #[derive(serde::Deserialize)]
-        #[serde(untagged)]
-        enum ForkingVariants {
-            Tagged(Tagged),
-            Fork(ForkOpts),
-        }
-        let f = match ForkingVariants::deserialize(deserializer)? {
-            ForkingVariants::Fork(ForkOpts { json_rpc_url, block_number }) => {
-                Self { json_rpc_url, block_number }
+        struct ForkingVisitor;
+
+        impl<'de> Visitor<'de> for ForkingVisitor {
+            type Value = Forking;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("fork options or an object containing tagged fork options")
             }
-            ForkingVariants::Tagged(f) => {
-                Self { json_rpc_url: f.forking.json_rpc_url, block_number: f.forking.block_number }
+
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Forking, A::Error> {
+                let mut fields = alloy_serde::OtherFields::default();
+                let mut tagged = None;
+                let mut duplicate = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "forking" => {
+                            if tagged.is_some() {
+                                return Err(de::Error::duplicate_field("forking"));
+                            }
+                            // Decode the tag directly so malformed or duplicate nested options
+                            // cannot be hidden by buffering or untagged fallback.
+                            tagged = Some(map.next_value::<ForkOpts>()?);
+                        }
+                        "jsonRpcUrl" | "blockNumber" => {
+                            let name =
+                                if key == "jsonRpcUrl" { "jsonRpcUrl" } else { "blockNumber" };
+                            if fields.insert(key, map.next_value()?).is_some() {
+                                duplicate = Some(name);
+                            }
+                        }
+                        _ => {
+                            let _ = map.next_value::<IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let options = if let Some(options) = tagged {
+                    options
+                } else {
+                    if let Some(field) = duplicate {
+                        return Err(de::Error::duplicate_field(field));
+                    }
+                    // Root options only apply in the absence of a tag. In particular, malformed
+                    // root options must not prevent a valid tagged configuration from decoding.
+                    fields.deserialize_into::<ForkOpts>().map_err(de::Error::custom)?
+                };
+                let ForkOpts { json_rpc_url, block_number } = options;
+                Ok(Forking { json_rpc_url, block_number })
             }
-        };
-        Ok(f)
+        }
+
+        deserializer.deserialize_map(ForkingVisitor)
     }
 }
 
@@ -248,6 +284,74 @@ mod tests {
         ] {
             let deserialized: MineOptions = serde_json::from_str(data).unwrap();
             assert_eq!(deserialized, expected, "{data}");
+        }
+    }
+
+    #[test]
+    fn test_serde_forking_rejects_invalid_tagged_options() {
+        for data in [
+            r#"{"forking":{"blockNumber":"invalid"}}"#,
+            r#"{"forking":{"jsonRpcUrl":42}}"#,
+            r#"{"forking":null}"#,
+            r#"{"forking":false}"#,
+            r#"{"forking":"invalid"}"#,
+        ] {
+            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
+        }
+    }
+
+    #[test]
+    fn test_serde_forking_untagged_and_empty_options() {
+        for data in [r#"{"blockNumber":"0x11965b1"}"#, r#"{"blockNumber":18441649}"#] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking { json_rpc_url: None, block_number: Some(18441649) }
+            );
+        }
+        for data in
+            [r#"{}"#, r#"{"forking":{}}"#, r#"{"unknown":true}"#, r#"{"forking":{"unknown":true}}"#]
+        {
+            assert_eq!(serde_json::from_str::<Forking>(data).unwrap(), Forking::default());
+        }
+        assert_eq!(
+            serde_json::from_str::<Forking>(r#"{"jsonRpcUrl":"http://localhost:8545"}"#).unwrap(),
+            Forking { json_rpc_url: Some("http://localhost:8545".into()), block_number: None }
+        );
+        assert_eq!(
+            serde_json::from_str::<Forking>(
+                r#"{"forking":{"blockNumber":"0x1"},"blockNumber":"invalid","jsonRpcUrl":42}"#
+            )
+            .unwrap(),
+            Forking { json_rpc_url: None, block_number: Some(1) }
+        );
+    }
+
+    #[test]
+    fn test_serde_forking_rejects_duplicate_options() {
+        for data in [
+            r#"{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}"#,
+            r#"{"blockNumber":"0x1","blockNumber":"0x2"}"#,
+            r#"{"jsonRpcUrl":null,"jsonRpcUrl":"http://second:8545"}"#,
+            r#"{"blockNumber":null,"blockNumber":"0x2"}"#,
+            r#"{"forking":{},"forking":{"blockNumber":"0x1"}}"#,
+            r#"{"forking":{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}}"#,
+            r#"{"forking":{"blockNumber":"0x1","blockNumber":"0x2"}}"#,
+        ] {
+            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
+        }
+    }
+
+    #[test]
+    fn test_serde_forking_tag_ignores_duplicate_root_options() {
+        for data in [
+            r#"{"jsonRpcUrl":false,"jsonRpcUrl":42,"blockNumber":false,"forking":{"blockNumber":"0x1"}}"#,
+            r#"{"forking":{"blockNumber":"0x1"},"blockNumber":false,"blockNumber":"invalid","jsonRpcUrl":42}"#,
+        ] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking { json_rpc_url: None, block_number: Some(1) },
+                "{data}"
+            );
         }
     }
 }

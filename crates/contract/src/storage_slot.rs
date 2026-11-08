@@ -20,7 +20,10 @@ use alloy_transport::TransportError;
 /// use alloy_primitives::{address, U256};
 /// use alloy_provider::ProviderBuilder;
 ///
-/// let provider = ProviderBuilder::new().connect_anvil();
+/// // Fork Ethereum mainnet so the DAI contract and its storage are available locally.
+/// // Requires Anvil and an Ethereum mainnet RPC endpoint in MAINNET_RPC_URL.
+/// let rpc_url = std::env::var("MAINNET_RPC_URL")?;
+/// let provider = ProviderBuilder::new().connect_anvil_with_config(|anvil| anvil.fork(rpc_url));
 /// let token = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
 /// let user = address!("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
 ///

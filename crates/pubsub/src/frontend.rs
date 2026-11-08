@@ -65,6 +65,8 @@ impl PubSubFrontend {
     }
 
     /// Send a request.
+    ///
+    /// Pending requests receive the terminal connection error if the service cannot reconnect.
     pub fn send(
         &self,
         req: SerializedRequest,

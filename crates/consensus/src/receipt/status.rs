@@ -1,6 +1,9 @@
 use alloy_primitives::B256;
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Error, Header};
 
+#[cfg(feature = "serde")]
+pub(crate) use serde_eip658::Eip658Fields;
+
 const EIP658_STATUS_FAILED_RLP_PAYLOAD: &[u8] = &[];
 const EIP658_STATUS_SUCCESS_RLP_PAYLOAD: &[u8] = &[0x01];
 const PRE_BYZANTIUM_POST_STATE_ROOT_LENGTH: usize = 32;
@@ -96,9 +99,13 @@ mod serde_eip658 {
     //!
     //! If both are present, prefers `status` key.
     //!
-    //! Should be used with `#[serde(flatten)]`.
+    //! Should be used with `#[serde(flatten)]`, or through [`Eip658Fields`] by a map visitor.
     use super::*;
-    use serde::{Deserialize, Serialize};
+    use serde::{
+        de::{Error, MapAccess},
+        Deserialize, Serialize,
+    };
+    use serde_json::Value;
 
     #[derive(serde::Serialize, serde::Deserialize)]
     #[serde(untagged)]
@@ -110,6 +117,57 @@ mod serde_eip658 {
         PostState {
             root: B256,
         },
+    }
+
+    /// Collects the `status` and `root` entries of a map and resolves them like [`SerdeHelper`],
+    /// without buffering the other entries.
+    ///
+    /// Only the first entry of each key is kept, since a repeated key never matches. Parsing is
+    /// deferred until [`Self::finish`], because an invalid `status` falls back to a valid `root`
+    /// and a valid `status` makes an invalid `root` irrelevant.
+    #[derive(Default)]
+    pub(crate) struct Eip658Fields {
+        pub(crate) status: Entry,
+        pub(crate) root: Entry,
+    }
+
+    #[derive(Default)]
+    pub(crate) enum Entry {
+        #[default]
+        Missing,
+        Single(Value),
+        Repeated,
+    }
+
+    impl Entry {
+        /// Reads the value of the next key, keeping it only if the key was not seen before.
+        pub(crate) fn read<'de, A: MapAccess<'de>>(&mut self, map: &mut A) -> Result<(), A::Error> {
+            *self = match self {
+                Self::Missing => Self::Single(map.next_value()?),
+                _ => {
+                    map.next_value::<serde::de::IgnoredAny>()?;
+                    Self::Repeated
+                }
+            };
+            Ok(())
+        }
+    }
+
+    impl Eip658Fields {
+        /// Resolves the collected entries, preferring `status` over `root`.
+        pub(crate) fn finish<E: Error>(self) -> Result<Eip658Value, E> {
+            if let Entry::Single(status) = self.status {
+                if let Ok(status) = alloy_serde::quantity::deserialize(status) {
+                    return Ok(Eip658Value::Eip658(status));
+                }
+            }
+            if let Entry::Single(root) = self.root {
+                if let Ok(root) = B256::deserialize(root) {
+                    return Ok(Eip658Value::PostState(root));
+                }
+            }
+            Err(E::custom("data did not match any variant of untagged enum SerdeHelper"))
+        }
     }
 
     impl Serialize for Eip658Value {

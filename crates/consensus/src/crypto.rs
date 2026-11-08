@@ -30,16 +30,17 @@ impl RecoveryError {
 
     /// Create a new error with an associated source.
     ///
-    /// **NOTE:** The "source" should **NOT** be used to propagate cryptographic
-    /// errors e.g. signature parsing or verification errors.
+    /// The source may describe backend-independent validation failures, such as
+    /// [`InvalidSignatureS`], or application errors. It must not propagate backend-specific
+    /// cryptographic parsing or verification errors; discard those with [`Self::new`] instead.
     pub fn from_source<E: core::error::Error + Send + Sync + 'static>(err: E) -> Self {
         Self { source: Some(Box::new(err)) }
     }
 }
 
 impl From<alloy_primitives::SignatureError> for RecoveryError {
-    fn from(err: alloy_primitives::SignatureError) -> Self {
-        Self::from_source(err)
+    fn from(_: alloy_primitives::SignatureError) -> Self {
+        Self::new()
     }
 }
 
@@ -363,7 +364,7 @@ mod impl_k256 {
 
     use super::*;
     use alloy_primitives::{keccak256, Address, B256};
-    use k256::ecdsa::{RecoveryId, SigningKey, VerifyingKey};
+    use k256::ecdsa::{signature::hazmat::PrehashVerifier, RecoveryId, SigningKey, VerifyingKey};
 
     /// Recovers the address of the sender using secp256k1 pubkey recovery.
     ///
@@ -396,8 +397,6 @@ mod impl_k256 {
         sig: &[u8; 64],
         msg: &[u8; 32],
     ) -> Result<Address, Error> {
-        use k256::ecdsa::signature::hazmat::PrehashVerifier;
-
         let vk = VerifyingKey::from_sec1_bytes(pubkey)?;
 
         let mut signature = k256::ecdsa::Signature::from_slice(&sig[0..64])?;
@@ -672,5 +671,40 @@ mod tests {
                 let _provider_ref = err.provider.as_ref();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod recovery_error_tests {
+    use super::*;
+    use core::error::Error;
+
+    #[test]
+    fn signature_errors_do_not_expose_sources() {
+        let err = RecoveryError::from(alloy_primitives::SignatureError::InvalidParity(2));
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    fn backend_signature_errors_do_not_expose_sources() {
+        let err =
+            RecoveryError::from(alloy_primitives::SignatureError::K256(k256::ecdsa::Error::new()));
+        assert!(err.source().is_none());
+    }
+
+    #[test]
+    #[cfg(any(feature = "secp256k1", feature = "k256"))]
+    fn high_s_errors_preserve_validation_source() {
+        let signature = Signature::new(U256::from(1), SECP256K1N_HALF + U256::from(1), false);
+        let err = secp256k1::recover_signer(&signature, alloy_primitives::B256::ZERO).unwrap_err();
+        assert!(err.source().unwrap().is::<InvalidSignatureS>());
+        let err = secp256k1::verify_and_compute_signer(
+            &[0; 65],
+            &signature,
+            alloy_primitives::B256::ZERO,
+        )
+        .unwrap_err();
+        assert!(err.source().unwrap().is::<InvalidSignatureS>());
     }
 }

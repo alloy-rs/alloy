@@ -125,6 +125,9 @@ impl<E> ErrorPayload<E> {
         match self.message.as_ref() {
             // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
             "header not found" => true,
+            // Infura can return this transiently for block fetches.
+            // <https://github.com/alloy-rs/alloy/issues/4477>
+            "precondition failure" if self.code == -32603 => true,
             // also thrown by infura if out of budget for the day and ratelimited
             "daily request count exceeded, request rate limited" => true,
             msg => {
@@ -375,11 +378,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use alloy_primitives::U256;
+    use alloy_primitives::{B256, U256};
     use alloy_sol_types::sol;
+    use serde_json::value::RawValue;
 
     use super::BorrowedErrorPayload;
-    use crate::ErrorPayload;
+    use crate::{ErrorPayload, RpcError};
 
     #[test]
     fn smooth_borrowing() {
@@ -446,11 +450,19 @@ mod test {
     }
 
     #[test]
-    fn extract_transaction_hash_box_raw_value() {
-        use crate::RpcError;
-        use alloy_primitives::B256;
-        use serde_json::value::RawValue;
+    fn infura_precondition_failure() {
+        for (code, message, retryable) in [
+            (-32603, "precondition failure", true),
+            (-32603, "internal error", false),
+            (-32602, "precondition failure", false),
+        ] {
+            let payload: ErrorPayload = ErrorPayload { code, message: message.into(), data: None };
+            assert_eq!(payload.is_retry_err(), retryable, "{payload}");
+        }
+    }
 
+    #[test]
+    fn extract_transaction_hash_box_raw_value() {
         let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         let json = format!(r#"{{"code":5,"message":"insufficient funds","data":"{}"}}"#, tx_hash);
 

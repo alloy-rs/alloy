@@ -11,6 +11,8 @@ use serde_json::Value;
 #[cfg(any(test, feature = "arbitrary"))]
 mod arbitrary_;
 
+mod keys;
+
 /// Generic type for capturing additional fields when deserializing structs.
 ///
 /// For example, the [optimism `eth_getTransactionByHash` request][optimism] returns additional
@@ -258,11 +260,14 @@ where
         // remove all fields present in the inner struct from the other fields, this is to avoid
         // duplicate fields in the catch all other fields because serde flatten does not exclude
         // already deserialized fields when deserializing the other fields.
-        if let Value::Object(map) =
-            serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
-        {
-            for key in map.keys() {
-                helper.other.remove(key);
+        if keys::remove_keys(&helper.inner, &mut helper.other).is_err() {
+            // Not every key is a string: let `serde_json` stringify them.
+            if let Value::Object(map) =
+                serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
+            {
+                for key in map.keys() {
+                    helper.other.remove(key);
+                }
             }
         }
 
@@ -306,6 +311,40 @@ mod tests {
             with_other.other,
             OtherFields::new(BTreeMap::from_iter([("b".to_string(), serde_json::json!(2))]))
         );
+    }
+
+    #[test]
+    fn test_other_excludes_serialized_keys() {
+        #[derive(Serialize, Deserialize)]
+        struct Inner {
+            a: u64,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            skipped: Option<u64>,
+            #[serde(flatten)]
+            map: BTreeMap<String, Value>,
+        }
+
+        let with_other: WithOtherFields<Inner> =
+            serde_json::from_str(r#"{"a": 1, "skipped": null, "x": 2}"#).unwrap();
+        assert_eq!(with_other.inner.map, BTreeMap::from([("x".to_string(), json!(2))]));
+        assert_eq!(
+            with_other.other,
+            OtherFields::new(BTreeMap::from([("skipped".to_string(), json!(null))]))
+        );
+
+        #[derive(Deserialize)]
+        struct IntKeys(BTreeMap<String, Value>);
+
+        impl Serialize for IntKeys {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.collect_map(self.0.iter().map(|(k, v)| (k.parse::<u64>().unwrap(), v)))
+            }
+        }
+
+        let with_other: WithOtherFields<IntKeys> =
+            serde_json::from_str(r#"{"1": 2, "2": 3}"#).unwrap();
+        assert_eq!(with_other.inner.0.len(), 2);
+        assert!(with_other.other.is_empty());
     }
 
     #[test]

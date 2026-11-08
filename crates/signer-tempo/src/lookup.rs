@@ -39,8 +39,8 @@ impl fmt::Debug for TempoAccessKey {
 ///
 /// In [`Self::Direct`] the signer is the wallet itself; in [`Self::Keychain`]
 /// the signer is an access key and the transaction `from` lives in the
-/// accompanying [`TempoAccessKey`]. Lookup does not enforce the metadata, and the underlying
-/// signer's chain ID is not configured.
+/// accompanying [`TempoAccessKey`]. Lookup does not enforce authorization or chain-ID metadata,
+/// and the underlying signer's chain ID is not configured.
 #[non_exhaustive]
 pub enum TempoLookup {
     /// EOA mode: the signer is the wallet.

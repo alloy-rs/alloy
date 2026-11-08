@@ -241,7 +241,7 @@ mod contract {
     pub enum EnsError {
         /// Failed to get the resolver for this name.
         #[error("Failed to get ENS resolver: {0}")]
-        Resolver(alloy_contract::Error),
+        Resolver(#[source] alloy_contract::Error),
         /// No resolver found for the given name.
         #[error("ENS resolver not found for name {0:?}")]
         ResolverNotFound(String),
@@ -255,19 +255,19 @@ mod contract {
         RequiresUniversalResolver(String),
         /// Failed to get the reverse registrar from the ENS registry.
         #[error("Failed to get reverse registrar from the ENS registry: {0}")]
-        RevRegistrar(alloy_contract::Error),
+        RevRegistrar(#[source] alloy_contract::Error),
         /// No reverse registrar found for `addr.reverse`.
         #[error("ENS reverse registrar not found for addr.reverse")]
         ReverseRegistrarNotFound,
         /// Failed to lookup ENS name from an address.
         #[error("Failed to lookup ENS name from an address: {0}")]
-        Lookup(alloy_contract::Error),
+        Lookup(#[source] alloy_contract::Error),
         /// Failed to resolve ENS name to an address.
         #[error("Failed to resolve ENS name to an address: {0}")]
-        Resolve(alloy_contract::Error),
+        Resolve(#[source] alloy_contract::Error),
         /// Failed to get a text record for an ENS name.
         #[error("Failed to resolve text record: {0}")]
-        ResolveTxtRecord(alloy_contract::Error),
+        ResolveTxtRecord(#[source] alloy_contract::Error),
         /// Failed to DNS-encode the ENS name for the Universal Resolver.
         #[error("Failed to DNS-encode ENS name: {0}")]
         DnsEncode(#[from] crate::DnsEncodeError),
@@ -325,6 +325,15 @@ mod provider {
         /// resolver or a parent/wildcard resolver: direct `addr`/`text`/`name` calls on such
         /// resolvers are not equivalent to Universal Resolver resolution, so use
         /// [`Self::resolve_name`], [`Self::lookup_txt`], or the other helpers instead.
+        ///
+        /// With ENSv2 the Universal Resolver reports an extended resolver for effectively every
+        /// mainnet name: unmigrated v1 names resolve through a read-only mirror of the v1
+        /// registry, and v2 names through their own resolver. Both only support ENSIP-10
+        /// `resolve`, so this returns [`EnsError::RequiresUniversalResolver`] for most names.
+        #[deprecated(
+            note = "ENSv2 resolvers only support Universal Resolver resolution; use `resolve_name`, \
+                    `lookup_txt`, or the other Universal Resolver helpers"
+        )]
         async fn get_resolver_for_name(
             &self,
             name: &str,
@@ -334,7 +343,7 @@ mod provider {
         ///
         /// This looks up the resolver in the ENS registry, which does not account for ENSIP-10
         /// extended or wildcard resolvers.
-        #[deprecated(note = "use `get_resolver_for_name` or the Universal Resolver helpers")]
+        #[deprecated(note = "use the Universal Resolver helpers")]
         async fn get_resolver(
             &self,
             node: B256,
@@ -850,6 +859,25 @@ mod resolver_info_tests {
     use alloy_primitives::{address, Bytes, B256, U256};
 
     #[test]
+    fn contract_errors_are_sources() {
+        let variants = [
+            EnsError::Resolver,
+            EnsError::RevRegistrar,
+            EnsError::Lookup,
+            EnsError::Resolve,
+            EnsError::ResolveTxtRecord,
+        ];
+        for wrap in variants {
+            let error = wrap(alloy_contract::Error::NotADeploymentTransaction);
+            let source = std::error::Error::source(&error).expect("contract error source");
+            assert!(matches!(
+                source.downcast_ref::<alloy_contract::Error>(),
+                Some(alloy_contract::Error::NotADeploymentTransaction)
+            ));
+        }
+    }
+
+    #[test]
     fn direct_resolver_rejects_extended_and_wildcard_resolvers() {
         let resolver = address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63");
         let info = |extended: bool, offset: u64| UniversalResolver::ResolverInfo {
@@ -875,8 +903,16 @@ mod provider_tests {
     #![allow(deprecated)]
 
     use super::*;
-    use alloy_primitives::address;
+    use alloy_primitives::{address, Bytes};
     use alloy_provider::{Provider, ProviderBuilder};
+    use alloy_sol_types::{SolCall, SolValue};
+
+    alloy_sol_types::sol! {
+        #[sol(rpc)]
+        interface ExtendedResolver {
+            function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory);
+        }
+    }
 
     fn provider() -> impl Provider {
         ProviderBuilder::new().connect_http("https://ethereum.reth.rs/rpc".parse().unwrap())
@@ -900,8 +936,10 @@ mod provider_tests {
     #[tokio::test]
     async fn test_get_resolver_for_name_mainnet() {
         let provider = provider();
-        let res = provider.get_resolver_for_name("vitalik.eth").await;
-        assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
+        // Since the Universal Resolver upgrade at block 26284289, `vitalik.eth` resolves through an
+        // extended resolver, so no direct resolver is returned.
+        let err = provider.get_resolver_for_name("vitalik.eth").await.unwrap_err();
+        assert!(matches!(err, EnsError::RequiresUniversalResolver(_)));
     }
 
     #[tokio::test]
@@ -922,8 +960,25 @@ mod provider_tests {
 
     #[tokio::test]
     async fn test_resolve_name_via_universal_resolver() {
-        let addr = provider().resolve_name("ur.integration-tests.eth").await.unwrap();
-        assert_eq!(addr, address!("0x2222222222222222222222222222222222222222"));
+        // Compare against ENSIP-10 resolution: a direct `addr` call on the registry resolver can
+        // return a different address for this name.
+        let provider = provider();
+        let name = "ur.integration-tests.eth";
+        let dns = Bytes::from(dns_encode(name));
+        let info = UniversalResolver::new(UNIVERSAL_RESOLVER_ADDRESS, &provider)
+            .requireResolver(dns.clone())
+            .call()
+            .await
+            .unwrap();
+        let data = EnsResolver::addrCall { node: namehash(name) }.abi_encode();
+        let expected = ExtendedResolver::new(info.resolver, &provider)
+            .resolve(dns, data.into())
+            .call()
+            .await
+            .unwrap();
+        let expected = Address::abi_decode(&expected).unwrap();
+        let addr = provider.resolve_name(name).await.unwrap();
+        assert_eq!(addr, expected);
     }
 
     #[tokio::test]

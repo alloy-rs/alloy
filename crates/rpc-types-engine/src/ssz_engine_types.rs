@@ -59,6 +59,8 @@ pub const MAX_BYTES_PER_HEADER: usize = 1 << 10;
 /// Maximum number of headers in [`ExecutionWitness::headers`].
 pub const MAX_WITNESS_HEADERS: usize = 1 << 8;
 
+mod optional;
+pub use optional::*;
 mod status;
 pub use status::*;
 mod payload;
