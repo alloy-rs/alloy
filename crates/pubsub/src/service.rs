@@ -139,11 +139,14 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
-        if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            self.dispatch_unsubscribe(local_id, server_id)?;
-        }
+        let res = self
+            .subs
+            .server_id_for(&local_id)
+            .map_or(Ok(()), |server_id| self.dispatch_unsubscribe(local_id, server_id));
+        // Remove the subscription even if the backend is gone, otherwise the reconnect triggered
+        // by the error re-creates it. The server subscription dies with the connection.
         self.subs.remove_sub(local_id);
-        Ok(())
+        res
     }
 
     /// Ask the server to cancel its subscription `server_id`, known locally as `local_id`.
@@ -807,5 +810,39 @@ mod tests {
             1,
             "default close_with_error should trigger exactly one reconnect"
         );
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_on_gone_backend_is_not_resubscribed() {
+        let (handle, interface) = ConnectionHandle::new();
+        let (replacement, mut replacement_interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+        let request =
+            Request::new("eth_subscribe", Id::Number(1), ["newHeads"]).serialize().unwrap();
+        let local_id = request.params_hash();
+        let (in_flight, _response) = InFlight::new(request, 16);
+        service.in_flights.insert(in_flight);
+        service
+            .handle_item(
+                serde_json::from_str(r#"{"jsonrpc":"2.0","id":1,"result":"0xaaa"}"#).unwrap(),
+            )
+            .unwrap();
+
+        drop(interface);
+        let err = service.service_unsubscribe(local_id).unwrap_err();
+        assert!(err.as_transport_err().is_some_and(TransportErrorKind::is_backend_gone));
+        service.reconnect().await.unwrap();
+
+        assert!(matches!(
+            replacement_interface.from_frontend.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
     }
 }
