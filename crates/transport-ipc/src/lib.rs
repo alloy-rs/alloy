@@ -10,7 +10,7 @@
 extern crate tracing;
 
 use alloy_transport::TransportErrorKind;
-use bytes::{Buf, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use futures::{ready, StreamExt};
 use interprocess::local_socket::{tokio::prelude::*, Name};
 use std::task::Poll::Ready;
@@ -39,18 +39,22 @@ struct IpcBackend {
 
 impl IpcBackend {
     /// Connect to a local socket. Either a unix socket or a windows named pipe.
-    async fn connect(name: Name<'_>) -> Result<alloy_pubsub::ConnectionHandle> {
+    async fn connect(
+        name: Name<'_>,
+        max_response_size: Option<usize>,
+    ) -> Result<alloy_pubsub::ConnectionHandle> {
         let stream = LocalSocketStream::connect(name).await?;
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = Self { stream, interface };
-        backend.spawn();
+        backend.spawn(max_response_size);
         Ok(handle)
     }
 
-    fn spawn(mut self) {
+    fn spawn(mut self, max_response_size: Option<usize>) {
         let fut = async move {
             let (read, mut writer) = self.stream.split();
-            let mut read = ReadJsonStream::new(read).fuse();
+            let mut read =
+                ReadJsonStream::new(read).with_max_response_size(max_response_size).fuse();
 
             let err = loop {
                 select! {
@@ -80,6 +84,10 @@ impl IpcBackend {
                                     break None;
                                 }
                             }
+                            // Retrying would likely produce the same oversized message.
+                            Some(Err(err)) if TooLarge::is(&err) => {
+                                break Some(TransportErrorKind::non_retryable(err));
+                            }
                             Some(Err(err)) => {
                                 break Some(TransportErrorKind::custom(err));
                             }
@@ -103,13 +111,38 @@ impl IpcBackend {
 /// Default capacity for the IPC buffer.
 const CAPACITY: usize = 4096;
 
+/// Error for a JSON value larger than the maximum response size of a [`ReadJsonStream`].
+#[derive(Debug)]
+struct TooLarge(usize);
+
+impl TooLarge {
+    /// Returns whether the I/O error was caused by a [`TooLarge`] value.
+    fn is(err: &std::io::Error) -> bool {
+        err.get_ref().is_some_and(|err| err.is::<Self>())
+    }
+}
+
+impl std::fmt::Display for TooLarge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IPC message exceeds {} bytes", self.0)
+    }
+}
+
+impl std::error::Error for TooLarge {}
+
 /// A stream of JSON-RPC items, read from an [`AsyncRead`] stream.
 ///
-/// Yields an [`std::io::Error`] for invalid JSON, an incomplete value at EOF, or a
-/// read failure, then terminates. JSON errors retain the [`serde_json::Error`] as
-/// their inner error; incomplete values have [`std::io::ErrorKind::UnexpectedEof`]
-/// and other JSON failures have [`std::io::ErrorKind::InvalidData`].
+/// Yields an [`std::io::Error`] for invalid JSON, an incomplete value at EOF, a value
+/// larger than the maximum response size, or a read failure, then terminates. JSON
+/// errors retain the [`serde_json::Error`] as their inner error; incomplete values
+/// have [`std::io::ErrorKind::UnexpectedEof`] and other JSON failures and oversized
+/// values have [`std::io::ErrorKind::InvalidData`].
 /// Clean EOF, including trailing whitespace, terminates without an error.
+///
+/// The maximum response size defaults to [`DEFAULT_MAX_RESPONSE_SIZE`] bytes, and can be
+/// changed with [`ReadJsonStream::with_max_response_size`].
+///
+/// [`DEFAULT_MAX_RESPONSE_SIZE`]: alloy_transport::DEFAULT_MAX_RESPONSE_SIZE
 ///
 /// Each item is a result; consumers can use [`futures::TryStreamExt`] to
 /// collect decoded values while propagating failures:
@@ -143,6 +176,8 @@ pub struct ReadJsonStream<T, Item = alloy_json_rpc::PubSubItem> {
     partial: bool,
     /// Whether EOF or a terminal error has been observed.
     finished: bool,
+    /// The maximum size of a single value, if any.
+    max_response_size: Option<usize>,
 
     /// PhantomData marking the item type this stream will yield.
     _pd: std::marker::PhantomData<Item>,
@@ -156,8 +191,20 @@ impl<T: AsyncRead, U> ReadJsonStream<T, U> {
             scanner: FrameScanner::default(),
             partial: false,
             finished: false,
+            max_response_size: Some(alloy_transport::DEFAULT_MAX_RESPONSE_SIZE),
             _pd: core::marker::PhantomData,
         }
+    }
+
+    /// Set the maximum size of a single JSON value in bytes, or `None` for no limit.
+    ///
+    /// A larger value ends the stream with an error, without buffering more than this many bytes.
+    /// Defaults to [`DEFAULT_MAX_RESPONSE_SIZE`].
+    ///
+    /// [`DEFAULT_MAX_RESPONSE_SIZE`]: alloy_transport::DEFAULT_MAX_RESPONSE_SIZE
+    pub const fn with_max_response_size(mut self, max_response_size: Option<usize>) -> Self {
+        self.max_response_size = max_response_size;
+        self
     }
 
     /// Total bytes the framer has inspected. Test-only complexity probe.
@@ -235,7 +282,27 @@ where
                     // Reserve before reading so `poll_read_buf` always gets a
                     // full page to fill, not whatever slack is left over.
                     this.buf.reserve(CAPACITY);
-                    match ready!(poll_read_buf(this.reader.as_mut(), cx, this.buf)) {
+                    let read = match *this.max_response_size {
+                        // Complete values are yielded first, so the buffer only holds
+                        // the incomplete value. Never read past the limit.
+                        Some(max) => {
+                            let Some(remaining) =
+                                max.checked_sub(this.buf.len()).filter(|&n| n > 0)
+                            else {
+                                error!(max, "IPC message exceeds the maximum response size");
+                                *this.finished = true;
+                                let err = std::io::Error::new(
+                                    std::io::ErrorKind::InvalidData,
+                                    TooLarge(max),
+                                );
+                                return Ready(Some(Err(err)));
+                            };
+                            let mut buf = BufMut::limit(&mut *this.buf, remaining);
+                            ready!(poll_read_buf(this.reader.as_mut(), cx, &mut buf))
+                        }
+                        None => ready!(poll_read_buf(this.reader.as_mut(), cx, this.buf)),
+                    };
+                    match read {
                         Ok(0) => {
                             *this.finished = true;
                             if this.scanner.depth != 0 {
@@ -463,6 +530,7 @@ mod tests {
     use alloy_json_rpc::{PubSubItem, ResponsePayload};
     use serde_json::value::RawValue;
     use std::future::poll_fn;
+    use tokio::io::AsyncReadExt;
 
     const JSON_RPC_ERROR: &[u8] = br#"{
         "jsonrpc": "2.0",
@@ -818,6 +886,49 @@ mod tests {
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
         assert!(err.get_ref().unwrap().downcast_ref::<serde_json::Error>().unwrap().is_syntax());
         assert!(reader.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn max_response_size_limits_values() {
+        let frame = br#"{"jsonrpc":"2.0","id":1,"result":"0x1"}"#;
+        let input = [frame.as_slice(), frame].concat();
+
+        // The default limit is finite.
+        let reader = ReadJsonStream::<_, PubSubItem>::from(input.as_slice());
+        assert_eq!(reader.max_response_size, Some(alloy_transport::DEFAULT_MAX_RESPONSE_SIZE));
+
+        for max in [Some(frame.len()), None] {
+            let mut reader =
+                ReadJsonStream::<_, PubSubItem>::from(input.as_slice()).with_max_response_size(max);
+            assert!(reader.next().await.unwrap().is_ok(), "{max:?}");
+            assert!(reader.next().await.unwrap().is_ok(), "{max:?}");
+            assert!(reader.next().await.is_none(), "{max:?}");
+        }
+
+        let max = frame.len() - 1;
+        let mut reader = ReadJsonStream::<_, PubSubItem>::from(input.as_slice())
+            .with_max_response_size(Some(max));
+        let err = reader.next().await.unwrap().unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+        assert!(TooLarge::is(&err), "{err}");
+        assert_eq!(err.to_string(), format!("IPC message exceeds {max} bytes"));
+        assert!(reader.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn endless_value_is_rejected_without_buffering_past_the_limit() {
+        let max = 64 * 1024;
+        // An endless string, and endless whitespace before a value.
+        for (prefix, fill) in
+            [(br#"{"jsonrpc":"2.0","id":1,"result":""#.as_slice(), b'0'), (b"", b' ')]
+        {
+            let input = AsyncReadExt::chain(prefix, tokio::io::repeat(fill));
+            let mut reader =
+                ReadJsonStream::<_, PubSubItem>::from(input).with_max_response_size(Some(max));
+            let err = reader.next().await.unwrap().unwrap_err();
+            assert!(TooLarge::is(&err), "{err}");
+            assert!(reader.buf.len() <= max, "buffered {} bytes", reader.buf.len());
+        }
     }
 
     #[tokio::test]

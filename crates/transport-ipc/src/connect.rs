@@ -10,9 +10,14 @@ pub(crate) fn to_name(path: &std::ffi::OsStr) -> io::Result<ls::Name<'_>> {
 }
 
 /// An IPC Connection object.
+///
+/// By default, messages from the server are limited to [`DEFAULT_MAX_RESPONSE_SIZE`] bytes.
+///
+/// [`DEFAULT_MAX_RESPONSE_SIZE`]: alloy_transport::DEFAULT_MAX_RESPONSE_SIZE
 #[derive(Clone, Debug)]
 pub struct IpcConnect<T> {
     inner: T,
+    max_response_size: Option<usize>,
 }
 
 impl<T> IpcConnect<T> {
@@ -22,7 +27,24 @@ impl<T> IpcConnect<T> {
     where
         Self: alloy_pubsub::PubSubConnect,
     {
-        Self { inner }
+        Self { inner, max_response_size: Some(alloy_transport::DEFAULT_MAX_RESPONSE_SIZE) }
+    }
+
+    /// Set the maximum size of a single message from the server in bytes, or `None` for no limit.
+    ///
+    /// A larger message closes the connection with a non-retryable error, failing all pending
+    /// requests, as retrying the request would likely produce the same message. Defaults to
+    /// [`DEFAULT_MAX_RESPONSE_SIZE`].
+    ///
+    /// [`DEFAULT_MAX_RESPONSE_SIZE`]: alloy_transport::DEFAULT_MAX_RESPONSE_SIZE
+    pub const fn with_max_response_size(mut self, max_response_size: Option<usize>) -> Self {
+        self.max_response_size = max_response_size;
+        self
+    }
+
+    /// Get the maximum size of a single message from the server in bytes, if any.
+    pub const fn max_response_size(&self) -> Option<usize> {
+        self.max_response_size
     }
 }
 
@@ -30,7 +52,7 @@ macro_rules! impl_connect {
     ($target:ty => | $inner:ident | $map:expr) => {
         impl From<$target> for IpcConnect<$target> {
             fn from(inner: $target) -> Self {
-                Self { inner }
+                Self::new(inner)
             }
         }
 
@@ -51,7 +73,7 @@ macro_rules! impl_connect {
                 let $inner = &self.inner;
                 let inner = $map;
                 let name = to_name(inner).map_err(alloy_transport::TransportErrorKind::custom)?;
-                crate::IpcBackend::connect(name)
+                crate::IpcBackend::connect(name, self.max_response_size)
                     .await
                     .map_err(alloy_transport::TransportErrorKind::custom)
             }

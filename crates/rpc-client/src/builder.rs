@@ -50,6 +50,9 @@ impl<L> ClientBuilder<L> {
 
     /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
     /// HTTP transport.
+    ///
+    /// The transport has the default response size limit and client timeouts, see
+    /// [`Http::new`](alloy_transport_http::Http::new).
     #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn http(self, url: url::Url) -> RpcClient
     where
@@ -64,6 +67,9 @@ impl<L> ClientBuilder<L> {
 
     /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
     /// HTTP transport using a pre-built `reqwest::Client`.
+    ///
+    /// The client's timeouts are used as is. The transport has the default response size limit,
+    /// see [`HttpTransportSettings`](alloy_transport_http::HttpTransportSettings).
     #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn http_with_client(self, client: reqwest::Client, url: url::Url) -> RpcClient
     where
@@ -77,6 +83,9 @@ impl<L> ClientBuilder<L> {
     }
 
     /// Convenience function to create a new [`RpcClient`] with a `hyper` HTTP transport.
+    ///
+    /// The transport has the default response size limit and client timeouts, see
+    /// [`HyperClient::new`](alloy_transport_http::HyperClient::new).
     #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient
     where

@@ -64,6 +64,9 @@ impl RpcClient {
     }
 
     /// Create a new [`RpcClient`] with an HTTP transport.
+    ///
+    /// The transport has the default response size limit and client timeouts, see
+    /// [`Http::new`](alloy_transport_http::Http::new).
     #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http(url: reqwest::Url) -> Self {
         let http = alloy_transport_http::Http::new(url);
@@ -72,6 +75,9 @@ impl RpcClient {
     }
 
     /// Create a new [`RpcClient`] with an HTTP transport using a pre-built [`reqwest::Client`].
+    ///
+    /// The client's timeouts are used as is. The transport has the default response size limit,
+    /// see [`HttpTransportSettings`](alloy_transport_http::HttpTransportSettings).
     #[cfg(all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1"))))]
     pub fn new_http_with_client(client: reqwest::Client, url: reqwest::Url) -> Self {
         let http = alloy_transport_http::Http::with_client(client, url);
