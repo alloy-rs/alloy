@@ -198,7 +198,7 @@ impl WsBackend<TungsteniteStream> {
 
     /// Send a message to the server.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), tungstenite::Error> {
-        self.socket.send(Message::Text(msg.get().to_owned().into())).await
+        self.socket.send(Message::Text(String::from(Box::<str>::from(msg)).into())).await
     }
 
     /// Spawn a new backend task.
