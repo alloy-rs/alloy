@@ -140,17 +140,21 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // A string id keeps the reply from matching a request issued by `RpcClient`,
-            // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
-            // dropped on arrival.
-            let id = Id::String(format!("unsubscribe-{local_id}"));
-            let req = Request::new("eth_unsubscribe", id, [server_id]);
-            let brv = req.serialize().expect("no ser error").take_request();
-
-            self.dispatch_request(brv)?;
+            self.dispatch_unsubscribe(local_id, server_id)?;
         }
         self.subs.remove_sub(local_id);
         Ok(())
+    }
+
+    /// Ask the server to cancel its subscription `server_id`, known locally as `local_id`.
+    fn dispatch_unsubscribe(&self, local_id: B256, server_id: &SubId) -> TransportResult<()> {
+        // A string id keeps the reply from matching a request issued by `RpcClient`,
+        // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
+        // dropped on arrival.
+        let id = Id::String(format!("unsubscribe-{local_id}"));
+        let req = Request::new("eth_unsubscribe", id, [server_id]);
+        let brv = req.serialize().expect("no ser error").take_request();
+        self.dispatch_request(brv)
     }
 
     /// Service an instruction
@@ -190,8 +194,15 @@ impl<T: PubSubConnect> PubSubService<T> {
         let id = request.id().clone();
 
         // Nobody waits for the response and the subscription is gone, e.g. it was unsubscribed
-        // while being re-issued after a reconnect. Don't re-create it without a consumer.
-        if in_flight.tx.is_closed() && !self.subs.contains(&request.params_hash()) {
+        // while being re-issued after a reconnect. Don't re-create it without a consumer, and
+        // cancel it on the server, which would otherwise keep sending its notifications.
+        let local_id = request.params_hash();
+        if in_flight.tx.is_closed() && !self.subs.contains(&local_id) {
+            // A failed dispatch means the backend is gone, and the server subscription with it.
+            // The closed backend is picked up and reconnected by the service loop.
+            if let Err(err) = self.dispatch_unsubscribe(local_id, &server_id) {
+                debug!(%err, "backend gone before cancelling orphaned subscription");
+            }
             return Ok(());
         }
 
