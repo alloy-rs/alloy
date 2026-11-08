@@ -21,8 +21,9 @@ pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
         P: Provider<N>,
         N: Network;
 
-    /// Called after sending a transaction fails, with the nonce this manager handed out for it, so
-    /// that managers that reserve nonces locally can release or resynchronize it.
+    /// Called after sending a transaction fails, or filling it fails after its nonce was filled in,
+    /// with the nonce this manager handed out for it, so that managers that reserve nonces locally
+    /// can release or resynchronize it.
     ///
     /// This is a no-op by default.
     async fn on_send_failure(&self, address: Address, nonce: u64, error: &TransportError) {
@@ -209,10 +210,10 @@ fn is_definitive_rejection(error: &TransportError) -> bool {
 /// - If the transaction request does not have a sender set, this layer will not fill nonces.
 /// - An explicit nonce is preserved and does not consult the manager.
 /// - If preparing another filler fails (e.g. gas estimation), the reserved nonce is passed to
-///   [`NonceManager::release`]. If sending a transaction fails, the nonce this layer filled in is
-///   passed to [`NonceManager::on_send_failure`]. This lets [`CachedNonceManager`] release or
-///   resynchronize it. Nonces reserved by direct
-///   [`FillProvider::fill`](crate::fillers::FillProvider::fill) calls are not released.
+///   [`NonceManager::release`]. If a later filling step (e.g. signing) or sending the transaction
+///   fails, the nonce this layer filled in is passed to [`NonceManager::on_send_failure`]. This
+///   lets [`CachedNonceManager`] release or resynchronize it. Nonces of transactions that
+///   [`FillProvider::fill`](crate::fillers::FillProvider::fill) returns are not released.
 /// - For concurrent sends from one address, reuse a provider or cloned [`CachedNonceManager`]. Two
 ///   independent cached managers can allocate conflicting nonces, while [`SimpleNonceManager`] does
 ///   not reserve nonces between concurrent requests.
@@ -668,6 +669,49 @@ mod tests {
         let receipt = provider.send_transaction_sync(transfer(U256::from(100))).await.unwrap();
         let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
         assert_eq!(tx.nonce(), 1);
+    }
+
+    /// A signer that fails while `fail` is set, like a rejection on a hardware wallet.
+    #[derive(Clone, Debug)]
+    struct FlakySigner {
+        inner: alloy_signer_local::PrivateKeySigner,
+        fail: Arc<std::sync::atomic::AtomicBool>,
+    }
+
+    #[cfg_attr(target_family = "wasm", async_trait(?Send))]
+    #[cfg_attr(not(target_family = "wasm"), async_trait)]
+    impl alloy_network::TxSigner<alloy_primitives::Signature> for FlakySigner {
+        fn address(&self) -> Address {
+            self.inner.address()
+        }
+
+        async fn sign_transaction(
+            &self,
+            tx: &mut dyn alloy_consensus::SignableTransaction<alloy_primitives::Signature>,
+        ) -> alloy_signer::Result<alloy_primitives::Signature> {
+            if self.fail.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err(alloy_signer::Error::other("rejected on device"));
+            }
+            alloy_network::TxSigner::sign_transaction(&self.inner, tx).await
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_signing_releases_nonce() {
+        let anvil = Anvil::new().spawn();
+        let fail = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let signer = FlakySigner { inner: anvil.keys()[0].clone().into(), fail: fail.clone() };
+        let provider = ProviderBuilder::new()
+            .wallet(alloy_network::EthereumWallet::new(signer))
+            .connect_http(anvil.endpoint_url());
+        send_with_nonce(&provider, 0).await;
+
+        // Signing runs after the nonce was filled in.
+        fail.store(true, std::sync::atomic::Ordering::SeqCst);
+        let err = provider.send_transaction(transfer(U256::from(100))).await.unwrap_err();
+        assert!(err.to_string().contains("rejected on device"), "{err}");
+        fail.store(false, std::sync::atomic::Ordering::SeqCst);
+        send_with_nonce(&provider, 1).await;
     }
 
     #[tokio::test]

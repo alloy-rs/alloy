@@ -296,8 +296,9 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         Ok(())
     }
 
-    /// Called after sending a transaction fails, with its sender and the nonce the fillers filled
-    /// in, so that fillers that reserved state for it can release it.
+    /// Called after sending a transaction fails, or filling it fails after its nonce was filled in
+    /// (e.g. when signing fails), with its sender and the nonce the fillers filled in, so that
+    /// fillers that reserved state for it can release it.
     ///
     /// This is not called if the caller supplied the nonce.
     fn on_send_failure(
@@ -382,13 +383,28 @@ where
         &self,
         mut tx: SendableTx<N>,
     ) -> TransportResult<(SendableTx<N>, Option<Address>)> {
+        // Only nonces the fillers choose are reported, a caller's nonce is theirs to manage.
+        let fills_nonce = tx.as_builder().is_some_and(|tx| tx.nonce().is_none());
         let mut from = None;
+        let mut filled_nonce = None;
         let mut count = 0;
 
         while self.filler.continue_filling(&tx) {
             self.filler.fill_sync(&mut tx);
             from = tx.as_builder().and_then(|tx| tx.from()).or(from);
-            tx = self.filler.prepare_and_fill(&self.inner, tx).await?;
+            tx = match self.filler.prepare_and_fill(&self.inner, tx).await {
+                Ok(tx) => tx,
+                Err(err) => {
+                    // A nonce filled in an earlier round, e.g. before signing failed, is unused.
+                    if let Some((from, nonce)) = from.zip(filled_nonce) {
+                        self.filler.on_send_failure(from, nonce, &err).await;
+                    }
+                    return Err(err);
+                }
+            };
+            if fills_nonce {
+                filled_nonce = tx.as_builder().and_then(|tx| tx.nonce()).or(filled_nonce);
+            }
 
             count += 1;
             if count >= 20 {
