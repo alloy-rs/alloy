@@ -211,13 +211,15 @@ impl WsBackend<TungsteniteStream> {
             loop {
                 // We bias the loop as follows
                 // 1. New dispatch to server.
-                // 2. Keepalive.
-                // 3. Response or notification from server.
+                // 2. Response or notification from server.
+                // 3. Keepalive.
                 // This prioritizes new dispatches over responses from the
                 // server. A ping is sent only if nothing has been received from
                 // the server in the keepalive interval. Outbound traffic must
                 // not postpone it: writes keep succeeding on a half-open
-                // connection that will never answer.
+                // connection that will never answer. Whatever was already
+                // received, such as a pong held back by a burst of dispatches,
+                // is handled before the keepalive checks for a missed pong.
                 tokio::select! {
                     biased;
                     // we've received a new dispatch, so we send it via
@@ -238,27 +240,6 @@ impl WsBackend<TungsteniteStream> {
                             },
                         }
                     },
-                    // Send a ping to the server, if no messages have been
-                    // received within the keepalive interval.
-                    _ = &mut keepalive => {
-                        // Still expecting a pong from the previous ping,
-                        // meaning connection is errored.
-                        if expecting_pong {
-                            error!("WS server missed a pong");
-                            errored = true;
-                            break
-                        }
-                        // Reset the keepalive timer.
-                        keepalive.set(sleep(self.keepalive_interval));
-                        if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
-                            error!(%err, "WS connection error");
-                            errored = true;
-                            break
-                        }
-                        // Expecting to receive a pong before the next
-                        // keepalive timer resolves.
-                        expecting_pong = true;
-                    }
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
@@ -279,6 +260,27 @@ impl WsBackend<TungsteniteStream> {
                                 break
                             },
                         }
+                    }
+                    // Send a ping to the server, if no messages have been
+                    // received within the keepalive interval.
+                    _ = &mut keepalive => {
+                        // Still expecting a pong from the previous ping,
+                        // meaning connection is errored.
+                        if expecting_pong {
+                            error!("WS server missed a pong");
+                            errored = true;
+                            break
+                        }
+                        // Reset the keepalive timer.
+                        keepalive.set(sleep(self.keepalive_interval));
+                        if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
+                            error!(%err, "WS connection error");
+                            errored = true;
+                            break
+                        }
+                        // Expecting to receive a pong before the next
+                        // keepalive timer resolves.
+                        expecting_pong = true;
                     }
                 }
             }
@@ -353,6 +355,61 @@ mod tests {
         assert!(
             matches!(reconnected, Ok(Some(()))),
             "a server that never answers pings must be detected as dead"
+        );
+    }
+
+    /// A burst of dispatches that outlasts the keepalive interval delays reading the pong to the
+    /// ping sent before it. That pong must be handled before the keepalive checks for a missed
+    /// one, or a healthy connection is dropped.
+    #[tokio::test]
+    async fn pong_received_during_outbound_burst_keeps_connection() {
+        use alloy_json_rpc::{Id, Request};
+        use tokio::{
+            net::TcpListener,
+            sync::{mpsc, oneshot},
+            time::timeout,
+        };
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (accepted_tx, mut accepted) = mpsc::unbounded_channel();
+        let (start_reading, start_rx) = oneshot::channel::<()>();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            let _ = accepted_tx.send(());
+            tokio::spawn(async move {
+                let _ = start_rx.await;
+                // Reading lets tungstenite answer pings with pongs.
+                while let Some(Ok(_)) = ws.next().await {}
+            });
+            // A reconnect means the connection was declared dead.
+            let _ = listener.accept().await;
+            let _ = accepted_tx.send(());
+        });
+
+        let keepalive = Duration::from_millis(500);
+        let frontend = WsConnect::new(format!("ws://{addr}"))
+            .with_keepalive_interval(keepalive)
+            .into_service()
+            .await
+            .unwrap();
+        accepted.recv().await.unwrap();
+
+        // After the first ping, queue more than the socket buffers hold while the server isn't
+        // reading, so dispatching stalls past the keepalive deadline.
+        tokio::time::sleep(keepalive * 3 / 2).await;
+        let payload = "0".repeat(32 * 1024);
+        for id in 0..1024 {
+            let req = Request::new("eth_call", Id::Number(id), [&payload]).serialize().unwrap();
+            tokio::spawn(frontend.send(req));
+        }
+        tokio::time::sleep(keepalive * 2).await;
+        start_reading.send(()).unwrap();
+
+        assert!(
+            timeout(keepalive * 3, accepted.recv()).await.is_err(),
+            "a connection whose pong arrived during a burst must not be dropped"
         );
     }
 
