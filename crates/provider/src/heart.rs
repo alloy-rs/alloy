@@ -4,12 +4,13 @@ use crate::{blocks::Paused, Provider, RootProvider};
 use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, Network, ReceiptResponse};
+use alloy_network_primitives::HeaderResponse;
 use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
     TxHash, U64,
 };
-use alloy_rpc_client::WeakClient;
-use alloy_transport::{utils::Spawnable, TransportError};
+use alloy_rpc_client::{RpcClientInner, WeakClient};
+use alloy_transport::{utils::Spawnable, TransportError, TransportResult};
 use futures::{
     stream::{FusedStream, StreamExt},
     FutureExt, Stream,
@@ -67,6 +68,10 @@ pub enum PendingTransactionError {
 }
 
 /// A builder for configuring a pending transaction watcher.
+///
+/// A transaction counts as included once it is in a sealed block on the canonical chain. Receipts
+/// that some RPCs serve for preconfirmed transactions, before their block is sealed, do not count:
+/// a preconfirmation can be revoked.
 ///
 /// # Examples
 ///
@@ -234,6 +239,10 @@ impl<N: Network> PendingTransactionBuilder<N> {
     /// Waits for the transaction to confirm with the given number of confirmations, and
     /// then fetches its receipt.
     ///
+    /// Only receipts from sealed blocks on the canonical chain count. Receipts that some RPCs
+    /// serve for preconfirmed transactions in a block that is not sealed yet are ignored, because
+    /// the transaction may still be dropped, or included later with a different outcome.
+    ///
     /// Note that this method will call `eth_getTransactionReceipt` on the [**root
     /// provider**](RootProvider), and not on a specific network provider. This means that any
     /// overrides or customizations made to the network provider will not be used.
@@ -246,10 +255,14 @@ impl<N: Network> PendingTransactionBuilder<N> {
         let hash = self.config.tx_hash;
         self.provider.watch_pending_transaction(self.config).await?.await?;
         let poll_interval = self.provider.client().poll_interval();
-        // Confirmation and receipt requests may reach different RPC replicas.
+        // Confirmation and receipt requests may reach different RPC replicas, and a replica that
+        // serves preconfirmations may still return the receipt of a block that is not sealed.
         for attempt in 0..=3 {
             if let Some(receipt) = self.provider.get_transaction_receipt(hash).await? {
-                return Ok(receipt);
+                if is_receipt_canonical::<N>(self.provider.client(), &receipt).await? {
+                    return Ok(receipt);
+                }
+                debug!(tx=%hash, "receipt is not from a canonical block yet");
             }
             if attempt < 3 {
                 sleep(poll_interval).await;
@@ -463,6 +476,28 @@ impl HeartbeatHandle {
     }
 }
 
+/// Returns whether `receipt` is from a sealed block on the canonical chain.
+///
+/// RPCs that serve preconfirmations can return a receipt for a block that is not sealed yet, for
+/// example with a zero block hash and the number of the next block. A preconfirmation can be
+/// revoked: the transaction may never be included, or be included later and revert. Comparing the
+/// receipt's block hash with the canonical block at its height rejects those receipts, as well as
+/// receipts from blocks that were reorged out.
+pub(crate) async fn is_receipt_canonical<N: Network>(
+    client: &RpcClientInner,
+    receipt: &N::ReceiptResponse,
+) -> TransportResult<bool> {
+    let (Some(number), Some(hash)) = (receipt.block_number(), receipt.block_hash()) else {
+        return Ok(false);
+    };
+    if hash.is_zero() {
+        return Ok(false);
+    }
+    let block: Option<N::BlockResponse> =
+        client.request("eth_getBlockByNumber", (U64::from(number), false)).await?;
+    Ok(block.is_some_and(|block| block.header().hash() == hash))
+}
+
 /// A receipt observed independently of the block stream.
 struct ReceiptCheck {
     hash: TxHash,
@@ -670,6 +705,20 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                     }
                     _ => return,
                 };
+                // Like the registration lookup, wait until the receipt's block is sealed and
+                // canonical: a preconfirmation receipt can still be revoked.
+                match timeout(Duration::from_secs(30), is_receipt_canonical::<N>(&client, &receipt)).await {
+                    Ok(Ok(true)) => {}
+                    Ok(Ok(false)) => {
+                        trace!(tx=%hash, "receipt is not from a canonical block yet; retrying next round");
+                        return;
+                    }
+                    Ok(Err(err)) => {
+                        debug!(tx=%hash, %err, "failed to check the receipt's block; retrying next round");
+                        return;
+                    }
+                    Err(_) => return,
+                }
                 let block = receipt.block_number();
                 // Notify single-confirmation callers before querying the head, even if a
                 // different caller watches the same hash with multiple confirmations.

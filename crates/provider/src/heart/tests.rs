@@ -1,47 +1,395 @@
 use super::*;
 use alloy_network::Ethereum;
-use alloy_primitives::B256;
-use alloy_rpc_types_eth::Block;
+use alloy_primitives::{keccak256, B256};
+use alloy_rpc_client::RpcClient;
+use alloy_rpc_types_eth::{Block, TransactionReceipt};
+use alloy_transport::mock::Asserter;
+use std::sync::Mutex;
+
+fn receipt(
+    tx: TxHash,
+    block_number: Option<u64>,
+    block_hash: Option<B256>,
+    success: bool,
+) -> TransactionReceipt {
+    let receipt = alloy_consensus::Receipt {
+        status: alloy_consensus::Eip658Value::Eip658(success),
+        cumulative_gas_used: 0,
+        logs: Vec::new(),
+    };
+    TransactionReceipt {
+        inner: alloy_consensus::ReceiptEnvelope::Eip1559(alloy_consensus::ReceiptWithBloom {
+            receipt,
+            logs_bloom: Default::default(),
+        }),
+        transaction_hash: tx,
+        transaction_index: Some(0),
+        block_hash,
+        block_number,
+        gas_used: 0,
+        effective_gas_price: 0,
+        blob_gas_used: None,
+        blob_gas_price: None,
+        from: alloy_primitives::Address::ZERO,
+        to: None,
+        contract_address: None,
+    }
+}
 
 #[tokio::test]
 async fn confirmed_receipt_retries_are_bounded() {
+    let mut block = block(1, vec![B256::ZERO]);
+    block.header.hash = B256::repeat_byte(0xbb);
+    let sealed = receipt(B256::ZERO, Some(1), Some(block.header.hash), true);
+    // A replica that hasn't sealed the block yet may serve a preconfirmation receipt instead.
+    let preconfirmed = receipt(B256::ZERO, Some(2), Some(B256::ZERO), true);
     for (missing, succeeds) in [(0, true), (1, true), (3, true), (4, false)] {
-        let asserter = alloy_transport::mock::Asserter::new();
-        let receipt = alloy_rpc_types_eth::TransactionReceipt {
-            inner: alloy_consensus::ReceiptEnvelope::Legacy(Default::default()),
-            transaction_hash: B256::ZERO,
-            transaction_index: Some(0),
-            block_hash: Some(B256::ZERO),
-            block_number: Some(1),
-            gas_used: 0,
-            effective_gas_price: 0,
-            blob_gas_used: None,
-            blob_gas_price: None,
-            from: alloy_primitives::Address::ZERO,
-            to: None,
-            contract_address: None,
-        };
-        // Registration sees an included receipt and confirms immediately.
-        asserter.push_success(&Some(&receipt));
-        for _ in 0..missing {
-            asserter.push_success(&Option::<alloy_rpc_types_eth::TransactionReceipt>::None);
+        for preconfirmation in [false, true] {
+            let asserter = Asserter::new();
+            // Registration sees a canonical receipt and confirms immediately.
+            asserter.push_success(&Some(&sealed));
+            asserter.push_success(&Some(&block));
+            for _ in 0..missing {
+                // Neither costs a block lookup: one has no receipt, the other has a zero hash.
+                if preconfirmation {
+                    asserter.push_success(&Some(&preconfirmed));
+                } else {
+                    asserter.push_success(&Option::<TransactionReceipt>::None);
+                }
+            }
+            if succeeds {
+                asserter.push_success(&Some(&sealed));
+                asserter.push_success(&Some(&block));
+            }
+            let client = RpcClient::mocked(asserter.clone());
+            client.set_poll_interval(Duration::from_millis(1));
+            let provider = RootProvider::<Ethereum>::new(client);
+            let result = PendingTransactionBuilder::new(provider, B256::ZERO).get_receipt().await;
+            if succeeds {
+                assert_eq!(result.unwrap(), sealed);
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(PendingTransactionError::TransportError(RpcError::NullResp))
+                ));
+            }
+            assert!(
+                asserter.read_q().is_empty(),
+                "unexpected number of requests: {missing}, {preconfirmation}"
+            );
         }
-        if succeeds {
-            asserter.push_success(&Some(&receipt));
+    }
+}
+
+/// An RPC that serves preconfirmations, like Base's public endpoint did before the Denim upgrade:
+/// until a block is sealed, a preconfirmed transaction's receipt has the next block's number and a
+/// zero block hash.
+struct PreconfChain {
+    blocks: Vec<Block>,
+    receipts: B256HashMap<TransactionReceipt>,
+}
+
+impl PreconfChain {
+    fn new() -> Arc<Mutex<Self>> {
+        let mut chain = Self { blocks: Vec::new(), receipts: Default::default() };
+        for _ in 0..3 {
+            chain.seal(Vec::new());
         }
-        let client = alloy_rpc_client::RpcClient::mocked(asserter.clone());
-        client.set_poll_interval(Duration::from_millis(1));
-        let provider = RootProvider::<Ethereum>::new(client);
-        let result = PendingTransactionBuilder::new(provider, B256::ZERO).get_receipt().await;
-        if succeeds {
-            assert_eq!(result.unwrap(), receipt);
+        Arc::new(Mutex::new(chain))
+    }
+
+    fn head(&self) -> u64 {
+        self.blocks.len() as u64 - 1
+    }
+
+    fn hash(&self, number: u64) -> B256 {
+        self.blocks[number as usize].header.hash
+    }
+
+    /// Seals the next block with `txs` and returns its number.
+    fn seal(&mut self, txs: Vec<TxHash>) -> u64 {
+        let number = self.blocks.len() as u64;
+        let mut block = block(number, txs);
+        block.header.hash = keccak256(number.to_be_bytes());
+        block.header.inner.parent_hash =
+            self.blocks.last().map(|parent| parent.header.hash).unwrap_or_default();
+        self.blocks.push(block);
+        number
+    }
+
+    /// Serves a preconfirmation receipt for `tx` in the next block, with the given block hash.
+    fn preconfirm(&mut self, tx: TxHash, block_hash: B256) {
+        let next = self.head() + 1;
+        self.receipts.insert(tx, receipt(tx, Some(next), Some(block_hash), true));
+    }
+
+    /// Seals `tx` in the next block and serves its receipt.
+    fn include(&mut self, tx: TxHash, success: bool) -> u64 {
+        let number = self.seal(vec![tx]);
+        self.receipts.insert(tx, receipt(tx, Some(number), Some(self.hash(number)), success));
+        number
+    }
+
+    fn client(chain: &Arc<Mutex<Self>>) -> RpcClient {
+        use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
+        use serde_json::value::to_raw_value;
+
+        let chain = chain.clone();
+        let transport = tower::service_fn(
+            move |request: RequestPacket| -> alloy_transport::TransportFut<'static> {
+                let chain = chain.clone();
+                Box::pin(async move {
+                    let RequestPacket::Single(request) = request else {
+                        panic!("unexpected batch")
+                    };
+                    let params: Vec<serde_json::Value> =
+                        request.params().map_or_else(Vec::new, |params| {
+                            serde_json::from_str(params.get()).unwrap()
+                        });
+                    let chain = chain.lock().unwrap();
+                    let result = match request.method() {
+                        "eth_blockNumber" => to_raw_value(&U64::from(chain.head())),
+                        "eth_getBlockByNumber" => {
+                            let number: U64 = serde_json::from_value(params[0].clone()).unwrap();
+                            to_raw_value(&chain.blocks.get(number.to::<usize>()))
+                        }
+                        "eth_getTransactionReceipt" => {
+                            let tx: TxHash = serde_json::from_value(params[0].clone()).unwrap();
+                            to_raw_value(&chain.receipts.get(&tx))
+                        }
+                        method => {
+                            return Err(alloy_transport::TransportErrorKind::custom_str(&format!(
+                                "unexpected request: {method}"
+                            )))
+                        }
+                    };
+                    Ok(ResponsePacket::Single(Response {
+                        id: request.id().clone(),
+                        payload: ResponsePayload::Success(result.unwrap()),
+                    }))
+                })
+            },
+        );
+        let client = RpcClient::new(transport, true);
+        client.set_poll_interval(Duration::from_millis(10));
+        client
+    }
+}
+
+/// Asserts that a watch is still pending, reporting how it finished otherwise.
+async fn assert_pending<T: fmt::Debug>(task: &mut tokio::task::JoinHandle<T>, context: String) {
+    if task.is_finished() {
+        panic!("{context}: {:?}", task.await);
+    }
+}
+
+async fn is_canonical(client: &RpcClient, receipt: &TransactionReceipt) -> bool {
+    is_receipt_canonical::<Ethereum>(client, receipt).await.unwrap()
+}
+
+#[tokio::test]
+async fn canonical_receipts() {
+    let chain = PreconfChain::new();
+    let client = PreconfChain::client(&chain);
+    let tx = B256::repeat_byte(1);
+    let (number, hash) = {
+        let mut chain = chain.lock().unwrap();
+        let number = chain.include(tx, true);
+        (number, chain.hash(number))
+    };
+    assert!(is_canonical(&client, &receipt(tx, Some(number), Some(hash), true)).await);
+    // A reverted transaction is still included.
+    assert!(is_canonical(&client, &receipt(tx, Some(number), Some(hash), false)).await);
+
+    // Pending, preconfirmed with a zero or a tentative hash, and from a reorged-out block.
+    for (number, hash) in [
+        (None, None),
+        (Some(number), None),
+        (None, Some(hash)),
+        (Some(number + 1), Some(B256::ZERO)),
+        (Some(number + 1), Some(B256::repeat_byte(0xee))),
+        (Some(number), Some(B256::ZERO)),
+        (Some(number), Some(B256::repeat_byte(0xdd))),
+    ] {
+        assert!(
+            !is_canonical(&client, &receipt(tx, number, hash, true)).await,
+            "{number:?} {hash:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn canonical_receipt_lookups() {
+    let asserter = Asserter::new();
+    let client = RpcClient::mocked(asserter.clone());
+    let tx = B256::repeat_byte(1);
+    // Receipts without a block, or with a zero block hash, are rejected without a block lookup.
+    assert!(!is_canonical(&client, &receipt(tx, None, None, true)).await);
+    assert!(!is_canonical(&client, &receipt(tx, Some(2), Some(B256::ZERO), true)).await);
+    assert!(asserter.read_q().is_empty());
+    // A block lookup error is returned, so callers keep watching instead of confirming.
+    asserter.push_failure_msg("unavailable");
+    let receipt = receipt(tx, Some(1), Some(B256::repeat_byte(0xbb)), true);
+    assert!(is_receipt_canonical::<Ethereum>(&client, &receipt).await.is_err());
+}
+
+/// How a preconfirmed transaction turns out.
+#[derive(Clone, Copy, Debug)]
+enum Outcome {
+    /// Sealed in the preconfirmed block.
+    Included,
+    /// Never included.
+    Dropped,
+    /// Included in a later block, and reverted.
+    Reverted,
+}
+
+/// Watches a preconfirmed transaction until it is sealed, dropped or reverted, checking that the
+/// preconfirmation never counts as inclusion.
+async fn preconfirmation(
+    outcome: Outcome,
+    preconf_hash: B256,
+    preconfirmed_before_watch: bool,
+    confirmations: u64,
+    get_receipt: bool,
+) {
+    let case = format!(
+        "{outcome:?}, preconf hash {preconf_hash}, before watch {preconfirmed_before_watch}, \
+         {confirmations} confirmations, get_receipt {get_receipt}"
+    );
+    let chain = PreconfChain::new();
+    let provider = RootProvider::<Ethereum>::new(PreconfChain::client(&chain));
+    let tx = B256::repeat_byte(0x42);
+    let preconfirmed_block = chain.lock().unwrap().head() + 1;
+    if preconfirmed_before_watch {
+        chain.lock().unwrap().preconfirm(tx, preconf_hash);
+    }
+    // The heartbeat lives as long as the provider, which `watch` would drop with the builder.
+    let builder = PendingTransactionBuilder::new(provider.clone(), tx)
+        .with_required_confirmations(confirmations)
+        .with_timeout(Some(Duration::from_millis(600)));
+    let mut task = tokio::spawn(async move {
+        if get_receipt {
+            builder.get_receipt().await.map(Some)
         } else {
-            assert!(matches!(
-                result,
-                Err(PendingTransactionError::TransportError(RpcError::NullResp))
-            ));
+            builder.watch().await.map(|_| None)
         }
-        assert!(asserter.read_q().is_empty(), "unexpected number of receipt requests: {missing}");
+    });
+    // Each pause spans several polling rounds of the heartbeat and its receipt checks.
+    let pause = || tokio::time::sleep(Duration::from_millis(80));
+    pause().await;
+    if !preconfirmed_before_watch {
+        chain.lock().unwrap().preconfirm(tx, preconf_hash);
+        pause().await;
+    }
+    assert_pending(&mut task, format!("{case}: confirmed by a preconfirmation")).await;
+
+    if matches!(outcome, Outcome::Dropped | Outcome::Reverted) {
+        // The preconfirmed block, and enough blocks after it to confirm it, are sealed without the
+        // transaction while the RPC keeps serving the stale preconfirmation receipt.
+        for _ in 0..=confirmations {
+            chain.lock().unwrap().seal(Vec::new());
+        }
+        pause().await;
+        assert_pending(&mut task, format!("{case}: confirmed by a revoked preconfirmation")).await;
+        chain.lock().unwrap().receipts.remove(&tx);
+    }
+    if matches!(outcome, Outcome::Included | Outcome::Reverted) {
+        let mut chain = chain.lock().unwrap();
+        chain.include(tx, matches!(outcome, Outcome::Included));
+        for _ in 1..confirmations {
+            chain.seal(Vec::new());
+        }
+    }
+
+    let result = tokio::time::timeout(Duration::from_secs(5), task).await.unwrap().unwrap();
+    if matches!(outcome, Outcome::Dropped) {
+        assert!(
+            matches!(result, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+            "{case}: {result:?}"
+        );
+        return;
+    }
+    let Some(receipt) = result.unwrap_or_else(|err| panic!("{case}: {err}")) else { return };
+    let chain = chain.lock().unwrap();
+    let number = receipt.block_number.unwrap();
+    assert_eq!(receipt.block_hash, Some(chain.hash(number)), "{case}");
+    match outcome {
+        Outcome::Included => {
+            assert!(receipt.status(), "{case}");
+            assert_eq!(number, preconfirmed_block, "{case}");
+        }
+        _ => {
+            assert!(!receipt.status(), "{case}");
+            assert!(number > preconfirmed_block, "{case}: {number}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn preconfirmations_are_not_inclusion() {
+    let mut cases = Vec::new();
+    for outcome in [Outcome::Included, Outcome::Dropped, Outcome::Reverted] {
+        // Base serves a zero block hash, but an RPC could also serve a tentative one.
+        for preconf_hash in [B256::ZERO, B256::repeat_byte(0xee)] {
+            for preconfirmed_before_watch in [true, false] {
+                for confirmations in [1, 3] {
+                    for get_receipt in [true, false] {
+                        cases.push(preconfirmation(
+                            outcome,
+                            preconf_hash,
+                            preconfirmed_before_watch,
+                            confirmations,
+                            get_receipt,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    futures::future::join_all(cases).await;
+}
+
+#[tokio::test]
+async fn receipts_from_reorged_blocks_are_not_inclusion() {
+    for confirmations in [1, 3] {
+        let chain = PreconfChain::new();
+        let provider = RootProvider::<Ethereum>::new(PreconfChain::client(&chain));
+        let tx = B256::repeat_byte(0x42);
+        {
+            let mut chain = chain.lock().unwrap();
+            // The transaction's block was reorged out and the canonical block at that height
+            // doesn't contain it, but a lagging replica still serves the old receipt. Enough
+            // blocks follow that a height check alone would count it as confirmed.
+            let number = chain.seal(Vec::new());
+            chain
+                .receipts
+                .insert(tx, receipt(tx, Some(number), Some(B256::repeat_byte(0xdd)), true));
+            for _ in 1..confirmations {
+                chain.seal(Vec::new());
+            }
+        }
+        let mut task = tokio::spawn(
+            PendingTransactionBuilder::new(provider.clone(), tx)
+                .with_required_confirmations(confirmations)
+                .get_receipt(),
+        );
+        tokio::time::sleep(Duration::from_millis(80)).await;
+        assert_pending(&mut task, format!("{confirmations}: confirmed by a reorged-out receipt"))
+            .await;
+
+        // The transaction is included again.
+        let (number, hash) = {
+            let mut chain = chain.lock().unwrap();
+            let number = chain.include(tx, true);
+            for _ in 1..confirmations {
+                chain.seal(Vec::new());
+            }
+            (number, chain.hash(number))
+        };
+        let receipt = tokio::time::timeout(Duration::from_secs(5), task).await.unwrap().unwrap();
+        let receipt = receipt.unwrap();
+        assert_eq!((receipt.block_number, receipt.block_hash), (Some(number), Some(hash)));
     }
 }
 

@@ -9,7 +9,7 @@ use super::{
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
-    heart::PendingTransactionError,
+    heart::{is_receipt_canonical, PendingTransactionError},
     utils::{self, Eip1559Estimation, Eip1559Estimator},
     EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
     PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
@@ -1903,18 +1903,25 @@ impl<N: Network> Provider<N> for RootProvider<N> {
         &self,
         config: PendingTransactionConfig,
     ) -> Result<PendingTransaction, PendingTransactionError> {
-        let block_number =
-            if let Some(receipt) = self.get_transaction_receipt(*config.tx_hash()).await? {
-                // The transaction is already confirmed.
-                if config.required_confirmations() <= 1 {
-                    return Ok(PendingTransaction::ready(*config.tx_hash()));
+        let hash = *config.tx_hash();
+        let mut block_number = None;
+        if let Some(receipt) = self.get_transaction_receipt(hash).await? {
+            // A receipt only shows inclusion once its block is sealed and canonical: a
+            // preconfirmation receipt can still be revoked. Until then, the heart keeps checking.
+            match is_receipt_canonical::<N>(self.client(), &receipt).await {
+                Ok(true) => {
+                    // The transaction is already confirmed.
+                    if config.required_confirmations() <= 1 {
+                        return Ok(PendingTransaction::ready(hash));
+                    }
+                    // Transaction has custom confirmations, so let the heart know about its block
+                    // number and let it handle the situation.
+                    block_number = receipt.block_number();
                 }
-                // Transaction has custom confirmations, so let the heart know about its block
-                // number and let it handle the situation.
-                receipt.block_number()
-            } else {
-                None
-            };
+                Ok(false) => debug!(tx=%hash, "receipt is not from a canonical block yet"),
+                Err(err) => debug!(tx=%hash, %err, "failed to check the receipt's block"),
+            }
+        }
 
         self.get_heart()
             .watch_tx(config, block_number)
