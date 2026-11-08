@@ -90,6 +90,31 @@ impl SubscriptionManager {
         }
     }
 
+    /// Count the resubscriptions that the dying backend did not acknowledge, and remove the
+    /// subscriptions that more than `max_replays` consecutive backends did not acknowledge. This
+    /// closes their receivers.
+    pub(crate) fn count_unacked_resubscribes(&mut self, max_replays: u32) {
+        let mut exhausted = Vec::new();
+        for (local_id, sub) in &mut self.local_to_sub {
+            if self.local_to_server.contains_left(local_id) {
+                sub.unacked_resubscribes = 0;
+            } else {
+                sub.unacked_resubscribes += 1;
+                if sub.unacked_resubscribes > max_replays {
+                    exhausted.push(*local_id);
+                }
+            }
+        }
+        for local_id in exhausted {
+            warn!(
+                %local_id,
+                "Backend died {} times before acknowledging the resubscription, dropping the subscription",
+                max_replays + 1
+            );
+            self.remove_sub(local_id);
+        }
+    }
+
     /// Remove a subscription by its local_id, returning it and its current server id.
     pub(crate) fn remove_sub(
         &mut self,

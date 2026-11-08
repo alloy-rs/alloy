@@ -12,6 +12,7 @@ use std::{
     },
     time::Duration,
 };
+use tokio::{sync::broadcast::error::RecvError, time::Instant};
 
 const MAX_RETRIES: u32 = 3;
 
@@ -71,10 +72,16 @@ impl Backend {
 }
 
 async fn spawn_service<const N: usize>() -> (PubSubFrontend, MockConnect, [Backend; N]) {
+    spawn_service_with(MAX_RETRIES).await
+}
+
+async fn spawn_service_with<const N: usize>(
+    max_retries: u32,
+) -> (PubSubFrontend, MockConnect, [Backend; N]) {
     let connector = MockConnect::default();
     let backends = std::array::from_fn(|_| {
         let (handle, interface) = ConnectionHandle::new();
-        connector.backends.lock().unwrap().push_back(handle.with_max_retries(MAX_RETRIES));
+        connector.backends.lock().unwrap().push_back(handle.with_max_retries(max_retries));
         Backend(interface)
     });
     let frontend = connector.clone().into_service().await.unwrap();
@@ -481,4 +488,95 @@ async fn repeated_reconnect_resubscribes_once() {
     third.respond(1, json!("0xccc"));
     third.notify("0xccc", json!(1));
     assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
+}
+
+#[tokio::test(start_paused = true)]
+async fn backends_dying_without_answering_exhaust_health_budget() {
+    let (frontend, connector, backends) = spawn_service_with::<3>(2).await;
+    let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 1, json!([]))));
+
+    let mut deaths = Vec::new();
+    for mut backend in backends {
+        assert_eq!(backend.recv().await["id"], 1);
+        // Notifications are no progress.
+        backend.notify("0xaaa", json!(1));
+        deaths.push(Instant::now());
+        backend.close();
+    }
+
+    let err = within(resp).await.unwrap().unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "3 consecutive backend connections closed without answering a request"
+    );
+    assert_eq!(connector.reconnects.load(Ordering::SeqCst), 2);
+    // Connecting succeeded every time, yet the second replacement waited for the retry interval.
+    assert_eq!(deaths[1] - deaths[0], Duration::ZERO);
+    assert_eq!(deaths[2] - deaths[1], Duration::from_secs(3));
+}
+
+#[tokio::test(start_paused = true)]
+async fn idle_backend_deaths_do_not_exhaust_health_budget() {
+    let (frontend, connector, [first, second, third, fourth, mut last]) =
+        spawn_service_with(2).await;
+    let start = Instant::now();
+    for backend in [first, second, third, fourth] {
+        backend.close();
+    }
+
+    probe(&frontend, &mut last, 1).await;
+    assert_eq!(connector.reconnects.load(Ordering::SeqCst), 4);
+    assert_eq!(start.elapsed(), Duration::ZERO);
+}
+
+#[tokio::test(start_paused = true)]
+async fn request_that_keeps_killing_backends_fails() {
+    let (frontend, _, [mut first, second, third, fourth, mut last]) = spawn_service().await;
+    let local_id = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0x1").await;
+    let mut sub = frontend.get_subscription(local_id).await.unwrap();
+    let resp = tokio::spawn(frontend.send(request("eth_getLogs", 2, json!([{}]))));
+    assert_eq!(first.recv().await["id"], 2);
+    let start = Instant::now();
+    first.close();
+
+    for (server_id, mut backend) in [(2, second), (3, third), (4, fourth)] {
+        // The backend acknowledges the resubscription, but dies on the replayed request.
+        let mut reqs = [backend.recv().await, backend.recv().await];
+        reqs.sort_by_key(|req| req["id"].as_u64());
+        assert_eq!(reqs.map(|req| req["method"].clone()), ["eth_subscribe", "eth_getLogs"]);
+        backend.respond(1, json!(format!("0x{server_id}")));
+        backend.close();
+    }
+
+    let err = within(resp).await.unwrap().unwrap_err();
+    assert_eq!(err.to_string(), "backend connection closed 4 times while the request was pending");
+    // Backends that answered a request are healthy, so there was no backoff.
+    assert_eq!(start.elapsed(), Duration::ZERO);
+
+    // The service keeps running without the failed request.
+    assert_eq!(last.recv().await["method"], "eth_subscribe");
+    probe(&frontend, &mut last, 3).await;
+    last.respond(1, json!("0x5"));
+    last.notify("0x5", json!(1));
+    assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
+}
+
+#[tokio::test(start_paused = true)]
+async fn resubscription_that_keeps_killing_backends_is_dropped() {
+    let (frontend, _, [mut first, second, third, fourth, fifth, mut last]) = spawn_service().await;
+    let local_id = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0x1").await;
+    let mut sub = frontend.get_subscription(local_id).await.unwrap();
+    first.close();
+
+    for (id, mut backend) in [(10, second), (11, third), (12, fourth), (13, fifth)] {
+        // The backend answers other requests, but dies before acknowledging the resubscription.
+        assert_eq!(backend.recv().await["method"], "eth_subscribe");
+        probe(&frontend, &mut backend, id).await;
+        backend.close();
+    }
+
+    // Dropping the subscription closed its receivers.
+    assert!(matches!(within(sub.recv()).await, Err(RecvError::Closed)));
+    probe(&frontend, &mut last, 20).await;
+    assert!(frontend.get_subscription(local_id).await.is_err());
 }

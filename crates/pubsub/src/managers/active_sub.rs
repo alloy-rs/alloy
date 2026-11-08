@@ -39,6 +39,8 @@ pub(crate) struct ActiveSubscription {
     pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
     /// The number of callers that were handed the local id but have not fetched a receiver yet.
     pub(crate) pending_claims: usize,
+    /// The number of consecutive backends that died before acknowledging the resubscription.
+    pub(crate) unacked_resubscribes: u32,
 }
 
 // NB: We implement this to prevent any incorrect future implementations.
@@ -85,7 +87,14 @@ impl ActiveSubscription {
     pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
         let local_id = subscription_local_id(&request);
         let (tx, rx) = broadcast::channel(channel_size);
-        Self { request, local_id, tx, rx: Mutex::new(Some(rx)), pending_claims: 0 }
+        Self {
+            request,
+            local_id,
+            tx,
+            rx: Mutex::new(Some(rx)),
+            pending_claims: 0,
+            unacked_resubscribes: 0,
+        }
     }
 
     /// Returns `true` if anyone holds a receiver for this subscription, or is about to fetch one.

@@ -22,6 +22,10 @@ use tokio::time::sleep;
 
 const MAX_RECONNECT_RETRY_INTERVAL: Duration = Duration::from_secs(30);
 
+/// The number of times a request is replayed on a new backend before it fails, when every backend
+/// dies while the request is pending. This also bounds resubscriptions.
+const MAX_REQUEST_REPLAYS: u32 = 3;
+
 /// A subscribe request on the wire, and the callers waiting for the same subscription.
 #[derive(Debug)]
 struct PendingSubscription {
@@ -53,6 +57,13 @@ pub(crate) struct PubSubService<T> {
     /// Subscribe requests on the wire, by local id. Identical subscribe requests wait for these
     /// instead of creating another subscription on the server.
     pending_subs: B256Map<PendingSubscription>,
+
+    /// Whether the current backend answered any request since it connected.
+    backend_progressed: bool,
+
+    /// The number of consecutive backends that died with requests pending, without answering
+    /// any request.
+    unhealthy_backends: u32,
 }
 
 impl<T: PubSubConnect> PubSubService<T> {
@@ -69,6 +80,8 @@ impl<T: PubSubConnect> PubSubService<T> {
             subs: SubscriptionManager::default(),
             in_flights: Default::default(),
             pending_subs: Default::default(),
+            backend_progressed: false,
+            unhealthy_backends: 0,
         }
     }
 
@@ -103,6 +116,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
 
         old_handle.shutdown();
+        self.backend_progressed = false;
 
         // Subscriptions nobody consumes are not restored: their server-side counterparts closed
         // with the old connection.
@@ -111,7 +125,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         // Re-issue pending requests.
         self.remove_cancelled();
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
-        for (_, in_flight) in self.in_flights.iter() {
+        for in_flight in self.in_flights.iter() {
             let msg = in_flight.request.serialized().to_owned();
             self.dispatch_request(msg)?;
         }
@@ -274,21 +288,34 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Handle an item from the backend.
     fn handle_item(&mut self, item: PubSubItem) -> TransportResult<()> {
         match item {
-            PubSubItem::Response(resp) => match self.in_flights.remove(&resp.id) {
-                Some(in_flight) if in_flight.is_subscription() => {
-                    self.handle_sub_response(in_flight, resp)
+            PubSubItem::Response(resp) => {
+                let Some(in_flight) = self.in_flights.remove(&resp.id) else {
+                    return Ok(());
+                };
+                self.backend_progressed = true;
+                if in_flight.is_subscription() {
+                    return self.handle_sub_response(in_flight, resp);
                 }
-                Some(in_flight) => {
-                    let _ = in_flight.fulfill(resp);
-                    Ok(())
-                }
-                None => Ok(()),
-            },
+                let _ = in_flight.fulfill(resp);
+                Ok(())
+            }
             PubSubItem::Notification(notification) => {
                 self.subs.notify(notification);
                 Ok(())
             }
         }
+    }
+
+    /// Take the callers that asked for the subscription `local_id` while the subscribe request
+    /// `id` was in flight.
+    fn take_waiters(&mut self, local_id: B256, id: &Id) -> Vec<InFlight> {
+        match self.pending_subs.get(&local_id) {
+            Some(pending) if pending.id == *id => {
+                self.pending_subs.remove(&local_id).map(|pending| pending.waiters)
+            }
+            _ => None,
+        }
+        .unwrap_or_default()
     }
 
     /// Handle the response to a subscribe request.
@@ -300,14 +327,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     fn handle_sub_response(&mut self, in_flight: InFlight, resp: Response) -> TransportResult<()> {
         let local_id = subscription_local_id(in_flight.request());
 
-        // Callers that asked for the same subscription while this request was in flight.
-        let waiters = match self.pending_subs.get(&local_id) {
-            Some(pending) if pending.id == resp.id => {
-                self.pending_subs.remove(&local_id).map(|pending| pending.waiters)
-            }
-            _ => None,
-        }
-        .unwrap_or_default();
+        let waiters = self.take_waiters(local_id, &resp.id);
         let payload = (!waiters.is_empty()).then(|| resp.payload.clone());
 
         let Some((server_id, in_flight)) = in_flight.fulfill(resp) else {
@@ -351,13 +371,15 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
-    /// Attempt to reconnect with retries.
+    /// Attempt to reconnect with retries, after accounting for the death of the current backend.
     ///
     /// Aborts immediately when a reconnect attempt returns a
     /// [`TransportErrorKind::NonRetryable`] error so deterministic backend
     /// failures (auth/protocol violations, malformed handshake, etc.) do not
     /// burn the full retry budget.
     async fn reconnect_with_retries(&mut self) -> TransportResult<()> {
+        self.handle_backend_death().await?;
+
         let mut retry_count = 0;
         let max_retries = self.handle.max_retries;
         let interval = self.handle.retry_interval;
@@ -383,6 +405,73 @@ impl<T: PubSubConnect> PubSubService<T> {
                 }
             }
         }
+    }
+
+    /// Account for the death of the current backend, before replacing it.
+    ///
+    /// A request fails once more than [`MAX_REQUEST_REPLAYS`] backends died while it was pending,
+    /// and a subscription is dropped once that many consecutive backends died without
+    /// acknowledging its resubscription.
+    ///
+    /// A backend is unhealthy if it died with requests pending, without answering any request
+    /// since it connected. Notifications don't count. A backend that answered a request resets the
+    /// count of consecutive unhealthy backends, and one that died idle leaves it unchanged. From
+    /// the second unhealthy backend on, the service backs off before connecting, and after
+    /// `max_retries` it shuts down, even if connecting keeps succeeding.
+    async fn handle_backend_death(&mut self) -> TransportResult<()> {
+        if self.backend_progressed {
+            self.unhealthy_backends = 0;
+        } else if !self.in_flights.is_empty() {
+            self.unhealthy_backends = self.unhealthy_backends.saturating_add(1);
+        }
+
+        for in_flight in self.in_flights.count_replays(MAX_REQUEST_REPLAYS) {
+            warn!(
+                method = in_flight.request.method(),
+                "Backend died {} times while the request was pending, failing it",
+                MAX_REQUEST_REPLAYS + 1
+            );
+            self.fail_replayed_request(in_flight);
+        }
+        self.subs.count_unacked_resubscribes(MAX_REQUEST_REPLAYS);
+
+        let unhealthy = self.unhealthy_backends;
+        let max_retries = self.handle.max_retries;
+        if unhealthy > max_retries {
+            error!(
+                "{unhealthy} consecutive backends died without answering a request, shutting down"
+            );
+            return Err(TransportErrorKind::custom_str(&format!(
+                "{unhealthy} consecutive backend connections closed without answering a request"
+            )));
+        }
+        if unhealthy > 1 {
+            let delay = reconnect_retry_interval(self.handle.retry_interval, unhealthy - 1);
+            warn!(
+                "{unhealthy} consecutive backends died without answering a request. \
+                 Reconnecting in {delay:?}...",
+            );
+            sleep(delay).await;
+        }
+        Ok(())
+    }
+
+    /// Fail a request that was pending on too many dead backends, along with the callers waiting
+    /// for the same subscription.
+    fn fail_replayed_request(&mut self, in_flight: InFlight) {
+        let error = || {
+            TransportErrorKind::custom_str(&format!(
+                "backend connection closed {} times while the request was pending",
+                MAX_REQUEST_REPLAYS + 1
+            ))
+        };
+        if in_flight.is_subscription() {
+            let local_id = subscription_local_id(in_flight.request());
+            for waiter in self.take_waiters(local_id, in_flight.request.id()) {
+                let _ = waiter.tx.send(Err(error()));
+            }
+        }
+        let _ = in_flight.tx.send(Err(error()));
     }
 
     /// Handle the loss of the backend, given the error it reported, if any.

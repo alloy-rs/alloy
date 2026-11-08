@@ -86,8 +86,15 @@ server ID changes across reconnections.
 ### Reconnection, replay, and cancellation
 
 After a retryable established-backend failure, the service attempts reconnection under its
-configured retry policy; non-retryable failures terminate it immediately. Following a successful
-reconnect, it re-sends every
+configured retry policy; non-retryable failures terminate it immediately. A backend that dies
+with requests pending, without answering any of them since it connected, is unhealthy even if
+connecting succeeded; notifications don't count as answers. From the second consecutive
+unhealthy backend on, the service backs off before reconnecting, and after `max_retries` of
+them it shuts down. A request that was pending on four consecutive dead backends fails instead
+of being re-sent again, and a subscription whose resubscription four consecutive backends did
+not acknowledge is dropped, which closes its receivers.
+
+Following a successful reconnect, it re-sends every
 request still awaiting a response and re-creates active subscriptions that still
 have consumers: a receiver, or a caller that was handed the local ID but has not
 fetched a receiver yet. If the
