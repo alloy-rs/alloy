@@ -5,6 +5,16 @@ use std::{str::FromStr, time::Duration};
 #[cfg(any(feature = "ws-base", feature = "ipc"))]
 use alloy_pubsub::PubSubConnect;
 
+// Both re-export `http::header`.
+#[cfg(feature = "hyper")]
+use alloy_transport_http::hyper::header;
+#[cfg(all(
+    not(feature = "hyper"),
+    feature = "reqwest",
+    not(all(target_os = "wasi", target_env = "p1"))
+))]
+use reqwest::header;
+
 /// Connection string for built-in transports.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -115,15 +125,19 @@ impl BuiltInConnectionString {
     /// # Notes
     ///
     /// - If the `hyper` feature is enabled, HTTP connections use hyper instead of reqwest.
-    /// - WS will extract auth, however, auth is disabled for wasm.
-    /// - Some configuration options may not apply to all transport types.
+    /// - [`ConnectionConfig::auth`] is sent as the `Authorization` header of every HTTP request and
+    ///   of the WS handshake. It takes precedence over credentials in the URL, which are then not
+    ///   sent. A header set on an individual request takes precedence over it for HTTP. WS auth is
+    ///   disabled for wasm.
+    /// - [`ConnectionConfig::max_retries`] and [`ConnectionConfig::retry_interval`] control WS
+    ///   reconnects only. HTTP has no persistent connection to retry; use `RetryBackoffLayer` to
+    ///   retry HTTP requests.
+    /// - IPC ignores the configuration.
     pub async fn connect_boxed_with(
         &self,
         config: ConnectionConfig,
     ) -> Result<BoxTransport, TransportError> {
-        // Note: Configuration is currently only applied to WebSocket transports.
-        // HTTP and IPC transports will use their default settings.
-        let _ = &config; // Suppress unused warning for non-WS transports
+        let _ = &config; // Suppress unused warning when no transport reads it
         match self {
             // reqwest is enabled, hyper is not
             #[cfg(all(
@@ -132,9 +146,19 @@ impl BuiltInConnectionString {
                 not(all(target_os = "wasi", target_env = "p1"))
             ))]
             Self::Http(url) => {
-                Ok(alloy_transport::Transport::boxed(
-                    alloy_transport_http::Http::<reqwest::Client>::new(url.clone()),
-                ))
+                let (url, auth) = http_auth(url, &config)?;
+                let mut builder = reqwest::Client::builder();
+                if let Some(auth) = auth {
+                    // Default headers are only added when the request does not set them.
+                    builder = builder.default_headers(header::HeaderMap::from_iter([(
+                        header::AUTHORIZATION,
+                        auth,
+                    )]));
+                }
+                let client = builder.build().map_err(TransportErrorKind::custom)?;
+                Ok(alloy_transport::Transport::boxed(alloy_transport_http::Http::with_client(
+                    client, url,
+                )))
             }
 
             #[cfg(all(
@@ -148,9 +172,28 @@ impl BuiltInConnectionString {
 
             // hyper takes precedence over reqwest when enabled
             #[cfg(feature = "hyper")]
-            Self::Http(url) => Ok(alloy_transport::Transport::boxed(
-                alloy_transport_http::HyperTransport::new_hyper(url.clone()),
-            )),
+            Self::Http(url) => {
+                let (url, auth) = http_auth(url, &config)?;
+                let Some(auth) = auth else {
+                    return Ok(alloy_transport::Transport::boxed(
+                        alloy_transport_http::HyperTransport::new_hyper(url),
+                    ));
+                };
+                // Only add the header when the request does not set it.
+                let client = alloy_transport_http::HyperClient::new().layer(
+                    tower::util::MapRequestLayer::new(
+                        move |mut req: alloy_transport_http::hyper::Request<_>| {
+                            req.headers_mut()
+                                .entry(header::AUTHORIZATION)
+                                .or_insert_with(|| auth.clone());
+                            req
+                        },
+                    ),
+                );
+                Ok(alloy_transport::Transport::boxed(alloy_transport_http::Http::with_client(
+                    client, url,
+                )))
+            }
 
             #[cfg(feature = "ws-base")]
             Self::Ws(url, existing_auth) => {
@@ -264,6 +307,32 @@ impl BuiltInConnectionString {
     }
 }
 
+/// Returns the URL and `Authorization` header value to use for an HTTP connection.
+///
+/// [`ConnectionConfig::auth`] takes precedence over credentials in the URL, as it does for WS. When
+/// it is set, the userinfo is removed from the URL, because reqwest would otherwise send it as a
+/// request header that wins over the configured one.
+#[cfg(any(
+    feature = "hyper",
+    all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))
+))]
+fn http_auth(
+    url: &url::Url,
+    config: &ConnectionConfig,
+) -> Result<(url::Url, Option<header::HeaderValue>), TransportError> {
+    let mut url = url.clone();
+    let Some(auth) = &config.auth else { return Ok((url, None)) };
+
+    // These only fail for URLs that cannot carry credentials, which have none to remove.
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+
+    let mut value =
+        header::HeaderValue::from_str(&auth.to_string()).map_err(TransportErrorKind::custom)?;
+    value.set_sensitive(true);
+    Ok((url, Some(value)))
+}
+
 impl FromStr for BuiltInConnectionString {
     type Err = RpcError<TransportErrorKind>;
 
@@ -290,12 +359,18 @@ impl FromStr for BuiltInConnectionString {
 #[non_exhaustive]
 pub struct ConnectionConfig {
     /// Authorization header for authenticated connections.
+    ///
+    /// Applied to HTTP requests and to the WebSocket handshake, in place of any credentials in the
+    /// URL. Ignored for IPC.
     pub auth: Option<alloy_transport::Authorization>,
     /// Maximum number of connection retries.
+    ///
+    /// Only used for WebSocket reconnects. Ignored for HTTP and IPC.
     pub max_retries: Option<u32>,
     /// Base interval between connection retries.
     ///
     /// WebSocket reconnect retries use capped exponential backoff from this base interval.
+    /// Ignored for HTTP and IPC.
     pub retry_interval: Option<Duration>,
     /// WebSocket-specific configuration.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
@@ -321,6 +396,8 @@ impl ConnectionConfig {
     }
 
     /// Set the maximum number of retries.
+    ///
+    /// Only used for WebSocket reconnects. Ignored for HTTP and IPC.
     pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = Some(max_retries);
         self
@@ -329,6 +406,7 @@ impl ConnectionConfig {
     /// Set the base retry interval.
     ///
     /// WebSocket reconnect retries use capped exponential backoff from this base interval.
+    /// Ignored for HTTP and IPC.
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = Some(retry_interval);
         self
@@ -447,5 +525,113 @@ mod test {
             BuiltInConnectionString::from_str(ipc_path.to_str().unwrap()).unwrap(),
             BuiltInConnectionString::Ipc(ipc_path.clone())
         );
+    }
+
+    /// Serves one JSON-RPC response on a local socket and returns the raw request it received.
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    async fn serve_once() -> (String, tokio::task::JoinHandle<String>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let handle = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            // Read the whole request before responding: closing the socket with unread bytes
+            // makes the client see a connection reset instead of the response.
+            let mut buf = Vec::new();
+            let mut chunk = [0; 4096];
+            loop {
+                let n = stream.read(&mut chunk).await.unwrap();
+                assert_ne!(n, 0, "connection closed before the request was complete");
+                buf.extend_from_slice(&chunk[..n]);
+                let Some(end) = buf.windows(4).position(|w| w == b"\r\n\r\n") else { continue };
+                let head = String::from_utf8_lossy(&buf[..end]).to_lowercase();
+                let len = head
+                    .lines()
+                    .find_map(|line| line.strip_prefix("content-length:"))
+                    .map_or(0, |len| len.trim().parse::<usize>().unwrap());
+                if buf.len() >= end + 4 + len {
+                    break;
+                }
+            }
+            let body = r#"{"jsonrpc":"2.0","id":0,"result":"0x1"}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\
+                 connection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).await.unwrap();
+            String::from_utf8_lossy(&buf).to_lowercase()
+        });
+        (url, handle)
+    }
+
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    async fn send(url: &str, config: ConnectionConfig, header: Option<&'static str>) {
+        use alloy_json_rpc::{Id, Request, RequestPacket};
+        use tower::Service;
+
+        let mut transport = BuiltInConnectionString::connect_with(url, config).await.unwrap();
+        let mut req = Request::new("eth_blockNumber", Id::Number(0), ());
+        if let Some(header) = header {
+            req.meta
+                .headers_mut()
+                .insert(http::header::AUTHORIZATION, http::HeaderValue::from_static(header));
+        }
+        transport.call(RequestPacket::Single(req.serialize().unwrap())).await.unwrap();
+    }
+
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    #[tokio::test]
+    async fn http_applies_config_auth() {
+        let (url, server) = serve_once().await;
+        let config =
+            ConnectionConfig::new().with_auth(alloy_transport::Authorization::bearer("t0k"));
+        send(&url, config, None).await;
+        let request = server.await.unwrap();
+        assert!(request.contains("\r\nauthorization: bearer t0k\r\n"), "{request}");
+    }
+
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    #[tokio::test]
+    async fn http_request_header_overrides_config_auth() {
+        let (url, server) = serve_once().await;
+        let config =
+            ConnectionConfig::new().with_auth(alloy_transport::Authorization::bearer("t0k"));
+        send(&url, config, Some("Bearer other")).await;
+        let request = server.await.unwrap();
+        assert!(request.contains("\r\nauthorization: bearer other\r\n"), "{request}");
+        assert_eq!(request.matches("authorization:").count(), 1, "{request}");
+    }
+
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    #[tokio::test]
+    async fn http_without_auth_sends_no_authorization() {
+        let (url, server) = serve_once().await;
+        send(&url, ConnectionConfig::new(), None).await;
+        let request = server.await.unwrap();
+        assert!(!request.contains("authorization:"), "{request}");
+    }
+
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    #[tokio::test]
+    async fn http_config_auth_overrides_url_credentials() {
+        let (url, server) = serve_once().await;
+        let url = url.replacen("http://", "http://user:pass@", 1);
+        let config =
+            ConnectionConfig::new().with_auth(alloy_transport::Authorization::bearer("t0k"));
+        send(&url, config, None).await;
+        let request = server.await.unwrap();
+        assert!(request.contains("\r\nauthorization: bearer t0k\r\n"), "{request}");
+        assert_eq!(request.matches("authorization:").count(), 1, "{request}");
+    }
+
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    #[tokio::test]
+    async fn http_rejects_invalid_config_auth() {
+        let config =
+            ConnectionConfig::new().with_auth(alloy_transport::Authorization::raw("t0k\nen"));
+        let res = BuiltInConnectionString::connect_with("http://127.0.0.1:8545", config).await;
+        assert!(res.is_err());
     }
 }
