@@ -65,6 +65,41 @@ macro_rules! delegate_transaction {
         }
 
         #[inline]
+        fn max_fee_per_gas_u256(&$self) -> alloy_primitives::U256 {
+            $crate::any::delegate_transaction!(@call $self $target max_fee_per_gas_u256())
+        }
+
+        #[inline]
+        fn max_priority_fee_per_gas_u256(&$self) -> Option<alloy_primitives::U256> {
+            $crate::any::delegate_transaction!(@call $self $target max_priority_fee_per_gas_u256())
+        }
+
+        #[inline]
+        fn max_fee_per_blob_gas_u256(&$self) -> Option<alloy_primitives::U256> {
+            $crate::any::delegate_transaction!(@call $self $target max_fee_per_blob_gas_u256())
+        }
+
+        #[inline]
+        fn priority_fee_or_price_u256(&$self) -> alloy_primitives::U256 {
+            $crate::any::delegate_transaction!(@call $self $target priority_fee_or_price_u256())
+        }
+
+        #[inline]
+        fn effective_gas_price_u256(&$self, base_fee: Option<u64>) -> alloy_primitives::U256 {
+            $crate::any::delegate_transaction!(@call $self $target effective_gas_price_u256(base_fee))
+        }
+
+        #[inline]
+        fn effective_tip_per_gas_u256(&$self, base_fee: u64) -> Option<alloy_primitives::U256> {
+            $crate::any::delegate_transaction!(@call $self $target effective_tip_per_gas_u256(base_fee))
+        }
+
+        #[inline]
+        fn frame_transaction(&$self) -> Option<&alloy_consensus::TxEip8141> {
+            $crate::any::delegate_transaction!(@call $self $target frame_transaction())
+        }
+
+        #[inline]
         fn is_dynamic_fee(&$self) -> bool {
             $crate::any::delegate_transaction!(@call $self $target is_dynamic_fee())
         }
