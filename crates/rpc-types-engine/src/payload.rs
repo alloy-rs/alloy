@@ -2121,7 +2121,7 @@ impl ssz::Decode for BlobsBundleV2 {
 
         let BlobsBundleRaw { commitments, proofs, blobs: blob_bytes } = raw;
         let mut blobs = Vec::with_capacity(blob_count);
-        for chunk in blob_bytes.chunks_exact(BYTES_PER_BLOB) {
+        for chunk in blob_bytes.as_chunks::<BYTES_PER_BLOB>().0 {
             // Copy straight into the blob. Keep the 128 KiB value out of `Result`/`Option`.
             let mut blob = Blob::ZERO;
             blob.as_mut_slice().copy_from_slice(chunk);
@@ -4357,9 +4357,7 @@ mod tests {
     #[test]
     #[cfg(feature = "ssz")]
     fn ssz_blobsbundlev2_roundtrip() {
-        let mut blobs = Vec::with_capacity(2);
-        blobs.push(Blob::repeat_byte(0x11));
-        blobs.push(Blob::repeat_byte(0x22));
+        let blobs = vec![Blob::repeat_byte(0x11), Blob::repeat_byte(0x22)];
         let commitments = vec![Bytes48::repeat_byte(0x31), Bytes48::repeat_byte(0x32)];
         let mut proofs = vec![Bytes48::repeat_byte(0x41); CELLS_PER_EXT_BLOB];
         proofs.extend(vec![Bytes48::repeat_byte(0x42); CELLS_PER_EXT_BLOB]);
@@ -4376,7 +4374,7 @@ mod tests {
         assert_eq!(decoded.blobs[0].as_slice(), blobs_bundle_v2.blobs[0].as_slice());
         assert_eq!(decoded.blobs[1].as_slice(), blobs_bundle_v2.blobs[1].as_slice());
 
-        let cloned = blobs_bundle_v2.clone();
+        let cloned = blobs_bundle_v2;
         let decoded_clone: BlobsBundleV2 =
             ssz::Decode::from_ssz_bytes(&ssz::Encode::as_ssz_bytes(&cloned)).unwrap();
         assert_eq!(decoded_clone, cloned);
