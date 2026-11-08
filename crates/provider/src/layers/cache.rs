@@ -5,10 +5,10 @@ use crate::{
     PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
     ProviderCall, ProviderLayer, RootProvider, RpcWithBlock, SendableTx,
 };
-use alloy_eips::{eip7928::BlockAccessList, BlockId};
+use alloy_eips::{eip7928::BlockAccessList, BlockId, BlockNumHash};
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::Network;
-use alloy_network_primitives::TransactionResponse;
+use alloy_network_primitives::{ReceiptResponse, TransactionResponse};
 use alloy_primitives::{
     keccak256, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256,
     U128, U256, U64,
@@ -298,7 +298,7 @@ where
             if let Some(ref tx) = result {
                 // Pending transactions can transition to an included state with additional fields
                 // (e.g., block hash/number). Caching pending snapshots can hide these updates.
-                if tx.block_hash_num().is_some() {
+                if is_sealed(tx.block_hash_num()) {
                     let json_str = serde_json::to_string(tx).map_err(TransportErrorKind::custom)?;
                     let hash = req.params_hash()?;
                     let _ = cache.put(hash, json_str);
@@ -354,7 +354,7 @@ where
         ProviderCall::BoxedFuture(Box::pin(async move {
             let result = call.await?;
 
-            if let Some(ref receipt) = result {
+            if let Some(receipt) = result.as_ref().filter(|r| is_sealed(r.block_hash_num())) {
                 let json_str =
                     serde_json::to_string(receipt).map_err(TransportErrorKind::custom)?;
                 let hash = req.params_hash()?;
@@ -748,6 +748,15 @@ where
     fn transaction_request(&self) -> N::TransactionRequest {
         self.inner.transaction_request()
     }
+}
+
+/// Returns whether a transaction or receipt in this block can be cached.
+///
+/// Pending responses have no block yet, and preconfirmed ones reference a block that is not sealed
+/// yet (zero block hash). Both can still change, so caching them would keep serving a stale or
+/// revoked snapshot.
+fn is_sealed(block: Option<BlockNumHash>) -> bool {
+    block.is_some_and(|block| !block.hash.is_zero())
 }
 
 /// Internal type to handle different types of requests and generating their param hashes.
@@ -1298,11 +1307,20 @@ mod tests {
         )
         .unwrap();
 
+        // Preconfirmed in the next block, which isn't sealed yet.
+        let mut preconfirmed_tx = mined_tx.clone();
+        preconfirmed_tx.block_hash = Some(B256::ZERO);
+
         asserter.push_success(&Some(pending_tx.clone()));
+        asserter.push_success(&Some(preconfirmed_tx.clone()));
         asserter.push_success(&Some(mined_tx.clone()));
 
         let first = provider.get_transaction_by_hash(tx_hash).await.unwrap();
         assert_eq!(first, Some(pending_tx));
+        assert!(shared_cache.get(&cache_key).is_none());
+
+        let preconfirmed = provider.get_transaction_by_hash(tx_hash).await.unwrap();
+        assert_eq!(preconfirmed, Some(preconfirmed_tx));
         assert!(shared_cache.get(&cache_key).is_none());
 
         let second = provider.get_transaction_by_hash(tx_hash).await.unwrap();
@@ -1389,16 +1407,29 @@ mod tests {
         )
         .unwrap();
 
+        // A preconfirmation receipt for a block that isn't sealed yet can still be revoked.
+        let mut preconfirmed_receipt = receipt.clone();
+        preconfirmed_receipt.block_hash = Some(B256::ZERO);
+
         asserter.push_success(&Option::<TransactionReceipt>::None);
+        asserter.push_success(&Some(preconfirmed_receipt.clone()));
         asserter.push_success(&Some(receipt.clone()));
 
         let first = provider.get_transaction_receipt(tx_hash).await.unwrap();
         assert_eq!(first, None);
         assert!(shared_cache.get(&cache_key).is_none());
 
+        let preconfirmed = provider.get_transaction_receipt(tx_hash).await.unwrap();
+        assert_eq!(preconfirmed, Some(preconfirmed_receipt));
+        assert!(shared_cache.get(&cache_key).is_none());
+
         let second = provider.get_transaction_receipt(tx_hash).await.unwrap();
-        assert_eq!(second, Some(receipt));
+        assert_eq!(second, Some(receipt.clone()));
         assert!(shared_cache.get(&cache_key).is_some());
+
+        // Served from the cache.
+        let third = provider.get_transaction_receipt(tx_hash).await.unwrap();
+        assert_eq!(third, Some(receipt));
     }
 
     #[tokio::test]
