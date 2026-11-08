@@ -116,18 +116,18 @@ pub fn calc_next_block_base_fee(
     match gas_used.cmp(&gas_target) {
         core::cmp::Ordering::Equal => base_fee,
         core::cmp::Ordering::Greater => {
-            // Calculate the increase in base fee based on the formula defined by EIP-1559.
-            // Use a saturating add to mirror the saturating subtraction in the decrease branch:
-            // `base_fee` and the computed increase are both valid `u64`s, but their sum can exceed
-            // `u64::MAX` (e.g. a congested block with a base fee near `u64::MAX`, or aggressive
-            // custom `BaseFeeParams`), which would panic in debug builds and silently wrap in
-            // release builds.
-            base_fee.saturating_add(core::cmp::max(
-                // Ensure a minimum increase of 1.
+            // Calculate the increase in base fee based on the formula defined by EIP-1559, ensuring
+            // a minimum increase of 1.
+            let increase = core::cmp::max(
                 1,
                 base_fee as u128 * (gas_used - gas_target) as u128
                     / (gas_target as u128 * base_fee_params.max_change_denominator),
-            ) as u64)
+            );
+            // Saturate instead of overflowing, mirroring the saturating decrease branch. Both the
+            // increase (when `gas_used` far exceeds `gas_target`) and the sum (with a base fee near
+            // `u64::MAX`) can exceed `u64::MAX`, which would otherwise truncate or wrap to a
+            // garbage-low base fee in release builds and panic in debug builds.
+            base_fee.saturating_add(u64::try_from(increase).unwrap_or(u64::MAX))
         }
         core::cmp::Ordering::Less => base_fee.saturating_sub(
             (base_fee as u128 * (gas_target - gas_used) as u128
@@ -284,5 +284,13 @@ mod tests {
         // garbage-low base fee in release builds. It must saturate at `u64::MAX` instead, mirroring
         // the saturating decrease branch.
         assert_eq!(calc_next_block_base_fee(30_000_000, 30_000_000, u64::MAX, p), u64::MAX);
+    }
+
+    #[test]
+    fn next_base_fee_saturates_on_oversized_increase() {
+        let p = BaseFeeParams::ethereum();
+        // gas_target = 2 / 2 = 1, so the increase is 16 * 2^63 / 8 = 2^64, one past `u64::MAX`.
+        // Truncating it with `as u64` gives 0 and leaves the base fee unchanged at 16.
+        assert_eq!(calc_next_block_base_fee((1 << 63) + 1, 2, 16, p), u64::MAX);
     }
 }
