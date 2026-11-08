@@ -3,8 +3,8 @@ use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
-use std::time::Duration;
-use tokio::time::{sleep, Instant};
+use std::{io, time::Duration};
+use tokio::time::{sleep, timeout, Instant};
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
@@ -108,9 +108,10 @@ impl WsConnect {
 
     /// Sets the keepalive ping interval.
     ///
-    /// A ping is sent if no other messages have been sent within this interval.
-    /// If the server does not respond with a pong before the next ping is due,
-    /// the connection is considered dead and will be closed.
+    /// A ping is sent if no message has been received from the server within this
+    /// interval. If nothing is received before the next ping is due, or a single
+    /// write takes longer than two intervals, the connection is considered dead
+    /// and will be closed.
     ///
     /// Default is 10 seconds.
     pub const fn with_keepalive_interval(mut self, keepalive_interval: Duration) -> Self {
@@ -197,8 +198,11 @@ impl WsBackend<TungsteniteStream> {
     }
 
     /// Send a message to the server.
+    ///
+    /// Fails with [`io::ErrorKind::TimedOut`] if the message can't be written within two
+    /// keepalive intervals.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), tungstenite::Error> {
-        self.socket.send(Message::Text(String::from(Box::<str>::from(msg)).into())).await
+        self.write(Message::Text(String::from(Box::<str>::from(msg)).into())).await
     }
 
     /// Spawn a new backend task.
@@ -220,6 +224,8 @@ impl WsBackend<TungsteniteStream> {
                 // connection that will never answer. Whatever was already
                 // received, such as a pong held back by a burst of dispatches,
                 // is handled before the keepalive checks for a missed pong.
+                // Writes are bounded, since nothing else runs while one is
+                // pending.
                 tokio::select! {
                     biased;
                     // we've received a new dispatch, so we send it via
@@ -273,7 +279,7 @@ impl WsBackend<TungsteniteStream> {
                         }
                         // Reset the keepalive timer.
                         keepalive.set(sleep(self.keepalive_interval));
-                        if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
+                        if let Err(err) = self.write(Message::Ping(Default::default())).await {
                             error!(%err, "WS connection error");
                             errored = true;
                             break
@@ -290,11 +296,30 @@ impl WsBackend<TungsteniteStream> {
         };
         fut.spawn_task()
     }
+
+    /// Writes a message to the socket, giving up after two keepalive intervals.
+    ///
+    /// Nothing is read and the keepalive doesn't run while a write is pending. Once a peer that
+    /// stopped reading has filled the socket buffers, the write would otherwise only fail when the
+    /// OS gives up on the connection.
+    async fn write(&mut self, msg: Message) -> Result<(), tungstenite::Error> {
+        timeout(self.keepalive_interval.saturating_mul(2), self.socket.send(msg))
+            .await
+            .unwrap_or_else(|_| {
+                Err(io::Error::new(io::ErrorKind::TimedOut, "write timed out").into())
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_json_rpc::{Id, Request};
+    use std::net::SocketAddr;
+    use tokio::{
+        net::TcpListener,
+        sync::{mpsc, oneshot},
+    };
 
     #[test]
     fn auth_from_url() {
@@ -315,23 +340,7 @@ mod tests {
     /// must still notice the missing pong and reconnect.
     #[tokio::test]
     async fn missed_pong_detected_under_steady_outbound_traffic() {
-        use alloy_json_rpc::{Id, Request};
-        use tokio::{net::TcpListener, sync::mpsc, time::timeout};
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let (accepted_tx, mut accepted) = mpsc::unbounded_channel();
-        tokio::spawn(async move {
-            let mut silent = Vec::new();
-            loop {
-                let (stream, _) = listener.accept().await.unwrap();
-                let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
-                // Hold the socket open without ever reading from it.
-                silent.push(ws);
-                let _ = accepted_tx.send(());
-            }
-        });
-
+        let (addr, mut accepted) = silent_server().await;
         let frontend = WsConnect::new(format!("ws://{addr}"))
             .with_keepalive_interval(Duration::from_millis(100))
             .into_service()
@@ -346,7 +355,7 @@ mod tests {
                 id += 1;
                 let req = Request::new("eth_blockNumber", Id::Number(id), ()).serialize().unwrap();
                 tokio::spawn(frontend.send(req));
-                tokio::time::sleep(Duration::from_millis(20)).await;
+                sleep(Duration::from_millis(20)).await;
             }
         });
 
@@ -363,13 +372,6 @@ mod tests {
     /// one, or a healthy connection is dropped.
     #[tokio::test]
     async fn pong_received_during_outbound_burst_keeps_connection() {
-        use alloy_json_rpc::{Id, Request};
-        use tokio::{
-            net::TcpListener,
-            sync::{mpsc, oneshot},
-            time::timeout,
-        };
-
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let (accepted_tx, mut accepted) = mpsc::unbounded_channel();
@@ -397,14 +399,15 @@ mod tests {
         accepted.recv().await.unwrap();
 
         // After the first ping, queue more than the socket buffers hold while the server isn't
-        // reading, so dispatching stalls past the keepalive deadline.
-        tokio::time::sleep(keepalive * 3 / 2).await;
+        // reading, so dispatching stalls past the keepalive deadline, but for less than the two
+        // intervals a single write may take.
+        sleep(keepalive * 3 / 2).await;
         let payload = "0".repeat(32 * 1024);
         for id in 0..1024 {
             let req = Request::new("eth_call", Id::Number(id), [&payload]).serialize().unwrap();
             tokio::spawn(frontend.send(req));
         }
-        tokio::time::sleep(keepalive * 2).await;
+        sleep(keepalive).await;
         start_reading.send(()).unwrap();
 
         assert!(
@@ -418,5 +421,51 @@ mod tests {
         let ws =
             WsConnect::new("wss://user:pass@example.com").with_auth(Authorization::bearer("tok"));
         assert_eq!(ws.auth(), Some(&Authorization::bearer("tok")));
+    }
+
+    /// Once the socket buffers are full, a write to a server that stopped reading never completes,
+    /// and the keepalive can't run while it is pending. The write must time out instead.
+    #[tokio::test]
+    async fn blocked_write_to_silent_server_times_out() {
+        let (addr, mut accepted) = silent_server().await;
+        let keepalive = Duration::from_millis(500);
+        let frontend = WsConnect::new(format!("ws://{addr}"))
+            .with_keepalive_interval(keepalive)
+            .into_service()
+            .await
+            .unwrap();
+        accepted.recv().await.unwrap();
+
+        // Queue more than the socket buffers hold, so a write blocks before the first ping.
+        let payload = "0".repeat(32 * 1024);
+        for id in 0..1024 {
+            let req = Request::new("eth_call", Id::Number(id), [&payload]).serialize().unwrap();
+            tokio::spawn(frontend.send(req));
+        }
+
+        assert!(
+            matches!(timeout(keepalive * 4, accepted.recv()).await, Ok(Some(()))),
+            "a write that never completes must close the connection"
+        );
+    }
+
+    /// Spawns a server that completes the handshake and then never reads from the socket.
+    ///
+    /// Returns its address and a receiver notified on every accepted connection.
+    async fn silent_server() -> (SocketAddr, mpsc::UnboundedReceiver<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (accepted_tx, accepted) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            let mut silent = Vec::new();
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+                // Hold the socket open without ever reading from it.
+                silent.push(ws);
+                let _ = accepted_tx.send(());
+            }
+        });
+        (addr, accepted)
     }
 }
