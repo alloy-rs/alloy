@@ -28,6 +28,14 @@ pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
     async fn on_send_failure(&self, address: Address, nonce: u64, error: &TransportError) {
         let _ = (address, nonce, error);
     }
+
+    /// Releases a nonce this manager handed out that won't be used, because filling its
+    /// transaction failed before it was sent.
+    ///
+    /// This is a no-op by default.
+    async fn release(&self, address: Address, nonce: u64) {
+        let _ = (address, nonce);
+    }
 }
 
 /// This [`NonceManager`] fetches the pending transaction count on every request and does not
@@ -56,13 +64,14 @@ impl NonceManager for SimpleNonceManager {
 /// then reserves subsequent nonces locally as transactions are filled. Clones share the same
 /// per-address state, so they can allocate distinct nonces to concurrent requests.
 ///
-/// The local nonce advances before broadcast. When sending fails, see
-/// [`NonceManager::on_send_failure`], a nonce whose transaction the node definitively rejected for
-/// a reason unrelated to the nonce is released and handed out again, lowest first. After a nonce
-/// error, or an error that leaves it unknown whether the node accepted the transaction (e.g. a
-/// transport failure), the account is reset and its nonce is fetched again on the next request. A
-/// chain reorganization or a transaction sent through another manager can still leave it out of
-/// sync with the node until a send fails with a nonce error.
+/// The local nonce advances before broadcast. A nonce is released and handed out again, lowest
+/// first, if filling its transaction fails ([`NonceManager::release`]), or if sending it fails
+/// with an error that shows the transaction never reached the node or was definitively rejected
+/// for a reason unrelated to the nonce ([`NonceManager::on_send_failure`]). After a nonce error,
+/// or an error that leaves it unknown whether the node accepted the transaction (e.g. a transport
+/// failure), the account is reset and its nonce is fetched again on the next request. A chain
+/// reorganization or a transaction sent through another manager can still leave it out of sync
+/// with the node until a send fails with a nonce error.
 ///
 /// There is also an alternative implementation [`SimpleNonceManager`] that does not store the
 /// transaction count locally.
@@ -76,8 +85,27 @@ pub struct CachedNonceManager {
 struct AccountNonce {
     /// The next nonce to hand out, or `None` if it has to be fetched first.
     next: Option<u64>,
-    /// Nonces below `next` that were released after their transaction was rejected.
+    /// Nonces below `next` that were released because their transaction never reached the node or
+    /// was rejected.
     released: BTreeSet<u64>,
+}
+
+impl AccountNonce {
+    /// Makes the nonce available again, if it was handed out since the nonce was last fetched.
+    fn release(&mut self, address: Address, nonce: u64) {
+        // Only nonces below `next` have been handed out since the nonce was last fetched.
+        if self.next.is_some_and(|next| nonce < next) {
+            trace!(%address, nonce, "releasing nonce");
+            self.released.insert(nonce);
+        }
+    }
+}
+
+impl CachedNonceManager {
+    /// Returns the nonces tracked for the account, if it has been seen before.
+    fn account(&self, address: Address) -> Option<Arc<Mutex<AccountNonce>>> {
+        self.nonces.get(&address).map(|rm| Arc::clone(rm.value()))
+    }
 }
 
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
@@ -117,28 +145,30 @@ impl NonceManager for CachedNonceManager {
     }
 
     async fn on_send_failure(&self, address: Address, nonce: u64, error: &TransportError) {
-        let Some(account) = self.nonces.get(&address).map(|rm| Arc::clone(rm.value())) else {
-            return;
-        };
+        let Some(account) = self.account(address) else { return };
 
         let mut account = account.lock().await;
         if is_definitive_rejection(error) {
-            // Only nonces below `next` have been handed out since the nonce was last fetched.
-            if account.next.is_some_and(|next| nonce < next) {
-                trace!(%address, nonce, "releasing nonce");
-                account.released.insert(nonce);
-            }
+            account.release(address, nonce);
         } else {
             trace!(%address, nonce, %error, "resetting nonce");
             *account = AccountNonce::default();
         }
     }
+
+    async fn release(&self, address: Address, nonce: u64) {
+        if let Some(account) = self.account(address) {
+            account.lock().await.release(address, nonce);
+        }
+    }
 }
 
-/// Returns `true` if sending a transaction failed with an error that definitively rejects it for a
-/// reason unrelated to its nonce, so that its nonce was not used and can be handed out again.
+/// Returns `true` if sending a transaction failed with an error that shows it never reached the
+/// node or was definitively rejected for a reason unrelated to its nonce, so that its nonce was not
+/// used and can be handed out again.
 ///
-/// This is a JSON-RPC error response, unless:
+/// This is a local usage error, which means the request never left the process, or a JSON-RPC
+/// error response, unless:
 /// - its message is about the nonce (e.g. "nonce too low" or "already known"), which means the
 ///   local nonce is out of sync with the node;
 /// - it carries a transaction hash, which an [EIP-7966] `eth_sendRawTransactionSync` timeout
@@ -159,6 +189,10 @@ fn is_definitive_rejection(error: &TransportError) -> bool {
         "replacement transaction underpriced",
     ];
 
+    if error.is_local_usage_error() {
+        return true;
+    }
+
     let Some(payload) = error.as_error_resp() else { return false };
     let message = payload.message.to_lowercase();
     if NONCE_ERRORS.iter().any(|pattern| message.contains(pattern)) {
@@ -174,10 +208,11 @@ fn is_definitive_rejection(error: &TransportError) -> bool {
 ///
 /// - If the transaction request does not have a sender set, this layer will not fill nonces.
 /// - An explicit nonce is preserved and does not consult the manager.
-/// - If sending a transaction fails, the nonce this layer filled in is passed to
-///   [`NonceManager::on_send_failure`], which lets [`CachedNonceManager`] release or resynchronize
-///   it. Nonces reserved by direct [`FillProvider::fill`](crate::fillers::FillProvider::fill)
-///   calls, or by a fill that fails before sending (e.g. in gas estimation), are not reported.
+/// - If preparing another filler fails (e.g. gas estimation), the reserved nonce is passed to
+///   [`NonceManager::release`]. If sending a transaction fails, the nonce this layer filled in is
+///   passed to [`NonceManager::on_send_failure`]. This lets [`CachedNonceManager`] release or
+///   resynchronize it. Nonces reserved by direct
+///   [`FillProvider::fill`](crate::fillers::FillProvider::fill) calls are not released.
 /// - For concurrent sends from one address, reuse a provider or cloned [`CachedNonceManager`]. Two
 ///   independent cached managers can allocate conflicting nonces, while [`SimpleNonceManager`] does
 ///   not reserve nonces between concurrent requests.
@@ -244,8 +279,17 @@ impl<M: NonceManager> NonceFiller<M> {
     }
 }
 
+/// A nonce that a [`NonceFiller`] reserved for a sender in [`TxFiller::prepare`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct NonceReservation {
+    /// The sender the nonce was reserved for.
+    pub from: Address,
+    /// The reserved nonce.
+    pub nonce: u64,
+}
+
 impl<M: NonceManager, N: Network> TxFiller<N> for NonceFiller<M> {
-    type Fillable = u64;
+    type Fillable = NonceReservation;
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
         if tx.nonce().is_some() {
@@ -268,18 +312,23 @@ impl<M: NonceManager, N: Network> TxFiller<N> for NonceFiller<M> {
         P: Provider<N>,
     {
         let from = tx.from().expect("checked by 'ready()'");
-        self.nonce_manager.get_next_nonce(provider, from).await
+        let nonce = self.nonce_manager.get_next_nonce(provider, from).await?;
+        Ok(NonceReservation { from, nonce })
     }
 
     async fn fill(
         &self,
-        nonce: Self::Fillable,
+        reservation: Self::Fillable,
         mut tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
         if let Some(builder) = tx.as_mut_builder() {
-            builder.set_nonce(nonce);
+            builder.set_nonce(reservation.nonce);
         }
         Ok(tx)
+    }
+
+    async fn release(&self, reservation: Self::Fillable) {
+        self.nonce_manager.release(reservation.from, reservation.nonce).await;
     }
 
     async fn on_send_failure(&self, from: Address, nonce: u64, error: &TransportError) {
@@ -295,7 +344,7 @@ mod tests {
     use alloy_json_rpc::ErrorPayload;
     use alloy_network::NetworkTransactionBuilder;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, U256, U64};
+    use alloy_primitives::{address, bytes, U256, U64};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_transport::{mock::Asserter, TransportErrorKind};
@@ -479,6 +528,8 @@ mod tests {
             assert!(!is_definitive_rejection(&error_resp(message)), "{message}");
         }
 
+        assert!(is_definitive_rejection(&TransportError::local_usage_str("missing properties")));
+
         assert!(!is_definitive_rejection(&sync_send_timeout()));
         assert!(!is_definitive_rejection(&TransportErrorKind::custom_str("connection reset")));
         assert!(!is_definitive_rejection(&TransportError::deser_err(
@@ -515,9 +566,10 @@ mod tests {
         for nonce in 0..5 {
             assert_eq!(next_nonce(&manager, &provider).await, nonce);
         }
-        for nonce in [3, 1, 2] {
-            manager.on_send_failure(Address::ZERO, nonce, &rejection()).await;
-        }
+        // Released nonces are reused the same way after a failed fill or a failed send.
+        manager.release(Address::ZERO, 3).await;
+        manager.on_send_failure(Address::ZERO, 1, &rejection()).await;
+        manager.release(Address::ZERO, 2).await;
 
         for nonce in [1, 2, 3, 5] {
             assert_eq!(next_nonce(&manager, &provider).await, nonce);
@@ -558,6 +610,7 @@ mod tests {
         let manager = CachedNonceManager::default();
 
         manager.on_send_failure(Address::ZERO, 0, &rejection()).await;
+        manager.release(Address::ZERO, 0).await;
         assert!(manager.nonces.is_empty());
 
         asserter.push_success(&U64::from(0));
@@ -565,6 +618,7 @@ mod tests {
         assert_eq!(next_nonce(&manager, &provider).await, 1);
         for nonce in [2, 5] {
             manager.on_send_failure(Address::ZERO, nonce, &rejection()).await;
+            manager.release(Address::ZERO, nonce).await;
         }
         assert_eq!(next_nonce(&manager, &provider).await, 2);
 
@@ -614,6 +668,19 @@ mod tests {
         let receipt = provider.send_transaction_sync(transfer(U256::from(100))).await.unwrap();
         let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
         assert_eq!(tx.nonce(), 1);
+    }
+
+    #[tokio::test]
+    async fn failed_gas_estimation_releases_nonce() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        // Caches the nonce, so the next one is reserved before gas estimation fails.
+        send_with_nonce(&provider, 0).await;
+
+        // Init code that reverts makes `eth_estimateGas` fail.
+        let tx = TransactionRequest::default().with_deploy_code(bytes!("60006000fd"));
+        let err = provider.send_transaction(tx).await.unwrap_err();
+        assert!(err.to_string().contains("revert"), "{err}");
+        send_with_nonce(&provider, 1).await;
     }
 
     #[tokio::test]

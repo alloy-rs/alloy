@@ -6,7 +6,7 @@ use crate::{
 use alloy_network::Network;
 use alloy_primitives::Address;
 use alloy_transport::{TransportError, TransportResult};
-use futures::try_join;
+use futures::join;
 
 /// A filler that can fill in a [`TransactionRequest`] with additional information by joining two
 /// [`TxFiller`]s.
@@ -15,7 +15,8 @@ use futures::try_join;
 ///
 /// Ready fillers run [`TxFiller::prepare`] concurrently on the same transaction request.
 /// Their prepared values are then applied by [`TxFiller::fill`] from left to right.
-/// Both preparations finish before either [`TxFiller::fill`] is called.
+/// Both preparations finish before either [`TxFiller::fill`] is called. If only one of them fails,
+/// the other's prepared value is passed to [`TxFiller::release`].
 /// [`TxFiller::fill_sync`] also runs from left to right.
 ///
 /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
@@ -131,7 +132,24 @@ where
     where
         P: Provider<N>,
     {
-        try_join!(self.prepare_left(provider, tx), self.prepare_right(provider, tx))
+        // Let both sides finish, so that one side's prepared value can be released if the other
+        // fails.
+        match join!(self.prepare_left(provider, tx), self.prepare_right(provider, tx)) {
+            (Ok(left), Ok(right)) => Ok((left, right)),
+            (Ok(left), Err(err)) => {
+                if let Some(left) = left {
+                    self.left.release(left).await;
+                }
+                Err(err)
+            }
+            (Err(err), Ok(right)) => {
+                if let Some(right) = right {
+                    self.right.release(right).await;
+                }
+                Err(err)
+            }
+            (Err(err), Err(_)) => Err(err),
+        }
     }
 
     async fn fill(
@@ -146,6 +164,15 @@ where
             tx = self.right.fill(to_fill, tx).await?;
         };
         Ok(tx)
+    }
+
+    async fn release(&self, fillable: Self::Fillable) {
+        if let Some(left) = fillable.0 {
+            self.left.release(left).await;
+        }
+        if let Some(right) = fillable.1 {
+            self.right.release(right).await;
+        }
     }
 
     async fn prepare_call(
@@ -183,5 +210,102 @@ where
 
     fn layer(&self, inner: P) -> Self::Provider {
         FillProvider::new(inner, self.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RootProvider;
+    use alloy_network::Ethereum;
+    use alloy_rpc_client::RpcClient;
+    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_transport::{mock::Asserter, TransportErrorKind};
+    use std::sync::{Arc, Mutex};
+
+    /// A filler that prepares its id, or fails with it, and records the ids it releases.
+    #[derive(Clone, Debug)]
+    struct ReservingFiller {
+        id: u64,
+        fails: bool,
+        released: Arc<Mutex<Vec<u64>>>,
+    }
+
+    impl TxFiller for ReservingFiller {
+        type Fillable = u64;
+
+        fn status(&self, _tx: &TransactionRequest) -> FillerControlFlow {
+            FillerControlFlow::Ready
+        }
+
+        fn fill_sync(&self, _tx: &mut SendableTx<Ethereum>) {}
+
+        async fn prepare<P: Provider>(
+            &self,
+            _provider: &P,
+            _tx: &TransactionRequest,
+        ) -> TransportResult<u64> {
+            if self.fails {
+                return Err(TransportErrorKind::custom_str(&format!("filler {} failed", self.id)));
+            }
+            Ok(self.id)
+        }
+
+        async fn fill(
+            &self,
+            _id: u64,
+            tx: SendableTx<Ethereum>,
+        ) -> TransportResult<SendableTx<Ethereum>> {
+            Ok(tx)
+        }
+
+        async fn release(&self, id: u64) {
+            self.released.lock().unwrap().push(id);
+        }
+    }
+
+    #[tokio::test]
+    async fn releases_prepared_side_if_other_fails() {
+        let provider = RootProvider::<Ethereum>::new(RpcClient::mocked(Asserter::new()));
+        let tx = TransactionRequest::default();
+        let released = Arc::new(Mutex::new(Vec::new()));
+        let filler = |id, fails| ReservingFiller { id, fails, released: released.clone() };
+        let take_released = || std::mem::take(&mut *released.lock().unwrap());
+
+        let err = JoinFill::new(filler(1, false), filler(2, true))
+            .prepare(&provider, &tx)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("filler 2 failed"), "{err}");
+        assert_eq!(take_released(), [1]);
+
+        let err = JoinFill::new(filler(1, true), filler(2, false))
+            .prepare(&provider, &tx)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("filler 1 failed"), "{err}");
+        assert_eq!(take_released(), [2]);
+
+        // Nested joins release every side that prepared.
+        let err = JoinFill::new(filler(1, false), JoinFill::new(filler(2, false), filler(3, true)))
+            .prepare(&provider, &tx)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("filler 3 failed"), "{err}");
+        assert_eq!(take_released(), [2, 1]);
+
+        // If both sides fail, the left error is returned and nothing is released.
+        let err = JoinFill::new(filler(1, true), filler(2, true))
+            .prepare(&provider, &tx)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("filler 1 failed"), "{err}");
+        assert!(take_released().is_empty());
+
+        let join = JoinFill::new(filler(1, false), filler(2, false));
+        join.release((Some(1), Some(2))).await;
+        assert_eq!(take_released(), [1, 2]);
+        join.release((None, Some(2))).await;
+        assert_eq!(take_released(), [2]);
     }
 }

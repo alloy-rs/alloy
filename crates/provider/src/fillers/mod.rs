@@ -35,7 +35,9 @@ mod wallet;
 pub use wallet::WalletFiller;
 
 mod nonce;
-pub use nonce::{CachedNonceManager, NonceFiller, NonceManager, SimpleNonceManager};
+pub use nonce::{
+    CachedNonceManager, NonceFiller, NonceManager, NonceReservation, SimpleNonceManager,
+};
 
 mod gas;
 pub use gas::{
@@ -229,6 +231,14 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         fillable: Self::Fillable,
         tx: SendableTx<N>,
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>);
+
+    /// Called with a prepared fillable that won't be filled because preparing another filler
+    /// failed, so that fillers that reserved state in [`TxFiller::prepare`] can release it.
+    fn release(&self, fillable: Self::Fillable) -> impl_future!(<Output = ()>) {
+        drop(fillable);
+        // This is a no-op by default
+        futures::future::ready(())
+    }
 
     /// Fills in the transaction request and try to convert it to an envelope.
     fn fill_envelope(
@@ -1171,6 +1181,56 @@ mod tests {
             tx.gas = Some(123);
             Err(RpcError::ErrorResp(alloy_json_rpc::ErrorPayload::invalid_request()))
         }
+    }
+
+    /// A filler that is always missing a property.
+    #[derive(Clone, Debug)]
+    struct MissingFiller;
+
+    impl TxFiller for MissingFiller {
+        type Fillable = ();
+
+        fn status(&self, _tx: &TransactionRequest) -> FillerControlFlow {
+            FillerControlFlow::missing("MissingFiller", vec!["property"])
+        }
+
+        fn fill_sync(&self, _tx: &mut SendableTx<Ethereum>) {}
+
+        async fn prepare<P: Provider>(
+            &self,
+            _provider: &P,
+            _tx: &TransactionRequest,
+        ) -> TransportResult<()> {
+            Ok(())
+        }
+
+        async fn fill(
+            &self,
+            (): (),
+            tx: SendableTx<Ethereum>,
+        ) -> TransportResult<SendableTx<Ethereum>> {
+            Ok(tx)
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_properties_release_filled_nonce() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let inner =
+            RootProvider::<Ethereum>::new(alloy_rpc_client::RpcClient::mocked(asserter.clone()));
+        let filler = JoinFill::new(NonceFiller::<CachedNonceManager>::default(), MissingFiller);
+        let provider = FillProvider::new(inner, filler);
+        let from = Address::with_last_byte(1);
+        asserter.push_success(&U64::from(5));
+
+        let err = provider.send_transaction(TransactionRequest::default().with_from(from)).await;
+        let err = err.unwrap_err();
+        assert!(err.to_string().contains("missing properties"), "{err}");
+
+        // The nonce never left the process, so it's handed out again without a refetch.
+        let manager = provider.filler().left().nonce_manager();
+        assert_eq!(manager.get_next_nonce(provider.inner(), from).await.unwrap(), 5);
+        assert_eq!(asserter.requests().len(), 1);
     }
 
     #[tokio::test]
