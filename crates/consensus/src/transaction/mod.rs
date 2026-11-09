@@ -117,10 +117,13 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// For legacy fee transactions this is `gas_price`.
     ///
     /// This is also commonly referred to as the "Gas Fee Cap".
+    ///
+    /// [`TxEip8141`] derives a compatibility estimate from its shared total fee budget;
+    /// it has no signed per-gas fee cap. See that type's documentation for pricing limits.
     fn max_fee_per_gas(&self) -> u128;
 
-    /// For dynamic fee transactions returns the Priority fee the caller is paying to the block
-    /// author.
+    /// For dynamic fee transactions returns the maximum priority fee per gas the caller is willing
+    /// to pay to the block author.
     ///
     /// This will return `None` for legacy fee transactions
     fn max_priority_fee_per_gas(&self) -> Option<u128>;
@@ -144,12 +147,20 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// Returns the effective gas price for the given base fee.
     ///
     /// If the transaction is a legacy fee transaction, the gas price is returned.
+    ///
+    /// Implementations with shared fee budgets, such as [`TxEip8141`], can only provide a
+    /// compatibility estimate here. This interface has no blob base fee or charged gas input;
+    /// it does not in general determine protocol `GASPRICE` or a realized receipt price.
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128;
 
     /// Returns the effective tip for this transaction.
     ///
     /// For dynamic fee transactions: `min(max_fee_per_gas - base_fee, max_priority_fee_per_gas)`.
     /// For legacy fee transactions: `gas_price - base_fee`.
+    ///
+    /// Returns `None` if the per-gas cap is below the base fee. For [`TxEip8141`] this is a
+    /// compatibility estimate ignoring blob charges and settlement gas usage; `Some` does not
+    /// establish affordability of the shared budget at the block's base fees.
     fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128> {
         let base_fee = base_fee as u128;
 
