@@ -4142,6 +4142,7 @@ mod tests {
     use alloy_consensus::TxEnvelope;
     use alloy_primitives::{b256, hex};
     use similar_asserts::assert_eq;
+    use std::path::PathBuf;
 
     #[test]
     fn convert_empty_bundle() {
@@ -5244,8 +5245,6 @@ mod tests {
 
     #[test]
     fn test_payload_to_block_with_sidecar_raw() {
-        use std::path::PathBuf;
-
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/payload");
         let dir = std::fs::read_dir(path).expect("Unable to read payload folder");
 

@@ -11,6 +11,7 @@ mod expand;
 mod parse;
 mod serde;
 
+use darling::FromDeriveInput;
 use expand::Expander;
 use parse::{EnvelopeArgs, GroupedVariants};
 use proc_macro::TokenStream;
@@ -71,7 +72,9 @@ use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Ident};
 ///   generated typed-transaction enum. By default, the macro syntactically unwraps `Signed<T>` and
 ///   `Sealed<T>` to `T`; other field types are reused unchanged.
 /// - A variant's `#[serde(...)]` options are forwarded to the macro's internal representation when
-///   Serde generation is enabled.
+///   Serde generation is enabled. That representation serializes by reference, so `with` and
+///   `serialize_with` functions are called with a `&&T` for a field of type `T`; a generic function
+///   must therefore accept the reference type.
 ///
 /// # Generated API
 ///
@@ -91,8 +94,6 @@ pub fn derive_transaction_envelope(input: TokenStream) -> TokenStream {
 
 /// Expand the transaction envelope derive macro.
 fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::TokenStream, Error> {
-    use darling::FromDeriveInput;
-
     // Parse the input with darling
     let args = EnvelopeArgs::from_derive_input(&input)
         .map_err(|e| Error::new_spanned(&input.ident, e.to_string()))?;

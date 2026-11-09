@@ -371,6 +371,14 @@ impl TransactionRequest {
         self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
     }
 
+    /// Returns true if `gas_price` is set together with `max_fee_per_gas` or
+    /// `max_priority_fee_per_gas`.
+    ///
+    /// Checks field presence, so zero-valued fee fields also conflict.
+    pub const fn has_conflicting_fee_fields(&self) -> bool {
+        self.gas_price.is_some() && self.has_eip1559_fields()
+    }
+
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
     /// effect otherwise.
     pub fn populate_blob_hashes(&mut self) {
@@ -1749,6 +1757,7 @@ mod tests {
     use super::*;
     use crate::Authorization;
     use alloy_consensus::BlobTransactionSidecarEip7594;
+    use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, BlobTransactionSidecar, Bytes48};
     use alloy_primitives::b256;
     #[cfg(feature = "serde")]
     use alloy_serde::WithOtherFields;
@@ -1982,8 +1991,6 @@ mod tests {
 
         // EIP-4844 with sidecar
         {
-            use alloy_eips::eip4844::{Blob, BlobTransactionSidecar};
-
             // Positive case
             let sidecar =
                 BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
@@ -2044,8 +2051,6 @@ mod tests {
 
         // EIP-4844 with EIP-7594 sidecar
         {
-            use alloy_eips::eip4844::Blob;
-
             // Positive case
             let sidecar = BlobTransactionSidecarEip7594::new(
                 vec![Blob::repeat_byte(0xFA)],
@@ -2223,8 +2228,6 @@ mod tests {
 
     #[test]
     fn set_blob_sidecar_7594_populates_versioned_hashes() {
-        use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, Bytes48};
-
         // Create a sidecar with a known commitment
         let commitment = Bytes48::repeat_byte(0x42);
         let sidecar = BlobTransactionSidecarEip7594::new(

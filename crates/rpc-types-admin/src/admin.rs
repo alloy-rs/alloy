@@ -237,10 +237,20 @@ pub struct PeerEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub msg_size: Option<u32>,
     /// The local endpoint of the TCP connection.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "local",
+        alias = "local_address",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub local_address: Option<SocketAddr>,
     /// The remote endpoint of the TCP connection.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "remote",
+        alias = "remote_address",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub remote_address: Option<SocketAddr>,
 }
 
@@ -519,6 +529,28 @@ mod tests {
             serde_json::from_str(&serialized).expect("Deserialization failed");
 
         assert_eq!(peer_info, deserialized);
+    }
+
+    #[test]
+    fn deserialize_geth_peer_event() {
+        // geth's `p2p.PeerEvent` uses the `local` and `remote` keys
+        let response = r#"{
+            "type":"msgrecv",
+            "peer":"df6f8bc331005962c2ef1f5236486a753bc6b2ddb5ef04370757999d1ca832d4",
+            "protocol":"eth",
+            "msg_code":16,
+            "msg_size":1024,
+            "local":"[::1]:30304",
+            "remote":"[::1]:60948"
+        }"#;
+        let peer_event: PeerEvent = serde_json::from_str(response).unwrap();
+
+        assert_eq!(peer_event.local_address, Some("[::1]:30304".parse().unwrap()));
+        assert_eq!(peer_event.remote_address, Some("[::1]:60948".parse().unwrap()));
+        assert_eq!(
+            serde_json::to_value(&peer_event).unwrap(),
+            serde_json::from_str::<serde_json::Value>(response).unwrap()
+        );
     }
 
     #[test]

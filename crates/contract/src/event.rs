@@ -546,6 +546,7 @@ mod tests {
     use super::*;
     use alloy_network::EthereumWallet;
     use alloy_primitives::U256;
+    use alloy_provider::ext::AnvilApi;
     use alloy_rpc_types_eth::Header;
     use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
@@ -792,8 +793,6 @@ mod tests {
     /// when events are spread across a range requiring multiple chunks.
     #[tokio::test]
     async fn chunked_query_collects_and_orders_logs() {
-        use alloy_provider::ext::AnvilApi;
-
         let _ = tracing_subscriber::fmt::try_init();
 
         let anvil = alloy_node_bindings::Anvil::new().spawn();
@@ -912,8 +911,6 @@ mod tests {
     /// Verifies that a chunked query resolves `finalized`, `safe`, and `latest` separately
     #[tokio::test]
     async fn chunked_query_resolves_block_tags() {
-        use alloy_provider::ext::AnvilApi;
-
         let anvil = alloy_node_bindings::Anvil::new().spawn();
 
         let pk: PrivateKeySigner =

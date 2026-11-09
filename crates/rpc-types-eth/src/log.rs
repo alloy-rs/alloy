@@ -4,7 +4,7 @@ use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 
 /// Ethereum Log emitted by a transaction
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Log<T = LogData> {
@@ -205,6 +205,55 @@ impl<T> AsMut<T> for Log<T> {
 impl<L> From<Log<L>> for alloy_primitives::Log<L> {
     fn from(value: Log<L>) -> Self {
         value.into_inner()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Log<T> {
+    /// Deserializes through a single flatten buffer: `alloy_primitives::Log<T>` would buffer the
+    /// whole object a second time to flatten `data: T`.
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "Log", rename_all = "camelCase")]
+        struct Helper<T> {
+            address: Address,
+            #[serde(flatten)]
+            data: T,
+            block_hash: Option<BlockHash>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            block_number: Option<u64>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            block_timestamp: Option<u64>,
+            transaction_hash: Option<TxHash>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            transaction_index: Option<u64>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            log_index: Option<u64>,
+            #[serde(default)]
+            removed: bool,
+        }
+
+        let Helper {
+            address,
+            data,
+            block_hash,
+            block_number,
+            block_timestamp,
+            transaction_hash,
+            transaction_index,
+            log_index,
+            removed,
+        } = Helper::deserialize(deserializer)?;
+        Ok(Self {
+            inner: alloy_primitives::Log { address, data },
+            block_hash,
+            block_number,
+            block_timestamp,
+            transaction_hash,
+            transaction_index,
+            log_index,
+            removed,
+        })
     }
 }
 

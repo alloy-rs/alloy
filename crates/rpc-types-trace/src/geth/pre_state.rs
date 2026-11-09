@@ -266,6 +266,10 @@ pub struct PreStateConfig {
     /// If `disableStorage` is set to true, the response frame will not include storage.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_storage: Option<bool>,
+    /// If `includeEmpty` is set to true, the response frame also includes accounts that were
+    /// empty before the transaction. Geth rejects this option together with `diffMode`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_empty: Option<bool>,
 }
 
 impl PreStateConfig {
@@ -291,6 +295,12 @@ impl PreStateConfig {
     #[inline]
     pub fn storage_enabled(&self) -> bool {
         !self.disable_storage.unwrap_or_default()
+    }
+
+    /// Returns true if accounts that were empty before the transaction are included.
+    #[inline]
+    pub fn include_empty(&self) -> bool {
+        self.include_empty.unwrap_or_default()
     }
 }
 
@@ -321,6 +331,18 @@ mod tests {
             serde_json::to_string(&opts).unwrap(),
             r#"{"disableStorage":false,"tracer":"prestateTracer","tracerConfig":{"diffMode":true}}"#
         );
+    }
+
+    #[test]
+    fn test_pre_state_config_include_empty() {
+        let config: PreStateConfig = serde_json::from_str(r#"{"includeEmpty":true}"#).unwrap();
+        assert_eq!(config.include_empty, Some(true));
+        assert!(config.include_empty());
+        assert_eq!(serde_json::to_string(&config).unwrap(), r#"{"includeEmpty":true}"#);
+
+        let config: PreStateConfig = serde_json::from_str("{}").unwrap();
+        assert!(!config.include_empty());
+        assert_eq!(serde_json::to_string(&config).unwrap(), "{}");
     }
 
     #[test]

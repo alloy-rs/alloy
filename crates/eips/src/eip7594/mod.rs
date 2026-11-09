@@ -31,7 +31,7 @@ mod rlp;
 pub use rlp::*;
 
 #[cfg(feature = "kzg-sidecar")]
-pub(crate) use rlp::decode_sidecar;
+pub(crate) use rlp::{decode_fixed_list, decode_sidecar};
 
 #[cfg(feature = "kzg-sidecar")]
 mod sidecar;

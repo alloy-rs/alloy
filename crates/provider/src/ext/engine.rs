@@ -568,3 +568,21 @@ where
         self.client().request("engine_exchangeCapabilities", (capabilities,)).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use alloy_rpc_types_engine::CAPABILITIES;
+
+    #[test]
+    fn capabilities_list_every_engine_api_method() {
+        // `engine_exchangeCapabilities` is how capabilities are exchanged, not one of them.
+        let methods = include_str!("engine.rs").split('"').filter(|s| {
+            s.len() > "engine_".len()
+                && s.starts_with("engine_")
+                && *s != "engine_exchangeCapabilities"
+        });
+        for method in methods {
+            assert!(CAPABILITIES.contains(&method), "{method} is missing from `CAPABILITIES`");
+        }
+    }
+}
