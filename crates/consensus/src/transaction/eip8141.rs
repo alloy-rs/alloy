@@ -189,29 +189,26 @@ impl TxEip8141 {
             .iter()
             .map(Vec::as_slice)
             .chain(self.frames.iter().map(|frame| frame.data.as_ref()))
-            .chain(self.signatures.iter().flat_map(|signature| {
-                [
-                    signature.signer.as_bytes(),
-                    signature.msg.as_bytes(),
-                    signature.signature.as_ref(),
-                ]
-            }));
-        let (mut tokens, bytes) = data.fold((0u64, 0u64), |(tokens, bytes), data| {
+            .chain(
+                self.signatures
+                    .iter()
+                    .flat_map(|signature| [signature.signer.as_bytes(), signature.msg.as_bytes()]),
+            );
+        let (tokens, bytes) = data.fold((0u64, 0u64), |(tokens, bytes), data| {
             (
                 tokens.saturating_add(tokens_in_calldata(data)),
                 bytes.saturating_add(data.len() as u64),
             )
         });
-        // Transaction-hash witnesses are charged uniformly, so changing their bytes cannot
+        // Transaction-hash witnesses are priced by length only, so changing their bytes cannot
         // change the gas reservation committed to by their signatures.
-        for signature in &self.signatures {
-            if signature.signs_transaction_hash() {
-                tokens = tokens.saturating_add(
-                    (signature.signature.len() as u64).saturating_mul(4)
-                        - tokens_in_calldata(&signature.signature),
-                );
-            }
-        }
+        let (tokens, bytes) =
+            self.signatures.iter().fold((tokens, bytes), |(tokens, bytes), signature| {
+                (
+                    tokens.saturating_add(signature.signature_tokens()),
+                    bytes.saturating_add(signature.signature.len() as u64),
+                )
+            });
         let intrinsic =
             fixed.saturating_add(tokens.saturating_mul(FRAME_TX_DATA_TOKEN_STANDARD_COST));
         let floor =
@@ -323,23 +320,13 @@ impl Decodable for TxEip8141 {
         let mut fields = Header::decode_bytes(buf, true)?;
         let chain_id = Decodable::decode(&mut fields)?;
         let nonce_keys = if fields.first().is_some_and(|byte| *byte >= 0xc0) {
-            let keys = Vec::<U256>::decode(&mut fields).map_err(|err| match err {
-                alloy_rlp::Error::Overflow => {
-                    alloy_rlp::Error::Custom("EIP-8250 nonce key exceeds 256 bits")
-                }
-                err => err,
-            })?;
+            let keys = Vec::<U256>::decode(&mut fields)?;
             validate_nonce_keys(&keys).map_err(alloy_rlp::Error::Custom)?;
             Some(keys)
         } else {
             None
         };
-        let nonce = u64::decode(&mut fields).map_err(|err| match err {
-            alloy_rlp::Error::Overflow if nonce_keys.is_some() => {
-                alloy_rlp::Error::Custom("EIP-8250 nonce sequence exceeds 64 bits")
-            }
-            err => err,
-        })?;
+        let nonce = u64::decode(&mut fields)?;
         if nonce == MAX_NONCE_SEQ && nonce_keys.as_ref().is_some_and(Vec::is_empty) {
             return Err(alloy_rlp::Error::Custom("EIP-8250 legacy nonce sequence is exhausted"));
         }
@@ -1553,8 +1540,6 @@ mod tests {
         use TxEip8141ValidationError as Error;
         assert_eq!(validate_blobs(&[]), Ok(()));
         let mut hashes = vec![B256::repeat_byte(VERSIONED_HASH_VERSION_KZG); 6];
-        assert_eq!(validate_blobs(&hashes), Ok(()));
-        // The blob base fee is checked by the execution client at block inclusion.
         assert_eq!(validate_blobs(&hashes), Ok(()));
         hashes.push(B256::repeat_byte(VERSIONED_HASH_VERSION_KZG));
         assert_eq!(validate_blobs(&hashes), Err(Error::BlobCount(7)));
