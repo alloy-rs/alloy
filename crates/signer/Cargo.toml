@@ -38,6 +38,9 @@ alloy-dyn-abi = { workspace = true, optional = true, features = [
     "eip712",
 ] }
 
+# eip7702
+alloy-eip7702 = { workspace = true, optional = true }
+
 [dev-dependencies]
 assert_matches.workspace = true
 serde.workspace = true
@@ -49,3 +52,4 @@ eip712 = [
     "dep:alloy-dyn-abi",
     "alloy-dyn-abi?/eip712",
 ]
+eip7702 = ["dep:alloy-eip7702"]

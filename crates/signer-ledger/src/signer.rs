@@ -129,6 +129,12 @@ impl Signer for LedgerSigner {
             .map_err(alloy_signer::Error::other)
     }
 
+    #[cfg(feature = "eip7702")]
+    #[inline]
+    async fn sign_authorization(&self, auth: &alloy_eip7702::Authorization) -> Result<Signature> {
+        self.sign_auth(auth).await.map_err(alloy_signer::Error::other)
+    }
+
     #[inline]
     fn address(&self) -> Address {
         self.address

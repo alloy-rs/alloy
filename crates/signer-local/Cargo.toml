@@ -69,6 +69,7 @@ serde_json.workspace = true
 serde.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+alloy-eip7702.workspace = true
 
 # need to enable features for tests
 yubihsm = { version = "0.42", features = ["mockhsm"] }
@@ -88,3 +89,4 @@ secp256k1 = [
 ]
 
 eip712 = ["alloy-signer/eip712"]
+eip7702 = ["alloy-signer/eip7702"]

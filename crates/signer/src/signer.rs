@@ -9,6 +9,9 @@ use alloy_dyn_abi::eip712::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
+#[cfg(feature = "eip7702")]
+use alloy_eip7702::Authorization;
+
 /// Asynchronous Ethereum signer.
 ///
 /// All provided implementations rely on [`sign_hash`](Signer::sign_hash). A signer may not always
@@ -70,6 +73,16 @@ pub trait Signer<Sig = Signature> {
     #[inline]
     async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Sig> {
         self.sign_hash(&payload.eip712_signing_hash()?).await
+    }
+
+    /// Signs an EIP-7702 authorization.
+    ///
+    /// The default implementation signs the authorization's signature hash. Dedicated backends
+    /// (such as hardware signers) can override this method to perform specialized signing.
+    #[cfg(feature = "eip7702")]
+    #[inline]
+    async fn sign_authorization(&self, auth: &Authorization) -> Result<Sig> {
+        self.sign_hash(&auth.signature_hash()).await
     }
 
     /// Returns the signer's Ethereum address.
@@ -160,6 +173,15 @@ pub trait SignerSync<Sig = Signature> {
         self.sign_hash_sync(&hash)
     }
 
+    /// Signs an EIP-7702 authorization synchronously.
+    ///
+    /// The default implementation signs the authorization's signature hash.
+    #[cfg(feature = "eip7702")]
+    #[inline]
+    fn sign_authorization_sync(&self, auth: &Authorization) -> Result<Sig> {
+        self.sign_hash_sync(&auth.signature_hash())
+    }
+
     /// Returns the chain ID used to fill or validate transactions before signing.
     ///
     /// This value does not affect hash, message, or typed-data signing.
@@ -201,6 +223,14 @@ where
             Self::Right(signer) => signer.set_chain_id(chain_id),
         }
     }
+
+    #[cfg(feature = "eip7702")]
+    async fn sign_authorization(&self, auth: &Authorization) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_authorization(auth).await,
+            Self::Right(signer) => signer.sign_authorization(auth).await,
+        }
+    }
 }
 
 impl<A, B, Sig> SignerSync<Sig> for Either<A, B>
@@ -212,6 +242,14 @@ where
         match self {
             Self::Left(signer) => signer.sign_hash_sync(hash),
             Self::Right(signer) => signer.sign_hash_sync(hash),
+        }
+    }
+
+    #[cfg(feature = "eip7702")]
+    fn sign_authorization_sync(&self, auth: &Authorization) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_authorization_sync(auth),
+            Self::Right(signer) => signer.sign_authorization_sync(auth),
         }
     }
 
@@ -275,6 +313,17 @@ mod tests {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
+            #[cfg(feature = "eip7702")]
+            assert_matches!(
+                s.sign_authorization(&alloy_eip7702::Authorization {
+                    chain_id: alloy_primitives::U256::ZERO,
+                    address: Address::ZERO,
+                    nonce: 0,
+                })
+                .await,
+                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+            );
+
             assert_eq!(s.chain_id(), None);
         }
 
@@ -295,6 +344,16 @@ mod tests {
                     &Eip712Data::default(),
                     None
                 )),
+                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+            );
+
+            #[cfg(feature = "eip7702")]
+            assert_matches!(
+                s.sign_authorization_sync(&alloy_eip7702::Authorization {
+                    chain_id: alloy_primitives::U256::ZERO,
+                    address: Address::ZERO,
+                    nonce: 0,
+                }),
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
