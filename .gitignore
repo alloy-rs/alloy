@@ -1,5 +1,5 @@
 /target
-.vscode
 .idea
-.env
 .DS_Store
+config.bat
+node_modules

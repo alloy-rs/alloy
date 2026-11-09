@@ -2247,6 +2247,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn watch_recovers_when_http_poller_skips_mined_block() {
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|anvil| anvil.block_time_f64(0.1))
+            .unwrap();
+        provider.client().set_poll_interval(std::time::Duration::from_secs(1));
+
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            ..Default::default()
+        };
+
+        let pending = provider.send_transaction(tx).await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), pending.watch())
+            .await
+            .expect("watch hung after the mined block was skipped")
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn test_send_raw_transaction_sync() {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
