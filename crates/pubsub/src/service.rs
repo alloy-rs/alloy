@@ -413,8 +413,10 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Account for the death of the current backend, before replacing it.
     ///
     /// A request fails once more than [`MAX_REQUEST_REPLAYS`] backends died while it was pending,
-    /// and a subscription is dropped once that many consecutive backends died without
-    /// acknowledging its resubscription.
+    /// and a subscription is dropped once that many consecutive backends answered other requests
+    /// but died without acknowledging its resubscription. Backends that answered nothing don't
+    /// count for resubscriptions: the health budget bounds them, and dropping a subscription that
+    /// still has consumers would end their streams while the service keeps running.
     ///
     /// A backend is unhealthy if it died with requests pending, without answering any request
     /// since it connected. Notifications don't count. A backend that answered a request resets the
@@ -436,7 +438,9 @@ impl<T: PubSubConnect> PubSubService<T> {
             );
             self.fail_replayed_request(in_flight);
         }
-        self.subs.count_unacked_resubscribes(MAX_REQUEST_REPLAYS);
+        if self.backend_progressed {
+            self.subs.count_unacked_resubscribes(MAX_REQUEST_REPLAYS);
+        }
 
         let unhealthy = self.unhealthy_backends;
         let max_retries = self.handle.max_retries;

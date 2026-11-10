@@ -92,7 +92,7 @@ connecting succeeded; notifications don't count as answers. From the second cons
 unhealthy backend on, the service backs off before reconnecting, and after `max_retries` of
 them it shuts down. A request that was pending on four consecutive dead backends fails instead
 of being re-sent again, and a subscription whose resubscription four consecutive backends did
-not acknowledge is dropped, which closes its receivers.
+not acknowledge, although they answered other requests, is dropped, which closes its receivers.
 
 Following a successful reconnect, it re-sends every
 request still awaiting a response and re-creates active subscriptions that still

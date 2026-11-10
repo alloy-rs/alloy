@@ -594,3 +594,23 @@ async fn resubscription_that_keeps_killing_backends_is_dropped() {
     probe(&frontend, &mut last, 20).await;
     assert!(frontend.get_subscription(local_id).await.is_err());
 }
+
+#[tokio::test(start_paused = true)]
+async fn backends_answering_nothing_keep_resubscriptions() {
+    let (frontend, _, [mut first, second, third, fourth, fifth, mut last]) =
+        spawn_service_with(10).await;
+    let local_id = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0x1").await;
+    let mut sub = frontend.get_subscription(local_id).await.unwrap();
+    first.close();
+
+    for mut backend in [second, third, fourth, fifth] {
+        // E.g. a proxy accepting connections while the node behind it restarts.
+        assert_eq!(backend.recv().await["method"], "eth_subscribe");
+        backend.close();
+    }
+
+    assert_eq!(last.recv().await["method"], "eth_subscribe");
+    last.respond(1, json!("0x6"));
+    last.notify("0x6", json!(1));
+    assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
+}
