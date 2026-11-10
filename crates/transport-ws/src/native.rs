@@ -1,10 +1,19 @@
 use crate::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
-use futures::{SinkExt, StreamExt};
+use futures::{task::AtomicWaker, FutureExt, SinkExt, StreamExt};
 use serde_json::value::RawValue;
-use std::{io, time::Duration};
-use tokio::time::{sleep, timeout};
+use std::{
+    future::{poll_fn, Future},
+    io,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    task::{ready, Context, Poll, Wake, Waker},
+    time::Duration,
+};
+use tokio::time::sleep;
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
@@ -109,8 +118,8 @@ impl WsConnect {
     /// Sets the keepalive ping interval.
     ///
     /// A ping is sent if no message has been received from the server within this
-    /// interval. If nothing is received before the next ping is due, or a single
-    /// write takes longer than two intervals, the connection is considered dead
+    /// interval. If nothing is received before the next ping is due, or a write
+    /// makes no progress for two intervals, the connection is considered dead
     /// and will be closed.
     ///
     /// Default is 10 seconds.
@@ -199,7 +208,7 @@ impl WsBackend<TungsteniteStream> {
 
     /// Send a message to the server.
     ///
-    /// Fails with [`io::ErrorKind::TimedOut`] if the message can't be written within two
+    /// Fails with [`io::ErrorKind::TimedOut`] if writing the message makes no progress for two
     /// keepalive intervals.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), tungstenite::Error> {
         self.write(Message::Text(String::from(Box::<str>::from(msg)).into())).await
@@ -297,17 +306,51 @@ impl WsBackend<TungsteniteStream> {
         fut.spawn_task()
     }
 
-    /// Writes a message to the socket, giving up after two keepalive intervals.
+    /// Writes a message to the socket, giving up once it makes no progress for two keepalive
+    /// intervals.
     ///
     /// Nothing is read and the keepalive doesn't run while a write is pending. Once a peer that
     /// stopped reading has filled the socket buffers, the write would otherwise only fail when the
-    /// OS gives up on the connection.
+    /// OS gives up on the connection. Bounding the whole write instead would fail a large message
+    /// to a slow peer on every reconnect, since pending requests are replayed.
     async fn write(&mut self, msg: Message) -> Result<(), tungstenite::Error> {
-        timeout(self.keepalive_interval.saturating_mul(2), self.socket.send(msg))
-            .await
-            .unwrap_or_else(|_| {
-                Err(io::Error::new(io::ErrorKind::TimedOut, "write timed out").into())
-            })
+        let idle = self.keepalive_interval.saturating_mul(2);
+        let progress = Arc::new(WriteProgress::default());
+        let waker = Waker::from(progress.clone());
+        let mut send = self.socket.send(msg);
+        let deadline = sleep(idle);
+        tokio::pin!(deadline);
+        poll_fn(|cx| {
+            progress.task.register(cx.waker());
+            if let Poll::Ready(res) = send.poll_unpin(&mut Context::from_waker(&waker)) {
+                return Poll::Ready(res);
+            }
+            // The socket wakes the write when it can take more data again.
+            if progress.woken.swap(false, Ordering::Relaxed) {
+                deadline.set(sleep(idle));
+            }
+            ready!(deadline.as_mut().poll(cx));
+            Poll::Ready(Err(io::Error::new(io::ErrorKind::TimedOut, "write timed out").into()))
+        })
+        .await
+    }
+}
+
+/// Waker for a pending write that records whether it was woken.
+#[derive(Default)]
+struct WriteProgress {
+    task: AtomicWaker,
+    woken: AtomicBool,
+}
+
+impl Wake for WriteProgress {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.woken.store(true, Ordering::Relaxed);
+        self.task.wake();
     }
 }
 
@@ -315,10 +358,12 @@ impl WsBackend<TungsteniteStream> {
 mod tests {
     use super::*;
     use alloy_json_rpc::{Id, Request};
-    use std::net::SocketAddr;
+    use std::{net::SocketAddr, pin::Pin};
     use tokio::{
-        net::TcpListener,
+        io::{AsyncRead, AsyncWrite, ReadBuf},
+        net::{TcpListener, TcpStream},
         sync::{mpsc, oneshot},
+        time::{timeout, Sleep},
     };
 
     #[test]
@@ -447,6 +492,92 @@ mod tests {
             matches!(timeout(keepalive * 4, accepted.recv()).await, Ok(Some(()))),
             "a write that never completes must close the connection"
         );
+    }
+
+    /// A request that takes longer than two keepalive intervals to reach a server that keeps
+    /// reading must not time out. Failing it would reconnect and replay it, timing out again on
+    /// every connection.
+    #[tokio::test]
+    async fn slow_write_to_reading_server_is_not_timed_out() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (received_tx, mut received) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            let mut accepted = 0usize;
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let (conn, received_tx) = (accepted, received_tx.clone());
+                accepted += 1;
+                tokio::spawn(async move {
+                    let stream =
+                        SlowReader { inner: stream, next_read: Box::pin(sleep(Duration::ZERO)) };
+                    let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+                    while let Some(Ok(msg)) = ws.next().await {
+                        if msg.is_text() {
+                            let _ = received_tx.send(conn);
+                        }
+                    }
+                });
+            }
+        });
+
+        let frontend = WsConnect::new(format!("ws://{addr}"))
+            .with_keepalive_interval(Duration::from_millis(100))
+            .into_service()
+            .await
+            .unwrap();
+
+        // Several times what the socket buffers hold and the server reads in two intervals.
+        let payload = "0".repeat(8 * 1024 * 1024);
+        let req = Request::new("eth_call", Id::Number(1), [&payload]).serialize().unwrap();
+        tokio::spawn(frontend.send(req));
+
+        assert_eq!(
+            timeout(Duration::from_secs(10), received.recv()).await,
+            Ok(Some(0)),
+            "a write that keeps making progress must reach the server on the first connection"
+        );
+    }
+
+    /// Reads at most 32 KiB every 5ms, a slow server that is still alive.
+    struct SlowReader {
+        inner: TcpStream,
+        next_read: Pin<Box<Sleep>>,
+    }
+
+    impl AsyncRead for SlowReader {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            ready!(self.next_read.as_mut().poll(cx));
+            let mut chunk = [0; 32 * 1024];
+            let len = chunk.len().min(buf.remaining());
+            let mut limited = ReadBuf::new(&mut chunk[..len]);
+            ready!(Pin::new(&mut self.inner).poll_read(cx, &mut limited))?;
+            buf.put_slice(limited.filled());
+            self.next_read.set(sleep(Duration::from_millis(5)));
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl AsyncWrite for SlowReader {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            Pin::new(&mut self.inner).poll_write(cx, buf)
+        }
+
+        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.inner).poll_flush(cx)
+        }
+
+        fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.inner).poll_shutdown(cx)
+        }
     }
 
     /// Spawns a server that completes the handshake and then never reads from the socket.
