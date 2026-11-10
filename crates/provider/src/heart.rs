@@ -690,13 +690,17 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// Recheck each hash once per round, regardless of how many callers watch it.
     /// Receipt RPCs run concurrently with block processing and timeout handling.
     fn receipt_checks(&self) -> ReceiptChecks {
-        let mut hashes = B256HashMap::<bool>::default();
+        // The fewest confirmations any multiple-confirmation watcher of each hash requires.
+        let mut hashes = B256HashMap::<Option<u64>>::default();
         for watcher in self.unconfirmed.values().chain(self.waiting_confs.values()).flatten() {
-            *hashes.entry(watcher.config.tx_hash).or_default() |=
-                watcher.config.required_confirmations > 1;
+            let confirmations = watcher.config.required_confirmations;
+            let min = hashes.entry(watcher.config.tx_hash).or_default();
+            if confirmations > 1 {
+                *min = Some(min.map_or(confirmations, |min| min.min(confirmations)));
+            }
         }
         let client = self.client.clone();
-        let checks = futures::stream::iter(hashes).map(move |(hash, needs_height)| {
+        let checks = futures::stream::iter(hashes).map(move |(hash, min_confirmations)| {
             let client = client.clone();
             Box::pin(async_stream::stream! {
                 let Some(client) = client.upgrade() else { return };
@@ -729,10 +733,16 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                 // Notify single-confirmation callers before querying the head, even if a
                 // different caller watches the same hash with multiple confirmations.
                 yield ReceiptCheck { hash, block, height: None };
-                if needs_height && block.is_some() {
-                    if let Ok(Ok(height)) = timeout(Duration::from_secs(30), client.request::<_, U64>("eth_blockNumber", ())).await {
-                        yield ReceiptCheck { hash, block, height: Some(height.to()) };
-                    }
+                let (Some(confirmations), Some(number)) = (min_confirmations, block) else { return };
+                let Ok(Ok(height)) = timeout(Duration::from_secs(30), client.request::<_, U64>("eth_blockNumber", ())).await else { return };
+                let height = height.to();
+                if height < number.saturating_add(confirmations - 1) {
+                    return;
+                }
+                // The head may come from a chain that reorged the receipt's block out after the
+                // check above, so check it again before the head counts its confirmations.
+                if matches!(timeout(Duration::from_secs(30), is_receipt_canonical::<N>(&client, &receipt)).await, Ok(Ok(true))) {
+                    yield ReceiptCheck { hash, block, height: Some(height) };
                 }
             })
         }).flatten_unordered(16);

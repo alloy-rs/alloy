@@ -95,11 +95,14 @@ async fn confirmed_receipt_retries_are_bounded() {
 struct PreconfChain {
     blocks: Vec<Block>,
     receipts: B256HashMap<TransactionReceipt>,
+    /// Replaces this block with a different one when the head is next requested.
+    reorg_on_head: Option<u64>,
 }
 
 impl PreconfChain {
     fn new() -> Arc<Mutex<Self>> {
-        let mut chain = Self { blocks: Vec::new(), receipts: Default::default() };
+        let mut chain =
+            Self { blocks: Vec::new(), receipts: Default::default(), reorg_on_head: None };
         for _ in 0..3 {
             chain.seal(Vec::new());
         }
@@ -154,9 +157,14 @@ impl PreconfChain {
                         request.params().map_or_else(Vec::new, |params| {
                             serde_json::from_str(params.get()).unwrap()
                         });
-                    let chain = chain.lock().unwrap();
+                    let mut chain = chain.lock().unwrap();
                     let result = match request.method() {
-                        "eth_blockNumber" => to_raw_value(&U64::from(chain.head())),
+                        "eth_blockNumber" => {
+                            if let Some(number) = chain.reorg_on_head.take() {
+                                chain.blocks[number as usize].header.hash = B256::repeat_byte(0xcc);
+                            }
+                            to_raw_value(&U64::from(chain.head()))
+                        }
                         "eth_getBlockByNumber" => {
                             let number: U64 = serde_json::from_value(params[0].clone()).unwrap();
                             to_raw_value(&chain.blocks.get(number.to::<usize>()))
@@ -398,6 +406,35 @@ async fn receipts_from_reorged_blocks_are_not_inclusion() {
         let receipt = tokio::time::timeout(Duration::from_secs(5), task).await.unwrap().unwrap();
         let receipt = receipt.unwrap();
         assert_eq!((receipt.block_number, receipt.block_hash), (Some(number), Some(hash)));
+    }
+}
+
+#[tokio::test]
+async fn recovery_rechecks_the_receipt_block_after_the_head_lookup() {
+    for reorg in [false, true] {
+        let chain = PreconfChain::new();
+        let client = PreconfChain::client(&chain);
+        let tx = B256::repeat_byte(0x42);
+        {
+            let mut chain = chain.lock().unwrap();
+            let number = chain.include(tx, true);
+            chain.seal(Vec::new());
+            chain.seal(Vec::new());
+            // The block is reorged out between the receipt's block check and the head lookup.
+            chain.reorg_on_head = reorg.then_some(number);
+        }
+        let mut heart = Heartbeat::<Ethereum, _>::new(
+            futures::stream::pending::<Block>(),
+            Arc::default(),
+            client.get_weak(),
+        );
+        let (watcher, mut pending) = watcher(tx, 3, None, None);
+        heart.handle_watch_ix(watcher);
+        let mut checks = heart.receipt_checks();
+        while let Some(check) = checks.next().await {
+            heart.handle_receipt(check);
+        }
+        assert_eq!((&mut pending).now_or_never().is_some(), !reorg, "reorg: {reorg}");
     }
 }
 
