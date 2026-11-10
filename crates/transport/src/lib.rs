@@ -41,10 +41,10 @@ pub mod utils;
 
 /// The default maximum size of a single response, in bytes.
 ///
-/// The HTTP transport rejects a larger response body by default, so that a malicious or
-/// misbehaving endpoint cannot make the client buffer an unbounded amount of data. 256 MiB leaves
-/// room for large `debug_trace*` and `eth_getLogs` responses, and is above reth's default
-/// server-side response limit of 160 MiB.
+/// The HTTP, WebSocket, and IPC transports reject a larger response by default, so that a
+/// malicious or misbehaving endpoint cannot make the client buffer an unbounded amount of data.
+/// 256 MiB leaves room for large `debug_trace*` and `eth_getLogs` responses, and is above reth's
+/// default server-side response limit of 160 MiB.
 pub const DEFAULT_MAX_RESPONSE_SIZE: usize = 256 * 1024 * 1024;
 
 /// Pin-boxed future.

@@ -1,6 +1,8 @@
 use crate::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    utils::Spawnable, Authorization, TransportErrorKind, TransportResult, DEFAULT_MAX_RESPONSE_SIZE,
+};
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -22,6 +24,9 @@ pub struct WsConnect {
     /// The authorization header to use.
     auth: Option<Authorization>,
     /// The websocket config.
+    ///
+    /// If unset, tungstenite's defaults are used, with a max message and frame size of
+    /// [`DEFAULT_MAX_RESPONSE_SIZE`].
     config: Option<WebSocketConfig>,
     /// Max number of retries before failing and exiting the connection.
     /// Default is 10.
@@ -70,6 +75,11 @@ impl WsConnect {
     }
 
     /// Sets the websocket config.
+    ///
+    /// If unset, tungstenite's defaults are used, with the max message and frame size raised to
+    /// [`DEFAULT_MAX_RESPONSE_SIZE`]. A config set here is used as is, so its
+    /// [`max_message_size`](WebSocketConfig::max_message_size) and
+    /// [`max_frame_size`](WebSocketConfig::max_frame_size) bound the size of a response.
     pub const fn with_config(mut self, config: WebSocketConfig) -> Self {
         self.config = Some(config);
         self
@@ -144,7 +154,8 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
+        let config = self.config.unwrap_or_else(default_config);
+        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, Some(config), false)
             .await
             .map_err(TransportErrorKind::custom)?;
 
@@ -155,6 +166,16 @@ impl PubSubConnect for WsConnect {
 
         Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
     }
+}
+
+/// Returns the [`WebSocketConfig`] used when none is set.
+///
+/// Raises tungstenite's default max message size of 64 MiB and max frame size of 16 MiB to
+/// [`DEFAULT_MAX_RESPONSE_SIZE`], so that WS accepts the same responses as HTTP and IPC.
+fn default_config() -> WebSocketConfig {
+    WebSocketConfig::default()
+        .max_message_size(Some(DEFAULT_MAX_RESPONSE_SIZE))
+        .max_frame_size(Some(DEFAULT_MAX_RESPONSE_SIZE))
 }
 
 /// Install a default rustls crypto provider if none is set.
