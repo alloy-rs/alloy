@@ -134,15 +134,6 @@ where
 {
     #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
     async fn do_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
-        timeout(self.settings.request_timeout(), self.send_hyper(req)).await.unwrap_or_else(
-            |duration| {
-                let msg = format!("HTTP request timed out after {duration:?}");
-                Err(TransportErrorKind::custom_str(&msg))
-            },
-        )
-    }
-
-    async fn send_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         debug!(count = req.len(), "sending request packet to server");
 
         let mut builder = hyper::Request::builder()
@@ -161,10 +152,16 @@ where
 
         let req = builder.body(body).map_err(TransportErrorKind::custom)?;
 
+        let request_timeout = self.settings.request_timeout();
+        let start = tokio::time::Instant::now();
         let read_timeout = self.client.read_timeout;
         let mut service = self.client.service;
-        let resp = timeout(read_timeout, service.call(req))
+        let resp = timeout(request_timeout, timeout(read_timeout, service.call(req)))
             .await
+            .map_err(|duration| {
+                let msg = format!("HTTP request timed out after {duration:?}");
+                TransportErrorKind::custom_str(&msg)
+            })?
             .map_err(|duration| {
                 let msg = format!("no HTTP response received within {duration:?}");
                 TransportErrorKind::custom_str(&msg)
@@ -179,7 +176,18 @@ where
         debug!(%status, "received response from server");
 
         let max = self.settings.max_response_size();
-        let body = collect_body(resp.into_body(), max, read_timeout).await;
+        let collect = collect_body(resp.into_body(), max, read_timeout);
+        // The rest of the deadline bounds the body on its own, so that an error response that
+        // times out keeps its status and `Retry-After`.
+        let body = match request_timeout {
+            Some(request_timeout) => {
+                let remaining = request_timeout.saturating_sub(start.elapsed());
+                tokio::time::timeout(remaining, collect)
+                    .await
+                    .unwrap_or(Err(BodyError::RequestTimedOut(request_timeout)))
+            }
+            None => collect.await,
+        };
         crate::handle_response(status.as_u16(), retry_after, body)
     }
 }

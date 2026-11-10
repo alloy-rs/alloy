@@ -15,6 +15,9 @@ pub(crate) enum BodyError<E> {
     /// No body data arrived within the read timeout.
     #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
     TimedOut(Duration),
+    /// The request deadline passed while reading the body.
+    #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
+    RequestTimedOut(Duration),
 }
 
 impl<E: std::error::Error + Send + Sync + 'static> BodyError<E> {
@@ -35,6 +38,10 @@ impl<E: fmt::Display> fmt::Display for BodyError<E> {
             #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
             Self::TimedOut(duration) => {
                 write!(f, "response body read timed out after {duration:?}")
+            }
+            #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
+            Self::RequestTimedOut(duration) => {
+                write!(f, "HTTP request timed out after {duration:?}")
             }
         }
     }

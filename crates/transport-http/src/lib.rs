@@ -505,13 +505,22 @@ mod tests {
             let settings =
                 HttpTransportSettings::new().with_request_timeout(Duration::from_millis(100));
             let url = serve_stalled("HTTP/1.1 200 OK\r\ncontent-length: 100\r\n\r\n{").await;
-            let err = call(new(url).with_settings(settings)).await.unwrap_err();
+            let err = call(new(url).with_settings(settings.clone())).await.unwrap_err();
 
             let mut source: Option<&dyn std::error::Error> = Some(&err);
             while let Some(err) = source.filter(|err| !err.to_string().contains("timed out")) {
                 source = err.source();
             }
             assert!(source.is_some(), "{err}");
+
+            // An error response that times out can still be retried.
+            let url = serve_stalled(
+                "HTTP/1.1 429 Too Many Requests\r\nretry-after: 1\r\ncontent-length: 100\r\n\r\n{",
+            )
+            .await;
+            let err = call(new(url).with_settings(settings)).await.unwrap_err();
+            let TransportError::Transport(kind) = &err else { panic!("{err}") };
+            assert_eq!(kind.retry_after(), Some(Duration::from_secs(1)), "{err}");
         }
 
         #[cfg(feature = "reqwest")]
