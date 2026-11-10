@@ -279,12 +279,9 @@ where
                     }
                 }
                 Scan::Incomplete => {
-                    // Reserve before reading so `poll_read_buf` always gets a
-                    // full page to fill, not whatever slack is left over.
-                    this.buf.reserve(CAPACITY);
-                    let read = match *this.max_response_size {
-                        // Complete values are yielded first, so the buffer only holds
-                        // the incomplete value. Never read past the limit.
+                    // Complete values are yielded first, so the buffer only holds
+                    // the incomplete value. Never read past the limit.
+                    let remaining = match *this.max_response_size {
                         Some(max) => {
                             let Some(remaining) =
                                 max.checked_sub(this.buf.len()).filter(|&n| n > 0)
@@ -297,12 +294,17 @@ where
                                 );
                                 return Ready(Some(Err(err)));
                             };
-                            let mut buf = BufMut::limit(&mut *this.buf, remaining);
-                            ready!(poll_read_buf(this.reader.as_mut(), cx, &mut buf))
+                            remaining
                         }
-                        None => ready!(poll_read_buf(this.reader.as_mut(), cx, this.buf)),
+                        None => usize::MAX,
                     };
-                    match read {
+                    // Reserve before reading so `poll_read_buf` always gets a
+                    // full page to fill, not whatever slack is left over. Near the
+                    // limit, reserve only what may still be read, so that the buffer
+                    // does not grow past a power-of-two limit.
+                    this.buf.reserve(CAPACITY.min(remaining));
+                    let mut buf = BufMut::limit(&mut *this.buf, remaining);
+                    match ready!(poll_read_buf(this.reader.as_mut(), cx, &mut buf)) {
                         Ok(0) => {
                             *this.finished = true;
                             if this.scanner.depth != 0 {
@@ -921,6 +923,7 @@ mod tests {
             let err = reader.next().await.unwrap().unwrap_err();
             assert!(TooLarge::is(&err), "{err}");
             assert!(reader.buf.len() <= max, "buffered {} bytes", reader.buf.len());
+            assert!(reader.buf.capacity() <= max, "reserved {} bytes", reader.buf.capacity());
         }
     }
 
