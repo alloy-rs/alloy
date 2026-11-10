@@ -282,6 +282,23 @@ async fn identical_subscriptions_share_local_id() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn late_identical_subscriber_starts_at_the_tail() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let local = subscribe(&frontend, &mut backend, 1, json!(["newHeads"]), "0xaaa").await;
+    let mut first = frontend.get_subscription(local).await.unwrap();
+    for n in 1..=3 {
+        backend.notify("0xaaa", json!(n));
+        assert_eq!(within(first.recv()).await.unwrap().get(), n.to_string());
+    }
+
+    let resp = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
+    assert_eq!(local_id(&resp.unwrap()), local);
+    let mut second = frontend.get_subscription(local).await.unwrap();
+    backend.notify("0xaaa", json!(4));
+    assert_eq!(within(second.recv()).await.unwrap().get(), "4");
+}
+
+#[tokio::test(start_paused = true)]
 async fn unsubscribe_sends_server_id_and_drops_subscription() {
     let (frontend, _, [mut backend]) = spawn_service().await;
     let local_id = subscribe(&frontend, &mut backend, 1, json!(["newHeads"]), "0xaaa").await;

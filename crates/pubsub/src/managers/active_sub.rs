@@ -114,15 +114,9 @@ impl ActiveSubscription {
 
     /// Get a subscription.
     pub(crate) fn subscribe(&self) -> RawSubscription {
-        if self.tx.is_empty() {
-            // If there are no pending notifications, we can subscribe directly and return a new
-            // subscriber.
-            return RawSubscription { rx: self.tx.subscribe(), local_id: self.local_id };
-        }
-
-        // If there are pending notifications, we need to ensure that they are not dropped.
-        // Hence, we first try to return the initial receiver (if it exists), which will receive
-        // those pending notifications.
+        // The first receiver is the initial one, so that notifications received before it was
+        // requested are not dropped. Later receivers start at the tail: the initial receiver may
+        // still hold notifications that other receivers already consumed.
         // Ref: <https://github.com/alloy-rs/alloy/issues/2187>
         RawSubscription {
             rx: self.rx.lock().deref_mut().take().unwrap_or_else(|| self.tx.subscribe()),
