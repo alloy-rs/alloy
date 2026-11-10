@@ -736,6 +736,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn failed_sign_request_releases_nonce() {
+        // Without a wallet the fillers return a request, and the node can't sign for this sender.
+        let provider = ProviderBuilder::new().connect_anvil();
+        let tx = transfer(U256::from(100)).with_from(Address::with_last_byte(1));
+
+        let err = provider.fill_and_sign_transaction(tx.clone()).await.unwrap_err();
+        assert!(err.to_string().contains("no wallet configured"), "{err}");
+        let err = provider.sign_transaction(tx.clone()).await.unwrap_err();
+        assert!(err.as_error_resp().is_some(), "{err}");
+
+        let tx = provider.fill(tx).await.unwrap();
+        assert_eq!(tx.as_builder().unwrap().nonce, Some(0));
+    }
+
+    #[tokio::test]
     async fn failed_gas_estimation_releases_nonce() {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
         // Caches the nonce, so the next one is reserved before gas estimation fails.

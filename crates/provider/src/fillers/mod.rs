@@ -413,13 +413,14 @@ where
                     ?tx, ?self.filler, loop_iterations = count,
                     ERROR
                 );
-                return Err(TransportError::local_usage_str(ERROR));
+                let err = TransportError::local_usage_str(ERROR);
+                return self.report_send_result(Err(err), from.zip(filled_nonce)).await;
             }
         }
         Ok((tx, from))
     }
 
-    /// Fills a transaction that is about to be sent.
+    /// Fills a transaction that is about to be sent or signed.
     ///
     /// Also returns its sender and nonce if the fillers filled in the nonce, rather than the
     /// caller, so that a failed send can be reported to [`TxFiller::on_send_failure`].
@@ -901,9 +902,12 @@ where
     }
 
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
-        let tx = self.fill(tx).await?;
-        let tx = tx.try_into_request().map_err(TransportError::local_usage)?;
-        self.inner.sign_transaction(tx).await
+        let (tx, filled) = self.fill_for_send(SendableTx::Builder(tx)).await?;
+        let result = match tx.try_into_request() {
+            Ok(tx) => self.inner.sign_transaction(tx).await,
+            Err(err) => Err(TransportError::local_usage(err)),
+        };
+        self.report_send_result(result, filled).await
     }
 
     async fn fill_transaction(
@@ -920,18 +924,21 @@ where
         &self,
         tx: N::TransactionRequest,
     ) -> TransportResult<N::TxEnvelope> {
-        match self.fill(tx).await? {
+        let (tx, filled) = self.fill_for_send(SendableTx::Builder(tx)).await?;
+        let result = match tx {
             SendableTx::Envelope(envelope) => Ok(envelope),
             SendableTx::Builder(tx) => {
                 if let FillerControlFlow::Missing(missing) = self.filler.status(&tx) {
                     let message = format!("missing properties: {missing:?}");
-                    return Err(RpcError::local_usage_str(&message));
+                    Err(RpcError::local_usage_str(&message))
+                } else {
+                    Err(RpcError::local_usage_str(
+                        "no wallet configured, fillers did not produce a signed transaction",
+                    ))
                 }
-                Err(RpcError::local_usage_str(
-                    "no wallet configured, fillers did not produce a signed transaction",
-                ))
             }
-        }
+        };
+        self.report_send_result(result, filled).await
     }
 
     #[cfg(feature = "pubsub")]
