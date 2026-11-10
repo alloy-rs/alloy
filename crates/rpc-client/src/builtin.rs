@@ -132,6 +132,9 @@ impl BuiltInConnectionString {
     /// - [`ConnectionConfig::max_retries`] and [`ConnectionConfig::retry_interval`] control WS
     ///   reconnects only. HTTP has no persistent connection to retry; use `RetryBackoffLayer` to
     ///   retry HTTP requests.
+    /// - [`ConnectionConfig::request_timeout`] applies to HTTP only. HTTP clients also use the
+    ///   default connect and read timeouts, see `alloy_transport_http::DEFAULT_CONNECT_TIMEOUT` and
+    ///   `alloy_transport_http::DEFAULT_READ_TIMEOUT`.
     /// - IPC ignores the configuration.
     pub async fn connect_boxed_with(
         &self,
@@ -147,7 +150,7 @@ impl BuiltInConnectionString {
             ))]
             Self::Http(url) => {
                 let (url, auth) = http_auth(url, &config)?;
-                let mut builder = reqwest::Client::builder();
+                let mut builder = alloy_transport_http::Http::default_client_builder();
                 if let Some(auth) = auth {
                     // Default headers are only added when the request does not set them.
                     builder = builder.default_headers(header::HeaderMap::from_iter([(
@@ -156,9 +159,10 @@ impl BuiltInConnectionString {
                     )]));
                 }
                 let client = builder.build().map_err(TransportErrorKind::custom)?;
-                Ok(alloy_transport::Transport::boxed(alloy_transport_http::Http::with_client(
-                    client, url,
-                )))
+                Ok(alloy_transport::Transport::boxed(
+                    alloy_transport_http::Http::with_client(client, url)
+                        .with_settings(config.http_settings()),
+                ))
             }
 
             #[cfg(all(
@@ -174,9 +178,11 @@ impl BuiltInConnectionString {
             #[cfg(feature = "hyper")]
             Self::Http(url) => {
                 let (url, auth) = http_auth(url, &config)?;
+                let settings = config.http_settings();
                 let Some(auth) = auth else {
                     return Ok(alloy_transport::Transport::boxed(
-                        alloy_transport_http::HyperTransport::new_hyper(url),
+                        alloy_transport_http::HyperTransport::new_hyper(url)
+                            .with_settings(settings),
                     ));
                 };
                 // Only add the header when the request does not set it.
@@ -190,9 +196,9 @@ impl BuiltInConnectionString {
                         },
                     ),
                 );
-                Ok(alloy_transport::Transport::boxed(alloy_transport_http::Http::with_client(
-                    client, url,
-                )))
+                Ok(alloy_transport::Transport::boxed(
+                    alloy_transport_http::Http::with_client(client, url).with_settings(settings),
+                ))
             }
 
             #[cfg(feature = "ws-base")]
@@ -372,6 +378,10 @@ pub struct ConnectionConfig {
     /// WebSocket reconnect retries use capped exponential backoff from this base interval.
     /// Ignored for HTTP and IPC.
     pub retry_interval: Option<Duration>,
+    /// Deadline for each HTTP request, from sending it until the whole response is read.
+    ///
+    /// There is no deadline by default. Ignored for WebSocket and IPC.
+    pub request_timeout: Option<Duration>,
     /// WebSocket-specific configuration.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
@@ -384,6 +394,7 @@ impl ConnectionConfig {
             auth: None,
             max_retries: None,
             retry_interval: None,
+            request_timeout: None,
             #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
             ws_config: None,
         }
@@ -412,11 +423,32 @@ impl ConnectionConfig {
         self
     }
 
+    /// Set a deadline for each HTTP request, from sending it until the whole response is read.
+    ///
+    /// Ignored for WebSocket and IPC.
+    pub const fn with_request_timeout(mut self, request_timeout: Duration) -> Self {
+        self.request_timeout = Some(request_timeout);
+        self
+    }
+
     /// Set the WebSocket configuration.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub const fn with_ws_config(mut self, config: alloy_transport_ws::WebSocketConfig) -> Self {
         self.ws_config = Some(config);
         self
+    }
+
+    /// Returns the HTTP transport settings for this configuration.
+    #[cfg(any(
+        feature = "hyper",
+        all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))
+    ))]
+    const fn http_settings(&self) -> alloy_transport_http::HttpTransportSettings {
+        let settings = alloy_transport_http::HttpTransportSettings::new();
+        match self.request_timeout {
+            Some(request_timeout) => settings.with_request_timeout(request_timeout),
+            None => settings,
+        }
     }
 }
 
