@@ -38,7 +38,7 @@ pub use hyper_transport::{HyperClient, HyperResponse, HyperResponseFut, HyperTra
 ))]
 mod body;
 
-use alloy_transport::utils::guess_local_url;
+use alloy_transport::{utils::guess_local_url, DEFAULT_MAX_RESPONSE_SIZE};
 use core::str::FromStr;
 use std::marker::PhantomData;
 use url::Url;
@@ -176,6 +176,8 @@ pub struct Http<T> {
 
 impl<T> Http<T> {
     /// Create a new [`Http`] transport with a custom client.
+    ///
+    /// The transport has the default [`HttpTransportSettings`], which limit the response size.
     pub const fn with_client(client: T, url: Url) -> Self {
         Self { client, url, settings: HttpTransportSettings::new() }
     }
@@ -227,25 +229,41 @@ impl<T> Http<T> {
 }
 
 /// Settings for an [`Http`] transport.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+///
+/// By default, response bodies are limited to [`DEFAULT_MAX_RESPONSE_SIZE`] bytes.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HttpTransportSettings {
     max_response_size: Option<usize>,
 }
 
+impl Default for HttpTransportSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HttpTransportSettings {
-    /// Create settings without any limits.
+    /// Create the default settings, with a maximum response size of [`DEFAULT_MAX_RESPONSE_SIZE`]
+    /// bytes.
     pub const fn new() -> Self {
+        Self { max_response_size: Some(DEFAULT_MAX_RESPONSE_SIZE) }
+    }
+
+    /// Create settings without any limits.
+    ///
+    /// Response bodies of any size are buffered, so this should only be used with trusted
+    /// endpoints.
+    pub const fn unlimited() -> Self {
         Self { max_response_size: None }
     }
 
-    /// Set the maximum size of a response body in bytes.
+    /// Set the maximum size of a response body in bytes, or `None` for no limit.
     ///
-    /// Larger responses are rejected before JSON decoding. On native targets, the limit is checked
-    /// incrementally while reading the body. The WASM reqwest transport rejects an oversized known
-    /// content length up front, but otherwise reads the full body before checking its size; the
-    /// limit does not bound body accumulation on that path. There is no limit by default.
-    pub const fn with_max_response_size(mut self, max_response_size: usize) -> Self {
-        self.max_response_size = Some(max_response_size);
+    /// Larger responses are rejected while reading the body, before JSON decoding: up front if the
+    /// content length is known to be too large, otherwise as soon as the bytes read exceed the
+    /// limit. Defaults to [`DEFAULT_MAX_RESPONSE_SIZE`].
+    pub const fn with_max_response_size(mut self, max_response_size: Option<usize>) -> Self {
+        self.max_response_size = max_response_size;
         self
     }
 
@@ -309,26 +327,41 @@ mod tests {
     mod max_response_size {
         use crate::{Http, HttpTransportSettings};
         use alloy_json_rpc::{Id, Request, RequestPacket, ResponsePacket};
-        use alloy_transport::TransportError;
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use alloy_transport::{TransportError, DEFAULT_MAX_RESPONSE_SIZE};
+        use std::{future::Future, time::Duration};
+        use tokio::{
+            io::{AsyncReadExt, AsyncWriteExt},
+            net::TcpStream,
+        };
         use tower::Service;
         use url::Url;
 
         const BODY: &str = r#"{"jsonrpc":"2.0","id":0,"result":"0x1"}"#;
 
-        /// Serves `response` to the first connection on a local socket.
-        async fn serve_once(response: String) -> Url {
+        /// Accepts the first connection on a local socket, reads the request, and hands the stream
+        /// to `respond`.
+        async fn serve<F, Fut>(respond: F) -> Url
+        where
+            F: FnOnce(TcpStream) -> Fut + Send + 'static,
+            Fut: Future<Output = ()> + Send,
+        {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let url = format!("http://{}", listener.local_addr().unwrap()).parse().unwrap();
             tokio::spawn(async move {
                 let (mut stream, _) = listener.accept().await.unwrap();
-                let mut buf = [0; 4096];
-                let _ = stream.read(&mut buf).await;
-                let _ = stream.write_all(response.as_bytes()).await;
-                // Keep the connection open until the client is done with it.
-                let _ = stream.read(&mut buf).await;
+                let _ = stream.read(&mut [0; 4096]).await;
+                respond(stream).await;
             });
             url
+        }
+
+        /// Serves `response`, then keeps the connection open until the client is done with it.
+        async fn serve_once(response: String) -> Url {
+            serve(|mut stream| async move {
+                let _ = stream.write_all(response.as_bytes()).await;
+                let _ = stream.read(&mut [0; 4096]).await;
+            })
+            .await
         }
 
         fn content_length_response() -> String {
@@ -354,7 +387,13 @@ mod tests {
             Http<C>: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>,
         {
             let req = Request::new("eth_blockNumber", Id::Number(0), ()).serialize().unwrap();
-            transport.call(RequestPacket::Single(req)).await
+            // Fail instead of hanging if a limit is not enforced.
+            tokio::time::timeout(
+                Duration::from_secs(10),
+                transport.call(RequestPacket::Single(req)),
+            )
+            .await
+            .expect("request did not complete")
         }
 
         async fn assert_max_response_size<C>(new: fn(Url) -> Http<C>)
@@ -362,7 +401,8 @@ mod tests {
             Http<C>: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>,
         {
             let with_max = |url, max| {
-                new(url).with_settings(HttpTransportSettings::new().with_max_response_size(max))
+                new(url)
+                    .with_settings(HttpTransportSettings::new().with_max_response_size(Some(max)))
             };
 
             for response in [content_length_response(), chunked_response()] {
@@ -373,18 +413,57 @@ mod tests {
                     call(with_max(serve_once(response).await, BODY.len() - 1)).await.unwrap_err();
                 assert!(err.to_string().contains("response body exceeds"), "{err}");
             }
+
+            // An endless chunked body is rejected once it exceeds the limit.
+            let url = serve(|mut stream| async move {
+                let head = "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n";
+                let _ = stream.write_all(head.as_bytes()).await;
+                let chunk = format!("2000\r\n{}\r\n", " ".repeat(0x2000));
+                while stream.write_all(chunk.as_bytes()).await.is_ok() {}
+            })
+            .await;
+            let err = call(with_max(url, 0x10000)).await.unwrap_err();
+            assert!(err.to_string().contains("response body exceeds 65536 bytes"), "{err}");
+        }
+
+        /// The default settings reject a content length above [`DEFAULT_MAX_RESPONSE_SIZE`] up
+        /// front.
+        async fn assert_default_max_response_size<C>(new: fn(Url) -> Http<C>)
+        where
+            Http<C>: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>,
+        {
+            let serve_oversized = || {
+                serve(|mut stream| async move {
+                    let head = format!(
+                        "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{{",
+                        DEFAULT_MAX_RESPONSE_SIZE + 1
+                    );
+                    let _ = stream.write_all(head.as_bytes()).await;
+                })
+            };
+
+            let err = call(new(serve_oversized().await)).await.unwrap_err();
+            let expected = format!("response body exceeds {DEFAULT_MAX_RESPONSE_SIZE} bytes");
+            assert!(err.to_string().contains(&expected), "{err}");
+
+            let unlimited =
+                new(serve_oversized().await).with_settings(HttpTransportSettings::unlimited());
+            let err = call(unlimited).await.unwrap_err();
+            assert!(!err.to_string().contains("response body exceeds"), "{err}");
         }
 
         #[cfg(feature = "reqwest")]
         #[tokio::test]
         async fn reqwest_transport() {
             assert_max_response_size(Http::new).await;
+            assert_default_max_response_size(Http::new).await;
         }
 
         #[cfg(feature = "hyper")]
         #[tokio::test]
         async fn hyper_transport() {
             assert_max_response_size(Http::new_hyper).await;
+            assert_default_max_response_size(Http::new_hyper).await;
         }
     }
 }
