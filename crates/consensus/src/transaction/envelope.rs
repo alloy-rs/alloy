@@ -2106,7 +2106,7 @@ mod fuzz_tests {
     use alloy_eips::eip2718::Decodable2718;
     use alloy_rlp::{Decodable, Header};
     use arbitrary::{Arbitrary, Unstructured};
-    use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+    use rand::{rngs::StdRng, Rng, RngExt, SeedableRng};
 
     fn arbitrary_envelope(seed: u64) -> EthereumTxEnvelope<TxEip4844> {
         let mut bytes = [0u8; 16 * 1024];
@@ -2151,8 +2151,8 @@ mod fuzz_tests {
             let payload = tx.encoded_2718();
             let mut rng = StdRng::seed_from_u64(seed);
             // A one-byte wrapper around the type byte is already rejected as non-canonical RLP.
-            let short = rng.gen_range(2..payload.len());
-            let long = payload.len() + rng.gen_range(1..=32);
+            let short = rng.random_range(2..payload.len());
+            let long = payload.len() + rng.random_range(1..=32);
             for payload_length in [short, long] {
                 let mut encoded = Vec::new();
                 Header { list: false, payload_length }.encode(&mut encoded);

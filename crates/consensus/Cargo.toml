@@ -63,7 +63,7 @@ secp256k1 = { workspace = true, optional = true, features = ["recovery", "global
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary", "kzg", "serde"] }
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
-secp256k1 = { workspace = true, features = ["recovery", "global-context", "std", "rand"] }
+secp256k1 = { workspace = true, features = ["recovery", "global-context", "std"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 bincode = { workspace = true, features = ["serde"] }

@@ -281,15 +281,17 @@ impl<'a, T: SignableTransaction<Signature> + arbitrary::Arbitrary<'a>> arbitrary
     for Signed<T, Signature>
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use k256::{
-            ecdsa::{signature::hazmat::PrehashSigner, SigningKey},
-            NonZeroScalar,
-        };
-        use rand::{rngs::StdRng, SeedableRng};
+        use k256::ecdsa::{signature::hazmat::PrehashSigner, SigningKey};
+        use rand::{rngs::StdRng, RngExt, SeedableRng};
 
         let rng_seed = u.arbitrary::<[u8; 32]>()?;
         let mut rand_gen = StdRng::from_seed(rng_seed);
-        let signing_key: SigningKey = NonZeroScalar::random(&mut rand_gen).into();
+        // k256 uses an older rand_core, so draw the scalar bytes here and retry until valid.
+        let signing_key = loop {
+            if let Ok(key) = SigningKey::from_slice(&rand_gen.random::<[u8; 32]>()) {
+                break key;
+            }
+        };
 
         let tx = T::arbitrary(u)?;
 

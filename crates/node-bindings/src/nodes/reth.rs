@@ -5,7 +5,7 @@ use crate::{
     NodeError, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
-use rand::Rng;
+use rand::RngExt;
 use std::{
     ffi::OsString,
     fs::create_dir_all,
@@ -195,7 +195,7 @@ impl Reth {
             auth_port: DEFAULT_AUTH_PORT,
             p2p_port: DEFAULT_P2P_PORT,
             block_time: None,
-            instance: rand::thread_rng().gen_range(1..200),
+            instance: rand::rng().random_range(1..200),
             discovery_enabled: true,
             program: None,
             ipc_path: None,

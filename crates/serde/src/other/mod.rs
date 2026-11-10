@@ -279,14 +279,14 @@ where
 mod tests {
     use super::*;
     use alloc::string::ToString;
-    use rand::Rng;
+    use rand::RngExt;
     use serde_json::json;
     use similar_asserts::assert_eq;
 
     #[test]
     fn other_fields_arbitrary() {
         let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
+        rand::rng().fill(bytes.as_mut_slice());
 
         let _ = arbitrary::Unstructured::new(&bytes).arbitrary::<OtherFields>().unwrap();
     }

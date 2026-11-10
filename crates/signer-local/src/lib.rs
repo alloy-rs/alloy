@@ -39,6 +39,33 @@ pub use coins_bip39;
 #[cfg(feature = "secp256k1")]
 pub use self::secp256k1::Secp256k1Credential;
 
+/// Adapts a [`rand`] RNG to the older `rand_core` traits that `k256` and `eth-keystore` take.
+struct RngCompat<'a, R: ?Sized>(&'a mut R);
+
+impl<R: rand::Rng + ?Sized> k256::elliptic_curve::rand_core::RngCore for RngCompat<'_, R> {
+    fn next_u32(&mut self) -> u32 {
+        self.0.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.0.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.0.fill_bytes(dest)
+    }
+
+    fn try_fill_bytes(
+        &mut self,
+        dest: &mut [u8],
+    ) -> Result<(), k256::elliptic_curve::rand_core::Error> {
+        self.0.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+impl<R: rand::CryptoRng + ?Sized> k256::elliptic_curve::rand_core::CryptoRng for RngCompat<'_, R> {}
+
 /// A signer instantiated with a locally stored private key.
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
