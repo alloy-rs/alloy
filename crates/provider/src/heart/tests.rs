@@ -546,6 +546,17 @@ async fn recovery_respects_confirmations_and_releases_heartbeat() {
 }
 
 #[tokio::test]
+async fn recovery_counts_confirmations_from_the_canonical_receipt_block() {
+    let mut heart = heart();
+    let hash = B256::repeat_byte(8);
+    // Seen in block 10, but moved to block 8 by a reorg the block stream missed.
+    let (watcher, pending) = watcher(hash, 3, Some(10), None);
+    heart.handle_watch_ix(watcher);
+    heart.handle_receipt(ReceiptCheck { hash, block: Some(8), height: Some(10) });
+    assert_eq!(pending.now_or_never().unwrap().unwrap(), hash);
+}
+
+#[tokio::test]
 async fn reorg_reinclusion_uses_new_height_and_cancellation_cleans_up() {
     let mut heart = heart();
     let hash = B256::repeat_byte(4);

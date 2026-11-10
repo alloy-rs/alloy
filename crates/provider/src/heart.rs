@@ -774,8 +774,10 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                 self.unconfirmed.remove(&hash);
             }
         }
-        if let Some(height) = height {
-            for watchers in self.waiting_confs.range_mut(..=height).map(|(_, watchers)| watchers) {
+        if height.is_some() {
+            // Waiting watchers are keyed by the block they were first seen in, which a reorg the
+            // stream missed may have changed. Count confirmations from the canonical receipt.
+            for watchers in self.waiting_confs.values_mut() {
                 for watcher in watchers.extract_if(.., confirmed) {
                     watcher.notify(Ok(()));
                 }
