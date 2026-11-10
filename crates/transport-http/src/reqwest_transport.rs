@@ -26,26 +26,49 @@ impl TransportConnect for ReqwestConnect {
     }
 
     async fn get_transport(&self) -> Result<BoxTransport, TransportError> {
-        Ok(BoxTransport::new(Http::with_client(Client::new(), self.url.clone())))
+        Ok(BoxTransport::new(Http::new(self.url.clone())))
     }
 }
 
 impl Http<Client> {
-    /// Create a new [`Http`] transport.
+    /// Create a new [`Http`] transport with a default client.
+    ///
+    /// The client is built from [`Http::default_client_builder`], so it has a
+    /// [`DEFAULT_CONNECT_TIMEOUT`](crate::DEFAULT_CONNECT_TIMEOUT) and a
+    /// [`DEFAULT_READ_TIMEOUT`](crate::DEFAULT_READ_TIMEOUT). Use [`Http::with_client`] to provide
+    /// a client with other timeouts, or none.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the client cannot be built, like [`Client::new`].
     pub fn new(url: Url) -> Self {
-        Self::with_client(Default::default(), url)
+        let client =
+            Self::default_client_builder().build().expect("failed to build reqwest client");
+        Self::with_client(client, url)
+    }
+
+    /// Returns a [`reqwest::ClientBuilder`] for the client used by [`Http::new`].
+    ///
+    /// On native targets, this sets a [`DEFAULT_CONNECT_TIMEOUT`](crate::DEFAULT_CONNECT_TIMEOUT)
+    /// and a [`DEFAULT_READ_TIMEOUT`](crate::DEFAULT_READ_TIMEOUT). The WASM client does not
+    /// support these, so it is returned as is.
+    #[allow(clippy::let_and_return)]
+    pub fn default_client_builder() -> reqwest::ClientBuilder {
+        let builder = Client::builder();
+        #[cfg(not(target_family = "wasm"))]
+        let builder = builder
+            .connect_timeout(crate::DEFAULT_CONNECT_TIMEOUT)
+            .read_timeout(crate::DEFAULT_READ_TIMEOUT);
+        builder
     }
 
     #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
     async fn do_reqwest(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
-        let resp = self
-            .client
-            .post(self.url)
-            .json(&req)
-            .headers(req.headers())
-            .send()
-            .await
-            .map_err(TransportErrorKind::custom)?;
+        let mut builder = self.client.post(self.url).json(&req).headers(req.headers());
+        if let Some(timeout) = self.settings.request_timeout() {
+            builder = builder.timeout(timeout);
+        }
+        let resp = builder.send().await.map_err(TransportErrorKind::custom)?;
         let status = resp.status();
         let retry_after = crate::parse_retry_after(
             resp.headers().get(reqwest::header::RETRY_AFTER).and_then(|value| value.to_str().ok()),

@@ -40,8 +40,25 @@ mod body;
 
 use alloy_transport::{utils::guess_local_url, DEFAULT_MAX_RESPONSE_SIZE};
 use core::str::FromStr;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, time::Duration};
 use url::Url;
+
+/// The default timeout for establishing a connection, used by the default HTTP clients.
+///
+/// This is set on the clients created by [`Http::new`] and `HyperClient::new`. It is not applied
+/// on WASM, where the browser controls connection timeouts.
+pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The default read timeout, used by the default HTTP clients.
+///
+/// The request fails if the server sends no response headers within this time, or if it then
+/// stops sending the body for this long. It is not a deadline for the whole request, so a large
+/// response that keeps arriving is never cut off; see
+/// [`HttpTransportSettings::with_request_timeout`] for that.
+///
+/// This is set on the clients created by [`Http::new`] and `HyperClient::new`. It is not applied
+/// on WASM, where the browser controls read timeouts.
+pub const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
 fn json_rpc_error_response(body: &[u8]) -> Option<alloy_json_rpc::ResponsePacket> {
@@ -230,10 +247,15 @@ impl<T> Http<T> {
 
 /// Settings for an [`Http`] transport.
 ///
-/// By default, response bodies are limited to [`DEFAULT_MAX_RESPONSE_SIZE`] bytes.
+/// By default, response bodies are limited to [`DEFAULT_MAX_RESPONSE_SIZE`] bytes and there is no
+/// request deadline.
+///
+/// Timeouts for connecting and reading are properties of the client instead, see
+/// [`DEFAULT_CONNECT_TIMEOUT`] and [`DEFAULT_READ_TIMEOUT`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HttpTransportSettings {
     max_response_size: Option<usize>,
+    request_timeout: Option<Duration>,
 }
 
 impl Default for HttpTransportSettings {
@@ -244,9 +266,9 @@ impl Default for HttpTransportSettings {
 
 impl HttpTransportSettings {
     /// Create the default settings, with a maximum response size of [`DEFAULT_MAX_RESPONSE_SIZE`]
-    /// bytes.
+    /// bytes and no request timeout.
     pub const fn new() -> Self {
-        Self { max_response_size: Some(DEFAULT_MAX_RESPONSE_SIZE) }
+        Self { max_response_size: Some(DEFAULT_MAX_RESPONSE_SIZE), request_timeout: None }
     }
 
     /// Create settings without any limits.
@@ -254,7 +276,7 @@ impl HttpTransportSettings {
     /// Response bodies of any size are buffered, so this should only be used with trusted
     /// endpoints.
     pub const fn unlimited() -> Self {
-        Self { max_response_size: None }
+        Self { max_response_size: None, request_timeout: None }
     }
 
     /// Set the maximum size of a response body in bytes, or `None` for no limit.
@@ -267,9 +289,23 @@ impl HttpTransportSettings {
         self
     }
 
+    /// Set a deadline for each request, from sending it until the whole response body is read.
+    ///
+    /// There is no deadline by default, as some responses, like `debug_trace*`, can take a long
+    /// time to produce and transfer.
+    pub const fn with_request_timeout(mut self, request_timeout: Duration) -> Self {
+        self.request_timeout = Some(request_timeout);
+        self
+    }
+
     /// Get the maximum size of a response body in bytes, if any.
     pub const fn max_response_size(&self) -> Option<usize> {
         self.max_response_size
+    }
+
+    /// Get the request deadline, if any.
+    pub const fn request_timeout(&self) -> Option<Duration> {
+        self.request_timeout
     }
 }
 
@@ -324,7 +360,7 @@ mod tests {
     }
 
     #[cfg(not(target_family = "wasm"))]
-    mod max_response_size {
+    mod limits {
         use crate::{Http, HttpTransportSettings};
         use alloy_json_rpc::{Id, Request, RequestPacket, ResponsePacket};
         use alloy_transport::{TransportError, DEFAULT_MAX_RESPONSE_SIZE};
@@ -452,11 +488,38 @@ mod tests {
             assert!(!err.to_string().contains("response body exceeds"), "{err}");
         }
 
+        /// Serves `head`, then keeps the connection open without sending anything else.
+        async fn serve_stalled(head: &'static str) -> Url {
+            serve(move |mut stream| async move {
+                let _ = stream.write_all(head.as_bytes()).await;
+                let _ = stream.read(&mut [0; 4096]).await;
+            })
+            .await
+        }
+
+        /// The request deadline also covers reading the body.
+        async fn assert_request_timeout<C>(new: fn(Url) -> Http<C>)
+        where
+            Http<C>: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>,
+        {
+            let settings =
+                HttpTransportSettings::new().with_request_timeout(Duration::from_millis(100));
+            let url = serve_stalled("HTTP/1.1 200 OK\r\ncontent-length: 100\r\n\r\n{").await;
+            let err = call(new(url).with_settings(settings)).await.unwrap_err();
+
+            let mut source: Option<&dyn std::error::Error> = Some(&err);
+            while let Some(err) = source.filter(|err| !err.to_string().contains("timed out")) {
+                source = err.source();
+            }
+            assert!(source.is_some(), "{err}");
+        }
+
         #[cfg(feature = "reqwest")]
         #[tokio::test]
         async fn reqwest_transport() {
             assert_max_response_size(Http::new).await;
             assert_default_max_response_size(Http::new).await;
+            assert_request_timeout(Http::new).await;
         }
 
         #[cfg(feature = "hyper")]
@@ -464,6 +527,26 @@ mod tests {
         async fn hyper_transport() {
             assert_max_response_size(Http::new_hyper).await;
             assert_default_max_response_size(Http::new_hyper).await;
+            assert_request_timeout(Http::new_hyper).await;
+        }
+
+        #[cfg(feature = "hyper")]
+        #[tokio::test]
+        async fn hyper_read_timeout() {
+            let new = |url| {
+                let client =
+                    crate::HyperClient::new().with_read_timeout(Some(Duration::from_millis(100)));
+                Http::with_client(client, url)
+            };
+
+            let err = call(new(serve_stalled("").await)).await.unwrap_err();
+            assert!(err.to_string().contains("no HTTP response received within 100ms"), "{err}");
+
+            let url =
+                serve_stalled("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n1\r\n{\r\n")
+                    .await;
+            let err = call(new(url)).await.unwrap_err();
+            assert!(err.to_string().contains("response body read timed out after 100ms"), "{err}");
         }
     }
 }

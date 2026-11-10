@@ -11,7 +11,7 @@ use hyper::{
 };
 use hyper_util::client::legacy::Error;
 use itertools::Itertools;
-use std::{future::Future, marker::PhantomData, pin::Pin, task};
+use std::{future::Future, marker::PhantomData, pin::Pin, task, time::Duration};
 use tower::{Layer, Service};
 use tracing::{debug, debug_span, instrument, Instrument};
 
@@ -25,6 +25,8 @@ pub type HyperTransport = Http<HyperClient>;
 
 impl HyperTransport {
     /// Create a new [`HyperTransport`] with the given URL and default hyper client.
+    ///
+    /// See [`HyperClient::new`] for the client's default timeouts.
     pub fn new_hyper(url: url::Url) -> Self {
         let client = HyperClient::new();
         Self::with_client(client, url)
@@ -35,6 +37,7 @@ impl HyperTransport {
 #[derive(Clone, Debug)]
 pub struct HyperClient<B = Full<Bytes>, S = Hyper> {
     service: S,
+    read_timeout: Option<Duration>,
     _pd: PhantomData<B>,
 }
 
@@ -47,11 +50,23 @@ pub type HyperResponseFut<T = HyperResponse, E = Error> =
 
 impl HyperClient {
     /// Create a new [HyperClient] with the default hyper client.
+    ///
+    /// The client has a [`DEFAULT_CONNECT_TIMEOUT`](crate::DEFAULT_CONNECT_TIMEOUT) and a
+    /// [`DEFAULT_READ_TIMEOUT`](crate::DEFAULT_READ_TIMEOUT). Use
+    /// [`HyperClient::with_read_timeout`] to change the read timeout, or
+    /// [`HyperClient::with_service`] to provide a client with other timeouts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the TLS connector cannot be created, like [`hyper_tls::HttpsConnector::new`].
     pub fn new() -> Self {
+        let mut http = hyper_util::client::legacy::connect::HttpConnector::new();
+        http.enforce_http(false);
+        http.set_connect_timeout(Some(crate::DEFAULT_CONNECT_TIMEOUT));
         let executor = hyper_util::rt::TokioExecutor::new();
         let service = hyper_util::client::legacy::Client::builder(executor)
-            .build(hyper_tls::HttpsConnector::new());
-        Self { service, _pd: PhantomData }
+            .build(hyper_tls::HttpsConnector::new_with_connector(http));
+        Self::with_service(service).with_read_timeout(Some(crate::DEFAULT_READ_TIMEOUT))
     }
 }
 
@@ -63,8 +78,25 @@ impl Default for HyperClient {
 
 impl<B, S> HyperClient<B, S> {
     /// Create a new [HyperClient] with the given service.
+    ///
+    /// No read timeout is added to the service.
     pub const fn with_service(service: S) -> Self {
-        Self { service, _pd: PhantomData }
+        Self { service, read_timeout: None, _pd: PhantomData }
+    }
+
+    /// Set the read timeout, or `None` for no read timeout.
+    ///
+    /// The request fails if the service does not return the response headers within this time,
+    /// or if the response body then yields no data for this long. See
+    /// [`DEFAULT_READ_TIMEOUT`](crate::DEFAULT_READ_TIMEOUT).
+    pub const fn with_read_timeout(mut self, read_timeout: Option<Duration>) -> Self {
+        self.read_timeout = read_timeout;
+        self
+    }
+
+    /// Get the read timeout, if any.
+    pub const fn read_timeout(&self) -> Option<Duration> {
+        self.read_timeout
     }
 
     /// Apply a tower [`Layer`] to this client's service.
@@ -86,7 +118,7 @@ impl<B, S> HyperClient<B, S> {
     where
         L: Layer<S>,
     {
-        HyperClient::with_service(layer.layer(self.service))
+        HyperClient::with_service(layer.layer(self.service)).with_read_timeout(self.read_timeout)
     }
 }
 
@@ -102,6 +134,15 @@ where
 {
     #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
     async fn do_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
+        timeout(self.settings.request_timeout(), self.send_hyper(req)).await.unwrap_or_else(
+            |duration| {
+                let msg = format!("HTTP request timed out after {duration:?}");
+                Err(TransportErrorKind::custom_str(&msg))
+            },
+        )
+    }
+
+    async fn send_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         debug!(count = req.len(), "sending request packet to server");
 
         let mut builder = hyper::Request::builder()
@@ -120,8 +161,15 @@ where
 
         let req = builder.body(body).map_err(TransportErrorKind::custom)?;
 
+        let read_timeout = self.client.read_timeout;
         let mut service = self.client.service;
-        let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
+        let resp = timeout(read_timeout, service.call(req))
+            .await
+            .map_err(|duration| {
+                let msg = format!("no HTTP response received within {duration:?}");
+                TransportErrorKind::custom_str(&msg)
+            })?
+            .map_err(TransportErrorKind::custom)?;
 
         let status = resp.status();
         let retry_after = crate::parse_retry_after(
@@ -130,25 +178,38 @@ where
 
         debug!(%status, "received response from server");
 
-        let body = collect_body(resp.into_body(), self.settings.max_response_size()).await;
+        let max = self.settings.max_response_size();
+        let body = collect_body(resp.into_body(), max, read_timeout).await;
         crate::handle_response(status.as_u16(), retry_after, body)
     }
 }
 
-/// Collects the response body, failing as soon as it exceeds `max` bytes, if set.
-async fn collect_body<B: Body>(body: B, max: Option<usize>) -> Result<Bytes, BodyError<B::Error>> {
-    let Some(max) = max else {
-        return body.collect().await.map(|body| body.to_bytes()).map_err(BodyError::Read);
-    };
-    if body.size_hint().lower() > max as u64 {
+/// Awaits `fut`, failing with the elapsed `duration` if it does not complete in time, if set.
+async fn timeout<F: Future>(duration: Option<Duration>, fut: F) -> Result<F::Output, Duration> {
+    match duration {
+        Some(duration) => tokio::time::timeout(duration, fut).await.map_err(|_| duration),
+        None => Ok(fut.await),
+    }
+}
+
+/// Collects the response body, failing as soon as it exceeds `max` bytes, or when no data arrives
+/// within `read_timeout`, if set.
+async fn collect_body<B: Body>(
+    body: B,
+    max: Option<usize>,
+    read_timeout: Option<Duration>,
+) -> Result<Bytes, BodyError<B::Error>> {
+    if let Some(max) = max.filter(|&max| body.size_hint().lower() > max as u64) {
         return Err(BodyError::TooLarge(max));
     }
 
     let mut body = std::pin::pin!(body);
     let mut buf = Vec::new();
-    while let Some(frame) = body.frame().await {
+    while let Some(frame) =
+        timeout(read_timeout, body.frame()).await.map_err(BodyError::TimedOut)?
+    {
         let Ok(mut data) = frame.map_err(BodyError::Read)?.into_data() else { continue };
-        if buf.len() + data.remaining() > max {
+        if let Some(max) = max.filter(|&max| buf.len() + data.remaining() > max) {
             return Err(BodyError::TooLarge(max));
         }
         while data.has_remaining() {
