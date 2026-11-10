@@ -479,7 +479,7 @@ async fn custom_subscriptions_are_distinct_and_cancelled_in_their_namespace() {
 
     for (local_id, method, server_id) in [
         (persisted, "reth_unsubscribePersistedBlock", "0xaaa"),
-        (peers, "admin_unsubscribe", "0xbbb"),
+        (peers, "admin_peerEvents_unsubscribe", "0xbbb"),
     ] {
         frontend.unsubscribe(local_id).unwrap();
         let unsubscribe = backend.recv().await;

@@ -107,8 +107,9 @@ already accepted by the service. Likewise, dropping a [`RawSubscription`] or
 subscription. Call [`PubSubFrontend::unsubscribe`] with the local ID when the
 server-side subscription is no longer needed. It sends
 `{namespace}_unsubscribe`, with the namespace of the subscribe method, e.g.
-`eth_unsubscribe` or `admin_unsubscribe`, and `{namespace}_unsubscribe{Name}`
-for methods named `{namespace}_subscribe{Name}`. `unsubscribe` only queues the
+`eth_unsubscribe`, `{namespace}_unsubscribe{Name}` for methods named
+`{namespace}_subscribe{Name}`, and `{method}_unsubscribe` for other methods,
+e.g. `admin_peerEvents_unsubscribe`. `unsubscribe` only queues the
 instruction and does not wait for the server's response.
 
 The service also cancels server-side subscriptions it would not route: those

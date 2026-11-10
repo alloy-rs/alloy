@@ -599,17 +599,18 @@ fn reconnect_retry_interval(base_interval: Duration, retry_count: u32) -> Durati
 /// Returns the method that cancels a subscription created by `subscribe_method`.
 ///
 /// The namespace is taken from the subscribe method, e.g. `eth_subscribe` maps to
-/// `eth_unsubscribe` and `admin_peerEvents` to `admin_unsubscribe`. Methods named
-/// `{namespace}_subscribe{Name}` map to `{namespace}_unsubscribe{Name}`, e.g.
-/// `reth_subscribeChainNotifications` to `reth_unsubscribeChainNotifications`. Methods without a
-/// namespace fall back to `eth_unsubscribe`.
+/// `eth_unsubscribe`. Methods named `{namespace}_subscribe{Name}` map to
+/// `{namespace}_unsubscribe{Name}`, e.g. `reth_subscribeChainNotifications` to
+/// `reth_unsubscribeChainNotifications`. Other methods map to `{method}_unsubscribe`, as reth's
+/// `admin_peerEvents` does to `admin_peerEvents_unsubscribe`. Methods without a namespace fall
+/// back to `eth_unsubscribe`.
 fn unsubscribe_method(subscribe_method: &str) -> Cow<'static, str> {
     match subscribe_method.split_once('_') {
         None | Some(("eth", "subscribe")) => Cow::Borrowed("eth_unsubscribe"),
-        Some((namespace, name)) => {
-            let suffix = name.strip_prefix("subscribe").unwrap_or_default();
-            Cow::Owned(format!("{namespace}_unsubscribe{suffix}"))
-        }
+        Some((namespace, name)) => match name.strip_prefix("subscribe") {
+            Some(suffix) => Cow::Owned(format!("{namespace}_unsubscribe{suffix}")),
+            None => Cow::Owned(format!("{subscribe_method}_unsubscribe")),
+        },
     }
 }
 
@@ -916,7 +917,7 @@ mod tests {
         for (subscribe, unsubscribe) in [
             ("eth_subscribe", "eth_unsubscribe"),
             ("debug_subscribe", "debug_unsubscribe"),
-            ("admin_peerEvents", "admin_unsubscribe"),
+            ("admin_peerEvents", "admin_peerEvents_unsubscribe"),
             ("reth_subscribeChainNotifications", "reth_unsubscribeChainNotifications"),
             ("reth_subscribePersistedBlock", "reth_unsubscribePersistedBlock"),
             ("subscribe", "eth_unsubscribe"),
