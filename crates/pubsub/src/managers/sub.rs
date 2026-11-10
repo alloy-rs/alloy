@@ -28,6 +28,11 @@ impl SubscriptionManager {
         self.local_to_sub.contains_key(local_id)
     }
 
+    /// Returns true if the subscription with this local_id is routed via a server id.
+    pub(crate) fn is_routed(&self, local_id: &B256) -> bool {
+        self.local_to_server.contains_left(local_id)
+    }
+
     /// Insert a new subscription routed via `server_id`, returning its local id.
     pub(crate) fn insert(
         &mut self,

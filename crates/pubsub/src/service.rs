@@ -197,9 +197,10 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
         if in_flight.is_subscription() {
             // Identical subscribe requests share one subscription, instead of each creating
-            // another one on the server.
+            // another one on the server. A subscription that is not routed, e.g. because its
+            // resubscription failed, is routed again by the request.
             let local_id = subscription_local_id(in_flight.request());
-            if self.subs.contains(&local_id) {
+            if self.subs.is_routed(&local_id) {
                 let id = in_flight.request.id().clone();
                 self.deliver_local_id(local_id, id, in_flight.tx)?;
                 return Ok(());

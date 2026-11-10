@@ -178,6 +178,26 @@ async fn reconnect_resubscribes_under_new_server_id() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn identical_subscribe_reroutes_subscription_after_failed_resubscription() {
+    let (frontend, _, [mut first, mut second]) = spawn_service().await;
+    let local = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
+    let mut sub = frontend.get_subscription(local).await.unwrap();
+
+    first.close();
+    assert_eq!(second.recv().await["id"], 1);
+    second.send(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": { "code": -32000, "message": "too many subscriptions" },
+    }));
+
+    // The identical subscribe reaches the server instead of the unrouted subscription answering it.
+    assert_eq!(subscribe(&frontend, &mut second, 2, json!(["newHeads"]), "0xbbb").await, local);
+    second.notify("0xbbb", json!(1));
+    assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
+}
+
+#[tokio::test(start_paused = true)]
 async fn unsubscribe_during_resubscribe_keeps_service_alive() {
     let (frontend, _, [mut first, mut second]) = spawn_service().await;
     let local_id = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
