@@ -122,12 +122,13 @@ impl<T: PubSubConnect> PubSubService<T> {
         // with the old connection.
         self.subs.retain_consumed();
 
-        // Re-issue pending requests.
+        // Re-issue pending requests. Dispatch errors are ignored: if the replacement already
+        // died, the service loop notices and accounts for its death like any other.
         self.remove_cancelled();
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
         for in_flight in self.in_flights.iter() {
             let msg = in_flight.request.serialized().to_owned();
-            self.dispatch_request(msg)?;
+            let _ = self.dispatch_request(msg);
         }
 
         // Re-subscribe to all active subscriptions
@@ -143,7 +144,7 @@ impl<T: PubSubConnect> PubSubService<T> {
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
-            self.dispatch_request(msg)?;
+            let _ = self.dispatch_request(msg);
         }
 
         Ok(())

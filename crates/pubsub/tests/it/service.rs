@@ -562,6 +562,20 @@ async fn request_that_keeps_killing_backends_fails() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn replacements_dying_during_replay_count_against_replay_budget() {
+    let (frontend, _, [mut first, second, third, fourth, mut last]) = spawn_service_with(10).await;
+    // These replacements are gone by the time the service replays the request to them.
+    drop((second, third, fourth));
+    let resp = tokio::spawn(frontend.send(request("eth_getLogs", 1, json!([{}]))));
+    assert_eq!(first.recv().await["id"], 1);
+    first.close();
+
+    let err = within(resp).await.unwrap().unwrap_err();
+    assert_eq!(err.to_string(), "backend connection closed 4 times while the request was pending");
+    probe(&frontend, &mut last, 2).await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn resubscription_that_keeps_killing_backends_is_dropped() {
     let (frontend, _, [mut first, second, third, fourth, fifth, mut last]) = spawn_service().await;
     let local_id = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0x1").await;
