@@ -66,6 +66,9 @@ impl Http<Client> {
     async fn do_reqwest(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         let mut builder = self.client.post(self.url).json(&req).headers(req.headers());
         if let Some(timeout) = self.settings.request_timeout() {
+            // The WASM client panics on timeouts that do not fit `setTimeout`'s `i32` milliseconds.
+            #[cfg(target_family = "wasm")]
+            let timeout = timeout.min(std::time::Duration::from_millis(i32::MAX as u64));
             builder = builder.timeout(timeout);
         }
         let resp = builder.send().await.map_err(TransportErrorKind::custom)?;
