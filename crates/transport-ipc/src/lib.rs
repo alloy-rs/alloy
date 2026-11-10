@@ -321,7 +321,9 @@ where
                         Ok(0) => {
                             *this.finished = true;
                             if this.scanner.depth != 0 {
-                                let err = serde_json::from_slice::<serde_json::Value>(this.buf)
+                                // `IgnoredAny` finds the error without building the value,
+                                // which would take many times the size of the buffer.
+                                let err = serde_json::from_slice::<serde::de::IgnoredAny>(this.buf)
                                     .unwrap_err();
                                 log_invalid_json(&err, this.buf.as_ref());
                                 return Ready(Some(Err(json_error(err))));
