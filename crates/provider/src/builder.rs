@@ -621,6 +621,10 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     /// Build this provider with a provided Reqwest client builder.
+    ///
+    /// The closure is given the builder of the default client,
+    /// [`Http::default_client_builder`](alloy_transport_http::Http::default_client_builder),
+    /// which has the default connect and read timeouts.
     #[cfg(any(test, all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))))]
     pub fn with_reqwest<B>(self, url: reqwest::Url, builder: B) -> F::Provider
     where
@@ -629,7 +633,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         N: Network,
         B: FnOnce(reqwest::ClientBuilder) -> reqwest::Client,
     {
-        self.connect_reqwest(builder(reqwest::ClientBuilder::default()), url)
+        self.connect_reqwest(builder(alloy_transport_http::Http::default_client_builder()), url)
     }
 
     /// Build this provider with an Hyper HTTP transport.
