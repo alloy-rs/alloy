@@ -390,7 +390,8 @@ struct TxWatcher {
     /// Invariant: any confirmed transaction in `Heart` has this value set.
     received_at_block: Option<u64>,
     tx: oneshot::Sender<Result<(), WatchTxError>>,
-    /// Each registration has its own deadline, including duplicate transaction hashes.
+    /// Each registration has its own deadline, including duplicate transaction hashes. Set when
+    /// the heartbeat processes the registration.
     deadline: Option<Instant>,
 }
 
@@ -468,8 +469,7 @@ impl HeartbeatHandle {
     ) -> Result<PendingTransaction, PendingTransactionConfig> {
         let (tx, rx) = oneshot::channel();
         let tx_hash = config.tx_hash;
-        let deadline = config.timeout.map(|timeout| Instant::now() + timeout);
-        match self.tx.send(TxWatcher { config, received_at_block, tx, deadline }).await {
+        match self.tx.send(TxWatcher { config, received_at_block, tx, deadline: None }).await {
             Ok(()) => Ok(PendingTransaction { tx_hash, rx }),
             Err(e) => Err(e.0.config),
         }
@@ -625,6 +625,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// Handle a watch instruction by adding it to the watch list, and
     /// preserving its individual timeout.
     fn handle_watch_ix(&mut self, mut to_watch: TxWatcher) {
+        to_watch.deadline = to_watch.config.timeout.map(|timeout| Instant::now() + timeout);
         if let Some(deadline) = to_watch.deadline {
             self.next_timeout = Some(self.next_timeout.map_or(deadline, |next| next.min(deadline)));
         }

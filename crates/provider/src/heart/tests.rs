@@ -397,15 +397,17 @@ fn watcher(
     hash: TxHash,
     confirmations: u64,
     received: Option<u64>,
-    deadline: Option<Instant>,
+    timeout: Option<Duration>,
 ) -> (TxWatcher, PendingTransaction) {
     let (tx, rx) = oneshot::channel();
     (
         TxWatcher {
-            config: PendingTransactionConfig::new(hash).with_required_confirmations(confirmations),
+            config: PendingTransactionConfig::new(hash)
+                .with_required_confirmations(confirmations)
+                .with_timeout(timeout),
             received_at_block: received,
             tx,
-            deadline,
+            deadline: None,
         },
         PendingTransaction { tx_hash: hash, rx },
     )
@@ -427,7 +429,7 @@ fn block(number: u64, hashes: Vec<TxHash>) -> Block {
 async fn duplicate_watchers_keep_independent_confirmations_and_deadlines() {
     let mut heart = heart();
     let hash = B256::repeat_byte(1);
-    let (first, first_rx) = watcher(hash, 1, None, Some(Instant::now()));
+    let (first, first_rx) = watcher(hash, 1, None, Some(Duration::ZERO));
     let (second, mut second_rx) = watcher(hash, 3, None, None);
     heart.handle_watch_ix(first);
     heart.handle_watch_ix(second);
@@ -446,11 +448,25 @@ async fn duplicate_watchers_keep_independent_confirmations_and_deadlines() {
 }
 
 #[tokio::test]
+async fn timeout_starts_when_the_heartbeat_processes_the_registration() {
+    let (tx, mut ixns) = mpsc::channel(1);
+    let config = PendingTransactionConfig::new(B256::repeat_byte(6))
+        .with_timeout(Some(Duration::from_millis(50)));
+    let mut pending = HeartbeatHandle { tx }.watch_tx(config, None).await.unwrap();
+    // The registration stays queued for longer than its timeout.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let mut heart = heart();
+    heart.handle_watch_ix(ixns.recv().await.unwrap());
+    heart.reap_timeouts();
+    assert!((&mut pending).now_or_never().is_none());
+}
+
+#[tokio::test]
 async fn timeouts_cover_already_mined_and_observed_transactions() {
     for already_mined in [false, true] {
         let mut heart = heart();
         let hash = B256::repeat_byte(2);
-        let (watcher, pending) = watcher(hash, 3, already_mined.then_some(1), Some(Instant::now()));
+        let (watcher, pending) = watcher(hash, 3, already_mined.then_some(1), Some(Duration::ZERO));
         heart.handle_watch_ix(watcher);
         if !already_mined {
             heart.handle_new_block(block(1, vec![hash]));
