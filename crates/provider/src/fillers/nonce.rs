@@ -70,9 +70,11 @@ impl NonceManager for SimpleNonceManager {
 /// with an error that shows the transaction never reached the node or was definitively rejected
 /// for a reason unrelated to the nonce ([`NonceManager::on_send_failure`]). After a nonce error,
 /// or an error that leaves it unknown whether the node accepted the transaction (e.g. a transport
-/// failure), the account is reset and its nonce is fetched again on the next request. A chain
-/// reorganization or a transaction sent through another manager can still leave it out of sync
-/// with the node until a send fails with a nonce error.
+/// failure), its nonce is fetched again on the next request. The local nonce then only moves
+/// forward, since transactions sent with the nonces handed out may not have reached the node yet,
+/// and the failed nonce is handed out again if the node doesn't have it. A transaction sent through
+/// another manager can leave it behind the node until a send fails with a nonce error, while a
+/// chain reorganization or a transaction the node dropped can leave it ahead.
 ///
 /// There is also an alternative implementation [`SimpleNonceManager`] that does not store the
 /// transaction count locally.
@@ -89,6 +91,8 @@ struct AccountNonce {
     /// Nonces below `next` that were released because their transaction never reached the node or
     /// was rejected.
     released: BTreeSet<u64>,
+    /// Whether the nonce has to be fetched again before the next one is handed out.
+    stale: bool,
 }
 
 impl AccountNonce {
@@ -99,6 +103,16 @@ impl AccountNonce {
             trace!(%address, nonce, "releasing nonce");
             self.released.insert(nonce);
         }
+    }
+
+    /// Catches up with the node's pending nonce, dropping released nonces the node has.
+    ///
+    /// Nonces handed out above the pending nonce stay reserved, since the node doesn't count
+    /// transactions that are still in flight or queued behind a gap.
+    fn sync(&mut self, pending: u64) {
+        self.released = self.released.split_off(&pending);
+        self.next = Some(self.next.map_or(pending, |next| next.max(pending)));
+        self.stale = false;
     }
 }
 
@@ -125,22 +139,19 @@ impl NonceManager for CachedNonceManager {
         };
 
         let mut account = account.lock().await;
+        if account.next.is_none() || account.stale {
+            trace!(%address, "fetching nonce");
+            let pending = provider.get_transaction_count(address).pending().await?;
+            account.sync(pending);
+        }
+
         if let Some(nonce) = account.released.pop_first() {
             trace!(%address, nonce, "reusing released nonce");
             return Ok(nonce);
         }
 
-        let nonce = match account.next {
-            Some(nonce) => {
-                trace!(%address, nonce, "incrementing nonce");
-                nonce
-            }
-            None => {
-                // Initialize the nonce if we haven't seen this account before, or it was reset.
-                trace!(%address, "fetching nonce");
-                provider.get_transaction_count(address).pending().await?
-            }
-        };
+        let nonce = account.next.expect("set by sync");
+        trace!(%address, nonce, "incrementing nonce");
         account.next = Some(nonce + 1);
         Ok(nonce)
     }
@@ -149,11 +160,12 @@ impl NonceManager for CachedNonceManager {
         let Some(account) = self.account(address) else { return };
 
         let mut account = account.lock().await;
-        if is_definitive_rejection(error) {
-            account.release(address, nonce);
-        } else {
-            trace!(%address, nonce, %error, "resetting nonce");
-            *account = AccountNonce::default();
+        account.release(address, nonce);
+        if !is_definitive_rejection(error) {
+            // The node may have the transaction, so its nonce is only reused if the node's pending
+            // nonce, fetched on the next request, doesn't cover it.
+            trace!(%address, nonce, %error, "resyncing nonce");
+            account.stale = true;
         }
     }
 
@@ -594,7 +606,7 @@ mod tests {
             for nonce in 0..3 {
                 assert_eq!(next_nonce(&manager, &provider).await, nonce);
             }
-            // The released nonce is dropped by the reset.
+            // Released nonces the node has are dropped.
             manager.on_send_failure(Address::ZERO, 0, &rejection()).await;
             manager.on_send_failure(Address::ZERO, 2, &error).await;
 
@@ -623,7 +635,7 @@ mod tests {
         }
         assert_eq!(next_nonce(&manager, &provider).await, 2);
 
-        // Nothing has been handed out since the reset.
+        // Released nonces below the refetched nonce are dropped.
         manager.on_send_failure(Address::ZERO, 2, &error_resp("nonce too low")).await;
         manager.on_send_failure(Address::ZERO, 1, &rejection()).await;
         asserter.push_success(&U64::from(3));
@@ -742,6 +754,32 @@ mod tests {
 
         let err = provider.send_transaction(transfer(U256::from(100))).await.unwrap_err();
         assert!(err.to_string().contains("nonce"), "{err}");
+        send_with_nonce(&provider, 3).await;
+    }
+
+    #[tokio::test]
+    async fn resync_keeps_nonces_in_use() {
+        let manager = CachedNonceManager::default();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_nonce_management(manager.clone())
+            .fetch_chain_id()
+            .connect_anvil_with_wallet();
+        let from = provider.default_signer_address();
+
+        let mut envelopes = Vec::new();
+        for _ in 0..3 {
+            let tx = provider.fill(transfer(U256::from(100))).await.unwrap();
+            envelopes.push(tx.try_into_envelope().unwrap());
+        }
+        let [tx0, _, tx2] = envelopes.try_into().unwrap();
+        provider.send_tx_envelope(tx0).await.unwrap().get_receipt().await.unwrap();
+        // The node queues 2 behind the gap, so its pending nonce is 1.
+        let _queued = provider.send_tx_envelope(tx2).await.unwrap();
+        let err = TransportErrorKind::custom_str("connection reset");
+        manager.on_send_failure(from, 1, &err).await;
+
+        send_with_nonce(&provider, 1).await;
         send_with_nonce(&provider, 3).await;
     }
 
