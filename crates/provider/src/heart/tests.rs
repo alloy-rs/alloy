@@ -565,6 +565,36 @@ async fn reorg_reinclusion_uses_new_height_and_cancellation_cleans_up() {
 }
 
 #[tokio::test]
+async fn receipt_blocks_replaced_before_the_stream_sees_the_watch_are_not_inclusion() {
+    // The registration's receipt is from block 10, which the stream has not reached yet or has
+    // already replaced with a block that doesn't contain the transaction.
+    for (stream_height, replaced) in [(9, false), (9, true), (10, true)] {
+        let mut heart = heart();
+        let hash = B256::repeat_byte(7);
+        for number in 8..=stream_height {
+            heart.handle_new_block(block(number, vec![]));
+        }
+        let (watcher, mut pending) = watcher(hash, 3, Some(10), None);
+        heart.handle_watch_ix(watcher);
+        for number in stream_height + 1..=12 {
+            let txs = if number == 10 && !replaced { vec![hash] } else { vec![] };
+            heart.handle_new_block(block(number, txs));
+        }
+        if !replaced {
+            assert_eq!(pending.await.unwrap(), hash);
+            continue;
+        }
+        assert!((&mut pending).now_or_never().is_none(), "{stream_height}");
+        // Included again, and confirmed from that block.
+        heart.handle_new_block(block(13, vec![hash]));
+        heart.handle_new_block(block(14, vec![]));
+        assert!((&mut pending).now_or_never().is_none(), "{stream_height}");
+        heart.handle_new_block(block(15, vec![]));
+        assert_eq!(pending.await.unwrap(), hash);
+    }
+}
+
+#[tokio::test]
 async fn zero_confirmations_at_genesis_do_not_underflow() {
     for confirmations in [0, 1] {
         for known_receipt in [false, true] {

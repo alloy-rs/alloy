@@ -637,6 +637,14 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         // Start watching for the transaction.
         debug!(tx=%to_watch.config.tx_hash, "watching");
         trace!(?to_watch.config, ?to_watch.received_at_block);
+        // The receipt's block may have been reorged out before this registration arrived.
+        if to_watch.received_at_block.is_some_and(|received_at_block| {
+            self.past_blocks.iter().any(|(height, txs)| {
+                *height == received_at_block && !txs.contains(&to_watch.config.tx_hash)
+            })
+        }) {
+            to_watch.received_at_block = None;
+        }
         if let Some(received_at_block) = to_watch.received_at_block {
             // Transaction is already confirmed, we just need to wait for the required
             // confirmations.
@@ -805,6 +813,21 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             }
         }
         self.past_blocks.push_back((block_height, block.transactions().hashes().collect()));
+
+        // A block known from a receipt can be replaced before the stream reaches its height,
+        // without a gap in heights. Watch those transactions again.
+        let txs = &self.past_blocks.back().unwrap().1;
+        for watchers in self.waiting_confs.range_mut(block_height..).map(|(_, watchers)| watchers) {
+            for mut watcher in watchers.extract_if(.., |watcher| {
+                watcher.received_at_block == Some(block_height)
+                    && !txs.contains(&watcher.config.tx_hash)
+            }) {
+                debug!(tx=%watcher.config.tx_hash, block_height, "not in the block of its receipt");
+                watcher.received_at_block = None;
+                self.unconfirmed.entry(watcher.config.tx_hash).or_default().push(watcher);
+            }
+        }
+        self.waiting_confs.retain(|_, watchers| !watchers.is_empty());
 
         // Check if we are watching for any of the transactions in this block.
         let to_check: Vec<_> = block

@@ -339,9 +339,13 @@ mod regression_tests {
     async fn heartbeat_continues_after_invalid_block_number() {
         let asserter = Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let tx_hash = B256::with_last_byte(1);
         for number in 0..=2 {
             let mut block: Block = Block::default();
             block.header.inner.number = number;
+            if number == 1 {
+                block.transactions = BlockTransactions::Hashes(vec![tx_hash]);
+            }
             asserter.push_success(&Some(block));
         }
 
@@ -353,7 +357,6 @@ mod regression_tests {
             Heartbeat::<Ethereum, _>::new(stream, paused, alloy_rpc_client::WeakClient::new())
                 .spawn();
 
-        let tx_hash = B256::with_last_byte(1);
         let config = PendingTransactionConfig::new(tx_hash).with_required_confirmations(2);
         let pending = heartbeat.watch_tx(config, Some(1)).await.unwrap();
         assert_eq!(
