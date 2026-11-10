@@ -94,11 +94,12 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(PubSubFrontend::new(tx))
     }
 
-    /// Reconnect by dropping the backend and creating a new one.
-    async fn get_new_backend(&mut self) -> TransportResult<ConnectionHandle> {
-        let mut handle = self.connector.try_reconnect().await?;
-        std::mem::swap(&mut self.handle, &mut handle);
-        Ok(handle)
+    /// Handle the items the current backend sent and the service has not read yet.
+    fn drain_backend(&mut self) -> TransportResult<()> {
+        while let Ok(item) = self.handle.from_socket.try_recv() {
+            self.handle_item(item)?;
+        }
+        Ok(())
     }
 
     /// Reconnect the backend, re-issue pending requests, and re-start active
@@ -106,16 +107,15 @@ impl<T: PubSubConnect> PubSubService<T> {
     async fn reconnect(&mut self) -> TransportResult<()> {
         debug!("Reconnecting pubsub service backend");
 
-        let mut old_handle = self.get_new_backend().await?;
+        let handle = self.connector.try_reconnect().await?;
 
         debug!("Draining old backend to_handle");
 
-        // Drain the old backend
-        while let Ok(item) = old_handle.from_socket.try_recv() {
-            self.handle_item(item)?;
-        }
+        // Drain the old backend while it is still the current one, so that cancelling a
+        // subscription it created doesn't reach the replacement.
+        self.drain_backend()?;
 
-        old_handle.shutdown();
+        std::mem::replace(&mut self.handle, handle).shutdown();
         self.backend_progressed = false;
 
         // Subscriptions nobody consumes are not restored: their server-side counterparts closed
@@ -378,6 +378,8 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// failures (auth/protocol violations, malformed handshake, etc.) do not
     /// burn the full retry budget.
     async fn reconnect_with_retries(&mut self) -> TransportResult<()> {
+        // Answers the backend sent before it died count for its health and their requests.
+        self.drain_backend()?;
         self.handle_backend_death().await?;
 
         let mut retry_count = 0;
@@ -820,6 +822,43 @@ mod tests {
             Err(mpsc::error::TryRecvError::Empty)
         ));
         assert_eq!(service.in_flights.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn answers_from_dying_backend_count_before_its_death() {
+        let (handle, interface) = ConnectionHandle::new();
+        let (replacement, mut replacement_interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service =
+            PubSubService::new(handle, MockConnect(Arc::new(Mutex::new(Some(replacement)))), reqs);
+        let request = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let (in_flight, response) = InFlight::new(request, 16);
+        service.in_flights.insert(in_flight);
+        let request =
+            Request::new("eth_subscribe", Id::Number(2), ["newHeads"]).serialize().unwrap();
+        let (in_flight, cancelled) = InFlight::new(request, 16);
+        drop(cancelled);
+        service.in_flights.insert(in_flight);
+
+        // The backend answers both requests and dies before the service reads the answers.
+        for answer in [
+            r#"{"jsonrpc":"2.0","id":1,"result":"0x1"}"#,
+            r#"{"jsonrpc":"2.0","id":2,"result":"0xaaa"}"#,
+        ] {
+            interface.send_to_frontend(serde_json::from_str(answer).unwrap()).unwrap();
+        }
+        drop(interface);
+        service.reconnect_with_retries().await.unwrap();
+
+        // The backend answered a request, so it was healthy.
+        assert_eq!(service.unhealthy_backends, 0);
+        let response = response.await.unwrap().unwrap();
+        assert_eq!(response.payload.as_success().unwrap().get(), r#""0x1""#);
+        // The subscription the dead backend created is not cancelled on the replacement.
+        assert!(matches!(
+            replacement_interface.from_frontend.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
     }
 
     #[tokio::test]
