@@ -279,6 +279,19 @@ where
                     }
                 }
                 Scan::Incomplete => {
+                    // Drop the whitespace before the value, so that it neither counts
+                    // toward the limit nor accumulates between values. The framer has
+                    // scanned the whole buffer, so this only moves its position back.
+                    let ws = this
+                        .buf
+                        .iter()
+                        .position(|b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))
+                        .unwrap_or(this.buf.len());
+                    if ws > 0 {
+                        this.buf.advance(ws);
+                        this.scanner.pos -= ws;
+                    }
+
                     // Complete values are yielded first, so the buffer only holds
                     // the incomplete value. Never read past the limit.
                     let remaining = match *this.max_response_size {
@@ -893,7 +906,9 @@ mod tests {
     #[tokio::test]
     async fn max_response_size_limits_values() {
         let frame = br#"{"jsonrpc":"2.0","id":1,"result":"0x1"}"#;
-        let input = [frame.as_slice(), frame].concat();
+        // Whitespace between values does not count toward the limit.
+        let whitespace = b" \t\r\n".repeat(frame.len());
+        let input = [frame.as_slice(), &whitespace, frame].concat();
 
         let mut reader = ReadJsonStream::<_, PubSubItem>::from(input.as_slice())
             .with_max_response_size(Some(frame.len()));
@@ -913,18 +928,14 @@ mod tests {
     #[tokio::test]
     async fn endless_value_is_rejected_without_buffering_past_the_limit() {
         let max = 64 * 1024;
-        // An endless string, and endless whitespace before a value.
-        for (prefix, fill) in
-            [(br#"{"jsonrpc":"2.0","id":1,"result":""#.as_slice(), b'0'), (b"", b' ')]
-        {
-            let input = AsyncReadExt::chain(prefix, tokio::io::repeat(fill));
-            let mut reader =
-                ReadJsonStream::<_, PubSubItem>::from(input).with_max_response_size(Some(max));
-            let err = reader.next().await.unwrap().unwrap_err();
-            assert!(TooLarge::is(&err), "{err}");
-            assert!(reader.buf.len() <= max, "buffered {} bytes", reader.buf.len());
-            assert!(reader.buf.capacity() <= max, "reserved {} bytes", reader.buf.capacity());
-        }
+        let prefix = br#"{"jsonrpc":"2.0","id":1,"result":""#;
+        let input = AsyncReadExt::chain(prefix.as_slice(), tokio::io::repeat(b'0'));
+        let mut reader =
+            ReadJsonStream::<_, PubSubItem>::from(input).with_max_response_size(Some(max));
+        let err = reader.next().await.unwrap().unwrap_err();
+        assert!(TooLarge::is(&err), "{err}");
+        assert!(reader.buf.len() <= max, "buffered {} bytes", reader.buf.len());
+        assert!(reader.buf.capacity() <= max, "reserved {} bytes", reader.buf.capacity());
     }
 
     #[tokio::test]
