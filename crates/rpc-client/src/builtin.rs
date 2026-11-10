@@ -132,7 +132,9 @@ impl BuiltInConnectionString {
     /// - [`ConnectionConfig::max_retries`] and [`ConnectionConfig::retry_interval`] control WS
     ///   reconnects only. HTTP has no persistent connection to retry; use `RetryBackoffLayer` to
     ///   retry HTTP requests.
-    /// - IPC ignores the configuration.
+    /// - [`ConnectionConfig::max_response_size`] limits HTTP response bodies and IPC messages, and
+    ///   WS messages unless [`ConnectionConfig::ws_config`] is set.
+    /// - IPC ignores all other configuration.
     pub async fn connect_boxed_with(
         &self,
         config: ConnectionConfig,
@@ -156,9 +158,10 @@ impl BuiltInConnectionString {
                     )]));
                 }
                 let client = builder.build().map_err(TransportErrorKind::custom)?;
-                Ok(alloy_transport::Transport::boxed(alloy_transport_http::Http::with_client(
-                    client, url,
-                )))
+                Ok(alloy_transport::Transport::boxed(
+                    alloy_transport_http::Http::with_client(client, url)
+                        .with_settings(config.http_settings()),
+                ))
             }
 
             #[cfg(all(
@@ -174,9 +177,11 @@ impl BuiltInConnectionString {
             #[cfg(feature = "hyper")]
             Self::Http(url) => {
                 let (url, auth) = http_auth(url, &config)?;
+                let settings = config.http_settings();
                 let Some(auth) = auth else {
                     return Ok(alloy_transport::Transport::boxed(
-                        alloy_transport_http::HyperTransport::new_hyper(url),
+                        alloy_transport_http::HyperTransport::new_hyper(url)
+                            .with_settings(settings),
                     ));
                 };
                 // Only add the header when the request does not set it.
@@ -190,9 +195,9 @@ impl BuiltInConnectionString {
                         },
                     ),
                 );
-                Ok(alloy_transport::Transport::boxed(alloy_transport_http::Http::with_client(
-                    client, url,
-                )))
+                Ok(alloy_transport::Transport::boxed(
+                    alloy_transport_http::Http::with_client(client, url).with_settings(settings),
+                ))
             }
 
             #[cfg(feature = "ws-base")]
@@ -208,9 +213,14 @@ impl BuiltInConnectionString {
                 #[cfg(target_family = "wasm")]
                 let _ = auth; // Suppress unused warning on WASM
 
-                // Apply WebSocket-specific config
+                // Apply WebSocket-specific config, or limit messages to the max response size.
                 #[cfg(not(target_family = "wasm"))]
-                if let Some(ws_config) = config.ws_config {
+                {
+                    let ws_config = config.ws_config.unwrap_or_else(|| {
+                        alloy_transport_ws::WebSocketConfig::default()
+                            .max_message_size(config.max_response_size)
+                            .max_frame_size(config.max_response_size)
+                    });
                     ws_connect = ws_connect.with_config(ws_config);
                 }
 
@@ -227,6 +237,7 @@ impl BuiltInConnectionString {
 
             #[cfg(feature = "ipc")]
             Self::Ipc(path) => alloy_transport_ipc::IpcConnect::new(path.to_owned())
+                .with_max_response_size(config.max_response_size)
                 .into_service()
                 .await
                 .map(alloy_transport::Transport::boxed),
@@ -354,8 +365,12 @@ impl FromStr for BuiltInConnectionString {
 /// Configuration for connecting to built-in transports.
 ///
 /// Provides a flexible way to configure various aspects of the connection,
-/// including authentication, retry behavior, and transport-specific settings.
-#[derive(Clone, Debug, Default)]
+/// including authentication, retry behavior, resource limits, and transport-specific settings.
+///
+/// By default, responses are limited to [`DEFAULT_MAX_RESPONSE_SIZE`] bytes.
+///
+/// [`DEFAULT_MAX_RESPONSE_SIZE`]: alloy_transport::DEFAULT_MAX_RESPONSE_SIZE
+#[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct ConnectionConfig {
     /// Authorization header for authenticated connections.
@@ -372,18 +387,38 @@ pub struct ConnectionConfig {
     /// WebSocket reconnect retries use capped exponential backoff from this base interval.
     /// Ignored for HTTP and IPC.
     pub retry_interval: Option<Duration>,
+    /// Maximum size of a single response in bytes, or `None` for no limit.
+    ///
+    /// Applied to HTTP response bodies, IPC messages, and the maximum WebSocket message and frame
+    /// size. A [`Self::ws_config`] takes precedence for WebSocket. Not applied to WebSocket on
+    /// WASM. Defaults to [`DEFAULT_MAX_RESPONSE_SIZE`].
+    ///
+    /// [`DEFAULT_MAX_RESPONSE_SIZE`]: alloy_transport::DEFAULT_MAX_RESPONSE_SIZE
+    pub max_response_size: Option<usize>,
     /// WebSocket-specific configuration.
+    ///
+    /// Takes precedence over [`Self::max_response_size`] for the maximum message and frame size.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
 }
 
+impl Default for ConnectionConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConnectionConfig {
-    /// Create a new empty configuration.
+    /// Create a new configuration with no authentication, retry, or WebSocket settings, and a
+    /// maximum response size of [`DEFAULT_MAX_RESPONSE_SIZE`] bytes.
+    ///
+    /// [`DEFAULT_MAX_RESPONSE_SIZE`]: alloy_transport::DEFAULT_MAX_RESPONSE_SIZE
     pub const fn new() -> Self {
         Self {
             auth: None,
             max_retries: None,
             retry_interval: None,
+            max_response_size: Some(alloy_transport::DEFAULT_MAX_RESPONSE_SIZE),
             #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
             ws_config: None,
         }
@@ -412,11 +447,31 @@ impl ConnectionConfig {
         self
     }
 
+    /// Set the maximum size of a single response in bytes, or `None` for no limit.
+    ///
+    /// See [`Self::max_response_size`].
+    pub const fn with_max_response_size(mut self, max_response_size: Option<usize>) -> Self {
+        self.max_response_size = max_response_size;
+        self
+    }
+
     /// Set the WebSocket configuration.
+    ///
+    /// Takes precedence over [`Self::max_response_size`] for the maximum message and frame size.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub const fn with_ws_config(mut self, config: alloy_transport_ws::WebSocketConfig) -> Self {
         self.ws_config = Some(config);
         self
+    }
+
+    /// Returns the HTTP transport settings for this configuration.
+    #[cfg(any(
+        feature = "hyper",
+        all(feature = "reqwest", not(all(target_os = "wasi", target_env = "p1")))
+    ))]
+    const fn http_settings(&self) -> alloy_transport_http::HttpTransportSettings {
+        alloy_transport_http::HttpTransportSettings::new()
+            .with_max_response_size(self.max_response_size)
     }
 }
 

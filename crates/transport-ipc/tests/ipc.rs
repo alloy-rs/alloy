@@ -140,3 +140,39 @@ async fn ipc_connect_reads_chunked_multimegabyte_response() {
     drop(frontend);
     let _ = server.await;
 }
+
+/// A message above the configured maximum fails the pending request without reconnecting and
+/// re-sending it.
+#[tokio::test]
+async fn ipc_connect_rejects_oversized_response() {
+    let (_dir, path, listener) = bind_temp_ipc();
+    const MAX: usize = 1024;
+
+    let server = tokio::spawn(async move {
+        let stream = listener.accept().await.unwrap();
+        let (mut reader, mut writer) = stream.split();
+        let _ = read_n_json_values(&mut reader, 1).await;
+
+        let mut body = Vec::from(br#"{"jsonrpc":"2.0","id":1,"result":"0x"#);
+        body.extend(vec![b'0'; MAX]);
+        body.extend_from_slice(br#""}"#);
+        writer.write_all(&body).await.unwrap();
+        writer.flush().await.unwrap();
+        let _ = reader.read(&mut [0u8; 64]).await;
+    });
+
+    let frontend = IpcConnect::new(path)
+        .with_max_response_size(Some(MAX))
+        .into_service()
+        .await
+        .expect("connect ipc");
+    let req = Request::new("eth_call", Id::Number(1), ()).serialize().unwrap();
+    let err = tokio::time::timeout(Duration::from_secs(5), frontend.send(req))
+        .await
+        .expect("oversized response timed out")
+        .unwrap_err();
+    assert!(err.to_string().contains(&format!("IPC message exceeds {MAX} bytes")), "{err}");
+
+    drop(frontend);
+    let _ = server.await;
+}

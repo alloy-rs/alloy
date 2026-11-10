@@ -301,7 +301,10 @@ impl<T: PubSubConnect> PubSubService<T> {
                                     .as_transport_err()
                                     .is_some_and(TransportErrorKind::is_backend_gone)
                                 {
-                                    if let Err(e) = self.reconnect_with_retries().await {
+                                    // The backend may have closed with a non-retryable error
+                                    // after the error branch above was polled.
+                                    let backend_err = self.handle.error.try_recv().ok();
+                                    if let Err(e) = self.handle_backend_error(backend_err).await {
                                         break Err(e)
                                     }
                                 } else {
