@@ -44,17 +44,20 @@ async fn confirmed_receipt_retries_are_bounded() {
     // A replica that hasn't sealed the block yet may serve a preconfirmation receipt instead.
     let preconfirmed = receipt(B256::ZERO, Some(2), Some(B256::ZERO), true);
     for (missing, succeeds) in [(0, true), (1, true), (3, true), (4, false)] {
-        for preconfirmation in [false, true] {
+        for miss in ["no receipt", "preconfirmation", "block lookup error"] {
             let asserter = Asserter::new();
             // Registration sees a canonical receipt and confirms immediately.
             asserter.push_success(&Some(&sealed));
             asserter.push_success(&Some(&block));
             for _ in 0..missing {
-                // Neither costs a block lookup: one has no receipt, the other has a zero hash.
-                if preconfirmation {
-                    asserter.push_success(&Some(&preconfirmed));
-                } else {
-                    asserter.push_success(&Option::<TransactionReceipt>::None);
+                match miss {
+                    // Neither costs a block lookup: one has no receipt, the other has a zero hash.
+                    "no receipt" => asserter.push_success(&Option::<TransactionReceipt>::None),
+                    "preconfirmation" => asserter.push_success(&Some(&preconfirmed)),
+                    _ => {
+                        asserter.push_success(&Some(&sealed));
+                        asserter.push_failure_msg("unavailable");
+                    }
                 }
             }
             if succeeds {
@@ -67,6 +70,11 @@ async fn confirmed_receipt_retries_are_bounded() {
             let result = PendingTransactionBuilder::new(provider, B256::ZERO).get_receipt().await;
             if succeeds {
                 assert_eq!(result.unwrap(), sealed);
+            } else if miss == "block lookup error" {
+                assert!(matches!(
+                    result,
+                    Err(PendingTransactionError::TransportError(RpcError::ErrorResp(_)))
+                ));
             } else {
                 assert!(matches!(
                     result,
@@ -75,7 +83,7 @@ async fn confirmed_receipt_retries_are_bounded() {
             }
             assert!(
                 asserter.read_q().is_empty(),
-                "unexpected number of requests: {missing}, {preconfirmation}"
+                "unexpected number of requests: {missing}, {miss}"
             );
         }
     }

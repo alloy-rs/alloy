@@ -257,18 +257,23 @@ impl<N: Network> PendingTransactionBuilder<N> {
         let poll_interval = self.provider.client().poll_interval();
         // Confirmation and receipt requests may reach different RPC replicas, and a replica that
         // serves preconfirmations may still return the receipt of a block that is not sealed.
+        let mut lookup_err = None;
         for attempt in 0..=3 {
             if let Some(receipt) = self.provider.get_transaction_receipt(hash).await? {
-                if is_receipt_canonical::<N>(self.provider.client(), &receipt).await? {
-                    return Ok(receipt);
+                match is_receipt_canonical::<N>(self.provider.client(), &receipt).await {
+                    Ok(true) => return Ok(receipt),
+                    Ok(false) => debug!(tx=%hash, "receipt is not from a canonical block yet"),
+                    Err(err) => {
+                        debug!(tx=%hash, %err, "failed to check the receipt's block");
+                        lookup_err = Some(err);
+                    }
                 }
-                debug!(tx=%hash, "receipt is not from a canonical block yet");
             }
             if attempt < 3 {
                 sleep(poll_interval).await;
             }
         }
-        Err(RpcError::NullResp.into())
+        Err(lookup_err.unwrap_or(RpcError::NullResp).into())
     }
 }
 
