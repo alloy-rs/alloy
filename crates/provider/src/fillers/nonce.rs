@@ -152,7 +152,8 @@ impl NonceManager for CachedNonceManager {
 
         let nonce = account.next.expect("set by sync");
         trace!(%address, nonce, "incrementing nonce");
-        account.next = Some(nonce + 1);
+        // No nonce follows `u64::MAX`, so it's fetched again instead.
+        account.next = nonce.checked_add(1);
         Ok(nonce)
     }
 
@@ -615,6 +616,14 @@ mod tests {
             assert_eq!(next_nonce(&manager, &provider).await, 6, "{error}");
             assert_eq!(asserter.requests().len(), 2, "{error}");
         }
+    }
+
+    #[tokio::test]
+    async fn pending_nonce_of_u64_max_does_not_overflow() {
+        let (provider, asserter) = mocked_provider();
+        let manager = CachedNonceManager::default();
+        asserter.push_success(&U64::MAX);
+        assert_eq!(next_nonce(&manager, &provider).await, u64::MAX);
     }
 
     #[tokio::test]
