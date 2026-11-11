@@ -1495,7 +1495,7 @@ pub(super) mod serde_bincode_compat {
         use crate::TransactionRequest;
         use arbitrary::Arbitrary;
         use bincode::config;
-        use rand::{rngs::StdRng, Rng, SeedableRng};
+        use rand::{rngs::StdRng, RngExt, SeedableRng};
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
 

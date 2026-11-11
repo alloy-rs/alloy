@@ -117,8 +117,8 @@ dependencies = [
  "either",
  "k256 0.13.4",
  "once_cell",
- "rand 0.8.8",
- "secp256k1 0.30.0",
+ "rand 0.10.3",
+ "secp256k1 0.33.1",
  "serde",
  "serde_json",
  "serde_with",
@@ -439,7 +439,7 @@ dependencies = [
  "ci_info",
  "k256 0.13.4",
  "libc",
- "rand 0.8.8",
+ "rand 0.10.3",
  "serde_json",
  "tempfile",
  "thiserror 2.0.21",
@@ -720,7 +720,7 @@ dependencies = [
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "jsonwebtoken",
- "rand 0.8.8",
+ "rand 0.10.3",
  "serde",
  "serde_json",
  "similar-asserts",
@@ -745,7 +745,7 @@ dependencies = [
  "assert_matches",
  "bincode",
  "itertools 0.14.0",
- "rand 0.8.8",
+ "rand 0.10.3",
  "rmp-serde",
  "serde",
  "serde_json",
@@ -814,7 +814,7 @@ version = "2.5.0"
 dependencies = [
  "alloy-primitives",
  "arbitrary",
- "rand 0.8.8",
+ "rand 0.10.3",
  "serde",
  "serde_json",
  "similar-asserts",
@@ -930,8 +930,8 @@ dependencies = [
  "coins-bip39",
  "eth-keystore",
  "k256 0.13.4",
- "rand 0.8.8",
- "secp256k1 0.30.0",
+ "rand 0.10.3",
+ "secp256k1 0.33.1",
  "serde",
  "serde_json",
  "tempfile",
@@ -3402,7 +3402,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4942,7 +4942,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5744,7 +5744,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5783,7 +5783,6 @@ dependencies = [
  "libc",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
- "serde",
 ]
 
 [[package]]
@@ -5806,6 +5805,7 @@ dependencies = [
  "chacha20",
  "getrandom 0.4.3",
  "rand_core 0.10.1",
+ "serde",
 ]
 
 [[package]]
@@ -6231,7 +6231,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6290,7 +6290,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6449,18 +6449,6 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b50c5943d326858130af85e049f2661ba3c78b26589b8ab98e65e80ae44a1252"
-dependencies = [
- "bitcoin_hashes",
- "rand 0.8.8",
- "secp256k1-sys 0.10.1",
- "serde",
-]
-
-[[package]]
-name = "secp256k1"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c3c81b43dc2d8877c216a3fccf76677ee1ebccd429566d3e67447290d0c42b2"
@@ -6471,12 +6459,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "secp256k1-sys"
-version = "0.10.1"
+name = "secp256k1"
+version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4387882333d3aa8cb20530a17c69a3752e97837832f34f6dccc760e715001d9"
+checksum = "d7f404a8dab7a7a5a631e741d8699aa9c8e1d689fc26ccf897c7187565490b69"
 dependencies = [
- "cc",
+ "arbitrary",
+ "rand 0.9.5",
+ "secp256k1-sys 0.14.1",
+ "serde",
 ]
 
 [[package]]
@@ -6484,6 +6475,15 @@ name = "secp256k1-sys"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb913707158fadaf0d8702c2db0e857de66eb003ccfdda5924b5f5ac98efb38"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "secp256k1-sys"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6b2992d4a3cd244539a7d5d0966aadbe5ca7fb868a5d7e38c29499b9e709bbd"
 dependencies = [
  "cc",
 ]
@@ -7097,10 +7097,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8086,7 +8086,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

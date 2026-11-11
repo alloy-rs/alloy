@@ -493,7 +493,7 @@ pub(crate) mod serde_bincode_compat {
         use alloy_primitives::Log;
         use arbitrary::Arbitrary;
         use bincode::config;
-        use rand::Rng;
+        use rand::RngExt;
         use serde::{de::DeserializeOwned, Deserialize, Serialize};
         use serde_with::serde_as;
 
@@ -507,7 +507,7 @@ pub(crate) mod serde_bincode_compat {
             }
 
             let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
+            rand::rng().fill(bytes.as_mut_slice());
             let mut data = Data {
                 receipt: Receipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
             };

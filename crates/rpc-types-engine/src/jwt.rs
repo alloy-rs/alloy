@@ -21,7 +21,7 @@ use alloc::string::String;
 use alloy_primitives::hex;
 use core::{str::FromStr, time::Duration};
 use jsonwebtoken::get_current_timestamp;
-use rand::Rng;
+use rand::RngExt;
 
 #[cfg(feature = "std")]
 use std::{
@@ -305,7 +305,7 @@ impl JwtSecret {
 
     /// Generates a random [`JwtSecret`] containing a hex-encoded 256 bit secret key.
     pub fn random() -> Self {
-        Self(rand::thread_rng().gen())
+        Self(rand::rng().random())
     }
 
     /// Encode the header and claims given and sign the payload using the algorithm from the header

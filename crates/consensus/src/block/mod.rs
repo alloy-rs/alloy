@@ -654,13 +654,13 @@ mod fuzz_tests {
     use crate::{EthereumTxEnvelope, TxEip4844};
     use alloy_rlp::Encodable;
     use arbitrary::{Arbitrary, Unstructured};
-    use rand::Rng;
+    use rand::RngExt;
 
     #[test]
     fn fuzz_decode_sealed_block_roundtrip() {
         for _ in 0..10 {
             let mut bytes = [0u8; 1024 * 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
+            rand::rng().fill(bytes.as_mut_slice());
             let mut u = Unstructured::new(&bytes);
 
             let block = Block::<EthereumTxEnvelope<TxEip4844>>::arbitrary(&mut u).unwrap();
@@ -681,7 +681,7 @@ mod fuzz_tests {
     fn fuzz_header_decode_sealed_roundtrip() {
         for _ in 0..200 {
             let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
+            rand::rng().fill(bytes.as_mut_slice());
             let mut u = Unstructured::new(&bytes);
 
             let header = Header::arbitrary(&mut u).unwrap();

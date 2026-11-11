@@ -751,7 +751,7 @@ pub(super) mod serde_bincode_compat {
         use alloy_primitives::{Address, B256, U256};
         use arbitrary::Arbitrary;
         use bincode::config;
-        use rand::Rng;
+        use rand::RngExt;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
 
@@ -767,7 +767,7 @@ pub(super) mod serde_bincode_compat {
             }
 
             let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
+            rand::rng().fill(bytes.as_mut_slice());
             let mut transaction =
                 TxEip8141::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
 
@@ -816,7 +816,7 @@ mod tests {
 
     use alloy_primitives::hex;
     use arbitrary::{Arbitrary, Unstructured};
-    use rand::{rngs::StdRng, RngCore, SeedableRng};
+    use rand::{rngs::StdRng, Rng, SeedableRng};
 
     fn valid_tx() -> TxEip8141 {
         TxEip8141 { chain_id: 1, frames: vec![Frame::default()], ..Default::default() }

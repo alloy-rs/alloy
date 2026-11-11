@@ -3,6 +3,8 @@
 //! This module provides a signer implementation using the [`secp256k1`] crate
 //! as an alternative to the default [`k256`] implementation.
 
+#[cfg(feature = "keystore")]
+use crate::RngCompat;
 use crate::{LocalSigner, LocalSignerError};
 use alloy_primitives::{hex, Address, B256, B512};
 use alloy_signer::{utils::raw_public_key_to_address, Signer};
@@ -11,7 +13,7 @@ use k256::ecdsa::{
     RecoveryId, Signature as K256Signature,
 };
 use rand::{CryptoRng, Rng};
-use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
+use secp256k1::{ecdsa::RecoverableSignature, Message, PublicKey, SecretKey};
 use std::str::FromStr;
 
 #[cfg(feature = "keystore")]
@@ -50,7 +52,7 @@ impl Secp256k1Credential {
     /// Returns the public key for this credential.
     #[inline]
     pub fn public_key(&self) -> PublicKey {
-        self.0.public_key(SECP256K1)
+        self.0.public_key()
     }
 }
 
@@ -62,7 +64,7 @@ impl std::fmt::Debug for Secp256k1Credential {
 
 impl PartialEq for Secp256k1Credential {
     fn eq(&self, other: &Self) -> bool {
-        self.0.secret_bytes() == other.0.secret_bytes()
+        self.0.to_secret_bytes() == other.0.to_secret_bytes()
     }
 }
 
@@ -74,16 +76,16 @@ impl From<SecretKey> for Secp256k1Credential {
 
 impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
     fn sign_prehash(&self, prehash: &[u8]) -> Result<(K256Signature, RecoveryId), SignatureError> {
-        let msg =
-            Message::from_digest_slice(prehash).map_err(|_| SignatureError::from_source(""))?;
+        let digest: [u8; 32] = prehash.try_into().map_err(|_| SignatureError::from_source(""))?;
+        let msg = Message::from_digest(digest);
 
-        let sig = SECP256K1.sign_ecdsa_recoverable(&msg, &self.0);
+        let sig = RecoverableSignature::sign_ecdsa_recoverable(msg, &self.0);
         let (rec_id, data) = sig.serialize_compact();
 
         // Convert secp256k1 signature to k256 signature
         let k256_sig = K256Signature::from_slice(&data).map_err(SignatureError::from_source)?;
 
-        let k256_rec_id = RecoveryId::from_byte(i32::from(rec_id) as u8)
+        let k256_rec_id = RecoveryId::from_byte(u8::from(rec_id))
             .ok_or_else(|| SignatureError::from_source("invalid recovery id"))?;
 
         Ok((k256_sig, k256_rec_id))
@@ -94,7 +96,7 @@ impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
 #[inline]
 fn secret_key_to_address(secret_key: &SecretKey) -> Address {
     // Strip out the first byte (0x04 tag for uncompressed public key)
-    raw_public_key_to_address(&secret_key.public_key(SECP256K1).serialize_uncompressed()[1..])
+    raw_public_key_to_address(&secret_key.public_key().serialize_uncompressed()[1..])
 }
 
 impl LocalSigner<Secp256k1Credential> {
@@ -118,20 +120,28 @@ impl LocalSigner<Secp256k1Credential> {
     /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a byte slice.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, secp256k1::Error> {
-        SecretKey::from_slice(bytes).map(Self::from_secp256k1)
+        let bytes: [u8; 32] = bytes.try_into().map_err(|_| secp256k1::Error::InvalidSecretKey)?;
+        SecretKey::from_secret_bytes(bytes).map(Self::from_secp256k1)
     }
 
-    /// Creates a new random keypair seeded with [`rand::thread_rng()`].
+    /// Creates a new random keypair seeded with [`rand::rng()`].
     #[inline]
     pub fn random() -> Self {
-        Self::random_with(&mut rand::thread_rng())
+        Self::random_with(&mut rand::rng())
     }
 
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        let (secret_key, _) = SECP256K1.generate_keypair(rng);
-        Self::from_secp256k1(secret_key)
+        // secp256k1's key generation takes a different major version of rand, so draw the
+        // scalar bytes here and retry until they form a valid secret key.
+        loop {
+            let mut bytes = [0u8; 32];
+            rng.fill_bytes(&mut bytes);
+            if let Ok(secret_key) = SecretKey::from_secret_bytes(bytes) {
+                return Self::from_secp256k1(secret_key);
+            }
+        }
     }
 
     /// Serializes this [`LocalSigner`]'s [`SecretKey`] as a [`B256`] byte array.
@@ -142,7 +152,7 @@ impl LocalSigner<Secp256k1Credential> {
     /// clear copies as soon as practical.
     #[inline]
     pub fn to_bytes(&self) -> B256 {
-        B256::from_slice(&self.credential.0.secret_bytes())
+        B256::from_slice(&self.credential.0.to_secret_bytes())
     }
 
     /// Convenience function that returns this signer's ethereum public key as a [`B512`] byte
@@ -160,7 +170,7 @@ impl LocalSigner<Secp256k1Credential> {
     /// The resulting signer will have the same address, private key, and chain ID.
     #[inline]
     pub fn to_k256(&self) -> crate::PrivateKeySigner {
-        let mut signer = crate::PrivateKeySigner::from_slice(&self.credential.0.secret_bytes())
+        let mut signer = crate::PrivateKeySigner::from_slice(&self.credential.0.to_secret_bytes())
             .expect("valid secp256k1 key bytes should be valid k256 key bytes");
         signer.set_chain_id(self.chain_id);
         signer
@@ -194,7 +204,7 @@ impl LocalSigner<Secp256k1Credential> {
         R: Rng + CryptoRng,
         S: AsRef<[u8]>,
     {
-        let (secret, uuid) = eth_keystore::new(dir, rng, password, name)?;
+        let (secret, uuid) = eth_keystore::new(dir, &mut RngCompat(rng), password, name)?;
         Ok((Self::from_slice(&secret)?, uuid))
     }
 
@@ -228,7 +238,7 @@ impl LocalSigner<Secp256k1Credential> {
         S: AsRef<[u8]>,
     {
         let pk = pk.as_ref();
-        let uuid = eth_keystore::encrypt_key(keypath, rng, pk, password, name)?;
+        let uuid = eth_keystore::encrypt_key(keypath, &mut RngCompat(rng), pk, password, name)?;
         Ok((Self::from_slice(pk)?, uuid))
     }
 }
@@ -312,7 +322,7 @@ mod tests {
     fn encrypted_json_keystore_new() {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let (key, uuid) = Secp256k1Signer::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
@@ -323,7 +333,7 @@ mod tests {
     fn encrypted_json_keystore_from_pk() {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let private_key =
             hex::decode("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b")
@@ -340,7 +350,7 @@ mod tests {
     fn signs_msg() {
         let message = "Some data";
         let hash = alloy_primitives::utils::eip191_hash_message(message);
-        let key = Secp256k1Signer::random_with(&mut rand::thread_rng());
+        let key = Secp256k1Signer::random_with(&mut rand::rng());
         let address = key.address;
 
         // sign a message

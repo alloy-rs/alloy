@@ -28,7 +28,7 @@ macro_rules! bincode_compat_roundtrip_test {
         #[test]
         fn $name() {
             use arbitrary::Arbitrary;
-            use rand::{rngs::StdRng, Rng, SeedableRng};
+            use rand::{rngs::StdRng, RngExt, SeedableRng};
 
             #[serde_with::serde_as]
             #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
