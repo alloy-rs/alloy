@@ -125,6 +125,9 @@ impl<E> ErrorPayload<E> {
         match self.message.as_ref() {
             // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
             "header not found" => true,
+            // Infura can return this transiently for block fetches.
+            // <https://github.com/alloy-rs/alloy/issues/4477>
+            "precondition failure" if self.code == -32603 => true,
             // also thrown by infura if out of budget for the day and ratelimited
             "daily request count exceeded, request rate limited" => true,
             msg => {
@@ -444,6 +447,18 @@ mod test {
         let json = r#"{"code":1008,"message":"You have exceeded the maximum number of concurrent requests on a single WebSocket. At most 200 concurrent requests are allowed per WebSocket."}"#;
         let payload: ErrorPayload = serde_json::from_str(json).unwrap();
         assert!(payload.is_retry_err());
+    }
+
+    #[test]
+    fn infura_precondition_failure() {
+        for (code, message, retryable) in [
+            (-32603, "precondition failure", true),
+            (-32603, "internal error", false),
+            (-32602, "precondition failure", false),
+        ] {
+            let payload: ErrorPayload = ErrorPayload { code, message: message.into(), data: None };
+            assert_eq!(payload.is_retry_err(), retryable, "{payload}");
+        }
     }
 
     #[test]

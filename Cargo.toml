@@ -90,7 +90,7 @@ alloy-eip2124 = { version = "0.2.0", default-features = false }
 alloy-eip2930 = { version = "0.2.3", default-features = false }
 alloy-eip7702 = { version = "0.6.3", default-features = false }
 alloy-eip7928 = { version = "0.4", default-features = false }
-alloy-eip8141 = { version = "0.1.1", default-features = false }
+alloy-eip8141 = { version = "0.2", default-features = false }
 
 # hardforks
 alloy-hardforks = "0.2.0"
@@ -154,7 +154,7 @@ derive_more = { version = "2", default-features = false }
 either = { version = "1.15", default-features = false }
 http = "1.1.0"
 itertools = { version = ">=0.13, <=0.14", default-features = false }
-jsonwebtoken = "10.3.0"
+jsonwebtoken = { version = "10.3.0", default-features = false }
 lru = "0.18.2"
 once_cell = { version = "1.21", default-features = false }
 parking_lot = "0.12.3"

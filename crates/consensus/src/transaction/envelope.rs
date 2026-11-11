@@ -1029,7 +1029,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{Recovered, SignableTransaction, SignerRecoverable},
+        transaction::{PooledTransaction, Recovered, SignableTransaction, SignerRecoverable},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
@@ -1580,6 +1580,60 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn network_decode_rejects_mismatched_wrapper_lengths() {
+        let tx: TxEnvelope = TxEip1559::default().into_signed(Signature::test_signature()).into();
+        let payload = tx.encoded_2718();
+
+        // Cover empty, short and long RLP string headers, with both understated and overstated
+        // lengths. Supply the extra bytes so overstated lengths pass Header::decode.
+        for payload_length in [0, 2, 55, 56, payload.len() - 3, payload.len() + 4] {
+            let mut encoded = Vec::new();
+            alloy_rlp::Header { list: false, payload_length }.encode(&mut encoded);
+            encoded.extend_from_slice(&payload);
+            if payload_length > payload.len() {
+                encoded.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+            }
+
+            assert!(matches!(
+                TxEnvelope::network_decode(&mut encoded.as_slice()),
+                Err(Eip2718Error::RlpError(alloy_rlp::Error::UnexpectedLength))
+            ));
+            assert_eq!(
+                PooledTransaction::decode(&mut encoded.as_slice()).unwrap_err(),
+                alloy_rlp::Error::UnexpectedLength
+            );
+
+            let mut list = Vec::new();
+            alloy_rlp::Header { list: true, payload_length: encoded.len() }.encode(&mut list);
+            list.extend_from_slice(&encoded);
+            assert_eq!(
+                Vec::<TxEnvelope>::decode(&mut list.as_slice()).unwrap_err(),
+                alloy_rlp::Error::UnexpectedLength
+            );
+        }
+    }
+
+    #[test]
+    fn network_decode_preserves_unwrapped_transactions() {
+        // Exercise both short and long canonical RLP string headers.
+        for signature in
+            [Signature::new(U256::ZERO, U256::ZERO, false), Signature::test_signature()]
+        {
+            let tx: TxEnvelope = TxEip1559::default().into_signed(signature).into();
+            for mut encoded in [alloy_rlp::encode(&tx), tx.encoded_2718()] {
+                let mut buf = encoded.as_slice();
+                assert_eq!(TxEnvelope::network_decode(&mut buf).unwrap(), tx);
+                assert!(buf.is_empty());
+
+                encoded.extend_from_slice(&[0x80, 0xc0]);
+                let mut buf = encoded.as_slice();
+                assert_eq!(TxEnvelope::decode(&mut buf).unwrap(), tx);
+                assert_eq!(buf, &[0x80, 0xc0]);
+            }
+        }
+    }
+
     #[cfg(feature = "serde")]
     fn test_serde_roundtrip<T: SignableTransaction<Signature>>(tx: T)
     where
@@ -2043,5 +2097,87 @@ mod tests {
 
         // Verify that the buffer was properly reused (no allocation needed between calls)
         assert!(!buf.is_empty());
+    }
+}
+
+#[cfg(all(test, feature = "arbitrary"))]
+mod fuzz_tests {
+    use super::*;
+    use alloy_eips::eip2718::Decodable2718;
+    use alloy_rlp::{Decodable, Header};
+    use arbitrary::{Arbitrary, Unstructured};
+    use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+
+    fn arbitrary_envelope(seed: u64) -> EthereumTxEnvelope<TxEip4844> {
+        let mut bytes = [0u8; 16 * 1024];
+        StdRng::seed_from_u64(seed).fill_bytes(&mut bytes);
+        EthereumTxEnvelope::arbitrary(&mut Unstructured::new(&bytes)).unwrap()
+    }
+
+    #[test]
+    fn fuzz_network_decode_roundtrip() {
+        for seed in 0..256 {
+            let tx = arbitrary_envelope(seed);
+            let network = alloy_rlp::encode(&tx);
+
+            for mut encoded in [network.clone(), tx.encoded_2718()] {
+                let mut buf = encoded.as_slice();
+                let decoded = EthereumTxEnvelope::<TxEip4844>::network_decode(&mut buf).unwrap();
+                assert_eq!(decoded, tx, "seed {seed}");
+                assert!(buf.is_empty(), "seed {seed}");
+                assert_eq!(alloy_rlp::encode(&decoded), network, "seed {seed}");
+
+                // Both wrapped and unwrapped inputs must leave the next transaction untouched.
+                encoded.extend_from_slice(&network);
+                let mut buf = encoded.as_slice();
+                assert_eq!(
+                    EthereumTxEnvelope::<TxEip4844>::decode(&mut buf).unwrap(),
+                    tx,
+                    "seed {seed}"
+                );
+                assert_eq!(buf, network, "seed {seed}");
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_network_decode_rejects_mismatched_wrapper_lengths() {
+        for seed in 0..256 {
+            let tx = arbitrary_envelope(seed);
+            if tx.is_legacy() {
+                continue;
+            }
+
+            let payload = tx.encoded_2718();
+            let mut rng = StdRng::seed_from_u64(seed);
+            // A one-byte wrapper around the type byte is already rejected as non-canonical RLP.
+            let short = rng.gen_range(2..payload.len());
+            let long = payload.len() + rng.gen_range(1..=32);
+            for payload_length in [short, long] {
+                let mut encoded = Vec::new();
+                Header { list: false, payload_length }.encode(&mut encoded);
+                encoded.extend_from_slice(&payload);
+                if payload_length > payload.len() {
+                    encoded.resize(encoded.len() + payload_length - payload.len(), 0x80);
+                }
+
+                assert_eq!(
+                    EthereumTxEnvelope::<TxEip4844>::decode(&mut encoded.as_slice()).unwrap_err(),
+                    alloy_rlp::Error::UnexpectedLength,
+                    "seed {seed}, declared {payload_length}, actual {}",
+                    payload.len()
+                );
+
+                let mut list = Vec::new();
+                Header { list: true, payload_length: encoded.len() }.encode(&mut list);
+                list.extend_from_slice(&encoded);
+                assert_eq!(
+                    Vec::<EthereumTxEnvelope<TxEip4844>>::decode(&mut list.as_slice()).unwrap_err(),
+                    alloy_rlp::Error::UnexpectedLength,
+                    "seed {seed}, declared {payload_length}, actual {}",
+                    payload.len()
+                );
+            }
+        }
     }
 }

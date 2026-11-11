@@ -205,6 +205,10 @@ impl FromStr for BlockNumberOrTag {
             "pending" => Self::Pending,
             s => {
                 if let Some(hex_val) = s.strip_prefix("0x") {
+                    // `from_str_radix` accepts a leading `+` sign, which is not a quantity digit.
+                    if hex_val.starts_with('+') {
+                        return Err(ParseError::InvalidDigit('+').into());
+                    }
                     u64::from_str_radix(hex_val, 16)?.into()
                 } else {
                     return Err(HexStringMissingPrefixError::default().into());
@@ -997,6 +1001,11 @@ mod tests {
             assert_eq!(s.parse::<BlockId>().unwrap(), expected, "{s}");
         }
         assert!("invalid_block_id".parse::<BlockId>().is_err());
+    }
+
+    #[test]
+    fn block_number_or_tag_rejects_plus_sign() {
+        assert!("0x+1".parse::<BlockNumberOrTag>().is_err());
     }
 
     #[test]

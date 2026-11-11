@@ -373,9 +373,9 @@ mod tests {
             function_selector: true,
             hash: true,
             tx_hash: true,
+            special_logs: true,
         };
-        let expected =
-            r#"["calldata","contract_address","logs","function_selector","hash","tx_hash"]"#;
+        let expected = r#"["calldata","contract_address","logs","function_selector","hash","tx_hash","special_logs"]"#;
         let actual = serde_json::to_string(&hint).unwrap();
         assert_eq!(actual, expected);
     }
@@ -389,10 +389,21 @@ mod tests {
             function_selector: false,
             hash: true,
             tx_hash: false,
+            special_logs: false,
         };
         let expected = r#"["calldata","logs","hash"]"#;
         let actual: PrivacyHint = serde_json::from_str(expected).unwrap();
         assert_eq!(actual, hint);
+    }
+
+    #[test]
+    fn can_deserialize_special_logs_privacy_hint() {
+        // The MEV-Share node accepts both spellings and emits `special_logs`.
+        for hint in ["special_logs", "default_logs"] {
+            let actual: PrivacyHint = serde_json::from_str(&format!(r#"["{hint}"]"#)).unwrap();
+            assert!(actual.has_special_logs(), "failed to parse {hint}");
+            assert_eq!(serde_json::to_string(&actual).unwrap(), r#"["special_logs"]"#);
+        }
     }
 
     #[test]

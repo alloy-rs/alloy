@@ -346,6 +346,10 @@ pub struct BuilderBlockValidationRequestV2 {
     pub registered_gas_limit: u64,
 }
 
+const fn default_true() -> bool {
+    true
+}
+
 /// A Request to validate a [`SignedBidSubmissionV3`]
 ///
 /// <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
@@ -360,6 +364,9 @@ pub struct BuilderBlockValidationRequestV3 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
+    /// Whether the node's disallow list applies to this request. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub apply_blacklist: bool,
 }
 
 /// A Request to validate a [`SignedBidSubmissionV4`]
@@ -374,6 +381,9 @@ pub struct BuilderBlockValidationRequestV4 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
+    /// Whether the node's disallow list applies to this request. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub apply_blacklist: bool,
 }
 
 impl BuilderBlockValidationRequestV4 {
@@ -412,6 +422,9 @@ pub struct BuilderBlockValidationRequestV5 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
+    /// Whether the node's disallow list applies to this request. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub apply_blacklist: bool,
 }
 
 impl BuilderBlockValidationRequestV5 {
@@ -450,6 +463,9 @@ pub struct BuilderBlockValidationRequestV6 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
+    /// Whether the node's disallow list applies to this request. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub apply_blacklist: bool,
 }
 
 impl BuilderBlockValidationRequestV6 {
@@ -929,6 +945,94 @@ mod tests {
             serde_json::from_str(VALIDATION_REQUEST_BODY).unwrap();
     }
 
+    fn electra_bid_submission_v4() -> SignedBidSubmissionV4 {
+        serde_json::from_str(include_str!(
+            "examples/relay_builder_block_validation_request_v4.json"
+        ))
+        .unwrap()
+    }
+
+    fn assert_apply_blacklist_serde<T>(request: T, apply_blacklist: impl Fn(&T) -> bool)
+    where
+        T: Serialize + serde::de::DeserializeOwned + PartialEq + core::fmt::Debug,
+    {
+        let mut json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["apply_blacklist"], false);
+        assert_eq!(serde_json::from_value::<T>(json.clone()).unwrap(), request);
+
+        json["apply_blacklist"] = true.into();
+        let parsed = serde_json::from_value::<T>(json.clone()).unwrap();
+        assert!(apply_blacklist(&parsed));
+        assert_eq!(serde_json::to_value(&parsed).unwrap(), json);
+
+        json.as_object_mut().unwrap().remove("apply_blacklist");
+        assert!(apply_blacklist(&serde_json::from_value(json.clone()).unwrap()));
+
+        json["apply_blacklist"] = "false".into();
+        assert!(serde_json::from_value::<T>(json).is_err());
+    }
+
+    #[test]
+    fn validation_request_v3_apply_blacklist_serde() {
+        let bid = electra_bid_submission_v4();
+        let request = BuilderBlockValidationRequestV3 {
+            request: SignedBidSubmissionV3 {
+                message: bid.message,
+                execution_payload: bid.execution_payload,
+                blobs_bundle: bid.blobs_bundle,
+                signature: bid.signature,
+            },
+            registered_gas_limit: 30000000,
+            parent_beacon_block_root: B256::repeat_byte(0x12),
+            apply_blacklist: false,
+        };
+        assert_apply_blacklist_serde(request, |request| request.apply_blacklist);
+    }
+
+    #[test]
+    fn validation_request_v4_apply_blacklist_serde() {
+        let request = BuilderBlockValidationRequestV4 {
+            request: electra_bid_submission_v4(),
+            registered_gas_limit: 30000000,
+            parent_beacon_block_root: B256::repeat_byte(0x12),
+            apply_blacklist: false,
+        };
+        assert_apply_blacklist_serde(request, |request| request.apply_blacklist);
+    }
+
+    #[test]
+    fn validation_request_v5_apply_blacklist_serde() {
+        let bid = electra_bid_submission_v4();
+        let request = BuilderBlockValidationRequestV5 {
+            request: SignedBidSubmissionV5 {
+                message: bid.message,
+                execution_payload: bid.execution_payload,
+                blobs_bundle: alloy_rpc_types_engine::BlobsBundleV2 {
+                    commitments: bid.blobs_bundle.commitments,
+                    proofs: bid.blobs_bundle.proofs,
+                    blobs: bid.blobs_bundle.blobs,
+                },
+                execution_requests: bid.execution_requests,
+                signature: bid.signature,
+            },
+            registered_gas_limit: 30000000,
+            parent_beacon_block_root: B256::repeat_byte(0x13),
+            apply_blacklist: false,
+        };
+        assert_apply_blacklist_serde(request, |request| request.apply_blacklist);
+    }
+
+    #[test]
+    fn validation_request_v6_apply_blacklist_serde() {
+        let request = BuilderBlockValidationRequestV6 {
+            request: amsterdam_bid_submission_v6(),
+            registered_gas_limit: 30000000,
+            parent_beacon_block_root: B256::repeat_byte(0x14),
+            apply_blacklist: false,
+        };
+        assert_apply_blacklist_serde(request, |request| request.apply_blacklist);
+    }
+
     #[test]
     fn test_serde_proposer_payload_delivered() {
         let s = r#"{
@@ -963,6 +1067,7 @@ mod tests {
             request: bid_submission,
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::from_slice(&[0x12; 32]),
+            apply_blacklist: true,
         };
 
         let expected_payload = request.request.execution_payload.clone();
@@ -1020,6 +1125,7 @@ mod tests {
             request: bid_submission_v5,
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::from_slice(&[0x13; 32]),
+            apply_blacklist: true,
         };
 
         // Store references before calling to_execution_data() which consumes self
@@ -1062,6 +1168,7 @@ mod tests {
             request: bid_submission_v6,
             registered_gas_limit: 30000000,
             parent_beacon_block_root: B256::from_slice(&[0x14; 32]),
+            apply_blacklist: true,
         };
 
         let expected_payload = request.request.execution_payload.clone();

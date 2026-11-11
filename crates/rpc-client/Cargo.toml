@@ -60,6 +60,8 @@ ci_info.workspace = true
 tempfile = "3"
 futures-util.workspace = true
 similar-asserts.workspace = true
+http.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "net", "io-util"] }
 
 [features]
 default = ["reqwest"]
