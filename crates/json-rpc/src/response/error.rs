@@ -18,6 +18,9 @@ use crate::RpcSend;
 
 const INTERNAL_ERROR: Cow<'static, str> = Cow::Borrowed("Internal error");
 
+/// The start of the message of an error returned for a reverted call.
+const REVERT_PREFIX: &str = "execution reverted";
+
 /// A JSON-RPC 2.0 error object.
 ///
 /// This response indicates that the server received and handled the request,
@@ -131,8 +134,13 @@ impl<E> ErrorPayload<E> {
             // also thrown by infura if out of budget for the day and ratelimited
             "daily request count exceeded, request rate limited" => true,
             // The revert reason is chosen by the contract, so it must not be matched against the
-            // rate limit phrases below.
-            msg if msg.starts_with("execution reverted") => false,
+            // rate limit phrases below. Some clients capitalise the prefix.
+            msg if msg
+                .get(..REVERT_PREFIX.len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(REVERT_PREFIX)) =>
+            {
+                false
+            }
             msg => {
                 msg.contains("rate limit")
                     || msg.contains("rate exceeded")
@@ -473,6 +481,7 @@ mod test {
             (3, "execution reverted: withdraw request limit reached"),
             (-32000, "execution reverted: too many requests"),
             (-32603, "execution reverted: credits limited"),
+            (-32000, "Execution reverted: rate limit exceeded"),
         ] {
             let payload: ErrorPayload =
                 ErrorPayload { code, message: message.into(), data: Some(data.clone()) };
