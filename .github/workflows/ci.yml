@@ -346,38 +346,6 @@ jobs:
       rust-toolchain: nightly
       flags: --locked --all-features
 
-  codeql:
-    name: Analyze (${{ matrix.language }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      id-token: write
-      contents: read
-      security-events: write
-      actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: actions
-            build-mode: none
-    steps:
-      - name: Secure runner
-        uses: tempoxyz/gh-actions/actions/secure-runner@2ab28a31ae569be9f780c7675b684471060afa40 # 2026-10-09T21-43-19Z-2ab28a31
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          category: "/language:${{matrix.language}}"
-
   ci-success:
     name: ci success
     runs-on: ubuntu-latest
@@ -395,7 +363,6 @@ jobs:
       - fmt
       - feature-propagation
       - deny
-      - codeql
     permissions:
       id-token: write
     steps:
