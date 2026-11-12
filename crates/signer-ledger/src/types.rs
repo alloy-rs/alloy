@@ -32,9 +32,12 @@ impl fmt::Display for DerivationType {
 /// Error when using the Ledger transport.
 #[derive(Debug, Error)]
 pub enum LedgerError {
-    /// Underlying Ledger transport error.
+    /// Underlying Ledger APDU or transport error.
     #[error(transparent)]
     LedgerError(#[from] coins_ledger::errors::LedgerError),
+    /// Error opening the native HID transport.
+    #[error(transparent)]
+    TransportError(#[from] coins_ledger::transports::NativeTransportError),
     /// Device response was unexpectedly empty.
     #[error("received an unexpected empty response")]
     UnexpectedNullResponse,
