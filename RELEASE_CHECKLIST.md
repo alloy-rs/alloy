@@ -27,7 +27,7 @@ changed or not.
   - Ignore these warnings:
     - `warning: updating <crate> to <version> despite no changes made since...`
     - `git-cliff` warning `there is already a tag (<tag>) for ...`
-  - [ ] If a failure happened before pushing, you should have an unpushed commit. After the issue is fixed, retry the release process with `--no-push` and squash the commits together, then push with `git push --tags`.
+  - [ ] If a failure happened before pushing, you should have an unpushed commit. After the issue is fixed, retry the release process with `--no-push` and squash the commits together, then push the commit and the tag together with `git push origin main v<version>`.
 - [ ] Approve the `publish` job of the [release workflow](./.github/workflows/release.yml) run for the tag.
   - [ ] If publishing stopped partway, re-run the failed job: crates already on `crates.io` are skipped.
 - [ ] Check the GitHub release the workflow created and set its name to `<repo> v<X.Y.Z>`.
