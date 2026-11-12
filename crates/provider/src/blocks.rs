@@ -20,6 +20,12 @@ use std::{
 #[cfg(feature = "pubsub")]
 use futures::{future::Either, FutureExt};
 
+#[cfg(all(feature = "pubsub", target_family = "wasm", target_os = "unknown"))]
+use wasmtimer::tokio::sleep;
+
+#[cfg(all(feature = "pubsub", not(all(target_family = "wasm", target_os = "unknown"))))]
+use tokio::time::sleep;
+
 /// The size of the block cache.
 const BLOCK_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(10).unwrap();
 
@@ -154,26 +160,32 @@ impl<N: Network> NewBlocks<N> {
         let stream =
             sub.into_typed::<N::HeaderResponse>().into_stream().map(|header| header.number());
         // The pubsub service closes the subscription if the server rejects it after a reconnect.
-        // Keep following new blocks by polling then, unless the service stopped too.
-        let client = self.client.clone();
+        // Keep following new blocks by polling then, until the service stops.
+        let weak = self.client.clone();
         let polled = stream! {
-            // The subscription already ended, so unsubscribing it only fails if the service is
-            // gone.
-            let service_alive = client.upgrade().is_some_and(|client| {
-                client.pubsub_frontend().is_some_and(|pubsub| pubsub.unsubscribe(id).is_ok())
-            });
-            if service_alive {
-                debug!("newHeads subscription closed, polling for new blocks");
-                for await number in poll_block_numbers(client) {
-                    yield number;
+            debug!("newHeads subscription closed, polling for new blocks");
+            while let Some(client) = weak.upgrade() {
+                let interval = client.poll_interval();
+                let number = client.request_noparams::<U64>("eth_blockNumber").await;
+                drop(client);
+                match number {
+                    Ok(number) => yield number.to::<u64>(),
+                    Err(RpcError::Transport(err)) if err.is_backend_gone() => break,
+                    Err(err) => error!(%err, "failed to poll block number"),
                 }
+                sleep(interval).await;
             }
         };
         Some(self.into_block_stream(stream.chain(Box::pin(polled))))
     }
 
     fn into_poll_stream(self) -> impl Stream<Item = N::BlockResponse> + 'static {
-        let stream = poll_block_numbers(self.client.clone());
+        // Spawned lazily on the first `poll`.
+        let stream =
+            PollerBuilder::<NoParams, U64>::new(self.client.clone(), "eth_blockNumber", [])
+                .into_stream()
+                .map(|n| n.to());
+
         self.into_block_stream(stream)
     }
 
@@ -293,12 +305,6 @@ impl<N: Network> NewBlocks<N> {
         }
         }
     }
-}
-
-/// Returns a stream of the latest block number, polled with `eth_blockNumber` once the stream is
-/// first polled.
-fn poll_block_numbers(client: WeakClient) -> impl Stream<Item = u64> + Unpin + 'static {
-    PollerBuilder::<NoParams, U64>::new(client, "eth_blockNumber", []).into_stream().map(|n| n.to())
 }
 
 #[cfg(test)]
@@ -555,7 +561,7 @@ mod regression_tests {
         let connector = MockConnect::default();
         let [mut first, mut second] = std::array::from_fn(|_| {
             let (handle, interface) = ConnectionHandle::new();
-            connector.0.lock().unwrap().push_back(handle);
+            connector.0.lock().unwrap().push_back(handle.with_max_retries(1));
             interface
         });
         let client = RpcClient::new(connector.into_service().await.unwrap(), true);
@@ -579,6 +585,12 @@ mod regression_tests {
         send(&second, json!({ "jsonrpc": "2.0", "id": poll["id"], "result": "0x3" }));
         serve_blocks(&mut second, 2..=3).await;
         assert_eq!(blocks.recv().await.unwrap().header.number, 2);
+        assert_eq!(blocks.recv().await.unwrap().header.number, 3);
+
+        // No backend is left to reconnect to, so the service stops, and so does the polling.
+        second.close_with_error();
+        let end = tokio::time::timeout(Duration::from_secs(60), blocks.recv()).await;
+        assert!(end.unwrap().is_none());
     }
 
     #[cfg(feature = "pubsub")]
