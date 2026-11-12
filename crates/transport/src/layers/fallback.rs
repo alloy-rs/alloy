@@ -5,9 +5,13 @@ use derive_more::{Deref, DerefMut};
 use futures::{stream::FuturesUnordered, StreamExt};
 use parking_lot::RwLock;
 use std::{
+    cmp::Ordering,
     collections::{HashSet, VecDeque},
     num::NonZeroUsize,
-    sync::Arc,
+    sync::{
+        atomic::{self, AtomicU64},
+        Arc,
+    },
     task::{Context, Poll},
 };
 use tower::{Layer, Service};
@@ -20,6 +24,7 @@ const STABILITY_WEIGHT: f64 = 0.7;
 const LATENCY_WEIGHT: f64 = 0.3;
 const DEFAULT_SAMPLE_COUNT: usize = 10;
 const DEFAULT_ACTIVE_TRANSPORT_COUNT: usize = 3;
+const FAILED_SCORE: f64 = -1.0;
 
 /// The [`FallbackService`] consumes multiple transports and is able to
 /// query them in parallel, returning the first successful response.
@@ -50,6 +55,8 @@ pub struct FallbackService<S> {
     /// Set of RPC methods that require sequential execution (non-deterministic results in
     /// parallel)
     sequential_methods: Arc<HashSet<String>>,
+    /// Counter that orders the attempts made on the transports.
+    attempts: Arc<AtomicU64>,
 }
 
 impl<S: Clone> FallbackService<S> {
@@ -90,6 +97,7 @@ impl<S: Clone> FallbackService<S> {
             transports: Arc::new(scored_transports),
             active_transport_count,
             sequential_methods: Arc::new(sequential_methods),
+            attempts: Default::default(),
         }
     }
 
@@ -128,11 +136,24 @@ impl<S: Clone> FallbackService<S> {
 
     /// Returns the top transports sorted by score (best first), limited by
     /// `active_transport_count`.
+    ///
+    /// Transports whose recent requests all failed are ordered by their last attempt, oldest
+    /// first. A failed transport only gets new samples when it is tried, so without this the
+    /// first one by index would win every tie and the others would never be tried again.
     fn top_transports(&self) -> Vec<ScoredTransport<S>> {
         // Snapshot the scores once, they can change concurrently while sorting.
-        let mut ranked: Vec<_> = self.transports.iter().map(|t| (t.score(), t)).collect();
-        ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
-        ranked.into_iter().take(self.active_transport_count).map(|(_, t)| t.clone()).collect()
+        let mut ranked: Vec<_> =
+            self.transports.iter().map(|t| (t.score(), t.last_attempt(), t)).collect();
+        ranked.sort_by(|a, b| {
+            b.0.total_cmp(&a.0).then_with(|| {
+                if a.0 == FAILED_SCORE {
+                    a.1.cmp(&b.1)
+                } else {
+                    Ordering::Equal
+                }
+            })
+        });
+        ranked.into_iter().take(self.active_transport_count).map(|(_, _, t)| t.clone()).collect()
     }
 }
 
@@ -178,6 +199,7 @@ where
         // Launch requests to all active transports in parallel
         for mut transport in top_transports {
             let req_clone = req.clone();
+            transport.record_attempt(&self.attempts);
 
             let future = async move {
                 let start = Instant::now();
@@ -244,6 +266,7 @@ where
             let start = Instant::now();
 
             trace!("Trying transport[{}] sequentially", transport.id);
+            transport.record_attempt(&self.attempts);
 
             match transport.call(req_clone).await {
                 Ok(response) => {
@@ -410,12 +433,19 @@ struct ScoredTransport<S> {
     id: usize,
     /// Metrics for the transport
     metrics: Arc<RwLock<TransportMetrics>>,
+    /// Value of the service's attempt counter when the transport was last tried, `0` if never.
+    last_attempt: Arc<AtomicU64>,
 }
 
 impl<S> ScoredTransport<S> {
     /// Create a new scored transport
     fn new(id: usize, transport: S) -> Self {
-        Self { id, transport, metrics: Arc::new(Default::default()) }
+        Self {
+            id,
+            transport,
+            metrics: Arc::new(Default::default()),
+            last_attempt: Default::default(),
+        }
     }
 
     /// Returns the current score of the transport based on the weighted algorithm.
@@ -440,6 +470,20 @@ impl<S> ScoredTransport<S> {
     fn track_failure(&self) {
         let mut metrics = self.metrics.write();
         metrics.track_failure();
+    }
+
+    /// Returns when the transport was last tried, see [`Self::record_attempt`].
+    fn last_attempt(&self) -> u64 {
+        self.last_attempt.load(atomic::Ordering::Relaxed)
+    }
+
+    /// Records that the transport is about to be tried, using the service's attempt counter.
+    ///
+    /// Concurrent attempts can publish out of order, so an older attempt never overwrites a newer
+    /// one.
+    fn record_attempt(&self, attempts: &AtomicU64) {
+        let attempt = attempts.fetch_add(1, atomic::Ordering::Relaxed) + 1;
+        self.last_attempt.fetch_max(attempt, atomic::Ordering::Relaxed);
     }
 }
 
@@ -509,7 +553,7 @@ impl TransportMetrics {
         // Rank a transport whose recent requests all failed below an untried one, regardless of
         // the latency of older successes.
         if !self.successes.contains(&true) {
-            return -1.0;
+            return FAILED_SCORE;
         }
 
         // Normalize latency score (1.0 for 0ms, approaches 0.0 as latency increases)
