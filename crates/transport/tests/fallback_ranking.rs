@@ -48,6 +48,11 @@ fn request() -> RequestPacket {
     Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap().into()
 }
 
+/// A request for a method that is sent to one transport at a time.
+fn sequential_request() -> RequestPacket {
+    Request::new("eth_sendRawTransactionSync", Id::Number(1), ()).serialize().unwrap().into()
+}
+
 #[tokio::test]
 async fn failed_transport_is_not_preferred_over_untried_one() {
     let calls = [Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))];
@@ -77,33 +82,36 @@ async fn transport_that_stopped_succeeding_falls_below_untried_one() {
 
 #[tokio::test]
 async fn recovered_transport_is_retried_after_failing_streak() {
-    let calls = [Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))];
-    let mut service = FallbackService::new(
-        vec![node_failing(&calls[0], 0..usize::MAX), node_failing(&calls[1], 5..15)],
-        1,
-    );
+    // Parallel and sequential requests pick their transports the same way.
+    for request in [request as fn() -> RequestPacket, sequential_request] {
+        let calls = [Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))];
+        let mut service = FallbackService::new(
+            vec![node_failing(&calls[0], 0..usize::MAX), node_failing(&calls[1], 5..15)],
+            1,
+        );
 
-    // The dead transport fails once, then the other one succeeds five times and fails ten times,
-    // which leaves both with only failures in their sample window.
-    assert!(service.call(request()).await.is_err());
-    for _ in 0..5 {
-        assert!(service.call(request()).await.is_ok());
-    }
-    for _ in 0..10 {
+        // The dead transport fails once, then the other one succeeds five times and fails ten
+        // times, which leaves both with only failures in their sample window.
         assert!(service.call(request()).await.is_err());
-    }
-    assert_eq!(calls[1].load(Ordering::SeqCst), 15);
+        for _ in 0..5 {
+            assert!(service.call(request()).await.is_ok());
+        }
+        for _ in 0..10 {
+            assert!(service.call(request()).await.is_err());
+        }
+        assert_eq!(calls[1].load(Ordering::SeqCst), 15);
 
-    let mut failures = 0;
-    while service.call(request()).await.is_err() {
-        failures += 1;
-        assert!(failures <= 2, "the recovered transport is never retried");
-    }
-    let dead_calls = calls[0].load(Ordering::SeqCst);
+        let mut failures = 0;
+        while service.call(request()).await.is_err() {
+            failures += 1;
+            assert!(failures <= 2, "the recovered transport is never retried");
+        }
+        let dead_calls = calls[0].load(Ordering::SeqCst);
 
-    for _ in 0..100 {
-        assert!(service.call(request()).await.is_ok());
+        for _ in 0..100 {
+            assert!(service.call(request()).await.is_ok());
+        }
+        assert_eq!(calls[0].load(Ordering::SeqCst), dead_calls, "the dead transport is still used");
+        assert_eq!(calls[1].load(Ordering::SeqCst), 116);
     }
-    assert_eq!(calls[0].load(Ordering::SeqCst), dead_calls, "the dead transport is still used");
-    assert_eq!(calls[1].load(Ordering::SeqCst), 116);
 }
