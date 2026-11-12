@@ -91,6 +91,7 @@ jobs:
           prev="$(git describe --tags --abbrev=0 --match "v*" "${TAG}^" 2>/dev/null || true)"
           args=(--verify-tag --generate-notes)
           version="${TAG#"${TAG%%v[0-9]*}"}"
+          version="${version%%+*}"
           if [[ "$version" == *-* ]]; then
             args+=(--prerelease)
           fi
