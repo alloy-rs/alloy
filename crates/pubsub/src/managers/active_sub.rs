@@ -1,9 +1,7 @@
-use crate::RawSubscription;
 use alloy_json_rpc::SerializedRequest;
-use alloy_primitives::{keccak256, Keccak256, B256};
-use parking_lot::Mutex;
+use alloy_primitives::{keccak256, map::B256Map, Keccak256, B256};
 use serde_json::value::RawValue;
-use std::{fmt, hash::Hash, ops::DerefMut};
+use std::{fmt, hash::Hash};
 use tokio::sync::broadcast;
 
 /// Returns the local id of a subscription request.
@@ -32,18 +30,8 @@ pub(crate) struct ActiveSubscription {
     pub(crate) local_id: B256,
     /// The serialized subscription request.
     pub(crate) request: SerializedRequest,
-    /// The channel via which notifications are broadcast.
-    pub(crate) tx: broadcast::Sender<Box<RawValue>>,
-    /// The initial channel via which notifications are received.
-    ///
-    /// This is stored so that we don't drop any notifications between initializing
-    /// using [`ActiveSubscription::new`] and [`ActiveSubscription::subscribe`]. Ref: <https://github.com/alloy-rs/alloy/issues/2187>
-    ///
-    /// This is wrapped in a [`Mutex`] to allow for mutable access to the receiver without making
-    /// [`ActiveSubscription::subscribe`] require mutable self.
-    pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
-    /// The number of callers that were handed the local id but have not fetched a receiver yet.
-    pub(crate) pending_claims: usize,
+    /// The shares of the callers that were handed a local id for this subscription, by that id.
+    pub(crate) shares: B256Map<Share>,
     /// The number of consecutive backends that died before acknowledging the resubscription.
     pub(crate) unacked_resubscribes: u32,
 }
@@ -81,33 +69,21 @@ impl fmt::Debug for ActiveSubscription {
         f.debug_struct("ActiveSubscription")
             .field("local_id", &self.local_id)
             .field("request", &self.request)
-            .field("subscribers", &self.tx.receiver_count())
-            .field("pending_claims", &self.pending_claims)
+            .field("shares", &self.shares.len())
             .finish()
     }
 }
 
 impl ActiveSubscription {
     /// Create a new active subscription.
-    pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
+    pub(crate) fn new(request: SerializedRequest) -> Self {
         let local_id = subscription_local_id(&request);
-        let (tx, rx) = broadcast::channel(channel_size);
-        Self {
-            request,
-            local_id,
-            tx,
-            rx: Mutex::new(Some(rx)),
-            pending_claims: 0,
-            unacked_resubscribes: 0,
-        }
+        Self { request, local_id, shares: B256Map::default(), unacked_resubscribes: 0 }
     }
 
     /// Returns `true` if anyone holds a receiver for this subscription, or is about to fetch one.
-    ///
-    /// The stored initial receiver does not count.
     pub(crate) fn has_consumers(&self) -> bool {
-        let initial = usize::from(self.rx.lock().is_some());
-        self.pending_claims > 0 || self.tx.receiver_count() > initial
+        self.shares.values().any(Share::is_live)
     }
 
     /// Serialize the request as a boxed [`RawValue`].
@@ -117,23 +93,51 @@ impl ActiveSubscription {
         &self.request
     }
 
-    /// Get a subscription.
-    pub(crate) fn subscribe(&self) -> RawSubscription {
+    /// Notify the channel of every share that has a receiver of a new value. If no receiver
+    /// exists, the notification is dropped.
+    pub(crate) fn notify(&self, notification: Box<RawValue>) {
+        let mut shares = self.shares.values().filter(|share| share.tx.receiver_count() > 0);
+        let Some(mut current) = shares.next() else { return };
+        for next in shares {
+            let _ = current.tx.send(notification.clone());
+            current = next;
+        }
+        let _ = current.tx.send(notification);
+    }
+}
+
+/// The share of a subscription held by a caller that was handed a local id for it.
+///
+/// Each share has its own channel, so that unsubscribing one local id closes only the receivers
+/// fetched with it.
+pub(crate) struct Share {
+    /// The channel via which notifications are broadcast to the receivers of this share.
+    tx: broadcast::Sender<Box<RawValue>>,
+    /// The initial receiver, until the caller fetches it.
+    ///
+    /// This is stored so that we don't drop any notifications between handing out the local id
+    /// and the caller fetching its receiver. Ref: <https://github.com/alloy-rs/alloy/issues/2187>
+    rx: Option<broadcast::Receiver<Box<RawValue>>>,
+}
+
+impl Share {
+    /// Create a new share whose channel buffers `channel_size` notifications.
+    pub(crate) fn new(channel_size: usize) -> Self {
+        let (tx, rx) = broadcast::channel(channel_size);
+        Self { tx, rx: Some(rx) }
+    }
+
+    /// Returns `true` if the caller holds a receiver, or has yet to fetch one.
+    pub(crate) fn is_live(&self) -> bool {
+        self.rx.is_some() || self.tx.receiver_count() > 0
+    }
+
+    /// Get a receiver.
+    pub(crate) fn subscribe(&mut self) -> broadcast::Receiver<Box<RawValue>> {
         // The first receiver is the initial one, so that notifications received before it was
         // requested are not dropped. Later receivers start at the tail: the initial receiver may
         // still hold notifications that other receivers already consumed.
         // Ref: <https://github.com/alloy-rs/alloy/issues/2187>
-        RawSubscription {
-            rx: self.rx.lock().deref_mut().take().unwrap_or_else(|| self.tx.subscribe()),
-            local_id: self.local_id,
-        }
-    }
-
-    /// Notify the subscription channel of a new value, if any receiver exists.
-    /// If no receiver exists, the notification is dropped.
-    pub(crate) fn notify(&self, notification: Box<RawValue>) {
-        if self.tx.receiver_count() > 0 {
-            let _ = self.tx.send(notification);
-        }
+        self.rx.take().unwrap_or_else(|| self.tx.subscribe())
     }
 }

@@ -178,10 +178,10 @@ async fn reconnect_resubscribes_under_new_server_id() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn identical_subscribe_reroutes_subscription_after_failed_resubscription() {
+async fn identical_subscribe_recreates_subscription_after_failed_resubscription() {
     let (frontend, _, [mut first, mut second]) = spawn_service().await;
     let local = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
-    let mut sub = frontend.get_subscription(local).await.unwrap();
+    let _sub = frontend.get_subscription(local).await.unwrap();
 
     first.close();
     assert_eq!(second.recv().await["id"], 1);
@@ -191,10 +191,34 @@ async fn identical_subscribe_reroutes_subscription_after_failed_resubscription()
         "error": { "code": -32000, "message": "too many subscriptions" },
     }));
 
-    // The identical subscribe reaches the server instead of the unrouted subscription answering it.
-    assert_eq!(subscribe(&frontend, &mut second, 2, json!(["newHeads"]), "0xbbb").await, local);
+    // The identical subscribe reaches the server and creates the subscription afresh.
+    let recreated = subscribe(&frontend, &mut second, 2, json!(["newHeads"]), "0xbbb").await;
+    assert_ne!(recreated, local);
+    let mut sub = frontend.get_subscription(recreated).await.unwrap();
+    // The local id of the dropped subscription does not refer to the new one.
+    assert!(frontend.get_subscription(local).await.is_err());
+    frontend.unsubscribe(local).unwrap();
+    probe(&frontend, &mut second, 3).await;
     second.notify("0xbbb", json!(1));
     assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
+}
+
+#[tokio::test(start_paused = true)]
+async fn rejected_resubscription_closes_subscription() {
+    let (frontend, _, [mut first, mut second]) = spawn_service().await;
+    let local = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
+    let mut sub = frontend.get_subscription(local).await.unwrap();
+
+    first.close();
+    assert_eq!(second.recv().await["id"], 1);
+    second.send(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": { "code": -32005, "message": "rate limited" },
+    }));
+
+    assert!(matches!(within(sub.recv()).await, Err(RecvError::Closed)));
+    assert!(frontend.get_subscription(local).await.is_err());
 }
 
 #[tokio::test(start_paused = true)]
@@ -232,14 +256,18 @@ async fn unsubscribe_during_resubscribe_without_receivers_keeps_service_alive() 
     // Take the initial receiver and drop it, so that the subscription has no receiver left.
     first.notify("0xaaa", json!(1));
     drop(frontend.get_subscription(local).await.unwrap());
-    // A caller is handed the local id, but has not fetched its receiver yet.
+    // Another caller is handed a local id, but has not fetched its receiver yet.
     let resp = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
-    assert_eq!(local_id(&resp.unwrap()), local);
+    let pending = local_id(&resp.unwrap());
 
     first.close();
     assert_eq!(second.recv().await["method"], "eth_subscribe");
+    // Both callers unsubscribe. The first one's local id is already gone, since its caller
+    // dropped its receiver before the second subscribe.
     frontend.unsubscribe(local).unwrap();
+    frontend.unsubscribe(pending).unwrap();
     assert!(frontend.get_subscription(local).await.is_err());
+    assert!(frontend.get_subscription(pending).await.is_err());
     second.respond(1, json!("0xbbb"));
     let unsubscribe = second.recv().await;
     assert_eq!(unsubscribe["method"], "eth_unsubscribe");
@@ -352,21 +380,24 @@ async fn subscription_response_carries_local_id() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn identical_subscriptions_share_local_id() {
+async fn identical_subscriptions_share_server_subscription() {
     let (frontend, _, [mut backend]) = spawn_service().await;
     let first = subscribe(&frontend, &mut backend, 1, json!(["newHeads"]), "0xaaa").await;
     let mut sub = frontend.get_subscription(first).await.unwrap();
-    // The identical subscribe is answered without another server-side subscription.
+    // The identical subscribe is answered with its own local id, without another server-side
+    // subscription.
     let second = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
     let second = second.unwrap();
     assert_eq!(second.id, Id::Number(2));
+    let mut second_sub = frontend.get_subscription(local_id(&second)).await.unwrap();
     let other =
         subscribe(&frontend, &mut backend, 3, json!(["newPendingTransactions"]), "0xccc").await;
-    assert_eq!(first, local_id(&second));
+    assert_ne!(first, local_id(&second));
     assert_ne!(first, other);
 
     backend.notify("0xaaa", json!(1));
     assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
+    assert_eq!(within(second_sub.recv()).await.unwrap().get(), "1");
     assert!(sub.is_empty());
 }
 
@@ -381,8 +412,7 @@ async fn late_identical_subscriber_starts_at_the_tail() {
     }
 
     let resp = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
-    assert_eq!(local_id(&resp.unwrap()), local);
-    let mut second = frontend.get_subscription(local).await.unwrap();
+    let mut second = frontend.get_subscription(local_id(&resp.unwrap())).await.unwrap();
     backend.notify("0xaaa", json!(4));
     assert_eq!(within(second.recv()).await.unwrap().get(), "4");
 }
@@ -397,6 +427,31 @@ async fn unsubscribe_sends_server_id_and_drops_subscription() {
     assert_eq!(unsubscribe["method"], "eth_unsubscribe");
     assert_eq!(unsubscribe["params"], json!(["0xaaa"]));
     assert!(frontend.get_subscription(local_id).await.is_err());
+}
+
+#[tokio::test(start_paused = true)]
+async fn shared_subscription_is_cancelled_by_last_unsubscribe() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let first = subscribe(&frontend, &mut backend, 1, json!(["newHeads"]), "0xaaa").await;
+    let mut first_sub = frontend.get_subscription(first).await.unwrap();
+    let resp = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
+    let second = local_id(&resp.unwrap());
+    let mut sub = frontend.get_subscription(second).await.unwrap();
+
+    // Unsubscribing closes the receivers of that local id only. The other subscriber keeps the
+    // subscription, on the server too.
+    frontend.unsubscribe(first).unwrap();
+    probe(&frontend, &mut backend, 3).await;
+    assert!(matches!(within(first_sub.recv()).await, Err(RecvError::Closed)));
+    backend.notify("0xaaa", json!(1));
+    assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
+
+    frontend.unsubscribe(second).unwrap();
+    let unsubscribe = backend.recv().await;
+    assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+    assert_eq!(unsubscribe["params"], json!(["0xaaa"]));
+    probe(&frontend, &mut backend, 4).await;
+    assert!(matches!(within(sub.recv()).await, Err(RecvError::Closed)));
 }
 
 #[tokio::test(start_paused = true)]
@@ -451,6 +506,44 @@ async fn batch_is_split_and_reassembled_in_order() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn subscriber_that_dropped_its_receivers_does_not_hold_subscription() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let first = subscribe(&frontend, &mut backend, 1, json!(["newHeads"]), "0xaaa").await;
+    // The first subscriber drops its receiver without unsubscribing.
+    drop(frontend.get_subscription(first).await.unwrap());
+    let resp = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
+    let second = local_id(&resp.unwrap());
+    let mut sub = frontend.get_subscription(second).await.unwrap();
+    // The share of the first subscriber is gone, so its local id does not refer to the
+    // subscription anymore.
+    assert!(frontend.get_subscription(first).await.is_err());
+
+    frontend.unsubscribe(second).unwrap();
+    let unsubscribe = backend.recv().await;
+    assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+    assert_eq!(unsubscribe["params"], json!(["0xaaa"]));
+    assert!(matches!(within(sub.recv()).await, Err(RecvError::Closed)));
+}
+
+#[tokio::test(start_paused = true)]
+async fn unsubscribe_releases_unfetched_local_id() {
+    let (frontend, _, [mut first, mut second]) = spawn_service().await;
+    let local = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
+    let sub = frontend.get_subscription(local).await.unwrap();
+    // Another caller is handed a local id and unsubscribes it without fetching a receiver.
+    let resp = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
+    frontend.unsubscribe(local_id(&resp.unwrap())).unwrap();
+    probe(&frontend, &mut first, 3).await;
+
+    // Once the remaining receiver is dropped, nobody consumes the subscription, so it is not
+    // re-created after a reconnect.
+    drop(sub);
+    first.close();
+    probe(&frontend, &mut second, 4).await;
+    assert!(frontend.get_subscription(local).await.is_err());
+}
+
+#[tokio::test(start_paused = true)]
 async fn concurrent_identical_subscribes_share_one_request() {
     let (frontend, _, [mut backend]) = spawn_service().await;
     let params = json!(["logs", { "address": "0x0000000000000000000000000000000000000001" }]);
@@ -464,7 +557,7 @@ async fn concurrent_identical_subscribes_share_one_request() {
     let first = within(first).await.unwrap().unwrap();
     let second = within(second).await.unwrap();
     assert_eq!((&first.id, &second.id), (&Id::Number(3), &Id::Number(4)));
-    assert_eq!(local_id(&first), local_id(&second));
+    assert_ne!(local_id(&first), local_id(&second));
 
     // Both callers share the single server-side subscription.
     let mut subs = [
@@ -476,6 +569,7 @@ async fn concurrent_identical_subscribes_share_one_request() {
         assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
     }
     frontend.unsubscribe(local_id(&first)).unwrap();
+    frontend.unsubscribe(local_id(&second)).unwrap();
     let unsubscribe = backend.recv().await;
     assert_eq!(unsubscribe["params"], json!(["0xbbb"]));
     probe(&frontend, &mut backend, 6).await;

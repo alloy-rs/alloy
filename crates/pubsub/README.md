@@ -62,22 +62,22 @@ For a normal request, the user sends a request to the **frontend**, and
 later receives a response via a tokio oneshot channel. This is straightforward
 and easy to reason about. Subscriptions, however, are side-effects of other
 requests, and are long-lived. They are managed by the **service** and
-identified locally by a `B256`. This value is a request-derived alias. Identical
-`eth_subscribe` requests share an alias and a single server-side subscription: a
-request for a subscription that exists, or is being created, is answered with
-its alias without another request to the server. Requests of other subscribe
-methods may stream a bounded range, e.g. `debug_subscribe` with `traceChain`,
-so each of them reaches the server and gets its own alias. The service uses
-this ID to manage the subscription lifecycle and dispatch notifications to
-receivers.
+identified locally by a `B256`. Each subscription request is answered with its
+own local ID, which is never reused. Identical `eth_subscribe` requests share a
+single server-side subscription: a request for a subscription that exists, or
+is being created, is answered without another request to the server. Requests
+of other subscribe methods may stream a bounded range, e.g. `debug_subscribe`
+with `traceChain`, so each of them reaches the server and gets its own
+subscription. The service uses these IDs to manage the subscription lifecycle
+and dispatch notifications to receivers.
 
 ### Server & Local IDs
 
 When a user issues a subscription request, the **frontend** sends a
 subscription request to the **service**. The **service** dispatches it to the
 RPC server via the **backend**. The **service** then intercepts the RPC server
-response containing the server ID and assigns a stable `B256` `local_id` to
-the subscription. Server IDs are represented by [`alloy_json_rpc::SubId`] and
+response containing the server ID and answers the caller with a stable `B256`
+`local_id`. Server IDs are represented by [`alloy_json_rpc::SubId`] and
 may be numeric or strings. The `local_id` identifies the subscription in the
 **service** and consumer tasks, while the current `server_id` associates
 notifications with the server-side subscription.
@@ -95,12 +95,14 @@ unhealthy backend on, the service backs off before reconnecting, and after `max_
 them it shuts down. A request that was pending on four consecutive dead backends fails instead
 of being re-sent again, and a subscription whose resubscription four consecutive backends did
 not acknowledge, although they answered other requests, is dropped, which closes its receivers.
+A subscription whose resubscription the server rejects, or answers with something other than a
+subscription ID, is dropped the same way; an identical subscribe request creates it afresh.
 A response that exceeds the size limit kills its backend before it is read, so its deaths count
 against the health budget too, unless the backend answered another request.
 
 Following a successful reconnect, it re-sends every
 request still awaiting a response and re-creates active subscriptions that still
-have consumers: a receiver, or a caller that was handed the local ID but has not
+have consumers: a receiver, or a caller that was handed a local ID but has not
 fetched a receiver yet. If the
 server processed a request but its response was lost, that request may execute
 more than once. Do not rely on at-most-once execution for non-idempotent methods.
@@ -109,7 +111,10 @@ Dropping a request future stops waiting locally, but does not cancel a request
 already accepted by the service. Likewise, dropping a [`RawSubscription`] or
 [`Subscription`] only drops that receiver; it does not cancel the server-side
 subscription. Call [`PubSubFrontend::unsubscribe`] with the local ID when the
-server-side subscription is no longer needed. It sends
+subscription is no longer needed. This closes the receivers fetched with that
+local ID. Identical subscriptions share the server-side subscription, so it is
+cancelled once no other local ID of it has a receiver or has yet to fetch one.
+Cancelling it sends
 `{namespace}_unsubscribe`, with the namespace of the subscribe method, e.g.
 `eth_unsubscribe`, `{namespace}_unsubscribe{Name}` for methods named
 `{namespace}_subscribe{Name}`, and `{method}_unsubscribe` for other methods,

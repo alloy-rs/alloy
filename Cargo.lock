@@ -553,7 +553,6 @@ dependencies = [
  "auto_impl",
  "bimap",
  "futures",
- "parking_lot",
  "serde",
  "serde_json",
  "tokio",
