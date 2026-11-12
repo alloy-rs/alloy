@@ -201,14 +201,11 @@ where
                         this.scanner.reset();
                         return Ready(Some(Ok(item)));
                     }
-                    // Incomplete, or complete but not an `Item`. Either way hand
-                    // the buffer to the framer instead of re-parsing it.
-                    Some(Err(err)) if err.is_eof() || err.is_data() => *this.partial = true,
-                    Some(Err(err)) => {
-                        log_invalid_json(&err, this.buf.as_ref());
-                        *this.finished = true;
-                        return Ready(Some(Err(json_error(err))));
-                    }
+                    // Incomplete, invalid, or complete but not an `Item`. Hand the
+                    // buffer to the framer instead of re-parsing it. A number cut
+                    // off by the end of the buffer is a syntax error rather than
+                    // EOF, so only a complete frame can tell whether it is valid.
+                    Some(Err(_)) => *this.partial = true,
                     None => {}
                 }
             }
@@ -831,5 +828,44 @@ mod tests {
             std::io::ErrorKind::UnexpectedEof
         );
         assert!(reader.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn number_split_across_reads_is_not_an_error() {
+        // A single read larger than the initial buffer is first probed at
+        // exactly `CAPACITY` bytes, here ending right after a decimal point.
+        let mut large = Vec::from(br#"{"jsonrpc":"2.0","id":1,"result":{"gasUsedRatio":["#);
+        while large.len() + 4 <= CAPACITY - 2 {
+            large.extend_from_slice(b"0.5,");
+        }
+        large.resize(CAPACITY - 2, b' ');
+        large.extend_from_slice(b"0.5");
+        large.extend(b",0.5".repeat(64));
+        large.extend_from_slice(b"]}}");
+        assert_eq!(&large[CAPACITY - 2..CAPACITY], b"0.");
+
+        let cases: [&[&[u8]]; 7] = [
+            &[br#"{"jsonrpc":"2.0","id":1,"result":{"gasUsedRatio":[0."#, b"5]}}"],
+            &[br#"{"jsonrpc":"2.0","id":1,"result":-"#, b"1}"],
+            &[br#"{"jsonrpc":"2.0","id":1,"result":1e"#, b"5}"],
+            &[br#"{"jsonrpc":"2.0","id":1,"result":1e+"#, b"5}"],
+            &[br#"{"jsonrpc":"2.0","id":1,"result":1e-"#, b"5}"],
+            &[
+                br#"{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0x1","result":[0."#,
+                b"5]}}",
+            ],
+            &[&large],
+        ];
+
+        for (i, reads) in cases.into_iter().enumerate() {
+            let mut builder = tokio_test::io::Builder::new();
+            for read in reads {
+                builder.read(read);
+            }
+            let mut reader = ReadJsonStream::<_, PubSubItem>::new(builder.build());
+            let item = reader.next().await.unwrap();
+            assert!(item.is_ok(), "case {i}: {item:?}");
+            assert!(reader.next().await.is_none(), "case {i}");
+        }
     }
 }
