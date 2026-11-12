@@ -5,13 +5,18 @@ use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
 use tokio::{
-    net::{lookup_host, TcpStream},
+    net::TcpStream,
     time::{sleep, timeout},
 };
 use tokio_tungstenite::{
-    tungstenite::{self, client::IntoClientRequest, error::UrlError, Message},
+    tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
 };
+
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+use tokio::net::lookup_host;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+use tokio_tungstenite::tungstenite::error::UrlError;
 
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -40,8 +45,7 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
-    /// The timeout for each TCP connect attempt, and for the TLS handshake and websocket upgrade
-    /// that follow.
+    /// The connect timeout, see [`Self::with_connect_timeout`].
     /// Default is 10 seconds.
     connect_timeout: Duration,
 }
@@ -129,13 +133,13 @@ impl WsConnect {
         self
     }
 
-    /// Sets the timeout for establishing a connection.
+    /// Sets the connect timeout.
     ///
-    /// The timeout applies to each TCP connect attempt, one per address the host resolves to, and
-    /// separately to the TLS handshake and websocket upgrade that follow. It applies to the
-    /// initial connect as well as to every reconnect attempt. If it expires for the last address
-    /// or for the handshake, the attempt fails with a retryable transport error, so reconnects
-    /// count it against the max number of retries.
+    /// With the `native-tls` or `rustls-tls` feature, it bounds each TCP connect attempt, one per
+    /// address the host resolves to, and separately the TLS handshake and websocket upgrade that
+    /// follow. Without them, it bounds the whole connect. It applies to the initial connect as
+    /// well as to every reconnect attempt. A connect that times out fails with a retryable
+    /// transport error, so reconnects count it against the max number of retries.
     ///
     /// Default is 10 seconds.
     pub const fn with_connect_timeout(mut self, connect_timeout: Duration) -> Self {
@@ -169,17 +173,15 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let stream = connect_tcp(req.uri(), self.connect_timeout).await?;
         #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
-        let handshake =
-            tokio_tungstenite::client_async_tls_with_config(req, stream, self.config, None);
-        // Without a TLS feature, `connect_tcp` rejects `wss` URLs.
+        let handshake = {
+            let stream = connect_tcp(req.uri(), self.connect_timeout).await?;
+            tokio_tungstenite::client_async_tls_with_config(req, stream, self.config, None)
+        };
+        // TLS can also be enabled on tokio-tungstenite directly, and only its own connect uses it
+        // then. That connect tries the resolved addresses in turn under the single timeout.
         #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
-        let handshake = tokio_tungstenite::client_async_with_config(
-            req,
-            MaybeTlsStream::Plain(stream),
-            self.config,
-        );
+        let handshake = tokio_tungstenite::connect_async_with_config(req, self.config, false);
         let (socket, _) = timeout(self.connect_timeout, handshake)
             .await
             .map_err(|_| {
@@ -203,28 +205,26 @@ impl PubSubConnect for WsConnect {
 ///
 /// Each address gets its own `connect_timeout`, so that an address that silently drops the
 /// connection attempt does not use up the time of the addresses after it.
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
 async fn connect_tcp(uri: &http::Uri, connect_timeout: Duration) -> TransportResult<TcpStream> {
     let url_err = |err| TransportErrorKind::custom(tungstenite::Error::Url(err));
+    let io_err = |err| TransportErrorKind::custom(tungstenite::Error::Io(err));
     let default_port = match uri.scheme_str() {
         Some("ws") => 80,
-        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
         Some("wss") => 443,
-        #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
-        Some("wss") => return Err(url_err(UrlError::TlsFeatureNotEnabled)),
         _ => return Err(url_err(UrlError::UnsupportedUrlScheme)),
     };
     let host = uri.host().ok_or_else(|| url_err(UrlError::NoHostName))?;
     // IPv6 literals are bracketed in URLs, but not when resolved.
     let host = host.strip_prefix('[').and_then(|host| host.strip_suffix(']')).unwrap_or(host);
-    let addrs = lookup_host((host, uri.port_u16().unwrap_or(default_port)))
-        .await
-        .map_err(TransportErrorKind::custom)?;
+    let addrs =
+        lookup_host((host, uri.port_u16().unwrap_or(default_port))).await.map_err(io_err)?;
 
     let mut last_err = None;
     for addr in addrs {
         match timeout(connect_timeout, TcpStream::connect(addr)).await {
             Ok(Ok(stream)) => return Ok(stream),
-            Ok(Err(err)) => last_err = Some(TransportErrorKind::custom(err)),
+            Ok(Err(err)) => last_err = Some(io_err(err)),
             Err(_) => {
                 last_err = Some(TransportErrorKind::custom_str(&format!(
                     "connecting to {addr} timed out after {connect_timeout:?}"
