@@ -35,7 +35,9 @@ pub struct ConnectionHandle {
     pub(crate) shutdown: oneshot::Sender<()>,
 
     /// Max number of retries before failing and exiting the connection.
-    /// Default is 10.
+    ///
+    /// This bounds both consecutive failed reconnect attempts, and consecutive backends that die
+    /// with requests pending without answering any. Default is 10.
     pub(crate) max_retries: u32,
     /// The base interval between retries.
     ///
@@ -70,7 +72,9 @@ impl ConnectionHandle {
     }
 
     /// Set the max number of retries before failing and exiting the connection.
-    /// Default is 10.
+    ///
+    /// This bounds both consecutive failed reconnect attempts, and consecutive backends that die
+    /// with requests pending without answering any. Default is 10.
     pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
         self

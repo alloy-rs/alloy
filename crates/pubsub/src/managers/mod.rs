@@ -1,5 +1,5 @@
 mod active_sub;
-pub(crate) use active_sub::ActiveSubscription;
+pub(crate) use active_sub::{subscription_local_id, ActiveSubscription};
 
 mod in_flight;
 pub use in_flight::InFlight;
