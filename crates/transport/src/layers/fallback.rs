@@ -478,9 +478,12 @@ impl<S> ScoredTransport<S> {
     }
 
     /// Records that the transport is about to be tried, using the service's attempt counter.
+    ///
+    /// Concurrent attempts can publish out of order, so an older attempt never overwrites a newer
+    /// one.
     fn record_attempt(&self, attempts: &AtomicU64) {
         let attempt = attempts.fetch_add(1, atomic::Ordering::Relaxed) + 1;
-        self.last_attempt.store(attempt, atomic::Ordering::Relaxed);
+        self.last_attempt.fetch_max(attempt, atomic::Ordering::Relaxed);
     }
 }
 
