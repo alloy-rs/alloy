@@ -67,6 +67,12 @@ jobs:
       - uses: tempoxyz/gh-actions/vendor/dtolnay/rust-toolchain@763efe11a9d8333bcbf0bb2f5ab80f21961c48fd # 2026-11-02T08-44-18Z-763efe11
         with:
           toolchain: 1.99.1
+      - name: Check the tag still points at the verified commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          target="$(git ls-remote origin "refs/tags/${TAG}" "refs/tags/${TAG}^{}" | tail -n 1 | cut -f 1)"
+          test "$target" = "$GITHUB_SHA"
       - uses: tempoxyz/gh-actions/actions/cargo-publish@763efe11a9d8333bcbf0bb2f5ab80f21961c48fd # 2026-11-02T08-44-18Z-763efe11
         with:
           packages: ${{ needs.verify.outputs.packages }}
@@ -84,6 +90,12 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Check the tag still points at the verified commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          target="$(git ls-remote origin "refs/tags/${TAG}" "refs/tags/${TAG}^{}" | tail -n 1 | cut -f 1)"
+          test "$target" = "$GITHUB_SHA"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
