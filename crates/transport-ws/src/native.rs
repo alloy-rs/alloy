@@ -4,7 +4,7 @@ use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, Trans
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
@@ -13,6 +13,9 @@ use tokio_tungstenite::{
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+
+/// The default connect timeout in seconds.
+const DEFAULT_CONNECT_TIMEOUT: u64 = 10;
 
 /// Simple connection details for a websocket connection.
 #[derive(Clone, Debug)]
@@ -34,6 +37,10 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
+    /// The timeout for establishing a connection, covering the TCP connect, the TLS handshake
+    /// and the websocket upgrade.
+    /// Default is 10 seconds.
+    connect_timeout: Duration,
 }
 
 impl WsConnect {
@@ -52,6 +59,7 @@ impl WsConnect {
             max_retries: 10,
             retry_interval: Duration::from_secs(3),
             keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
+            connect_timeout: Duration::from_secs(DEFAULT_CONNECT_TIMEOUT),
         }
     }
 
@@ -117,6 +125,19 @@ impl WsConnect {
         self.keepalive_interval = keepalive_interval;
         self
     }
+
+    /// Sets the timeout for establishing a connection.
+    ///
+    /// The timeout covers the TCP connect, the TLS handshake and the websocket upgrade, and
+    /// applies to the initial connect as well as to every reconnect attempt. If it expires, the
+    /// attempt fails with a retryable transport error, so reconnects count it against the max
+    /// number of retries.
+    ///
+    /// Default is 10 seconds.
+    pub const fn with_connect_timeout(mut self, connect_timeout: Duration) -> Self {
+        self.connect_timeout = connect_timeout;
+        self
+    }
 }
 
 impl IntoClientRequest for WsConnect {
@@ -144,9 +165,18 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
-            .await
-            .map_err(TransportErrorKind::custom)?;
+        let (socket, _) = timeout(
+            self.connect_timeout,
+            tokio_tungstenite::connect_async_with_config(req, self.config, false),
+        )
+        .await
+        .map_err(|_| {
+            TransportErrorKind::custom_str(&format!(
+                "connecting timed out after {:?}",
+                self.connect_timeout
+            ))
+        })?
+        .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
@@ -315,5 +345,29 @@ mod tests {
         let ws =
             WsConnect::new("wss://user:pass@example.com").with_auth(Authorization::bearer("tok"));
         assert_eq!(ws.auth(), Some(&Authorization::bearer("tok")));
+    }
+
+    #[tokio::test]
+    async fn connect_times_out_on_stalled_handshake() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        // Accept the TCP connection but never answer the upgrade request.
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            std::future::pending::<()>().await;
+            drop(socket);
+        });
+
+        let connect = WsConnect::new(format!("ws://{addr}"))
+            .with_connect_timeout(Duration::from_millis(200))
+            .into_service();
+        let err = timeout(Duration::from_secs(30), connect)
+            .await
+            .expect("connect should time out instead of hanging")
+            .unwrap_err();
+        assert!(!err.as_transport_err().unwrap().is_non_retryable());
+        assert_eq!(err.to_string(), "connecting timed out after 200ms");
+
+        server.abort();
     }
 }
