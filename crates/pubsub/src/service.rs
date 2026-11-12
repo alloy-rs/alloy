@@ -248,8 +248,11 @@ impl<T: PubSubConnect> PubSubService<T> {
     }
 
     /// Service an unsubscribe instruction.
+    ///
+    /// Identical subscribe requests share a subscription, so it is only removed, and cancelled on
+    /// the server, once every caller that was handed its local id unsubscribed.
     fn service_unsubscribe(&mut self, local_id: B256) {
-        if let Some((sub, Some(server_id))) = self.subs.remove_sub(local_id) {
+        if let Some((sub, Some(server_id))) = self.subs.release(local_id) {
             self.dispatch_unsubscribe(sub.request().method(), local_id, &server_id);
         }
     }

@@ -238,6 +238,8 @@ async fn unsubscribe_during_resubscribe_without_receivers_keeps_service_alive() 
 
     first.close();
     assert_eq!(second.recv().await["method"], "eth_subscribe");
+    // Both callers that were handed the local id unsubscribe.
+    frontend.unsubscribe(local).unwrap();
     frontend.unsubscribe(local).unwrap();
     assert!(frontend.get_subscription(local).await.is_err());
     second.respond(1, json!("0xbbb"));
@@ -331,6 +333,28 @@ async fn unsubscribe_sends_server_id_and_drops_subscription() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn shared_subscription_is_cancelled_by_last_unsubscribe() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let local = subscribe(&frontend, &mut backend, 1, json!(["newHeads"]), "0xaaa").await;
+    let resp = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
+    assert_eq!(local_id(&resp.unwrap()), local);
+    let mut sub = frontend.get_subscription(local).await.unwrap();
+
+    // The other subscriber keeps the subscription, on the server too.
+    frontend.unsubscribe(local).unwrap();
+    probe(&frontend, &mut backend, 3).await;
+    backend.notify("0xaaa", json!(1));
+    assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
+
+    frontend.unsubscribe(local).unwrap();
+    let unsubscribe = backend.recv().await;
+    assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+    assert_eq!(unsubscribe["params"], json!(["0xaaa"]));
+    probe(&frontend, &mut backend, 4).await;
+    assert!(matches!(within(sub.recv()).await, Err(RecvError::Closed)));
+}
+
+#[tokio::test(start_paused = true)]
 async fn unsubscribe_reply_does_not_resolve_unrelated_request() {
     let (frontend, _, [mut backend]) = spawn_service().await;
     let local_id = subscribe(&frontend, &mut backend, 0, json!(["newHeads"]), "0xaaa").await;
@@ -407,6 +431,7 @@ async fn concurrent_identical_subscribes_share_one_request() {
         assert_eq!(within(sub.recv()).await.unwrap().get(), "1");
     }
     frontend.unsubscribe(local_id(&first)).unwrap();
+    frontend.unsubscribe(local_id(&second)).unwrap();
     let unsubscribe = backend.recv().await;
     assert_eq!(unsubscribe["params"], json!(["0xbbb"]));
     probe(&frontend, &mut backend, 6).await;

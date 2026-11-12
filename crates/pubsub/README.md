@@ -105,7 +105,10 @@ Dropping a request future stops waiting locally, but does not cancel a request
 already accepted by the service. Likewise, dropping a [`RawSubscription`] or
 [`Subscription`] only drops that receiver; it does not cancel the server-side
 subscription. Call [`PubSubFrontend::unsubscribe`] with the local ID when the
-server-side subscription is no longer needed. It sends
+subscription is no longer needed. Identical subscriptions are shared, so each
+unsubscribe only releases the share of one subscribe request that was answered
+with the local ID, and the server-side subscription is cancelled once every such
+request was released. Cancelling it sends
 `{namespace}_unsubscribe`, with the namespace of the subscribe method, e.g.
 `eth_unsubscribe`, `{namespace}_unsubscribe{Name}` for methods named
 `{namespace}_subscribe{Name}`, and `{method}_unsubscribe` for other methods,

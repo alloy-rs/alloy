@@ -64,10 +64,12 @@ impl SubscriptionManager {
         }
     }
 
-    /// Record that a caller was handed the local id and is expected to fetch a receiver.
+    /// Record that a caller was handed the local id and is expected to fetch a receiver, and to
+    /// unsubscribe once.
     pub(crate) fn add_pending_claim(&mut self, local_id: B256) {
         if let Some(sub) = self.local_to_sub.get_mut(&local_id) {
             sub.pending_claims += 1;
+            sub.shares += 1;
         }
     }
 
@@ -145,5 +147,21 @@ impl SubscriptionManager {
         let sub = self.local_to_sub.get_mut(&local_id)?;
         sub.pending_claims = sub.pending_claims.saturating_sub(1);
         Some(sub.subscribe())
+    }
+
+    /// Release the share of one caller that was handed the local id, and remove the subscription
+    /// once no such caller is left, returning it and its current server id.
+    ///
+    /// Returns `None` if the subscription is unknown or still shared with another caller.
+    pub(crate) fn release(
+        &mut self,
+        local_id: B256,
+    ) -> Option<(ActiveSubscription, Option<SubId>)> {
+        let sub = self.local_to_sub.get_mut(&local_id)?;
+        sub.shares = sub.shares.saturating_sub(1);
+        if sub.shares > 0 {
+            return None;
+        }
+        self.remove_sub(local_id)
     }
 }

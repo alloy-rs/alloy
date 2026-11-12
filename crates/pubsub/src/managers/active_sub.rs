@@ -39,6 +39,8 @@ pub(crate) struct ActiveSubscription {
     pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
     /// The number of callers that were handed the local id but have not fetched a receiver yet.
     pub(crate) pending_claims: usize,
+    /// The number of callers that were handed the local id and have not unsubscribed yet.
+    pub(crate) shares: usize,
     /// The number of consecutive backends that died before acknowledging the resubscription.
     pub(crate) unacked_resubscribes: u32,
 }
@@ -78,6 +80,7 @@ impl fmt::Debug for ActiveSubscription {
             .field("request", &self.request)
             .field("subscribers", &self.tx.receiver_count())
             .field("pending_claims", &self.pending_claims)
+            .field("shares", &self.shares)
             .finish()
     }
 }
@@ -93,6 +96,7 @@ impl ActiveSubscription {
             tx,
             rx: Mutex::new(Some(rx)),
             pending_claims: 0,
+            shares: 0,
             unacked_resubscribes: 0,
         }
     }
