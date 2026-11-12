@@ -95,6 +95,8 @@ unhealthy backend on, the service backs off before reconnecting, and after `max_
 them it shuts down. A request that was pending on four consecutive dead backends fails instead
 of being re-sent again, and a subscription whose resubscription four consecutive backends did
 not acknowledge, although they answered other requests, is dropped, which closes its receivers.
+A response that exceeds the size limit kills its backend before it is read, so its deaths count
+against the health budget too, unless the backend answered another request.
 
 Following a successful reconnect, it re-sends every
 request still awaiting a response and re-creates active subscriptions that still
