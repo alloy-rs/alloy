@@ -248,6 +248,33 @@ async fn unsubscribe_during_resubscribe_without_receivers_keeps_service_alive() 
 }
 
 #[tokio::test(start_paused = true)]
+async fn waiter_is_answered_after_dispatched_caller_cancels_across_reconnect() {
+    let (frontend, _, [mut first, mut second, mut third]) = spawn_service().await;
+    let local = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
+    let _sub = frontend.get_subscription(local).await.unwrap();
+
+    // While the resubscription is in flight, an identical subscribe is dispatched and another
+    // one waits for it. Then the dispatched caller cancels and the backend dies.
+    first.close();
+    assert_eq!(second.recv().await["id"], 1);
+    let dispatched = tokio::spawn(frontend.send(request("eth_subscribe", 2, json!(["newHeads"]))));
+    assert_eq!(second.recv().await["id"], 2);
+    let waiter = tokio::spawn(frontend.send(request("eth_subscribe", 3, json!(["newHeads"]))));
+    probe(&frontend, &mut second, 4).await;
+    dispatched.abort();
+    assert!(dispatched.await.unwrap_err().is_cancelled());
+    second.close();
+
+    // The request the waiter depends on is replayed along with the resubscription.
+    let mut reqs = [third.recv().await, third.recv().await];
+    reqs.sort_by_key(|req| req["id"].as_u64());
+    assert_eq!(reqs.map(|req| req["id"].clone()), [json!(1), json!(2)]);
+    third.respond(2, json!("0xccc"));
+    let resp = within(waiter).await.unwrap().unwrap();
+    assert!(frontend.get_subscription(local_id(&resp)).await.is_ok());
+}
+
+#[tokio::test(start_paused = true)]
 async fn exhausted_reconnects_shut_down_service() {
     let (mut frontend, connector, [mut backend]) = spawn_service().await;
     let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 1, json!([]))));

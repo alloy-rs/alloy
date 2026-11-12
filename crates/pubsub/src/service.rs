@@ -157,7 +157,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// from their subscriptions, and a subscribe request is kept while another caller waits for
     /// the same subscription.
     fn remove_cancelled(&mut self) {
-        let Self { in_flights, subs, pending_subs, .. } = self;
+        let Self { in_flights, pending_subs, .. } = self;
         in_flights.retain(|in_flight| {
             if !in_flight.tx.is_closed() {
                 return true;
@@ -165,10 +165,8 @@ impl<T: PubSubConnect> PubSubService<T> {
             if !in_flight.is_subscription() {
                 return false;
             }
+            // Only a caller's subscribe request can have waiters, a resubscription never has.
             let local_id = subscription_local_id(in_flight.request());
-            if subs.contains(&local_id) {
-                return false;
-            }
             let Some(pending) = pending_subs
                 .get_mut(&local_id)
                 .filter(|pending| pending.id == *in_flight.request.id())
