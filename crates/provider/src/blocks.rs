@@ -153,16 +153,27 @@ impl<N: Network> NewBlocks<N> {
         };
         let stream =
             sub.into_typed::<N::HeaderResponse>().into_stream().map(|header| header.number());
-        Some(self.into_block_stream(stream))
+        // The pubsub service closes the subscription if the server rejects it after a reconnect.
+        // Keep following new blocks by polling then, unless the service stopped too.
+        let client = self.client.clone();
+        let polled = stream! {
+            // The subscription already ended, so unsubscribing it only fails if the service is
+            // gone.
+            let service_alive = client.upgrade().is_some_and(|client| {
+                client.pubsub_frontend().is_some_and(|pubsub| pubsub.unsubscribe(id).is_ok())
+            });
+            if service_alive {
+                debug!("newHeads subscription closed, polling for new blocks");
+                for await number in poll_block_numbers(client) {
+                    yield number;
+                }
+            }
+        };
+        Some(self.into_block_stream(stream.chain(Box::pin(polled))))
     }
 
     fn into_poll_stream(self) -> impl Stream<Item = N::BlockResponse> + 'static {
-        // Spawned lazily on the first `poll`.
-        let stream =
-            PollerBuilder::<NoParams, U64>::new(self.client.clone(), "eth_blockNumber", [])
-                .into_stream()
-                .map(|n| n.to());
-
+        let stream = poll_block_numbers(self.client.clone());
         self.into_block_stream(stream)
     }
 
@@ -284,6 +295,12 @@ impl<N: Network> NewBlocks<N> {
     }
 }
 
+/// Returns a stream of the latest block number, polled with `eth_blockNumber` once the stream is
+/// first polled.
+fn poll_block_numbers(client: WeakClient) -> impl Stream<Item = u64> + Unpin + 'static {
+    PollerBuilder::<NoParams, U64>::new(client, "eth_blockNumber", []).into_stream().map(|n| n.to())
+}
+
 #[cfg(test)]
 mod regression_tests {
     use super::*;
@@ -295,6 +312,105 @@ mod regression_tests {
     use alloy_transport::mock::Asserter;
     use futures::{poll, FutureExt};
     use std::{pin::pin, task::Poll, time::Duration};
+
+    #[cfg(feature = "pubsub")]
+    use alloy_pubsub::{ConnectionHandle, ConnectionInterface, PubSubConnect};
+    #[cfg(feature = "pubsub")]
+    use alloy_rpc_client::RpcClient;
+    #[cfg(feature = "pubsub")]
+    use alloy_transport::{TransportErrorKind, TransportResult};
+    #[cfg(feature = "pubsub")]
+    use serde_json::{json, Value};
+    #[cfg(feature = "pubsub")]
+    use std::{ops::RangeInclusive, sync::Mutex};
+    #[cfg(feature = "pubsub")]
+    use tokio::sync::mpsc;
+
+    /// Connects to the queued backends, in order.
+    #[cfg(feature = "pubsub")]
+    #[derive(Clone, Debug, Default)]
+    struct MockConnect(Arc<Mutex<VecDeque<ConnectionHandle>>>);
+
+    #[cfg(feature = "pubsub")]
+    impl PubSubConnect for MockConnect {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            self.0
+                .lock()
+                .unwrap()
+                .pop_front()
+                .ok_or_else(|| TransportErrorKind::custom_str("no backend left"))
+        }
+    }
+
+    /// Receives the next request sent to a mock pubsub backend.
+    #[cfg(feature = "pubsub")]
+    async fn recv(backend: &mut ConnectionInterface) -> Value {
+        let req = tokio::time::timeout(Duration::from_secs(10), backend.recv_from_frontend())
+            .await
+            .unwrap()
+            .unwrap();
+        serde_json::from_str(req.get()).unwrap()
+    }
+
+    /// Sends a JSON-RPC message from a mock pubsub backend.
+    #[cfg(feature = "pubsub")]
+    fn send(backend: &ConnectionInterface, item: Value) {
+        backend.send_to_frontend(serde_json::from_value(item).unwrap()).unwrap();
+    }
+
+    /// Answers the requests for the blocks `numbers` on a mock pubsub backend.
+    #[cfg(feature = "pubsub")]
+    async fn serve_blocks(backend: &mut ConnectionInterface, numbers: RangeInclusive<u64>) {
+        for number in numbers {
+            let fetch = recv(backend).await;
+            assert_eq!(
+                (&fetch["method"], &fetch["params"][0]),
+                (&json!("eth_getBlockByNumber"), &json!(format!("{number:#x}")))
+            );
+            let mut block = Block::<B256>::default();
+            block.header.inner.number = number;
+            send(backend, json!({ "jsonrpc": "2.0", "id": fetch["id"], "result": block }));
+        }
+    }
+
+    /// Streams the new blocks of a pubsub client into a channel, once the blocks 0 and 1 arrived
+    /// through its `newHeads` subscription.
+    #[cfg(feature = "pubsub")]
+    async fn follow_new_heads(
+        client: &RpcClient,
+        backend: &mut ConnectionInterface,
+    ) -> mpsc::UnboundedReceiver<<Ethereum as Network>::BlockResponse> {
+        let mut stream = Box::pin(NewBlocks::<Ethereum>::new(client.get_weak()).into_stream());
+        let (tx, mut blocks) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            while let Some(block) = stream.next().await {
+                let _ = tx.send(block);
+            }
+        });
+
+        let subscribe = recv(backend).await;
+        assert_eq!(subscribe["method"], "eth_subscribe");
+        send(backend, json!({ "jsonrpc": "2.0", "id": subscribe["id"], "result": "0x1" }));
+        let mut header = Block::<B256>::default().header;
+        header.inner.number = 1;
+        send(
+            backend,
+            json!({
+                "jsonrpc": "2.0",
+                "method": "eth_subscription",
+                "params": { "subscription": "0x1", "result": header },
+            }),
+        );
+        serve_blocks(backend, 0..=1).await;
+        for number in 0..=1 {
+            assert_eq!(blocks.recv().await.unwrap().header.number, number);
+        }
+        blocks
+    }
 
     #[tokio::test]
     async fn paused_wait_returns_immediately_when_unpaused() {
@@ -431,6 +547,54 @@ mod regression_tests {
             .await;
         let hash = B256::with_last_byte;
         assert_eq!(yielded, [(0, hash(10)), (1, hash(11)), (1, hash(11))]);
+    }
+
+    #[cfg(feature = "pubsub")]
+    #[tokio::test]
+    async fn new_blocks_polls_once_subscription_is_closed() {
+        let connector = MockConnect::default();
+        let [mut first, mut second] = std::array::from_fn(|_| {
+            let (handle, interface) = ConnectionHandle::new();
+            connector.0.lock().unwrap().push_back(handle);
+            interface
+        });
+        let client = RpcClient::new(connector.into_service().await.unwrap(), true);
+        let mut blocks = follow_new_heads(&client, &mut first).await;
+
+        // The server rejects the resubscription after a reconnect, which closes the subscription.
+        first.close_with_error();
+        let resubscribe = recv(&mut second).await;
+        assert_eq!(resubscribe["method"], "eth_subscribe");
+        send(
+            &second,
+            json!({
+                "jsonrpc": "2.0",
+                "id": resubscribe["id"],
+                "error": { "code": -32005, "message": "rate limited" },
+            }),
+        );
+
+        let poll = recv(&mut second).await;
+        assert_eq!(poll["method"], "eth_blockNumber");
+        send(&second, json!({ "jsonrpc": "2.0", "id": poll["id"], "result": "0x3" }));
+        serve_blocks(&mut second, 2..=3).await;
+        assert_eq!(blocks.recv().await.unwrap().header.number, 2);
+    }
+
+    #[cfg(feature = "pubsub")]
+    #[tokio::test(start_paused = true)]
+    async fn new_blocks_ends_with_pubsub_service() {
+        let connector = MockConnect::default();
+        let (handle, mut backend) = ConnectionHandle::new();
+        connector.0.lock().unwrap().push_back(handle.with_max_retries(1));
+        let client = RpcClient::new(connector.into_service().await.unwrap(), true);
+        let mut blocks = follow_new_heads(&client, &mut backend).await;
+
+        // No backend is left to reconnect to, so the service stops, and the stream ends instead
+        // of polling it.
+        backend.close_with_error();
+        let end = tokio::time::timeout(Duration::from_secs(60), blocks.recv()).await;
+        assert!(end.unwrap().is_none());
     }
 }
 
