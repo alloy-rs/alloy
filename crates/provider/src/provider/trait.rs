@@ -1782,7 +1782,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         GetSubscription::new(self.weak_client(), rpc_call)
     }
 
-    /// Cancels a subscription given the subscription ID.
+    /// Unsubscribes the subscription with the given local ID.
+    ///
+    /// This closes the receivers fetched with the ID. Identical subscriptions share one
+    /// server-side subscription, which is cancelled once no other ID of it is in use.
     #[cfg(feature = "pubsub")]
     async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.root().unsubscribe(id)

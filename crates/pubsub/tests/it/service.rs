@@ -262,7 +262,8 @@ async fn unsubscribe_during_resubscribe_without_receivers_keeps_service_alive() 
 
     first.close();
     assert_eq!(second.recv().await["method"], "eth_subscribe");
-    // Both callers unsubscribe.
+    // Both callers unsubscribe. The first one's local id is already gone, since its caller
+    // dropped its receiver before the second subscribe.
     frontend.unsubscribe(local).unwrap();
     frontend.unsubscribe(pending).unwrap();
     assert!(frontend.get_subscription(local).await.is_err());
@@ -444,6 +445,9 @@ async fn subscriber_that_dropped_its_receivers_does_not_hold_subscription() {
     let resp = within(frontend.send(request("eth_subscribe", 2, json!(["newHeads"])))).await;
     let second = local_id(&resp.unwrap());
     let mut sub = frontend.get_subscription(second).await.unwrap();
+    // The share of the first subscriber is gone, so its local id does not refer to the
+    // subscription anymore.
+    assert!(frontend.get_subscription(first).await.is_err());
 
     frontend.unsubscribe(second).unwrap();
     let unsubscribe = backend.recv().await;
