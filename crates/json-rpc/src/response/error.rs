@@ -130,6 +130,9 @@ impl<E> ErrorPayload<E> {
             "precondition failure" if self.code == -32603 => true,
             // also thrown by infura if out of budget for the day and ratelimited
             "daily request count exceeded, request rate limited" => true,
+            // The revert reason is chosen by the contract, so it must not be matched against the
+            // rate limit phrases below.
+            msg if msg.starts_with("execution reverted") => false,
             msg => {
                 msg.contains("rate limit")
                     || msg.contains("rate exceeded")
@@ -459,6 +462,26 @@ mod test {
             let payload: ErrorPayload = ErrorPayload { code, message: message.into(), data: None };
             assert_eq!(payload.is_retry_err(), retryable, "{payload}");
         }
+    }
+
+    #[test]
+    fn revert_reason_is_not_retry_err() {
+        let data = RawValue::from_string(r#""0x08c379a0""#.into()).unwrap();
+        for (code, message) in [
+            (3, "execution reverted: rate limit exceeded"),
+            (3, "execution reverted: max rate exceeded"),
+            (3, "execution reverted: withdraw request limit reached"),
+            (-32000, "execution reverted: too many requests"),
+            (-32603, "execution reverted: credits limited"),
+        ] {
+            let payload: ErrorPayload =
+                ErrorPayload { code, message: message.into(), data: Some(data.clone()) };
+            assert!(!payload.is_retry_err(), "{payload}");
+        }
+
+        let payload: ErrorPayload =
+            ErrorPayload { code: -32000, message: "rate limit exceeded".into(), data: None };
+        assert!(payload.is_retry_err());
     }
 
     #[test]
