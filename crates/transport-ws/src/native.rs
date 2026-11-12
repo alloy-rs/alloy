@@ -4,13 +4,16 @@ use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, Trans
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
-use tokio::time::{sleep, timeout};
+use tokio::{
+    net::{lookup_host, TcpStream},
+    time::{sleep, timeout},
+};
 use tokio_tungstenite::{
-    tungstenite::{self, client::IntoClientRequest, Message},
+    tungstenite::{self, client::IntoClientRequest, error::UrlError, Message},
     MaybeTlsStream, WebSocketStream,
 };
 
-type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+type TungsteniteStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
@@ -37,8 +40,8 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
-    /// The timeout for establishing a connection, covering the TCP connect, the TLS handshake
-    /// and the websocket upgrade.
+    /// The timeout for each TCP connect attempt, and for the TLS handshake and websocket upgrade
+    /// that follow.
     /// Default is 10 seconds.
     connect_timeout: Duration,
 }
@@ -128,10 +131,11 @@ impl WsConnect {
 
     /// Sets the timeout for establishing a connection.
     ///
-    /// The timeout covers the TCP connect, the TLS handshake and the websocket upgrade, and
-    /// applies to the initial connect as well as to every reconnect attempt. If it expires, the
-    /// attempt fails with a retryable transport error, so reconnects count it against the max
-    /// number of retries.
+    /// The timeout applies to each TCP connect attempt, one per address the host resolves to, and
+    /// separately to the TLS handshake and websocket upgrade that follow. It applies to the
+    /// initial connect as well as to every reconnect attempt. If it expires for the last address
+    /// or for the handshake, the attempt fails with a retryable transport error, so reconnects
+    /// count it against the max number of retries.
     ///
     /// Default is 10 seconds.
     pub const fn with_connect_timeout(mut self, connect_timeout: Duration) -> Self {
@@ -165,18 +169,26 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) = timeout(
-            self.connect_timeout,
-            tokio_tungstenite::connect_async_with_config(req, self.config, false),
-        )
-        .await
-        .map_err(|_| {
-            TransportErrorKind::custom_str(&format!(
-                "connecting timed out after {:?}",
-                self.connect_timeout
-            ))
-        })?
-        .map_err(TransportErrorKind::custom)?;
+        let stream = connect_tcp(req.uri(), self.connect_timeout).await?;
+        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+        let handshake =
+            tokio_tungstenite::client_async_tls_with_config(req, stream, self.config, None);
+        // Without a TLS feature, `connect_tcp` rejects `wss` URLs.
+        #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+        let handshake = tokio_tungstenite::client_async_with_config(
+            req,
+            MaybeTlsStream::Plain(stream),
+            self.config,
+        );
+        let (socket, _) = timeout(self.connect_timeout, handshake)
+            .await
+            .map_err(|_| {
+                TransportErrorKind::custom_str(&format!(
+                    "connecting timed out after {:?}",
+                    self.connect_timeout
+                ))
+            })?
+            .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
@@ -185,6 +197,42 @@ impl PubSubConnect for WsConnect {
 
         Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
     }
+}
+
+/// Opens a TCP connection to the host of `uri`, trying the addresses it resolves to in turn.
+///
+/// Each address gets its own `connect_timeout`, so that an address that silently drops the
+/// connection attempt does not use up the time of the addresses after it.
+async fn connect_tcp(uri: &http::Uri, connect_timeout: Duration) -> TransportResult<TcpStream> {
+    let url_err = |err| TransportErrorKind::custom(tungstenite::Error::Url(err));
+    let default_port = match uri.scheme_str() {
+        Some("ws") => 80,
+        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+        Some("wss") => 443,
+        #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+        Some("wss") => return Err(url_err(UrlError::TlsFeatureNotEnabled)),
+        _ => return Err(url_err(UrlError::UnsupportedUrlScheme)),
+    };
+    let host = uri.host().ok_or_else(|| url_err(UrlError::NoHostName))?;
+    // IPv6 literals are bracketed in URLs, but not when resolved.
+    let host = host.strip_prefix('[').and_then(|host| host.strip_suffix(']')).unwrap_or(host);
+    let addrs = lookup_host((host, uri.port_u16().unwrap_or(default_port)))
+        .await
+        .map_err(TransportErrorKind::custom)?;
+
+    let mut last_err = None;
+    for addr in addrs {
+        match timeout(connect_timeout, TcpStream::connect(addr)).await {
+            Ok(Ok(stream)) => return Ok(stream),
+            Ok(Err(err)) => last_err = Some(TransportErrorKind::custom(err)),
+            Err(_) => {
+                last_err = Some(TransportErrorKind::custom_str(&format!(
+                    "connecting to {addr} timed out after {connect_timeout:?}"
+                )))
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| TransportErrorKind::custom_str("host resolved to no address")))
 }
 
 /// Install a default rustls crypto provider if none is set.

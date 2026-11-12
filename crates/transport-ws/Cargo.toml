@@ -34,12 +34,12 @@ tracing.workspace = true
 # non-WASM only
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 http = "1.1"
-tokio = { workspace = true, features = ["sync", "rt", "time"] }
+tokio = { workspace = true, features = ["sync", "rt", "time", "net"] }
 rustls = { version = "0.23", default-features = false, optional = true }
 tokio-tungstenite = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
-tokio = { workspace = true, features = ["macros", "net"] }
+tokio = { workspace = true, features = ["macros"] }
 
 # WASM only
 [target.'cfg(target_family = "wasm")'.dependencies]
