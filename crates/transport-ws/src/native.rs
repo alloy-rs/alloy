@@ -118,7 +118,7 @@ impl WsConnect {
     /// Sets the keepalive ping interval.
     ///
     /// A ping is sent if no message has been received from the server within this
-    /// interval. If nothing is received before the next ping is due, or a write
+    /// interval. If no data arrives before the next ping is due, or a write
     /// makes no progress for two intervals, the connection is considered dead
     /// and will be closed.
     ///
@@ -219,6 +219,9 @@ impl WsBackend<TungsteniteStream> {
         let fut = async move {
             let mut errored = false;
             let mut expecting_pong = false;
+            // Records whether the socket woke the read, which it does when more data arrives.
+            let inbound = Arc::new(SocketWake::default());
+            let inbound_waker = Waker::from(inbound.clone());
             let keepalive = sleep(self.keepalive_interval);
             tokio::pin!(keepalive);
             loop {
@@ -232,7 +235,9 @@ impl WsBackend<TungsteniteStream> {
                 // not postpone it: writes keep succeeding on a half-open
                 // connection that will never answer. Whatever was already
                 // received, such as a pong held back by a burst of dispatches,
-                // is handled before the keepalive checks for a missed pong.
+                // is handled before the keepalive checks for a missed pong. A
+                // pong can also be queued behind a large message that is still
+                // arriving, so data received since the ping counts as well.
                 // Writes are bounded, since nothing else runs while one is
                 // pending.
                 tokio::select! {
@@ -243,11 +248,15 @@ impl WsBackend<TungsteniteStream> {
                     inst = self.interface.recv_from_frontend() => {
                         match inst {
                             Some(msg) => {
+                                let arrived = inbound.woken.load(Ordering::Relaxed);
                                 if let Err(err) = self.send(msg).await {
                                     error!(%err, "WS connection error");
                                     errored = true;
                                     break
                                 }
+                                // The socket wakes the read as well while a write
+                                // is pending, which doesn't show that data arrived.
+                                inbound.woken.store(arrived, Ordering::Relaxed);
                             },
                             // dispatcher has gone away, or shutdown was received
                             None => {
@@ -255,7 +264,10 @@ impl WsBackend<TungsteniteStream> {
                             },
                         }
                     },
-                    resp = self.socket.next() => {
+                    resp = poll_fn(|cx| {
+                        inbound.task.register(cx.waker());
+                        self.socket.poll_next_unpin(&mut Context::from_waker(&inbound_waker))
+                    }) => {
                         match resp {
                             Some(Ok(item)) => {
                                 // Any message from the server shows the connection is alive.
@@ -279,22 +291,29 @@ impl WsBackend<TungsteniteStream> {
                     // Send a ping to the server, if no messages have been
                     // received within the keepalive interval.
                     _ = &mut keepalive => {
-                        // Still expecting a pong from the previous ping,
-                        // meaning connection is errored.
-                        if expecting_pong {
+                        // Still expecting a pong from the previous ping and
+                        // no data arrived since, meaning connection is errored.
+                        if expecting_pong && !inbound.woken.swap(false, Ordering::Relaxed) {
                             error!("WS server missed a pong");
                             errored = true;
                             break
                         }
                         // Reset the keepalive timer.
                         keepalive.set(sleep(self.keepalive_interval));
+                        // Data is still arriving, such as a large message the
+                        // pong is queued behind, so keep waiting for it.
+                        if expecting_pong {
+                            continue
+                        }
                         if let Err(err) = self.write(Message::Ping(Default::default())).await {
                             error!(%err, "WS connection error");
                             errored = true;
                             break
                         }
                         // Expecting to receive a pong before the next
-                        // keepalive timer resolves.
+                        // keepalive timer resolves. Only data that arrives
+                        // after the ping shows that the server is still alive.
+                        inbound.woken.store(false, Ordering::Relaxed);
                         expecting_pong = true;
                     }
                 }
@@ -315,7 +334,7 @@ impl WsBackend<TungsteniteStream> {
     /// to a slow peer on every reconnect, since pending requests are replayed.
     async fn write(&mut self, msg: Message) -> Result<(), tungstenite::Error> {
         let idle = self.keepalive_interval.saturating_mul(2);
-        let progress = Arc::new(WriteProgress::default());
+        let progress = Arc::new(SocketWake::default());
         let waker = Waker::from(progress.clone());
         let mut send = self.socket.send(msg);
         let deadline = sleep(idle);
@@ -336,14 +355,14 @@ impl WsBackend<TungsteniteStream> {
     }
 }
 
-/// Waker for a pending write that records whether it was woken.
+/// Waker for a pending read or write that records whether the socket woke it.
 #[derive(Default)]
-struct WriteProgress {
+struct SocketWake {
     task: AtomicWaker,
     woken: AtomicBool,
 }
 
-impl Wake for WriteProgress {
+impl Wake for SocketWake {
     fn wake(self: Arc<Self>) {
         self.wake_by_ref();
     }
@@ -509,8 +528,11 @@ mod tests {
                 let (conn, received_tx) = (accepted, received_tx.clone());
                 accepted += 1;
                 tokio::spawn(async move {
-                    let stream =
-                        SlowReader { inner: stream, next_read: Box::pin(sleep(Duration::ZERO)) };
+                    let stream = SlowStream {
+                        inner: stream,
+                        slow_reads: true,
+                        next: Box::pin(sleep(Duration::ZERO)),
+                    };
                     let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
                     while let Some(Ok(msg)) = ws.next().await {
                         if msg.is_text() {
@@ -539,36 +561,89 @@ mod tests {
         );
     }
 
-    /// Reads at most 32 KiB every 5ms, a slow server that is still alive.
-    struct SlowReader {
-        inner: TcpStream,
-        next_read: Pin<Box<Sleep>>,
+    /// A message that takes longer than two keepalive intervals to arrive holds back the pong
+    /// queued behind it. The bytes still coming in show that the server is alive, so the
+    /// connection must not be dropped.
+    #[tokio::test]
+    async fn slow_inbound_message_keeps_connection() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (sent_tx, sent) = oneshot::channel();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let stream = SlowStream {
+                inner: stream,
+                slow_reads: false,
+                next: Box::pin(sleep(Duration::ZERO)),
+            };
+            let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            let (mut sink, mut stream) = ws.split();
+            // Reading lets tungstenite answer pings, with pongs that queue behind the message.
+            tokio::spawn(async move { while let Some(Ok(_)) = stream.next().await {} });
+            // Several times what the server writes in two intervals.
+            let result = "0".repeat(8 * 1024 * 1024);
+            let notification = format!(
+                r#"{{"jsonrpc":"2.0","method":"eth_subscription","params":{{"subscription":"0x1","result":"{result}"}}}}"#
+            );
+            // Fails if the client drops the connection before it has the whole message.
+            let _ = sent_tx.send(sink.send(Message::Text(notification.into())).await.is_ok());
+        });
+
+        let _frontend = WsConnect::new(format!("ws://{addr}"))
+            .with_keepalive_interval(Duration::from_millis(100))
+            .into_service()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            timeout(Duration::from_secs(10), sent).await,
+            Ok(Ok(true)),
+            "a connection that keeps receiving must not be dropped"
+        );
     }
 
-    impl AsyncRead for SlowReader {
+    /// Moves at most 32 KiB every 5ms in one direction, a slow server that is still alive.
+    struct SlowStream {
+        inner: TcpStream,
+        /// Slows down reads if set, writes otherwise.
+        slow_reads: bool,
+        next: Pin<Box<Sleep>>,
+    }
+
+    impl AsyncRead for SlowStream {
         fn poll_read(
             mut self: Pin<&mut Self>,
             cx: &mut Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<io::Result<()>> {
-            ready!(self.next_read.as_mut().poll(cx));
+            if !self.slow_reads {
+                return Pin::new(&mut self.inner).poll_read(cx, buf);
+            }
+            ready!(self.next.as_mut().poll(cx));
             let mut chunk = [0; 32 * 1024];
             let len = chunk.len().min(buf.remaining());
             let mut limited = ReadBuf::new(&mut chunk[..len]);
             ready!(Pin::new(&mut self.inner).poll_read(cx, &mut limited))?;
             buf.put_slice(limited.filled());
-            self.next_read.set(sleep(Duration::from_millis(5)));
+            self.next.set(sleep(Duration::from_millis(5)));
             Poll::Ready(Ok(()))
         }
     }
 
-    impl AsyncWrite for SlowReader {
+    impl AsyncWrite for SlowStream {
         fn poll_write(
             mut self: Pin<&mut Self>,
             cx: &mut Context<'_>,
             buf: &[u8],
         ) -> Poll<io::Result<usize>> {
-            Pin::new(&mut self.inner).poll_write(cx, buf)
+            if self.slow_reads {
+                return Pin::new(&mut self.inner).poll_write(cx, buf);
+            }
+            ready!(self.next.as_mut().poll(cx));
+            let len = buf.len().min(32 * 1024);
+            let written = ready!(Pin::new(&mut self.inner).poll_write(cx, &buf[..len]))?;
+            self.next.set(sleep(Duration::from_millis(5)));
+            Poll::Ready(Ok(written))
         }
 
         fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
