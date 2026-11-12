@@ -201,11 +201,18 @@ where
                         this.scanner.reset();
                         return Ready(Some(Ok(item)));
                     }
-                    // Incomplete, invalid, or complete but not an `Item`. Hand the
-                    // buffer to the framer instead of re-parsing it. A number cut
-                    // off by the end of the buffer is a syntax error rather than
-                    // EOF, so only a complete frame can tell whether it is valid.
-                    Some(Err(_)) => *this.partial = true,
+                    // Incomplete, or complete but not an `Item`. Either way hand
+                    // the buffer to the framer instead of re-parsing it.
+                    Some(Err(err)) if err.is_eof() || err.is_data() => *this.partial = true,
+                    // A number cut off by the end of the buffer, e.g. after `0.`, is
+                    // a syntax error rather than EOF. Probe again once more data
+                    // arrived.
+                    Some(Err(err)) if error_at_end(&err, this.buf.as_ref()) => {}
+                    Some(Err(err)) => {
+                        log_invalid_json(&err, this.buf.as_ref());
+                        *this.finished = true;
+                        return Ready(Some(Err(json_error(err))));
+                    }
                     None => {}
                 }
             }
@@ -275,6 +282,18 @@ where
             }
         }
     }
+}
+
+/// Returns `true` if serde_json detected `err` at the last byte of `buf`, as it does for a number
+/// cut off by the end of the buffer.
+fn error_at_end(err: &serde_json::Error, buf: &[u8]) -> bool {
+    // Lines and columns are 1-based, and columns count bytes.
+    let line_start = buf
+        .split(|&byte| byte == b'\n')
+        .take(err.line().saturating_sub(1))
+        .map(|line| line.len() + 1)
+        .sum::<usize>();
+    line_start + err.column() == buf.len()
 }
 
 /// Convert a JSON error without discarding its details or EOF classification.
@@ -866,6 +885,30 @@ mod tests {
             let item = reader.next().await.unwrap();
             assert!(item.is_ok(), "case {i}: {item:?}");
             assert!(reader.next().await.is_none(), "case {i}");
+        }
+    }
+
+    #[tokio::test]
+    async fn invalid_frame_fails_before_eof() {
+        let invalid = br#"{"jsonrpc":"2.0","id":1,"result":[1}"#;
+        let valid = br#"{"jsonrpc":"2.0","id":2,"result":"0x"}"#;
+        let open = std::time::Duration::from_secs(3600);
+        // In one read with the next frame, and with the invalid byte ending a read.
+        let mocks = [
+            tokio_test::io::Builder::new().read(&[&invalid[..], valid].concat()).wait(open).build(),
+            tokio_test::io::Builder::new()
+                .read(invalid)
+                .wait(std::time::Duration::from_millis(1))
+                .read(valid)
+                .wait(open)
+                .build(),
+        ];
+        for mock in mocks {
+            let mut reader = ReadJsonStream::<_, PubSubItem>::new(mock);
+            let item =
+                tokio::time::timeout(std::time::Duration::from_secs(10), reader.next()).await;
+            let err = item.expect("the invalid frame is held until EOF").unwrap().unwrap_err();
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
         }
     }
 }
