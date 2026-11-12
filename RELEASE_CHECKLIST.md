@@ -20,7 +20,9 @@ changed or not.
 
 - [ ] Update the version number in the [README](./README.md#installation) to the new version.
 - [ ] Make sure you're on the `main` branch.
+- [ ] Make sure every crate is already on crates.io. Trusted publishing can't create a crate, so the release workflow stops if one is missing. For a new crate, a crates.io owner publishes a placeholder `0.0.0` by hand and adds this repository's `release.yml` (environment `release`) as its trusted publisher before you tag.
 - [ ] (optional) Dry run `cargo-release`: `cargo release <version>`
+- [ ] Check that every crate packages and builds: `cargo publish --workspace --dry-run --locked`. With `publish = false`, `cargo release` no longer does this, and CI only checks it after the tag is pushed.
 - [ ] Run `cargo-semver-checks` for a non-breaking release: `cargo +stable semver-checks`
   - [ ] Breaking changes are not a blocker even for non-breaking release, but you must review them carefully in case of an accidental breaking change.
 - [ ] Run `cargo-release`: `cargo release --execute <version>`
