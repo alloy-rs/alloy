@@ -205,9 +205,12 @@ where
                     // the buffer to the framer instead of re-parsing it.
                     Some(Err(err)) if err.is_eof() || err.is_data() => *this.partial = true,
                     // A number cut off by the end of the buffer, e.g. after `0.`, is
-                    // a syntax error rather than EOF. Probe again once more data
-                    // arrived.
-                    Some(Err(err)) if error_at_end(&err, this.buf.as_ref()) => {}
+                    // a syntax error rather than EOF. Probe a small buffer again once
+                    // more data arrived, so invalid input fails before its frame
+                    // closes. Larger ones go to the framer, to keep the cost linear.
+                    Some(Err(err)) if error_at_end(&err, this.buf.as_ref()) => {
+                        *this.partial = this.buf.len() > CAPACITY;
+                    }
                     Some(Err(err)) => {
                         log_invalid_json(&err, this.buf.as_ref());
                         *this.finished = true;
