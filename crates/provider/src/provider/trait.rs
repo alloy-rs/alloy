@@ -1784,7 +1784,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Unsubscribes the subscription with the given local ID.
     ///
-    /// This closes the receivers fetched with the ID. Identical subscriptions share one
+    /// This closes the receivers fetched with the ID. Identical `eth_subscribe` requests share one
     /// server-side subscription, which is cancelled once no other ID of it is in use.
     #[cfg(feature = "pubsub")]
     async fn unsubscribe(&self, id: B256) -> TransportResult<()> {

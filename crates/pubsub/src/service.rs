@@ -196,7 +196,7 @@ impl<T: PubSubConnect> PubSubService<T> {
             return Ok(());
         }
         if in_flight.is_subscription() {
-            // Identical subscribe requests share one subscription, instead of each creating
+            // Identical `eth_subscribe` requests share one subscription, instead of each creating
             // another one on the server. A subscription that is not routed, because its
             // resubscription is still in flight, is routed again by the request.
             let local_id = subscription_local_id(in_flight.request());
@@ -260,9 +260,9 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service an unsubscribe instruction.
     ///
-    /// This closes the receivers fetched with the local id. Identical subscribe requests share a
-    /// subscription, so it is only removed, and cancelled on the server, once no other caller
-    /// holds a receiver or has yet to fetch one.
+    /// This closes the receivers fetched with the local id. Identical `eth_subscribe` requests
+    /// share a subscription, so it is only removed, and cancelled on the server, once no other
+    /// caller holds a receiver or has yet to fetch one.
     fn service_unsubscribe(&mut self, alias: B256) {
         if let Some((sub, Some(server_id))) = self.subs.release(alias) {
             self.dispatch_unsubscribe(sub.request().method(), sub.local_id, &server_id);

@@ -54,7 +54,7 @@ impl PubSubFrontend {
     /// A successful return means the instruction was sent to the pubsub
     /// service. It does not wait for the server's response to the
     /// `{namespace}_unsubscribe` request. It closes the receivers fetched with
-    /// this local ID. Identical subscribe requests share a server-side
+    /// this local ID. Identical `eth_subscribe` requests share a server-side
     /// subscription, so it is only cancelled once no other local ID of it has a
     /// receiver or has yet to fetch one. Dropping a [`RawSubscription`] does
     /// not call this automatically. If reconnection is re-creating the
