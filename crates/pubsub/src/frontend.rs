@@ -53,10 +53,10 @@ impl PubSubFrontend {
     ///
     /// A successful return means the instruction was sent to the pubsub
     /// service. It does not wait for the server's response to the
-    /// `{namespace}_unsubscribe` request. Identical subscribe requests share a
-    /// subscription, so it is only cancelled once each subscribe request that
-    /// was answered with this local ID was followed by an unsubscribe. Dropping
-    /// a [`RawSubscription`] does
+    /// `{namespace}_unsubscribe` request. It closes the receivers fetched with
+    /// this local ID. Identical subscribe requests share a server-side
+    /// subscription, so it is only cancelled once no other local ID of it has a
+    /// receiver or has yet to fetch one. Dropping a [`RawSubscription`] does
     /// not call this automatically. If reconnection is re-creating the
     /// subscription, the replacement is cancelled once the server acknowledges
     /// it.

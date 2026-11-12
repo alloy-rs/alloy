@@ -1,6 +1,9 @@
-use crate::{managers::ActiveSubscription, RawSubscription};
+use crate::{
+    managers::{ActiveSubscription, Share},
+    RawSubscription,
+};
 use alloy_json_rpc::{EthNotification, Id, SerializedRequest, SubId};
-use alloy_primitives::B256;
+use alloy_primitives::{map::B256Map, Keccak256, B256};
 use bimap::BiBTreeMap;
 use std::collections::BTreeMap;
 
@@ -10,6 +13,10 @@ pub(crate) struct SubscriptionManager {
     local_to_sub: BTreeMap<B256, ActiveSubscription>,
     /// Tracks the CURRENT server id for a subscription.
     local_to_server: BiBTreeMap<B256, SubId>,
+    /// The subscription of each local id handed to a caller.
+    alias_to_local: B256Map<B256>,
+    /// The number of local ids handed to callers so far.
+    aliases_issued: u64,
 }
 
 impl SubscriptionManager {
@@ -34,13 +41,8 @@ impl SubscriptionManager {
     }
 
     /// Insert a new subscription routed via `server_id`, returning its local id.
-    pub(crate) fn insert(
-        &mut self,
-        request: SerializedRequest,
-        server_id: SubId,
-        channel_size: usize,
-    ) -> B256 {
-        let active = ActiveSubscription::new(request, channel_size);
+    pub(crate) fn insert(&mut self, request: SerializedRequest, server_id: SubId) -> B256 {
+        let active = ActiveSubscription::new(request);
         let local_id = active.local_id;
         self.local_to_server.insert(local_id, server_id);
         self.local_to_sub.insert(local_id, active);
@@ -64,13 +66,34 @@ impl SubscriptionManager {
         }
     }
 
-    /// Record that a caller was handed the local id and is expected to fetch a receiver, and to
-    /// unsubscribe once.
-    pub(crate) fn add_pending_claim(&mut self, local_id: B256) {
-        if let Some(sub) = self.local_to_sub.get_mut(&local_id) {
-            sub.pending_claims += 1;
-            sub.shares += 1;
-        }
+    /// Returns a new local id to hand to a caller of the subscription `local_id`.
+    ///
+    /// Local ids are never reused, so a caller's id never refers to another caller's share, even
+    /// after its subscription was dropped and created afresh.
+    pub(crate) fn new_alias(&mut self, local_id: B256) -> B256 {
+        self.aliases_issued += 1;
+        let mut hasher = Keccak256::new();
+        hasher.update(local_id);
+        hasher.update(self.aliases_issued.to_be_bytes());
+        hasher.finalize()
+    }
+
+    /// Record that a caller was handed `alias` for the subscription `local_id`, and is expected to
+    /// fetch a receiver with it and to unsubscribe it.
+    ///
+    /// The shares of callers that dropped every receiver without unsubscribing are removed.
+    pub(crate) fn add_share(&mut self, local_id: B256, alias: B256, channel_size: usize) {
+        let Self { local_to_sub, alias_to_local, .. } = self;
+        let Some(sub) = local_to_sub.get_mut(&local_id) else { return };
+        sub.shares.retain(|alias, share| {
+            let live = share.is_live();
+            if !live {
+                alias_to_local.remove(alias);
+            }
+            live
+        });
+        sub.shares.insert(alias, Share::new(channel_size));
+        alias_to_local.insert(alias, local_id);
     }
 
     /// De-alias an alias, getting the original ID.
@@ -128,7 +151,11 @@ impl SubscriptionManager {
         local_id: B256,
     ) -> Option<(ActiveSubscription, Option<SubId>)> {
         let server_id = self.local_to_server.remove_by_left(&local_id).map(|(_, id)| id);
-        self.local_to_sub.remove(&local_id).map(|sub| (sub, server_id))
+        let sub = self.local_to_sub.remove(&local_id)?;
+        for alias in sub.shares.keys() {
+            self.alias_to_local.remove(alias);
+        }
+        Some((sub, server_id))
     }
 
     /// Notify the subscription channel of a new value, if the sub is known,
@@ -142,24 +169,24 @@ impl SubscriptionManager {
         }
     }
 
-    /// Get a receiver for a subscription.
-    pub(crate) fn get_subscription(&mut self, local_id: B256) -> Option<RawSubscription> {
-        let sub = self.local_to_sub.get_mut(&local_id)?;
-        sub.pending_claims = sub.pending_claims.saturating_sub(1);
-        Some(sub.subscribe())
+    /// Get a receiver for the subscription that `alias` was handed out for.
+    pub(crate) fn get_subscription(&mut self, alias: B256) -> Option<RawSubscription> {
+        let local_id = self.alias_to_local.get(&alias)?;
+        let share = self.local_to_sub.get_mut(local_id)?.shares.get_mut(&alias)?;
+        Some(RawSubscription { rx: share.subscribe(), local_id: alias })
     }
 
-    /// Release the share of one caller that was handed the local id, and remove the subscription
-    /// once no such caller is left, returning it and its current server id.
+    /// Remove the share of the caller that was handed `alias`, which closes the receivers fetched
+    /// with it. Once no caller holds a receiver or has yet to fetch one, the subscription is
+    /// removed too, and returned with its current server id.
     ///
-    /// Returns `None` if the subscription is unknown or still shared with another caller.
-    pub(crate) fn release(
-        &mut self,
-        local_id: B256,
-    ) -> Option<(ActiveSubscription, Option<SubId>)> {
+    /// Returns `None` if `alias` is unknown, e.g. because its subscription was dropped, or if
+    /// another caller still consumes the subscription.
+    pub(crate) fn release(&mut self, alias: B256) -> Option<(ActiveSubscription, Option<SubId>)> {
+        let local_id = self.alias_to_local.remove(&alias)?;
         let sub = self.local_to_sub.get_mut(&local_id)?;
-        sub.shares = sub.shares.saturating_sub(1);
-        if sub.shares > 0 {
+        sub.shares.remove(&alias);
+        if sub.has_consumers() {
             return None;
         }
         self.remove_sub(local_id)

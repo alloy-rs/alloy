@@ -140,7 +140,9 @@ impl<T: PubSubConnect> PubSubService<T> {
         // Dispatch all subscription requests.
         for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
-            let (in_flight, _) = InFlight::new(req.clone(), sub.tx.receiver_count());
+            // Nobody waits for the response, so no local id is handed out with a channel of this
+            // size.
+            let (in_flight, _) = InFlight::new(req.clone(), 1);
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
@@ -202,7 +204,7 @@ impl<T: PubSubConnect> PubSubService<T> {
             let local_id = subscription_local_id(in_flight.request());
             if self.subs.is_routed(&local_id) {
                 let id = in_flight.request.id().clone();
-                self.deliver_local_id(local_id, id, in_flight.tx)?;
+                self.deliver_local_id(local_id, id, in_flight.tx, in_flight.channel_size)?;
                 return Ok(());
             }
             if let Some(pending) = self.pending_subs.get_mut(&local_id) {
@@ -221,20 +223,24 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
-    /// Send the local id of a subscription to a caller waiting for it, returning whether the
-    /// caller received it.
+    /// Send a new local id of the subscription `local_id` to a caller waiting for it, returning
+    /// whether the caller received it.
+    ///
+    /// Each caller gets its own local id, so that its unsubscribe only affects its own receivers.
     fn deliver_local_id(
         &mut self,
         local_id: B256,
         id: Id,
         tx: oneshot::Sender<TransportResult<Response>>,
+        channel_size: usize,
     ) -> TransportResult<bool> {
+        let alias = self.subs.new_alias(local_id);
         // Serialized B256 is always a valid serialized U256 too.
-        let ser_alias = to_json_raw_value(&local_id)?;
+        let ser_alias = to_json_raw_value(&alias)?;
         let delivered =
             tx.send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) })).is_ok();
         if delivered {
-            self.subs.add_pending_claim(local_id);
+            self.subs.add_share(local_id, alias, channel_size);
         }
         Ok(delivered)
     }
@@ -243,17 +249,18 @@ impl<T: PubSubConnect> PubSubService<T> {
     ///
     /// If the subscription exists, the waiter is sent `Some` broadcast receiver. If
     /// the subscription does not exist, the waiter is sent `None`.
-    fn service_get_sub(&mut self, local_id: B256, tx: oneshot::Sender<Option<RawSubscription>>) {
-        let _ = tx.send(self.subs.get_subscription(local_id));
+    fn service_get_sub(&mut self, alias: B256, tx: oneshot::Sender<Option<RawSubscription>>) {
+        let _ = tx.send(self.subs.get_subscription(alias));
     }
 
     /// Service an unsubscribe instruction.
     ///
-    /// Identical subscribe requests share a subscription, so it is only removed, and cancelled on
-    /// the server, once every caller that was handed its local id unsubscribed.
-    fn service_unsubscribe(&mut self, local_id: B256) {
-        if let Some((sub, Some(server_id))) = self.subs.release(local_id) {
-            self.dispatch_unsubscribe(sub.request().method(), local_id, &server_id);
+    /// This closes the receivers fetched with the local id. Identical subscribe requests share a
+    /// subscription, so it is only removed, and cancelled on the server, once no other caller
+    /// holds a receiver or has yet to fetch one.
+    fn service_unsubscribe(&mut self, alias: B256) {
+        if let Some((sub, Some(server_id))) = self.subs.release(alias) {
+            self.dispatch_unsubscribe(sub.request().method(), sub.local_id, &server_id);
         }
     }
 
@@ -364,21 +371,23 @@ impl<T: PubSubConnect> PubSubService<T> {
                 self.dispatch_unsubscribe(request.method(), local_id, &server_id);
                 return Ok(());
             }
-            self.subs.insert(request, server_id, channel_size);
+            self.subs.insert(request, server_id);
         } else if let Err(server_id) = self.subs.set_server_id(local_id, server_id) {
             // The subscription is already routed via another server id.
             self.dispatch_unsubscribe(request.method(), local_id, &server_id);
         }
 
-        let mut delivered = self.deliver_local_id(local_id, id, tx)?;
+        let mut delivered = self.deliver_local_id(local_id, id, tx, channel_size)?;
         for waiter in waiters {
             let id = waiter.request.id().clone();
-            delivered |= self.deliver_local_id(local_id, id, waiter.tx)?;
+            delivered |= self.deliver_local_id(local_id, id, waiter.tx, waiter.channel_size)?;
         }
 
         // Every caller stopped waiting while the subscription was being created.
         if created && !delivered {
-            self.service_unsubscribe(local_id);
+            if let Some((sub, Some(server_id))) = self.subs.remove_sub(local_id) {
+                self.dispatch_unsubscribe(sub.request().method(), local_id, &server_id);
+            }
         }
 
         Ok(())
@@ -640,6 +649,13 @@ mod tests {
     };
     use tokio::time::timeout;
 
+    /// Hand a caller a new local id of the subscription `local_id`, and fetch its receiver.
+    fn consume(subs: &mut SubscriptionManager, local_id: B256) -> RawSubscription {
+        let alias = subs.new_alias(local_id);
+        subs.add_share(local_id, alias, 16);
+        subs.get_subscription(alias).unwrap()
+    }
+
     #[derive(Clone, Debug, Default)]
     struct MockConnect(Arc<Mutex<Option<ConnectionHandle>>>);
 
@@ -822,8 +838,8 @@ mod tests {
             Request::new("eth_subscribe", Id::Number(3), ["newHeads"]).serialize().unwrap();
         let expected = request.serialized().get().to_owned();
         // A consumed subscription whose resubscription after an earlier reconnect is pending.
-        let local_id = service.subs.insert(request.clone(), SubId::Number(U256::from(1)), 16);
-        let _sub = service.subs.get_subscription(local_id).unwrap();
+        let local_id = service.subs.insert(request.clone(), SubId::Number(U256::from(1)));
+        let _sub = consume(&mut service.subs, local_id);
         service.subs.drop_server_ids();
         // Internal resubscription requests have no oneshot receiver: delivery
         // uses the subscription's broadcast channel instead.
@@ -886,8 +902,8 @@ mod tests {
         let mut service = PubSubService::new(handle, MockConnect::default(), reqs);
         let request =
             Request::new("eth_subscribe", Id::Number(1), ["newHeads"]).serialize().unwrap();
-        let local_id = service.subs.insert(request, SubId::Number(U256::from(0xaaa)), 16);
-        let mut sub = service.subs.get_subscription(local_id).unwrap();
+        let local_id = service.subs.insert(request, SubId::Number(U256::from(0xaaa)));
+        let mut sub = consume(&mut service.subs, local_id);
 
         // An identical subscribe request raced the first one onto the wire.
         let raced = Request::new("eth_subscribe", Id::Number(2), ["newHeads"]).serialize().unwrap();
@@ -899,11 +915,12 @@ mod tests {
             )
             .unwrap();
 
-        // The raced caller shares the existing subscription.
+        // The raced caller shares the existing subscription, under its own local id.
         let response = raced_response.try_recv().unwrap().unwrap();
         let alias: B256 =
             serde_json::from_str(response.payload.as_success().unwrap().get()).unwrap();
-        assert_eq!(alias, local_id);
+        assert_ne!(alias, sub.local_id);
+        let mut raced_sub = service.subs.get_subscription(alias).unwrap();
 
         // The second server-side subscription is cancelled instead of replacing the first.
         let unsubscribe = interface.from_frontend.try_recv().unwrap();
@@ -921,6 +938,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(sub.try_recv().unwrap().get(), "1");
+        assert_eq!(raced_sub.try_recv().unwrap().get(), "1");
     }
 
     #[test]

@@ -29,7 +29,6 @@ alloy-transport.workspace = true
 auto_impl.workspace = true
 bimap.workspace = true
 futures.workspace = true
-parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "sync"] }

@@ -62,20 +62,20 @@ For a normal request, the user sends a request to the **frontend**, and
 later receives a response via a tokio oneshot channel. This is straightforward
 and easy to reason about. Subscriptions, however, are side-effects of other
 requests, and are long-lived. They are managed by the **service** and
-identified locally by a `B256`. This value is a request-derived alias: it is the
-Keccak-256 hash of the method and the serialized parameters. Identical
-subscription requests share an alias and a single server-side subscription: a
-request for a subscription that exists, or is being created, is answered with
-its alias without another request to the server. The service uses this ID to
-manage the subscription lifecycle and dispatch notifications to receivers.
+identified locally by a `B256`. Each subscription request is answered with its
+own local ID, which is never reused. Identical subscription requests, with the
+same method and serialized parameters, share a single server-side subscription:
+a request for a subscription that exists, or is being created, is answered
+without another request to the server. The service uses these IDs to manage
+the subscription lifecycle and dispatch notifications to receivers.
 
 ### Server & Local IDs
 
 When a user issues a subscription request, the **frontend** sends a
 subscription request to the **service**. The **service** dispatches it to the
 RPC server via the **backend**. The **service** then intercepts the RPC server
-response containing the server ID and assigns a stable `B256` `local_id` to
-the subscription. Server IDs are represented by [`alloy_json_rpc::SubId`] and
+response containing the server ID and answers the caller with a stable `B256`
+`local_id`. Server IDs are represented by [`alloy_json_rpc::SubId`] and
 may be numeric or strings. The `local_id` identifies the subscription in the
 **service** and consumer tasks, while the current `server_id` associates
 notifications with the server-side subscription.
@@ -98,7 +98,7 @@ subscription ID, is dropped the same way; an identical subscribe request creates
 
 Following a successful reconnect, it re-sends every
 request still awaiting a response and re-creates active subscriptions that still
-have consumers: a receiver, or a caller that was handed the local ID but has not
+have consumers: a receiver, or a caller that was handed a local ID but has not
 fetched a receiver yet. If the
 server processed a request but its response was lost, that request may execute
 more than once. Do not rely on at-most-once execution for non-idempotent methods.
@@ -107,10 +107,10 @@ Dropping a request future stops waiting locally, but does not cancel a request
 already accepted by the service. Likewise, dropping a [`RawSubscription`] or
 [`Subscription`] only drops that receiver; it does not cancel the server-side
 subscription. Call [`PubSubFrontend::unsubscribe`] with the local ID when the
-subscription is no longer needed. Identical subscriptions are shared, so each
-unsubscribe only releases the share of one subscribe request that was answered
-with the local ID, and the server-side subscription is cancelled once every such
-request was released. Cancelling it sends
+subscription is no longer needed. This closes the receivers fetched with that
+local ID. Identical subscriptions share the server-side subscription, so it is
+cancelled once no other local ID of it has a receiver or has yet to fetch one.
+Cancelling it sends
 `{namespace}_unsubscribe`, with the namespace of the subscribe method, e.g.
 `eth_unsubscribe`, `{namespace}_unsubscribe{Name}` for methods named
 `{namespace}_subscribe{Name}`, and `{method}_unsubscribe` for other methods,
