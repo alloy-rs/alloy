@@ -71,7 +71,7 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          target="$(git ls-remote origin "refs/tags/${TAG}" "refs/tags/${TAG}^{}" | tail -n 1 | cut -f 1)"
+          target="$(git ls-remote --tags origin | awk -v r="refs/tags/${TAG}" '$2 == r { t = $1 } $2 == r "^{}" { p = $1 } END { print (p != "" ? p : t) }')"
           test "$target" = "$GITHUB_SHA"
       - uses: tempoxyz/gh-actions/actions/cargo-publish@763efe11a9d8333bcbf0bb2f5ab80f21961c48fd # 2026-11-02T08-44-18Z-763efe11
         with:
@@ -94,7 +94,7 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          target="$(git ls-remote origin "refs/tags/${TAG}" "refs/tags/${TAG}^{}" | tail -n 1 | cut -f 1)"
+          target="$(git ls-remote --tags origin | awk -v r="refs/tags/${TAG}" '$2 == r { t = $1 } $2 == r "^{}" { p = $1 } END { print (p != "" ? p : t) }')"
           test "$target" = "$GITHUB_SHA"
       - name: Create GitHub release
         env:
@@ -102,7 +102,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           prev="$(git describe --tags --abbrev=0 --match "v*" "${TAG}^" 2>/dev/null || true)"
-          args=(--verify-tag --generate-notes)
+          args=(--verify-tag --generate-notes --title "alloy ${TAG}")
           version="${TAG#"${TAG%%v[0-9]*}"}"
           version="${version%%+*}"
           if [[ "$version" == *-* ]]; then

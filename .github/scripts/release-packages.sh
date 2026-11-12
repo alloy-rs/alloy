@@ -29,4 +29,4 @@ for package in $packages; do
     fi
 done
 
-echo "packages=$(paste -sd ' ' <<<"$packages")"
+echo "packages=$(paste -sd ' ' - <<<"$packages")"
