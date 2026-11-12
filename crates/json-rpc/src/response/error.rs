@@ -94,6 +94,12 @@ impl<E> ErrorPayload<E> {
             return true;
         }
 
+        // The message of a reverted call carries the revert reason, which the contract chooses, so
+        // it must not be matched against the rate limit phrases below.
+        if is_revert_message(&self.message) {
+            return false;
+        }
+
         // alternative alchemy error for specific IPs
         if self.code == -32016 && self.message.contains("rate limit") {
             return true;
@@ -140,6 +146,14 @@ impl<E> ErrorPayload<E> {
             }
         }
     }
+}
+
+/// Returns true if the error message reports a reverted call, e.g. `execution reverted: <reason>`.
+///
+/// Clients differ in case and wording, so any mention of a revert counts.
+fn is_revert_message(message: &str) -> bool {
+    const REVERT: &[u8] = b"revert";
+    message.as_bytes().windows(REVERT.len()).any(|window| window.eq_ignore_ascii_case(REVERT))
 }
 
 impl<T> From<T> for ErrorPayload<T>
@@ -459,6 +473,31 @@ mod test {
             let payload: ErrorPayload = ErrorPayload { code, message: message.into(), data: None };
             assert_eq!(payload.is_retry_err(), retryable, "{payload}");
         }
+    }
+
+    #[test]
+    fn revert_reason_is_not_retry_err() {
+        let data = RawValue::from_string(r#""0x08c379a0""#.into()).unwrap();
+        for (code, message) in [
+            (3, "execution reverted: rate limit exceeded"),
+            (3, "execution reverted: max rate exceeded"),
+            (3, "execution reverted: withdraw request limit reached"),
+            (-32000, "execution reverted: too many requests"),
+            (-32603, "execution reverted: credits limited"),
+            (-32000, "Execution reverted: rate limit exceeded"),
+            (-32000, "VM Exception while processing transaction: revert rate limit exceeded"),
+            (-32016, "execution reverted: rate limit exceeded"),
+            (-32012, "execution reverted: credits limited"),
+            (-32007, "execution reverted: request limit reached"),
+        ] {
+            let payload: ErrorPayload =
+                ErrorPayload { code, message: message.into(), data: Some(data.clone()) };
+            assert!(!payload.is_retry_err(), "{payload}");
+        }
+
+        let payload: ErrorPayload =
+            ErrorPayload { code: -32000, message: "rate limit exceeded".into(), data: None };
+        assert!(payload.is_retry_err());
     }
 
     #[test]
