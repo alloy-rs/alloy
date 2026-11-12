@@ -16,7 +16,7 @@ use tower::{Layer, Service};
 use tracing::trace;
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::tokio::sleep;
+use crate::time::sleep;
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;

@@ -23,10 +23,7 @@ use tokio::{
 };
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::{
-    std::Instant,
-    tokio::{interval, sleep_until},
-};
+use alloy_transport::time::{interval, sleep_until, Instant};
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use {
