@@ -18,9 +18,6 @@ use crate::RpcSend;
 
 const INTERNAL_ERROR: Cow<'static, str> = Cow::Borrowed("Internal error");
 
-/// The start of the message of an error returned for a reverted call.
-const REVERT_PREFIX: &str = "execution reverted";
-
 /// A JSON-RPC 2.0 error object.
 ///
 /// This response indicates that the server received and handled the request,
@@ -97,6 +94,12 @@ impl<E> ErrorPayload<E> {
             return true;
         }
 
+        // The message of a reverted call carries the revert reason, which the contract chooses, so
+        // it must not be matched against the rate limit phrases below.
+        if is_revert_message(&self.message) {
+            return false;
+        }
+
         // alternative alchemy error for specific IPs
         if self.code == -32016 && self.message.contains("rate limit") {
             return true;
@@ -133,14 +136,6 @@ impl<E> ErrorPayload<E> {
             "precondition failure" if self.code == -32603 => true,
             // also thrown by infura if out of budget for the day and ratelimited
             "daily request count exceeded, request rate limited" => true,
-            // The revert reason is chosen by the contract, so it must not be matched against the
-            // rate limit phrases below. Some clients capitalise the prefix.
-            msg if msg
-                .get(..REVERT_PREFIX.len())
-                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(REVERT_PREFIX)) =>
-            {
-                false
-            }
             msg => {
                 msg.contains("rate limit")
                     || msg.contains("rate exceeded")
@@ -151,6 +146,14 @@ impl<E> ErrorPayload<E> {
             }
         }
     }
+}
+
+/// Returns true if the error message reports a reverted call, e.g. `execution reverted: <reason>`.
+///
+/// Clients differ in case and wording, so any mention of a revert counts.
+fn is_revert_message(message: &str) -> bool {
+    const REVERT: &[u8] = b"revert";
+    message.as_bytes().windows(REVERT.len()).any(|window| window.eq_ignore_ascii_case(REVERT))
 }
 
 impl<T> From<T> for ErrorPayload<T>
@@ -482,6 +485,10 @@ mod test {
             (-32000, "execution reverted: too many requests"),
             (-32603, "execution reverted: credits limited"),
             (-32000, "Execution reverted: rate limit exceeded"),
+            (-32000, "VM Exception while processing transaction: revert rate limit exceeded"),
+            (-32016, "execution reverted: rate limit exceeded"),
+            (-32012, "execution reverted: credits limited"),
+            (-32007, "execution reverted: request limit reached"),
         ] {
             let payload: ErrorPayload =
                 ErrorPayload { code, message: message.into(), data: Some(data.clone()) };
