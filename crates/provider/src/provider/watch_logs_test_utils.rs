@@ -17,6 +17,20 @@ use std::{
     time::Duration,
 };
 
+/// Runs a poll assertion with a timeout outside the executor being tested.
+///
+/// An in-executor timeout cannot interrupt a synchronous loop inside `poll_next`.
+pub(crate) fn assert_completes(f: impl FnOnce() + Send + 'static) {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_time().build().unwrap();
+        let _guard = runtime.enter();
+        f();
+        let _ = tx.send(());
+    });
+    rx.recv_timeout(Duration::from_secs(5)).expect("poll assertion did not complete");
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct AlwaysRetryPolicy;
 

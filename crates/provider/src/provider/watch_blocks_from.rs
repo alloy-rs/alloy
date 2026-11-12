@@ -30,21 +30,19 @@ pub(super) const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug)]
 pub(super) struct PollIntervalDelay {
-    timer: Option<Interval>,
+    timer: Interval,
 }
 
 impl PollIntervalDelay {
     pub(super) fn new(poll_interval: Duration) -> Self {
-        if poll_interval.is_zero() {
-            return Self { timer: None };
-        }
-        Self { timer: Some(interval_at(Instant::now() + poll_interval, poll_interval)) }
+        // An immediately ready delay can keep the watch state machines in a synchronous loop.
+        let poll_interval =
+            if poll_interval.is_zero() { Duration::from_millis(1) } else { poll_interval };
+        Self { timer: interval_at(Instant::now() + poll_interval, poll_interval) }
     }
 
     pub(super) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        if let Some(timer) = &mut self.timer {
-            ready!(timer.poll_tick(cx));
-        }
+        ready!(self.timer.poll_tick(cx));
         Poll::Ready(())
     }
 }
@@ -314,6 +312,8 @@ impl<N: Network> WatchBlocksFrom<N> {
     }
 
     /// Sets the poll interval used when the stream is caught up.
+    ///
+    /// A zero interval is treated as one millisecond.
     pub const fn poll_interval(mut self, poll_interval: Duration) -> Self {
         self.poll_interval = poll_interval;
         self
@@ -485,13 +485,50 @@ impl<N: Network> Stream for WatchBlocksFromStream<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::watch_logs_test_utils::AlwaysRetryPolicy, *};
+    use super::{
+        super::watch_logs_test_utils::{assert_completes, AlwaysRetryPolicy},
+        *,
+    };
     use crate::{Provider, ProviderBuilder};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types_eth::Block;
     use alloy_transport::{layers::RetryBackoffLayer, mock::MockTransport};
     use futures::{Stream, StreamExt};
     use tokio::time::timeout;
+
+    #[tokio::test(start_paused = true)]
+    async fn poll_interval_delay_waits_for_interval() {
+        for interval in [
+            Duration::ZERO,
+            Duration::from_nanos(1),
+            Duration::from_millis(1),
+            Duration::from_millis(25),
+        ] {
+            let mut delay = PollIntervalDelay::new(interval);
+            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+            assert!(delay.poll(&mut cx).is_pending());
+
+            let expected = if interval.is_zero() { Duration::from_millis(1) } else { interval };
+            assert_eq!(delay.timer.period(), expected);
+            // Tokio timers have millisecond resolution, including for sub-millisecond intervals.
+            tokio::time::advance(expected + Duration::from_millis(1)).await;
+            assert!(delay.poll(&mut cx).is_ready());
+        }
+    }
+
+    #[test]
+    fn zero_poll_interval_yields_when_ahead_of_fixed_head() {
+        assert_completes(|| {
+            let provider = ProviderBuilder::new().connect_mocked_client(Default::default());
+            let mut stream = provider
+                .watch_blocks_from(1)
+                .block_tag(BlockNumberOrTag::Number(0))
+                .poll_interval(Duration::ZERO)
+                .into_stream();
+            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+            assert!(Pin::new(&mut stream).poll_next(&mut cx).is_pending());
+        });
+    }
 
     fn block(number: u64) -> Block {
         let mut block: Block = Block::default();
