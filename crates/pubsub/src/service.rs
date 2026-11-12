@@ -204,8 +204,15 @@ impl<T: PubSubConnect> PubSubService<T> {
                 return Ok(());
             }
             if let Some(pending) = self.pending_subs.get_mut(&local_id) {
-                pending.waiters.push(in_flight);
-                return Ok(());
+                // A request that nobody waits for anymore may never be answered, so the caller
+                // sends its own instead.
+                pending.waiters.retain(|waiter| !waiter.tx.is_closed());
+                let awaited = !pending.waiters.is_empty()
+                    || self.in_flights.get(&pending.id).is_some_and(|req| !req.tx.is_closed());
+                if awaited {
+                    pending.waiters.push(in_flight);
+                    return Ok(());
+                }
             }
             let id = in_flight.request.id().clone();
             self.pending_subs.insert(local_id, PendingSubscription { id, waiters: Vec::new() });

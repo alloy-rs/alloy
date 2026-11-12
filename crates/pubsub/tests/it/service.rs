@@ -275,6 +275,28 @@ async fn waiter_is_answered_after_dispatched_caller_cancels_across_reconnect() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn identical_subscribe_is_sent_when_nobody_waits_for_the_pending_one() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let cancelled = tokio::spawn(frontend.send(request("eth_subscribe", 1, json!(["newHeads"]))));
+    assert_eq!(backend.recv().await["id"], 1);
+    cancelled.abort();
+    assert!(cancelled.await.unwrap_err().is_cancelled());
+
+    // The first request may never be answered, so the identical one is sent too.
+    let resp = tokio::spawn(frontend.send(request("eth_subscribe", 2, json!(["newHeads"]))));
+    assert_eq!(backend.recv().await["id"], 2);
+    backend.respond(2, json!("0xbbb"));
+    let resp = within(resp).await.unwrap().unwrap();
+    assert!(frontend.get_subscription(local_id(&resp)).await.is_ok());
+
+    // A late answer to the first request is cancelled on the server.
+    backend.respond(1, json!("0xaaa"));
+    let unsubscribe = backend.recv().await;
+    assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+    assert_eq!(unsubscribe["params"], json!(["0xaaa"]));
+}
+
+#[tokio::test(start_paused = true)]
 async fn exhausted_reconnects_shut_down_service() {
     let (mut frontend, connector, [mut backend]) = spawn_service().await;
     let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 1, json!([]))));

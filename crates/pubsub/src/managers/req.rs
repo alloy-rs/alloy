@@ -64,4 +64,9 @@ impl RequestManager {
     pub(crate) fn drain(&mut self) -> impl Iterator<Item = InFlight> + '_ {
         self.reqs.drain().map(|(_, pending)| pending.in_flight)
     }
+
+    /// Get the request with the given id.
+    pub(crate) fn get(&self, id: &Id) -> Option<&InFlight> {
+        self.reqs.get(id).map(|pending| &pending.in_flight)
+    }
 }
