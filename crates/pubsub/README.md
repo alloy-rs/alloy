@@ -93,6 +93,8 @@ unhealthy backend on, the service backs off before reconnecting, and after `max_
 them it shuts down. A request that was pending on four consecutive dead backends fails instead
 of being re-sent again, and a subscription whose resubscription four consecutive backends did
 not acknowledge, although they answered other requests, is dropped, which closes its receivers.
+A subscription whose resubscription the server rejects, or answers with something other than a
+subscription ID, is dropped the same way; an identical subscribe request creates it afresh.
 
 Following a successful reconnect, it re-sends every
 request still awaiting a response and re-creates active subscriptions that still

@@ -1,5 +1,5 @@
 use crate::{managers::ActiveSubscription, RawSubscription};
-use alloy_json_rpc::{EthNotification, SerializedRequest, SubId};
+use alloy_json_rpc::{EthNotification, Id, SerializedRequest, SubId};
 use alloy_primitives::B256;
 use bimap::BiBTreeMap;
 use std::collections::BTreeMap;
@@ -163,5 +163,12 @@ impl SubscriptionManager {
             return None;
         }
         self.remove_sub(local_id)
+    }
+
+    /// Returns true if `id` is the id of the request that re-creates the unrouted subscription
+    /// with this local_id after a reconnect.
+    pub(crate) fn is_resubscription(&self, local_id: &B256, id: &Id) -> bool {
+        !self.is_routed(local_id)
+            && self.local_to_sub.get(local_id).is_some_and(|sub| sub.request.id() == id)
     }
 }

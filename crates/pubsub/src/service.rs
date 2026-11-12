@@ -197,8 +197,8 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
         if in_flight.is_subscription() {
             // Identical subscribe requests share one subscription, instead of each creating
-            // another one on the server. A subscription that is not routed, e.g. because its
-            // resubscription failed, is routed again by the request.
+            // another one on the server. A subscription that is not routed, because its
+            // resubscription is still in flight, is routed again by the request.
             let local_id = subscription_local_id(in_flight.request());
             if self.subs.is_routed(&local_id) {
                 let id = in_flight.request.id().clone();
@@ -328,14 +328,22 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// On success, the subscription is created or restored, and its local id is sent to every
     /// caller waiting for it. A server id that won't be routed, because nobody waits for the
     /// subscription anymore or because the subscription is already routed via another server id,
-    /// is cancelled on the server.
+    /// is cancelled on the server. A failed resubscription removes the subscription, which closes
+    /// its receivers.
     fn handle_sub_response(&mut self, in_flight: InFlight, resp: Response) -> TransportResult<()> {
         let local_id = subscription_local_id(in_flight.request());
 
         let waiters = self.take_waiters(local_id, &resp.id);
-        let payload = (!waiters.is_empty()).then(|| resp.payload.clone());
+        let resubscription = self.subs.is_resubscription(&local_id, &resp.id);
+        let payload = (!waiters.is_empty() || resubscription).then(|| resp.payload.clone());
 
         let Some((server_id, in_flight)) = in_flight.fulfill(resp) else {
+            // Nobody waits for the response, so without a server id the subscription would stay
+            // silent. An identical subscribe request creates it afresh.
+            if resubscription {
+                warn!(%local_id, ?payload, "Resubscription failed, dropping the subscription");
+                self.subs.remove_sub(local_id);
+            }
             // The subscription failed for every caller waiting for it.
             if let Some(payload) = payload {
                 for waiter in waiters {
