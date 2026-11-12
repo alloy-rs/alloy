@@ -1,14 +1,19 @@
 use alloy_json_rpc::SerializedRequest;
-use alloy_primitives::{map::B256Map, Keccak256, B256};
+use alloy_primitives::{keccak256, map::B256Map, Keccak256, B256};
 use serde_json::value::RawValue;
 use std::{fmt, hash::Hash};
 use tokio::sync::broadcast;
 
 /// Returns the local id of a subscription request.
 ///
-/// The id commits to the method as well as the params, so that subscriptions with identical params
-/// on different methods (e.g. `admin_peerEvents` and `reth_subscribePersistedBlock`) stay distinct.
+/// Identical `eth_subscribe` requests get the same id, so they share one subscription. The id
+/// commits to the method as well as the params. Requests of other methods may stream a bounded
+/// range, e.g. `debug_subscribe` with `traceChain`, so each of them gets its own id, derived from
+/// the whole request including its id.
 pub(crate) fn subscription_local_id(request: &SerializedRequest) -> B256 {
+    if request.method() != "eth_subscribe" {
+        return keccak256(request.serialized().get());
+    }
     let method = request.method();
     let mut hasher = Keccak256::new();
     hasher.update((method.len() as u64).to_be_bytes());

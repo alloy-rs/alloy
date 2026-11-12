@@ -159,7 +159,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// from their subscriptions, and a subscribe request is kept while another caller waits for
     /// the same subscription.
     fn remove_cancelled(&mut self) {
-        let Self { in_flights, subs, pending_subs, .. } = self;
+        let Self { in_flights, pending_subs, .. } = self;
         in_flights.retain(|in_flight| {
             if !in_flight.tx.is_closed() {
                 return true;
@@ -167,10 +167,8 @@ impl<T: PubSubConnect> PubSubService<T> {
             if !in_flight.is_subscription() {
                 return false;
             }
+            // Only a caller's subscribe request can have waiters, a resubscription never has.
             let local_id = subscription_local_id(in_flight.request());
-            if subs.contains(&local_id) {
-                return false;
-            }
             let Some(pending) = pending_subs
                 .get_mut(&local_id)
                 .filter(|pending| pending.id == *in_flight.request.id())
@@ -208,8 +206,15 @@ impl<T: PubSubConnect> PubSubService<T> {
                 return Ok(());
             }
             if let Some(pending) = self.pending_subs.get_mut(&local_id) {
-                pending.waiters.push(in_flight);
-                return Ok(());
+                // A request that nobody waits for anymore may never be answered, so the caller
+                // sends its own instead.
+                pending.waiters.retain(|waiter| !waiter.tx.is_closed());
+                let awaited = !pending.waiters.is_empty()
+                    || self.in_flights.get(&pending.id).is_some_and(|req| !req.tx.is_closed());
+                if awaited {
+                    pending.waiters.push(in_flight);
+                    return Ok(());
+                }
             }
             let id = in_flight.request.id().clone();
             self.pending_subs.insert(local_id, PendingSubscription { id, waiters: Vec::new() });

@@ -63,11 +63,13 @@ later receives a response via a tokio oneshot channel. This is straightforward
 and easy to reason about. Subscriptions, however, are side-effects of other
 requests, and are long-lived. They are managed by the **service** and
 identified locally by a `B256`. Each subscription request is answered with its
-own local ID, which is never reused. Identical subscription requests, with the
-same method and serialized parameters, share a single server-side subscription:
-a request for a subscription that exists, or is being created, is answered
-without another request to the server. The service uses these IDs to manage
-the subscription lifecycle and dispatch notifications to receivers.
+own local ID, which is never reused. Identical `eth_subscribe` requests share a
+single server-side subscription: a request for a subscription that exists, or
+is being created, is answered without another request to the server. Requests
+of other subscribe methods may stream a bounded range, e.g. `debug_subscribe`
+with `traceChain`, so each of them reaches the server and gets its own
+subscription. The service uses these IDs to manage the subscription lifecycle
+and dispatch notifications to receivers.
 
 ### Server & Local IDs
 
@@ -95,6 +97,8 @@ of being re-sent again, and a subscription whose resubscription four consecutive
 not acknowledge, although they answered other requests, is dropped, which closes its receivers.
 A subscription whose resubscription the server rejects, or answers with something other than a
 subscription ID, is dropped the same way; an identical subscribe request creates it afresh.
+A response that exceeds the size limit kills its backend before it is read, so its deaths count
+against the health budget too, unless the backend answered another request.
 
 Following a successful reconnect, it re-sends every
 request still awaiting a response and re-creates active subscriptions that still

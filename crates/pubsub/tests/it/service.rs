@@ -276,6 +276,75 @@ async fn unsubscribe_during_resubscribe_without_receivers_keeps_service_alive() 
 }
 
 #[tokio::test(start_paused = true)]
+async fn waiter_is_answered_after_dispatched_caller_cancels_across_reconnect() {
+    let (frontend, _, [mut first, mut second, mut third]) = spawn_service().await;
+    let local = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
+    let _sub = frontend.get_subscription(local).await.unwrap();
+
+    // While the resubscription is in flight, an identical subscribe is dispatched and another
+    // one waits for it. Then the dispatched caller cancels and the backend dies.
+    first.close();
+    assert_eq!(second.recv().await["id"], 1);
+    let dispatched = tokio::spawn(frontend.send(request("eth_subscribe", 2, json!(["newHeads"]))));
+    assert_eq!(second.recv().await["id"], 2);
+    let waiter = tokio::spawn(frontend.send(request("eth_subscribe", 3, json!(["newHeads"]))));
+    probe(&frontend, &mut second, 4).await;
+    dispatched.abort();
+    assert!(dispatched.await.unwrap_err().is_cancelled());
+    second.close();
+
+    // The request the waiter depends on is replayed along with the resubscription.
+    let mut reqs = [third.recv().await, third.recv().await];
+    reqs.sort_by_key(|req| req["id"].as_u64());
+    assert_eq!(reqs.map(|req| req["id"].clone()), [json!(1), json!(2)]);
+    third.respond(2, json!("0xccc"));
+    let resp = within(waiter).await.unwrap().unwrap();
+    assert!(frontend.get_subscription(local_id(&resp)).await.is_ok());
+}
+
+#[tokio::test(start_paused = true)]
+async fn identical_subscribe_is_sent_when_nobody_waits_for_the_pending_one() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let cancelled = tokio::spawn(frontend.send(request("eth_subscribe", 1, json!(["newHeads"]))));
+    assert_eq!(backend.recv().await["id"], 1);
+    cancelled.abort();
+    assert!(cancelled.await.unwrap_err().is_cancelled());
+
+    // The first request may never be answered, so the identical one is sent too.
+    let resp = tokio::spawn(frontend.send(request("eth_subscribe", 2, json!(["newHeads"]))));
+    assert_eq!(backend.recv().await["id"], 2);
+    backend.respond(2, json!("0xbbb"));
+    let resp = within(resp).await.unwrap().unwrap();
+    assert!(frontend.get_subscription(local_id(&resp)).await.is_ok());
+
+    // A late answer to the first request is cancelled on the server.
+    backend.respond(1, json!("0xaaa"));
+    let unsubscribe = backend.recv().await;
+    assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+    assert_eq!(unsubscribe["params"], json!(["0xaaa"]));
+}
+
+#[tokio::test(start_paused = true)]
+async fn identical_subscribes_of_other_methods_are_not_shared() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let trace_chain = |id| {
+        let mut req = request("debug_subscribe", id, json!(["traceChain", "0x1", "0x2"]));
+        req.set_is_subscription();
+        req
+    };
+    let first = subscribe_with(&frontend, &mut backend, trace_chain(1), "0xaaa").await;
+    // A bounded trace runs again for an identical request, so the request reaches the server.
+    let second = subscribe_with(&frontend, &mut backend, trace_chain(2), "0xbbb").await;
+    assert_ne!(first, second);
+
+    let first = frontend.get_subscription(first).await.unwrap();
+    let mut second = frontend.get_subscription(second).await.unwrap();
+    backend.notify("0xbbb", json!(1));
+    assert_eq!(within(second.recv()).await.unwrap().get(), "1");
+    assert!(first.is_empty());
+}
+
+#[tokio::test(start_paused = true)]
 async fn exhausted_reconnects_shut_down_service() {
     let (mut frontend, connector, [mut backend]) = spawn_service().await;
     let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 1, json!([]))));
