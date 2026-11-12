@@ -634,4 +634,20 @@ mod test {
         let res = BuiltInConnectionString::connect_with("http://127.0.0.1:8545", config).await;
         assert!(res.is_err());
     }
+
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    #[tokio::test]
+    async fn http_sends_url_credentials_unless_the_request_sets_them() {
+        for (header, expected) in
+            [(None, "Basic dXM6ZXI6cEBzcw=="), (Some("Bearer other"), "Bearer other")]
+        {
+            let (url, server) = serve_once().await;
+            let url = url.replacen("http://", "http://us%3Aer:p%40ss@", 1);
+            send(&url, ConnectionConfig::new(), header).await;
+            let request = server.await.unwrap();
+            let expected = format!("\r\nauthorization: {}\r\n", expected.to_lowercase());
+            assert!(request.contains(&expected), "{request}");
+            assert_eq!(request.matches("authorization:").count(), 1, "{request}");
+        }
+    }
 }
