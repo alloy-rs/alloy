@@ -297,6 +297,26 @@ async fn identical_subscribe_is_sent_when_nobody_waits_for_the_pending_one() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn identical_subscribes_of_other_methods_are_not_shared() {
+    let (frontend, _, [mut backend]) = spawn_service().await;
+    let trace_chain = |id| {
+        let mut req = request("debug_subscribe", id, json!(["traceChain", "0x1", "0x2"]));
+        req.set_is_subscription();
+        req
+    };
+    let first = subscribe_with(&frontend, &mut backend, trace_chain(1), "0xaaa").await;
+    // A bounded trace runs again for an identical request, so the request reaches the server.
+    let second = subscribe_with(&frontend, &mut backend, trace_chain(2), "0xbbb").await;
+    assert_ne!(first, second);
+
+    let first = frontend.get_subscription(first).await.unwrap();
+    let mut second = frontend.get_subscription(second).await.unwrap();
+    backend.notify("0xbbb", json!(1));
+    assert_eq!(within(second.recv()).await.unwrap().get(), "1");
+    assert!(first.is_empty());
+}
+
+#[tokio::test(start_paused = true)]
 async fn exhausted_reconnects_shut_down_service() {
     let (mut frontend, connector, [mut backend]) = spawn_service().await;
     let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 1, json!([]))));

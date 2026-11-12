@@ -62,12 +62,14 @@ For a normal request, the user sends a request to the **frontend**, and
 later receives a response via a tokio oneshot channel. This is straightforward
 and easy to reason about. Subscriptions, however, are side-effects of other
 requests, and are long-lived. They are managed by the **service** and
-identified locally by a `B256`. This value is a request-derived alias: it is the
-Keccak-256 hash of the method and the serialized parameters. Identical
-subscription requests share an alias and a single server-side subscription: a
+identified locally by a `B256`. This value is a request-derived alias. Identical
+`eth_subscribe` requests share an alias and a single server-side subscription: a
 request for a subscription that exists, or is being created, is answered with
-its alias without another request to the server. The service uses this ID to
-manage the subscription lifecycle and dispatch notifications to receivers.
+its alias without another request to the server. Requests of other subscribe
+methods may stream a bounded range, e.g. `debug_subscribe` with `traceChain`,
+so each of them reaches the server and gets its own alias. The service uses
+this ID to manage the subscription lifecycle and dispatch notifications to
+receivers.
 
 ### Server & Local IDs
 
