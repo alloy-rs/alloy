@@ -35,7 +35,9 @@ mod wallet;
 pub use wallet::WalletFiller;
 
 mod nonce;
-pub use nonce::{CachedNonceManager, NonceFiller, NonceManager, SimpleNonceManager};
+pub use nonce::{
+    CachedNonceManager, NonceFiller, NonceManager, NonceReservation, SimpleNonceManager,
+};
 
 mod gas;
 pub use gas::{
@@ -56,7 +58,7 @@ use crate::{
     SendableTxErr,
 };
 use alloy_json_rpc::{RpcError, RpcRecv};
-use alloy_network::{AnyNetwork, Ethereum, Network};
+use alloy_network::{AnyNetwork, Ethereum, Network, TransactionBuilder};
 use alloy_primitives::{Bytes, U64};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
@@ -230,6 +232,14 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         tx: SendableTx<N>,
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>);
 
+    /// Called with a prepared fillable that won't be filled because preparing another filler
+    /// failed, so that fillers that reserved state in [`TxFiller::prepare`] can release it.
+    fn release(&self, fillable: Self::Fillable) -> impl_future!(<Output = ()>) {
+        drop(fillable);
+        // This is a no-op by default
+        futures::future::ready(())
+    }
+
     /// Fills in the transaction request and try to convert it to an envelope.
     fn fill_envelope(
         &self,
@@ -284,6 +294,22 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         let _ = tx;
         // No-op default
         Ok(())
+    }
+
+    /// Called after sending a transaction fails, or filling it fails after its nonce was filled in
+    /// (e.g. when signing fails), with its sender and the nonce the fillers filled in, so that
+    /// fillers that reserved state for it can release it.
+    ///
+    /// This is not called if the caller supplied the nonce.
+    fn on_send_failure(
+        &self,
+        from: Address,
+        nonce: u64,
+        error: &TransportError,
+    ) -> impl_future!(<Output = ()>) {
+        let _ = (from, nonce, error);
+        // This is a no-op by default
+        futures::future::ready(())
     }
 }
 
@@ -349,12 +375,36 @@ where
         self.filler.join_with(other).layer(self.inner)
     }
 
-    async fn fill_inner(&self, mut tx: SendableTx<N>) -> TransportResult<SendableTx<N>> {
+    /// Runs the fillers on the transaction until they are finished.
+    ///
+    /// Also returns the sender, read from the request while filling, since a signed envelope no
+    /// longer carries it.
+    async fn fill_inner(
+        &self,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<(SendableTx<N>, Option<Address>)> {
+        // Only nonces the fillers choose are reported, a caller's nonce is theirs to manage.
+        let fills_nonce = tx.as_builder().is_some_and(|tx| tx.nonce().is_none());
+        let mut from = None;
+        let mut filled_nonce = None;
         let mut count = 0;
 
         while self.filler.continue_filling(&tx) {
             self.filler.fill_sync(&mut tx);
-            tx = self.filler.prepare_and_fill(&self.inner, tx).await?;
+            from = tx.as_builder().and_then(|tx| tx.from()).or(from);
+            tx = match self.filler.prepare_and_fill(&self.inner, tx).await {
+                Ok(tx) => tx,
+                Err(err) => {
+                    // A nonce filled in an earlier round, e.g. before signing failed, is unused.
+                    if let Some((from, nonce)) = from.zip(filled_nonce) {
+                        self.filler.on_send_failure(from, nonce, &err).await;
+                    }
+                    return Err(err);
+                }
+            };
+            if fills_nonce {
+                filled_nonce = tx.as_builder().and_then(|tx| tx.nonce()).or(filled_nonce);
+            }
 
             count += 1;
             if count >= 20 {
@@ -363,10 +413,44 @@ where
                     ?tx, ?self.filler, loop_iterations = count,
                     ERROR
                 );
-                return Err(TransportError::local_usage_str(ERROR));
+                let err = TransportError::local_usage_str(ERROR);
+                return self.report_send_result(Err(err), from.zip(filled_nonce)).await;
             }
         }
-        Ok(tx)
+        Ok((tx, from))
+    }
+
+    /// Fills a transaction that is about to be sent or signed.
+    ///
+    /// Also returns its sender and nonce if the fillers filled in the nonce, rather than the
+    /// caller, so that a failed send can be reported to [`TxFiller::on_send_failure`].
+    async fn fill_for_send(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<(SendableTx<N>, Option<(Address, u64)>)> {
+        let caller_nonce = tx.as_builder().is_none_or(|tx| tx.nonce().is_some());
+        let (tx, from) = self.fill_inner(tx).await?;
+        if caller_nonce {
+            return Ok((tx, None));
+        }
+
+        let nonce = match &tx {
+            SendableTx::Builder(tx) => tx.nonce(),
+            SendableTx::Envelope(tx) => Some(alloy_consensus::Transaction::nonce(tx)),
+        };
+        Ok((tx, from.zip(nonce)))
+    }
+
+    /// Reports a failed send to the fillers if they filled in the nonce, then returns the result.
+    async fn report_send_result<T>(
+        &self,
+        result: TransportResult<T>,
+        filled: Option<(Address, u64)>,
+    ) -> TransportResult<T> {
+        if let (Err(err), Some((from, nonce))) = (&result, filled) {
+            self.filler.on_send_failure(from, nonce, err).await;
+        }
+        result
     }
 
     /// Fills the transaction request, using the configured fillers
@@ -416,7 +500,7 @@ where
     /// # fn example() {}
     /// ```
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
-        self.fill_inner(SendableTx::Builder(tx)).await
+        self.fill_inner(SendableTx::Builder(tx)).await.map(|(tx, _)| tx)
     }
 
     /// Prepares a transaction request for eth_call operations using the configured fillers
@@ -779,44 +863,51 @@ where
 
     async fn send_transaction_internal(
         &self,
-        mut tx: SendableTx<N>,
+        tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<N>> {
-        tx = self.fill_inner(tx).await?;
+        let (tx, filled) = self.fill_for_send(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
                 // TODO: improve this.
                 // blocked by #431
                 let message = format!("missing properties: {missing:?}");
-                return Err(RpcError::local_usage_str(&message));
+                let err = RpcError::local_usage_str(&message);
+                return self.report_send_result(Err(err), filled).await;
             }
         }
 
         // Errors in tx building happen further down the stack.
-        self.inner.send_transaction_internal(tx).await
+        let result = self.inner.send_transaction_internal(tx).await;
+        self.report_send_result(result, filled).await
     }
 
     async fn send_transaction_sync_internal(
         &self,
-        mut tx: SendableTx<N>,
+        tx: SendableTx<N>,
     ) -> TransportResult<N::ReceiptResponse> {
-        tx = self.fill_inner(tx).await?;
+        let (tx, filled) = self.fill_for_send(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
                 let message = format!("missing properties: {missing:?}");
-                return Err(RpcError::local_usage_str(&message));
+                let err = RpcError::local_usage_str(&message);
+                return self.report_send_result(Err(err), filled).await;
             }
         }
 
         // Errors in tx building happen further down the stack.
-        self.inner.send_transaction_sync_internal(tx).await
+        let result = self.inner.send_transaction_sync_internal(tx).await;
+        self.report_send_result(result, filled).await
     }
 
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
-        let tx = self.fill(tx).await?;
-        let tx = tx.try_into_request().map_err(TransportError::local_usage)?;
-        self.inner.sign_transaction(tx).await
+        let (tx, filled) = self.fill_for_send(SendableTx::Builder(tx)).await?;
+        let result = match tx.try_into_request() {
+            Ok(tx) => self.inner.sign_transaction(tx).await,
+            Err(err) => Err(TransportError::local_usage(err)),
+        };
+        self.report_send_result(result, filled).await
     }
 
     async fn fill_transaction(
@@ -833,18 +924,21 @@ where
         &self,
         tx: N::TransactionRequest,
     ) -> TransportResult<N::TxEnvelope> {
-        match self.fill(tx).await? {
+        let (tx, filled) = self.fill_for_send(SendableTx::Builder(tx)).await?;
+        let result = match tx {
             SendableTx::Envelope(envelope) => Ok(envelope),
             SendableTx::Builder(tx) => {
                 if let FillerControlFlow::Missing(missing) = self.filler.status(&tx) {
                     let message = format!("missing properties: {missing:?}");
-                    return Err(RpcError::local_usage_str(&message));
+                    Err(RpcError::local_usage_str(&message))
+                } else {
+                    Err(RpcError::local_usage_str(
+                        "no wallet configured, fillers did not produce a signed transaction",
+                    ))
                 }
-                Err(RpcError::local_usage_str(
-                    "no wallet configured, fillers did not produce a signed transaction",
-                ))
             }
-        }
+        };
+        self.report_send_result(result, filled).await
     }
 
     #[cfg(feature = "pubsub")]
@@ -1110,6 +1204,56 @@ mod tests {
             tx.gas = Some(123);
             Err(RpcError::ErrorResp(alloy_json_rpc::ErrorPayload::invalid_request()))
         }
+    }
+
+    /// A filler that is always missing a property.
+    #[derive(Clone, Debug)]
+    struct MissingFiller;
+
+    impl TxFiller for MissingFiller {
+        type Fillable = ();
+
+        fn status(&self, _tx: &TransactionRequest) -> FillerControlFlow {
+            FillerControlFlow::missing("MissingFiller", vec!["property"])
+        }
+
+        fn fill_sync(&self, _tx: &mut SendableTx<Ethereum>) {}
+
+        async fn prepare<P: Provider>(
+            &self,
+            _provider: &P,
+            _tx: &TransactionRequest,
+        ) -> TransportResult<()> {
+            Ok(())
+        }
+
+        async fn fill(
+            &self,
+            (): (),
+            tx: SendableTx<Ethereum>,
+        ) -> TransportResult<SendableTx<Ethereum>> {
+            Ok(tx)
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_properties_release_filled_nonce() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let inner =
+            RootProvider::<Ethereum>::new(alloy_rpc_client::RpcClient::mocked(asserter.clone()));
+        let filler = JoinFill::new(NonceFiller::<CachedNonceManager>::default(), MissingFiller);
+        let provider = FillProvider::new(inner, filler);
+        let from = Address::with_last_byte(1);
+        asserter.push_success(&U64::from(5));
+
+        let err = provider.send_transaction(TransactionRequest::default().with_from(from)).await;
+        let err = err.unwrap_err();
+        assert!(err.to_string().contains("missing properties"), "{err}");
+
+        // The nonce never left the process, so it's handed out again without a refetch.
+        let manager = provider.filler().left().nonce_manager();
+        assert_eq!(manager.get_next_nonce(provider.inner(), from).await.unwrap(), 5);
+        assert_eq!(asserter.requests().len(), 1);
     }
 
     #[tokio::test]
