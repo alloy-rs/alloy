@@ -250,31 +250,27 @@ impl<T: TxHashable<Sig> + PartialEq, Sig: PartialEq> Eq for Signed<T, Sig> {}
 
 #[cfg(feature = "k256")]
 impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
-    /// Recover the signer of the transaction.
-    ///
-    /// Returns an error if the signature's `s` value is not in the lower half of the curve order,
-    /// as specified in [EIP-2](https://eips.ethereum.org/EIPS/eip-2).
+    /// Recover the signer of the transaction
     pub fn recover_signer(
         &self,
-    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         let sighash = self.tx.signature_hash();
-        crate::crypto::secp256k1::recover_signer(&self.signature, sighash)
+        self.signature.recover_address_from_prehash(&sighash)
     }
 
-    /// Attempts to recover signer via [`Self::recover_signer`] and constructs a
-    /// [`crate::transaction::Recovered`] object.
+    /// Attempts to recover signer and constructs a [`crate::transaction::Recovered`] object.
     pub fn try_into_recovered(
         self,
-    ) -> Result<crate::transaction::Recovered<T>, crate::crypto::RecoveryError> {
+    ) -> Result<crate::transaction::Recovered<T>, alloy_primitives::SignatureError> {
         let signer = self.recover_signer()?;
         Ok(crate::transaction::Recovered::new_unchecked(self.tx, signer))
     }
 
-    /// Attempts to recover signer via [`Self::recover_signer`] and constructs a
-    /// [`crate::transaction::Recovered`] with a reference to the transaction `Recovered<&T>`
+    /// Attempts to recover signer and constructs a [`crate::transaction::Recovered`] with a
+    /// reference to the transaction `Recovered<&T>`
     pub fn try_to_recovered_ref(
         &self,
-    ) -> Result<crate::transaction::Recovered<&T>, crate::crypto::RecoveryError> {
+    ) -> Result<crate::transaction::Recovered<&T>, alloy_primitives::SignatureError> {
         let signer = self.recover_signer()?;
         Ok(crate::transaction::Recovered::new_unchecked(&self.tx, signer))
     }
