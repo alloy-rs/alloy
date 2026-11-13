@@ -3,7 +3,7 @@ use crate::common::{Privacy, ProtocolVersion, Validity};
 use alloy_eips::BlockId;
 use alloy_primitives::{Bytes, TxHash, U256};
 use alloy_rpc_types_eth::{BlockOverrides, Log};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 /// A bundle of transactions to send to the matchmaker.
 ///
@@ -221,11 +221,41 @@ pub struct SimBundleOverrides {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_block: Option<BlockId>,
     /// Overrides for block environment values.
-    #[serde(flatten)]
+    #[serde(flatten, serialize_with = "serialize_sim_block_overrides")]
     pub block_overrides: BlockOverrides,
     /// Timeout in seconds, defaults to 5
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timeout: Option<u64>,
+}
+
+/// Serializes [`BlockOverrides`] with the `blockNumber` and `timestamp` keys that mev-share
+/// expects, instead of `number` and `time`.
+fn serialize_sim_block_overrides<S: Serializer>(
+    overrides: &BlockOverrides,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SimBlockOverrides {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        block_number: Option<U256>,
+        #[serde(with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+        timestamp: Option<u64>,
+        #[serde(flatten)]
+        overrides: BlockOverrides,
+    }
+
+    let mut overrides = overrides.clone();
+    SimBlockOverrides {
+        block_number: overrides.number.take(),
+        timestamp: overrides.time.take(),
+        overrides,
+    }
+    .serialize(serializer)
 }
 
 /// Response from the matchmaker after sending a simulation request.
@@ -421,5 +451,25 @@ mod tests {
         "#;
         let actual: SimBundleResponse = serde_json::from_str(expected).unwrap();
         assert!(actual.success);
+    }
+
+    #[test]
+    fn can_serialize_sim_bundle_overrides() {
+        let overrides = SimBundleOverrides {
+            block_overrides: BlockOverrides {
+                number: Some(U256::from(100)),
+                time: Some(1234),
+                gas_limit: Some(30_000_000),
+                ..Default::default()
+            },
+            timeout: Some(5),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&overrides).unwrap();
+        assert_eq!(
+            json,
+            r#"{"blockNumber":"0x64","timestamp":"0x4d2","gasLimit":"0x1c9c380","timeout":5}"#
+        );
+        assert_eq!(serde_json::from_str::<SimBundleOverrides>(&json).unwrap(), overrides);
     }
 }
