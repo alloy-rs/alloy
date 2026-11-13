@@ -1,4 +1,4 @@
-use crate::{Provider, ProviderLayer, RootProvider};
+use crate::{provider::forward, Provider, ProviderLayer};
 use alloy_network::{Ethereum, Network};
 use alloy_node_bindings::{Anvil, AnvilInstance};
 use reqwest::Url;
@@ -74,9 +74,15 @@ impl<P: Provider<N>, N: Network> AnvilProvider<P, N> {
     }
 }
 
-impl<P: Provider<N>, N: Network> Provider<N> for AnvilProvider<P, N> {
+impl<P: Provider<N>, N: Network> forward::ForwardingProvider<N> for AnvilProvider<P, N> {
+    type Inner = P;
+
     #[inline(always)]
-    fn root(&self) -> &RootProvider<N> {
-        self.inner.root()
+    fn inner_provider(&self) -> &P {
+        &self.inner
     }
 }
+
+forward::impl_provider_forwarding!(
+    impl[P: Provider<N>, N: Network] Provider<N> for AnvilProvider<P, N>
+);
