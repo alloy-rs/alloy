@@ -51,7 +51,9 @@ pub enum GasFillable {
 ///   and `max_priority_fee_per_gas` fields if unset.
 /// - If the network does not support EIP-1559, it will fallback to the legacy tx and populate the
 ///   `gas_limit` and `gas_price` fields if unset. This fallback only triggers when the latest block
-///   header has no base fee.
+///   header has no base fee and the request sets neither `max_fee_per_gas` nor
+///   `max_priority_fee_per_gas`. If one of them is set, filling fails with
+///   [`RpcError::UnsupportedFeature`], because a legacy tx would drop that fee.
 /// - If the filler was created with [`GasFiller::legacy`], it skips EIP-1559 estimation entirely
 ///   and always populates the `gas_limit` and `gas_price` fields if unset.
 ///
