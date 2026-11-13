@@ -34,6 +34,9 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
+    /// The deadline for each connection attempt, including reconnects.
+    /// Default is no deadline.
+    connect_timeout: Option<Duration>,
 }
 
 impl WsConnect {
@@ -52,6 +55,7 @@ impl WsConnect {
             max_retries: 10,
             retry_interval: Duration::from_secs(3),
             keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
+            connect_timeout: None,
         }
     }
 
@@ -117,6 +121,19 @@ impl WsConnect {
         self.keepalive_interval = keepalive_interval;
         self
     }
+
+    /// Sets the deadline for each connection attempt: the TCP connection, TLS and the WebSocket
+    /// handshake.
+    ///
+    /// It applies to the initial connection and to every reconnect attempt. An attempt that misses
+    /// it fails with [`TransportErrorKind::Timeout`], and a reconnect is then retried as configured
+    /// with [`Self::with_max_retries`].
+    ///
+    /// Default is no deadline.
+    pub const fn with_connect_timeout(mut self, connect_timeout: Duration) -> Self {
+        self.connect_timeout = Some(connect_timeout);
+        self
+    }
 }
 
 impl IntoClientRequest for WsConnect {
@@ -144,9 +161,14 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
-            .await
-            .map_err(TransportErrorKind::custom)?;
+        let connect = tokio_tungstenite::connect_async_with_config(req, self.config, false);
+        let (socket, _) = match self.connect_timeout {
+            Some(connect_timeout) => tokio::time::timeout(connect_timeout, connect)
+                .await
+                .map_err(|_| TransportErrorKind::timeout(connect_timeout))?,
+            None => connect.await,
+        }
+        .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
@@ -295,6 +317,26 @@ impl WsBackend<TungsteniteStream> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::{io::AsyncReadExt, net::TcpListener};
+
+    #[tokio::test]
+    async fn connect_timeout_fails_unanswered_handshake() {
+        // Accepts the TCP connection but never answers the handshake.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("ws://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = [0; 1024];
+            while socket.read(&mut buf).await.is_ok_and(|n| n > 0) {}
+        });
+
+        let timeout = Duration::from_millis(50);
+        let err = WsConnect::new(url).with_connect_timeout(timeout).connect().await.unwrap_err();
+        assert!(matches!(
+            err.as_transport_err(),
+            Some(TransportErrorKind::Timeout(t)) if *t == timeout
+        ));
+    }
 
     #[test]
     fn auth_from_url() {
