@@ -16,6 +16,12 @@ use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
 
+#[cfg(feature = "serde")]
+use alloy_eips::{
+    eip4844::{Blob, BlobTransactionSidecar, Bytes48},
+    eip7594::BlobTransactionSidecarEip7594,
+};
+
 /// Represents _all_ transaction requests to/from RPC.
 ///
 /// Transaction type selection is field-driven. The [`Self::transaction_type`] field is retained
@@ -143,7 +149,7 @@ pub struct TransactionRequest {
             default,
             flatten,
             skip_serializing_if = "Option::is_none",
-            deserialize_with = "alloy_eips::eip7594::deserialize_flattened_sidecar"
+            deserialize_with = "deserialize_flattened_sidecar"
         )
     )]
     pub sidecar: Option<BlobTransactionSidecarVariant>,
@@ -1757,6 +1763,43 @@ pub struct FillTransaction<T = TypedTransaction> {
     pub tx: T,
 }
 
+/// Deserializes the flattened [`TransactionRequest::sidecar`].
+///
+/// A flattened `Option<T>` turns every error of `T` into `None`, which would silently drop
+/// malformed blobs, commitments or proofs. Incomplete sidecars still give `None`, since clients
+/// such as viem send `blobs` without `commitments` and `proofs`.
+#[cfg(feature = "serde")]
+fn deserialize_flattened_sidecar<'de, D>(
+    deserializer: D,
+) -> Result<Option<BlobTransactionSidecarVariant>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(serde::Deserialize)]
+    #[serde(transparent)]
+    struct Blobs(#[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")] Vec<Blob>);
+
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SidecarFields {
+        blobs: Option<Blobs>,
+        commitments: Option<Vec<Bytes48>>,
+        proofs: Option<Vec<Bytes48>>,
+        cell_proofs: Option<Vec<Bytes48>>,
+    }
+
+    let fields = <SidecarFields as serde::Deserialize>::deserialize(deserializer)?;
+    Ok(match (fields.blobs, fields.commitments, fields.proofs, fields.cell_proofs) {
+        (Some(Blobs(blobs)), Some(commitments), Some(proofs), None) => {
+            Some(BlobTransactionSidecar { blobs, commitments, proofs }.into())
+        }
+        (Some(Blobs(blobs)), Some(commitments), None, Some(cell_proofs)) => {
+            Some(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs }.into())
+        }
+        _ => None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1859,30 +1902,17 @@ mod tests {
 
         json.as_object_mut().unwrap().remove("proofs");
 
-        let err = serde_json::from_value::<TransactionRequest>(json.clone()).unwrap_err();
-        assert_eq!(err.to_string(), "Missing 'cellProofs' or 'proofs'");
+        let req = serde_json::from_str::<TransactionRequest>(&json.to_string()).unwrap();
 
-        let malformed = serde_json::json!({
-            "from": "0x0000000000000000000000000000000000000001",
-            "to": "0x0000000000000000000000000000000000000002",
-            "maxFeePerGas": "0x1",
-            "maxPriorityFeePerGas": "0x1",
-            "blobs": ["0x00"],
-            "commitments": [],
-            "proofs": []
-        });
+        assert!(req.sidecar.is_none()); // Sidecar won't be deserialized.
+
+        json["blobs"] = serde_json::json!(["0x00"]);
         let sidecar_err = serde_json::from_value::<BlobTransactionSidecarVariant>(
             serde_json::json!({ "blobs": ["0x00"], "commitments": [], "proofs": [] }),
         )
         .unwrap_err();
-        let err = serde_json::from_value::<TransactionRequest>(malformed).unwrap_err();
+        let err = serde_json::from_value::<TransactionRequest>(json).unwrap_err();
         assert_eq!(err.to_string(), sidecar_err.to_string());
-
-        for key in ["blobs", "commitments", "proofs"] {
-            json[key] = serde_json::Value::Null;
-        }
-        let req = serde_json::from_value::<TransactionRequest>(json).unwrap();
-        assert!(req.sidecar.is_none());
     }
 
     #[test]

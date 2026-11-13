@@ -14,12 +14,6 @@ use crate::eip4844::{box_blob, VersionedHashIter};
 #[cfg(feature = "kzg")]
 use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 
-#[cfg(feature = "serde")]
-use serde::de::{
-    value::{MapAccessDeserializer, UnitDeserializer},
-    DeserializeSeed, IgnoredAny, MapAccess, Visitor,
-};
-
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
 ///
@@ -441,9 +435,6 @@ impl TryFrom<BlobTransactionSidecarVariant> for BlobTransactionSidecarEip7594 {
 }
 
 #[cfg(feature = "serde")]
-const SIDECAR_FIELDS: &[&str] = &["blobs", "commitments", "proofs", "cellProofs"];
-
-#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -519,121 +510,9 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
             }
         }
 
-        deserializer.deserialize_struct(
-            "BlobTransactionSidecarVariant",
-            SIDECAR_FIELDS,
-            VariantVisitor,
-        )
+        const FIELDS: &[&str] = &["blobs", "commitments", "proofs", "cellProofs"];
+        deserializer.deserialize_struct("BlobTransactionSidecarVariant", FIELDS, VariantVisitor)
     }
-}
-
-/// Deserializes a `#[serde(flatten)]` `Option<T>` blob transaction sidecar field.
-///
-/// A plain flattened `Option<T>` turns every error of `T` into `None`, which silently drops a
-/// malformed sidecar. This returns `None` only if none of `blobs`, `commitments`, `proofs` and
-/// `cellProofs` has a non-null value, and the error of `T` otherwise. `T` only sees these fields.
-#[cfg(feature = "serde")]
-pub fn deserialize_flattened_sidecar<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-    T: serde::Deserialize<'de>,
-{
-    struct SidecarVisitor<T>(core::marker::PhantomData<T>);
-
-    impl<'de, T: serde::Deserialize<'de>> Visitor<'de> for SidecarVisitor<T> {
-        type Value = Option<T>;
-
-        fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            formatter.write_str("an optional blob transaction sidecar")
-        }
-
-        fn visit_map<M: MapAccess<'de>>(self, map: M) -> Result<Self::Value, M::Error> {
-            let mut map = NonNullTracker { map, non_null: false };
-            match T::deserialize(MapAccessDeserializer::new(&mut map)) {
-                Ok(sidecar) => Ok(Some(sidecar)),
-                Err(err) => {
-                    // `T` can fail before it reaches a non-null field.
-                    while !map.non_null && map.next_key::<IgnoredAny>()?.is_some() {
-                        map.next_value::<IgnoredAny>()?;
-                    }
-                    if map.non_null {
-                        Err(err)
-                    } else {
-                        Ok(None)
-                    }
-                }
-            }
-        }
-    }
-
-    struct NonNullTracker<M> {
-        map: M,
-        non_null: bool,
-    }
-
-    impl<'de, M: MapAccess<'de>> MapAccess<'de> for NonNullTracker<M> {
-        type Error = M::Error;
-
-        fn next_key_seed<K: DeserializeSeed<'de>>(
-            &mut self,
-            seed: K,
-        ) -> Result<Option<K::Value>, Self::Error> {
-            self.map.next_key_seed(seed)
-        }
-
-        fn next_value_seed<V: DeserializeSeed<'de>>(
-            &mut self,
-            seed: V,
-        ) -> Result<V::Value, Self::Error> {
-            self.map.next_value_seed(NonNullSeed { seed, non_null: &mut self.non_null })
-        }
-    }
-
-    struct NonNullSeed<'a, S> {
-        seed: S,
-        non_null: &'a mut bool,
-    }
-
-    impl<'de, S: DeserializeSeed<'de>> DeserializeSeed<'de> for NonNullSeed<'_, S> {
-        type Value = S::Value;
-
-        fn deserialize<D: serde::Deserializer<'de>>(
-            self,
-            deserializer: D,
-        ) -> Result<Self::Value, D::Error> {
-            deserializer.deserialize_option(self)
-        }
-    }
-
-    impl<'de, S: DeserializeSeed<'de>> Visitor<'de> for NonNullSeed<'_, S> {
-        type Value = S::Value;
-
-        fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            formatter.write_str("a blob transaction sidecar field")
-        }
-
-        fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
-            self.seed.deserialize(UnitDeserializer::new())
-        }
-
-        fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
-            self.visit_none()
-        }
-
-        fn visit_some<D: serde::Deserializer<'de>>(
-            self,
-            deserializer: D,
-        ) -> Result<Self::Value, D::Error> {
-            *self.non_null = true;
-            self.seed.deserialize(deserializer)
-        }
-    }
-
-    deserializer.deserialize_struct(
-        "BlobTransactionSidecarVariant",
-        SIDECAR_FIELDS,
-        SidecarVisitor(core::marker::PhantomData),
-    )
 }
 
 /// This represents a set of blobs, and its corresponding commitments and cell proofs.
