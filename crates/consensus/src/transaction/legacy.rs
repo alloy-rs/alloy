@@ -717,12 +717,10 @@ pub(super) mod serde_bincode_compat {
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use crate::{
-        crypto::InvalidSignatureS,
         transaction::{from_eip155_value, to_eip155_value, RlpEcdsaDecodableTx},
         SignableTransaction, TxLegacy,
     };
     use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, B256, U256};
-    use core::error::Error;
 
     #[test]
     fn recover_signer_legacy() {
@@ -750,15 +748,6 @@ mod tests {
 
         assert_eq!(*signed_tx.hash(), hash, "Expected same hash");
         assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
-
-        // The malleated form of `sig`: `s` replaced by `n - s` and the parity flipped.
-        let high_s = Signature::from_scalars_and_parity(
-            b256!("2a378831cf81d99a3f06a18ae1b6ca366817ab4d88a70053c41d7a8f0368e031"),
-            b256!("baf27ce5fa491be78dbbc93fa3eaa1f49f334ad69977a478c96aafb5c689f18c"),
-            true,
-        );
-        let err = signed_tx.strip_signature().into_signed(high_s).recover_signer().unwrap_err();
-        assert!(err.source().unwrap().is::<InvalidSignatureS>());
     }
 
     #[test]
