@@ -211,6 +211,11 @@ where
 /// Geth ref: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
 fn patch_pending_block(block: &mut Value) {
     tracing::trace!(pending_block = ?block.to_string());
+    // Indexing a non-object panics; leave it for deserialization to reject.
+    if !block.is_object() {
+        return;
+    }
+
     if block.get("hash").is_none_or(|v| v.is_null()) {
         block["hash"] = Value::String(format!("{}", B256::ZERO));
     }
@@ -540,6 +545,16 @@ mod tests {
 
         let block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap();
         assert!(block.is_none());
+    }
+
+    #[tokio::test]
+    async fn pending_block_rejects_non_object() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        asserter.push_success(&"0x");
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+        let err = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap_err();
+        assert!(err.is_deser_error());
     }
 
     fn numbered_block(number: u64) -> Block {
