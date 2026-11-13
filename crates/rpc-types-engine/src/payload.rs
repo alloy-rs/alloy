@@ -3779,7 +3779,14 @@ pub enum PayloadStatusEnum {
     ///   - forkchoiceUpdate: if the new head is unknown, pre-merge, or reorg to it fails
     Invalid {
         /// The error message for the invalid payload.
-        #[cfg_attr(feature = "serde", serde(rename = "validationError"))]
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                rename = "validationError",
+                default,
+                deserialize_with = "alloy_serde::null_as_default"
+            )
+        )]
         validation_error: String,
     },
 
@@ -4137,7 +4144,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CancunPayloadFields, PayloadValidationError};
+    use crate::{CancunPayloadFields, ForkchoiceUpdated, PayloadValidationError};
     use alloc::vec;
     use alloy_consensus::TxEnvelope;
     use alloy_primitives::{b256, hex};
@@ -4783,6 +4790,21 @@ mod tests {
             },
         };
         assert_eq!(q, serde_json::from_str(s).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_payload_status_invalid_without_validation_error() {
+        let s = r#"{"payloadStatus":{"status":"INVALID","latestValidHash":null,"validationError":null},"payloadId":null}"#;
+        let fcu: ForkchoiceUpdated = serde_json::from_str(s).unwrap();
+        assert_eq!(
+            fcu.payload_status.status,
+            PayloadStatusEnum::Invalid { validation_error: String::new() }
+        );
+
+        let s = r#"{"status":"INVALID","latestValidHash":null}"#;
+        let status: PayloadStatus = serde_json::from_str(s).unwrap();
+        assert_eq!(status.status, PayloadStatusEnum::Invalid { validation_error: String::new() });
     }
 
     #[test]
