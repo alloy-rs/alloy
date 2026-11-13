@@ -189,7 +189,13 @@ impl<N: Network> TxFiller<N> for GasFiller {
             match self.prepare_1559(provider, tx).await {
                 // fallback to legacy
                 Ok(estimate) => Ok(estimate),
-                Err(RpcError::UnsupportedFeature(_)) => self.prepare_legacy(provider, tx).await,
+                // A legacy transaction would drop a caller-set EIP-1559 fee.
+                Err(RpcError::UnsupportedFeature(_))
+                    if tx.max_fee_per_gas().is_none()
+                        && tx.max_priority_fee_per_gas().is_none() =>
+                {
+                    self.prepare_legacy(provider, tx).await
+                }
                 Err(e) => Err(e),
             }
         }
@@ -384,7 +390,7 @@ mod tests {
     use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
     use alloy_network::Ethereum;
     use alloy_primitives::{address, U256};
-    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_rpc_types_eth::{Block, FeeHistory, TransactionRequest};
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
@@ -537,6 +543,39 @@ mod tests {
             fill_eip1559_fees(None, Some(4_000_000_000)).await,
             (6_000_000_000, Some(4_000_000_000))
         );
+    }
+
+    #[tokio::test]
+    async fn no_legacy_fallback_with_eip1559_fee() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .connect_mocked_client(asserter.clone());
+        let fee_history = FeeHistory {
+            oldest_block: 1,
+            base_fee_per_gas: vec![0, 0],
+            gas_used_ratio: vec![0.5],
+            reward: Some(vec![vec![0]]),
+            ..Default::default()
+        };
+
+        for (max_fee_per_gas, max_priority_fee_per_gas) in [(Some(1), None), (None, Some(1))] {
+            // The latest block has no base fee, so EIP-1559 estimation is unsupported.
+            asserter.push_success(&fee_history);
+            asserter.push_success(&<Block>::default());
+            let tx = TransactionRequest {
+                gas: Some(21000),
+                max_fee_per_gas,
+                max_priority_fee_per_gas,
+                ..Default::default()
+            };
+
+            let err =
+                <GasFiller as TxFiller<Ethereum>>::prepare(&GasFiller::default(), &provider, &tx)
+                    .await
+                    .unwrap_err();
+            assert!(matches!(err, RpcError::UnsupportedFeature(_)), "{err:?}");
+        }
     }
 
     #[test]
