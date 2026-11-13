@@ -137,6 +137,20 @@ impl BuiltInConnectionString {
         &self,
         config: ConnectionConfig,
     ) -> Result<BoxTransport, TransportError> {
+        let request_timeout = config.request_timeout;
+        let transport = self.connect_transport(config).await?;
+        Ok(match request_timeout {
+            Some(timeout) => alloy_transport::Transport::boxed(
+                alloy_transport::layers::TimeoutService::new(transport, timeout),
+            ),
+            None => transport,
+        })
+    }
+
+    async fn connect_transport(
+        &self,
+        config: ConnectionConfig,
+    ) -> Result<BoxTransport, TransportError> {
         let _ = &config; // Suppress unused warning when no transport reads it
         match self {
             // reqwest is enabled, hyper is not
@@ -220,6 +234,10 @@ impl BuiltInConnectionString {
                 }
                 if let Some(retry_interval) = config.retry_interval {
                     ws_connect = ws_connect.with_retry_interval(retry_interval);
+                }
+                #[cfg(not(target_family = "wasm"))]
+                if let Some(connect_timeout) = config.connect_timeout {
+                    ws_connect = ws_connect.with_connect_timeout(connect_timeout);
                 }
 
                 ws_connect.into_service().await.map(alloy_transport::Transport::boxed)
@@ -375,6 +393,15 @@ pub struct ConnectionConfig {
     /// WebSocket-specific configuration.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
+    /// Deadline for each WebSocket connection attempt, including reconnects.
+    ///
+    /// Ignored for HTTP and IPC, and on WASM.
+    pub connect_timeout: Option<Duration>,
+    /// Deadline for each request sent through the transport.
+    ///
+    /// A request without a response by then fails with
+    /// [`TransportErrorKind::Timeout`]. Applies to every transport.
+    pub request_timeout: Option<Duration>,
 }
 
 impl ConnectionConfig {
@@ -386,6 +413,8 @@ impl ConnectionConfig {
             retry_interval: None,
             #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
             ws_config: None,
+            connect_timeout: None,
+            request_timeout: None,
         }
     }
 
@@ -416,6 +445,23 @@ impl ConnectionConfig {
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub const fn with_ws_config(mut self, config: alloy_transport_ws::WebSocketConfig) -> Self {
         self.ws_config = Some(config);
+        self
+    }
+
+    /// Set the deadline for each WebSocket connection attempt, including reconnects.
+    ///
+    /// Ignored for HTTP and IPC, and on WASM.
+    pub const fn with_connect_timeout(mut self, connect_timeout: Duration) -> Self {
+        self.connect_timeout = Some(connect_timeout);
+        self
+    }
+
+    /// Set the deadline for each request sent through the transport.
+    ///
+    /// A request without a response by then fails with
+    /// [`TransportErrorKind::Timeout`]. Applies to every transport.
+    pub const fn with_request_timeout(mut self, request_timeout: Duration) -> Self {
+        self.request_timeout = Some(request_timeout);
         self
     }
 }
@@ -579,6 +625,33 @@ mod test {
                 .insert(http::header::AUTHORIZATION, http::HeaderValue::from_static(header));
         }
         transport.call(RequestPacket::Single(req.serialize().unwrap())).await.unwrap();
+    }
+
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
+    #[tokio::test]
+    async fn request_timeout_fails_unanswered_request() {
+        use alloy_json_rpc::{Id, Request, RequestPacket};
+        use tokio::io::AsyncReadExt;
+        use tower::Service;
+
+        // Accepts the connection and reads the request, but never responds.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buf = [0; 4096];
+            while stream.read(&mut buf).await.is_ok_and(|n| n > 0) {}
+        });
+
+        let timeout = Duration::from_millis(50);
+        let config = ConnectionConfig::new().with_request_timeout(timeout);
+        let mut transport = BuiltInConnectionString::connect_with(&url, config).await.unwrap();
+        let req = Request::new("eth_blockNumber", Id::Number(0), ()).serialize().unwrap();
+        let err = transport.call(RequestPacket::Single(req)).await.unwrap_err();
+        assert!(matches!(
+            err.as_transport_err(),
+            Some(TransportErrorKind::Timeout(t)) if *t == timeout
+        ));
     }
 
     #[cfg(any(feature = "reqwest", feature = "hyper"))]

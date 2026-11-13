@@ -50,6 +50,7 @@ impl SharedTransportError {
                 }
                 TransportErrorKind::BackendGone => TransportErrorKind::BackendGone,
                 TransportErrorKind::PubsubUnavailable => TransportErrorKind::PubsubUnavailable,
+                TransportErrorKind::Timeout(duration) => TransportErrorKind::Timeout(*duration),
                 TransportErrorKind::HttpError(error) => {
                     TransportErrorKind::HttpError(crate::HttpError {
                         status: error.status,
