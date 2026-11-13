@@ -4,15 +4,26 @@ use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, Trans
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
-use tokio::time::sleep;
+use tokio::{
+    net::TcpStream,
+    time::{sleep, timeout},
+};
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
 };
 
-type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+use tokio::net::lookup_host;
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+use tokio_tungstenite::tungstenite::error::UrlError;
+
+type TungsteniteStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+
+/// The default connect timeout in seconds.
+const DEFAULT_CONNECT_TIMEOUT: u64 = 10;
 
 /// Simple connection details for a websocket connection.
 #[derive(Clone, Debug)]
@@ -34,6 +45,9 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
+    /// The connect timeout, see [`Self::with_connect_timeout`].
+    /// Default is 10 seconds.
+    connect_timeout: Duration,
 }
 
 impl WsConnect {
@@ -52,6 +66,7 @@ impl WsConnect {
             max_retries: 10,
             retry_interval: Duration::from_secs(3),
             keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
+            connect_timeout: Duration::from_secs(DEFAULT_CONNECT_TIMEOUT),
         }
     }
 
@@ -117,6 +132,20 @@ impl WsConnect {
         self.keepalive_interval = keepalive_interval;
         self
     }
+
+    /// Sets the connect timeout.
+    ///
+    /// With the `native-tls` or `rustls-tls` feature, it bounds each TCP connect attempt, one per
+    /// address the host resolves to, and separately the TLS handshake and websocket upgrade that
+    /// follow. Without them, it bounds the whole connect. It applies to the initial connect as
+    /// well as to every reconnect attempt. A connect that times out fails with a retryable
+    /// transport error, so reconnects count it against the max number of retries.
+    ///
+    /// Default is 10 seconds.
+    pub const fn with_connect_timeout(mut self, connect_timeout: Duration) -> Self {
+        self.connect_timeout = connect_timeout;
+        self
+    }
 }
 
 impl IntoClientRequest for WsConnect {
@@ -144,8 +173,23 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
+        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+        let handshake = {
+            let stream = connect_tcp(req.uri(), self.connect_timeout).await?;
+            tokio_tungstenite::client_async_tls_with_config(req, stream, self.config, None)
+        };
+        // TLS can also be enabled on tokio-tungstenite directly, and only its own connect uses it
+        // then. That connect tries the resolved addresses in turn under the single timeout.
+        #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+        let handshake = tokio_tungstenite::connect_async_with_config(req, self.config, false);
+        let (socket, _) = timeout(self.connect_timeout, handshake)
             .await
+            .map_err(|_| {
+                TransportErrorKind::custom_str(&format!(
+                    "connecting timed out after {:?}",
+                    self.connect_timeout
+                ))
+            })?
             .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
@@ -155,6 +199,40 @@ impl PubSubConnect for WsConnect {
 
         Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
     }
+}
+
+/// Opens a TCP connection to the host of `uri`, trying the addresses it resolves to in turn.
+///
+/// Each address gets its own `connect_timeout`, so that an address that silently drops the
+/// connection attempt does not use up the time of the addresses after it.
+#[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+async fn connect_tcp(uri: &http::Uri, connect_timeout: Duration) -> TransportResult<TcpStream> {
+    let url_err = |err| TransportErrorKind::custom(tungstenite::Error::Url(err));
+    let io_err = |err| TransportErrorKind::custom(tungstenite::Error::Io(err));
+    let default_port = match uri.scheme_str() {
+        Some("ws") => 80,
+        Some("wss") => 443,
+        _ => return Err(url_err(UrlError::UnsupportedUrlScheme)),
+    };
+    let host = uri.host().ok_or_else(|| url_err(UrlError::NoHostName))?;
+    // IPv6 literals are bracketed in URLs, but not when resolved.
+    let host = host.strip_prefix('[').and_then(|host| host.strip_suffix(']')).unwrap_or(host);
+    let addrs =
+        lookup_host((host, uri.port_u16().unwrap_or(default_port))).await.map_err(io_err)?;
+
+    let mut last_err = None;
+    for addr in addrs {
+        match timeout(connect_timeout, TcpStream::connect(addr)).await {
+            Ok(Ok(stream)) => return Ok(stream),
+            Ok(Err(err)) => last_err = Some(io_err(err)),
+            Err(_) => {
+                last_err = Some(TransportErrorKind::custom_str(&format!(
+                    "connecting to {addr} timed out after {connect_timeout:?}"
+                )))
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| TransportErrorKind::custom_str("host resolved to no address")))
 }
 
 /// Install a default rustls crypto provider if none is set.
@@ -315,5 +393,29 @@ mod tests {
         let ws =
             WsConnect::new("wss://user:pass@example.com").with_auth(Authorization::bearer("tok"));
         assert_eq!(ws.auth(), Some(&Authorization::bearer("tok")));
+    }
+
+    #[tokio::test]
+    async fn connect_times_out_on_stalled_handshake() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        // Accept the TCP connection but never answer the upgrade request.
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            std::future::pending::<()>().await;
+            drop(socket);
+        });
+
+        let connect = WsConnect::new(format!("ws://{addr}"))
+            .with_connect_timeout(Duration::from_millis(200))
+            .into_service();
+        let err = timeout(Duration::from_secs(30), connect)
+            .await
+            .expect("connect should time out instead of hanging")
+            .unwrap_err();
+        assert!(!err.as_transport_err().unwrap().is_non_retryable());
+        assert_eq!(err.to_string(), "connecting timed out after 200ms");
+
+        server.abort();
     }
 }
