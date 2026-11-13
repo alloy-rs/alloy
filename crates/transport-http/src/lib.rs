@@ -43,6 +43,12 @@ use core::str::FromStr;
 use std::marker::PhantomData;
 use url::Url;
 
+/// The maximum number of bytes of an HTTP error response body kept in a [`HttpError`].
+///
+/// [`HttpError`]: alloy_transport::HttpError
+#[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
+const MAX_ERROR_BODY_SIZE: usize = 4 * 1024;
+
 #[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
 fn json_rpc_error_response(body: &[u8]) -> Option<alloy_json_rpc::ResponsePacket> {
     let response = serde_json::from_slice::<alloy_json_rpc::ResponsePacket>(body).ok()?;
@@ -61,9 +67,33 @@ fn http_error_response(
 
     Err(alloy_transport::TransportErrorKind::http_error_with_retry_after(
         status,
-        String::from_utf8_lossy(body).into_owned(),
+        error_body(body),
         retry_after,
     ))
+}
+
+/// Converts an HTTP error response body to a string, truncated to [`MAX_ERROR_BODY_SIZE`] bytes.
+///
+/// A leading JSON object is kept whole, as [`RpcError::error_code`] parses the error code from it.
+///
+/// [`RpcError::error_code`]: alloy_json_rpc::RpcError::error_code
+#[cfg(any(feature = "reqwest", all(not(target_family = "wasm"), feature = "hyper")))]
+fn error_body(body: &[u8]) -> String {
+    if body.len() <= MAX_ERROR_BODY_SIZE {
+        return String::from_utf8_lossy(body).into_owned();
+    }
+    let mut values =
+        serde_json::Deserializer::from_slice(body).into_iter::<&serde_json::value::RawValue>();
+    let json_len = match values.next() {
+        Some(Ok(value)) if value.get().starts_with('{') => values.byte_offset(),
+        _ => 0,
+    };
+    // A character split at the cut is replaced with U+FFFD.
+    let (head, rest) = body.split_at(json_len.max(MAX_ERROR_BODY_SIZE));
+    if rest.is_empty() {
+        return String::from_utf8_lossy(head).into_owned();
+    }
+    format!("{}... <{} more bytes truncated>", String::from_utf8_lossy(head), rest.len())
 }
 
 /// Parses the value of a `Retry-After` header, delay-seconds form only.
@@ -303,6 +333,34 @@ mod tests {
         let TransportError::Transport(error) = error else { panic!("expected transport error") };
         assert_eq!(error.retry_after(), Some(Duration::from_secs(52)));
         assert_eq!(error.as_http_error().unwrap().status, 429);
+    }
+
+    #[test]
+    fn truncates_long_http_error_body() {
+        let body = vec![b'a'; super::MAX_ERROR_BODY_SIZE + 10];
+        let error = super::http_error_response(502, &body, None).unwrap_err();
+        let TransportError::Transport(error) = error else { panic!("expected transport error") };
+        let expected =
+            format!("{}... <10 more bytes truncated>", "a".repeat(super::MAX_ERROR_BODY_SIZE));
+        assert_eq!(error.as_http_error().unwrap().body, expected);
+
+        let body = vec![b'a'; super::MAX_ERROR_BODY_SIZE];
+        let error = super::http_error_response(502, &body, None).unwrap_err();
+        let TransportError::Transport(error) = error else { panic!("expected transport error") };
+        assert_eq!(error.as_http_error().unwrap().body.as_bytes(), body);
+    }
+
+    #[test]
+    fn keeps_error_code_of_long_json_http_error_body() {
+        let message = "a".repeat(super::MAX_ERROR_BODY_SIZE);
+        let json = format!(r#"{{"code":-32000,"message":"{message}"}}"#);
+        let body = format!("{json}{}", "b".repeat(super::MAX_ERROR_BODY_SIZE));
+        let error = super::http_error_response(400, body.as_bytes(), None).unwrap_err();
+
+        assert_eq!(error.error_code(), Some(-32000));
+        let TransportError::Transport(error) = error else { panic!("expected transport error") };
+        let expected = format!("{json}... <{} more bytes truncated>", super::MAX_ERROR_BODY_SIZE);
+        assert_eq!(error.as_http_error().unwrap().body, expected);
     }
 
     #[cfg(not(target_family = "wasm"))]
