@@ -1906,6 +1906,14 @@ mod tests {
 
         assert!(req.sidecar.is_none()); // Sidecar won't be deserialized.
 
+        // `cellProofs` in place of `proofs` gives the EIP-7594 sidecar.
+        let mut json_7594 = json.clone();
+        json_7594["cellProofs"] = serde_json::json!([zero_48]);
+        let req = serde_json::from_value::<TransactionRequest>(json_7594).unwrap();
+        assert!(req.sidecar.as_ref().unwrap().is_eip7594());
+        let serialized = serde_json::to_string(&req).unwrap();
+        assert_eq!(serde_json::from_str::<TransactionRequest>(&serialized).unwrap(), req);
+
         json["blobs"] = serde_json::json!(["0x00"]);
         let sidecar_err = serde_json::from_value::<BlobTransactionSidecarVariant>(
             serde_json::json!({ "blobs": ["0x00"], "commitments": [], "proofs": [] }),
