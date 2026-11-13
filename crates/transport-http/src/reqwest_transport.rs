@@ -4,6 +4,7 @@ use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
     TransportFut, TransportResult,
 };
+use futures::TryStreamExt;
 use itertools::Itertools;
 use std::task;
 use tower::Service;
@@ -69,28 +70,16 @@ async fn read_body_limited(
         return Err(BodyError::TooLarge(max));
     }
 
-    // wasm responses can't be read incrementally, so the size is only checked after reading.
-    #[cfg(target_family = "wasm")]
-    {
-        let body = resp.bytes().await.map_err(BodyError::Read)?;
-        if body.len() > max {
+    // Streamed on all targets, as WASM responses have no `chunk` method.
+    let mut chunks = std::pin::pin!(resp.bytes_stream());
+    let mut body = Vec::new();
+    while let Some(chunk) = chunks.try_next().await.map_err(BodyError::Read)? {
+        if body.len() + chunk.len() > max {
             return Err(BodyError::TooLarge(max));
         }
-        Ok(body.into())
+        body.extend_from_slice(&chunk);
     }
-
-    #[cfg(not(target_family = "wasm"))]
-    {
-        let mut resp = resp;
-        let mut body = Vec::new();
-        while let Some(chunk) = resp.chunk().await.map_err(BodyError::Read)? {
-            if body.len() + chunk.len() > max {
-                return Err(BodyError::TooLarge(max));
-            }
-            body.extend_from_slice(&chunk);
-        }
-        Ok(body)
-    }
+    Ok(body)
 }
 
 impl Service<RequestPacket> for Http<reqwest::Client> {
