@@ -463,11 +463,11 @@ mod serde_impl {
         }
 
         fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
-            T::deserialize(MapAccessDeserializer::new(map)).map(First::Tx)
+            T::deserialize(Element(MapAccessDeserializer::new(map))).map(First::Tx)
         }
 
         fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
-            T::deserialize(SeqAccessDeserializer::new(seq)).map(First::Tx)
+            T::deserialize(Element(SeqAccessDeserializer::new(seq))).map(First::Tx)
         }
 
         fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
@@ -476,6 +476,44 @@ mod serde_impl {
 
         fn visit_bytes<E: Error>(self, v: &[u8]) -> Result<Self::Value, E> {
             B256::deserialize(BytesDeserializer::<E>::new(v)).map(First::Hash)
+        }
+    }
+
+    /// Handles the newtype and option hints that the `serde::de::value` adapters ignore.
+    struct Element<D>(D);
+
+    impl<'de, D: Deserializer<'de>> Deserializer<'de> for Element<D> {
+        type Error = D::Error;
+
+        fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, D::Error> {
+            self.0.deserialize_any(visitor)
+        }
+
+        fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, D::Error> {
+            visitor.visit_some(self)
+        }
+
+        fn deserialize_newtype_struct<V: Visitor<'de>>(
+            self,
+            _name: &'static str,
+            visitor: V,
+        ) -> Result<V::Value, D::Error> {
+            visitor.visit_newtype_struct(self)
+        }
+
+        fn deserialize_enum<V: Visitor<'de>>(
+            self,
+            name: &'static str,
+            variants: &'static [&'static str],
+            visitor: V,
+        ) -> Result<V::Value, D::Error> {
+            self.0.deserialize_enum(name, variants, visitor)
+        }
+
+        serde::forward_to_deserialize_any! {
+            bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+            bytes byte_buf unit unit_struct seq tuple tuple_struct map struct
+            identifier ignored_any
         }
     }
 }
@@ -529,6 +567,49 @@ mod tests {
 
         let uncle = serde_json::from_str::<BlockTransactions<Tx>>("null").unwrap();
         assert_eq!(uncle, BlockTransactions::Uncle);
+    }
+
+    #[test]
+    fn deserializes_wrapped_transactions() {
+        #[derive(Debug, PartialEq, serde::Deserialize)]
+        struct Wrapped(Tx);
+
+        #[derive(Debug, PartialEq, serde::Deserialize)]
+        struct WrappedTuple((B256,));
+
+        #[derive(Debug, PartialEq, serde::Deserialize)]
+        enum Tagged {
+            Legacy(Tx),
+        }
+
+        let json = format!("[{},{}]", tx(H1), tx(H2));
+        let expected = BlockTransactions::Full(vec![
+            Wrapped(Tx { hash: B256::repeat_byte(0x11) }),
+            Wrapped(Tx { hash: B256::repeat_byte(0x22) }),
+        ]);
+        assert_eq!(serde_json::from_str::<BlockTransactions<Wrapped>>(&json).unwrap(), expected);
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(serde_json::from_value::<BlockTransactions<Wrapped>>(value).unwrap(), expected);
+
+        let options = serde_json::from_str::<BlockTransactions<Option<Tx>>>(&json).unwrap();
+        assert_eq!(
+            options,
+            BlockTransactions::Full(vec![
+                Some(Tx { hash: B256::repeat_byte(0x11) }),
+                Some(Tx { hash: B256::repeat_byte(0x22) })
+            ])
+        );
+
+        let json = format!(r#"[["{H1}"]]"#);
+        let tuples = serde_json::from_str::<BlockTransactions<WrappedTuple>>(&json).unwrap();
+        assert_eq!(tuples, BlockTransactions::Full(vec![WrappedTuple((B256::repeat_byte(0x11),))]));
+
+        let json = format!(r#"[{{"Legacy":{}}}]"#, tx(H1));
+        let tagged = serde_json::from_str::<BlockTransactions<Tagged>>(&json).unwrap();
+        assert_eq!(
+            tagged,
+            BlockTransactions::Full(vec![Tagged::Legacy(Tx { hash: B256::repeat_byte(0x11) })])
+        );
     }
 
     #[test]
