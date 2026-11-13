@@ -16,6 +16,12 @@ use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
 
+#[cfg(feature = "serde")]
+use alloy_eips::{
+    eip4844::{Blob, BlobTransactionSidecar, Bytes48},
+    eip7594::BlobTransactionSidecarEip7594,
+};
+
 /// Represents _all_ transaction requests to/from RPC.
 ///
 /// Transaction type selection is field-driven. The [`Self::transaction_type`] field is retained
@@ -139,7 +145,12 @@ pub struct TransactionRequest {
     /// Blob sidecar for EIP-4844 transactions.
     #[cfg_attr(
         feature = "serde",
-        serde(default, flatten, skip_serializing_if = "Option::is_none")
+        serde(
+            default,
+            flatten,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "deserialize_flattened_sidecar"
+        )
     )]
     pub sidecar: Option<BlobTransactionSidecarVariant>,
     /// Authorization list for EIP-7702 transactions.
@@ -1752,6 +1763,49 @@ pub struct FillTransaction<T = TypedTransaction> {
     pub tx: T,
 }
 
+/// Deserializes the flattened [`TransactionRequest::sidecar`].
+///
+/// A flattened `Option<T>` turns every error of `T` into `None`, which would silently drop
+/// malformed blobs, commitments or proofs. Incomplete sidecars still give `None`, since clients
+/// such as viem send `blobs` without `commitments` and `proofs`. `proofs` and `cellProofs`
+/// together are an error, as they are for [`BlobTransactionSidecarVariant`].
+#[cfg(feature = "serde")]
+fn deserialize_flattened_sidecar<'de, D>(
+    deserializer: D,
+) -> Result<Option<BlobTransactionSidecarVariant>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(serde::Deserialize)]
+    #[serde(transparent)]
+    struct Blobs(#[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")] Vec<Blob>);
+
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SidecarFields {
+        blobs: Option<Blobs>,
+        commitments: Option<Vec<Bytes48>>,
+        proofs: Option<Vec<Bytes48>>,
+        cell_proofs: Option<Vec<Bytes48>>,
+    }
+
+    let fields = <SidecarFields as serde::Deserialize>::deserialize(deserializer)?;
+    Ok(match (fields.blobs, fields.commitments, fields.proofs, fields.cell_proofs) {
+        (Some(Blobs(blobs)), Some(commitments), Some(proofs), None) => {
+            Some(BlobTransactionSidecar { blobs, commitments, proofs }.into())
+        }
+        (Some(Blobs(blobs)), Some(commitments), None, Some(cell_proofs)) => {
+            Some(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs }.into())
+        }
+        (_, _, Some(_), Some(_)) => {
+            return Err(serde::de::Error::custom(
+                "Both 'cellProofs' and 'proofs' cannot be present",
+            ))
+        }
+        _ => None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1857,6 +1911,29 @@ mod tests {
         let req = serde_json::from_str::<TransactionRequest>(&json.to_string()).unwrap();
 
         assert!(req.sidecar.is_none()); // Sidecar won't be deserialized.
+
+        // `cellProofs` in place of `proofs` gives the EIP-7594 sidecar.
+        let mut json_7594 = json.clone();
+        json_7594["cellProofs"] = serde_json::json!([zero_48]);
+        let req = serde_json::from_value::<TransactionRequest>(json_7594).unwrap();
+        assert!(req.sidecar.as_ref().unwrap().is_eip7594());
+        let serialized = serde_json::to_string(&req).unwrap();
+        assert_eq!(serde_json::from_str::<TransactionRequest>(&serialized).unwrap(), req);
+
+        // `proofs` and `cellProofs` together are rejected.
+        let mut json_both = json.clone();
+        json_both["proofs"] = serde_json::json!([zero_48]);
+        json_both["cellProofs"] = serde_json::json!([zero_48]);
+        let err = serde_json::from_value::<TransactionRequest>(json_both).unwrap_err();
+        assert_eq!(err.to_string(), "Both 'cellProofs' and 'proofs' cannot be present");
+
+        json["blobs"] = serde_json::json!(["0x00"]);
+        let sidecar_err = serde_json::from_value::<BlobTransactionSidecarVariant>(
+            serde_json::json!({ "blobs": ["0x00"], "commitments": [], "proofs": [] }),
+        )
+        .unwrap_err();
+        let err = serde_json::from_value::<TransactionRequest>(json).unwrap_err();
+        assert_eq!(err.to_string(), sidecar_err.to_string());
     }
 
     #[test]
