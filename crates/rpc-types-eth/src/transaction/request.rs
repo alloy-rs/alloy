@@ -1767,7 +1767,8 @@ pub struct FillTransaction<T = TypedTransaction> {
 ///
 /// A flattened `Option<T>` turns every error of `T` into `None`, which would silently drop
 /// malformed blobs, commitments or proofs. Incomplete sidecars still give `None`, since clients
-/// such as viem send `blobs` without `commitments` and `proofs`.
+/// such as viem send `blobs` without `commitments` and `proofs`. `proofs` and `cellProofs`
+/// together are an error, as they are for [`BlobTransactionSidecarVariant`].
 #[cfg(feature = "serde")]
 fn deserialize_flattened_sidecar<'de, D>(
     deserializer: D,
@@ -1795,6 +1796,11 @@ where
         }
         (Some(Blobs(blobs)), Some(commitments), None, Some(cell_proofs)) => {
             Some(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs }.into())
+        }
+        (_, _, Some(_), Some(_)) => {
+            return Err(serde::de::Error::custom(
+                "Both 'cellProofs' and 'proofs' cannot be present",
+            ))
         }
         _ => None,
     })
@@ -1913,6 +1919,13 @@ mod tests {
         assert!(req.sidecar.as_ref().unwrap().is_eip7594());
         let serialized = serde_json::to_string(&req).unwrap();
         assert_eq!(serde_json::from_str::<TransactionRequest>(&serialized).unwrap(), req);
+
+        // `proofs` and `cellProofs` together are rejected.
+        let mut json_both = json.clone();
+        json_both["proofs"] = serde_json::json!([zero_48]);
+        json_both["cellProofs"] = serde_json::json!([zero_48]);
+        let err = serde_json::from_value::<TransactionRequest>(json_both).unwrap_err();
+        assert_eq!(err.to_string(), "Both 'cellProofs' and 'proofs' cannot be present");
 
         json["blobs"] = serde_json::json!(["0x00"]);
         let sidecar_err = serde_json::from_value::<BlobTransactionSidecarVariant>(
