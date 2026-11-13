@@ -47,7 +47,11 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for TxEip4844Varia
             #[serde(flatten)]
             #[doc(alias = "transaction")]
             tx: TxEip4844,
-            #[serde(flatten)]
+            #[serde(
+                flatten,
+                deserialize_with = "alloy_eips::eip7594::deserialize_flattened_sidecar",
+                bound = "Sidecar: serde::Deserialize<'de>"
+            )]
             sidecar: Option<Sidecar>,
         }
 
@@ -1353,5 +1357,18 @@ mod tests {
             let result = sidecar.validate(&tx.blob_versioned_hashes, kzg_settings.get());
             assert_matches!(result, Err(_));
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserialize_malformed_sidecar() {
+        let sidecar = serde_json::json!({ "blobs": ["0x00"], "commitments": [], "proofs": [] });
+        let sidecar_err =
+            serde_json::from_value::<BlobTransactionSidecarVariant>(sidecar.clone()).unwrap_err();
+
+        let mut json = serde_json::to_value(TxEip4844::default()).unwrap();
+        json.as_object_mut().unwrap().extend(sidecar.as_object().unwrap().clone());
+        let err = serde_json::from_value::<TxEip4844Variant>(json).unwrap_err();
+        assert_eq!(err.to_string(), sidecar_err.to_string());
     }
 }

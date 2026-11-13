@@ -139,7 +139,12 @@ pub struct TransactionRequest {
     /// Blob sidecar for EIP-4844 transactions.
     #[cfg_attr(
         feature = "serde",
-        serde(default, flatten, skip_serializing_if = "Option::is_none")
+        serde(
+            default,
+            flatten,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "alloy_eips::eip7594::deserialize_flattened_sidecar"
+        )
     )]
     pub sidecar: Option<BlobTransactionSidecarVariant>,
     /// Authorization list for EIP-7702 transactions.
@@ -1854,9 +1859,30 @@ mod tests {
 
         json.as_object_mut().unwrap().remove("proofs");
 
-        let req = serde_json::from_str::<TransactionRequest>(&json.to_string()).unwrap();
+        let err = serde_json::from_value::<TransactionRequest>(json.clone()).unwrap_err();
+        assert_eq!(err.to_string(), "Missing 'cellProofs' or 'proofs'");
 
-        assert!(req.sidecar.is_none()); // Sidecar won't be deserialized.
+        let malformed = serde_json::json!({
+            "from": "0x0000000000000000000000000000000000000001",
+            "to": "0x0000000000000000000000000000000000000002",
+            "maxFeePerGas": "0x1",
+            "maxPriorityFeePerGas": "0x1",
+            "blobs": ["0x00"],
+            "commitments": [],
+            "proofs": []
+        });
+        let sidecar_err = serde_json::from_value::<BlobTransactionSidecarVariant>(
+            serde_json::json!({ "blobs": ["0x00"], "commitments": [], "proofs": [] }),
+        )
+        .unwrap_err();
+        let err = serde_json::from_value::<TransactionRequest>(malformed).unwrap_err();
+        assert_eq!(err.to_string(), sidecar_err.to_string());
+
+        for key in ["blobs", "commitments", "proofs"] {
+            json[key] = serde_json::Value::Null;
+        }
+        let req = serde_json::from_value::<TransactionRequest>(json).unwrap();
+        assert!(req.sidecar.is_none());
     }
 
     #[test]
