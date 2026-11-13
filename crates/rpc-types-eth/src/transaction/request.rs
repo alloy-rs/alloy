@@ -1332,14 +1332,12 @@ impl<T: TransactionTrait> From<Recovered<T>> for TransactionRequest {
 
 impl From<TxEnvelope> for TransactionRequest {
     fn from(envelope: TxEnvelope) -> Self {
+        // Recovered without the EIP-2 low-s check, so the sender of a pre-Homestead transaction is
+        // kept.
         #[cfg(feature = "k256")]
-        let from = match &envelope {
-            TxEnvelope::Legacy(tx) => tx.recover_signer().ok(),
-            TxEnvelope::Eip2930(tx) => tx.recover_signer().ok(),
-            TxEnvelope::Eip1559(tx) => tx.recover_signer().ok(),
-            TxEnvelope::Eip4844(tx) => tx.recover_signer().ok(),
-            TxEnvelope::Eip7702(tx) => tx.recover_signer().ok(),
-        };
+        let from =
+            alloy_consensus::transaction::SignerRecoverable::recover_signer_unchecked(&envelope)
+                .ok();
         let req: Self = TypedTransaction::from(envelope).into();
         #[cfg(feature = "k256")]
         let req = Self { from, ..req };
@@ -2303,6 +2301,29 @@ mod tests {
         let request: TransactionRequest = eip1559.clone().into();
         assert_eq!(request.to, Some(TxKind::Create));
         assert_eq!(request.build_1559().unwrap(), eip1559);
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    fn from_envelope_keeps_sender_of_high_s_signature() {
+        let r = b256!("2a378831cf81d99a3f06a18ae1b6ca366817ab4d88a70053c41d7a8f0368e031");
+        let low_s = Signature::from_scalars_and_parity(
+            r,
+            b256!("450d831a05b6e418724436c05c155e0a1b7b921015d0fbc2f667aed709ac4fb5"),
+            false,
+        );
+        // The malleated form of `low_s`: `s` replaced by `n - s` and the parity flipped.
+        let high_s = Signature::from_scalars_and_parity(
+            r,
+            b256!("baf27ce5fa491be78dbbc93fa3eaa1f49f334ad69977a478c96aafb5c689f18c"),
+            true,
+        );
+
+        let [low, high] = [low_s, high_s].map(|signature| -> TransactionRequest {
+            TxEnvelope::from(TxLegacy::default().into_signed(signature)).into()
+        });
+        assert!(low.from.is_some());
+        assert_eq!(high.from, low.from);
     }
 }
 
