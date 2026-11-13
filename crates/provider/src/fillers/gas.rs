@@ -51,7 +51,9 @@ pub enum GasFillable {
 ///   and `max_priority_fee_per_gas` fields if unset.
 /// - If the network does not support EIP-1559, it will fallback to the legacy tx and populate the
 ///   `gas_limit` and `gas_price` fields if unset. This fallback only triggers when the latest block
-///   header has no base fee.
+///   header has no base fee and the request sets neither `max_fee_per_gas` nor
+///   `max_priority_fee_per_gas`. If one of them is set, filling fails with
+///   [`RpcError::UnsupportedFeature`], because a legacy tx would drop that fee.
 /// - If the filler was created with [`GasFiller::legacy`], it skips EIP-1559 estimation entirely
 ///   and always populates the `gas_limit` and `gas_price` fields if unset.
 ///
@@ -189,7 +191,13 @@ impl<N: Network> TxFiller<N> for GasFiller {
             match self.prepare_1559(provider, tx).await {
                 // fallback to legacy
                 Ok(estimate) => Ok(estimate),
-                Err(RpcError::UnsupportedFeature(_)) => self.prepare_legacy(provider, tx).await,
+                // A legacy transaction would drop a caller-set EIP-1559 fee.
+                Err(RpcError::UnsupportedFeature(_))
+                    if tx.max_fee_per_gas().is_none()
+                        && tx.max_priority_fee_per_gas().is_none() =>
+                {
+                    self.prepare_legacy(provider, tx).await
+                }
                 Err(e) => Err(e),
             }
         }
@@ -384,7 +392,7 @@ mod tests {
     use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
     use alloy_network::Ethereum;
     use alloy_primitives::{address, U256};
-    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_rpc_types_eth::{Block, FeeHistory, TransactionRequest};
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
@@ -537,6 +545,39 @@ mod tests {
             fill_eip1559_fees(None, Some(4_000_000_000)).await,
             (6_000_000_000, Some(4_000_000_000))
         );
+    }
+
+    #[tokio::test]
+    async fn no_legacy_fallback_with_eip1559_fee() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .connect_mocked_client(asserter.clone());
+        let fee_history = FeeHistory {
+            oldest_block: 1,
+            base_fee_per_gas: vec![0, 0],
+            gas_used_ratio: vec![0.5],
+            reward: Some(vec![vec![0]]),
+            ..Default::default()
+        };
+
+        for (max_fee_per_gas, max_priority_fee_per_gas) in [(Some(1), None), (None, Some(1))] {
+            // The latest block has no base fee, so EIP-1559 estimation is unsupported.
+            asserter.push_success(&fee_history);
+            asserter.push_success(&<Block>::default());
+            let tx = TransactionRequest {
+                gas: Some(21000),
+                max_fee_per_gas,
+                max_priority_fee_per_gas,
+                ..Default::default()
+            };
+
+            let err =
+                <GasFiller as TxFiller<Ethereum>>::prepare(&GasFiller::default(), &provider, &tx)
+                    .await
+                    .unwrap_err();
+            assert!(matches!(err, RpcError::UnsupportedFeature(_)), "{err:?}");
+        }
     }
 
     #[test]
