@@ -158,6 +158,10 @@ async fn unsubscribe_during_resubscribe_keeps_service_alive() {
     frontend.unsubscribe(local_id).unwrap();
     assert!(frontend.get_subscription(local_id).await.is_err());
     second.respond(1, json!("0xbbb"));
+    // The server subscription created by the resubscription is cancelled.
+    let unsubscribe = second.recv().await;
+    assert_eq!(unsubscribe["method"], "eth_unsubscribe");
+    assert_eq!(unsubscribe["params"], json!(["0xbbb"]));
 
     let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 2, json!([]))));
     assert_eq!(second.recv().await["method"], "eth_blockNumber");
@@ -167,6 +171,30 @@ async fn unsubscribe_during_resubscribe_keeps_service_alive() {
         r#""0x10""#
     );
     assert!(frontend.get_subscription(local_id).await.is_err());
+}
+
+#[tokio::test(start_paused = true)]
+async fn orphaned_resubscription_ack_from_closed_backend_reconnects() {
+    let (frontend, _, [mut first, mut second, mut third]) = spawn_service().await;
+    let local_id = subscribe(&frontend, &mut first, 1, json!(["newHeads"]), "0xaaa").await;
+    drop(frontend.get_subscription(local_id).await.unwrap());
+
+    first.close();
+    assert_eq!(second.recv().await["method"], "eth_subscribe");
+    frontend.unsubscribe(local_id).unwrap();
+    assert!(frontend.get_subscription(local_id).await.is_err());
+    // The backend goes away right after acknowledging the resubscription, so the orphaned
+    // server subscription can't be cancelled. The service must reconnect, not shut down.
+    second.respond(1, json!("0xbbb"));
+    second.close();
+
+    let resp = tokio::spawn(frontend.send(request("eth_blockNumber", 2, json!([]))));
+    assert_eq!(third.recv().await["method"], "eth_blockNumber");
+    third.respond(2, json!("0x10"));
+    assert_eq!(
+        within(resp).await.unwrap().unwrap().payload.as_success().unwrap().get(),
+        r#""0x10""#
+    );
 }
 
 #[tokio::test(start_paused = true)]
