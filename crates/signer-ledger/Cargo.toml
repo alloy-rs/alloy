@@ -54,7 +54,10 @@ eip712 = [
     "dep:alloy-dyn-abi",
     "alloy-dyn-abi?/eip712",
 ]
-eip7702 = ["alloy-eip7702"]
+eip7702 = [
+    "alloy-signer/eip7702",
+    "dep:alloy-eip7702",
+]
 
 # WASM support
 browser = ["coins-ledger/browser"]
