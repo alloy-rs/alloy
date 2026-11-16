@@ -864,6 +864,7 @@ mod tests {
     use alloy_eips::eip4895::Withdrawal;
     use alloy_primitives::{hex, keccak256, Bloom, B64};
     use similar_asserts::assert_eq;
+    use test_case::test_case;
 
     #[cfg(feature = "serde")]
     const PRE_MERGE_BLOCK: &str = r#"{
@@ -1065,21 +1066,20 @@ mod tests {
     #[test]
     fn block_overrides_is_empty() {
         assert!(BlockOverrides::default().is_empty());
+    }
 
-        for overrides in [
-            BlockOverrides::default().with_number(U256::from(42)),
-            BlockOverrides::default().with_difficulty(U256::from(100)),
-            BlockOverrides::default().with_time(12345),
-            BlockOverrides::default().with_gas_limit(21000),
-            BlockOverrides::default().with_coinbase(Address::with_last_byte(1)),
-            BlockOverrides::default().with_random(B256::with_last_byte(1)),
-            BlockOverrides::default().with_base_fee(U256::from(20)),
-            BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1)),
-            BlockOverrides::default().with_beacon_root(B256::with_last_byte(1)),
-            BlockOverrides::default().with_withdrawals(Withdrawals::default()),
-        ] {
-            assert!(!overrides.is_empty(), "{overrides:?}");
-        }
+    #[test_case(BlockOverrides::default().with_number(U256::from(42)))]
+    #[test_case(BlockOverrides::default().with_difficulty(U256::from(100)))]
+    #[test_case(BlockOverrides::default().with_time(12345))]
+    #[test_case(BlockOverrides::default().with_gas_limit(21000))]
+    #[test_case(BlockOverrides::default().with_coinbase(Address::with_last_byte(1)))]
+    #[test_case(BlockOverrides::default().with_random(B256::with_last_byte(1)))]
+    #[test_case(BlockOverrides::default().with_base_fee(U256::from(20)))]
+    #[test_case(BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1)))]
+    #[test_case(BlockOverrides::default().with_beacon_root(B256::with_last_byte(1)))]
+    #[test_case(BlockOverrides::default().with_withdrawals(Withdrawals::default()))]
+    fn block_overrides_is_not_empty(overrides: BlockOverrides) {
+        assert!(!overrides.is_empty());
     }
 
     #[test]

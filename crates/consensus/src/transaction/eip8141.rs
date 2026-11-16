@@ -817,6 +817,7 @@ mod tests {
     use alloy_primitives::hex;
     use arbitrary::{Arbitrary, Unstructured};
     use rand::{rngs::StdRng, RngCore, SeedableRng};
+    use test_case::test_case;
 
     fn valid_tx() -> TxEip8141 {
         TxEip8141 { chain_id: 1, frames: vec![Frame::default()], ..Default::default() }
@@ -836,16 +837,12 @@ mod tests {
         assert_ne!(keyed.signature_hash(), legacy.signature_hash());
     }
 
-    #[test]
-    fn keyed_nonce_decoder_rejects_noncanonical_sets() {
-        for keys in [
-            vec![U256::from(2), U256::from(1)],
-            vec![U256::from(1); 2],
-            (1..=17).map(U256::from).collect(),
-        ] {
-            let tx = TxEip8141 { nonce_keys: Some(keys), ..valid_tx() };
-            assert!(TxEip8141::decode(&mut alloy_rlp::encode(tx).as_slice()).is_err());
-        }
+    #[test_case(vec![U256::from(2), U256::from(1)])]
+    #[test_case(vec![U256::from(1); 2])]
+    #[test_case((1..=17).map(U256::from).collect())]
+    fn keyed_nonce_decoder_rejects_noncanonical_sets(keys: Vec<U256>) {
+        let tx = TxEip8141 { nonce_keys: Some(keys), ..valid_tx() };
+        assert!(TxEip8141::decode(&mut alloy_rlp::encode(tx).as_slice()).is_err());
     }
 
     #[test]
@@ -1178,20 +1175,32 @@ mod tests {
         assert_eq!(base + (escrow - required) / gas, gasprice);
     }
 
-    #[test]
-    fn fee_estimates_without_blobs_match_reserved_price() {
+    #[test_case(1, 1, 0)]
+    #[test_case(2, 2, 1)]
+    #[test_case(3, 3, 2)]
+    #[test_case(4, 3, 2)]
+    fn fee_estimates_without_blobs_match_reserved_price(
+        budget_per_gas: u128,
+        price: u128,
+        tip: u128,
+    ) {
         let mut tx = valid_tx();
         let gas = U256::from(tx.gas_limit());
         tx.fees.max_priority_fee_per_gas = U256::from(2);
-        for (budget_per_gas, price, tip) in [(1, 1, 0), (2, 2, 1), (3, 3, 2), (4, 3, 2)] {
-            tx.fees.max_fee = gas * U256::from(budget_per_gas);
-            assert_eq!(tx.validate(), Ok(()));
-            let reserved_tip = (tx.fees.max_priority_fee_per_gas * gas).min(tx.fees.max_fee - gas);
-            assert_eq!(U256::from(price), U256::from(1) + reserved_tip / gas);
-            assert_eq!(tx.effective_gas_price(Some(1)), price);
-            assert_eq!(tx.effective_tip_per_gas(1), Some(tip));
-            assert_eq!(tx.effective_gas_price(None), budget_per_gas);
-        }
+        tx.fees.max_fee = gas * U256::from(budget_per_gas);
+        assert_eq!(tx.validate(), Ok(()));
+        let reserved_tip = (tx.fees.max_priority_fee_per_gas * gas).min(tx.fees.max_fee - gas);
+        assert_eq!(U256::from(price), U256::from(1) + reserved_tip / gas);
+        assert_eq!(tx.effective_gas_price(Some(1)), price);
+        assert_eq!(tx.effective_tip_per_gas(1), Some(tip));
+        assert_eq!(tx.effective_gas_price(None), budget_per_gas);
+    }
+
+    #[test]
+    fn fee_estimates_without_blobs_round_down() {
+        let mut tx = valid_tx();
+        let gas = U256::from(tx.gas_limit());
+        tx.fees.max_priority_fee_per_gas = U256::from(2);
         // Division rounds down even when the signed budget is not a multiple of G.
         tx.fees.max_fee = gas * U256::from(2) - U256::from(1);
         assert_eq!(tx.effective_gas_price(Some(1)), 1);
@@ -1660,63 +1669,61 @@ mod tests {
         assert_eq!(tx.gas_limit(), 18_475);
     }
 
-    #[test]
-    fn validates_signature_scalars_and_resolved_signers() {
+    #[test_case(SignatureScheme::Secp256k1, SECP256K1N, 65, 1)]
+    #[test_case(SignatureScheme::P256, SECP256R1N, 128, 0)]
+    fn validates_signature_scalars_and_resolved_signers(
+        scheme: SignatureScheme,
+        order: U256,
+        len: usize,
+        offset: usize,
+    ) {
         use TxEip8141ValidationError as Error;
         let mut tx = valid_tx();
-        for (scheme, order, len, offset) in [
-            (SignatureScheme::Secp256k1, SECP256K1N, 65, 1),
-            (SignatureScheme::P256, SECP256R1N, 128, 0),
+        let mut bytes = vec![0u8; len];
+        bytes[offset + 31] = 1;
+        bytes[offset + 63] = 1;
+        let mut signature =
+            FrameSignature { scheme, signature: bytes.clone().into(), ..Default::default() };
+        tx.sender = signature.p256_signer_address().unwrap_or(Address::ZERO);
+        tx.signatures = vec![signature.clone()];
+        assert_eq!(tx.validate(), Ok(()));
+        for (r, s) in [
+            (U256::ZERO, U256::from(1)),
+            (order, U256::from(1)),
+            (U256::from(1), (order >> 1) + U256::from(1)),
         ] {
-            let mut bytes = vec![0u8; len];
-            bytes[offset + 31] = 1;
-            bytes[offset + 63] = 1;
-            let mut signature =
-                FrameSignature { scheme, signature: bytes.clone().into(), ..Default::default() };
-            tx.sender = signature.p256_signer_address().unwrap_or(Address::ZERO);
-            tx.signatures = vec![signature.clone()];
-            assert_eq!(tx.validate(), Ok(()));
-            for (r, s) in [
-                (U256::ZERO, U256::from(1)),
-                (order, U256::from(1)),
-                (U256::from(1), (order >> 1) + U256::from(1)),
-            ] {
-                bytes[offset..offset + 32].copy_from_slice(&r.to_be_bytes::<32>());
-                bytes[offset + 32..offset + 64].copy_from_slice(&s.to_be_bytes::<32>());
-                tx.signatures[0].signature = bytes.clone().into();
-                assert_eq!(
-                    tx.validate(),
-                    Err(Error::Signature {
-                        index: 0,
-                        source: Eip8141Error::InvalidSignatureScalar
-                    })
-                );
-            }
-            if scheme == SignatureScheme::P256 {
-                signature.signer = Address::repeat_byte(1).into();
-                tx.signatures[0] = signature;
-                assert!(matches!(
-                    tx.validate(),
-                    Err(Error::Signature { source: Eip8141Error::P256SignerMismatch { .. }, .. })
-                ));
-            } else {
-                bytes[offset..offset + 32].copy_from_slice(&U256::from(1).to_be_bytes::<32>());
-                bytes[offset + 32..offset + 64].copy_from_slice(&U256::from(1).to_be_bytes::<32>());
-                bytes[0] = 27;
-                tx.signatures[0].signature = bytes.clone().into();
-                assert_eq!(
-                    tx.validate(),
-                    Err(Error::Signature { index: 0, source: Eip8141Error::InvalidParity(27) })
-                );
-            }
-            tx.signatures[0].signature = Bytes::new();
+            bytes[offset..offset + 32].copy_from_slice(&r.to_be_bytes::<32>());
+            bytes[offset + 32..offset + 64].copy_from_slice(&s.to_be_bytes::<32>());
+            tx.signatures[0].signature = bytes.clone().into();
             assert_eq!(
                 tx.validate(),
-                Err(Error::Signature {
-                    index: 0,
-                    source: Eip8141Error::InvalidSignatureLength { expected: len, actual: 0 }
-                })
+                Err(Error::Signature { index: 0, source: Eip8141Error::InvalidSignatureScalar })
             );
         }
+        if scheme == SignatureScheme::P256 {
+            signature.signer = Address::repeat_byte(1).into();
+            tx.signatures[0] = signature;
+            assert!(matches!(
+                tx.validate(),
+                Err(Error::Signature { source: Eip8141Error::P256SignerMismatch { .. }, .. })
+            ));
+        } else {
+            bytes[offset..offset + 32].copy_from_slice(&U256::from(1).to_be_bytes::<32>());
+            bytes[offset + 32..offset + 64].copy_from_slice(&U256::from(1).to_be_bytes::<32>());
+            bytes[0] = 27;
+            tx.signatures[0].signature = bytes.clone().into();
+            assert_eq!(
+                tx.validate(),
+                Err(Error::Signature { index: 0, source: Eip8141Error::InvalidParity(27) })
+            );
+        }
+        tx.signatures[0].signature = Bytes::new();
+        assert_eq!(
+            tx.validate(),
+            Err(Error::Signature {
+                index: 0,
+                source: Eip8141Error::InvalidSignatureLength { expected: len, actual: 0 }
+            })
+        );
     }
 }

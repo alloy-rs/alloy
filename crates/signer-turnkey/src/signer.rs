@@ -204,35 +204,41 @@ fn parse_signature(r: &str, s: &str, v: &str) -> Result<Signature, TurnkeySigner
 mod tests {
     use super::*;
     use k256::ecdsa::VerifyingKey;
+    use test_case::test_case;
 
-    #[test]
-    fn parse_fixed_width_signature() {
+    #[test_case("00", false)]
+    #[test_case("01", true)]
+    #[test_case("1b", false)]
+    #[test_case("1c", true)]
+    fn parse_fixed_width_signature(v: &str, parity: bool) {
         let r = "01".repeat(32);
         let s = "02".repeat(32);
-        for (v, parity) in [("00", false), ("01", true), ("1b", false), ("1c", true)] {
-            let signature = parse_signature(&r, &s, v).unwrap();
-            assert_eq!(signature.r(), U256::from_be_bytes([1u8; 32]));
-            assert_eq!(signature.s(), U256::from_be_bytes([2u8; 32]));
-            assert_eq!(signature.v(), parity);
-        }
-        assert!(parse_signature(&format!("0x{r}"), &format!("0x{s}"), "0x01").is_ok());
+        let signature = parse_signature(&r, &s, v).unwrap();
+        assert_eq!(signature.r(), U256::from_be_bytes([1u8; 32]));
+        assert_eq!(signature.s(), U256::from_be_bytes([2u8; 32]));
+        assert_eq!(signature.v(), parity);
     }
 
     #[test]
-    fn reject_invalid_signature_fields() {
-        let field = "01".repeat(32);
-        for (r, s, v) in [
-            ("01", field.as_str(), "00"),
-            (&field, "01", "00"),
-            (&field, &field, "0000"),
-            (&field, &field, "02"),
-        ] {
-            assert!(matches!(parse_signature(r, s, v), Err(TurnkeySignerError::InvalidSignature)));
-        }
-        for (r, s, v) in [("zz", field.as_str(), "00"), (&field, "z", "00"), (&field, &field, "zz")]
-        {
-            assert!(matches!(parse_signature(r, s, v), Err(TurnkeySignerError::Hex(_))));
-        }
+    fn parse_prefixed_fixed_width_signature() {
+        let r = "01".repeat(32);
+        let s = "02".repeat(32);
+        assert!(parse_signature(&format!("0x{r}"), &format!("0x{s}"), "0x01").is_ok());
+    }
+
+    #[test_case("01", &"01".repeat(32), "00"; "short r")]
+    #[test_case(&"01".repeat(32), "01", "00"; "short s")]
+    #[test_case(&"01".repeat(32), &"01".repeat(32), "0000"; "long v")]
+    #[test_case(&"01".repeat(32), &"01".repeat(32), "02"; "invalid v")]
+    fn reject_invalid_signature_fields(r: &str, s: &str, v: &str) {
+        assert!(matches!(parse_signature(r, s, v), Err(TurnkeySignerError::InvalidSignature)));
+    }
+
+    #[test_case("zz", &"01".repeat(32), "00"; "non hex r")]
+    #[test_case(&"01".repeat(32), "z", "00"; "non hex s")]
+    #[test_case(&"01".repeat(32), &"01".repeat(32), "zz"; "non hex v")]
+    fn reject_non_hex_signature_fields(r: &str, s: &str, v: &str) {
+        assert!(matches!(parse_signature(r, s, v), Err(TurnkeySignerError::Hex(_))));
     }
 
     fn signer() -> TurnkeySigner {

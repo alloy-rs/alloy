@@ -33,6 +33,7 @@ thiserror = { workspace = true, optional = true }
 alloy-json-rpc.workspace = true
 alloy-provider = { workspace = true, features = ["reqwest", "reqwest-default-tls"] }
 serde_json.workspace = true
+test-case.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]

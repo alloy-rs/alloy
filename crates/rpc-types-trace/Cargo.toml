@@ -34,3 +34,4 @@ thiserror.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 
 similar-asserts.workspace = true
+test-case.workspace = true

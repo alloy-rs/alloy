@@ -37,6 +37,7 @@ borsh = { workspace = true, optional = true, features = ["derive"] }
 [dev-dependencies]
 bincode = { workspace = true, features = ["serde"] }
 serde_json.workspace = true
+test-case.workspace = true
 
 [features]
 account-ext = ["alloy-trie/account-ext", "alloy-trie/serde"]

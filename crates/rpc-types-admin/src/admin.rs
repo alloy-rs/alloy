@@ -280,6 +280,7 @@ mod tests {
     use super::*;
     use similar_asserts::assert_eq;
     use std::str::FromStr;
+    use test_case::test_case;
 
     #[test]
     fn deserialize_peer_info() {
@@ -593,32 +594,26 @@ mod tests {
         assert_eq!(peer_event, deserialized);
     }
 
-    #[test]
-    fn serialize_deserialize_peer_event_all_types_roundtrip() {
-        let event_types = vec![
-            PeerEventType::Add,
-            PeerEventType::Drop,
-            PeerEventType::MsgSend,
-            PeerEventType::MsgRecv,
-        ];
+    #[test_case(PeerEventType::Add)]
+    #[test_case(PeerEventType::Drop)]
+    #[test_case(PeerEventType::MsgSend)]
+    #[test_case(PeerEventType::MsgRecv)]
+    fn serialize_deserialize_peer_event_all_types_roundtrip(event_type: PeerEventType) {
+        let peer_event = PeerEvent {
+            kind: event_type,
+            peer: "test_peer_id".to_string(),
+            error: None,
+            protocol: None,
+            msg_code: None,
+            msg_size: None,
+            local_address: None,
+            remote_address: None,
+        };
 
-        for event_type in event_types {
-            let peer_event = PeerEvent {
-                kind: event_type,
-                peer: "test_peer_id".to_string(),
-                error: None,
-                protocol: None,
-                msg_code: None,
-                msg_size: None,
-                local_address: None,
-                remote_address: None,
-            };
+        let serialized = serde_json::to_string(&peer_event).expect("Serialization failed");
+        let deserialized: PeerEvent =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
 
-            let serialized = serde_json::to_string(&peer_event).expect("Serialization failed");
-            let deserialized: PeerEvent =
-                serde_json::from_str(&serialized).expect("Deserialization failed");
-
-            assert_eq!(peer_event, deserialized);
-        }
+        assert_eq!(peer_event, deserialized);
     }
 }

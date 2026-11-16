@@ -34,6 +34,7 @@ turnkey_client = "0.7"
 
 [dev-dependencies]
 k256 = { workspace = true, features = ["ecdsa"] }
+test-case.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]

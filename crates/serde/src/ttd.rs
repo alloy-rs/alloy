@@ -116,6 +116,7 @@ mod tests {
     use alloy_primitives::U256;
     use serde::{Deserialize, Serialize};
     use serde_json::json;
+    use test_case::test_case;
 
     #[test]
     fn deserialize_ttd() {
@@ -141,24 +142,19 @@ mod tests {
         );
     }
 
-    #[test]
-    fn serialize_ttd() {
+    #[test_case(U256::ZERO)]
+    #[test_case(U256::from(17000000000000000u64))]
+    #[test_case(U256::from(58750000000000000000000u128))]
+    #[test_case(U256::from(u128::MAX))]
+    fn serialize_ttd(value: U256) {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Ttd(#[serde(with = "super")] Option<U256>);
 
-        let tests = vec![
-            Ttd(Some(U256::ZERO)),
-            Ttd(Some(U256::from(17000000000000000u64))),
-            Ttd(Some(U256::from(58750000000000000000000u128))),
-            Ttd(Some(U256::from(u128::MAX))),
-        ];
-
-        for test in tests {
-            let str = serde_json::to_string(&test).unwrap();
-            // should be serialized as a decimal number and not a quoted string
-            let num = str.parse::<u128>().unwrap();
-            assert!(matches!(test, Ttd(Some(ttd)) if ttd == U256::from(num)));
-        }
+        let test = Ttd(Some(value));
+        let str = serde_json::to_string(&test).unwrap();
+        // should be serialized as a decimal number and not a quoted string
+        let num = str.parse::<u128>().unwrap();
+        assert!(matches!(test, Ttd(Some(ttd)) if ttd == U256::from(num)));
     }
 
     #[test]

@@ -415,47 +415,48 @@ mod tests {
     use coins_bip32::{Bip32Error, BIP32_HARDEN};
     use coins_bip39::English;
     use tempfile::tempdir;
+    use test_case::test_case;
 
     const TEST_DERIVATION_PATH: &str = "m/44'/60'/0'/2/1";
 
-    #[test]
-    fn mnemonic_deterministic() {
-        // Testcases have been taken from MyCryptoWallet
-        let tests = [
-            (
-                "work man father plunge mystery proud hollow address reunion sauce theory bonus",
-                0u32,
-                Some("TREZOR123"),
-                "0x431a00DA1D54c281AeF638A73121B3D153e0b0F6",
-            ),
-            (
-                "inject danger program federal spice bitter term garbage coyote breeze thought funny",
-                1u32,
-                Some("LEDGER321"),
-                "0x231a3D0a05d13FAf93078C779FeeD3752ea1350C",
-            ),
-            (
-                "fire evolve buddy tenant talent favorite ankle stem regret myth dream fresh",
-                2u32,
-                None,
-                "0x1D86AD5eBb2380dAdEAF52f61f4F428C485460E9",
-            ),
-            (
-                "thumb soda tape crunch maple fresh imitate cancel order blind denial giraffe",
-                3u32,
-                None,
-                "0xFB78b25f69A8e941036fEE2A5EeAf349D81D4ccc",
-            ),
-        ];
-        for (phrase, index, password, expected_addr) in tests {
-            let mut builder =
-                MnemonicBuilder::<English>::default().phrase(phrase).index(index).unwrap();
-            if let Some(psswd) = password {
-                builder = builder.password(psswd);
-            }
-            let signer = builder.build().unwrap();
-            assert_eq!(&signer.address.to_string(), expected_addr);
+    // Testcases have been taken from MyCryptoWallet
+    #[test_case(
+        "work man father plunge mystery proud hollow address reunion sauce theory bonus",
+        0u32,
+        Some("TREZOR123"),
+        "0x431a00DA1D54c281AeF638A73121B3D153e0b0F6"
+    )]
+    #[test_case(
+        "inject danger program federal spice bitter term garbage coyote breeze thought funny",
+        1u32,
+        Some("LEDGER321"),
+        "0x231a3D0a05d13FAf93078C779FeeD3752ea1350C"
+    )]
+    #[test_case(
+        "fire evolve buddy tenant talent favorite ankle stem regret myth dream fresh",
+        2u32,
+        None,
+        "0x1D86AD5eBb2380dAdEAF52f61f4F428C485460E9"
+    )]
+    #[test_case(
+        "thumb soda tape crunch maple fresh imitate cancel order blind denial giraffe",
+        3u32,
+        None,
+        "0xFB78b25f69A8e941036fEE2A5EeAf349D81D4ccc"
+    )]
+    fn mnemonic_deterministic(
+        phrase: &str,
+        index: u32,
+        password: Option<&str>,
+        expected_addr: &str,
+    ) {
+        let mut builder =
+            MnemonicBuilder::<English>::default().phrase(phrase).index(index).unwrap();
+        if let Some(psswd) = password {
+            builder = builder.password(psswd);
         }
+        let signer = builder.build().unwrap();
+        assert_eq!(&signer.address.to_string(), expected_addr);
     }
 
     #[test]
@@ -605,19 +606,6 @@ mod tests {
         let account_0 = build("m/44'/60'/0'/0/0").unwrap();
         assert_eq!(account_0.address(), address!("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"));
 
-        for path in [
-            "m/44'/60'/0'/0/2147483648'",
-            "m/44'/60'/0'/0/2147483648",
-            "m/2147483648h",
-            &format!("m/{}", u32::MAX),
-        ] {
-            let err = build(path).unwrap_err();
-            assert!(
-                matches!(err, LocalSignerError::Bip32Error(Bip32Error::MalformattedDerivation(_))),
-                "{path} should be rejected as harden-bit overflow, got {err:?}"
-            );
-        }
-
         // `index` builds the path itself, so it inherits the same guard.
         assert!(MnemonicBuilder::<English>::english().index(BIP32_HARDEN).is_err());
 
@@ -625,5 +613,24 @@ mod tests {
         // gives a key distinct from account 0 rather than collapsing onto it.
         let max_hardened = build("m/44'/60'/0'/0/2147483647'").unwrap();
         assert_ne!(max_hardened.address(), account_0.address());
+    }
+
+    /// Paths whose index sets the harden bit must be rejected rather than silently wrapping.
+    #[test_case("m/44'/60'/0'/0/2147483648'"; "hardened index overflow")]
+    #[test_case("m/44'/60'/0'/0/2147483648"; "unhardened index overflow")]
+    #[test_case("m/2147483648h"; "h suffix index overflow")]
+    #[test_case(&format!("m/{}", u32::MAX); "u32 max index")]
+    fn mnemonic_rejects_harden_bit_overflow_path(path: &str) {
+        const ANVIL: &str = "test test test test test test test test test test test junk";
+
+        let build = |path: &str| {
+            MnemonicBuilder::<English>::default().phrase(ANVIL).derivation_path(path)?.build()
+        };
+
+        let err = build(path).unwrap_err();
+        assert!(
+            matches!(err, LocalSignerError::Bip32Error(Bip32Error::MalformattedDerivation(_))),
+            "{path} should be rejected as harden-bit overflow, got {err:?}"
+        );
     }
 }

@@ -590,6 +590,7 @@ mod tx_serde {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
 
     #[test]
     fn from_transaction_saturates_full_width_frame_fee_estimate() {
@@ -611,25 +612,27 @@ mod tests {
         assert_eq!(rpc.effective_tip_per_gas(1), Some(u128::MAX));
     }
 
-    #[test]
-    fn from_transaction_preserves_ordinary_fee_prices() {
+    #[test_case(None, 100)]
+    #[test_case(Some(80), 90)]
+    #[test_case(Some(95), 100)]
+    #[test_case(Some(101), 101)]
+    fn from_transaction_preserves_ordinary_fee_prices(base: Option<u64>, expected: u128) {
         use alloy_consensus::{TxEip1559, TxLegacy};
 
-        for (base, expected) in [(None, 100), (Some(80), 90), (Some(95), 100), (Some(101), 101)] {
-            let info = TransactionInfo { base_fee: base, ..Default::default() };
-            let tx = TxEip1559 {
-                max_fee_per_gas: 100,
-                max_priority_fee_per_gas: 10,
-                ..Default::default()
-            };
-            let rpc =
-                Transaction::from_transaction(Recovered::new_unchecked(tx, Address::ZERO), info);
-            assert_eq!(rpc.effective_gas_price, Some(expected));
-            let tx = TxLegacy { gas_price: 100, ..Default::default() };
-            let rpc =
-                Transaction::from_transaction(Recovered::new_unchecked(tx, Address::ZERO), info);
-            assert_eq!(rpc.effective_gas_price, Some(base.map_or(100, |b| u128::from(b).max(100))));
-        }
+        let info = TransactionInfo { base_fee: base, ..Default::default() };
+        let tx =
+            TxEip1559 { max_fee_per_gas: 100, max_priority_fee_per_gas: 10, ..Default::default() };
+        let rpc = Transaction::from_transaction(Recovered::new_unchecked(tx, Address::ZERO), info);
+        assert_eq!(rpc.effective_gas_price, Some(expected));
+        let tx = TxLegacy { gas_price: 100, ..Default::default() };
+        let rpc = Transaction::from_transaction(Recovered::new_unchecked(tx, Address::ZERO), info);
+        assert_eq!(rpc.effective_gas_price, Some(base.map_or(100, |b| u128::from(b).max(100))));
+    }
+
+    #[test]
+    fn from_transaction_preserves_max_fee_prices() {
+        use alloy_consensus::TxEip1559;
+
         let tx = TxEip1559 {
             max_fee_per_gas: u128::MAX,
             max_priority_fee_per_gas: u128::MAX,

@@ -41,6 +41,7 @@ tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true
+test-case.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "time"] }
 tokio-test.workspace = true
 

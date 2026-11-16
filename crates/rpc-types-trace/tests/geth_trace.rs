@@ -1,6 +1,7 @@
 //! Untagged deserialization of top-level [`GethTrace`] responses.
 
 use alloy_rpc_types_trace::geth::{GethTrace, NoopFrame};
+use test_case::test_case;
 
 const STRUCT_LOGS: &str = include_str!("../test_data/default/structlogs_01.json");
 const CALL: &str = include_str!("../test_data/call_tracer/default.json");
@@ -44,28 +45,24 @@ const fn variant(trace: &GethTrace) -> &'static str {
     }
 }
 
-#[test]
-fn top_level_variants() {
-    let mux =
-        format!(r#"{{"4byteTracer": {FOUR_BYTE}, "callTracer": {CALL}, "noopTracer": {{}}}}"#);
-    let cases = [
-        (STRUCT_LOGS, "Default"),
-        (CALL, "CallTracer"),
-        (FLAT_CALL, "FlatCallTracer"),
-        (FOUR_BYTE, "FourByteTracer"),
-        (PRESTATE, "PreStateTracer"),
-        (PRESTATE_DIFF, "PreStateTracer"),
-        (STATE_GAS, "StateGasTracer"),
-        // `{}` is both the noopTracer response and an empty 4byteTracer response.
-        (EMPTY, "FourByteTracer"),
-        (&mux, "MuxTracer"),
-        (JS, "JS"),
-    ];
+fn mux() -> String {
+    format!(r#"{{"4byteTracer": {FOUR_BYTE}, "callTracer": {CALL}, "noopTracer": {{}}}}"#)
+}
 
-    for (json, expected) in cases {
-        let trace: GethTrace = serde_json::from_str(json).unwrap();
-        assert_eq!(variant(&trace), expected, "{json}");
-    }
+#[test_case(STRUCT_LOGS, "Default"; "struct logs")]
+#[test_case(CALL, "CallTracer"; "call")]
+#[test_case(FLAT_CALL, "FlatCallTracer"; "flat call")]
+#[test_case(FOUR_BYTE, "FourByteTracer"; "four byte")]
+#[test_case(PRESTATE, "PreStateTracer"; "prestate")]
+#[test_case(PRESTATE_DIFF, "PreStateTracer"; "prestate diff")]
+#[test_case(STATE_GAS, "StateGasTracer"; "state gas")]
+// `{}` is both the noopTracer response and an empty 4byteTracer response.
+#[test_case(EMPTY, "FourByteTracer"; "empty")]
+#[test_case(&mux(), "MuxTracer"; "mux")]
+#[test_case(JS, "JS"; "js")]
+fn top_level_variants(json: &str, expected: &str) {
+    let trace: GethTrace = serde_json::from_str(json).unwrap();
+    assert_eq!(variant(&trace), expected);
 }
 
 #[test]

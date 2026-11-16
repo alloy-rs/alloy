@@ -73,41 +73,34 @@ impl fmt::Display for Authorization {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
     use url::Url;
 
-    #[test]
-    fn test_extract_from_url() {
-        for (url, credentials) in [
-            ("http://username:password@domain.com", Some("username:password")),
-            ("http://domain.com", None),
-            // A username of "localhost" is valid userinfo and should be extracted.
-            ("http://localhost:password@domain.com", Some("localhost:password")),
-            ("http://127.0.0.1:8080", None),
-            ("http://:secret@domain.com", Some(":secret")),
-        ] {
-            let auth = Authorization::extract_from_url(&Url::parse(url).unwrap());
-            let expected = credentials.map(|credentials| {
-                Authorization::Basic(general_purpose::STANDARD.encode(credentials))
-            });
-            assert_eq!(auth, expected, "{url}");
-        }
+    #[test_case("http://username:password@domain.com", Some("username:password"))]
+    #[test_case("http://domain.com", None)]
+    // A username of "localhost" is valid userinfo and should be extracted.
+    #[test_case("http://localhost:password@domain.com", Some("localhost:password"))]
+    #[test_case("http://127.0.0.1:8080", None)]
+    #[test_case("http://:secret@domain.com", Some(":secret"))]
+    fn test_extract_from_url(url: &str, credentials: Option<&str>) {
+        let auth = Authorization::extract_from_url(&Url::parse(url).unwrap());
+        let expected = credentials
+            .map(|credentials| general_purpose::STANDARD.encode(credentials))
+            .map(Authorization::Basic);
+        assert_eq!(auth, expected);
     }
 
-    #[test]
-    fn test_extract_from_url_decodes_credentials() {
-        for (url, credentials) in [
-            ("wss://user:p%40ss@host", Some("user:p@ss")),
-            ("wss://user:abc==@host", Some("user:abc==")),
-            ("wss://us%3Aer:plain@host", Some("us:er:plain")),
-            ("wss://us%C3%A9r:p%C3%A4ss@host", Some("usér:päss")),
-            ("wss://user:%FF@host", Some("user:")),
-            ("wss://%FF:pass@host", None),
-        ] {
-            let auth = Authorization::extract_from_url(&Url::parse(url).unwrap());
-            let expected = credentials.map(|credentials| {
-                Authorization::Basic(general_purpose::STANDARD.encode(credentials))
-            });
-            assert_eq!(auth, expected, "{url}");
-        }
+    #[test_case("wss://user:p%40ss@host", Some("user:p@ss"); "percent encoded at")]
+    #[test_case("wss://user:abc==@host", Some("user:abc=="); "unencoded equals")]
+    #[test_case("wss://us%3Aer:plain@host", Some("us:er:plain"); "percent encoded colon")]
+    #[test_case("wss://us%C3%A9r:p%C3%A4ss@host", Some("usér:päss"); "percent encoded utf8")]
+    #[test_case("wss://user:%FF@host", Some("user:"); "invalid utf8 password")]
+    #[test_case("wss://%FF:pass@host", None; "invalid utf8 username")]
+    fn test_extract_from_url_decodes_credentials(url: &str, credentials: Option<&str>) {
+        let auth = Authorization::extract_from_url(&Url::parse(url).unwrap());
+        let expected = credentials
+            .map(|credentials| general_purpose::STANDARD.encode(credentials))
+            .map(Authorization::Basic);
+        assert_eq!(auth, expected);
     }
 }

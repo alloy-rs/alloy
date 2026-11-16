@@ -488,6 +488,7 @@ mod tests {
         string::{String, ToString},
     };
     use alloy_primitives::b256;
+    use test_case::test_case;
 
     #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
     struct Tx {
@@ -531,20 +532,17 @@ mod tests {
         assert_eq!(uncle, BlockTransactions::Uncle);
     }
 
-    #[test]
-    fn rejects_invalid_shapes() {
-        let bad_tx = r#"{"hash":"0x12"}"#;
-        for json in [
-            format!("[{},\"{H2}\"]", tx(H1)),
-            format!("[\"{H1}\",{}]", tx(H2)),
-            format!("[{}, {bad_tx}]", tx(H1)),
-            format!("[{bad_tx}]"),
-            r#"["0x12"]"#.to_string(),
-            format!("[\"{H1}\",\"0x12\"]"),
-            "{}".to_string(),
-            format!("\"{H1}\""),
-        ] {
-            serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap_err();
-        }
+    const BAD_TX: &str = r#"{"hash":"0x12"}"#;
+
+    #[test_case(format!("[{},\"{H2}\"]", tx(H1)))]
+    #[test_case(format!("[\"{H1}\",{}]", tx(H2)))]
+    #[test_case(format!("[{}, {BAD_TX}]", tx(H1)))]
+    #[test_case(format!("[{BAD_TX}]"))]
+    #[test_case(r#"["0x12"]"#.to_string())]
+    #[test_case(format!("[\"{H1}\",\"0x12\"]"))]
+    #[test_case("{}".to_string())]
+    #[test_case(format!("\"{H1}\""))]
+    fn rejects_invalid_shapes(json: String) {
+        serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap_err();
     }
 }

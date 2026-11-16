@@ -126,6 +126,7 @@ mod tests {
     use alloy_primitives::{address, hex, Bytes, Signature, U256};
     use alloy_rlp::Decodable;
     use std::path::PathBuf;
+    use test_case::test_case;
 
     fn eip7594_sidecar() -> BlobTransactionSidecarEip7594 {
         BlobTransactionSidecarEip7594::new(
@@ -168,44 +169,38 @@ mod tests {
         assert_eq!(sidecar.cell_proofs, cell_proofs);
     }
 
-    #[test]
-    fn invalid_legacy_pooled_decoding_input_too_short() {
-        let input_too_short = [
-            // this should fail because the payload length is longer than expected
-            &hex!("d90b0280808bc5cd028083c5cdfd9e407c56565656")[..],
-            // these should fail decoding
-            //
-            // The `c1` at the beginning is a list header, and the rest is a valid legacy
-            // transaction, BUT the payload length of the list header is 1, and the payload is
-            // obviously longer than one byte.
-            &hex!("c10b02808083c5cd028883c5cdfd9e407c56565656"),
-            &hex!("c10b0280808bc5cd028083c5cdfd9e407c56565656"),
-            // this one is 19 bytes, and the buf is long enough, but the transaction will not
-            // consume that many bytes.
-            &hex!("d40b02808083c5cdeb8783c5acfd9e407c5656565656"),
-            &hex!("d30102808083c5cd02887dc5cdfd9e64fd9e407c56"),
-        ];
+    // this should fail because the payload length is longer than expected
+    #[test_case(&hex!("d90b0280808bc5cd028083c5cdfd9e407c56565656"))]
+    // these should fail decoding
+    //
+    // The `c1` at the beginning is a list header, and the rest is a valid legacy
+    // transaction, BUT the payload length of the list header is 1, and the payload is
+    // obviously longer than one byte.
+    #[test_case(&hex!("c10b02808083c5cd028883c5cdfd9e407c56565656"))]
+    #[test_case(&hex!("c10b0280808bc5cd028083c5cdfd9e407c56565656"))]
+    // this one is 19 bytes, and the buf is long enough, but the transaction will not
+    // consume that many bytes.
+    #[test_case(&hex!("d40b02808083c5cdeb8783c5acfd9e407c5656565656"))]
+    #[test_case(&hex!("d30102808083c5cd02887dc5cdfd9e64fd9e407c56"))]
+    fn invalid_legacy_pooled_decoding_input_too_short(hex_data: &[u8]) {
+        let input_rlp = &mut &hex_data[..];
+        let res = PooledTransaction::decode(input_rlp);
 
-        for hex_data in &input_too_short {
-            let input_rlp = &mut &hex_data[..];
-            let res = PooledTransaction::decode(input_rlp);
+        assert!(
+            res.is_err(),
+            "expected err after decoding rlp input: {:x?}",
+            Bytes::copy_from_slice(hex_data)
+        );
 
-            assert!(
-                res.is_err(),
-                "expected err after decoding rlp input: {:x?}",
-                Bytes::copy_from_slice(hex_data)
-            );
+        // this is a legacy tx so we can attempt the same test with decode_enveloped
+        let input_rlp = &mut &hex_data[..];
+        let res = PooledTransaction::decode_2718(input_rlp);
 
-            // this is a legacy tx so we can attempt the same test with decode_enveloped
-            let input_rlp = &mut &hex_data[..];
-            let res = PooledTransaction::decode_2718(input_rlp);
-
-            assert!(
-                res.is_err(),
-                "expected err after decoding enveloped rlp input: {:x?}",
-                Bytes::copy_from_slice(hex_data)
-            );
-        }
+        assert!(
+            res.is_err(),
+            "expected err after decoding enveloped rlp input: {:x?}",
+            Bytes::copy_from_slice(hex_data)
+        );
     }
 
     // <https://holesky.etherscan.io/tx/0x7f60faf8a410a80d95f7ffda301d5ab983545913d3d789615df3346579f6c849>

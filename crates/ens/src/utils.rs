@@ -135,38 +135,34 @@ fn strip_variation_selector(name: &str) -> Cow<'_, str> {
 mod tests {
     use super::*;
     use alloy_primitives::hex;
+    use test_case::test_case;
 
     fn assert_hex(hash: B256, val: &str) {
         assert_eq!(hash.0[..], hex::decode(val).unwrap()[..]);
     }
 
-    #[test]
-    fn test_namehash() {
-        for (name, expected) in &[
-            ("", "0x0000000000000000000000000000000000000000000000000000000000000000"),
-            ("eth", "0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae"),
-            ("foo.eth", "0xde9b09fd7c5f901e23a3f19fecc54828e9c848539801e86591bd9801b019f84f"),
-            ("alice.eth", "0x787192fc5378cc32aa956ddfdedbf26b24e8d78e40109add0eea2c1a012c3dec"),
-            ("ret↩️rn.eth", "0x3de5f4c02db61b221e7de7f1c40e29b6e2f07eb48d65bf7e304715cd9ed33b24"),
-        ] {
-            assert_hex(namehash(name), expected);
-        }
+    #[test_case("", "0x0000000000000000000000000000000000000000000000000000000000000000")]
+    #[test_case("eth", "0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae")]
+    #[test_case("foo.eth", "0xde9b09fd7c5f901e23a3f19fecc54828e9c848539801e86591bd9801b019f84f")]
+    #[test_case("alice.eth", "0x787192fc5378cc32aa956ddfdedbf26b24e8d78e40109add0eea2c1a012c3dec")]
+    #[test_case(
+        "ret↩️rn.eth",
+        "0x3de5f4c02db61b221e7de7f1c40e29b6e2f07eb48d65bf7e304715cd9ed33b24"
+    )]
+    fn test_namehash(name: &str, expected: &str) {
+        assert_hex(namehash(name), expected);
     }
 
-    #[test]
-    fn test_reverse_address() {
-        for (addr, expected) in [
-            (
-                "0x314159265dd8dbb310642f98f50c066173c1259b",
-                "314159265dd8dbb310642f98f50c066173c1259b.addr.reverse",
-            ),
-            (
-                "0x28679A1a632125fbBf7A68d850E50623194A709E",
-                "28679a1a632125fbbf7a68d850e50623194a709e.addr.reverse",
-            ),
-        ] {
-            assert_eq!(reverse_address(&addr.parse().unwrap()), expected, "{addr}");
-        }
+    #[test_case(
+        "0x314159265dd8dbb310642f98f50c066173c1259b",
+        "314159265dd8dbb310642f98f50c066173c1259b.addr.reverse"
+    )]
+    #[test_case(
+        "0x28679A1a632125fbBf7A68d850E50623194A709E",
+        "28679a1a632125fbbf7a68d850e50623194a709e.addr.reverse"
+    )]
+    fn test_reverse_address(addr: &str, expected: &str) {
+        assert_eq!(reverse_address(&addr.parse().unwrap()), expected);
     }
 
     #[test]

@@ -60,6 +60,7 @@ rand.workspace = true
 similar-asserts.workspace = true
 assert_matches.workspace = true
 bincode = { workspace = true, features = ["serde"] }
+test-case.workspace = true
 
 [features]
 account-ext = ["dep:alloy-trie", "alloy-trie/account-ext", "alloy-trie/serde"]

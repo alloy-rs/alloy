@@ -194,6 +194,7 @@ mod tests {
     use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U160, U256};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
     use std::str::FromStr;
+    use test_case::test_case;
 
     #[test]
     fn from_eip1559_to_tx_req() {
@@ -285,43 +286,43 @@ mod tests {
         assert!(matches!(tx, TypedTransaction::Legacy(_)));
     }
 
-    #[test]
-    fn test_invalid_fields() {
-        let common = ["to", "nonce", "gas_limit"];
-        let eip1559 = ["max_priority_fee_per_gas", "max_fee_per_gas"];
-        for (request, expected_type, extra) in [
-            (TransactionRequest::default().with_gas_price(0), TxType::Legacy, vec![]),
-            (TransactionRequest::default(), TxType::Eip1559, eip1559.to_vec()),
-            (
-                TransactionRequest::default()
-                    .with_access_list(AccessList::default())
-                    .with_gas_price(Default::default()),
-                TxType::Eip2930,
-                vec![],
-            ),
-            (
-                TransactionRequest::default()
-                    .with_blob_sidecar_4844(BlobTransactionSidecar::default()),
-                TxType::Eip4844,
-                [eip1559.as_slice(), &["max_fee_per_blob_gas"]].concat(),
-            ),
-            (
-                TransactionRequest::default().with_authorization_list(vec![]),
-                TxType::Eip7702,
-                eip1559.to_vec(),
-            ),
-        ] {
-            let error = request.build_unsigned().unwrap_err();
-            let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
-            else {
-                panic!("wrong variant")
-            };
+    const EIP1559_FIELDS: [&str; 2] = ["max_priority_fee_per_gas", "max_fee_per_gas"];
 
-            assert_eq!(tx_type, expected_type);
-            assert_eq!(errors.len(), common.len() + extra.len(), "{tx_type:?}: {errors:?}");
-            for key in common.iter().chain(&extra) {
-                assert!(errors.contains(key), "{tx_type:?}: missing {key}");
-            }
+    #[test_case(TransactionRequest::default().with_gas_price(0), TxType::Legacy, vec![])]
+    #[test_case(TransactionRequest::default(), TxType::Eip1559, EIP1559_FIELDS.to_vec())]
+    #[test_case(
+        TransactionRequest::default()
+            .with_access_list(AccessList::default())
+            .with_gas_price(Default::default()),
+        TxType::Eip2930,
+        vec![]
+    )]
+    #[test_case(
+        TransactionRequest::default().with_blob_sidecar_4844(BlobTransactionSidecar::default()),
+        TxType::Eip4844,
+        [EIP1559_FIELDS.as_slice(), &["max_fee_per_blob_gas"]].concat()
+    )]
+    #[test_case(
+        TransactionRequest::default().with_authorization_list(vec![]),
+        TxType::Eip7702,
+        EIP1559_FIELDS.to_vec()
+    )]
+    fn test_invalid_fields(
+        request: TransactionRequest,
+        expected_type: TxType,
+        extra: Vec<&'static str>,
+    ) {
+        let common = ["to", "nonce", "gas_limit"];
+        let error = request.build_unsigned().unwrap_err();
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
+            panic!("wrong variant")
+        };
+
+        assert_eq!(tx_type, expected_type);
+        assert_eq!(errors.len(), common.len() + extra.len(), "{tx_type:?}: {errors:?}");
+        for key in common.iter().chain(&extra) {
+            assert!(errors.contains(key), "{tx_type:?}: missing {key}");
         }
     }
 

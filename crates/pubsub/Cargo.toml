@@ -41,4 +41,5 @@ tracing.workspace = true
 wasmtimer.workspace = true
 
 [dev-dependencies]
+test-case.workspace = true
 tokio = { workspace = true, features = ["macros", "test-util"] }

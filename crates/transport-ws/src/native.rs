@@ -295,19 +295,16 @@ impl WsBackend<TungsteniteStream> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
 
-    #[test]
-    fn auth_from_url() {
-        for (url, auth) in [
-            ("wss://user:pass@example.com/path", Some(Authorization::basic("user", "pass"))),
-            ("ws://user@example.com", Some(Authorization::basic("user", ""))),
-            ("wss://example.com/rpc", None),
-            ("ws://localhost:8545", None),
-        ] {
-            let ws = WsConnect::new(url);
-            assert_eq!(ws.url(), url);
-            assert_eq!(ws.auth(), auth.as_ref(), "{url}");
-        }
+    #[test_case("wss://user:pass@example.com/path", Some(Authorization::basic("user", "pass")))]
+    #[test_case("ws://user@example.com", Some(Authorization::basic("user", "")))]
+    #[test_case("wss://example.com/rpc", None)]
+    #[test_case("ws://localhost:8545", None)]
+    fn auth_from_url(url: &str, auth: Option<Authorization>) {
+        let ws = WsConnect::new(url);
+        assert_eq!(ws.url(), url);
+        assert_eq!(ws.auth(), auth.as_ref());
     }
 
     #[test]

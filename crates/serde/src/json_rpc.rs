@@ -339,6 +339,7 @@ mod tests {
     use alloy_primitives::U256;
     use serde::{de::IntoDeserializer, Deserialize};
     use serde_json::{json, Value};
+    use test_case::test_case;
 
     fn value<T: LenientNumber>(value: Value) -> Result<T, serde_json::Error> {
         super::deserialize(value.into_deserializer())
@@ -368,19 +369,18 @@ mod tests {
         assert_eq!(opt_value::<u64>(json!(null)).unwrap(), None);
     }
 
-    #[test]
-    fn rejects_values_that_do_not_fit_the_target_type() {
-        for raw in [
-            json!("0x10000000000000000"),
-            json!("18446744073709551616"),
-            json!(-1),
-            json!(1.5),
-            json!(null),
-            json!([100]),
-        ] {
-            assert!(value::<u64>(raw).is_err());
-        }
+    #[test_case(json!("0x10000000000000000"))]
+    #[test_case(json!("18446744073709551616"))]
+    #[test_case(json!(-1))]
+    #[test_case(json!(1.5))]
+    #[test_case(json!(null))]
+    #[test_case(json!([100]))]
+    fn rejects_values_that_do_not_fit_the_target_type(raw: Value) {
+        assert!(value::<u64>(raw).is_err());
+    }
 
+    #[test]
+    fn rejects_values_that_overflow_u8_and_u256() {
         // narrower types are not truncated
         assert_eq!(value::<u8>(json!(255)).unwrap(), 255);
         assert!(value::<u8>(json!(256)).is_err());
@@ -412,40 +412,38 @@ mod tests {
         }
     }
 
-    #[test]
-    fn rejects_invalid_sequence_shape_and_overflow() {
-        for raw in [
-            json!([]),
-            json!([1, 2]),
-            json!([null]),
-            json!(null),
-            json!([["0x64"]]),
-            json!(["0x10000000000000000"]),
-            json!("0x10000000000000000"),
-            json!(["18446744073709551616"]),
-            json!("18446744073709551616"),
-        ] {
-            assert!(seq::<u64>(raw).is_err());
-        }
-
-        assert!(seq::<u8>(json!([256])).is_err());
+    #[test_case(json!([]) ; "empty_seq")]
+    #[test_case(json!([1, 2]) ; "two_elements")]
+    #[test_case(json!([null]) ; "seq_null")]
+    #[test_case(json!(null) ; "bare_null")]
+    #[test_case(json!([["0x64"]]) ; "nested_seq")]
+    #[test_case(json!(["0x10000000000000000"]) ; "seq_hex_overflow")]
+    #[test_case(json!("0x10000000000000000") ; "bare_hex_overflow")]
+    #[test_case(json!(["18446744073709551616"]) ; "seq_decimal_overflow")]
+    #[test_case(json!("18446744073709551616") ; "bare_decimal_overflow")]
+    fn rejects_invalid_sequence_shape_and_overflow(raw: Value) {
+        assert!(seq::<u64>(raw).is_err());
     }
 
     #[test]
-    fn deserializes_optional_single_param_sequence() {
-        for raw in [json!([]), json!([null]), json!(null)] {
-            assert_eq!(opt_seq::<u64>(raw.clone()).unwrap(), None);
-            assert_eq!(opt_seq::<U256>(raw).unwrap(), None);
-        }
+    fn rejects_sequence_overflowing_u8() {
+        assert!(seq::<u8>(json!([256])).is_err());
+    }
 
-        for raw in [
-            json!([1, 2]),
-            json!([["0x64"]]),
-            json!(["0x10000000000000000"]),
-            json!(["18446744073709551616"]),
-        ] {
-            assert!(opt_seq::<u64>(raw).is_err());
-        }
+    #[test_case(json!([]) ; "empty_seq")]
+    #[test_case(json!([null]) ; "seq_null")]
+    #[test_case(json!(null) ; "bare_null")]
+    fn deserializes_optional_single_param_sequence(raw: Value) {
+        assert_eq!(opt_seq::<u64>(raw.clone()).unwrap(), None);
+        assert_eq!(opt_seq::<U256>(raw).unwrap(), None);
+    }
+
+    #[test_case(json!([1, 2]))]
+    #[test_case(json!([["0x64"]]))]
+    #[test_case(json!(["0x10000000000000000"]))]
+    #[test_case(json!(["18446744073709551616"]))]
+    fn rejects_invalid_optional_single_param_sequence(raw: Value) {
+        assert!(opt_seq::<u64>(raw).is_err());
     }
 
     #[test]

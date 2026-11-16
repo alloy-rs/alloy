@@ -1106,10 +1106,11 @@ where
 mod tests {
     use super::*;
     use alloc::{collections::BTreeMap, vec};
-    use alloy_primitives::Bytes;
+    use alloy_primitives::{b256, Bytes};
     use alloy_trie::{root::storage_root_unhashed, TrieAccount};
     use core::str::FromStr;
     use serde_json::json;
+    use test_case::test_case;
 
     #[cfg(feature = "account-ext")]
     #[test]
@@ -1151,36 +1152,32 @@ mod tests {
         assert_eq!(ser["slotNumber"], "0x3e7");
     }
 
-    #[test]
-    fn blob_schedule_includes_amsterdam_and_bogota() {
-        for (amsterdam, bogota) in [
-            ("amsterdam", "bogota"),
-            ("Amsterdam", "Bogota"),
-            ("Amsterdam", "bogota"),
-            ("amsterdam", "Bogota"),
-        ] {
-            let config: ChainConfig = serde_json::from_value(json!({
-                "chainId": 1,
-                "bpo1Time": 10,
-                "amsterdamTime": 20,
-                "bogotaTime": 30,
-                "blobSchedule": {
-                    "bpo1": { "target": 10, "max": 15, "baseFeeUpdateFraction": 8346193 },
-                    (amsterdam): { "target": 14, "max": 21, "baseFeeUpdateFraction": 11684671 },
-                    (bogota): { "target": 21, "max": 32, "baseFeeUpdateFraction": 20609697 }
-                }
-            }))
-            .unwrap();
+    #[test_case("amsterdam", "bogota")]
+    #[test_case("Amsterdam", "Bogota")]
+    #[test_case("Amsterdam", "bogota")]
+    #[test_case("amsterdam", "Bogota")]
+    fn blob_schedule_includes_amsterdam_and_bogota(amsterdam: &str, bogota: &str) {
+        let config: ChainConfig = serde_json::from_value(json!({
+            "chainId": 1,
+            "bpo1Time": 10,
+            "amsterdamTime": 20,
+            "bogotaTime": 30,
+            "blobSchedule": {
+                "bpo1": { "target": 10, "max": 15, "baseFeeUpdateFraction": 8346193 },
+                (amsterdam): { "target": 14, "max": 21, "baseFeeUpdateFraction": 11684671 },
+                (bogota): { "target": 21, "max": 32, "baseFeeUpdateFraction": 20609697 }
+            }
+        }))
+        .unwrap();
 
-            let scheduled = config.blob_schedule_blob_params().scheduled;
-            let entries: Vec<_> = scheduled
-                .iter()
-                .map(|(timestamp, params)| {
-                    (*timestamp, params.target_blob_count, params.max_blob_count)
-                })
-                .collect();
-            assert_eq!(entries, vec![(10, 10, 15), (20, 14, 21), (30, 21, 32)]);
-        }
+        let scheduled = config.blob_schedule_blob_params().scheduled;
+        let entries: Vec<_> = scheduled
+            .iter()
+            .map(|(timestamp, params)| {
+                (*timestamp, params.target_blob_count, params.max_blob_count)
+            })
+            .collect();
+        assert_eq!(entries, vec![(10, 10, 15), (20, 14, 21), (30, 21, 32)]);
     }
 
     #[test]
@@ -1209,17 +1206,13 @@ mod tests {
         assert_eq!(ChainConfig::default().blob_schedule_blob_params().osaka, BlobParams::osaka());
     }
 
-    #[test]
-    fn parse_genesis_fixtures() {
-        for json in [
-            include_str!("../testdata/hive-clique-smoke-genesis.json"),
-            include_str!("../testdata/hive-graphql-genesis.json"),
-            include_str!("../testdata/hive-engine-genesis.json"),
-            include_str!("../testdata/hive-devp2p-genesis.json"),
-            include_str!("../testdata/execution-apis-genesis.json"),
-        ] {
-            serde_json::from_str::<Genesis>(json).unwrap();
-        }
+    #[test_case(include_str!("../testdata/hive-clique-smoke-genesis.json"); "hive_clique_smoke")]
+    #[test_case(include_str!("../testdata/hive-graphql-genesis.json"); "hive_graphql")]
+    #[test_case(include_str!("../testdata/hive-engine-genesis.json"); "hive_engine")]
+    #[test_case(include_str!("../testdata/hive-devp2p-genesis.json"); "hive_devp2p")]
+    #[test_case(include_str!("../testdata/execution-apis-genesis.json"); "execution_apis")]
+    fn parse_genesis_fixtures(json: &str) {
+        serde_json::from_str::<Genesis>(json).unwrap();
     }
 
     #[test]
@@ -1662,18 +1655,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parse_dump_genesis() {
-        for dump in [
-            include_str!("../dumpgenesis/mainnet.json"),
-            include_str!("../dumpgenesis/sepolia.json"),
-            include_str!("../dumpgenesis/holesky.json"),
-        ] {
-            let gen1 = serde_json::from_str::<Genesis>(dump).unwrap();
-            let s = serde_json::to_string_pretty(&gen1).unwrap();
-            let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
-            assert_eq!(gen1, gen2);
-        }
+    #[test_case(include_str!("../dumpgenesis/mainnet.json"); "mainnet")]
+    #[test_case(include_str!("../dumpgenesis/sepolia.json"); "sepolia")]
+    #[test_case(include_str!("../dumpgenesis/holesky.json"); "holesky")]
+    fn parse_dump_genesis(dump: &str) {
+        let gen1 = serde_json::from_str::<Genesis>(dump).unwrap();
+        let s = serde_json::to_string_pretty(&gen1).unwrap();
+        let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
+        assert_eq!(gen1, gen2);
     }
 
     #[test]
@@ -1703,23 +1692,22 @@ mod tests {
         assert_eq!(actual_object_value, &serde_json::json!({"sub_field": "sub_value"}));
     }
 
-    #[test]
-    fn deserialize_private_key_cases() {
-        let key =
-            B256::from_str("123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234")
-                .unwrap();
-        for (secret_key, expected) in [
-            (json!("0x"), Some(None)),
-            (json!(key), Some(Some(key))),
-            (json!(null), Some(None)),
-            (json!("0xINVALIDHEX"), None),
-            (json!(""), None),
-        ] {
-            let account = serde_json::from_value::<GenesisAccount>(
-                json!({ "balance": "0x0", "secretKey": secret_key }),
-            );
-            assert_eq!(account.ok().map(|account| account.private_key), expected, "{secret_key}");
-        }
+    const PRIVATE_KEY: B256 =
+        b256!("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234");
+
+    #[test_case(json!("0x"), Some(None); "empty_hex")]
+    #[test_case(json!(PRIVATE_KEY), Some(Some(PRIVATE_KEY)); "valid_key")]
+    #[test_case(json!(null), Some(None); "null")]
+    #[test_case(json!("0xINVALIDHEX"), None; "invalid_hex")]
+    #[test_case(json!(""), None; "empty_string")]
+    fn deserialize_private_key_cases(
+        secret_key: serde_json::Value,
+        expected: Option<Option<B256>>,
+    ) {
+        let account = serde_json::from_value::<GenesisAccount>(
+            json!({ "balance": "0x0", "secretKey": secret_key }),
+        );
+        assert_eq!(account.ok().map(|account| account.private_key), expected);
     }
 
     #[test]

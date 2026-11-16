@@ -287,6 +287,7 @@ mod tests {
     use alloy_primitives::hex;
     use core::str::FromStr;
     use similar_asserts::assert_eq;
+    use test_case::test_case;
 
     #[test]
     fn params_serde() {
@@ -339,51 +340,45 @@ mod tests {
         }
     }
 
-    #[test]
-    fn subscription_kind_str_roundtrip() {
-        for kind in [
-            SubscriptionKind::NewHeads,
-            SubscriptionKind::Logs,
-            SubscriptionKind::NewPendingTransactions,
-            SubscriptionKind::Syncing,
-            SubscriptionKind::TransactionReceipts,
-        ] {
-            let s = kind.to_string();
-            let parsed: SubscriptionKind = s.parse().unwrap();
-            assert_eq!(kind, parsed);
+    #[test_case(SubscriptionKind::NewHeads)]
+    #[test_case(SubscriptionKind::Logs)]
+    #[test_case(SubscriptionKind::NewPendingTransactions)]
+    #[test_case(SubscriptionKind::Syncing)]
+    #[test_case(SubscriptionKind::TransactionReceipts)]
+    fn subscription_kind_str_roundtrip(kind: SubscriptionKind) {
+        let s = kind.to_string();
+        let parsed: SubscriptionKind = s.parse().unwrap();
+        assert_eq!(kind, parsed);
 
-            // Verify FromStr matches serde
-            let serde_str = serde_json::to_string(&kind).unwrap();
-            let serde_str = serde_str.trim_matches('"');
-            assert_eq!(s, serde_str);
-            assert_eq!(SubscriptionKind::from_str(serde_str).unwrap(), kind);
-        }
+        // Verify FromStr matches serde
+        let serde_str = serde_json::to_string(&kind).unwrap();
+        let serde_str = serde_str.trim_matches('"');
+        assert_eq!(s, serde_str);
+        assert_eq!(SubscriptionKind::from_str(serde_str).unwrap(), kind);
+    }
+
+    #[test_case(Params::None, "[]")]
+    #[test_case(Params::Bool(true), "true")]
+    #[test_case(Params::Bool(false), "false")]
+    #[test_case(Params::Logs(Box::default()), &serde_json::to_string(&Filter::default()).unwrap())]
+    #[test_case(
+        Params::TransactionReceipts(TransactionReceiptsParams {
+            transaction_hashes: Some(vec![B256::from(hex!(
+                "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"
+            ))]),
+        }),
+        r#"{"transactionHashes":["0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"]}"#
+    )]
+    #[test_case(
+        Params::TransactionReceipts(TransactionReceiptsParams::default()),
+        r#"{"transactionHashes":null}"#
+    )]
+    fn params_serialize(param: Params, expected: &str) {
+        assert_eq!(serde_json::to_string(&param).unwrap(), expected);
     }
 
     #[test]
-    fn params_serialize() {
-        let filter = serde_json::to_string(&Filter::default()).unwrap();
-        for (param, expected) in [
-            (Params::None, "[]"),
-            (Params::Bool(true), "true"),
-            (Params::Bool(false), "false"),
-            (Params::Logs(Box::default()), filter.as_str()),
-            (
-                Params::TransactionReceipts(TransactionReceiptsParams {
-                    transaction_hashes: Some(vec![B256::from(hex!(
-                        "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"
-                    ))]),
-                }),
-                r#"{"transactionHashes":["0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060"]}"#,
-            ),
-            (
-                Params::TransactionReceipts(TransactionReceiptsParams::default()),
-                r#"{"transactionHashes":null}"#,
-            ),
-        ] {
-            assert_eq!(serde_json::to_string(&param).unwrap(), expected);
-        }
-
+    fn params_serialize_null_transaction_hashes_roundtrip() {
         // None must be serialized as `null` (not omitted) so that round-tripping
         // through `Params::from_json_value` keeps the `TransactionReceipts` variant.
         let param = Params::TransactionReceipts(TransactionReceiptsParams::default());

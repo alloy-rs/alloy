@@ -163,6 +163,7 @@ pub fn calculate_block_gas_limit_with_bound_divisor(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
 
     #[test]
     fn calculate_block_gas_limit_bounds_desired_limit() {
@@ -186,8 +187,42 @@ mod tests {
         calculate_block_gas_limit_with_bound_divisor(1_000, 2_000, 0);
     }
 
-    #[test]
-    fn calculate_base_fee_success() {
+    #[test_case(
+        BaseFeeParams::ethereum(),
+        [
+            1125000000, 1083333333, 1053571428, 1179939062, 1116028649, 918084097,
+            1063811730, 1, 2, 3,
+        ]
+    )]
+    #[test_case(
+        BaseFeeParams::optimism_sepolia(),
+        [
+            1100000048, 1080000000, 1065714297, 1167067046, 1128881311, 1028254188,
+            1098203452, 1, 2, 3,
+        ]
+    )]
+    #[test_case(
+        BaseFeeParams::optimism(),
+        [
+            1100000048, 1080000000, 1065714297, 1167067046, 1128881311, 1028254188,
+            1098203452, 1, 2, 3,
+        ]
+    )]
+    #[test_case(
+        BaseFeeParams::optimism_canyon(),
+        [
+            1020000009, 1016000000, 1013142859, 1091550909, 1073187043, 1045042012,
+            1059031864, 1, 2, 3,
+        ]
+    )]
+    #[test_case(
+        BaseFeeParams::base_sepolia(),
+        [
+            1180000000, 1146666666, 1122857142, 1244299375, 1189416692, 1028254188,
+            1144836295, 1, 2, 3,
+        ]
+    )]
+    fn calculate_base_fee_success(params: BaseFeeParams, next_base_fee: [u64; 10]) {
         let base_fee = [
             1000000000, 1000000000, 1000000000, 1072671875, 1059263476, 1049238967, 1049238967, 0,
             1, 2,
@@ -201,50 +236,11 @@ mod tests {
             18000000, 18000000,
         ];
 
-        for (params, next_base_fee) in [
-            (
-                BaseFeeParams::ethereum(),
-                [
-                    1125000000, 1083333333, 1053571428, 1179939062, 1116028649, 918084097,
-                    1063811730, 1, 2, 3,
-                ],
-            ),
-            (
-                BaseFeeParams::optimism_sepolia(),
-                [
-                    1100000048, 1080000000, 1065714297, 1167067046, 1128881311, 1028254188,
-                    1098203452, 1, 2, 3,
-                ],
-            ),
-            (
-                BaseFeeParams::optimism(),
-                [
-                    1100000048, 1080000000, 1065714297, 1167067046, 1128881311, 1028254188,
-                    1098203452, 1, 2, 3,
-                ],
-            ),
-            (
-                BaseFeeParams::optimism_canyon(),
-                [
-                    1020000009, 1016000000, 1013142859, 1091550909, 1073187043, 1045042012,
-                    1059031864, 1, 2, 3,
-                ],
-            ),
-            (
-                BaseFeeParams::base_sepolia(),
-                [
-                    1180000000, 1146666666, 1122857142, 1244299375, 1189416692, 1028254188,
-                    1144836295, 1, 2, 3,
-                ],
-            ),
-        ] {
-            for i in 0..base_fee.len() {
-                assert_eq!(
-                    next_base_fee[i],
-                    calc_next_block_base_fee(gas_used[i], gas_limit[i], base_fee[i], params),
-                    "{params:?}"
-                );
-            }
+        for i in 0..base_fee.len() {
+            assert_eq!(
+                next_base_fee[i],
+                calc_next_block_base_fee(gas_used[i], gas_limit[i], base_fee[i], params)
+            );
         }
     }
 

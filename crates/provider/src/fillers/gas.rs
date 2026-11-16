@@ -393,6 +393,7 @@ mod tests {
     use alloy_network::Ethereum;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::{Block, FeeHistory, TransactionRequest};
+    use test_case::test_case;
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
@@ -547,8 +548,13 @@ mod tests {
         );
     }
 
+    #[test_case(Some(1), None)]
+    #[test_case(None, Some(1))]
     #[tokio::test]
-    async fn no_legacy_fallback_with_eip1559_fee() {
+    async fn no_legacy_fallback_with_eip1559_fee(
+        max_fee_per_gas: Option<u128>,
+        max_priority_fee_per_gas: Option<u128>,
+    ) {
         let asserter = alloy_transport::mock::Asserter::new();
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
@@ -561,23 +567,20 @@ mod tests {
             ..Default::default()
         };
 
-        for (max_fee_per_gas, max_priority_fee_per_gas) in [(Some(1), None), (None, Some(1))] {
-            // The latest block has no base fee, so EIP-1559 estimation is unsupported.
-            asserter.push_success(&fee_history);
-            asserter.push_success(&<Block>::default());
-            let tx = TransactionRequest {
-                gas: Some(21000),
-                max_fee_per_gas,
-                max_priority_fee_per_gas,
-                ..Default::default()
-            };
+        // The latest block has no base fee, so EIP-1559 estimation is unsupported.
+        asserter.push_success(&fee_history);
+        asserter.push_success(&<Block>::default());
+        let tx = TransactionRequest {
+            gas: Some(21000),
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
+            ..Default::default()
+        };
 
-            let err =
-                <GasFiller as TxFiller<Ethereum>>::prepare(&GasFiller::default(), &provider, &tx)
-                    .await
-                    .unwrap_err();
-            assert!(matches!(err, RpcError::UnsupportedFeature(_)), "{err:?}");
-        }
+        let err = <GasFiller as TxFiller<Ethereum>>::prepare(&GasFiller::default(), &provider, &tx)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, RpcError::UnsupportedFeature(_)), "{err:?}");
     }
 
     #[test]

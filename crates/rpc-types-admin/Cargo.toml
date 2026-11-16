@@ -30,3 +30,4 @@ serde_json.workspace = true
 
 [dev-dependencies]
 similar-asserts.workspace = true
+test-case.workspace = true

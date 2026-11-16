@@ -29,3 +29,6 @@ thiserror = { workspace = true, features = ["std"] }
 tracing.workspace = true
 alloy-sol-types.workspace = true
 http.workspace = true
+
+[dev-dependencies]
+test-case.workspace = true

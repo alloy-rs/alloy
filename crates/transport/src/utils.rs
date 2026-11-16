@@ -76,24 +76,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::guess_local_url;
+    use test_case::test_case;
 
-    #[test]
-    fn guesses_local_urls() {
-        for (url, local) in [
-            ("http://localhost:8545", true),
-            ("http://127.0.0.1:8545", true),
-            ("http://127.0.0.2:8545", true),
-            ("http://127.255.255.254:8545", true),
-            ("http://126.255.255.255:8545", false),
-            ("http://128.0.0.1:8545", false),
-            ("http://[::2]:8545", false),
-            ("ws://[::1]:8546", true),
-            ("http://[0:0:0:0:0:0:0:1]:8545", true),
-            ("https://eth.example.com", false),
-            ("file:///tmp/geth.ipc", true),
-            ("not a url", false),
-        ] {
-            assert_eq!(guess_local_url(url), local, "{url}");
-        }
+    #[test_case("http://localhost:8545" => true)]
+    #[test_case("http://127.0.0.1:8545" => true)]
+    #[test_case("http://127.0.0.2:8545" => true)]
+    #[test_case("http://127.255.255.254:8545" => true)]
+    #[test_case("http://126.255.255.255:8545" => false)]
+    #[test_case("http://128.0.0.1:8545" => false)]
+    #[test_case("http://[::2]:8545" => false)]
+    #[test_case("ws://[::1]:8546" => true)]
+    #[test_case("http://[0:0:0:0:0:0:0:1]:8545" => true)]
+    #[test_case("https://eth.example.com" => false)]
+    #[test_case("file:///tmp/geth.ipc" => true)]
+    #[test_case("not a url" => false)]
+    fn guesses_local_urls(url: &str) -> bool {
+        guess_local_url(url)
     }
 }

@@ -89,6 +89,7 @@ rand.workspace = true
 serde_json.workspace = true
 similar-asserts.workspace = true
 tempfile.workspace = true
+test-case.workspace = true
 assert_matches.workspace = true
 
 [[bench]]

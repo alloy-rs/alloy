@@ -545,60 +545,55 @@ mod tests {
     use super::*;
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{Address, Bytes, U256};
+    use test_case::test_case;
 
-    #[test]
-    fn test_decode_unsigned_all_types() {
-        let transactions = [
-            TypedTransaction::Legacy(TxLegacy {
-                chain_id: Some(1),
-                nonce: 0,
-                gas_price: 1,
-                gas_limit: 2,
-                to: Address::ZERO.into(),
-                value: U256::ZERO,
-                input: Bytes::default(),
-            }),
-            TypedTransaction::Eip2930(TxEip2930 {
-                chain_id: 1,
-                nonce: 0,
-                gas_price: 1,
-                gas_limit: 2,
-                to: Address::ZERO.into(),
-                value: U256::ZERO,
-                input: Bytes::default(),
-                access_list: AccessList::default(),
-            }),
-            TypedTransaction::Eip1559(TxEip1559 {
-                chain_id: 1,
-                nonce: 0,
-                gas_limit: 1,
-                max_fee_per_gas: 2,
-                max_priority_fee_per_gas: 3,
-                to: Address::ZERO.into(),
-                value: U256::ZERO,
-                input: Bytes::default(),
-                access_list: AccessList::default(),
-            }),
-            TypedTransaction::Eip7702(TxEip7702 {
-                chain_id: 1,
-                nonce: 0,
-                gas_limit: 1,
-                max_fee_per_gas: 2,
-                max_priority_fee_per_gas: 3,
-                to: Address::ZERO,
-                value: U256::ZERO,
-                input: Bytes::default(),
-                access_list: AccessList::default(),
-                authorization_list: vec![],
-            }),
-        ];
-
-        for tx in transactions {
-            let mut encoded = Vec::new();
-            tx.encode_for_signing(&mut encoded);
-            let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap();
-            assert_eq!(decoded, tx);
-        }
+    #[test_case(TypedTransaction::Legacy(TxLegacy {
+        chain_id: Some(1),
+        nonce: 0,
+        gas_price: 1,
+        gas_limit: 2,
+        to: Address::ZERO.into(),
+        value: U256::ZERO,
+        input: Bytes::default(),
+    }))]
+    #[test_case(TypedTransaction::Eip2930(TxEip2930 {
+        chain_id: 1,
+        nonce: 0,
+        gas_price: 1,
+        gas_limit: 2,
+        to: Address::ZERO.into(),
+        value: U256::ZERO,
+        input: Bytes::default(),
+        access_list: AccessList::default(),
+    }))]
+    #[test_case(TypedTransaction::Eip1559(TxEip1559 {
+        chain_id: 1,
+        nonce: 0,
+        gas_limit: 1,
+        max_fee_per_gas: 2,
+        max_priority_fee_per_gas: 3,
+        to: Address::ZERO.into(),
+        value: U256::ZERO,
+        input: Bytes::default(),
+        access_list: AccessList::default(),
+    }))]
+    #[test_case(TypedTransaction::Eip7702(TxEip7702 {
+        chain_id: 1,
+        nonce: 0,
+        gas_limit: 1,
+        max_fee_per_gas: 2,
+        max_priority_fee_per_gas: 3,
+        to: Address::ZERO,
+        value: U256::ZERO,
+        input: Bytes::default(),
+        access_list: AccessList::default(),
+        authorization_list: vec![],
+    }))]
+    fn test_decode_unsigned_all_types(tx: TypedTransaction) {
+        let mut encoded = Vec::new();
+        tx.encode_for_signing(&mut encoded);
+        let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap();
+        assert_eq!(decoded, tx);
     }
 
     #[test]

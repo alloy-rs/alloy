@@ -32,6 +32,7 @@ serde_with = { workspace = true, optional = true }
 [dev-dependencies]
 similar-asserts.workspace = true
 bincode = { workspace = true, features = ["serde"] }
+test-case.workspace = true
 
 [lints]
 workspace = true

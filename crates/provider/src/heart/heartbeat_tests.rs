@@ -1,6 +1,7 @@
 use super::*;
 use alloy_network::Ethereum;
 use alloy_rpc_types_eth::{Block, BlockTransactions};
+use test_case::test_case;
 
 struct Harness {
     blocks: futures::channel::mpsc::UnboundedSender<Block>,
@@ -43,55 +44,60 @@ fn poll(pending: &mut PendingTransaction) -> Option<Result<TxHash, PendingTransa
 
 const TX: TxHash = B256::with_last_byte(1);
 
+// (required confirmations, block including the tx, block at which the watcher resolves)
+#[test_case(1, 2, 2)]
+#[test_case(2, 2, 3)]
+#[test_case(3, 2, 4)]
 #[tokio::test(start_paused = true)]
-async fn confirms_after_required_confirmations() {
-    // (required confirmations, block including the tx, block at which the watcher resolves)
-    for (confirmations, mined_in, resolves_at) in [(1, 2, 2), (2, 2, 3), (3, 2, 4)] {
-        let harness = Harness::new();
-        let config = PendingTransactionConfig::new(TX).with_required_confirmations(confirmations);
-        let mut pending = harness.watch(config, None).await;
+async fn confirms_after_required_confirmations(
+    confirmations: u64,
+    mined_in: u64,
+    resolves_at: u64,
+) {
+    let harness = Harness::new();
+    let config = PendingTransactionConfig::new(TX).with_required_confirmations(confirmations);
+    let mut pending = harness.watch(config, None).await;
 
-        let mut resolved = None;
-        for number in 1..=resolves_at {
-            harness.block(number, if number == mined_in { &[TX] } else { &[] });
-            settle().await;
-            resolved = poll(&mut pending);
-            assert_eq!(resolved.is_some(), number == resolves_at, "{confirmations}: {number}");
-        }
-        assert_eq!(resolved.unwrap().unwrap(), TX);
+    let mut resolved = None;
+    for number in 1..=resolves_at {
+        harness.block(number, if number == mined_in { &[TX] } else { &[] });
+        settle().await;
+        resolved = poll(&mut pending);
+        assert_eq!(resolved.is_some(), number == resolves_at, "{confirmations}: {number}");
     }
+    assert_eq!(resolved.unwrap().unwrap(), TX);
 }
 
+// (received_at_block, required confirmations, resolves before block 4)
+#[test_case(None, 1, true)]
+#[test_case(None, 2, true)]
+#[test_case(None, 3, false)]
+#[test_case(Some(2), 2, true)]
+#[test_case(Some(2), 3, false)]
 #[tokio::test(start_paused = true)]
-async fn already_mined_tx_counts_confirmations_from_its_block() {
-    // (received_at_block, required confirmations, resolves before block 4)
-    let cases = [
-        (None, 1, true),
-        (None, 2, true),
-        (None, 3, false),
-        (Some(2), 2, true),
-        (Some(2), 3, false),
-    ];
-    for (received_at_block, confirmations, immediately) in cases {
-        let harness = Harness::new();
-        harness.block(1, &[]);
-        harness.block(2, &[TX]);
-        harness.block(3, &[]);
-        settle().await;
+async fn already_mined_tx_counts_confirmations_from_its_block(
+    received_at_block: Option<u64>,
+    confirmations: u64,
+    immediately: bool,
+) {
+    let harness = Harness::new();
+    harness.block(1, &[]);
+    harness.block(2, &[TX]);
+    harness.block(3, &[]);
+    settle().await;
 
-        let config = PendingTransactionConfig::new(TX).with_required_confirmations(confirmations);
-        let mut pending = harness.watch(config, received_at_block).await;
-        settle().await;
-        let mut resolved = poll(&mut pending);
-        assert_eq!(resolved.is_some(), immediately, "{received_at_block:?}, {confirmations}");
+    let config = PendingTransactionConfig::new(TX).with_required_confirmations(confirmations);
+    let mut pending = harness.watch(config, received_at_block).await;
+    settle().await;
+    let mut resolved = poll(&mut pending);
+    assert_eq!(resolved.is_some(), immediately);
 
-        if !immediately {
-            harness.block(4, &[]);
-            settle().await;
-            resolved = poll(&mut pending);
-        }
-        assert_eq!(resolved.expect("not confirmed after block 4").unwrap(), TX);
+    if !immediately {
+        harness.block(4, &[]);
+        settle().await;
+        resolved = poll(&mut pending);
     }
+    assert_eq!(resolved.expect("not confirmed after block 4").unwrap(), TX);
 }
 
 #[tokio::test(start_paused = true)]
@@ -115,73 +121,74 @@ async fn timeout_reaps_unconfirmed_tx() {
     assert_eq!(poll(&mut pending).unwrap().unwrap(), other);
 }
 
-#[tokio::test(start_paused = true)]
-async fn chain_gap_resets_txs_included_at_or_above_it() {
-    // (block number, includes the tx, watcher resolved after this block), 3 confirmations
-    let scenarios: [&[(u64, bool, bool)]; 4] = [
-        &[(1, true, false), (2, false, false), (2, false, false), (3, false, true)],
-        &[
-            (1, false, false),
-            (2, true, false),
-            (3, false, false),
-            (2, false, false),
-            (3, true, false),
-            (4, false, false),
-            (5, false, true),
-        ],
-        &[(1, true, false), (5, false, true)],
-        // Reincluded higher after a reorg, then reorged out again before the new deadline.
-        &[
-            (1, false, false),
-            (2, true, false),
-            (2, false, false),
-            (3, false, false),
-            (4, true, false),
-            (4, false, false),
-            (5, false, false),
-            (6, false, false),
-            (7, true, false),
-            (8, false, false),
-            (9, false, true),
-        ],
+// (block number, includes the tx, watcher resolved after this block), 3 confirmations
+#[test_case(
+    &[(1, true, false), (2, false, false), (2, false, false), (3, false, true)];
+    "reorg above inclusion block"
+)]
+#[test_case(
+    &[
+        (1, false, false),
+        (2, true, false),
+        (3, false, false),
+        (2, false, false),
+        (3, true, false),
+        (4, false, false),
+        (5, false, true),
     ];
-    for steps in scenarios {
-        let harness = Harness::new();
-        let config = PendingTransactionConfig::new(TX).with_required_confirmations(3);
-        let mut pending = harness.watch(config, None).await;
+    "reorg at inclusion block"
+)]
+#[test_case(&[(1, true, false), (5, false, true)]; "gap above inclusion block")]
+// Reincluded higher after a reorg, then reorged out again before the new deadline.
+#[test_case(
+    &[
+        (1, false, false),
+        (2, true, false),
+        (2, false, false),
+        (3, false, false),
+        (4, true, false),
+        (4, false, false),
+        (5, false, false),
+        (6, false, false),
+        (7, true, false),
+        (8, false, false),
+        (9, false, true),
+    ];
+    "reincluded higher then reorged again"
+)]
+#[tokio::test(start_paused = true)]
+async fn chain_gap_resets_txs_included_at_or_above_it(steps: &[(u64, bool, bool)]) {
+    let harness = Harness::new();
+    let config = PendingTransactionConfig::new(TX).with_required_confirmations(3);
+    let mut pending = harness.watch(config, None).await;
 
-        for (i, &(number, includes_tx, resolves)) in steps.iter().enumerate() {
-            harness.block(number, if includes_tx { &[TX] } else { &[] });
-            settle().await;
-            let resolved = poll(&mut pending);
-            assert_eq!(resolved.is_some(), resolves, "{steps:?}: step {i}");
-            if let Some(res) = resolved {
-                assert_eq!(res.unwrap(), TX);
-            }
+    for (i, &(number, includes_tx, resolves)) in steps.iter().enumerate() {
+        harness.block(number, if includes_tx { &[TX] } else { &[] });
+        settle().await;
+        let resolved = poll(&mut pending);
+        assert_eq!(resolved.is_some(), resolves, "{steps:?}: step {i}");
+        if let Some(res) = resolved {
+            assert_eq!(res.unwrap(), TX);
         }
     }
 }
 
+// (blocks as (number, includes the tx), tx found when registered afterwards)
+#[test_case((1..=11).map(|n| (n, n == 2)).collect(), true; "second of eleven blocks")]
+#[test_case((1..=11).map(|n| (n, n == 1)).collect(), false; "first of eleven blocks")]
+#[test_case(vec![(1, true), (2, false), (3, false), (2, false)], true; "reorg above tx block")]
+#[test_case(vec![(1, false), (2, true), (3, false), (2, false)], false; "reorg at tx block")]
 #[tokio::test(start_paused = true)]
-async fn lookbehind_keeps_last_ten_canonical_blocks() {
-    // (blocks as (number, includes the tx), tx found when registered afterwards)
-    let cases: [(Vec<(u64, bool)>, bool); 4] = [
-        ((1..=11).map(|n| (n, n == 2)).collect(), true),
-        ((1..=11).map(|n| (n, n == 1)).collect(), false),
-        (vec![(1, true), (2, false), (3, false), (2, false)], true),
-        (vec![(1, false), (2, true), (3, false), (2, false)], false),
-    ];
-    for (blocks, found) in cases {
-        let harness = Harness::new();
-        for &(number, includes_tx) in &blocks {
-            harness.block(number, if includes_tx { &[TX] } else { &[] });
-        }
-        settle().await;
-
-        let mut pending = harness.watch(PendingTransactionConfig::new(TX), None).await;
-        settle().await;
-        assert_eq!(poll(&mut pending).is_some(), found, "{blocks:?}");
+async fn lookbehind_keeps_last_ten_canonical_blocks(blocks: Vec<(u64, bool)>, found: bool) {
+    let harness = Harness::new();
+    for &(number, includes_tx) in &blocks {
+        harness.block(number, if includes_tx { &[TX] } else { &[] });
     }
+    settle().await;
+
+    let mut pending = harness.watch(PendingTransactionConfig::new(TX), None).await;
+    settle().await;
+    assert_eq!(poll(&mut pending).is_some(), found);
 }
 
 #[tokio::test(start_paused = true)]

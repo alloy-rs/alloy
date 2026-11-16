@@ -1985,55 +1985,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
-    fn deserialize_filter_with_null_fields() {
-        for (json, block_option) in [
-            (
-                json!({"fromBlock": "0x429d3b", "toBlock": "0x429d3b", "address": null, "topics": null}),
-                FilterBlockOption::Range {
-                    from_block: Some(4365627u64.into()),
-                    to_block: Some(4365627u64.into()),
-                },
-            ),
-            (
-                json!({
-                    "fromBlock": null,
-                    "toBlock": null,
-                    "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
-                    "address": null,
-                    "topics": null
-                }),
-                FilterBlockOption::AtBlockHash(
-                    "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
-                        .parse()
-                        .unwrap(),
-                ),
-            ),
-            (
-                json!({"fromBlock": "0x1", "toBlock": "0x2", "blockHash": null, "address": null, "topics": null}),
-                FilterBlockOption::Range {
-                    from_block: Some(1u64.into()),
-                    to_block: Some(2u64.into()),
-                },
-            ),
-            (
-                json!({"fromBlock": null, "toBlock": "0x2", "blockHash": null, "address": null, "topics": null}),
-                FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) },
-            ),
-            (
-                json!({"fromBlock": "0x1", "toBlock": null, "blockHash": null, "address": null, "topics": null}),
-                FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None },
-            ),
-        ] {
-            let filter: Filter = serde_json::from_value(json).unwrap();
-            assert_eq!(
-                filter,
-                Filter { block_option, address: Default::default(), topics: Default::default() }
-            );
-        }
-    }
-
-    #[test]
     fn test_is_pending_block_filter() {
         let filter =
             Filter::new().from_block(BlockNumberOrTag::Pending).to_block(BlockNumberOrTag::Pending);
@@ -2365,5 +2316,56 @@ mod tests {
         assert!(filter.matches_block(&BlockNumHash { number: 15, hash }));
         assert!(filter.matches_block(&BlockNumHash { number: 20, hash }));
         assert!(!filter.matches_block(&BlockNumHash { number: 21, hash }));
+    }
+
+    #[cfg(feature = "serde")]
+    mod null_fields {
+        use super::*;
+        use similar_asserts::assert_eq;
+        use test_case::test_case;
+
+        #[test_case(
+            json!({"fromBlock": "0x429d3b", "toBlock": "0x429d3b", "address": null, "topics": null}),
+            FilterBlockOption::Range {
+                from_block: Some(4365627u64.into()),
+                to_block: Some(4365627u64.into()),
+            }
+        )]
+        #[test_case(
+            json!({
+                "fromBlock": null,
+                "toBlock": null,
+                "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
+                "address": null,
+                "topics": null
+            }),
+            FilterBlockOption::AtBlockHash(
+                "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
+                    .parse()
+                    .unwrap(),
+            )
+        )]
+        #[test_case(
+            json!({"fromBlock": "0x1", "toBlock": "0x2", "blockHash": null, "address": null, "topics": null}),
+            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: Some(2u64.into()) }
+        )]
+        #[test_case(
+            json!({"fromBlock": null, "toBlock": "0x2", "blockHash": null, "address": null, "topics": null}),
+            FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) }
+        )]
+        #[test_case(
+            json!({"fromBlock": "0x1", "toBlock": null, "blockHash": null, "address": null, "topics": null}),
+            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None }
+        )]
+        fn deserialize_filter_with_null_fields(
+            json: serde_json::Value,
+            block_option: FilterBlockOption,
+        ) {
+            let filter: Filter = serde_json::from_value(json).unwrap();
+            assert_eq!(
+                filter,
+                Filter { block_option, address: Default::default(), topics: Default::default() }
+            );
+        }
     }
 }

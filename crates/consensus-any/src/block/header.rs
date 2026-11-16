@@ -452,49 +452,6 @@ mod tests {
         assert_eq!(header.state_root, B256::ZERO);
     }
 
-    // Stable chain (chainId 988) returns baseFeePerGas = 10^21 for a range of
-    // historical blocks. With the prior `Option<u64>` deserializer this errored
-    // with "invalid type: integer 1000000000000000000000, expected u64".
-    // Saturate to u64::MAX instead.
-    // <https://github.com/alloy-rs/alloy/issues/3741>
-    #[test]
-    #[cfg(feature = "serde")]
-    fn deserializes_base_fee() {
-        use super::*;
-
-        let base = serde_json::json!({
-            "parentHash": B256::ZERO,
-            "sha3Uncles": B256::ZERO,
-            "miner": Address::ZERO,
-            "stateRoot": B256::ZERO,
-            "transactionsRoot": B256::ZERO,
-            "receiptsRoot": B256::ZERO,
-            "logsBloom": Bloom::ZERO,
-            "difficulty": "0x0",
-            "number": "0x1",
-            "gasLimit": "0x1c9c380",
-            "gasUsed": "0x5208",
-            "timestamp": "0x65",
-            "extraData": "0x"
-        });
-
-        for (base_fee, expected) in [
-            (Some("0x3b9aca00"), Some(1_000_000_000)),
-            // 10^21, well above u64::MAX
-            (Some("0x3635c9adc5dea00000"), Some(u64::MAX)),
-            (Some("0xffffffffffffffff"), Some(u64::MAX)),
-            // pre-London
-            (None, None),
-        ] {
-            let mut json = base.clone();
-            if let Some(base_fee) = base_fee {
-                json["baseFeePerGas"] = base_fee.into();
-            }
-            let header: AnyHeader = serde_json::from_str(&json.to_string()).unwrap();
-            assert_eq!(header.base_fee_per_gas, expected, "{base_fee:?}");
-        }
-    }
-
     // The saturating JSON path must not change the binary serde shape inherited
     // from `alloy_serde::quantity::opt`.
     #[test]
@@ -513,5 +470,45 @@ mod tests {
                 .unwrap();
 
         assert_eq!(decoded, header);
+    }
+
+    #[cfg(feature = "serde")]
+    mod base_fee {
+        use super::super::*;
+        use test_case::test_case;
+
+        // Stable chain (chainId 988) returns baseFeePerGas = 10^21 for a range of
+        // historical blocks. With the prior `Option<u64>` deserializer this errored
+        // with "invalid type: integer 1000000000000000000000, expected u64".
+        // Saturate to u64::MAX instead.
+        // <https://github.com/alloy-rs/alloy/issues/3741>
+        #[test_case(Some("0x3b9aca00"), Some(1_000_000_000))]
+        // 10^21, well above u64::MAX
+        #[test_case(Some("0x3635c9adc5dea00000"), Some(u64::MAX))]
+        #[test_case(Some("0xffffffffffffffff"), Some(u64::MAX))]
+        // pre-London
+        #[test_case(None, None)]
+        fn deserializes_base_fee(base_fee: Option<&str>, expected: Option<u64>) {
+            let mut json = serde_json::json!({
+                "parentHash": B256::ZERO,
+                "sha3Uncles": B256::ZERO,
+                "miner": Address::ZERO,
+                "stateRoot": B256::ZERO,
+                "transactionsRoot": B256::ZERO,
+                "receiptsRoot": B256::ZERO,
+                "logsBloom": Bloom::ZERO,
+                "difficulty": "0x0",
+                "number": "0x1",
+                "gasLimit": "0x1c9c380",
+                "gasUsed": "0x5208",
+                "timestamp": "0x65",
+                "extraData": "0x"
+            });
+            if let Some(base_fee) = base_fee {
+                json["baseFeePerGas"] = base_fee.into();
+            }
+            let header: AnyHeader = serde_json::from_str(&json.to_string()).unwrap();
+            assert_eq!(header.base_fee_per_gas, expected);
+        }
     }
 }

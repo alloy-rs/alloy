@@ -131,80 +131,78 @@ pub struct UserStats {
 mod tests {
     use super::*;
     use similar_asserts::assert_eq;
+    use test_case::test_case;
 
     use crate::SealedByBuildersAt;
 
-    #[test]
-    fn can_serialize_deserialize_bundle_stats() {
-        let fixtures = [
-            (
-                r#"{
-                    "isSimulated": false
-                }"#,
-                BundleStats::Unknown,
-            ),
-            (
-                r#"{
-                    "isHighPriority": false,
-                    "isSimulated": false,
-                    "receivedAt": "476190476193"
-                }"#,
-                BundleStats::Seen(StatsSeen {
-                    is_high_priority: false,
-                    is_simulated: false,
-                    received_at: "476190476193".to_string(),
-                }),
-            ),
-            (
-                r#"{
-                    "isHighPriority": true,
-                    "isSimulated": true,
-                    "simulatedAt": "111",
-                    "receivedAt": "222",
-                    "consideredByBuildersAt":[],
-                    "sealedByBuildersAt": [
-                        {
-                            "pubkey": "333",
-                            "timestamp": "444"
-                        },
-                        {
-                            "pubkey": "555",
-                            "timestamp": "666"
-                        }
-                    ]
-                }"#,
-                BundleStats::Simulated(StatsSimulated {
-                    is_high_priority: true,
-                    is_simulated: true,
-                    simulated_at: String::from("111"),
-                    received_at: String::from("222"),
-                    considered_by_builders_at: vec![],
-                    sealed_by_builders_at: vec![
-                        SealedByBuildersAt {
-                            pubkey: String::from("333"),
-                            timestamp: String::from("444"),
-                        },
-                        SealedByBuildersAt {
-                            pubkey: String::from("555"),
-                            timestamp: String::from("666"),
-                        },
-                    ],
-                }),
-            ),
-        ];
-
+    #[test_case(
+        r#"{
+            "isSimulated": false
+        }"#,
+        BundleStats::Unknown
+        ; "unknown"
+    )]
+    #[test_case(
+        r#"{
+            "isHighPriority": false,
+            "isSimulated": false,
+            "receivedAt": "476190476193"
+        }"#,
+        BundleStats::Seen(StatsSeen {
+            is_high_priority: false,
+            is_simulated: false,
+            received_at: "476190476193".to_string(),
+        })
+        ; "seen"
+    )]
+    #[test_case(
+        r#"{
+            "isHighPriority": true,
+            "isSimulated": true,
+            "simulatedAt": "111",
+            "receivedAt": "222",
+            "consideredByBuildersAt":[],
+            "sealedByBuildersAt": [
+                {
+                    "pubkey": "333",
+                    "timestamp": "444"
+                },
+                {
+                    "pubkey": "555",
+                    "timestamp": "666"
+                }
+            ]
+        }"#,
+        BundleStats::Simulated(StatsSimulated {
+            is_high_priority: true,
+            is_simulated: true,
+            simulated_at: String::from("111"),
+            received_at: String::from("222"),
+            considered_by_builders_at: vec![],
+            sealed_by_builders_at: vec![
+                SealedByBuildersAt {
+                    pubkey: String::from("333"),
+                    timestamp: String::from("444"),
+                },
+                SealedByBuildersAt {
+                    pubkey: String::from("555"),
+                    timestamp: String::from("666"),
+                },
+            ],
+        })
+        ; "simulated"
+    )]
+    fn can_serialize_deserialize_bundle_stats(serialized: &str, deserialized: BundleStats) {
         let strip_whitespaces =
             |input: &str| input.chars().filter(|&c| !c.is_whitespace()).collect::<String>();
 
-        for (serialized, deserialized) in fixtures {
-            // Check de-serialization
-            let deserialized_expected = serde_json::from_str::<BundleStats>(serialized).unwrap();
-            assert_eq!(deserialized, deserialized_expected);
+        // Check de-serialization
+        let deserialized_expected = serde_json::from_str::<BundleStats>(serialized).unwrap();
+        assert_eq!(deserialized, deserialized_expected);
 
-            // Check serialization
-            let serialized_expected = &serde_json::to_string(&deserialized).unwrap();
-            assert_eq!(strip_whitespaces(serialized), strip_whitespaces(serialized_expected));
-        }
+        // Check serialization
+        let serialized_expected = &serde_json::to_string(&deserialized).unwrap();
+        assert_eq!(strip_whitespaces(serialized), strip_whitespaces(serialized_expected));
     }
 }
 

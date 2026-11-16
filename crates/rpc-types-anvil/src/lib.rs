@@ -235,6 +235,7 @@ pub enum TransactionData {
 mod tests {
     use super::*;
     use similar_asserts::assert_eq;
+    use test_case::test_case;
 
     #[test]
     fn test_serde_forking_deserialization() {
@@ -267,37 +268,40 @@ mod tests {
         assert_eq!(forking, Forking { json_rpc_url: None, block_number: Some(18441649) });
     }
 
-    #[test]
-    fn test_serde_deserialize_mine_options() {
-        let options = |timestamp, blocks| MineOptions::Options { timestamp, blocks };
-        for (data, expected) in [
-            (r#"{"timestamp": 1620000000, "blocks": 10}"#, options(Some(1620000000), Some(10))),
-            (r#"{"timestamp": "0x608f3d00", "blocks": 10}"#, options(Some(1620000000), Some(10))),
-            (r#"{"blocks": 5}"#, options(None, Some(5))),
-            (r#"{}"#, MineOptions::default()),
-            // Unknown keys are ignored, matching maps with a `timestamp` key.
-            (r#"{"foo": 1}"#, MineOptions::default()),
-            (r#"{"timestamp":"1620000000"}"#, options(Some(1620000000), None)),
-            (r#"{"timestamp":"0x608f3d00"}"#, options(Some(1620000000), None)),
-            (r#""1620000000""#, MineOptions::Timestamp(Some(1620000000))),
-            (r#""0x608f3d00""#, MineOptions::Timestamp(Some(1620000000))),
-        ] {
-            let deserialized: MineOptions = serde_json::from_str(data).unwrap();
-            assert_eq!(deserialized, expected, "{data}");
-        }
+    #[test_case(
+        r#"{"timestamp": 1620000000, "blocks": 10}"#,
+        MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
+    )]
+    #[test_case(
+        r#"{"timestamp": "0x608f3d00", "blocks": 10}"#,
+        MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
+    )]
+    #[test_case(r#"{"blocks": 5}"#, MineOptions::Options { timestamp: None, blocks: Some(5) })]
+    #[test_case(r#"{}"#, MineOptions::default())]
+    // Unknown keys are ignored, matching maps with a `timestamp` key.
+    #[test_case(r#"{"foo": 1}"#, MineOptions::default())]
+    #[test_case(
+        r#"{"timestamp":"1620000000"}"#,
+        MineOptions::Options { timestamp: Some(1620000000), blocks: None }
+    )]
+    #[test_case(
+        r#"{"timestamp":"0x608f3d00"}"#,
+        MineOptions::Options { timestamp: Some(1620000000), blocks: None }
+    )]
+    #[test_case(r#""1620000000""#, MineOptions::Timestamp(Some(1620000000)))]
+    #[test_case(r#""0x608f3d00""#, MineOptions::Timestamp(Some(1620000000)))]
+    fn test_serde_deserialize_mine_options(data: &str, expected: MineOptions) {
+        let deserialized: MineOptions = serde_json::from_str(data).unwrap();
+        assert_eq!(deserialized, expected, "{data}");
     }
 
-    #[test]
-    fn test_serde_forking_rejects_invalid_tagged_options() {
-        for data in [
-            r#"{"forking":{"blockNumber":"invalid"}}"#,
-            r#"{"forking":{"jsonRpcUrl":42}}"#,
-            r#"{"forking":null}"#,
-            r#"{"forking":false}"#,
-            r#"{"forking":"invalid"}"#,
-        ] {
-            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
-        }
+    #[test_case(r#"{"forking":{"blockNumber":"invalid"}}"#)]
+    #[test_case(r#"{"forking":{"jsonRpcUrl":42}}"#)]
+    #[test_case(r#"{"forking":null}"#)]
+    #[test_case(r#"{"forking":false}"#)]
+    #[test_case(r#"{"forking":"invalid"}"#)]
+    fn test_serde_forking_rejects_invalid_tagged_options(data: &str) {
+        assert!(serde_json::from_str::<Forking>(data).is_err());
     }
 
     #[test]
@@ -326,32 +330,30 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_serde_forking_rejects_duplicate_options() {
-        for data in [
-            r#"{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}"#,
-            r#"{"blockNumber":"0x1","blockNumber":"0x2"}"#,
-            r#"{"jsonRpcUrl":null,"jsonRpcUrl":"http://second:8545"}"#,
-            r#"{"blockNumber":null,"blockNumber":"0x2"}"#,
-            r#"{"forking":{},"forking":{"blockNumber":"0x1"}}"#,
-            r#"{"forking":{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}}"#,
-            r#"{"forking":{"blockNumber":"0x1","blockNumber":"0x2"}}"#,
-        ] {
-            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
-        }
+    #[test_case(r#"{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}"#)]
+    #[test_case(r#"{"blockNumber":"0x1","blockNumber":"0x2"}"#)]
+    #[test_case(r#"{"jsonRpcUrl":null,"jsonRpcUrl":"http://second:8545"}"#)]
+    #[test_case(r#"{"blockNumber":null,"blockNumber":"0x2"}"#)]
+    #[test_case(r#"{"forking":{},"forking":{"blockNumber":"0x1"}}"#)]
+    #[test_case(
+        r#"{"forking":{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}}"#
+    )]
+    #[test_case(r#"{"forking":{"blockNumber":"0x1","blockNumber":"0x2"}}"#)]
+    fn test_serde_forking_rejects_duplicate_options(data: &str) {
+        assert!(serde_json::from_str::<Forking>(data).is_err());
     }
 
-    #[test]
-    fn test_serde_forking_tag_ignores_duplicate_root_options() {
-        for data in [
-            r#"{"jsonRpcUrl":false,"jsonRpcUrl":42,"blockNumber":false,"forking":{"blockNumber":"0x1"}}"#,
-            r#"{"forking":{"blockNumber":"0x1"},"blockNumber":false,"blockNumber":"invalid","jsonRpcUrl":42}"#,
-        ] {
-            assert_eq!(
-                serde_json::from_str::<Forking>(data).unwrap(),
-                Forking { json_rpc_url: None, block_number: Some(1) },
-                "{data}"
-            );
-        }
+    #[test_case(
+        r#"{"jsonRpcUrl":false,"jsonRpcUrl":42,"blockNumber":false,"forking":{"blockNumber":"0x1"}}"#
+    )]
+    #[test_case(
+        r#"{"forking":{"blockNumber":"0x1"},"blockNumber":false,"blockNumber":"invalid","jsonRpcUrl":42}"#
+    )]
+    fn test_serde_forking_tag_ignores_duplicate_root_options(data: &str) {
+        assert_eq!(
+            serde_json::from_str::<Forking>(data).unwrap(),
+            Forking { json_rpc_url: None, block_number: Some(1) },
+            "{data}"
+        );
     }
 }

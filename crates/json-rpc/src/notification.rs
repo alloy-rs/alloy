@@ -200,6 +200,7 @@ mod tests {
     use super::*;
     use crate::{EthNotification, PubSubItem, SubId};
     use serde_json::json;
+    use test_case::test_case;
 
     #[test]
     fn deserializer_test() {
@@ -314,15 +315,14 @@ mod tests {
         }
     }
 
-    #[test]
-    fn deserializer_test_invalid_notifications() {
-        for invalid in [
-            // no params
-            r#"{"jsonrpc": "2.0", "method": "eth_subscription"}"#,
-            // params without subscription and result
-            r#"{"jsonrpc": "2.0", "method": "eth_subscription", "params": {}}"#,
-        ] {
-            assert!(serde_json::from_str::<PubSubItem>(invalid).is_err(), "{invalid}");
-        }
+    // no params
+    #[test_case(r#"{"jsonrpc": "2.0", "method": "eth_subscription"}"#; "no_params")]
+    // params without subscription and result
+    #[test_case(
+        r#"{"jsonrpc": "2.0", "method": "eth_subscription", "params": {}}"#;
+        "params_without_subscription_and_result"
+    )]
+    fn deserializer_test_invalid_notifications(invalid: &str) {
+        assert!(serde_json::from_str::<PubSubItem>(invalid).is_err());
     }
 }

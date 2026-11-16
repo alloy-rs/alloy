@@ -636,11 +636,18 @@ mod test {
     }
 
     #[cfg(any(feature = "reqwest", feature = "hyper"))]
-    #[tokio::test]
-    async fn http_sends_url_credentials_unless_the_request_sets_them() {
-        for (header, expected) in
-            [(None, "Basic dXM6ZXI6cEBzcw=="), (Some("Bearer other"), "Bearer other")]
-        {
+    mod url_credentials {
+        use super::*;
+        use similar_asserts::assert_eq;
+        use test_case::test_case;
+
+        #[test_case(None, "Basic dXM6ZXI6cEBzcw==")]
+        #[test_case(Some("Bearer other"), "Bearer other")]
+        #[tokio::test]
+        async fn http_sends_url_credentials_unless_the_request_sets_them(
+            header: Option<&'static str>,
+            expected: &str,
+        ) {
             let (url, server) = serve_once().await;
             let url = url.replacen("http://", "http://us%3Aer:p%40ss@", 1);
             send(&url, ConnectionConfig::new(), header).await;

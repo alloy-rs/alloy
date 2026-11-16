@@ -42,4 +42,5 @@ libc = "0.2"
 
 [dev-dependencies]
 ci_info.workspace = true
+test-case.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

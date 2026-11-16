@@ -482,6 +482,7 @@ mod tests {
     use alloy_json_rpc::{PubSubItem, ResponsePayload};
     use serde_json::value::RawValue;
     use std::future::poll_fn;
+    use test_case::test_case;
 
     const JSON_RPC_ERROR: &[u8] = br#"{
         "jsonrpc": "2.0",
@@ -544,25 +545,19 @@ mod tests {
         assert_eq!(scanner.examined, frame.len());
     }
 
-    #[test]
-    fn frame_scanner_matches_serde_byte_offset() {
-        let corpus: &[&[u8]] = &[
-            br#"{"jsonrpc":"2.0","id":1,"result":"0xaaa"}"#,
-            JSON_RPC_ERROR,
-            br#"{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0x1","result":{"difficulty":"0x1","uncles":[]}}}"#,
-            br#"  {"a":1}"#,
-            br#"{"a":1}{"b":2}"#,
-            br#"{"s":"quote \" and brace } and bracket ]"}"#,
-            br#"{"s":"trailing backslash \\"}"#,
-            br#"[1,{"a":[2,3]}]"#,
-            br#"{"nested":{"x":[1,{"y":"}"}]}}"#,
-        ];
-
-        for raw in corpus {
-            let mut scanner = FrameScanner::default();
-            let expected = Scan::Frame(serde_frame_end(raw));
-            assert_eq!(scanner.scan(raw), expected, "input={}", String::from_utf8_lossy(raw));
-        }
+    #[test_case(br#"{"jsonrpc":"2.0","id":1,"result":"0xaaa"}"#; "response")]
+    #[test_case(JSON_RPC_ERROR; "error response")]
+    #[test_case(br#"{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0x1","result":{"difficulty":"0x1","uncles":[]}}}"#; "subscription")]
+    #[test_case(br#"  {"a":1}"#; "leading whitespace")]
+    #[test_case(br#"{"a":1}{"b":2}"#; "concatenated frames")]
+    #[test_case(br#"{"s":"quote \" and brace } and bracket ]"}"#; "delimiters in string")]
+    #[test_case(br#"{"s":"trailing backslash \\"}"#; "trailing backslash in string")]
+    #[test_case(br#"[1,{"a":[2,3]}]"#; "array")]
+    #[test_case(br#"{"nested":{"x":[1,{"y":"}"}]}}"#; "nested")]
+    fn frame_scanner_matches_serde_byte_offset(raw: &[u8]) {
+        let mut scanner = FrameScanner::default();
+        let expected = Scan::Frame(serde_frame_end(raw));
+        assert_eq!(scanner.scan(raw), expected, "input={}", String::from_utf8_lossy(raw));
     }
 
     #[test]

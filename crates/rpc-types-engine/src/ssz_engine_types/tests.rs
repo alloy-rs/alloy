@@ -2,6 +2,7 @@ use super::*;
 use alloy_eips::eip4895::Withdrawal;
 use alloy_primitives::{Address, Bloom, Bytes};
 use ssz::{Decode, Encode};
+use test_case::test_case;
 
 fn payload_v1() -> ExecutionPayloadV1 {
     ExecutionPayloadV1 {
@@ -289,21 +290,17 @@ fn payload_attributes_legacy_conversions_reject_loss() {
     );
 }
 
-#[test]
-fn every_payload_status_roundtrips() {
-    for status in [
-        PayloadStatusEnum::Valid,
-        PayloadStatusEnum::Invalid { validation_error: "invalid".into() },
-        PayloadStatusEnum::Syncing,
-        PayloadStatusEnum::Accepted,
-    ] {
-        let value = PayloadStatus::try_from(LegacyPayloadStatus {
-            status,
-            latest_valid_hash: Some(B256::ZERO),
-        })
-        .unwrap();
-        assert_eq!(PayloadStatus::from_ssz_bytes(&value.as_ssz_bytes()).unwrap(), value);
-    }
+#[test_case(PayloadStatusEnum::Valid; "valid")]
+#[test_case(PayloadStatusEnum::Invalid { validation_error: "invalid".into() }; "invalid")]
+#[test_case(PayloadStatusEnum::Syncing; "syncing")]
+#[test_case(PayloadStatusEnum::Accepted; "accepted")]
+fn every_payload_status_roundtrips(status: PayloadStatusEnum) {
+    let value = PayloadStatus::try_from(LegacyPayloadStatus {
+        status,
+        latest_valid_hash: Some(B256::ZERO),
+    })
+    .unwrap();
+    assert_eq!(PayloadStatus::from_ssz_bytes(&value.as_ssz_bytes()).unwrap(), value);
 }
 
 #[test]
@@ -647,21 +644,26 @@ fn geth_golden_vectors() {
     }
 }
 
-#[test]
-fn blob_cells_require_matching_proofs() {
-    for value in [
-        BlobCellsAndProofs { blob_cells: vec![Optional::none()], proofs: vec![] },
-        BlobCellsAndProofs {
-            blob_cells: vec![Optional::none()],
-            proofs: vec![Optional::some(Bytes48::ZERO)],
-        },
-        BlobCellsAndProofs {
-            blob_cells: vec![Optional::some(Cell::ZERO)],
-            proofs: vec![Optional::none()],
-        },
-    ] {
-        assert!(BlobCellsAndProofs::from_ssz_bytes(&value.as_ssz_bytes()).is_err());
-    }
+#[test_case(
+    BlobCellsAndProofs { blob_cells: vec![Optional::none()], proofs: vec![] };
+    "missing proof"
+)]
+#[test_case(
+    BlobCellsAndProofs {
+        blob_cells: vec![Optional::none()],
+        proofs: vec![Optional::some(Bytes48::ZERO)],
+    };
+    "proof without cell"
+)]
+#[test_case(
+    BlobCellsAndProofs {
+        blob_cells: vec![Optional::some(Cell::ZERO)],
+        proofs: vec![Optional::none()],
+    };
+    "cell without proof"
+)]
+fn blob_cells_require_matching_proofs(value: BlobCellsAndProofs) {
+    assert!(BlobCellsAndProofs::from_ssz_bytes(&value.as_ssz_bytes()).is_err());
 }
 
 #[test]
@@ -735,23 +737,50 @@ fn witness_response_omits_witness_and_keys_for_non_valid_status() {
     }
 }
 
-#[test]
-fn witness_bounds() {
-    let item = |len| vec![Bytes::from(vec![0; len])];
-    let empty = ExecutionWitness::default;
-    for (witness, valid) in [
-        (ExecutionWitness { state: item(MAX_BYTES_PER_WITNESS_NODE), ..empty() }, true),
-        (ExecutionWitness { state: item(MAX_BYTES_PER_WITNESS_NODE + 1), ..empty() }, false),
-        (ExecutionWitness { codes: item(MAX_BYTES_PER_CODE), ..empty() }, true),
-        (ExecutionWitness { codes: item(MAX_BYTES_PER_CODE + 1), ..empty() }, false),
-        (ExecutionWitness { headers: item(MAX_BYTES_PER_HEADER), ..empty() }, true),
-        (ExecutionWitness { headers: item(MAX_BYTES_PER_HEADER + 1), ..empty() }, false),
-        (ExecutionWitness { headers: vec![Bytes::new(); MAX_WITNESS_HEADERS], ..empty() }, true),
-        (
-            ExecutionWitness { headers: vec![Bytes::new(); MAX_WITNESS_HEADERS + 1], ..empty() },
-            false,
-        ),
-    ] {
-        assert_eq!(ExecutionWitness::from_ssz_bytes(&witness.as_ssz_bytes()).is_ok(), valid);
-    }
+fn witness_item(len: usize) -> Vec<Bytes> {
+    vec![Bytes::from(vec![0; len])]
+}
+
+#[test_case(
+    ExecutionWitness { state: witness_item(MAX_BYTES_PER_WITNESS_NODE), ..Default::default() }
+    => true;
+    "state node at limit"
+)]
+#[test_case(
+    ExecutionWitness { state: witness_item(MAX_BYTES_PER_WITNESS_NODE + 1), ..Default::default() }
+    => false;
+    "state node over limit"
+)]
+#[test_case(
+    ExecutionWitness { codes: witness_item(MAX_BYTES_PER_CODE), ..Default::default() }
+    => true;
+    "code at limit"
+)]
+#[test_case(
+    ExecutionWitness { codes: witness_item(MAX_BYTES_PER_CODE + 1), ..Default::default() }
+    => false;
+    "code over limit"
+)]
+#[test_case(
+    ExecutionWitness { headers: witness_item(MAX_BYTES_PER_HEADER), ..Default::default() }
+    => true;
+    "header at limit"
+)]
+#[test_case(
+    ExecutionWitness { headers: witness_item(MAX_BYTES_PER_HEADER + 1), ..Default::default() }
+    => false;
+    "header over limit"
+)]
+#[test_case(
+    ExecutionWitness { headers: vec![Bytes::new(); MAX_WITNESS_HEADERS], ..Default::default() }
+    => true;
+    "header count at limit"
+)]
+#[test_case(
+    ExecutionWitness { headers: vec![Bytes::new(); MAX_WITNESS_HEADERS + 1], ..Default::default() }
+    => false;
+    "header count over limit"
+)]
+fn witness_bounds(witness: ExecutionWitness) -> bool {
+    ExecutionWitness::from_ssz_bytes(&witness.as_ssz_bytes()).is_ok()
 }

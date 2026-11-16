@@ -4682,30 +4682,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
-    fn ssz_payload_status_roundtrip() {
-        use ssz::{Decode, Encode};
-
-        let statuses = [
-            PayloadStatus {
-                status: PayloadStatusEnum::Valid,
-                latest_valid_hash: Some(B256::with_last_byte(1)),
-            },
-            PayloadStatus {
-                status: PayloadStatusEnum::Invalid { validation_error: "bad payload".to_string() },
-                latest_valid_hash: Some(B256::with_last_byte(2)),
-            },
-            PayloadStatus { status: PayloadStatusEnum::Syncing, latest_valid_hash: None },
-            PayloadStatus { status: PayloadStatusEnum::Accepted, latest_valid_hash: None },
-        ];
-
-        for status in statuses {
-            let decoded = PayloadStatus::from_ssz_bytes(&status.as_ssz_bytes()).unwrap();
-            assert_eq!(decoded, status);
-        }
-    }
-
-    #[test]
-    #[cfg(feature = "ssz")]
     fn ssz_payload_status_matches_eip8178_container() {
         use ssz::{Decode, Encode};
 
@@ -4968,6 +4944,42 @@ mod tests {
     "0xf8521384565adcb7830186a0808080820a95a0784dbd311a82f822184a46f1677a428cbe3a2b88a798fb8ad1370cdbc06429e8a07a7f6a0efd428e3d822d1de9a050b8a883938b632185c254944dd3e40180eb79"
   ],
   "withdrawals": []
+
+    #[cfg(feature = "ssz")]
+    mod ssz_payload_status {
+        use super::*;
+        use similar_asserts::assert_eq;
+        use ssz::{Decode, Encode};
+        use test_case::test_case;
+
+        #[test_case(
+            PayloadStatus {
+                status: PayloadStatusEnum::Valid,
+                latest_valid_hash: Some(B256::with_last_byte(1)),
+            };
+            "valid"
+        )]
+        #[test_case(
+            PayloadStatus {
+                status: PayloadStatusEnum::Invalid { validation_error: "bad payload".to_string() },
+                latest_valid_hash: Some(B256::with_last_byte(2)),
+            };
+            "invalid"
+        )]
+        #[test_case(
+            PayloadStatus { status: PayloadStatusEnum::Syncing, latest_valid_hash: None };
+            "syncing"
+        )]
+        #[test_case(
+            PayloadStatus { status: PayloadStatusEnum::Accepted, latest_valid_hash: None };
+            "accepted"
+        )]
+        fn ssz_payload_status_roundtrip(status: PayloadStatus) {
+
+            let decoded = PayloadStatus::from_ssz_bytes(&status.as_ssz_bytes()).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
 }
         "#;
         let payload: ExecutionPayloadInputV2 = serde_json::from_str(response).unwrap();

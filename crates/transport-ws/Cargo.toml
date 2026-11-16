@@ -42,6 +42,9 @@ tokio-tungstenite = { workspace = true }
 [target.'cfg(target_family = "wasm")'.dependencies]
 ws_stream_wasm = "0.7.4"
 
+[dev-dependencies]
+test-case.workspace = true
+
 [features]
 default = ["aws-lc-rs"]
 aws-lc-rs = ["rustls-tls", "rustls?/aws-lc-rs"]

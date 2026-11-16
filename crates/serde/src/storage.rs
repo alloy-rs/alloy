@@ -179,6 +179,7 @@ mod tests {
     use super::*;
     use alloc::string::ToString;
     use serde_json::json;
+    use test_case::test_case;
 
     #[test]
     fn test_storage_key() {
@@ -193,27 +194,27 @@ mod tests {
         assert_eq!(key.as_b256(), key2.as_b256());
     }
 
-    #[test]
-    fn test_storage_key_serde_roundtrips() {
-        let test_cases = [
-            "0x0000000000000000000000000000000000000000000000000000000000000001", // Hash
-            "0x0000000000000000000000000000000000000000000000000000000000000abc", // Hash
-            "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",   // Number
-            "0xabc",                                                              // Number
-            "0xabcd",                                                             // Number
-            // 0x + 64 hex chars (max U256, total len = 66)
-            "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Hash
-        ];
+    // Hash
+    #[test_case("0x0000000000000000000000000000000000000000000000000000000000000001")]
+    // Hash
+    #[test_case("0x0000000000000000000000000000000000000000000000000000000000000abc")]
+    // Number
+    #[test_case("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
+    // Number
+    #[test_case("0xabc")]
+    // Number
+    #[test_case("0xabcd")]
+    // 0x + 64 hex chars (max U256, total len = 66)
+    // Hash
+    #[test_case("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
+    fn test_storage_key_serde_roundtrips(input: &str) {
+        let key: JsonStorageKey = serde_json::from_str(&json!(input).to_string()).unwrap();
+        let output = key.to_string();
 
-        for input in test_cases {
-            let key: JsonStorageKey = serde_json::from_str(&json!(input).to_string()).unwrap();
-            let output = key.to_string();
-
-            assert_eq!(
-                input, output,
-                "Storage key roundtrip failed to preserve the exact hex representation for {input}"
-            );
-        }
+        assert_eq!(
+            input, output,
+            "Storage key roundtrip failed to preserve the exact hex representation"
+        );
     }
 
     #[test]

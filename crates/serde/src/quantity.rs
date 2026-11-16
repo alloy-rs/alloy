@@ -391,61 +391,54 @@ mod private {
 
 #[cfg(test)]
 mod tests {
+    use super::private;
     use alloc::{collections::BTreeMap, string::ToString, vec, vec::Vec};
     use alloy_primitives::map::HashMap;
-    use core::num::{NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8};
+    use core::{
+        fmt::Debug,
+        num::{NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8},
+    };
     use serde::{Deserialize, Serialize};
+    use test_case::test_case;
 
-    macro_rules! nonzero_quantity_roundtrip_test {
-        ($name:ident, $ty:ty, $value:expr, $json:literal) => {
-            #[test]
-            fn $name() {
-                #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-                struct Value {
-                    #[serde(with = "super")]
-                    inner: $ty,
-                }
+    #[test_case(NonZeroU8::new(7u8).unwrap(), "{\"inner\":\"0x7\"}" ; "nonzero_u8_via_ruint")]
+    #[test_case(
+        NonZeroU16::new(1000u16).unwrap(),
+        "{\"inner\":\"0x3e8\"}"
+        ; "nonzero_u16_via_ruint"
+    )]
+    #[test_case(
+        NonZeroU32::new(1000u32).unwrap(),
+        "{\"inner\":\"0x3e8\"}"
+        ; "nonzero_u32_via_ruint"
+    )]
+    #[test_case(
+        NonZeroU64::new(1000u64).unwrap(),
+        "{\"inner\":\"0x3e8\"}"
+        ; "nonzero_u64_via_ruint"
+    )]
+    #[test_case(
+        NonZeroU128::new(1000u128).unwrap(),
+        "{\"inner\":\"0x3e8\"}"
+        ; "nonzero_u128_via_ruint"
+    )]
+    fn test_nonzero_quantity_roundtrip<T>(value: T, json: &str)
+    where
+        T: private::ConvertRuint + Debug + PartialEq,
+    {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Value<T: private::ConvertRuint> {
+            #[serde(with = "super")]
+            inner: T,
+        }
 
-                let val = Value { inner: <$ty>::new($value).unwrap() };
-                let s = serde_json::to_string(&val).unwrap();
-                assert_eq!(s, $json);
+        let val = Value { inner: value };
+        let s = serde_json::to_string(&val).unwrap();
+        assert_eq!(s, json);
 
-                let deserialized: Value = serde_json::from_str(&s).unwrap();
-                assert_eq!(val, deserialized);
-            }
-        };
+        let deserialized: Value<T> = serde_json::from_str(&s).unwrap();
+        assert_eq!(val, deserialized);
     }
-
-    nonzero_quantity_roundtrip_test!(
-        test_nonzero_u8_via_ruint,
-        NonZeroU8,
-        7u8,
-        "{\"inner\":\"0x7\"}"
-    );
-    nonzero_quantity_roundtrip_test!(
-        test_nonzero_u16_via_ruint,
-        NonZeroU16,
-        1000u16,
-        "{\"inner\":\"0x3e8\"}"
-    );
-    nonzero_quantity_roundtrip_test!(
-        test_nonzero_u32_via_ruint,
-        NonZeroU32,
-        1000u32,
-        "{\"inner\":\"0x3e8\"}"
-    );
-    nonzero_quantity_roundtrip_test!(
-        test_nonzero_u64_via_ruint,
-        NonZeroU64,
-        1000u64,
-        "{\"inner\":\"0x3e8\"}"
-    );
-    nonzero_quantity_roundtrip_test!(
-        test_nonzero_u128_via_ruint,
-        NonZeroU128,
-        1000u128,
-        "{\"inner\":\"0x3e8\"}"
-    );
 
     #[test]
     fn test_hex_u64() {
@@ -594,25 +587,30 @@ mod tests {
         let deserialized: Value = serde_json::from_str(&s).unwrap();
         assert_eq!(val, deserialized);
 
-        for (inner, expected) in [
-            (vec![], r#"{"inner":[]}"#),
-            (
-                vec![vec![], vec![0, u128::MAX]],
-                r#"{"inner":[[],["0x0","0xffffffffffffffffffffffffffffffff"]]}"#,
-            ),
-        ] {
-            let val = Value { inner: Some(inner) };
-            let serialized = serde_json::to_string(&val).unwrap();
-            assert_eq!(serialized, expected);
-            assert_eq!(serde_json::from_str::<Value>(&serialized).unwrap(), val);
-        }
-
         let val = Value { inner: None };
         let s = serde_json::to_string(&val).unwrap();
         assert_eq!(s, "{\"inner\":null}");
 
         let deserialized: Value = serde_json::from_str(&s).unwrap();
         assert_eq!(val, deserialized);
+    }
+
+    #[test_case(vec![], r#"{"inner":[]}"#)]
+    #[test_case(
+        vec![vec![], vec![0, u128::MAX]],
+        r#"{"inner":[[],["0x0","0xffffffffffffffffffffffffffffffff"]]}"#
+    )]
+    fn test_u128_vec_vec_opt_via_ruint_cases(inner: Vec<Vec<u128>>, expected: &str) {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Value {
+            #[serde(with = "super::u128_vec_vec_opt")]
+            inner: Option<Vec<Vec<u128>>>,
+        }
+
+        let val = Value { inner: Some(inner) };
+        let serialized = serde_json::to_string(&val).unwrap();
+        assert_eq!(serialized, expected);
+        assert_eq!(serde_json::from_str::<Value>(&serialized).unwrap(), val);
     }
 
     #[test]

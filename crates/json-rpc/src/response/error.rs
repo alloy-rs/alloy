@@ -395,6 +395,7 @@ mod test {
     use alloy_primitives::{B256, U256};
     use alloy_sol_types::sol;
     use serde_json::value::RawValue;
+    use test_case::test_case;
 
     use super::BorrowedErrorPayload;
     use crate::{ErrorPayload, RpcError};
@@ -463,38 +464,33 @@ mod test {
         assert!(payload.is_retry_err());
     }
 
-    #[test]
-    fn infura_precondition_failure() {
-        for (code, message, retryable) in [
-            (-32603, "precondition failure", true),
-            (-32603, "internal error", false),
-            (-32602, "precondition failure", false),
-        ] {
-            let payload: ErrorPayload = ErrorPayload { code, message: message.into(), data: None };
-            assert_eq!(payload.is_retry_err(), retryable, "{payload}");
-        }
+    #[test_case(-32603, "precondition failure", true)]
+    #[test_case(-32603, "internal error", false)]
+    #[test_case(-32602, "precondition failure", false)]
+    fn infura_precondition_failure(code: i64, message: &'static str, retryable: bool) {
+        let payload: ErrorPayload = ErrorPayload { code, message: message.into(), data: None };
+        assert_eq!(payload.is_retry_err(), retryable, "{payload}");
+    }
+
+    #[test_case(3, "execution reverted: rate limit exceeded")]
+    #[test_case(3, "execution reverted: max rate exceeded")]
+    #[test_case(3, "execution reverted: withdraw request limit reached")]
+    #[test_case(-32000, "execution reverted: too many requests")]
+    #[test_case(-32603, "execution reverted: credits limited")]
+    #[test_case(-32000, "Execution reverted: rate limit exceeded")]
+    #[test_case(-32000, "VM Exception while processing transaction: revert rate limit exceeded")]
+    #[test_case(-32016, "execution reverted: rate limit exceeded")]
+    #[test_case(-32012, "execution reverted: credits limited")]
+    #[test_case(-32007, "execution reverted: request limit reached")]
+    fn revert_reason_is_not_retry_err(code: i64, message: &'static str) {
+        let data = RawValue::from_string(r#""0x08c379a0""#.into()).unwrap();
+        let payload: ErrorPayload =
+            ErrorPayload { code, message: message.into(), data: Some(data) };
+        assert!(!payload.is_retry_err(), "{payload}");
     }
 
     #[test]
-    fn revert_reason_is_not_retry_err() {
-        let data = RawValue::from_string(r#""0x08c379a0""#.into()).unwrap();
-        for (code, message) in [
-            (3, "execution reverted: rate limit exceeded"),
-            (3, "execution reverted: max rate exceeded"),
-            (3, "execution reverted: withdraw request limit reached"),
-            (-32000, "execution reverted: too many requests"),
-            (-32603, "execution reverted: credits limited"),
-            (-32000, "Execution reverted: rate limit exceeded"),
-            (-32000, "VM Exception while processing transaction: revert rate limit exceeded"),
-            (-32016, "execution reverted: rate limit exceeded"),
-            (-32012, "execution reverted: credits limited"),
-            (-32007, "execution reverted: request limit reached"),
-        ] {
-            let payload: ErrorPayload =
-                ErrorPayload { code, message: message.into(), data: Some(data.clone()) };
-            assert!(!payload.is_retry_err(), "{payload}");
-        }
-
+    fn rate_limit_without_revert_data_is_retry_err() {
         let payload: ErrorPayload =
             ErrorPayload { code: -32000, message: "rate limit exceeded".into(), data: None };
         assert!(payload.is_retry_err());

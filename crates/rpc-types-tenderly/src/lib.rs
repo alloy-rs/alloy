@@ -508,6 +508,7 @@ pub struct ValueChange {
 #[cfg(test)]
 mod tests {
     use alloy_dyn_abi::{DynSolType, DynSolValue};
+    use test_case::test_case;
 
     use crate::{
         TenderlyDecodeInputResult, TenderlyEstimateGasResult, TenderlyGasPriceResult,
@@ -523,14 +524,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_success_response() {
-        assert_roundtrip::<TenderlySimulationResult>(include_str!("../test_data/success.json"));
-    }
-
-    #[test]
-    fn test_failure_response() {
-        assert_roundtrip::<TenderlySimulationResult>(include_str!("../test_data/failure.json"));
+    #[test_case(include_str!("../test_data/success.json") ; "success_response")]
+    #[test_case(include_str!("../test_data/failure.json") ; "failure_response")]
+    #[test_case(include_str!("../test_data/trace_success.json") ; "trace_success_response")]
+    #[test_case(include_str!("../test_data/trace_complex.json") ; "trace_complex_response")]
+    #[test_case(include_str!("../test_data/trace_swap.json") ; "trace_swap_response")]
+    fn test_simulation_response_roundtrip(input: &str) {
+        assert_roundtrip::<TenderlySimulationResult>(input);
     }
 
     #[test]
@@ -538,25 +538,6 @@ mod tests {
         assert_roundtrip::<Vec<TenderlySimulationResult>>(include_str!(
             "../test_data/bundle_success.json"
         ));
-    }
-
-    #[test]
-    fn test_trace_success_response() {
-        assert_roundtrip::<TenderlySimulationResult>(include_str!(
-            "../test_data/trace_success.json"
-        ));
-    }
-
-    #[test]
-    fn test_trace_complex_response() {
-        assert_roundtrip::<TenderlySimulationResult>(include_str!(
-            "../test_data/trace_complex.json"
-        ));
-    }
-
-    #[test]
-    fn test_trace_swap_response() {
-        assert_roundtrip::<TenderlySimulationResult>(include_str!("../test_data/trace_swap.json"));
     }
 
     #[test]

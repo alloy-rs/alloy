@@ -547,84 +547,92 @@ fn fake_exponential_u512(factor: u128, numerator: u128, denominator: u128) -> u1
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA, eip7892::BPO2_BASE_UPDATE_FRACTION,
+    };
+    use test_case::test_case;
 
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L27
     #[test]
-    fn test_calc_excess_blob_gas() {
+    fn test_calc_excess_blob_gas_zero_is_const() {
         const ZERO_EXCESS: u64 = calc_excess_blob_gas(0, 0);
         assert_eq!(ZERO_EXCESS, 0);
+    }
 
-        for t @ &(excess, blobs, expected) in &[
-            // The excess blob gas should not increase from zero if the used blob
-            // slots are below - or equal - to the target.
-            (0, 0, 0),
-            (0, 1, 0),
-            (0, TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB, 0),
-            // If the target blob gas is exceeded, the excessBlobGas should increase
-            // by however much it was overshot
-            (0, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB),
-            (1, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB + 1),
-            (
-                1,
-                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 2,
-                2 * DATA_GAS_PER_BLOB + 1,
-            ),
-            // The excess blob gas should decrease by however much the target was
-            // under-shot, capped at zero.
-            (
-                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
-                TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB,
-                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
-            ),
-            (
-                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
-                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 1,
-                TARGET_DATA_GAS_PER_BLOCK_DENCUN - DATA_GAS_PER_BLOB,
-            ),
-            (
-                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
-                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 2,
-                TARGET_DATA_GAS_PER_BLOCK_DENCUN - (2 * DATA_GAS_PER_BLOB),
-            ),
-            (DATA_GAS_PER_BLOB - 1, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 1, 0),
-        ] {
-            let actual = calc_excess_blob_gas(excess, blobs * DATA_GAS_PER_BLOB);
-            assert_eq!(actual, expected, "test: {t:?}");
+    // The excess blob gas should not increase from zero if the used blob
+    // slots are below - or equal - to the target.
+    #[test_case(0, 0, 0)]
+    #[test_case(0, 1, 0)]
+    #[test_case(0, TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB, 0)]
+    // If the target blob gas is exceeded, the excessBlobGas should increase
+    // by however much it was overshot
+    #[test_case(0, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB)]
+    #[test_case(
+        1,
+        (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 1,
+        DATA_GAS_PER_BLOB + 1
+    )]
+    #[test_case(
+        1,
+        (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 2,
+        2 * DATA_GAS_PER_BLOB + 1
+    )]
+    // The excess blob gas should decrease by however much the target was
+    // under-shot, capped at zero.
+    #[test_case(
+        TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+        TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB,
+        TARGET_DATA_GAS_PER_BLOCK_DENCUN
+    )]
+    #[test_case(
+        TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+        (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 1,
+        TARGET_DATA_GAS_PER_BLOCK_DENCUN - DATA_GAS_PER_BLOB
+    )]
+    #[test_case(
+        TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+        (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 2,
+        TARGET_DATA_GAS_PER_BLOCK_DENCUN - (2 * DATA_GAS_PER_BLOB)
+    )]
+    #[test_case(
+        DATA_GAS_PER_BLOB - 1,
+        (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 1,
+        0
+    )]
+    fn test_calc_excess_blob_gas(excess: u64, blobs: u64, expected: u64) {
+        let t = (excess, blobs, expected);
+        let actual = calc_excess_blob_gas(excess, blobs * DATA_GAS_PER_BLOB);
+        assert_eq!(actual, expected, "test: {t:?}");
 
-            // the inlined implementation must stay consistent with the osaka variant it
-            // previously delegated to
-            let osaka = eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
-                excess,
-                blobs * DATA_GAS_PER_BLOB,
-                0,
-            );
-            assert_eq!(actual, osaka, "osaka consistency: {t:?}");
-        }
+        // the inlined implementation must stay consistent with the osaka variant it
+        // previously delegated to
+        let osaka = eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
+            excess,
+            blobs * DATA_GAS_PER_BLOB,
+            0,
+        );
+        assert_eq!(actual, osaka, "osaka consistency: {t:?}");
     }
 
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L60
-    #[test]
-    fn test_calc_blob_fee() {
-        let blob_fee_vectors = &[
-            (0, 1),
-            (2314057, 1),
-            (2314058, 2),
-            (10 * 1024 * 1024, 23),
-            // calc_blob_gasprice approximates `e ** (excess_blob_gas /
-            // BLOB_GASPRICE_UPDATE_FRACTION)` using Taylor expansion
-            //
-            // to roughly find where boundaries will be hit:
-            // 2 ** bits = e ** (excess_blob_gas / BLOB_GASPRICE_UPDATE_FRACTION)
-            // excess_blob_gas = ln(2 ** bits) * BLOB_GASPRICE_UPDATE_FRACTION
-            (148099578, 18446739238971471609), // output is just below the overflow
-            (148099579, 18446744762204311910), // output is just after the overflow
-            (161087488, 902580055246494526580),
-        ];
-
-        for &(excess, expected) in blob_fee_vectors {
-            let actual = calc_blob_gasprice(excess);
-            assert_eq!(actual, expected, "test: {excess}");
-        }
+    #[test_case(0, 1)]
+    #[test_case(2314057, 1)]
+    #[test_case(2314058, 2)]
+    #[test_case(10 * 1024 * 1024, 23)]
+    // calc_blob_gasprice approximates `e ** (excess_blob_gas /
+    // BLOB_GASPRICE_UPDATE_FRACTION)` using Taylor expansion
+    //
+    // to roughly find where boundaries will be hit:
+    // 2 ** bits = e ** (excess_blob_gas / BLOB_GASPRICE_UPDATE_FRACTION)
+    // excess_blob_gas = ln(2 ** bits) * BLOB_GASPRICE_UPDATE_FRACTION
+    // output is just below the overflow
+    #[test_case(148099578, 18446739238971471609)]
+    // output is just after the overflow
+    #[test_case(148099579, 18446744762204311910)]
+    #[test_case(161087488, 902580055246494526580)]
+    fn test_calc_blob_fee(excess: u64, expected: u128) {
+        let actual = calc_blob_gasprice(excess);
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -634,32 +642,37 @@ mod tests {
     }
 
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L78
-    #[test]
-    fn fake_exp() {
-        for t @ &(factor, numerator, denominator, expected) in &[
-            (1u64, 0u64, 1u64, 1u128),
-            (38493, 0, 1000, 38493),
-            (0, 1234, 2345, 0),
-            (1, 2, 1, 6), // approximate 7.389
-            (1, 4, 2, 6),
-            (1, 3, 1, 16), // approximate 20.09
-            (1, 6, 2, 18),
-            (1, 4, 1, 49), // approximate 54.60
-            (1, 8, 2, 50),
-            (10, 8, 2, 542), // approximate 540.598
-            (11, 8, 2, 596), // approximate 600.58
-            (1, 5, 1, 136),  // approximate 148.4
-            (1, 5, 2, 11),   // approximate 12.18
-            (2, 5, 2, 23),   // approximate 24.36
-            (1, 50000000, 2225652, 5709098764),
-            (1, 380928, BLOB_GASPRICE_UPDATE_FRACTION.try_into().unwrap(), 1),
-            (0, 89, 1, 0),
-            (1, 299453931, 5007716, 93359993185840258978230108),
-            (1, 88, 1, 165162653699637111792770913913821835905),
-        ] {
-            let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
-            assert_eq!(actual, expected, "test: {t:?}");
-        }
+    #[test_case(1, 0, 1, 1)]
+    #[test_case(38493, 0, 1000, 38493)]
+    #[test_case(0, 1234, 2345, 0)]
+    // approximate 7.389
+    #[test_case(1, 2, 1, 6)]
+    #[test_case(1, 4, 2, 6)]
+    // approximate 20.09
+    #[test_case(1, 3, 1, 16)]
+    #[test_case(1, 6, 2, 18)]
+    // approximate 54.60
+    #[test_case(1, 4, 1, 49)]
+    #[test_case(1, 8, 2, 50)]
+    // approximate 540.598
+    #[test_case(10, 8, 2, 542)]
+    // approximate 600.58
+    #[test_case(11, 8, 2, 596)]
+    // approximate 148.4
+    #[test_case(1, 5, 1, 136)]
+    // approximate 12.18
+    #[test_case(1, 5, 2, 11)]
+    // approximate 24.36
+    #[test_case(2, 5, 2, 23)]
+    #[test_case(1, 50000000, 2225652, 5709098764)]
+    #[test_case(1, 380928, BLOB_GASPRICE_UPDATE_FRACTION.try_into().unwrap(), 1)]
+    #[test_case(0, 89, 1, 0)]
+    #[test_case(1, 299453931, 5007716, 93359993185840258978230108)]
+    #[test_case(1, 88, 1, 165162653699637111792770913913821835905)]
+    fn fake_exp(factor: u64, numerator: u64, denominator: u64, expected: u128) {
+        let t = (factor, numerator, denominator, expected);
+        let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
+        assert_eq!(actual, expected, "test: {t:?}");
     }
 
     #[test]
@@ -688,52 +701,45 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fake_exp_u128_matches_u512() {
-        for update_fraction in [
-            BLOB_GASPRICE_UPDATE_FRACTION,
-            crate::eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
-            crate::eip7892::BPO2_BASE_UPDATE_FRACTION as u128,
-        ] {
-            for excess in (0..400_000_000).step_by(1_234_567) {
-                let expected = fake_exponential_u512(1, excess, update_fraction);
-                if let Some(actual) = fake_exponential_u128(1, excess, update_fraction) {
-                    assert_eq!(actual, expected, "test: {excess}, {update_fraction}");
-                }
-                assert_eq!(fake_exponential(1, excess, update_fraction), expected);
+    #[test_case(BLOB_GASPRICE_UPDATE_FRACTION)]
+    #[test_case(BLOB_GASPRICE_UPDATE_FRACTION_PECTRA)]
+    #[test_case(BPO2_BASE_UPDATE_FRACTION as u128)]
+    fn fake_exp_u128_matches_u512(update_fraction: u128) {
+        for excess in (0..400_000_000).step_by(1_234_567) {
+            let expected = fake_exponential_u512(1, excess, update_fraction);
+            if let Some(actual) = fake_exponential_u128(1, excess, update_fraction) {
+                assert_eq!(actual, expected, "test: {excess}, {update_fraction}");
             }
-
-            // A blob fee above 1 ETH per blob gas is still computed without the fallback.
-            let excess = 42 * update_fraction;
-            assert!(fake_exponential_u128(1, excess, update_fraction).unwrap() > 10u128.pow(18));
+            assert_eq!(fake_exponential(1, excess, update_fraction), expected);
         }
+
+        // A blob fee above 1 ETH per blob gas is still computed without the fallback.
+        let excess = 42 * update_fraction;
+        assert!(fake_exponential_u128(1, excess, update_fraction).unwrap() > 10u128.pow(18));
     }
 
-    #[test]
-    fn osaka_excess_blob_gas_with_zero_blob_capacity() {
+    #[test_case(0, 0, 0)]
+    #[test_case(0, 1, 1)]
+    // Blob fee is 1 for these inputs. At base fee 16,
+    // the reserve-price comparison is equal; at 17 it is exceeded.
+    #[test_case(16, 0, 0)]
+    #[test_case(16, 1, 1)]
+    #[test_case(17, 0, 0)]
+    #[test_case(17, 1, 1)]
+    #[test_case(1_000_000_000, 0, 0)]
+    #[test_case(1_000_000_000, 1, 1)]
+    fn osaka_excess_blob_gas_with_zero_blob_capacity(base_fee: u64, excess: u64, expected: u64) {
         let params = crate::eip7840::BlobParams {
             target_blob_count: 0,
             max_blob_count: 0,
             max_blobs_per_tx: 0,
             ..crate::eip7840::BlobParams::osaka()
         };
+        let t = (base_fee, excess, expected);
 
-        for t @ &(base_fee, excess, expected) in &[
-            (0, 0, 0),
-            (0, 1, 1),
-            // Blob fee is 1 for these inputs. At base fee 16,
-            // the reserve-price comparison is equal; at 17 it is exceeded.
-            (16, 0, 0),
-            (16, 1, 1),
-            (17, 0, 0),
-            (17, 1, 1),
-            (1_000_000_000, 0, 0),
-            (1_000_000_000, 1, 1),
-        ] {
-            let actual = params.next_block_excess_blob_gas_osaka(excess, 0, base_fee);
+        let actual = params.next_block_excess_blob_gas_osaka(excess, 0, base_fee);
 
-            assert_eq!(actual, expected, "test: {t:?}");
-        }
+        assert_eq!(actual, expected, "test: {t:?}");
     }
 
     #[test]

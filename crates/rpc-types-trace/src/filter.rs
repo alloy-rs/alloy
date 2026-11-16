@@ -263,54 +263,52 @@ mod tests {
     use alloy_primitives::{Bytes, B256, U256};
     use serde_json::json;
     use similar_asserts::assert_eq;
+    use test_case::test_case;
 
-    #[test]
-    fn default_filter_intersects_address_lists() {
-        let from = Address::with_last_byte(1);
-        let to = Address::with_last_byte(2);
-        let other = Address::with_last_byte(3);
+    const FROM: Address = Address::with_last_byte(1);
+    const TO: Address = Address::with_last_byte(2);
+    const OTHER: Address = Address::with_last_byte(3);
+    const HASH: B256 = B256::with_last_byte(0xab);
+
+    #[test_case(FROM, TO, true)]
+    #[test_case(OTHER, OTHER, true)]
+    #[test_case(FROM, FROM, false)]
+    #[test_case(TO, TO, false)]
+    #[test_case(TO, FROM, false)]
+    fn default_filter_intersects_address_lists(
+        sender: Address,
+        recipient: Address,
+        expected: bool,
+    ) {
         let filter: TraceFilter = serde_json::from_value(json!({
-            "fromAddress": [from, other],
-            "toAddress": [to, other],
+            "fromAddress": [FROM, OTHER],
+            "toAddress": [TO, OTHER],
         }))
         .unwrap();
         assert_eq!(filter.mode, TraceFilterMode::Intersection);
         assert_eq!(TraceFilter::default().mode, TraceFilterMode::Intersection);
 
-        for (sender, recipient, expected) in [
-            (from, to, true),
-            (other, other, true),
-            (from, from, false),
-            (to, to, false),
-            (to, from, false),
-        ] {
-            let trace = TransactionTrace {
-                action: Action::Call(CallAction {
-                    from: sender,
-                    to: recipient,
-                    ..Default::default()
-                }),
-                ..Default::default()
-            };
-            assert_eq!(filter.matcher().matches(&trace), expected);
-        }
+        let trace = TransactionTrace {
+            action: Action::Call(CallAction { from: sender, to: recipient, ..Default::default() }),
+            ..Default::default()
+        };
+        assert_eq!(filter.matcher().matches(&trace), expected);
     }
 
-    #[test]
-    fn filter_mode_is_explicit_and_validated() {
+    #[test_case("union", true)]
+    #[test_case("intersection", false)]
+    fn filter_mode_is_explicit_and_validated(mode: &str, expected: bool) {
         let from = Address::with_last_byte(1);
         let to = Address::with_last_byte(2);
         let trace = TransactionTrace {
             action: Action::Call(CallAction { from, to: from, ..Default::default() }),
             ..Default::default()
         };
-        for (mode, expected) in [("union", true), ("intersection", false)] {
-            let filter: TraceFilter = serde_json::from_value(json!({
-                "fromAddress": [from], "toAddress": [to], "mode": mode,
-            }))
-            .unwrap();
-            assert_eq!(filter.matcher().matches(&trace), expected);
-        }
+        let filter: TraceFilter = serde_json::from_value(json!({
+            "fromAddress": [from], "toAddress": [to], "mode": mode,
+        }))
+        .unwrap();
+        assert_eq!(filter.matcher().matches(&trace), expected);
     }
 
     #[test]
@@ -328,37 +326,32 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(filter, omitted);
-
-        for member in [
-            "fromBlock",
-            "toBlock",
-            "fromAddress",
-            "toAddress",
-            "mode",
-            "after",
-            "count",
-            "blockHash",
-        ] {
-            let filter: TraceFilter = serde_json::from_value(json!({ member: null })).unwrap();
-            assert_eq!(filter, TraceFilter::default(), "{member}");
-        }
     }
 
-    #[test]
-    fn invalid_members_are_rejected() {
-        for filter in [
-            json!({ "mode": "unknown" }),
-            json!({ "mode": 1 }),
-            json!({ "fromAddress": Address::ZERO }),
-            json!({ "toAddress": [null] }),
-            json!({ "unknown": null }),
-            json!({ "fromAddress": null, "unknown": null }),
-            json!({ "blockHash": "0x1234" }),
-            json!({ "blockHash": { "blockHash": B256::ZERO } }),
-            json!({ "blockHash": 1 }),
-        ] {
-            assert!(serde_json::from_value::<TraceFilter>(filter.clone()).is_err(), "{filter}");
-        }
+    #[test_case("fromBlock")]
+    #[test_case("toBlock")]
+    #[test_case("fromAddress")]
+    #[test_case("toAddress")]
+    #[test_case("mode")]
+    #[test_case("after")]
+    #[test_case("count")]
+    #[test_case("blockHash")]
+    fn null_member_is_omitted(member: &str) {
+        let filter: TraceFilter = serde_json::from_value(json!({ member: null })).unwrap();
+        assert_eq!(filter, TraceFilter::default(), "{member}");
+    }
+
+    #[test_case(json!({ "mode": "unknown" }); "unknown mode")]
+    #[test_case(json!({ "mode": 1 }); "numeric mode")]
+    #[test_case(json!({ "fromAddress": Address::ZERO }); "from address not a list")]
+    #[test_case(json!({ "toAddress": [null] }); "null to address entry")]
+    #[test_case(json!({ "unknown": null }); "unknown member")]
+    #[test_case(json!({ "fromAddress": null, "unknown": null }); "null member and unknown member")]
+    #[test_case(json!({ "blockHash": "0x1234" }); "short block hash")]
+    #[test_case(json!({ "blockHash": { "blockHash": B256::ZERO } }); "nested block hash")]
+    #[test_case(json!({ "blockHash": 1 }); "numeric block hash")]
+    fn invalid_members_are_rejected(filter: serde_json::Value) {
+        assert!(serde_json::from_value::<TraceFilter>(filter).is_err());
     }
 
     #[test]
@@ -387,32 +380,35 @@ mod tests {
         assert!(serde_json::to_value(TraceFilter::default()).unwrap().get("blockHash").is_none());
     }
 
-    #[test]
-    fn block_hash_excludes_range_bounds() {
-        let hash = B256::with_last_byte(0xab);
-        for filter in [
-            json!({ "blockHash": hash, "fromBlock": "0x2" }),
-            json!({ "blockHash": hash, "toBlock": "0x2" }),
-            json!({ "blockHash": hash, "fromBlock": "0x2", "toBlock": "0x2" }),
-        ] {
-            let filter: TraceFilter = serde_json::from_value(filter).unwrap();
-            assert_eq!(filter.block_option(), Err(TraceFilterBlockConflict), "{filter:?}");
-        }
+    #[test_case(json!({ "blockHash": HASH, "fromBlock": "0x2" }); "from block")]
+    #[test_case(json!({ "blockHash": HASH, "toBlock": "0x2" }); "to block")]
+    #[test_case(json!({ "blockHash": HASH, "fromBlock": "0x2", "toBlock": "0x2" }); "both bounds")]
+    fn block_hash_excludes_range_bounds(filter: serde_json::Value) {
+        let filter: TraceFilter = serde_json::from_value(filter).unwrap();
+        assert_eq!(filter.block_option(), Err(TraceFilterBlockConflict), "{filter:?}");
+    }
 
-        for (filter, expected) in [
-            (
-                json!({ "blockHash": hash, "fromBlock": null, "toBlock": null }),
-                TraceFilterBlockOption::AtBlockHash(hash),
-            ),
-            (
-                json!({ "blockHash": null, "fromBlock": "0x2", "toBlock": "0x5" }),
-                TraceFilterBlockOption::Range { from_block: Some(2), to_block: Some(5) },
-            ),
-            (json!({}), TraceFilterBlockOption::Range { from_block: None, to_block: None }),
-        ] {
-            let filter: TraceFilter = serde_json::from_value(filter).unwrap();
-            assert_eq!(filter.block_option(), Ok(expected));
-        }
+    #[test_case(
+        json!({ "blockHash": HASH, "fromBlock": null, "toBlock": null }),
+        TraceFilterBlockOption::AtBlockHash(HASH);
+        "block hash with null bounds"
+    )]
+    #[test_case(
+        json!({ "blockHash": null, "fromBlock": "0x2", "toBlock": "0x5" }),
+        TraceFilterBlockOption::Range { from_block: Some(2), to_block: Some(5) };
+        "range with null block hash"
+    )]
+    #[test_case(
+        json!({}),
+        TraceFilterBlockOption::Range { from_block: None, to_block: None };
+        "empty"
+    )]
+    fn block_hash_or_range_selects_block_option(
+        filter: serde_json::Value,
+        expected: TraceFilterBlockOption,
+    ) {
+        let filter: TraceFilter = serde_json::from_value(filter).unwrap();
+        assert_eq!(filter.block_option(), Ok(expected));
     }
 
     #[test]
@@ -444,30 +440,24 @@ mod tests {
         }
     }
 
-    #[test]
-    fn default_filter_empty_lists_are_unconstrained() {
-        let from = Address::with_last_byte(1);
-        let to = Address::with_last_byte(2);
+    #[test_case(json!({}), true; "empty")]
+    #[test_case(json!({ "fromAddress": [], "toAddress": [] }), true; "both empty")]
+    #[test_case(json!({ "fromAddress": [], "toAddress": [TO] }), true; "empty from, to hit")]
+    #[test_case(json!({ "fromAddress": [FROM], "toAddress": [] }), true; "from hit, empty to")]
+    #[test_case(json!({ "fromAddress": [], "toAddress": [FROM] }), false; "empty from, to miss")]
+    #[test_case(json!({ "fromAddress": [TO], "toAddress": [] }), false; "from miss, empty to")]
+    #[test_case(json!({ "fromAddress": null, "toAddress": null }), true; "both null")]
+    #[test_case(json!({ "fromAddress": null, "toAddress": [TO] }), true; "null from, to hit")]
+    #[test_case(json!({ "fromAddress": [FROM], "toAddress": null }), true; "from hit, null to")]
+    #[test_case(json!({ "fromAddress": null, "toAddress": [FROM] }), false; "null from, to miss")]
+    #[test_case(json!({ "fromAddress": [TO], "toAddress": null }), false; "from miss, null to")]
+    fn default_filter_empty_lists_are_unconstrained(filter: serde_json::Value, expected: bool) {
         let trace = TransactionTrace {
-            action: Action::Call(CallAction { from, to, ..Default::default() }),
+            action: Action::Call(CallAction { from: FROM, to: TO, ..Default::default() }),
             ..Default::default()
         };
-        for (filter, expected) in [
-            (json!({}), true),
-            (json!({ "fromAddress": [], "toAddress": [] }), true),
-            (json!({ "fromAddress": [], "toAddress": [to] }), true),
-            (json!({ "fromAddress": [from], "toAddress": [] }), true),
-            (json!({ "fromAddress": [], "toAddress": [from] }), false),
-            (json!({ "fromAddress": [to], "toAddress": [] }), false),
-            (json!({ "fromAddress": null, "toAddress": null }), true),
-            (json!({ "fromAddress": null, "toAddress": [to] }), true),
-            (json!({ "fromAddress": [from], "toAddress": null }), true),
-            (json!({ "fromAddress": null, "toAddress": [from] }), false),
-            (json!({ "fromAddress": [to], "toAddress": null }), false),
-        ] {
-            let filter: TraceFilter = serde_json::from_value(filter).unwrap();
-            assert_eq!(filter.matcher().matches(&trace), expected);
-        }
+        let filter: TraceFilter = serde_json::from_value(filter).unwrap();
+        assert_eq!(filter.matcher().matches(&trace), expected);
     }
 
     #[test]

@@ -1152,6 +1152,7 @@ mod tests {
     use alloy_rlp::{Decodable, Encodable};
     use assert_matches::assert_matches;
     use std::path::PathBuf;
+    use test_case::test_case;
 
     #[test]
     fn different_sidecar_same_hash() {
@@ -1213,8 +1214,17 @@ mod tests {
         assert_eq!(decoded, expected_envelope);
     }
 
-    #[test]
-    fn decoded_sidecar_hash_excludes_sidecar() {
+    #[test_case(BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
+        blobs: vec![[2; 131072].into()],
+        commitments: vec![[3; 48].into()],
+        proofs: vec![[4; 48].into()],
+    }))]
+    #[test_case(BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
+        blobs: vec![[2; 131072].into()],
+        commitments: vec![[3; 48].into()],
+        cell_proofs: vec![[4; 48].into(); CELLS_PER_EXT_BLOB],
+    }))]
+    fn decoded_sidecar_hash_excludes_sidecar(sidecar: BlobTransactionSidecarVariant) {
         type WithSidecar = TxEip4844WithSidecar<BlobTransactionSidecarVariant>;
         type Variant = TxEip4844Variant<BlobTransactionSidecarVariant>;
 
@@ -1228,34 +1238,20 @@ mod tests {
         let signature = Signature::test_signature();
         let expected = *tx.clone().into_signed(signature).hash();
 
-        let sidecars = [
-            BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
-                blobs: vec![[2; 131072].into()],
-                commitments: vec![[3; 48].into()],
-                proofs: vec![[4; 48].into()],
-            }),
-            BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
-                blobs: vec![[2; 131072].into()],
-                commitments: vec![[3; 48].into()],
-                cell_proofs: vec![[4; 48].into(); CELLS_PER_EXT_BLOB],
-            }),
+        let signed = TxEip4844WithSidecar { tx, sidecar }.into_signed(signature);
+        assert_eq!(*signed.hash(), expected);
+
+        let encoded = signed.encoded_2718();
+        let mut network = Vec::new();
+        signed.network_encode(&mut network);
+
+        let hashes = [
+            *WithSidecar::eip2718_decode(&mut encoded.as_slice()).unwrap().hash(),
+            *WithSidecar::network_decode(&mut network.as_slice()).unwrap().hash(),
+            *Variant::eip2718_decode(&mut encoded.as_slice()).unwrap().hash(),
+            *Variant::network_decode(&mut network.as_slice()).unwrap().hash(),
         ];
-        for sidecar in sidecars {
-            let signed = TxEip4844WithSidecar { tx: tx.clone(), sidecar }.into_signed(signature);
-            assert_eq!(*signed.hash(), expected);
-
-            let encoded = signed.encoded_2718();
-            let mut network = Vec::new();
-            signed.network_encode(&mut network);
-
-            let hashes = [
-                *WithSidecar::eip2718_decode(&mut encoded.as_slice()).unwrap().hash(),
-                *WithSidecar::network_decode(&mut network.as_slice()).unwrap().hash(),
-                *Variant::eip2718_decode(&mut encoded.as_slice()).unwrap().hash(),
-                *Variant::network_decode(&mut network.as_slice()).unwrap().hash(),
-            ];
-            assert_eq!(hashes, [expected; 4]);
-        }
+        assert_eq!(hashes, [expected; 4]);
     }
 
     #[test]

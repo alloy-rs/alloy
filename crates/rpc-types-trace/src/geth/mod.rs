@@ -857,6 +857,7 @@ fn serialize_string_storage_map_opt<S: Serializer>(
 mod tests {
     use super::*;
     use similar_asserts::assert_eq;
+    use test_case::test_case;
 
     #[test]
     fn serde_chain_block_trace_result() {
@@ -1097,20 +1098,31 @@ mod tests {
                 assert_eq!(opts.records_call_logs(), expected, "{opts:?}");
             }
         }
+    }
 
-        for options in [
-            serde_json::json!({}),
-            serde_json::json!({ "tracerConfig": { "withLog": true } }),
-            serde_json::json!({ "tracer": "prestateTracer", "tracerConfig": { "withLog": true } }),
-            serde_json::json!({ "tracer": "customTracer", "tracerConfig": { "withLog": true } }),
-            serde_json::json!({ "tracer": "muxTracer" }),
-            serde_json::json!({ "tracer": "muxTracer", "tracerConfig": { "withLog": true } }),
-            serde_json::json!({ "tracer": "muxTracer", "tracerConfig": {
-                "prestateTracer": { "withLog": true }
-            } }),
-        ] {
-            let opts = serde_json::from_value::<GethDebugTracingOptions>(options).unwrap();
-            assert!(!opts.records_call_logs(), "{opts:?}");
-        }
+    #[test_case(serde_json::json!({}); "empty")]
+    #[test_case(serde_json::json!({ "tracerConfig": { "withLog": true } }); "no tracer")]
+    #[test_case(
+        serde_json::json!({ "tracer": "prestateTracer", "tracerConfig": { "withLog": true } });
+        "prestate tracer"
+    )]
+    #[test_case(
+        serde_json::json!({ "tracer": "customTracer", "tracerConfig": { "withLog": true } });
+        "custom tracer"
+    )]
+    #[test_case(serde_json::json!({ "tracer": "muxTracer" }); "mux without config")]
+    #[test_case(
+        serde_json::json!({ "tracer": "muxTracer", "tracerConfig": { "withLog": true } });
+        "mux with top level log"
+    )]
+    #[test_case(
+        serde_json::json!({ "tracer": "muxTracer", "tracerConfig": {
+            "prestateTracer": { "withLog": true }
+        } });
+        "mux with prestate log"
+    )]
+    fn does_not_record_call_logs(options: serde_json::Value) {
+        let opts = serde_json::from_value::<GethDebugTracingOptions>(options).unwrap();
+        assert!(!opts.records_call_logs(), "{opts:?}");
     }
 }

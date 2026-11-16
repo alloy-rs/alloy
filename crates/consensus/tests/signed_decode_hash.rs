@@ -8,6 +8,7 @@ use alloy_consensus::{
 use alloy_eips::eip2718::Decodable2718;
 use alloy_primitives::{b256, hex, Address, Signature, TxKind, B256, U256};
 use std::path::PathBuf;
+use test_case::test_case;
 
 fn assert_decoded_hash<T: RlpEcdsaDecodableTx>(eip2718: &[u8], name: &str) {
     let signed = Signed::<T>::eip2718_decode(&mut &eip2718[..]).unwrap();
@@ -89,31 +90,27 @@ fn decoded_hash_excludes_sidecar() {
     }
 }
 
-#[test]
-fn decoded_hash_matches_known_hash() {
-    // Computed independently as `keccak256(0x03 || rlp(tx_payload_body))`, the first element of
-    // the pooled encoding.
-    for (file, expected) in [
-        (
-            "testdata/4844rlp/0.rlp",
-            b256!("0xd886baa4d7824402a508487d94b8efed257832170ecb5f5a85b8d2e15317728c"),
-        ),
-        (
-            "testdata/7594rlp/1.rlp",
-            b256!("0xb7490b74a4642b4c9d5c6cdb8a7a24dd639affa2d8eef4d5cd32a931a92a9752"),
-        ),
-    ] {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(file);
-        let raw = hex::decode(std::fs::read_to_string(&path).unwrap().trim()).unwrap();
+// Computed independently as `keccak256(0x03 || rlp(tx_payload_body))`, the first element of
+// the pooled encoding.
+#[test_case(
+    "testdata/4844rlp/0.rlp",
+    b256!("0xd886baa4d7824402a508487d94b8efed257832170ecb5f5a85b8d2e15317728c")
+)]
+#[test_case(
+    "testdata/7594rlp/1.rlp",
+    b256!("0xb7490b74a4642b4c9d5c6cdb8a7a24dd639affa2d8eef4d5cd32a931a92a9752")
+)]
+fn decoded_hash_matches_known_hash(file: &str, expected: B256) {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(file);
+    let raw = hex::decode(std::fs::read_to_string(&path).unwrap().trim()).unwrap();
 
-        let signed = Signed::<TxEip4844WithSidecar>::eip2718_decode(&mut &raw[..]).unwrap();
-        assert_eq!(*signed.hash(), expected, "eip2718_decode: {file}");
-        let signed = Signed::<TxEip4844Variant>::eip2718_decode(&mut &raw[..]).unwrap();
-        assert_eq!(*signed.hash(), expected, "variant eip2718_decode: {file}");
+    let signed = Signed::<TxEip4844WithSidecar>::eip2718_decode(&mut &raw[..]).unwrap();
+    assert_eq!(*signed.hash(), expected, "eip2718_decode");
+    let signed = Signed::<TxEip4844Variant>::eip2718_decode(&mut &raw[..]).unwrap();
+    assert_eq!(*signed.hash(), expected, "variant eip2718_decode");
 
-        let mut network = Vec::new();
-        signed.network_encode(&mut network);
-        let signed = Signed::<TxEip4844WithSidecar>::network_decode(&mut &network[..]).unwrap();
-        assert_eq!(*signed.hash(), expected, "network_decode: {file}");
-    }
+    let mut network = Vec::new();
+    signed.network_encode(&mut network);
+    let signed = Signed::<TxEip4844WithSidecar>::network_decode(&mut &network[..]).unwrap();
+    assert_eq!(*signed.hash(), expected, "network_decode");
 }

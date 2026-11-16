@@ -600,6 +600,7 @@ mod provider {
             CcipReadGatewayError, CcipReadRequest, ProviderBuilder,
         };
         use alloy_sol_types::{sol, SolError};
+        use test_case::test_case;
 
         sol! {
             error OffchainLookup(
@@ -697,17 +698,18 @@ mod provider {
                 map_ccip_error(transport, "foo.eth", EnsError::Resolve),
                 EnsError::ResolverNotFound(name) if name == "foo.eth"
             ));
+        }
 
-            for error in [
-                CcipReadError::Gateway(CcipReadGatewayError::new("gateway down")),
-                CcipReadError::TooManyRedirects(4),
-                CcipReadError::SenderMismatch { sender: Address::ZERO, target: Address::ZERO },
-            ] {
-                assert!(matches!(
-                    map_ccip_error(error, "test.eth", EnsError::Resolve),
-                    EnsError::CcipRead(_)
-                ));
-            }
+        #[test_case(CcipReadError::Gateway(CcipReadGatewayError::new("gateway down")))]
+        #[test_case(CcipReadError::TooManyRedirects(4))]
+        #[test_case(
+            CcipReadError::SenderMismatch { sender: Address::ZERO, target: Address::ZERO }
+        )]
+        fn map_ccip_error_keeps_ccip_read_categories(error: CcipReadError) {
+            assert!(matches!(
+                map_ccip_error(error, "test.eth", EnsError::Resolve),
+                EnsError::CcipRead(_)
+            ));
         }
 
         /// Checks the DNS gateway request without contacting a live DNSSEC service.
@@ -819,17 +821,17 @@ mod provider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
 
-    #[test]
-    fn test_invalid_address() {
-        for addr in [
-            "0x314618",
-            "0x000000000000000000000000000000000000000", // 41
-            "0x00000000000000000000000000000000000000000", // 43
-            "0x28679A1a632125fbBf7A68d850E50623194A709E123", // 44
-        ] {
-            assert!(NameOrAddress::from_str(addr).is_err());
-        }
+    #[test_case("0x314618")]
+    // 41
+    #[test_case("0x000000000000000000000000000000000000000")]
+    // 43
+    #[test_case("0x00000000000000000000000000000000000000000")]
+    // 44
+    #[test_case("0x28679A1a632125fbBf7A68d850E50623194A709E123")]
+    fn test_invalid_address(addr: &str) {
+        assert!(NameOrAddress::from_str(addr).is_err());
     }
 
     #[test]
@@ -856,45 +858,49 @@ mod tests {
 #[cfg(all(test, feature = "contract"))]
 mod resolver_info_tests {
     use super::*;
-    use alloy_primitives::{address, Bytes, B256, U256};
+    use alloy_primitives::{address, Address, Bytes, B256, U256};
+    use std::error::Error;
+    use test_case::test_case;
 
-    #[test]
-    fn contract_errors_are_sources() {
-        let variants = [
-            EnsError::Resolver,
-            EnsError::RevRegistrar,
-            EnsError::Lookup,
-            EnsError::Resolve,
-            EnsError::ResolveTxtRecord,
-        ];
-        for wrap in variants {
-            let error = wrap(alloy_contract::Error::NotADeploymentTransaction);
-            let source = std::error::Error::source(&error).expect("contract error source");
-            assert!(matches!(
-                source.downcast_ref::<alloy_contract::Error>(),
-                Some(alloy_contract::Error::NotADeploymentTransaction)
-            ));
+    const RESOLVER: Address = address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63");
+
+    #[test_case(EnsError::Resolver)]
+    #[test_case(EnsError::RevRegistrar)]
+    #[test_case(EnsError::Lookup)]
+    #[test_case(EnsError::Resolve)]
+    #[test_case(EnsError::ResolveTxtRecord)]
+    fn contract_errors_are_sources(wrap: fn(alloy_contract::Error) -> EnsError) {
+        let error = wrap(alloy_contract::Error::NotADeploymentTransaction);
+        let source = Error::source(&error).expect("contract error source");
+        assert!(matches!(
+            source.downcast_ref::<alloy_contract::Error>(),
+            Some(alloy_contract::Error::NotADeploymentTransaction)
+        ));
+    }
+
+    fn info(extended: bool, offset: u64) -> UniversalResolver::ResolverInfo {
+        UniversalResolver::ResolverInfo {
+            name: Bytes::new(),
+            offset: U256::from(offset),
+            node: B256::ZERO,
+            resolver: RESOLVER,
+            extended,
         }
     }
 
     #[test]
-    fn direct_resolver_rejects_extended_and_wildcard_resolvers() {
-        let resolver = address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63");
-        let info = |extended: bool, offset: u64| UniversalResolver::ResolverInfo {
-            name: Bytes::new(),
-            offset: U256::from(offset),
-            node: B256::ZERO,
-            resolver,
-            extended,
-        };
+    fn direct_resolver_accepts_plain_resolver() {
+        assert_eq!(info(false, 0).direct_resolver("vitalik.eth").unwrap(), RESOLVER);
+    }
 
-        assert_eq!(info(false, 0).direct_resolver("vitalik.eth").unwrap(), resolver);
-        for (extended, offset) in [(true, 0), (false, 4), (true, 4)] {
-            let err = info(extended, offset).direct_resolver("sub.wildcard.eth").unwrap_err();
-            assert!(
-                matches!(err, EnsError::RequiresUniversalResolver(name) if name == "sub.wildcard.eth")
-            );
-        }
+    #[test_case(true, 0)]
+    #[test_case(false, 4)]
+    #[test_case(true, 4)]
+    fn direct_resolver_rejects_extended_and_wildcard_resolvers(extended: bool, offset: u64) {
+        let err = info(extended, offset).direct_resolver("sub.wildcard.eth").unwrap_err();
+        assert!(
+            matches!(err, EnsError::RequiresUniversalResolver(name) if name == "sub.wildcard.eth")
+        );
     }
 }
 

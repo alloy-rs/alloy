@@ -226,6 +226,8 @@ mod tests {
     use crate::{Anvil, Geth, NodeError, Reth};
     #[cfg(unix)]
     use std::{io::Read, os::unix::fs::PermissionsExt};
+    #[cfg(unix)]
+    use test_case::test_case;
 
     /// Writes an executable shell script at `dir/name`.
     #[cfg(unix)]
@@ -357,56 +359,57 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn startup_errors_reap_children() {
-        for (name, output, private_key_error) in [
-            ("anvil", "\\377\\n", false),
-            ("geth", "\\377\\n", false),
-            ("reth", "\\377\\n", false),
-            ("anvil", "Private Keys\\n(0) 0xinvalid\\n", true),
-        ] {
-            let dir = tempfile::tempdir().unwrap();
-            let program = dir.path().join(name);
-            let redirect = if name == "geth" { ">&2" } else { "" };
-            std::fs::write(
-                &program,
-                format!(
-                    "#!/bin/sh\necho $$ > \"$0.pid\"\nprintf '{output}' {redirect}\nwhile :; do :; done\n"
-                ),
-            )
+    #[test_case("anvil", "\\377\\n", false)]
+    #[test_case("geth", "\\377\\n", false)]
+    #[test_case("reth", "\\377\\n", false)]
+    #[test_case("anvil", "Private Keys\\n(0) 0xinvalid\\n", true)]
+    fn startup_errors_reap_children(name: &str, output: &str, private_key_error: bool) {
+        use std::{
+            fs::{self, Permissions},
+            io, ptr,
+        };
+
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join(name);
+        let redirect = if name == "geth" { ">&2" } else { "" };
+        fs::write(
+            &program,
+            format!(
+                "#!/bin/sh\necho $$ > \"$0.pid\"\nprintf '{output}' {redirect}\nwhile :; do :; done\n"
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&program, Permissions::from_mode(0o755)).unwrap();
+
+        let result = match name {
+            "anvil" => Anvil::at(&program).try_spawn().map(drop),
+            "geth" => Geth::at(&program).try_spawn().map(drop),
+            "reth" => Reth::at(&program).try_spawn().map(drop),
+            _ => unreachable!(),
+        };
+        let pid = fs::read_to_string(program.with_extension("pid"))
+            .unwrap()
+            .trim()
+            .parse::<libc::pid_t>()
             .unwrap();
-            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
-
-            let result = match name {
-                "anvil" => Anvil::at(&program).try_spawn().map(drop),
-                "geth" => Geth::at(&program).try_spawn().map(drop),
-                "reth" => Reth::at(&program).try_spawn().map(drop),
-                _ => unreachable!(),
-            };
-            let pid = std::fs::read_to_string(program.with_extension("pid"))
-                .unwrap()
-                .trim()
-                .parse::<libc::pid_t>()
-                .unwrap();
-            // SAFETY: This only queries the child PID written by our test process.
-            let status = unsafe { libc::waitpid(pid, std::ptr::null_mut(), libc::WNOHANG) };
-            let error = std::io::Error::last_os_error();
-            if status == 0 {
-                // SAFETY: A zero waitpid result confirms this is our live child. Clean it up even
-                // when the assertion below will fail.
-                unsafe {
-                    libc::kill(pid, libc::SIGKILL);
-                    libc::waitpid(pid, std::ptr::null_mut(), 0);
-                }
+        // SAFETY: This only queries the child PID written by our test process.
+        let status = unsafe { libc::waitpid(pid, ptr::null_mut(), libc::WNOHANG) };
+        let error = io::Error::last_os_error();
+        if status == 0 {
+            // SAFETY: A zero waitpid result confirms this is our live child. Clean it up even
+            // when the assertion below will fail.
+            unsafe {
+                libc::kill(pid, libc::SIGKILL);
+                libc::waitpid(pid, ptr::null_mut(), 0);
             }
-
-            if private_key_error {
-                assert!(matches!(result, Err(NodeError::FromHexError(_))), "{result:?}");
-            } else {
-                assert!(matches!(result, Err(NodeError::ReadLineError(_))), "{name}: {result:?}");
-            }
-            assert_eq!(status, -1, "{name} child was not reaped");
-            assert_eq!(error.raw_os_error(), Some(libc::ECHILD), "{name}: {error}");
         }
+
+        if private_key_error {
+            assert!(matches!(result, Err(NodeError::FromHexError(_))), "{result:?}");
+        } else {
+            assert!(matches!(result, Err(NodeError::ReadLineError(_))), "{name}: {result:?}");
+        }
+        assert_eq!(status, -1, "child was not reaped");
+        assert_eq!(error.raw_os_error(), Some(libc::ECHILD), "{name}: {error}");
     }
 }

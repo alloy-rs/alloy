@@ -591,115 +591,6 @@ mod test {
         serde_json::from_value::<ReceiptEnvelope<()>>(json).unwrap_err();
     }
 
-    /// Accepted and rejected JSON shapes, as text and as a `Value`, alone and flattened.
-    #[cfg(feature = "serde")]
-    #[test]
-    fn deser_receipt_envelope_shapes() {
-        use crate::{Eip658Value, ReceiptWithBloom};
-        use alloy_primitives::{b256, Bloom, B256};
-
-        const ROOT: B256 =
-            b256!("284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10");
-
-        let bloom = Bloom::default();
-        let ok = Eip658Value::Eip658(true);
-        let failed = Eip658Value::Eip658(false);
-        let root = Eip658Value::PostState(ROOT);
-        let legacy = TxType::Legacy;
-
-        // Fields added to a receipt with `cumulativeGasUsed`, `logs` and `logsBloom`, and the
-        // expected result. `ROOT` stands for a valid state root.
-        let cases: &[(&str, Option<(TxType, Eip658Value)>)] = &[
-            // status vs root
-            (r#""status":"0x1""#, Some((legacy, ok))),
-            (r#""status":"0x0""#, Some((legacy, failed))),
-            (r#""root":"ROOT""#, Some((legacy, root))),
-            (r#""status":"0x1","root":"ROOT""#, Some((legacy, ok))),
-            (r#""root":"ROOT","status":"0x0""#, Some((legacy, failed))),
-            ("", None),
-            (r#""status":null"#, None),
-            (r#""status":"0x2""#, None),
-            (r#""root":"0x1""#, None),
-            // an invalid status falls back to a valid root, and a valid status ignores the root
-            (r#""status":"0x2","root":"ROOT""#, Some((legacy, root))),
-            (r#""status":[1],"root":"ROOT""#, Some((legacy, root))),
-            (r#""status":"0x1","root":{"a":1}"#, Some((legacy, ok))),
-            (r#""status":"0x2","root":"0x1""#, None),
-            // `type`
-            (r#""type":null,"status":"0x1""#, Some((legacy, ok))),
-            (r#""type":"0x0","status":"0x1""#, Some((legacy, ok))),
-            (r#""type":"0x1","status":"0x1""#, Some((TxType::Eip2930, ok))),
-            (r#""type":"0x2","status":"0x1""#, Some((TxType::Eip1559, ok))),
-            (r#""type":"0x5","status":"0x1""#, None),
-            (r#""type":"0x7f","status":"0x1""#, None),
-            (r#""type":true,"status":"0x1""#, None),
-            // unknown keys are ignored
-            (
-                r#""blockHash":"ROOT","status":"0x1","transactionIndex":"0x0","other":{"status":"0x0"}"#,
-                Some((legacy, ok)),
-            ),
-            (
-                r#""type":"0x2","gasUsed":"0x5208","status":"0x1","effectiveGasPrice":[1,2]"#,
-                Some((TxType::Eip1559, ok)),
-            ),
-            // escaped keys
-            (r#""\u0073tatus":"0x1","\u0074ype":"0x2""#, Some((TxType::Eip1559, ok))),
-        ];
-
-        // A `Value` keeps only the last of repeated keys, so these are only parsed from text.
-        let repeated: &[(&str, Option<(TxType, Eip658Value)>)] = &[
-            (r#""status":"0x1","status":"0x1""#, None),
-            (r#""status":"0x1","status":"0x1","root":"ROOT""#, Some((legacy, root))),
-            (r#""root":"ROOT","root":"ROOT""#, None),
-            (r#""status":"0x0","root":"ROOT","root":"0x1""#, Some((legacy, failed))),
-            (r#""type":"0x1","type":"0x1","status":"0x1""#, None),
-            (r#""cumulativeGasUsed":"0x1","status":"0x1""#, None),
-            (r#""logs":[],"status":"0x1""#, None),
-            (r#""logsBloom":"BLOOM","status":"0x1""#, None),
-        ];
-
-        #[derive(serde::Deserialize)]
-        struct Outer {
-            #[serde(flatten)]
-            receipt: ReceiptEnvelope<()>,
-            #[serde(rename = "blockHash")]
-            _block_hash: Option<B256>,
-        }
-
-        let check = |fields: &str, expected: Option<(TxType, Eip658Value)>, from_value: bool| {
-            let sep = if fields.is_empty() { "" } else { "," };
-            let json = format!(
-                r#"{{"cumulativeGasUsed":"0x1","logs":[],"logsBloom":"BLOOM"{sep}{fields}}}"#
-            )
-            .replace("BLOOM", &bloom.to_string())
-            .replace("ROOT", &ROOT.to_string());
-            let expected = expected.map(|(ty, status)| {
-                let receipt = Receipt { status, cumulative_gas_used: 1, logs: Vec::<()>::new() };
-                ReceiptEnvelope::from_typed(ty, ReceiptWithBloom { receipt, logs_bloom: bloom })
-            });
-
-            let envelope = serde_json::from_str::<ReceiptEnvelope<()>>(&json).ok();
-            assert_eq!(envelope, expected, "{json}");
-
-            // The receipt may be flattened into a larger object, which passes down all its keys.
-            let outer = serde_json::from_str::<Outer>(&json).ok().map(|outer| outer.receipt);
-            assert_eq!(outer, expected, "{json}");
-
-            if from_value {
-                let value = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-                let envelope = serde_json::from_value::<ReceiptEnvelope<()>>(value).ok();
-                assert_eq!(envelope, expected, "{json}");
-            }
-        };
-
-        for &(fields, expected) in cases {
-            check(fields, expected, true);
-        }
-        for &(fields, expected) in repeated {
-            check(fields, expected, false);
-        }
-    }
-
     #[test]
     fn convert_envelope() {
         let receipt = Receipt::<Log>::default();
@@ -731,5 +622,121 @@ mod test {
             Err(Eip2718Error::UnexpectedType(0))
         ));
         assert!(ReceiptEnvelope::decode(&mut tagged_network.as_slice()).is_err());
+    }
+
+    #[cfg(feature = "serde")]
+    mod shapes {
+        use super::*;
+        use crate::{Eip658Value, ReceiptWithBloom};
+        use alloy_primitives::{b256, Bloom, B256};
+        use test_case::test_case;
+
+        /// A valid state root, written as `ROOT` in the receipt fields below.
+        const ROOT: B256 =
+            b256!("284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10");
+        const LEGACY: TxType = TxType::Legacy;
+        const OK: Eip658Value = Eip658Value::Eip658(true);
+        const FAILED: Eip658Value = Eip658Value::Eip658(false);
+        const POST_STATE: Eip658Value = Eip658Value::PostState(ROOT);
+
+        /// Accepted and rejected JSON shapes, as text and as a `Value`, alone and flattened.
+        ///
+        /// Each case gives fields added to a receipt with `cumulativeGasUsed`, `logs` and
+        /// `logsBloom`, and the expected result. `ROOT` stands for a valid state root.
+        // status vs root
+        #[test_case(r#""status":"0x1""#, Some((LEGACY, OK)), true)]
+        #[test_case(r#""status":"0x0""#, Some((LEGACY, FAILED)), true)]
+        #[test_case(r#""root":"ROOT""#, Some((LEGACY, POST_STATE)), true)]
+        #[test_case(r#""status":"0x1","root":"ROOT""#, Some((LEGACY, OK)), true)]
+        #[test_case(r#""root":"ROOT","status":"0x0""#, Some((LEGACY, FAILED)), true)]
+        #[test_case("", None, true)]
+        #[test_case(r#""status":null"#, None, true)]
+        #[test_case(r#""status":"0x2""#, None, true)]
+        #[test_case(r#""root":"0x1""#, None, true)]
+        // an invalid status falls back to a valid root, and a valid status ignores the root
+        #[test_case(r#""status":"0x2","root":"ROOT""#, Some((LEGACY, POST_STATE)), true)]
+        #[test_case(r#""status":[1],"root":"ROOT""#, Some((LEGACY, POST_STATE)), true)]
+        #[test_case(r#""status":"0x1","root":{"a":1}"#, Some((LEGACY, OK)), true)]
+        #[test_case(r#""status":"0x2","root":"0x1""#, None, true)]
+        // `type`
+        #[test_case(r#""type":null,"status":"0x1""#, Some((LEGACY, OK)), true)]
+        #[test_case(r#""type":"0x0","status":"0x1""#, Some((LEGACY, OK)), true)]
+        #[test_case(r#""type":"0x1","status":"0x1""#, Some((TxType::Eip2930, OK)), true)]
+        #[test_case(r#""type":"0x2","status":"0x1""#, Some((TxType::Eip1559, OK)), true)]
+        #[test_case(r#""type":"0x5","status":"0x1""#, None, true)]
+        #[test_case(r#""type":"0x7f","status":"0x1""#, None, true)]
+        #[test_case(r#""type":true,"status":"0x1""#, None, true)]
+        // unknown keys are ignored
+        #[test_case(
+            r#""blockHash":"ROOT","status":"0x1","transactionIndex":"0x0","other":{"status":"0x0"}"#,
+            Some((LEGACY, OK)),
+            true
+        )]
+        #[test_case(
+            r#""type":"0x2","gasUsed":"0x5208","status":"0x1","effectiveGasPrice":[1,2]"#,
+            Some((TxType::Eip1559, OK)),
+            true
+        )]
+        // escaped keys
+        #[test_case(
+            r#""\u0073tatus":"0x1","\u0074ype":"0x2""#,
+            Some((TxType::Eip1559, OK)),
+            true
+        )]
+        // A `Value` keeps only the last of repeated keys, so these are only parsed from text.
+        #[test_case(r#""status":"0x1","status":"0x1""#, None, false)]
+        #[test_case(
+            r#""status":"0x1","status":"0x1","root":"ROOT""#,
+            Some((LEGACY, POST_STATE)),
+            false
+        )]
+        #[test_case(r#""root":"ROOT","root":"ROOT""#, None, false)]
+        #[test_case(
+            r#""status":"0x0","root":"ROOT","root":"0x1""#,
+            Some((LEGACY, FAILED)),
+            false
+        )]
+        #[test_case(r#""type":"0x1","type":"0x1","status":"0x1""#, None, false)]
+        #[test_case(r#""cumulativeGasUsed":"0x1","status":"0x1""#, None, false)]
+        #[test_case(r#""logs":[],"status":"0x1""#, None, false)]
+        #[test_case(r#""logsBloom":"BLOOM","status":"0x1""#, None, false)]
+        fn deser_receipt_envelope_shapes(
+            fields: &str,
+            expected: Option<(TxType, Eip658Value)>,
+            from_value: bool,
+        ) {
+            #[derive(serde::Deserialize)]
+            struct Outer {
+                #[serde(flatten)]
+                receipt: ReceiptEnvelope<()>,
+                #[serde(rename = "blockHash")]
+                _block_hash: Option<B256>,
+            }
+
+            let bloom = Bloom::default();
+            let sep = if fields.is_empty() { "" } else { "," };
+            let json = format!(
+                r#"{{"cumulativeGasUsed":"0x1","logs":[],"logsBloom":"BLOOM"{sep}{fields}}}"#
+            )
+            .replace("BLOOM", &bloom.to_string())
+            .replace("ROOT", &ROOT.to_string());
+            let expected = expected.map(|(ty, status)| {
+                let receipt = Receipt { status, cumulative_gas_used: 1, logs: Vec::<()>::new() };
+                ReceiptEnvelope::from_typed(ty, ReceiptWithBloom { receipt, logs_bloom: bloom })
+            });
+
+            let envelope = serde_json::from_str::<ReceiptEnvelope<()>>(&json).ok();
+            assert_eq!(envelope, expected, "{json}");
+
+            // The receipt may be flattened into a larger object, which passes down all its keys.
+            let outer = serde_json::from_str::<Outer>(&json).ok().map(|outer| outer.receipt);
+            assert_eq!(outer, expected, "{json}");
+
+            if from_value {
+                let value = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+                let envelope = serde_json::from_value::<ReceiptEnvelope<()>>(value).ok();
+                assert_eq!(envelope, expected, "{json}");
+            }
+        }
     }
 }

@@ -68,6 +68,7 @@ alloy-network.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 tempfile.workspace = true
+test-case.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 # need to enable features for tests

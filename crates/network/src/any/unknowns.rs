@@ -319,23 +319,18 @@ mod tests {
     use crate::{AnyRpcTransaction, AnyTxEnvelope};
 
     use super::*;
+    use test_case::test_case;
 
-    #[test]
-    fn create_detection_matches_kind() {
-        for (fields, expected) in [
-            (serde_json::json!({}), TxKind::Create),
-            (serde_json::json!({ "to": null }), TxKind::Create),
-            (serde_json::json!({ "to": Address::ZERO }), TxKind::Call(Address::ZERO)),
-            (serde_json::json!({ "to": "not-an-address" }), TxKind::Create),
-            (serde_json::json!({ "to": 42 }), TxKind::Create),
-        ] {
-            let tx = UnknownTypedTransaction::new(
-                AnyTxType(0x7e),
-                serde_json::from_value(fields).unwrap(),
-            );
-            assert_eq!(tx.kind(), expected, "{tx:?}");
-            assert_eq!(tx.is_create(), expected.is_create(), "{tx:?}");
-        }
+    #[test_case(serde_json::json!({}), TxKind::Create)]
+    #[test_case(serde_json::json!({ "to": null }), TxKind::Create)]
+    #[test_case(serde_json::json!({ "to": Address::ZERO }), TxKind::Call(Address::ZERO))]
+    #[test_case(serde_json::json!({ "to": "not-an-address" }), TxKind::Create)]
+    #[test_case(serde_json::json!({ "to": 42 }), TxKind::Create)]
+    fn create_detection_matches_kind(fields: serde_json::Value, expected: TxKind) {
+        let tx =
+            UnknownTypedTransaction::new(AnyTxType(0x7e), serde_json::from_value(fields).unwrap());
+        assert_eq!(tx.kind(), expected, "{tx:?}");
+        assert_eq!(tx.is_create(), expected.is_create(), "{tx:?}");
     }
 
     #[test]

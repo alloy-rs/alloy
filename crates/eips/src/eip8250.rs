@@ -65,26 +65,23 @@ pub fn nonce_calldata(keys: &[U256], nonce: u64) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
 
-    #[test]
-    fn canonical_nonce_sets() {
-        for keys in [
-            vec![],
-            vec![U256::ZERO, U256::from(1)],
-            vec![U256::ZERO],
-            vec![U256::MAX],
-            (1..=16).map(U256::from).collect(),
-        ] {
-            assert!(validate_nonce_keys(&keys).is_ok());
-        }
-        for keys in [
-            vec![U256::from(1), U256::from(1)],
-            vec![U256::from(2), U256::from(1)],
-            vec![U256::from(1), U256::ZERO],
-            (1..=17).map(U256::from).collect(),
-        ] {
-            assert!(validate_nonce_keys(&keys).is_err());
-        }
+    #[test_case(vec![])]
+    #[test_case(vec![U256::ZERO, U256::from(1)])]
+    #[test_case(vec![U256::ZERO])]
+    #[test_case(vec![U256::MAX])]
+    #[test_case((1..=16).map(U256::from).collect())]
+    fn canonical_nonce_sets(keys: Vec<U256>) {
+        assert!(validate_nonce_keys(&keys).is_ok());
+    }
+
+    #[test_case(vec![U256::from(1), U256::from(1)])]
+    #[test_case(vec![U256::from(2), U256::from(1)])]
+    #[test_case(vec![U256::from(1), U256::ZERO])]
+    #[test_case((1..=17).map(U256::from).collect())]
+    fn noncanonical_nonce_sets(keys: Vec<U256>) {
+        assert!(validate_nonce_keys(&keys).is_err());
     }
 
     #[test]

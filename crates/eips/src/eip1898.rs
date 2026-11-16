@@ -981,25 +981,30 @@ mod tests {
     use super::*;
     use alloc::vec::Vec;
     use alloy_primitives::b256;
+    use test_case::test_case;
 
     const HASH: B256 = b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");
 
+    #[cfg(feature = "serde")]
+    const GENESIS_HASH: B256 =
+        b256!("d4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3");
+
+    #[test_case("0x0", BlockId::number(0))]
+    #[test_case("0x24A931", BlockId::number(2402609))]
+    #[test_case("0x12345", BlockId::number(74565))]
+    #[test_case("12345", BlockId::number(12345))]
+    #[test_case("0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9", HASH.into())]
+    #[test_case("latest", BlockId::latest())]
+    #[test_case("finalized", BlockId::finalized())]
+    #[test_case("safe", BlockId::safe())]
+    #[test_case("earliest", BlockId::earliest())]
+    #[test_case("pending", BlockId::pending())]
+    fn block_id_from_str(s: &str, expected: BlockId) {
+        assert_eq!(s.parse::<BlockId>().unwrap(), expected);
+    }
+
     #[test]
-    fn block_id_from_str() {
-        for (s, expected) in [
-            ("0x0", BlockId::number(0)),
-            ("0x24A931", BlockId::number(2402609)),
-            ("0x12345", BlockId::number(74565)),
-            ("12345", BlockId::number(12345)),
-            ("0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9", HASH.into()),
-            ("latest", BlockId::latest()),
-            ("finalized", BlockId::finalized()),
-            ("safe", BlockId::safe()),
-            ("earliest", BlockId::earliest()),
-            ("pending", BlockId::pending()),
-        ] {
-            assert_eq!(s.parse::<BlockId>().unwrap(), expected, "{s}");
-        }
+    fn block_id_from_str_rejects_invalid() {
         assert!("invalid_block_id".parse::<BlockId>().is_err());
     }
 
@@ -1024,43 +1029,28 @@ mod tests {
         assert_eq!(serde_json::to_string(&pending).unwrap(), "\"pending\"");
     }
 
-    #[test]
     #[cfg(feature = "serde")]
-    fn can_parse_eip1898_block_ids() {
-        let hash = b256!("d4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3");
-        let mut cases = vec![
-            (serde_json::json!({ "blockNumber": "0x0" }), BlockId::number(0)),
-            (serde_json::json!({ "blockNumber": "0xaf" }), BlockId::number(175)),
-            (serde_json::json!("0x0"), BlockId::number(0)),
-            (serde_json::json!({ "blockHash": hash }), BlockId::hash(hash)),
-            (
-                serde_json::json!({ "blockHash": hash, "requireCanonical": true }),
-                BlockId::hash_canonical(hash),
-            ),
-        ];
-        for (name, tag) in [
-            ("pending", BlockNumberOrTag::Pending),
-            ("latest", BlockNumberOrTag::Latest),
-            ("finalized", BlockNumberOrTag::Finalized),
-            ("safe", BlockNumberOrTag::Safe),
-            ("earliest", BlockNumberOrTag::Earliest),
-        ] {
-            cases.push((serde_json::json!({ "blockNumber": name }), tag.into()));
-            cases.push((serde_json::json!(name), tag.into()));
-        }
-
-        for (json, expected) in cases {
-            assert_eq!(
-                serde_json::from_value::<BlockId>(json.clone()).unwrap(),
-                expected,
-                "{json}"
-            );
-            assert_eq!(
-                serde_json::from_str::<BlockId>(&json.to_string()).unwrap(),
-                expected,
-                "{json}"
-            );
-        }
+    #[test_case(serde_json::json!({ "blockNumber": "0x0" }), BlockId::number(0))]
+    #[test_case(serde_json::json!({ "blockNumber": "0xaf" }), BlockId::number(175))]
+    #[test_case(serde_json::json!("0x0"), BlockId::number(0))]
+    #[test_case(serde_json::json!({ "blockHash": GENESIS_HASH }), BlockId::hash(GENESIS_HASH))]
+    #[test_case(
+        serde_json::json!({ "blockHash": GENESIS_HASH, "requireCanonical": true }),
+        BlockId::hash_canonical(GENESIS_HASH)
+    )]
+    #[test_case(serde_json::json!({ "blockNumber": "pending" }), BlockId::pending())]
+    #[test_case(serde_json::json!("pending"), BlockId::pending())]
+    #[test_case(serde_json::json!({ "blockNumber": "latest" }), BlockId::latest())]
+    #[test_case(serde_json::json!("latest"), BlockId::latest())]
+    #[test_case(serde_json::json!({ "blockNumber": "finalized" }), BlockId::finalized())]
+    #[test_case(serde_json::json!("finalized"), BlockId::finalized())]
+    #[test_case(serde_json::json!({ "blockNumber": "safe" }), BlockId::safe())]
+    #[test_case(serde_json::json!("safe"), BlockId::safe())]
+    #[test_case(serde_json::json!({ "blockNumber": "earliest" }), BlockId::earliest())]
+    #[test_case(serde_json::json!("earliest"), BlockId::earliest())]
+    fn can_parse_eip1898_block_ids(json: serde_json::Value, expected: BlockId) {
+        assert_eq!(serde_json::from_value::<BlockId>(json.clone()).unwrap(), expected);
+        assert_eq!(serde_json::from_str::<BlockId>(&json.to_string()).unwrap(), expected);
     }
 
     #[test]
@@ -1184,16 +1174,15 @@ mod tests {
         }
     }
 
-    #[test]
     #[cfg(feature = "serde")]
-    fn serde_blockid_number() {
-        for (number, expected) in [(0u64, "\"0x0\""), (100, "\"0x64\"")] {
-            let block_id = BlockId::from(number);
-            let serialized = serde_json::to_string(&block_id).unwrap();
-            assert_eq!(serialized, expected);
-            let deserialized: BlockId = serde_json::from_str(&serialized).unwrap();
-            assert_eq!(deserialized, block_id)
-        }
+    #[test_case(0, "\"0x0\"")]
+    #[test_case(100, "\"0x64\"")]
+    fn serde_blockid_number(number: u64, expected: &str) {
+        let block_id = BlockId::from(number);
+        let serialized = serde_json::to_string(&block_id).unwrap();
+        assert_eq!(serialized, expected);
+        let deserialized: BlockId = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, block_id)
     }
 
     #[test]
@@ -1308,28 +1297,30 @@ mod tests {
         assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": {}}"#).is_err());
     }
 
+    #[cfg(feature = "serde")]
+    #[derive(Debug, serde::Deserialize, PartialEq)]
+    struct TestLenientOptStruct {
+        #[serde(
+            default,
+            deserialize_with = "super::lenient_block_number_or_tag::opt::deserialize"
+        )]
+        block: Option<BlockNumberOrTag>,
+    }
+
+    #[cfg(feature = "serde")]
+    #[test_case(r#"{"block": 123}"#, Some(BlockNumberOrTag::Number(123)))]
+    #[test_case(r#"{"block": "123"}"#, Some(BlockNumberOrTag::Number(123)))]
+    #[test_case(r#"{"block": "latest"}"#, Some(BlockNumberOrTag::Latest))]
+    #[test_case(r#"{"block": null}"#, None)]
+    #[test_case("{}", None)]
+    fn test_lenient_block_number_or_tag_opt(raw: &str, expected: Option<BlockNumberOrTag>) {
+        let lenient_struct: TestLenientOptStruct = serde_json::from_str(raw).unwrap();
+        assert_eq!(lenient_struct.block, expected);
+    }
+
     #[test]
     #[cfg(feature = "serde")]
-    fn test_lenient_block_number_or_tag_opt() {
-        #[derive(Debug, serde::Deserialize, PartialEq)]
-        struct TestLenientOptStruct {
-            #[serde(
-                default,
-                deserialize_with = "super::lenient_block_number_or_tag::opt::deserialize"
-            )]
-            block: Option<BlockNumberOrTag>,
-        }
-
-        for (raw, expected) in [
-            (r#"{"block": 123}"#, Some(BlockNumberOrTag::Number(123))),
-            (r#"{"block": "123"}"#, Some(BlockNumberOrTag::Number(123))),
-            (r#"{"block": "latest"}"#, Some(BlockNumberOrTag::Latest)),
-            (r#"{"block": null}"#, None),
-            ("{}", None),
-        ] {
-            let lenient_struct: TestLenientOptStruct = serde_json::from_str(raw).unwrap();
-            assert_eq!(lenient_struct.block, expected);
-        }
+    fn test_lenient_block_number_or_tag_opt_rejects_invalid() {
         assert!(serde_json::from_str::<TestLenientOptStruct>(r#"{"block": "invalid"}"#).is_err());
     }
 }
