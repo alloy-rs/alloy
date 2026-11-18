@@ -11,6 +11,10 @@ use alloy_primitives::{Bytes, U256};
 mod limited;
 #[cfg(feature = "serde")]
 pub use limited::{SimulatePayloadLimitExceeded, SimulatePayloadSeed};
+#[cfg(feature = "serde")]
+mod raw;
+#[cfg(feature = "serde")]
+pub use raw::{RawSimulatePayload, RawSimulatePayloadError};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
@@ -144,6 +148,8 @@ pub struct SimCallResult {
 /// enforce that limit.
 /// Servers parsing untrusted input can use `SimulatePayloadSeed` (with the `serde` feature) to
 /// enforce their own block and call limits during deserialization.
+/// Servers whose limits are only known inside the request handler can take a `RawSimulatePayload`
+/// parameter instead and decode it there with those limits.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
