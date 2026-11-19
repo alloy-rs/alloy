@@ -10,7 +10,7 @@ use serde_with::{serde_as, DisplayFromStr};
 pub struct LightClientFinalityData {
     /// The attested header containing a `Beacon`.
     pub attested_header: AttestedHeader,
-    /// The finalized header containing a `Beacon2`.
+    /// The finalized header containing a `Beacon`.
     pub finalized_header: FinalizedHeader,
     /// The Merkle branch proof for the finality.
     pub finality_branch: Vec<String>,
@@ -28,10 +28,10 @@ pub struct AttestedHeader {
     pub beacon: BeaconBlockHeader,
 }
 
-/// Contains the `Beacon2` header that was finalized.
+/// Contains the `Beacon` header that was finalized.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FinalizedHeader {
-    /// The `Beacon2` object representing the block header.
+    /// The `Beacon` object representing the block header.
     pub beacon: BeaconBlockHeader,
 }
 

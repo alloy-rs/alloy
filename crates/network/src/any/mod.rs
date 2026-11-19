@@ -1,4 +1,6 @@
 mod builder;
+mod delegate;
+use delegate::delegate_transaction;
 mod either;
 
 pub mod error;
@@ -6,8 +8,7 @@ pub mod error;
 use alloy_consensus::{
     Sealed, Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
 };
-use alloy_eips::{eip7702::SignedAuthorization, Typed2718};
-use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
+use alloy_eips::Typed2718;
 pub use either::{AnyTxEnvelope, AnyTypedTransaction};
 use std::error::Error;
 
@@ -23,7 +24,7 @@ use alloy_consensus::{
 };
 use alloy_network_primitives::{BlockResponse, TransactionResponse};
 pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
-use alloy_rpc_types_eth::{AccessList, Block, BlockTransactions, Transaction, TransactionRequest};
+use alloy_rpc_types_eth::{Block, BlockTransactions, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use derive_more::From;
 use serde::{Deserialize, Serialize};
@@ -461,73 +462,7 @@ impl TryFrom<AnyRpcTransaction> for TxEnvelope {
 }
 
 impl alloy_consensus::Transaction for AnyRpcTransaction {
-    fn chain_id(&self) -> Option<ChainId> {
-        self.inner.chain_id()
-    }
-
-    fn nonce(&self) -> u64 {
-        self.inner.nonce()
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.inner.gas_limit()
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        alloy_consensus::Transaction::gas_price(&self.0.inner)
-    }
-
-    fn max_fee_per_gas(&self) -> u128 {
-        alloy_consensus::Transaction::max_fee_per_gas(&self.inner)
-    }
-
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.inner.max_priority_fee_per_gas()
-    }
-
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.inner.max_fee_per_blob_gas()
-    }
-
-    fn priority_fee_or_price(&self) -> u128 {
-        self.inner.priority_fee_or_price()
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        self.inner.effective_gas_price(base_fee)
-    }
-
-    fn is_dynamic_fee(&self) -> bool {
-        self.inner.is_dynamic_fee()
-    }
-
-    fn kind(&self) -> TxKind {
-        self.inner.kind()
-    }
-
-    fn is_create(&self) -> bool {
-        self.inner.is_create()
-    }
-
-    fn value(&self) -> U256 {
-        self.inner.value()
-    }
-
-    fn input(&self) -> &Bytes {
-        self.inner.input()
-    }
-
-    fn access_list(&self) -> Option<&AccessList> {
-        self.inner.access_list()
-    }
-
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        self.inner.blob_versioned_hashes()
-    }
-
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.inner.authorization_list()
-    }
+    delegate_transaction!(self => &self.0.inner);
 }
 
 impl TransactionResponse for AnyRpcTransaction {
@@ -565,7 +500,7 @@ impl Typed2718 for AnyRpcTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::B64;
+    use alloy_primitives::{B256, B64};
 
     #[test]
     fn convert_any_block() {
@@ -638,6 +573,39 @@ mod tests {
             req.inner.from,
             Some("0x32be343b94f860124dc4fee278fdcbd38c102d88".parse().unwrap())
         );
+    }
+
+    #[test]
+    fn deserialize_any_block_with_full_transactions() {
+        let tx: AnyRpcTransaction = serde_json::from_value(serde_json::json!({
+            "blockHash": "0x8e38b4dbf6b11fcc3b9dee84fb7986e29ca0a02cecd8977c161ff7333329681e",
+            "blockNumber": "0xf4240",
+            "hash": "0xe9e91f1ee4b56c0df2e9f06c2b8c27c6076195a88a7b8537ba8313d80e6f124e",
+            "transactionIndex": "0x1",
+            "type": "0x0",
+            "nonce": "0x43eb",
+            "input": "0x",
+            "r": "0x3b08715b4403c792b8c7567edea634088bedcd7f60d9352b1f16c69830f3afd5",
+            "s": "0x10b9afb67d2ec8b956f0e1dbc07eb79152904f3a7bf789fc869db56320adfe09",
+            "chainId": "0x0",
+            "v": "0x1c",
+            "gas": "0xc350",
+            "from": "0x32be343b94f860124dc4fee278fdcbd38c102d88",
+            "to": "0xdf190dc7190dfba737d7777a163445b7fff16133",
+            "value": "0x6113a84987be800",
+            "gasPrice": "0xdf8475800",
+        }))
+        .unwrap();
+        let block = AnyRpcBlock::new(
+            Block::new(
+                AnyRpcHeader::from_sealed(AnyHeader::default().seal(B256::ZERO)),
+                BlockTransactions::Full(vec![tx.clone(), tx]),
+            )
+            .into(),
+        );
+
+        let json = serde_json::to_string(&block).unwrap();
+        assert_eq!(serde_json::from_str::<AnyRpcBlock>(&json).unwrap(), block);
     }
 
     #[test]

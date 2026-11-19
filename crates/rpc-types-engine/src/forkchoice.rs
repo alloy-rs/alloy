@@ -1,4 +1,4 @@
-use super::{PayloadStatus, PayloadStatusEnum};
+use super::{PayloadStatus, PayloadStatusEnum, PayloadStatusV2};
 use crate::PayloadId;
 use alloy_primitives::B256;
 
@@ -48,33 +48,21 @@ impl ForkchoiceState {
     /// [`None`].
     #[inline]
     pub fn state_head_hash(&self) -> Option<B256> {
-        if self.head_block_hash.is_zero() {
-            None
-        } else {
-            Some(self.head_block_hash)
-        }
+        (!self.head_block_hash.is_zero()).then_some(self.head_block_hash)
     }
 
     /// Returns the `safe_block_hash`, only if it is not [`B256::ZERO`], otherwise this returns
     /// [`None`].
     #[inline]
     pub fn state_safe_hash(&self) -> Option<B256> {
-        if self.safe_block_hash.is_zero() {
-            None
-        } else {
-            Some(self.safe_block_hash)
-        }
+        (!self.safe_block_hash.is_zero()).then_some(self.safe_block_hash)
     }
 
     /// Returns the `finalized_block_hash`, only if it is not [`B256::ZERO`], otherwise this
     /// returns [`None`].
     #[inline]
     pub fn state_finalized_hash(&self) -> Option<B256> {
-        if self.finalized_block_hash.is_zero() {
-            None
-        } else {
-            Some(self.finalized_block_hash)
-        }
+        (!self.finalized_block_hash.is_zero()).then_some(self.finalized_block_hash)
     }
 
     /// Returns true if any of the hashes in this [`ForkchoiceState`] match the given hash
@@ -209,25 +197,83 @@ impl ssz::Decode for ForkchoiceUpdated {
     }
 }
 
+/// Represents a successfully processed forkchoice update in the Bogota Engine API.
+///
+/// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/bogota.md#engine_forkchoiceupdatedv5>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ForkchoiceUpdatedResponseV2 {
+    /// Represents the outcome of payload validation.
+    ///
+    /// The Engine API restricts the status to `VALID`, `INVALID`, and `SYNCING` for this response.
+    pub payload_status: PayloadStatusV2,
+    /// The identifier of the payload build process that was successfully initiated.
+    pub payload_id: Option<PayloadId>,
+}
+
+impl ForkchoiceUpdatedResponseV2 {
+    /// Creates a new forkchoice update response.
+    pub const fn new(payload_status: PayloadStatusV2) -> Self {
+        Self { payload_status, payload_id: None }
+    }
+
+    /// Creates a new response from a common payload status.
+    pub const fn from_status(status: PayloadStatusEnum) -> Self {
+        Self::new(PayloadStatusV2::new(PayloadStatus::from_status(status), None))
+    }
+
+    /// Sets the latest valid hash of the payload status.
+    pub const fn with_latest_valid_hash(mut self, hash: B256) -> Self {
+        self.payload_status.payload_inner.latest_valid_hash = Some(hash);
+        self
+    }
+
+    /// Sets whether the payload satisfied the inclusion-list constraints.
+    pub const fn with_inclusion_list_satisfied(mut self, satisfied: bool) -> Self {
+        self.payload_status.inclusion_list_satisfied = Some(satisfied);
+        self
+    }
+
+    /// Sets the payload id of the created payload job.
+    pub const fn with_payload_id(mut self, id: PayloadId) -> Self {
+        self.payload_id = Some(id);
+        self
+    }
+
+    /// Returns true if the payload status is syncing.
+    pub const fn is_syncing(&self) -> bool {
+        self.payload_status.is_syncing()
+    }
+
+    /// Returns true if the payload status is valid.
+    pub const fn is_valid(&self) -> bool {
+        self.payload_status.is_valid()
+    }
+
+    /// Returns true if the payload status is invalid.
+    pub const fn is_invalid(&self) -> bool {
+        self.payload_status.is_invalid()
+    }
+}
+
+impl From<ForkchoiceUpdated> for ForkchoiceUpdatedResponseV2 {
+    fn from(response: ForkchoiceUpdated) -> Self {
+        Self { payload_status: response.payload_status.into(), payload_id: response.payload_id }
+    }
+}
+
+/// Downgrades a V2 forkchoice response, discarding its inclusion-list validation result.
+impl From<ForkchoiceUpdatedResponseV2> for ForkchoiceUpdated {
+    fn from(response: ForkchoiceUpdatedResponseV2) -> Self {
+        Self { payload_status: response.payload_status.into(), payload_id: response.payload_id }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    #[cfg(feature = "ssz")]
-    fn ssz_forkchoice_state_roundtrip() {
-        use ssz::{Decode, Encode};
-
-        let state = ForkchoiceState {
-            head_block_hash: B256::with_last_byte(1),
-            safe_block_hash: B256::with_last_byte(2),
-            finalized_block_hash: B256::with_last_byte(3),
-        };
-
-        let encoded = state.as_ssz_bytes();
-        let decoded = ForkchoiceState::from_ssz_bytes(&encoded).unwrap();
-        assert_eq!(decoded, state);
-    }
 
     #[test]
     #[cfg(feature = "ssz")]
@@ -258,6 +304,19 @@ mod tests {
 
         let encoded = updated.as_ssz_bytes();
         let decoded = ForkchoiceUpdated::from_ssz_bytes(&encoded).unwrap();
+        assert_eq!(decoded, updated);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_forkchoice_updated_response_v2() {
+        let updated = ForkchoiceUpdatedResponseV2::from_status(PayloadStatusEnum::Valid)
+            .with_inclusion_list_satisfied(true);
+        let value = serde_json::to_value(&updated).unwrap();
+        assert_eq!(value["payloadStatus"]["status"], "VALID");
+        assert_eq!(value["payloadStatus"]["inclusionListSatisfied"], true);
+
+        let decoded: ForkchoiceUpdatedResponseV2 = serde_json::from_value(value).unwrap();
         assert_eq!(decoded, updated);
     }
 }

@@ -187,6 +187,9 @@ impl<T: Encodable2718> Block<T, Header> {
     ///
     /// Computes and sets the `transactions_root` on the header automatically.
     /// `ommers_hash` is set to [`EMPTY_OMMER_ROOT_HASH`](crate::EMPTY_OMMER_ROOT_HASH).
+    ///
+    /// This updates no other header fields, creates a body without withdrawals, and does not
+    /// calculate the receipts root, validate transactions, or seal the header.
     pub fn from_transactions(
         mut header: Header,
         transactions: impl IntoIterator<Item = T>,
@@ -306,7 +309,7 @@ impl<T: Transaction, H> BlockBody<T, H> {
     /// Returns an iterator over all blob versioned hashes from the block body.
     #[inline]
     pub fn blob_versioned_hashes_iter(&self) -> impl Iterator<Item = &B256> + '_ {
-        self.eip4844_transactions_iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
+        self.transactions.iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
     }
 }
 
@@ -321,6 +324,12 @@ impl<T: Typed2718, H> BlockBody<T, H> {
     #[inline]
     pub fn has_eip7702_transactions(&self) -> bool {
         self.transactions.iter().any(|tx| tx.is_eip7702())
+    }
+
+    /// Returns whether or not the block body contains any EIP-8141 transactions.
+    #[inline]
+    pub fn has_eip8141_transactions(&self) -> bool {
+        self.transactions.iter().any(|tx| tx.is_eip8141())
     }
 
     /// Returns an iterator over all blob transactions of the block.
@@ -396,21 +405,31 @@ mod block_rlp {
         /// This is more efficient than decoding the block and then sealing it, as the header
         /// hash is computed from the raw RLP bytes without re-encoding.
         pub fn decode_sealed(buf: &mut &[u8]) -> alloy_rlp::Result<Sealed<Self>> {
-            // Decode the outer block list header
-            let block_rlp_head = alloy_rlp::Header::decode(buf)?;
-            if !block_rlp_head.list {
-                return Err(alloy_rlp::Error::UnexpectedString);
-            }
+            // Restrict child decoding to the outer block list's declared payload.
+            let mut payload = alloy_rlp::Header::decode_bytes(buf, true)?;
 
             // Decode header and compute hash from raw RLP bytes
-            let header_start = *buf;
-            let header = H::decode(buf)?;
-            let header_hash = keccak256(&header_start[..header_start.len() - buf.len()]);
+            let header_start = payload;
+            let header = H::decode(&mut payload)?;
+            let header_length = header_start
+                .len()
+                .checked_sub(payload.len())
+                .ok_or(alloy_rlp::Error::InputTooShort)?;
+            let header_rlp =
+                header_start.get(..header_length).ok_or(alloy_rlp::Error::InputTooShort)?;
+            let header_hash = keccak256(header_rlp);
 
             // Decode remaining body fields
-            let transactions = Vec::<T>::decode(buf)?;
-            let ommers = Vec::<H>::decode(buf)?;
-            let withdrawals = if buf.is_empty() { None } else { Some(Decodable::decode(buf)?) };
+            let transactions = Vec::<T>::decode(&mut payload)?;
+            let ommers = Vec::<H>::decode(&mut payload)?;
+            let withdrawals =
+                if payload.is_empty() { None } else { Some(Decodable::decode(&mut payload)?) };
+            if !payload.is_empty() {
+                return Err(alloy_rlp::Error::ListLengthMismatch {
+                    expected: header_start.len(),
+                    got: header_start.len().saturating_sub(payload.len()),
+                });
+            }
 
             let block = Self { header, body: BlockBody { transactions, ommers, withdrawals } };
 
@@ -443,7 +462,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Signed, TxEnvelope, TxLegacy};
+    use crate::{
+        transaction::Either, SignableTransaction, Signed, TxEip4844, TxEip8141, TxEnvelope,
+        TxLegacy,
+    };
+    use alloy_primitives::{Address, Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
@@ -485,9 +508,6 @@ mod tests {
 
     #[test]
     fn decode_sealed_roundtrip_with_transactions() {
-        use crate::{SignableTransaction, TxLegacy};
-        use alloy_primitives::{Address, Signature, TxKind, U256};
-
         let tx = TxLegacy {
             nonce: 1,
             gas_price: 100,
@@ -518,6 +538,44 @@ mod tests {
         assert_eq!(sealed.header.number, 42);
         assert_eq!(sealed.body.transactions.len(), 1);
         assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn decode_sealed_rejects_fields_past_outer_rlp_boundary() {
+        let block: Block<TxEnvelope> = Block::default();
+        let mut encoded = alloy_rlp::encode(&block);
+
+        let mut payload = encoded.as_slice();
+        let outer = alloy_rlp::Header::decode(&mut payload).unwrap();
+        let header_length = encoded.len() - payload.len();
+        assert!(outer.list);
+        assert!(outer.payload_length > 56);
+
+        let mut replacement = Vec::with_capacity(header_length);
+        alloy_rlp::Header { list: true, payload_length: outer.payload_length - 1 }
+            .encode(&mut replacement);
+        assert_eq!(replacement.len(), header_length);
+        encoded[..header_length].copy_from_slice(&replacement);
+
+        assert!(Block::<TxEnvelope>::decode_sealed(&mut encoded.as_slice()).is_err());
+    }
+
+    #[test]
+    fn decode_sealed_rejects_decoder_that_expands_input() {
+        #[derive(Debug)]
+        struct ExpandingHeader;
+
+        impl Decodable for ExpandingHeader {
+            fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+                *buf = &[0, 0];
+                Ok(Self)
+            }
+        }
+
+        let mut encoded: &[u8] = &[0xc1, 0x80];
+        let result = Block::<TxEnvelope, ExpandingHeader>::decode_sealed(&mut encoded);
+
+        assert!(matches!(result, Err(alloy_rlp::Error::InputTooShort)));
     }
 
     #[test]
@@ -562,6 +620,31 @@ mod tests {
         let present_string = block_rlp_with_body_fields(&[0xc0, 0xc0, 0x80]);
         assert!(Block::<TxEnvelope>::decode(&mut present_string.as_slice()).is_err());
         assert!(Block::<TxEnvelope>::decode_sealed(&mut present_string.as_slice()).is_err());
+    }
+
+    #[test]
+    fn blob_versioned_hashes_iter_includes_frame_transactions() {
+        let blob_hash = B256::with_last_byte(1);
+        let frame_hash = B256::with_last_byte(2);
+        let body = BlockBody::<Either<TxEip4844, TxEip8141>> {
+            transactions: vec![
+                Either::Left(TxEip4844 {
+                    blob_versioned_hashes: vec![blob_hash],
+                    ..Default::default()
+                }),
+                Either::Right(TxEip8141 {
+                    blob_versioned_hashes: vec![frame_hash],
+                    ..Default::default()
+                }),
+            ],
+            ommers: vec![],
+            withdrawals: None,
+        };
+
+        assert_eq!(
+            body.blob_versioned_hashes_iter().collect::<Vec<_>>(),
+            [&blob_hash, &frame_hash]
+        );
     }
 }
 

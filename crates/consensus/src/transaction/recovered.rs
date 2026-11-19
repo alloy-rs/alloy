@@ -8,7 +8,10 @@ use alloy_primitives::{bytes, Address, Bytes, Sealed, B256};
 use alloy_rlp::{Decodable, Encodable};
 use derive_more::{AsRef, Deref};
 
-/// Signed object with recovered signer.
+/// A signed object paired with a previously recovered signer.
+///
+/// The signer is cached metadata and is not recomputed. Mapping or mutating the inner value is
+/// valid only when it preserves the signed payload and signature preimage.
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, AsRef, Deref)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -33,12 +36,14 @@ impl<T> Recovered<T> {
         &self.signer
     }
 
-    /// Reference to the inner recovered object.
+    /// Returns a reference to the inner recovered object.
     pub const fn inner(&self) -> &T {
         &self.inner
     }
 
-    /// Reference to the inner recovered object.
+    /// Returns a mutable reference to the inner recovered object.
+    ///
+    /// This does not update or invalidate the cached signer.
     pub const fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
@@ -75,7 +80,7 @@ impl<T> Recovered<T> {
         Self { inner, signer }
     }
 
-    /// Converts the inner signed object to the given alternative that is `From<T>`
+    /// Converts the inner signed object while preserving the signer without validation.
     pub fn convert<Tx>(self) -> Recovered<Tx>
     where
         Tx: From<T>,
@@ -83,7 +88,7 @@ impl<T> Recovered<T> {
         self.map(Tx::from)
     }
 
-    /// Converts the inner signed object to the given alternative that is `TryFrom<T>`
+    /// Fallibly converts the inner signed object while preserving the signer without validation.
     pub fn try_convert<Tx>(self) -> Result<Recovered<Tx>, Tx::Error>
     where
         Tx: TryFrom<T>,
@@ -91,12 +96,12 @@ impl<T> Recovered<T> {
         self.try_map(Tx::try_from)
     }
 
-    /// Applies the given closure to the inner signed object.
+    /// Applies a closure while preserving the signer without validation.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.inner), self.signer)
     }
 
-    /// Applies the given fallible closure to the inner signed object.
+    /// Applies a fallible closure while preserving the signer without validation.
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Recovered<Tx>, E> {
         Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
     }

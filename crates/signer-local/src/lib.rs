@@ -49,7 +49,12 @@ pub type Secp256k1Signer = LocalSigner<Secp256k1Credential>;
 #[cfg(feature = "yubihsm")]
 pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 
-/// An Ethereum private-public key pair which can be used for signing messages.
+/// An Ethereum signer backed by a synchronous [`PrehashSigner`] credential.
+///
+/// [`PrivateKeySigner`] and `Secp256k1Signer` keep private-key material in process memory, while
+/// credentials such as `YubiSigner` can delegate signing to external hardware. The asynchronous
+/// [`Signer`] implementation calls the credential synchronously and does not move blocking work to
+/// another thread; custom or hardware credentials may therefore block an async executor.
 ///
 /// # Examples
 ///
@@ -65,10 +70,6 @@ pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 /// use alloy_signer_local::PrivateKeySigner;
 ///
 /// let signer = PrivateKeySigner::random();
-///
-/// // Optionally, the signer's chain id can be set, in order to use EIP-155
-/// // replay protection with different chains
-/// let signer = signer.with_chain_id(Some(1337));
 ///
 /// // The signer can be used to sign messages
 /// let message = b"hello";
@@ -128,7 +129,11 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigne
 }
 
 impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<C> {
-    /// Construct a new credential with an external [`PrehashSigner`].
+    /// Constructs a signer from an external [`PrehashSigner`] credential.
+    ///
+    /// `address` is trusted and is not derived from or checked against `credential`. The caller
+    /// must ensure it is the address recovered from signatures produced by the credential.
+    /// `chain_id` affects transaction signing only.
     #[inline]
     pub const fn new_with_credential(
         credential: C,
@@ -139,12 +144,18 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<C> {
     }
 
     /// Returns this signer's credential.
+    ///
+    /// Depending on `C`, the returned value may expose private-key material. Do not log or
+    /// otherwise disclose it.
     #[inline]
     pub const fn credential(&self) -> &C {
         &self.credential
     }
 
     /// Consumes this signer and returns its credential.
+    ///
+    /// Depending on `C`, the returned value may expose private-key material. Do not log or
+    /// otherwise disclose it.
     #[inline]
     pub fn into_credential(self) -> C {
         self.credential

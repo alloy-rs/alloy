@@ -5,10 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [genesis] Derive missing osaka blob params from prague ([#4538](https://github.com/alloy-rs/alloy/issues/4538))
+- [genesis] Match lowercase amsterdam and bogota blob schedule keys ([#4430](https://github.com/alloy-rs/alloy/issues/4430))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Testing
+
+- Remove trivial tests in eips, genesis and consensus ([#4369](https://github.com/alloy-rs/alloy/issues/4369))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Features
+
+- [genesis] Support feature-gated account extensions ([#4182](https://github.com/alloy-rs/alloy/issues/4182))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+## [2.4.1](https://github.com/alloy-rs/alloy/releases/tag/v2.4.1) - 2026-08-13
+
+### Features
+
+- [genesis] Add slot_number genesis header field (EIP-7843) ([#4138](https://github.com/alloy-rs/alloy/issues/4138))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Features
+
+- [genesis] Add account code helpers ([#4132](https://github.com/alloy-rs/alloy/issues/4132))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Miscellaneous Tasks
 
+- Release 2.3.0
 - Add bogota hardfork for support ([#4087](https://github.com/alloy-rs/alloy/issues/4087))
 - Release 2.2.0
 - Release 2.1.1

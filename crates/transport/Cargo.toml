@@ -7,7 +7,6 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
@@ -39,6 +38,7 @@ governor = { version = "0.10", default-features = false, features = [
 ], optional = true }
 futures.workspace = true
 parking_lot.workspace = true
+percent-encoding.workspace = true
 derive_more.workspace = true
 auto_impl.workspace = true
 

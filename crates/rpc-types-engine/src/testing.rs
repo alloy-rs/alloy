@@ -30,6 +30,42 @@ pub struct TestingBuildBlockRequestV1 {
 }
 
 impl TestingBuildBlockRequestV1 {
+    /// Creates a new request for the given parent block hash and payload attributes, without any
+    /// transactions or extra data.
+    pub const fn new(parent_block_hash: B256, payload_attributes: PayloadAttributes) -> Self {
+        Self { parent_block_hash, payload_attributes, transactions: Vec::new(), extra_data: None }
+    }
+
+    /// Sets the parent block hash of the block to build.
+    pub const fn with_parent_block_hash(mut self, parent_block_hash: B256) -> Self {
+        self.parent_block_hash = parent_block_hash;
+        self
+    }
+
+    /// Sets the payload attributes.
+    pub fn with_payload_attributes(mut self, payload_attributes: PayloadAttributes) -> Self {
+        self.payload_attributes = payload_attributes;
+        self
+    }
+
+    /// Sets the raw signed transactions to force-include in order.
+    pub fn with_transactions(mut self, transactions: Vec<Bytes>) -> Self {
+        self.transactions = transactions;
+        self
+    }
+
+    /// Appends a raw signed transaction to force-include.
+    pub fn with_transaction(mut self, transaction: Bytes) -> Self {
+        self.transactions.push(transaction);
+        self
+    }
+
+    /// Sets the extra data for the block header.
+    pub fn with_extra_data(mut self, extra_data: Bytes) -> Self {
+        self.extra_data = Some(extra_data);
+        self
+    }
+
     /// Consumes the request and returns the positional JSON-RPC parameters.
     pub fn into_params(self) -> (B256, PayloadAttributes, Vec<Bytes>, Option<Bytes>) {
         (self.parent_block_hash, self.payload_attributes, self.transactions, self.extra_data)

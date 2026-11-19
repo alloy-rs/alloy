@@ -67,9 +67,10 @@ pub trait NetworkWallet<N: Network>: std::fmt::Debug + Send + Sync {
 /// A signer should hold an optional [`ChainId`] value, which is used for [EIP-155] replay
 /// protection.
 ///
-/// If `chain_id` is Some, [EIP-155] should be applied to the input transaction in
-/// [`sign_transaction`](Self::sign_transaction), and to the resulting signature in all the methods.
-/// If `chain_id` is None, [EIP-155] should not be applied.
+/// If the signer has a chain ID, [`sign_transaction`](Self::sign_transaction) should set it on
+/// transactions whose chain ID is unset and reject transactions with a different chain ID. If the
+/// signer has no chain ID, it should leave the transaction's chain ID unchanged. In particular,
+/// signing a legacy transaction with an existing chain ID still uses [EIP-155] replay protection.
 ///
 /// Synchronous signers should implement both this trait and [`TxSignerSync`].
 ///
@@ -97,9 +98,10 @@ pub trait TxSigner<Signature> {
 /// A signer should hold an optional [`ChainId`] value, which is used for [EIP-155] replay
 /// protection.
 ///
-/// If `chain_id` is Some, [EIP-155] should be applied to the input transaction in
-/// [`sign_transaction_sync`](Self::sign_transaction_sync), and to the resulting signature in all
-/// the methods. If `chain_id` is None, [EIP-155] should not be applied.
+/// If the signer has a chain ID, [`sign_transaction_sync`](Self::sign_transaction_sync) should set
+/// it on transactions whose chain ID is unset and reject transactions with a different chain ID. If
+/// the signer has no chain ID, it should leave the transaction's chain ID unchanged. In particular,
+/// signing a legacy transaction with an existing chain ID still uses [EIP-155] replay protection.
 ///
 /// Synchronous signers should also implement [`TxSigner`], as they are always able to by delegating
 /// the asynchronous methods to the synchronous ones.

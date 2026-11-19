@@ -1,6 +1,13 @@
 use alloy_primitives::B256;
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Error, Header};
 
+#[cfg(feature = "serde")]
+pub(crate) use serde_eip658::Eip658Fields;
+
+const EIP658_STATUS_FAILED_RLP_PAYLOAD: &[u8] = &[];
+const EIP658_STATUS_SUCCESS_RLP_PAYLOAD: &[u8] = &[0x01];
+const PRE_BYZANTIUM_POST_STATE_ROOT_LENGTH: usize = 32;
+
 /// Captures the result of a transaction execution.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -92,9 +99,13 @@ mod serde_eip658 {
     //!
     //! If both are present, prefers `status` key.
     //!
-    //! Should be used with `#[serde(flatten)]`.
+    //! Should be used with `#[serde(flatten)]`, or through [`Eip658Fields`] by a map visitor.
     use super::*;
-    use serde::{Deserialize, Serialize};
+    use serde::{
+        de::{Error, MapAccess},
+        Deserialize, Serialize,
+    };
+    use serde_json::Value;
 
     #[derive(serde::Serialize, serde::Deserialize)]
     #[serde(untagged)]
@@ -106,6 +117,57 @@ mod serde_eip658 {
         PostState {
             root: B256,
         },
+    }
+
+    /// Collects the `status` and `root` entries of a map and resolves them like [`SerdeHelper`],
+    /// without buffering the other entries.
+    ///
+    /// Only the first entry of each key is kept, since a repeated key never matches. Parsing is
+    /// deferred until [`Self::finish`], because an invalid `status` falls back to a valid `root`
+    /// and a valid `status` makes an invalid `root` irrelevant.
+    #[derive(Default)]
+    pub(crate) struct Eip658Fields {
+        pub(crate) status: Entry,
+        pub(crate) root: Entry,
+    }
+
+    #[derive(Default)]
+    pub(crate) enum Entry {
+        #[default]
+        Missing,
+        Single(Value),
+        Repeated,
+    }
+
+    impl Entry {
+        /// Reads the value of the next key, keeping it only if the key was not seen before.
+        pub(crate) fn read<'de, A: MapAccess<'de>>(&mut self, map: &mut A) -> Result<(), A::Error> {
+            *self = match self {
+                Self::Missing => Self::Single(map.next_value()?),
+                _ => {
+                    map.next_value::<serde::de::IgnoredAny>()?;
+                    Self::Repeated
+                }
+            };
+            Ok(())
+        }
+    }
+
+    impl Eip658Fields {
+        /// Resolves the collected entries, preferring `status` over `root`.
+        pub(crate) fn finish<E: Error>(self) -> Result<Eip658Value, E> {
+            if let Entry::Single(status) = self.status {
+                if let Ok(status) = alloy_serde::quantity::deserialize(status) {
+                    return Ok(Eip658Value::Eip658(status));
+                }
+            }
+            if let Entry::Single(root) = self.root {
+                if let Ok(root) = B256::deserialize(root) {
+                    return Ok(Eip658Value::PostState(root));
+                }
+            }
+            Err(E::custom("data did not match any variant of untagged enum SerdeHelper"))
+        }
     }
 
     impl Serialize for Eip658Value {
@@ -161,15 +223,26 @@ impl Encodable for Eip658Value {
 impl Decodable for Eip658Value {
     fn decode(buf: &mut &[u8]) -> Result<Self, Error> {
         let h = Header::decode(buf)?;
+        if h.list {
+            return Err(Error::UnexpectedList);
+        }
 
         match h.payload_length {
-            0 => Ok(Self::Eip658(false)),
-            1 => {
-                let status = buf.get_u8() != 0;
-                Ok(status.into())
+            len if len == EIP658_STATUS_FAILED_RLP_PAYLOAD.len() => Ok(Self::Eip658(false)),
+            len if len == EIP658_STATUS_SUCCESS_RLP_PAYLOAD.len() => {
+                if buf.remaining() < len {
+                    return Err(Error::InputTooShort);
+                }
+                let is_success = &buf[..len] == EIP658_STATUS_SUCCESS_RLP_PAYLOAD;
+                buf.advance(len);
+                if is_success {
+                    Ok(Self::Eip658(true))
+                } else {
+                    Err(Error::Custom("invalid EIP-658 status, must be 0 or 1"))
+                }
             }
-            32 => {
-                if buf.remaining() < 32 {
+            PRE_BYZANTIUM_POST_STATE_ROOT_LENGTH => {
+                if buf.remaining() < PRE_BYZANTIUM_POST_STATE_ROOT_LENGTH {
                     return Err(Error::InputTooShort);
                 }
                 let mut state = B256::default();
@@ -196,6 +269,19 @@ mod test {
         let state = Eip658Value::PostState(B256::default());
         state.encode(&mut buf);
         assert_eq!(Eip658Value::decode(&mut buf.as_slice()), Ok(state));
+    }
+
+    #[test]
+    fn rejects_non_canonical_status() {
+        for encoded in [[0x00], [0x02], [0x7f]] {
+            assert!(Eip658Value::decode(&mut encoded.as_slice()).is_err());
+        }
+
+        assert!(Eip658Value::decode(&mut [0xc0].as_slice()).is_err());
+
+        let mut state_list = [0_u8; 33];
+        state_list[0] = 0xe0;
+        assert!(Eip658Value::decode(&mut state_list.as_slice()).is_err());
     }
 
     #[cfg(feature = "serde")]

@@ -1,6 +1,6 @@
 use crate::{Response, ResponsePayload, RpcError, RpcRecv};
 use serde_json::value::RawValue;
-use std::{any::TypeId, borrow::Borrow};
+use std::{any::TypeId, borrow::Borrow, fmt::Debug};
 
 /// The result of a JSON-RPC request.
 ///
@@ -10,10 +10,11 @@ use std::{any::TypeId, borrow::Borrow};
 ///
 /// The common cases are:
 /// - `Ok(T)` - The server returned a successful response.
-/// - `Err(RpcError::ErrorResponse(ErrResp))` - The server returned an error response.
-/// - `Err(RpcError::SerError(E))` - A serialization error occurred.
-/// - `Err(RpcError::DeserError { err: E, text: String })` - A deserialization error occurred.
-/// - `Err(RpcError::TransportError(E))` - Some client-side or communication error occurred.
+/// - `Err(RpcError::ErrorResp(ErrorPayload<ErrResp>))` - The server returned an error response.
+/// - `Err(RpcError::SerError(serde_json::Error))` - A serialization error occurred.
+/// - `Err(RpcError::DeserError { err: serde_json::Error, text: String })` - A deserialization error
+///   occurred.
+/// - `Err(RpcError::Transport(E))` - Some client-side or communication error occurred.
 pub type RpcResult<T, E, ErrResp = Box<RawValue>> = Result<T, RpcError<E, ErrResp>>;
 
 /// A partially deserialized [`RpcResult`], borrowing from the deserializer.
@@ -72,13 +73,49 @@ where
         return Ok(unsafe { std::mem::transmute_copy::<J, T>(&json) });
     }
 
-    let _guard = debug_span!("deserialize_response", ty=%std::any::type_name::<T>()).entered();
-    let json = json.borrow().get();
+    deserialize_str(json.borrow().get())
+}
+
+/// Deserializes `json` into `T`, tracing the attempt.
+///
+/// Only [`serde_json::from_str`] depends on `T`; the tracing is delegated to non-generic helpers.
+fn deserialize_str<T, E, ErrResp>(json: &str) -> RpcResult<T, E, ErrResp>
+where
+    T: RpcRecv,
+    ErrResp: RpcRecv,
+{
+    let _guard = deserialize_span(std::any::type_name::<T>());
+    trace_json(json);
+    match serde_json::from_str(json) {
+        Ok(response) => {
+            trace_deserialized(&response);
+            Ok(response)
+        }
+        Err(err) => {
+            trace_deserialize_failed(&err);
+            Err(RpcError::deser_err(err, json))
+        }
+    }
+}
+
+#[inline(never)]
+fn deserialize_span(ty: &'static str) -> tracing::span::EnteredSpan {
+    debug_span!("deserialize_response", %ty).entered()
+}
+
+#[inline(never)]
+fn trace_json(json: &str) {
     trace!(%json, "deserializing");
-    serde_json::from_str(json)
-        .inspect(|response| trace!(?response, "deserialized"))
-        .inspect_err(|err| trace!(?err, "failed to deserialize"))
-        .map_err(|err| RpcError::deser_err(err, json))
+}
+
+#[inline(never)]
+fn trace_deserialized(response: &dyn Debug) {
+    trace!(?response, "deserialized");
+}
+
+#[inline(never)]
+fn trace_deserialize_failed(err: &serde_json::Error) {
+    trace!(?err, "failed to deserialize");
 }
 
 #[cfg(test)]

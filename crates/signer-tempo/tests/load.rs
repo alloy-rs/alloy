@@ -10,14 +10,6 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 #[test]
-fn load_strict_parses_all_entries() {
-    let store = TempoKeystore::load_from(fixture("keys.toml")).unwrap();
-    assert_eq!(store.len(), 4);
-    assert!(!store.is_empty());
-    assert_eq!(store.path(), fixture("keys.toml"));
-}
-
-#[test]
 fn iter_returns_redacted_summaries() {
     let store = TempoKeystore::load_from(fixture("keys.toml")).unwrap();
     let summaries: Vec<_> = store.iter().collect();

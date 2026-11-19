@@ -8,8 +8,11 @@
 
 use alloy_primitives::{BlockHash, Bytes, ChainId, B256, U256};
 use alloy_rpc_types_eth::TransactionRequest;
-use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use serde::{
+    de::{self, value::SeqAccessDeserializer, IgnoredAny, MapAccess, SeqAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+use std::{collections::BTreeMap, fmt};
 
 /// Represents the params to set forking which can take various forms:
 ///  - untagged
@@ -36,25 +39,121 @@ impl<'de> serde::Deserialize<'de> for Forking {
             block_number: Option<u64>,
         }
 
+        /// The block number of positional `[url, block]` options.
         #[derive(serde::Deserialize)]
-        struct Tagged {
-            forking: ForkOpts,
+        struct PositionalBlock(#[serde(with = "alloy_serde::quantity::opt")] Option<u64>);
+
+        /// The first element of positional options: the URL, or the complete options.
+        enum PositionalFirst {
+            Url(Option<String>),
+            Options(Forking),
         }
-        #[derive(serde::Deserialize)]
-        #[serde(untagged)]
-        enum ForkingVariants {
-            Tagged(Tagged),
-            Fork(ForkOpts),
+
+        impl<'de> serde::Deserialize<'de> for PositionalFirst {
+            fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                struct PositionalFirstVisitor;
+
+                impl<'de> Visitor<'de> for PositionalFirstVisitor {
+                    type Value = PositionalFirst;
+
+                    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                        formatter.write_str("a fork URL or fork options")
+                    }
+
+                    fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                        Ok(PositionalFirst::Url(Some(v.to_string())))
+                    }
+
+                    fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+                        Ok(PositionalFirst::Url(None))
+                    }
+
+                    fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+                        Ok(PositionalFirst::Url(None))
+                    }
+
+                    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+                        // Apply the same tag, duplicate, and precedence rules as unwrapped
+                        // options, so `[{"forking": {..}}]` is not decoded as empty options.
+                        ForkingVisitor.visit_map(map).map(PositionalFirst::Options)
+                    }
+
+                    fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
+                        let ForkOpts { json_rpc_url, block_number } =
+                            ForkOpts::deserialize(SeqAccessDeserializer::new(seq))?;
+                        Ok(PositionalFirst::Options(Forking { json_rpc_url, block_number }))
+                    }
+                }
+
+                deserializer.deserialize_any(PositionalFirstVisitor)
+            }
         }
-        let f = match ForkingVariants::deserialize(deserializer)? {
-            ForkingVariants::Fork(ForkOpts { json_rpc_url, block_number }) => {
-                Self { json_rpc_url, block_number }
+
+        struct ForkingVisitor;
+
+        impl<'de> Visitor<'de> for ForkingVisitor {
+            type Value = Forking;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("fork options, tagged fork options, or positional fork options")
             }
-            ForkingVariants::Tagged(f) => {
-                Self { json_rpc_url: f.forking.json_rpc_url, block_number: f.forking.block_number }
+
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Forking, A::Error> {
+                let mut fields = alloy_serde::OtherFields::default();
+                let mut tagged = None;
+                let mut duplicate = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "forking" => {
+                            if tagged.is_some() {
+                                return Err(de::Error::duplicate_field("forking"));
+                            }
+                            // Decode the tag directly so malformed or duplicate nested options
+                            // cannot be hidden by buffering or untagged fallback.
+                            tagged = Some(map.next_value::<ForkOpts>()?);
+                        }
+                        "jsonRpcUrl" | "blockNumber" => {
+                            let name =
+                                if key == "jsonRpcUrl" { "jsonRpcUrl" } else { "blockNumber" };
+                            if fields.insert(key, map.next_value()?).is_some() {
+                                duplicate = Some(name);
+                            }
+                        }
+                        _ => {
+                            let _ = map.next_value::<IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let options = if let Some(options) = tagged {
+                    options
+                } else {
+                    if let Some(field) = duplicate {
+                        return Err(de::Error::duplicate_field(field));
+                    }
+                    // Root options only apply in the absence of a tag. In particular, malformed
+                    // root options must not prevent a valid tagged configuration from decoding.
+                    fields.deserialize_into::<ForkOpts>().map_err(de::Error::custom)?
+                };
+                let ForkOpts { json_rpc_url, block_number } = options;
+                Ok(Forking { json_rpc_url, block_number })
             }
-        };
-        Ok(f)
+
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Forking, A::Error> {
+                // Positional options are either `[url, block]` or a single element holding the
+                // options, such as `[[url, block]]` or `[{"jsonRpcUrl": url}]`.
+                match seq.next_element::<PositionalFirst>()? {
+                    None => Err(de::Error::invalid_length(0, &self)),
+                    Some(PositionalFirst::Options(forking)) => Ok(forking),
+                    Some(PositionalFirst::Url(json_rpc_url)) => Ok(Forking {
+                        json_rpc_url,
+                        block_number: seq.next_element::<PositionalBlock>()?.and_then(|b| b.0),
+                    }),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(ForkingVisitor)
     }
 }
 
@@ -232,63 +331,139 @@ mod tests {
     }
 
     #[test]
-    fn test_serde_deserialize_options_with_values() {
-        let data = r#"{"timestamp": 1620000000, "blocks": 10}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
-        );
+    fn test_serde_deserialize_mine_options() {
+        let options = |timestamp, blocks| MineOptions::Options { timestamp, blocks };
+        for (data, expected) in [
+            (r#"{"timestamp": 1620000000, "blocks": 10}"#, options(Some(1620000000), Some(10))),
+            (r#"{"timestamp": "0x608f3d00", "blocks": 10}"#, options(Some(1620000000), Some(10))),
+            (r#"{"blocks": 5}"#, options(None, Some(5))),
+            (r#"{}"#, MineOptions::default()),
+            // Unknown keys are ignored, matching maps with a `timestamp` key.
+            (r#"{"foo": 1}"#, MineOptions::default()),
+            (r#"{"timestamp":"1620000000"}"#, options(Some(1620000000), None)),
+            (r#"{"timestamp":"0x608f3d00"}"#, options(Some(1620000000), None)),
+            (r#""1620000000""#, MineOptions::Timestamp(Some(1620000000))),
+            (r#""0x608f3d00""#, MineOptions::Timestamp(Some(1620000000))),
+        ] {
+            let deserialized: MineOptions = serde_json::from_str(data).unwrap();
+            assert_eq!(deserialized, expected, "{data}");
+        }
+    }
 
-        let data = r#"{"timestamp": "0x608f3d00", "blocks": 10}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+    #[test]
+    fn test_serde_forking_rejects_invalid_tagged_options() {
+        for data in [
+            r#"{"forking":{"blockNumber":"invalid"}}"#,
+            r#"{"forking":{"jsonRpcUrl":42}}"#,
+            r#"{"forking":null}"#,
+            r#"{"forking":false}"#,
+            r#"{"forking":"invalid"}"#,
+        ] {
+            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
+        }
+    }
+
+    #[test]
+    fn test_serde_forking_untagged_and_empty_options() {
+        for data in [r#"{"blockNumber":"0x11965b1"}"#, r#"{"blockNumber":18441649}"#] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking { json_rpc_url: None, block_number: Some(18441649) }
+            );
+        }
+        for data in
+            [r#"{}"#, r#"{"forking":{}}"#, r#"{"unknown":true}"#, r#"{"forking":{"unknown":true}}"#]
+        {
+            assert_eq!(serde_json::from_str::<Forking>(data).unwrap(), Forking::default());
+        }
         assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
+            serde_json::from_str::<Forking>(r#"{"jsonRpcUrl":"http://localhost:8545"}"#).unwrap(),
+            Forking { json_rpc_url: Some("http://localhost:8545".into()), block_number: None }
+        );
+        assert_eq!(
+            serde_json::from_str::<Forking>(
+                r#"{"forking":{"blockNumber":"0x1"},"blockNumber":"invalid","jsonRpcUrl":42}"#
+            )
+            .unwrap(),
+            Forking { json_rpc_url: None, block_number: Some(1) }
         );
     }
 
     #[test]
-    fn test_serde_deserialize_options_without_timestamp() {
-        let data = r#"{"blocks": 5}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::Options { timestamp: None, blocks: Some(5) });
-
-        let data = r#"{}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::default());
-
-        // Unknown keys are ignored, matching maps with a `timestamp` key.
-        let data = r#"{"foo": 1}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::default());
-    }
-
-    #[test]
-    fn test_serde_deserialize_options_with_timestamp() {
-        let data = r#"{"timestamp":"1620000000"}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+    fn test_serde_forking_positional_options() {
+        for data in [
+            r#"["http://localhost:8545",42]"#,
+            r#"["http://localhost:8545","0x2a"]"#,
+            r#"[["http://localhost:8545","0x2a"]]"#,
+            r#"[{"jsonRpcUrl":"http://localhost:8545","blockNumber":42}]"#,
+            r#"[{"forking":{"jsonRpcUrl":"http://localhost:8545","blockNumber":42}}]"#,
+        ] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking {
+                    json_rpc_url: Some("http://localhost:8545".into()),
+                    block_number: Some(42)
+                },
+                "{data}"
+            );
+        }
+        for data in [r#"["http://localhost:8545"]"#, r#"["http://localhost:8545",null]"#] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking { json_rpc_url: Some("http://localhost:8545".into()), block_number: None },
+                "{data}"
+            );
+        }
         assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
-        );
-
-        let data = r#"{"timestamp":"0x608f3d00"}"#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(
-            deserialized,
-            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
+            serde_json::from_str::<Forking>("[null,42]").unwrap(),
+            Forking { json_rpc_url: None, block_number: Some(42) }
         );
     }
 
     #[test]
-    fn test_serde_deserialize_timestamp() {
-        let data = r#""1620000000""#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
+    fn test_serde_forking_rejects_invalid_positional_options() {
+        for data in [
+            "[]",
+            "[[]]",
+            "[42]",
+            "[true]",
+            r#"["http://localhost:8545","invalid"]"#,
+            r#"["http://localhost:8545",42,1]"#,
+            r#"[["http://localhost:8545",42],1]"#,
+            r#"[{"jsonRpcUrl":"http://localhost:8545"},42]"#,
+            r#"[{"blockNumber":"0x1","blockNumber":"0x2"}]"#,
+            r#"[{"forking":{"blockNumber":"invalid"}}]"#,
+        ] {
+            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
+        }
+    }
 
-        let data = r#""0x608f3d00""#;
-        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
-        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
+    #[test]
+    fn test_serde_forking_rejects_duplicate_options() {
+        for data in [
+            r#"{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}"#,
+            r#"{"blockNumber":"0x1","blockNumber":"0x2"}"#,
+            r#"{"jsonRpcUrl":null,"jsonRpcUrl":"http://second:8545"}"#,
+            r#"{"blockNumber":null,"blockNumber":"0x2"}"#,
+            r#"{"forking":{},"forking":{"blockNumber":"0x1"}}"#,
+            r#"{"forking":{"jsonRpcUrl":"http://first:8545","jsonRpcUrl":"http://second:8545"}}"#,
+            r#"{"forking":{"blockNumber":"0x1","blockNumber":"0x2"}}"#,
+        ] {
+            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
+        }
+    }
+
+    #[test]
+    fn test_serde_forking_tag_ignores_duplicate_root_options() {
+        for data in [
+            r#"{"jsonRpcUrl":false,"jsonRpcUrl":42,"blockNumber":false,"forking":{"blockNumber":"0x1"}}"#,
+            r#"{"forking":{"blockNumber":"0x1"},"blockNumber":false,"blockNumber":"invalid","jsonRpcUrl":42}"#,
+        ] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking { json_rpc_url: None, block_number: Some(1) },
+                "{data}"
+            );
+        }
     }
 }

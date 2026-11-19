@@ -38,6 +38,18 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
         end_inclusive: BlockNumberOrTag,
     ) -> TransportResult<Vec<BlockTraceResult>>;
 
+    /// Subscribes to traces for blocks in `(start, end]`.
+    #[cfg(feature = "pubsub")]
+    fn debug_subscribe_trace_chain(
+        &self,
+        start_exclusive: BlockNumberOrTag,
+        end_inclusive: BlockNumberOrTag,
+        trace_options: Option<GethDebugTracingOptions>,
+    ) -> crate::GetSubscription<
+        (&'static str, BlockNumberOrTag, BlockNumberOrTag, Option<GethDebugTracingOptions>),
+        alloy_rpc_types_trace::geth::ChainBlockTraceResult,
+    >;
+
     /// The debug_traceBlock method will return a full stack trace of all invoked opcodes of all
     /// transaction that were included in this block.
     ///
@@ -400,6 +412,24 @@ where
         self.client().request("debug_traceChain", (start_exclusive, end_inclusive)).await
     }
 
+    #[cfg(feature = "pubsub")]
+    fn debug_subscribe_trace_chain(
+        &self,
+        start_exclusive: BlockNumberOrTag,
+        end_inclusive: BlockNumberOrTag,
+        trace_options: Option<GethDebugTracingOptions>,
+    ) -> crate::GetSubscription<
+        (&'static str, BlockNumberOrTag, BlockNumberOrTag, Option<GethDebugTracingOptions>),
+        alloy_rpc_types_trace::geth::ChainBlockTraceResult,
+    > {
+        let mut call = self.client().request(
+            "debug_subscribe",
+            ("traceChain", start_exclusive, end_inclusive, trace_options),
+        );
+        call.set_is_subscription();
+        crate::GetSubscription::new(self.weak_client(), call)
+    }
+
     async fn debug_trace_block(
         &self,
         rlp_block: &[u8],
@@ -583,7 +613,7 @@ mod test {
     use crate::{ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
-    use alloy_primitives::{address, U256};
+    use alloy_primitives::{address, b256, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
@@ -767,8 +797,6 @@ mod test {
     #[tokio::test]
     #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_debug_code_by_hash() {
-        use alloy_primitives::b256;
-
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();

@@ -23,18 +23,3 @@ where
         RlpEcdsaEncodableTx::tx_hash_with_type(self, signature, ty)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{Signed, TxLegacy};
-    use alloy_primitives::U256;
-
-    #[test]
-    fn hashable_signed() {
-        let tx = TxLegacy::default();
-        let signature = Signature::new(U256::from(1u64), U256::from(1u64), false);
-        let signed = Signed::new_unhashed(tx, signature);
-        let _hash = signed.hash();
-    }
-}

@@ -59,6 +59,39 @@ fn can_launch_reth_dev() {
 
 #[test]
 #[cfg_attr(windows, ignore = "no reth on windows")]
+fn can_set_host() {
+    if !ci_info::is_ci() {
+        return;
+    }
+
+    run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+        let reth =
+            Reth::new().host("0.0.0.0").dev().disable_discovery().data_dir(temp_dir_path).spawn();
+
+        assert_eq!(reth.host(), "0.0.0.0");
+        assert!(reth.endpoint().starts_with("http://0.0.0.0:"));
+        assert!(reth.ws_endpoint().starts_with("ws://0.0.0.0:"));
+    });
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "no reth on windows")]
+fn default_host_is_localhost() {
+    if !ci_info::is_ci() {
+        return;
+    }
+
+    run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+        let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
+
+        assert_eq!(reth.host(), "localhost");
+        assert!(reth.endpoint().starts_with("http://localhost:"));
+        assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
+    });
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth_dev_custom_genesis() {
     if !ci_info::is_ci() {
         return;

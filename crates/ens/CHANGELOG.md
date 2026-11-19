@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [contract] Preserve revert error sources ([#4411](https://github.com/alloy-rs/alloy/issues/4411))
+
+### Features
+
+- [ens] Deprecate get_resolver_for_name for ENSv2 ([#4464](https://github.com/alloy-rs/alloy/issues/4464))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+
+### Testing
+
+- [ens] Fix live mainnet tests after ENS resolver changes ([#4463](https://github.com/alloy-rs/alloy/issues/4463))
+- [ens] Follow the mainnet Universal Resolver upgrade ([#4465](https://github.com/alloy-rs/alloy/issues/4465))
+- [ens] Isolate live DNSSEC resolution from CI ([#4391](https://github.com/alloy-rs/alloy/issues/4391))
+- Remove trivial tests in small crates and signers ([#4370](https://github.com/alloy-rs/alloy/issues/4370))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Features
+
+- [ens] Follow CCIP Read redirects during resolution ([#4185](https://github.com/alloy-rs/alloy/issues/4185))
+- [ens] Migrate resolution to the Universal Resolver ([#4183](https://github.com/alloy-rs/alloy/issues/4183))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+
 ## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
 
 ### Bug Fixes

@@ -5,6 +5,117 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [provider] Keep EIP-1559 fees on GasFiller fallback ([#4537](https://github.com/alloy-rs/alloy/issues/4537))
+- [provider] Don't panic on a non-object pending block ([#4536](https://github.com/alloy-rs/alloy/issues/4536))
+- [provider] Keep every heartbeat timeout scheduled for the same instant ([#4512](https://github.com/alloy-rs/alloy/issues/4512))
+- [rpc-types-engine] List every EngineApi method in CAPABILITIES ([#4507](https://github.com/alloy-rs/alloy/issues/4507))
+- [provider] Report missing Multicall3 in MulticallBuilder ([#4471](https://github.com/alloy-rs/alloy/issues/4471))
+- [provider] Track reinclusion heights after reorgs ([#4437](https://github.com/alloy-rs/alloy/issues/4437))
+- [rpc] Preserve preparation and shutdown errors ([#4427](https://github.com/alloy-rs/alloy/issues/4427))
+- [provider] Return errors for filler loops ([#3917](https://github.com/alloy-rs/alloy/issues/3917))
+- [provider] Fail closed when call batching cannot inspect a request ([#4371](https://github.com/alloy-rs/alloy/issues/4371))
+- [provider] Preserve inner provider overrides in cache layer ([#4296](https://github.com/alloy-rs/alloy/issues/4296))
+- [provider] Keep all heartbeat watchers per tx ([#4350](https://github.com/alloy-rs/alloy/issues/4350))
+- [provider] Forward non-block methods through BlockIdProvider ([#4378](https://github.com/alloy-rs/alloy/issues/4378))
+- [provider] Wrap tenderly timestamp in params array ([#4334](https://github.com/alloy-rs/alloy/issues/4334))
+- [provider] Recheck paused state after notifications ([#4272](https://github.com/alloy-rs/alloy/issues/4272))
+- [provider] Don't drop fetched blocks when one fetch fails ([#4376](https://github.com/alloy-rs/alloy/issues/4376))
+- [provider] Detect same-height reorgs in NewBlocks ([#4256](https://github.com/alloy-rs/alloy/issues/4256))
+- [provider] Keep caller-set EIP-1559 fees in GasFiller ([#4395](https://github.com/alloy-rs/alloy/issues/4395))
+- [provider] Stream CCIP Read bodies on wasm ([#4394](https://github.com/alloy-rs/alloy/issues/4394))
+- [provider] Forward missing methods in FillProvider ([#4333](https://github.com/alloy-rs/alloy/issues/4333))
+- [rpc-client] Preserve pubsub frontend in connect_with_config ([#4273](https://github.com/alloy-rs/alloy/issues/4273))
+- [provider] Forward missing methods in DynProvider ([#4332](https://github.com/alloy-rs/alloy/issues/4332))
+- [provider] Honor block selection in call batching and multicall ([#4252](https://github.com/alloy-rs/alloy/issues/4252))
+- [provider] Preserve inner provider overrides in BlockIdLayer ([#4245](https://github.com/alloy-rs/alloy/issues/4245))
+- [provider] Ignore invalid heartbeat block heights ([#4241](https://github.com/alloy-rs/alloy/issues/4241))
+
+### Documentation
+
+- [provider] Correct filler return value and execution order docs ([#4431](https://github.com/alloy-rs/alloy/issues/4431))
+- Correct two copy-pasted doc comments ([#4429](https://github.com/alloy-rs/alloy/issues/4429))
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+- [provider] Note that CacheLayer entries are not scoped by chain ([#4253](https://github.com/alloy-rs/alloy/issues/4253))
+
+### Features
+
+- [provider] Add fill_and_sign_transaction to Provider trait ([#4207](https://github.com/alloy-rs/alloy/issues/4207))
+- [provider] Add legacy mode to GasFiller ([#4235](https://github.com/alloy-rs/alloy/issues/4235))
+
+### Miscellaneous Tasks
+
+- Move function-local `use`s to module scope ([#4478](https://github.com/alloy-rs/alloy/issues/4478))
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Performance
+
+- [provider] Dedup watch_pending_transaction and pending block codegen ([#4447](https://github.com/alloy-rs/alloy/issues/4447))
+
+### Testing
+
+- [provider] Fix anvil_reorg test ([#4459](https://github.com/alloy-rs/alloy/issues/4459))
+- Run multicall and anvil blob tests without a mainnet fork ([#4404](https://github.com/alloy-rs/alloy/issues/4404))
+- [provider] Remove dead and redundant tests ([#4368](https://github.com/alloy-rs/alloy/issues/4368))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [provider] Revert five recent RPC compatibility changes ([#4225](https://github.com/alloy-rs/alloy/issues/4225))
+- [provider] Accept nullable raw debug results ([#4223](https://github.com/alloy-rs/alloy/issues/4223))
+- [provider] Handle nullable trace collection results ([#4219](https://github.com/alloy-rs/alloy/issues/4219))
+- [provider] Preserve individual replay transaction hashes
+- [provider] Accept nullable uncle counts
+- [provider] Accept tree paths in trace_get
+- [trace] Decode regularGasUsed and explain gas ([#4195](https://github.com/alloy-rs/alloy/issues/4195))
+- [provider] Call eth_getBlockAccessList ([#4208](https://github.com/alloy-rs/alloy/issues/4208))
+
+### Testing
+
+- Allow slow Geth startup in Windows integration tests ([#4213](https://github.com/alloy-rs/alloy/issues/4213))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Features
+
+- [provider] Add CCIP Read (ERC-3668) support ([#4184](https://github.com/alloy-rs/alloy/issues/4184))
+- [provider] Expose request metadata and header helpers ([#4144](https://github.com/alloy-rs/alloy/issues/4144))
+- [provider] Add bogota engine api methods ([#4142](https://github.com/alloy-rs/alloy/issues/4142))
+
+### Other
+
+- Add block_opt method for optional block setting ([#4187](https://github.com/alloy-rs/alloy/issues/4187))
+
+### Styling
+
+- Fmt ([#4177](https://github.com/alloy-rs/alloy/issues/4177))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Bug Fixes
+
+- [provider] Skip cache for requireCanonical block hash queries ([#4075](https://github.com/alloy-rs/alloy/issues/4075))
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Features
+
+- [contract] Add call timeout futures ([#4119](https://github.com/alloy-rs/alloy/issues/4119))
+- [provider] Add trace chain subscription ([#4116](https://github.com/alloy-rs/alloy/issues/4116))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Bug Fixes
@@ -18,6 +129,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - [provider-ext-mev] Add sim_mev_bundle call ([#4108](https://github.com/alloy-rs/alloy/issues/4108))
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
 
 ## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
 

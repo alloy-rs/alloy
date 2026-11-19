@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [rpc-types-engine] Accept null INVALID validationError ([#4539](https://github.com/alloy-rs/alloy/issues/4539))
+- [rpc-types-engine] List every EngineApi method in CAPABILITIES ([#4507](https://github.com/alloy-rs/alloy/issues/4507))
+- [rpc-types-engine] Enforce strict payload fields ([#4202](https://github.com/alloy-rs/alloy/issues/4202))
+- [rpc-types-engine] Add missing Amsterdam Engine API methods to CAPABILITIES ([#3774](https://github.com/alloy-rs/alloy/issues/3774))
+- [rpc-types-engine] Reject V4 fields on V1 payloads ([#4297](https://github.com/alloy-rs/alloy/issues/4297))
+- [rpc-types-engine] Avoid base fee overflow panic ([#4345](https://github.com/alloy-rs/alloy/issues/4345))
+- [rpc-types-engine] Create JWT secret file with 0600 permissions ([#4292](https://github.com/alloy-rs/alloy/issues/4292))
+
+### Features
+
+- [rpc-types-engine] Add LA client code ([#4466](https://github.com/alloy-rs/alloy/issues/4466))
+- [rpc-types-engine] Add CN, EX and NE client codes ([#4387](https://github.com/alloy-rs/alloy/issues/4387))
+- [rpc-types-engine] Add TestingBuildBlockRequestV1 builders ([#4275](https://github.com/alloy-rs/alloy/issues/4275))
+- [engine] Add REST-SSZ payload witness types ([#4250](https://github.com/alloy-rs/alloy/issues/4250))
+- [rpc-types-engine] Partition V2 blobs ([#4246](https://github.com/alloy-rs/alloy/issues/4246))
+
+### Miscellaneous Tasks
+
+- Move function-local `use`s to module scope ([#4478](https://github.com/alloy-rs/alloy/issues/4478))
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Refactor
+
+- [engine] Decouple representation helpers ([#4424](https://github.com/alloy-rs/alloy/issues/4424))
+- [rpc-types-engine] Share flat payload serde helper ([#4360](https://github.com/alloy-rs/alloy/issues/4360))
+
+### Testing
+
+- [rpc-types] Remove trivial tests and dedupe fixtures ([#4367](https://github.com/alloy-rs/alloy/issues/4367))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [jwt] Strip 0x prefix when reporting InvalidLength ([#3782](https://github.com/alloy-rs/alloy/issues/3782))
+
+### Features
+
+- [engine] Add REST-SSZ wire types ([#4038](https://github.com/alloy-rs/alloy/issues/4038))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Bug Fixes
+
+- [rpc-types] Avoid stack overflow when decoding V2 blobs ([#4186](https://github.com/alloy-rs/alloy/issues/4186))
+
+### Features
+
+- [rpc-types-engine] Add amsterdam payload errors ([#4179](https://github.com/alloy-rs/alloy/issues/4179))
+
+## [2.4.1](https://github.com/alloy-rs/alloy/releases/tag/v2.4.1) - 2026-08-13
+
+### Features
+
+- [rpc-types-engine] Add Bogota payload sidecar fields ([#4141](https://github.com/alloy-rs/alloy/issues/4141))
+- [rpc-types-engine] Add Bogota payload types ([#4139](https://github.com/alloy-rs/alloy/issues/4139))
+- [rpc-types-engine] Add FOCIL response types ([#4137](https://github.com/alloy-rs/alloy/issues/4137))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Bug Fixes
@@ -31,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.3.0
 - Release 2.2.0
 - Release 2.1.1
 - Release 2.1.0

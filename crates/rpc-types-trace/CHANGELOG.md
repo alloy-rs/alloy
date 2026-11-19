@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [rpc-types-trace] Accept SELFDESTRUCT erc7562 frames ([#4489](https://github.com/alloy-rs/alloy/issues/4489))
+- [rpc-types-trace] Convert {} trace to NoopFrame ([#4323](https://github.com/alloy-rs/alloy/issues/4323))
+- [rpc-types-trace] Treat null trace filter members as omitted ([#4257](https://github.com/alloy-rs/alloy/issues/4257))
+
+### Documentation
+
+- Correct two copy-pasted doc comments ([#4429](https://github.com/alloy-rs/alloy/issues/4429))
+
+### Features
+
+- [rpc-types-trace] Add includeEmpty to PreStateConfig ([#4467](https://github.com/alloy-rs/alloy/issues/4467))
+- [trace] Expose records_call_logs ([#4407](https://github.com/alloy-rs/alloy/issues/4407))
+- [rpc-types-trace] Add codeHash to prestate AccountState ([#4372](https://github.com/alloy-rs/alloy/issues/4372))
+- [rpc-types-trace] Add blockHash to TraceFilter ([#4274](https://github.com/alloy-rs/alloy/issues/4274))
+- [rpc-types-trace] Iterate VM storage writes ([#4248](https://github.com/alloy-rs/alloy/issues/4248))
+
+### Miscellaneous Tasks
+
+- Move function-local `use`s to module scope ([#4478](https://github.com/alloy-rs/alloy/issues/4478))
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Performance
+
+- [rpc-types-trace] Deserialize TraceResult with a map visitor ([#4448](https://github.com/alloy-rs/alloy/issues/4448))
+
+### Refactor
+
+- [rpc-types-trace] Generate GethTrace accessors ([#4298](https://github.com/alloy-rs/alloy/issues/4298))
+
+### Testing
+
+- [rpc-types] Remove trivial tests and dedupe fixtures ([#4367](https://github.com/alloy-rs/alloy/issues/4367))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [provider] Revert five recent RPC compatibility changes ([#4225](https://github.com/alloy-rs/alloy/issues/4225))
+- [provider] Preserve individual replay transaction hashes
+- [rpc-types-trace] Serialize absent transaction fields as null ([#4218](https://github.com/alloy-rs/alloy/issues/4218))
+- [rpc-types-trace] Default address filters to intersection ([#4216](https://github.com/alloy-rs/alloy/issues/4216))
+- [trace] Decode regularGasUsed and explain gas ([#4195](https://github.com/alloy-rs/alloy/issues/4195))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Features
+
+- [rpc-types-trace] Add EIP-8037 state-gas fields ([#4113](https://github.com/alloy-rs/alloy/issues/4113))
+- [rpc-types] Add debug_traceChain result type ([#4115](https://github.com/alloy-rs/alloy/issues/4115))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+
 ## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
 
 ### Bug Fixes

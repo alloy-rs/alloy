@@ -5,7 +5,7 @@ use alloy_consensus::Blob;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
-use alloy_transport::{TransportError, TransportResult};
+use alloy_transport::TransportResult;
 use futures::try_join;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
@@ -454,9 +454,9 @@ where
         config: ImpersonateConfig,
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         let from = request.from().ok_or_else(|| {
-            TransportError::from(alloy_transport::TransportErrorKind::Custom(
-                "TransactionRequest must have a `from` address set.".to_string().into(),
-            ))
+            alloy_transport::TransportErrorKind::custom_str(
+                "TransactionRequest must have a `from` address set.",
+            )
         })?;
 
         let impersonate_future = self.anvil_impersonate_account(from);
@@ -536,6 +536,7 @@ mod tests {
     use alloy_network::{AnyNetwork, TransactionBuilder, TransactionBuilder4844};
     use alloy_network_primitives::BlockResponse as _;
     use alloy_primitives::{address, B256};
+    use alloy_rpc_types_anvil::TransactionData;
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::{sol, SolCall};
     use alloy_transport::mock::Asserter;
@@ -1221,7 +1222,19 @@ mod tests {
         provider.anvil_mine(Some(2), None).await.unwrap();
 
         let reorged_block = provider.get_block_by_number(2.into()).await.unwrap().unwrap();
-        provider.anvil_reorg(ReorgOptions { depth: 1, tx_block_pairs: Vec::new() }).await.unwrap();
+
+        // An empty replacement block can be identical to the original, so mine a transaction.
+        let tx = TransactionRequest::default()
+            .with_from(provider.get_accounts().await.unwrap()[0])
+            .with_to(Address::ZERO)
+            .with_value(U256::from(1));
+        provider
+            .anvil_reorg(ReorgOptions {
+                depth: 1,
+                tx_block_pairs: vec![(TransactionData::JSON(tx), 0)],
+            })
+            .await
+            .unwrap();
 
         let new_block = provider.get_block_by_number(2.into()).await.unwrap().unwrap();
 
@@ -1230,7 +1243,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_anvil_rollback() {
         let provider = ProviderBuilder::new().connect_anvil();
 
@@ -1285,7 +1297,7 @@ mod tests {
                 rt.block_on(async {
                     let provider = ProviderBuilder::new()
                         .connect_anvil_with_wallet_and_config(|anvil| {
-                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                            anvil.args(["--hardfork", "cancun"])
                         })
                         .unwrap();
 
@@ -1325,7 +1337,7 @@ mod tests {
                 rt.block_on(async {
                     let provider = ProviderBuilder::new()
                         .connect_anvil_with_wallet_and_config(|anvil| {
-                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                            anvil.args(["--hardfork", "cancun"])
                         })
                         .unwrap();
 

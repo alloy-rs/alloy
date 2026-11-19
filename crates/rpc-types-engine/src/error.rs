@@ -56,6 +56,18 @@ pub enum PayloadError {
     /// requests present in pre-prague payload.
     #[display("requests present in pre-prague payload")]
     PrePragueBlockRequests,
+    /// block access list present in pre-amsterdam payload.
+    #[display("block access list present in pre-amsterdam payload")]
+    PreAmsterdamBlockWithBlockAccessList,
+    /// block access list missing in post-amsterdam payload.
+    #[display("block access list missing in post-amsterdam payload")]
+    PostAmsterdamBlockWithoutBlockAccessList,
+    /// slot number present in pre-amsterdam payload.
+    #[display("slot number present in pre-amsterdam payload")]
+    PreAmsterdamBlockWithSlotNumber,
+    /// slot number missing in post-amsterdam payload.
+    #[display("slot number missing in post-amsterdam payload")]
+    PostAmsterdamBlockWithoutSlotNumber,
     /// Invalid payload block hash.
     #[display("block hash mismatch: want {execution}, got {consensus}")]
     BlockHash {

@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [rpc] Preserve preparation and shutdown errors ([#4427](https://github.com/alloy-rs/alloy/issues/4427))
+- [pubsub] Skip cancelled requests when reconnecting ([#4196](https://github.com/alloy-rs/alloy/issues/4196))
+- [pubsub] Don't re-create unsubscribed subs ([#4348](https://github.com/alloy-rs/alloy/issues/4348))
+- [pubsub] Send eth_unsubscribe with unique id ([#4347](https://github.com/alloy-rs/alloy/issues/4347))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+
+### Refactor
+
+- Dedupe transport stack internals ([#4363](https://github.com/alloy-rs/alloy/issues/4363))
+
+### Testing
+
+- [pubsub] Cover reconnect, routing and streams ([#4312](https://github.com/alloy-rs/alloy/issues/4312))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Bug Fixes
+
+- [pubsub] Drop tokio/time from the wasm build ([#4023](https://github.com/alloy-rs/alloy/issues/4023)) ([#4027](https://github.com/alloy-rs/alloy/issues/4027))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Features
@@ -13,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.3.0
 - Release 2.2.0
 - Release 2.1.1
 - Release 2.1.0

@@ -178,8 +178,7 @@ impl<L> ClientBuilder<L> {
         let connect = BuiltInConnectionString::from_str(s)?;
         let is_local = connect.is_local();
         let transport = connect.connect_boxed_with(config).await?;
-        let transport = self.builder.service(transport);
-        Ok(RpcClient::new(transport.into_box_transport(), is_local))
+        Ok(self.transport(transport, is_local))
     }
 
     /// Connect a transport, producing an [`RpcClient`].

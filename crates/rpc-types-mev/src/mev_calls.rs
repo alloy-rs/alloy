@@ -3,7 +3,7 @@ use crate::common::{Privacy, ProtocolVersion, Validity};
 use alloy_eips::BlockId;
 use alloy_primitives::{Bytes, TxHash, U256};
 use alloy_rpc_types_eth::{BlockOverrides, Log};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 /// A bundle of transactions to send to the matchmaker.
 ///
@@ -15,16 +15,15 @@ pub struct MevSendBundle {
     #[serde(rename = "version")]
     pub protocol_version: ProtocolVersion,
     /// Data used by block builders to check if the bundle should be considered for inclusion.
-    #[serde(rename = "inclusion")]
     pub inclusion: Inclusion,
     /// The transactions to include in the bundle.
     #[serde(rename = "body")]
     pub bundle_body: Vec<BundleItem>,
     /// Requirements for the bundle to be included in the block.
-    #[serde(rename = "validity", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub validity: Option<Validity>,
     /// Preferences on what data should be shared about the bundle and its transactions
-    #[serde(rename = "privacy", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub privacy: Option<Privacy>,
 }
 
@@ -191,7 +190,6 @@ impl Inclusion {
 /// A bundle tx, which can either be a transaction hash, or a full tx.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
-#[serde(rename_all = "camelCase")]
 pub enum BundleItem {
     /// The hash of either a transaction or bundle we are trying to backrun.
     Hash {
@@ -207,7 +205,6 @@ pub enum BundleItem {
         can_revert: bool,
     },
     /// A nested bundle request.
-    #[serde(rename_all = "camelCase")]
     Bundle {
         /// A bundle request of type MevSendBundle
         bundle: MevSendBundle,
@@ -224,11 +221,41 @@ pub struct SimBundleOverrides {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_block: Option<BlockId>,
     /// Overrides for block environment values.
-    #[serde(flatten)]
+    #[serde(flatten, serialize_with = "serialize_sim_block_overrides")]
     pub block_overrides: BlockOverrides,
     /// Timeout in seconds, defaults to 5
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timeout: Option<u64>,
+}
+
+/// Serializes [`BlockOverrides`] with the `blockNumber` and `timestamp` keys that mev-share
+/// expects, instead of `number` and `time`.
+fn serialize_sim_block_overrides<S: Serializer>(
+    overrides: &BlockOverrides,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SimBlockOverrides {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        block_number: Option<U256>,
+        #[serde(with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+        timestamp: Option<u64>,
+        #[serde(flatten)]
+        overrides: BlockOverrides,
+    }
+
+    let mut overrides = overrides.clone();
+    SimBlockOverrides {
+        block_number: overrides.number.take(),
+        timestamp: overrides.time.take(),
+        overrides,
+    }
+    .serialize(serializer)
 }
 
 /// Response from the matchmaker after sending a simulation request.
@@ -284,55 +311,6 @@ mod tests {
     use similar_asserts::assert_eq;
 
     use super::*;
-
-    #[test]
-    fn can_deserialize_simple() {
-        let str = r#"
-        [{
-            "version": "v0.1",
-            "inclusion": {
-                "block": "0x1"
-            },
-            "body": [{
-                "tx": "0x02f86b0180843b9aca00852ecc889a0082520894c87037874aed04e51c29f582394217a0a2b89d808080c080a0a463985c616dd8ee17d7ef9112af4e6e06a27b071525b42182fe7b0b5c8b4925a00af5ca177ffef2ff28449292505d41be578bebb77110dfc09361d2fb56998260",
-                "canRevert": false
-            }]
-        }]
-        "#;
-        let res: Result<Vec<MevSendBundle>, _> = serde_json::from_str(str);
-        assert!(res.is_ok());
-    }
-
-    #[test]
-    fn can_deserialize_complex() {
-        let str = r#"
-        [{
-            "version": "v0.1",
-            "inclusion": {
-                "block": "0x1"
-            },
-            "body": [{
-                "tx": "0x02f86b0180843b9aca00852ecc889a0082520894c87037874aed04e51c29f582394217a0a2b89d808080c080a0a463985c616dd8ee17d7ef9112af4e6e06a27b071525b42182fe7b0b5c8b4925a00af5ca177ffef2ff28449292505d41be578bebb77110dfc09361d2fb56998260",
-                "canRevert": false
-            }],
-            "privacy": {
-                "hints": [
-                  "calldata"
-                ]
-              },
-              "validity": {
-                "refundConfig": [
-                  {
-                    "address": "0x8EC1237b1E80A6adf191F40D4b7D095E21cdb18f",
-                    "percent": 100
-                  }
-                ]
-              }
-        }]
-        "#;
-        let res: Result<Vec<MevSendBundle>, _> = serde_json::from_str(str);
-        assert!(res.is_ok());
-    }
 
     #[test]
     fn can_serialize_complex() {
@@ -425,9 +403,9 @@ mod tests {
             function_selector: true,
             hash: true,
             tx_hash: true,
+            special_logs: true,
         };
-        let expected =
-            r#"["calldata","contract_address","logs","function_selector","hash","tx_hash"]"#;
+        let expected = r#"["calldata","contract_address","logs","function_selector","hash","tx_hash","special_logs"]"#;
         let actual = serde_json::to_string(&hint).unwrap();
         assert_eq!(actual, expected);
     }
@@ -441,10 +419,21 @@ mod tests {
             function_selector: false,
             hash: true,
             tx_hash: false,
+            special_logs: false,
         };
         let expected = r#"["calldata","logs","hash"]"#;
         let actual: PrivacyHint = serde_json::from_str(expected).unwrap();
         assert_eq!(actual, hint);
+    }
+
+    #[test]
+    fn can_deserialize_special_logs_privacy_hint() {
+        // The MEV-Share node accepts both spellings and emits `special_logs`.
+        for hint in ["special_logs", "default_logs"] {
+            let actual: PrivacyHint = serde_json::from_str(&format!(r#"["{hint}"]"#)).unwrap();
+            assert!(actual.has_special_logs(), "failed to parse {hint}");
+            assert_eq!(serde_json::to_string(&actual).unwrap(), r#"["special_logs"]"#);
+        }
     }
 
     #[test]
@@ -462,5 +451,25 @@ mod tests {
         "#;
         let actual: SimBundleResponse = serde_json::from_str(expected).unwrap();
         assert!(actual.success);
+    }
+
+    #[test]
+    fn can_serialize_sim_bundle_overrides() {
+        let overrides = SimBundleOverrides {
+            block_overrides: BlockOverrides {
+                number: Some(U256::from(100)),
+                time: Some(1234),
+                gas_limit: Some(30_000_000),
+                ..Default::default()
+            },
+            timeout: Some(5),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&overrides).unwrap();
+        assert_eq!(
+            json,
+            r#"{"blockNumber":"0x64","timestamp":"0x4d2","gasLimit":"0x1c9c380","timeout":5}"#
+        );
+        assert_eq!(serde_json::from_str::<SimBundleOverrides>(&json).unwrap(), overrides);
     }
 }

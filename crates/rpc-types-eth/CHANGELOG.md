@@ -5,6 +5,87 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [consensus] Enforce low-s in Signed::recover_signer ([#4541](https://github.com/alloy-rs/alloy/issues/4541))
+- [rpc-types-eth] Reject malformed blob sidecars in JSON ([#4542](https://github.com/alloy-rs/alloy/issues/4542))
+- [consensus] Align EIP-8141 types with Bogota devnet 2 ([#4443](https://github.com/alloy-rs/alloy/issues/4443))
+- Preserve buildable contract creation requests ([#4071](https://github.com/alloy-rs/alloy/issues/4071))
+- [rpc-types-eth] Parse Work block number as quantity ([#4320](https://github.com/alloy-rs/alloy/issues/4320))
+- [rpc-types-eth] Keep TxKind::Create in From impls ([#4319](https://github.com/alloy-rs/alloy/issues/4319))
+- [rpc-types-eth] Parse empty array as Params::None ([#4321](https://github.com/alloy-rs/alloy/issues/4321))
+- [rpc-types-eth] Accept omitted optional log metadata ([#4287](https://github.com/alloy-rs/alloy/issues/4287))
+- [rpc-types-eth] Accept ERC-7769 gas estimation field names ([#4294](https://github.com/alloy-rs/alloy/issues/4294))
+- [rpc-types-eth] Deserialize eth_sendUserOperation result as a hash ([#4278](https://github.com/alloy-rs/alloy/issues/4278))
+- [rpc-types-eth] Hash FilterSet order-independently ([#4260](https://github.com/alloy-rs/alloy/issues/4260))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Features
+
+- [rpc-types] Add fee conflict predicate ([#4494](https://github.com/alloy-rs/alloy/issues/4494))
+- [rpc] Add bounded simulation payload deserialization seed ([#4399](https://github.com/alloy-rs/alloy/issues/4399))
+- [rpc-types-eth] Add withdrawals to BlockOverrides ([#4386](https://github.com/alloy-rs/alloy/issues/4386))
+- [rpc-types-eth] Add AccountInfo::new and with_extension ([#4270](https://github.com/alloy-rs/alloy/issues/4270))
+- [rpc-types-eth] Add SimulatedBlock log iterators ([#4266](https://github.com/alloy-rs/alloy/issues/4266))
+
+### Miscellaneous Tasks
+
+- Move function-local `use`s to module scope ([#4478](https://github.com/alloy-rs/alloy/issues/4478))
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Other
+
+- "fix(consensus)!: enforce low-s in Signed::recover_signer" ([#4543](https://github.com/alloy-rs/alloy/issues/4543))
+
+### Performance
+
+- [rpc-types-eth] Deserialize Log through a single flatten buffer ([#4449](https://github.com/alloy-rs/alloy/issues/4449))
+- [rpc-types-eth] Serialize Transaction without cloning ([#4446](https://github.com/alloy-rs/alloy/issues/4446))
+
+### Refactor
+
+- Simplify transaction data adapters ([#4418](https://github.com/alloy-rs/alloy/issues/4418))
+
+### Testing
+
+- [rpc-types] Remove trivial tests and dedupe fixtures ([#4367](https://github.com/alloy-rs/alloy/issues/4367))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [trace] Decode regularGasUsed and explain gas ([#4195](https://github.com/alloy-rs/alloy/issues/4195))
+- [rpc-types-eth] Remove filter Hash implementations ([#4211](https://github.com/alloy-rs/alloy/issues/4211))
+- [rpc-types-eth] Ignore bloom cache in FilterSet equality ([#4204](https://github.com/alloy-rs/alloy/issues/4204))
+
+### Features
+
+- [genesis] Support feature-gated account extensions ([#4182](https://github.com/alloy-rs/alloy/issues/4182))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Documentation
+
+- [rpc-types-eth] Fix incorrect doc links in Filter matching methods ([#4164](https://github.com/alloy-rs/alloy/issues/4164))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Bug Fixes
@@ -24,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.3.0
 - Release 2.2.0
 - Release 2.1.1
 - Expand zepter feature checks ([#4063](https://github.com/alloy-rs/alloy/issues/4063))

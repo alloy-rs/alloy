@@ -1,4 +1,4 @@
-use std::{future::IntoFuture, marker::PhantomData};
+use std::{future::IntoFuture, marker::PhantomData, time::Duration};
 
 use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt};
@@ -10,6 +10,12 @@ use alloy_rpc_types_eth::{
     BlockId, BlockOverrides,
 };
 use alloy_sol_types::SolCall;
+
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+use tokio::time::{timeout as timeout_future, Timeout};
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use wasmtimer::tokio::{timeout as timeout_future, Timeout};
 
 /// Raw coder.
 const RAW_CODER: () = ();
@@ -69,6 +75,42 @@ where
         EthCall { inner: self.inner, decoder }
     }
 
+    /// Wraps this call in a client-side timeout that only stops waiting for the response.
+    ///
+    /// Awaiting the returned future produces a timeout result around the existing contract result,
+    /// so the two error cases can be handled separately.
+    ///
+    /// ```no_run
+    /// # async fn example<P: alloy_provider::Provider>(
+    /// #     provider: P,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_primitives::Address;
+    /// use alloy_sol_types::sol;
+    /// use std::time::Duration;
+    ///
+    /// sol! {
+    ///     #[sol(rpc)]
+    ///     contract Token {
+    ///         function balanceOf(address owner) external view returns (uint256);
+    ///     }
+    /// }
+    ///
+    /// let contract = Token::new(Address::ZERO, &provider);
+    /// let call = contract.balanceOf(Address::ZERO);
+    /// let balance = call.call().timeout(Duration::from_secs(10)).await??;
+    /// # let _ = balance;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// On Tokio-backed targets, including WASI, the returned future panics when polled if there
+    /// is no current Tokio timer, for example when polled outside of a Tokio runtime.
+    pub fn timeout(self, duration: Duration) -> Timeout<<Self as IntoFuture>::IntoFuture> {
+        timeout_future(duration, self.into_future())
+    }
+
     /// Set the state overrides for this call.
     pub fn overrides(mut self, overrides: impl Into<StateOverride>) -> Self {
         self.inner = self.inner.overrides(overrides);
@@ -115,7 +157,7 @@ where
     N: Network,
 {
     fn from(inner: alloy_provider::EthCall<N, Bytes>) -> Self {
-        Self { inner, decoder: &RAW_CODER }
+        Self::new_raw(inner)
     }
 }
 
@@ -160,13 +202,9 @@ where
     ) -> std::task::Poll<Self::Output> {
         let this = self.get_mut();
         let pin = std::pin::pin!(&mut this.inner);
-        match pin.poll(cx) {
-            std::task::Poll::Ready(Ok(data)) => {
-                std::task::Poll::Ready(this.decoder.abi_decode_output(data))
-            }
-            std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(e.into())),
-            std::task::Poll::Pending => std::task::Poll::Pending,
-        }
+        pin.poll(cx).map(|res| {
+            res.map_err(Into::into).and_then(|data| this.decoder.abi_decode_output(data))
+        })
     }
 }
 

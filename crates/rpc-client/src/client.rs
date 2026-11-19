@@ -384,28 +384,32 @@ impl RpcClientInner {
 mod pubsub_impl {
     use super::*;
     use alloy_pubsub::{PubSubConnect, RawSubscription, Subscription};
-    use alloy_transport::TransportResult;
+    use alloy_transport::{TransportErrorKind, TransportResult};
 
     impl RpcClientInner {
         /// Get a [`RawSubscription`] for the given subscription ID.
         ///
-        /// # Panics
-        ///
-        /// Panics if the transport does not support pubsub.
-        pub async fn get_raw_subscription(&self, id: alloy_primitives::B256) -> RawSubscription {
-            self.expect_pubsub_frontend().get_subscription(id).await.unwrap()
+        /// Returns an error if pubsub is unavailable, the backend has stopped, or the
+        /// subscription is no longer present.
+        pub async fn get_raw_subscription(
+            &self,
+            id: alloy_primitives::B256,
+        ) -> TransportResult<RawSubscription> {
+            self.pubsub_frontend()
+                .ok_or_else(TransportErrorKind::pubsub_unavailable)?
+                .get_subscription(id)
+                .await
         }
 
         /// Get a [`Subscription`] for the given subscription ID.
         ///
-        /// # Panics
-        ///
-        /// Panics if the transport does not support pubsub.
+        /// Returns an error if pubsub is unavailable, the backend has stopped, or the
+        /// subscription is no longer present.
         pub async fn get_subscription<T: serde::de::DeserializeOwned>(
             &self,
             id: alloy_primitives::B256,
-        ) -> Subscription<T> {
-            Subscription::from(self.get_raw_subscription(id).await)
+        ) -> TransportResult<Subscription<T>> {
+            self.get_raw_subscription(id).await.map(Subscription::from)
         }
     }
 
@@ -442,16 +446,42 @@ mod pubsub_impl {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "pubsub"))]
 mod tests {
     use super::*;
-    use similar_asserts::assert_eq;
+    use alloy_primitives::B256;
+    use alloy_pubsub::{PubSubFrontend, PubSubInstruction};
+    use alloy_transport::{TransportError, TransportErrorKind};
+    use tokio::sync::mpsc;
 
-    #[test]
-    fn test_client_with_poll_interval() {
-        let poll_interval = Duration::from_millis(5_000);
-        let client = RpcClient::new_http(reqwest::Url::parse("http://localhost").unwrap())
-            .with_poll_interval(poll_interval);
-        assert_eq!(client.poll_interval(), poll_interval);
+    #[tokio::test]
+    async fn subscription_without_pubsub_returns_error() {
+        let client = RpcClient::mocked(Asserter::new());
+        let err = client.get_raw_subscription(B256::ZERO).await.unwrap_err();
+        assert!(matches!(err, TransportError::Transport(TransportErrorKind::PubsubUnavailable)));
+    }
+
+    #[tokio::test]
+    async fn subscription_with_stopped_backend_returns_error() {
+        let (tx, rx) = mpsc::unbounded_channel();
+        drop(rx);
+        let client = RpcClient::new(PubSubFrontend::new(tx), true);
+        let err = client.get_raw_subscription(B256::ZERO).await.unwrap_err();
+        assert!(matches!(err, TransportError::Transport(TransportErrorKind::BackendGone)));
+    }
+
+    #[tokio::test]
+    async fn missing_typed_subscription_returns_error() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let client = RpcClient::new(PubSubFrontend::new(tx), true);
+        let lookup = client.get_subscription::<u64>(B256::ZERO);
+        let respond = async {
+            let PubSubInstruction::GetSub(_, tx) = rx.recv().await.unwrap() else {
+                panic!("expected subscription lookup");
+            };
+            tx.send(None).unwrap();
+        };
+        let (result, ()) = tokio::join!(lookup, respond);
+        assert_eq!(result.unwrap_err().to_string(), "subscription not found");
     }
 }

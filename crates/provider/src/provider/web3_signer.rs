@@ -12,8 +12,6 @@ use super::Provider;
 /// Note:
 ///
 /// `"eth_signTransaction"` is not supported by regular nodes.
-///
-/// [`ProviderBuilder`]: crate::ProviderBuilder
 #[derive(Debug, Clone)]
 pub struct Web3Signer<P: Provider<N> + Clone, N: Network = Ethereum> {
     /// The provider used to make `"eth_signTransaction"` requests.

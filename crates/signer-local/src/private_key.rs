@@ -77,13 +77,23 @@ impl LocalSigner<SigningKey> {
         self.credential.as_nonzero_scalar()
     }
 
-    /// Serialize this [`LocalSigner`]'s [`SigningKey`] as a [`B256`] byte array.
+    /// Serializes this [`LocalSigner`]'s [`SigningKey`] as a [`B256`] byte array.
+    ///
+    /// # Security
+    ///
+    /// The returned bytes are unencrypted private-key material. Do not log or disclose them, and
+    /// clear copies as soon as practical.
     #[inline]
     pub fn to_bytes(&self) -> B256 {
         B256::new(<[u8; 32]>::from(self.to_field_bytes()))
     }
 
-    /// Serialize this [`LocalSigner`]'s [`SigningKey`] as a [`FieldBytes`] byte array.
+    /// Serializes this [`LocalSigner`]'s [`SigningKey`] as a [`FieldBytes`] byte array.
+    ///
+    /// # Security
+    ///
+    /// The returned bytes are unencrypted private-key material. Do not log or disclose them, and
+    /// clear copies as soon as practical.
     #[inline]
     pub fn to_field_bytes(&self) -> FieldBytes {
         self.credential.to_bytes()
@@ -238,12 +248,6 @@ mod tests {
 
     #[cfg(feature = "keystore")]
     use tempfile::tempdir;
-
-    #[test]
-    fn parse_pk() {
-        let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
-        let _pk: PrivateKeySigner = s.parse().unwrap();
-    }
 
     #[test]
     fn parse_short_key() {

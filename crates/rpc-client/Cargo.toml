@@ -7,7 +7,6 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
@@ -54,13 +53,15 @@ wasmtimer.workspace = true
 [dev-dependencies]
 alloy-primitives.workspace = true
 alloy-node-bindings.workspace = true
-alloy-transport-ipc = { workspace = true, features = ["mock"] }
+alloy-transport-ipc.workspace = true
 alloy-transport-ws = { workspace = true, features = ["aws-lc-rs"] }
 
 ci_info.workspace = true
 tempfile = "3"
 futures-util.workspace = true
 similar-asserts.workspace = true
+http.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "net", "io-util"] }
 
 [features]
 default = ["reqwest"]

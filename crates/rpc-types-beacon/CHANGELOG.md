@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Features
+
+- [rpc-types-beacon] Add transaction filter to builder validation requests ([#4473](https://github.com/alloy-rs/alloy/issues/4473))
+
+### Miscellaneous Tasks
+
+- Move function-local `use`s to module scope ([#4478](https://github.com/alloy-rs/alloy/issues/4478))
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Testing
+
+- [rpc-types] Remove trivial tests and dedupe fixtures ([#4367](https://github.com/alloy-rs/alloy/issues/4367))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Features
+
+- [rpc-types-beacon] Add EIP-8282 builder execution requests ([#4215](https://github.com/alloy-rs/alloy/issues/4215))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+
 ## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
 
 ### Features

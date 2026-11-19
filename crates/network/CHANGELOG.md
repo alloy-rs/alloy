@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+### Bug Fixes
+
+- [network-primitives] Deserialize newtype transactions in full blocks ([#4545](https://github.com/alloy-rs/alloy/issues/4545))
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [network] Keep unknown transaction create detection consistent ([#4432](https://github.com/alloy-rs/alloy/issues/4432))
+- [network] Invalidate unknown tx caches ([#4416](https://github.com/alloy-rs/alloy/issues/4416))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Refactor
+
+- Simplify transaction data adapters ([#4418](https://github.com/alloy-rs/alloy/issues/4418))
+- Delegate Transaction impls via macro ([#4364](https://github.com/alloy-rs/alloy/issues/4364))
+
+### Testing
+
+- Remove trivial tests in small crates and signers ([#4370](https://github.com/alloy-rs/alloy/issues/4370))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+### Bug Fixes
+
+- [network] Ignore deserialization cache in transaction equality ([#4212](https://github.com/alloy-rs/alloy/issues/4212))
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
 ## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
 
 ### Bug Fixes
@@ -18,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 2.3.0
 - Release 2.2.0
 - Release 2.1.1
 - Expand zepter feature checks ([#4063](https://github.com/alloy-rs/alloy/issues/4063))

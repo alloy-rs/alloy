@@ -1,4 +1,4 @@
-# alloy-networks
+# alloy-network
 
 Ethereum blockchain RPC behavior abstraction.
 
@@ -14,11 +14,10 @@ networking. The core model is as follows:
 
 - `Transaction` - A trait that defines an abstract interface for EVM-like
   transactions.
-- `Network` - A trait that defines the RPC types for a given blockchain.
-  Providers are parameterized by a `Network` type, and use the associated
-  types to define the input and output types of the RPC methods.
-- `TransactionBuilder` - A trait for constructing and validating network-specific transaction requests. Used to build typed transactions for signing and submission. See [`TransactionBuilder`](./src/transaction/builder.rs).
-- `NetworkWallet` - A trait for wallets that can sign transactions for a given network. Used to abstract over different signing backends. See [`NetworkWallet`](./src/transaction/signer.rs).
+- `Network` - A type-level mapping between a blockchain's consensus types and JSON-RPC request and
+  response types. Providers use its associated types to define RPC inputs and outputs.
+- `TransactionBuilder` - A trait for constructing and validating network-specific transaction requests. Used to build typed transactions for signing and submission. See [`TransactionBuilder`](https://docs.rs/alloy-network/latest/alloy_network/trait.TransactionBuilder.html).
+- `NetworkWallet` - A trait for wallets that can sign transactions for a given network. Used to abstract over different signing backends. See [`NetworkWallet`](https://docs.rs/alloy-network/latest/alloy_network/trait.NetworkWallet.html).
 - `BlockResponse`, `TransactionResponse`, `ReceiptResponse`, `HeaderResponse` - Traits (from `alloy-network-primitives`) that define the structure of block, transaction, receipt, and header types used in RPC responses. These are associated types in the `Network` trait and are implemented by network-specific types. See [`alloy-network-primitives`](https://docs.rs/alloy-network-primitives/).
 
 ## Usage
@@ -34,7 +33,8 @@ and then parameterizing the `Provider` type with the new network type.
 For example, to add a new network called `Foo`:
 
 ```rust,ignore
-// Foo must be a ZST. It is a compile error to use a non-ZST type.
+// A ZST is conventional because Network is a type-level marker, but it is not required.
+#[derive(Clone, Copy, Debug)]
 struct Foo;
 
 impl Network for Foo {
@@ -55,17 +55,20 @@ The user may then instantiate a `Provider<Foo>` and use it as normal. This
 allows the user to use the same API for all networks, regardless of the
 underlying RPC types.
 
-**Note:** If you need to also add custom _methods_ to your network, you should
-make an extension trait for `Provider<N>` as follows:
+If the network also needs custom RPC methods, define an extension trait with default method
+implementations and add a blanket implementation for every matching provider:
 
 ```rust,ignore
-#[async_trait]
-trait FooProviderExt: Provider<Foo> {
-    async fn custom_foo_method(&self) -> RpcResult<Something, TransportError>;
+use alloy_provider::Provider;
+use alloy_transport::TransportResult;
 
-    async fn another_custom_method(&self) -> RpcResult<Something, TransportError>;
+trait FooProviderExt: Provider<Foo> {
+    async fn custom_foo_method(&self) -> TransportResult<Something> {
+        self.client().request("foo_customMethod", ()).await
+    }
 }
+
+impl<P: Provider<Foo>> FooProviderExt for P {}
 ```
 
-[alloy-provider]: ../provider
-
+[alloy-provider]: https://docs.rs/alloy-provider/

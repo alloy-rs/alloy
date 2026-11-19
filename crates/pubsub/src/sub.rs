@@ -10,7 +10,10 @@ use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
 /// local ID.
 ///
 /// This type is mostly a wrapper around [`broadcast::Receiver`], and exposes
-/// the same methods.
+/// the same methods. Dropping it removes this receiver but does not unsubscribe
+/// from the server; use [`PubSubFrontend::unsubscribe`] for that.
+///
+/// [`PubSubFrontend::unsubscribe`]: crate::PubSubFrontend::unsubscribe
 #[derive(Debug)]
 pub struct RawSubscription {
     /// The channel via which notifications are received.
@@ -52,8 +55,11 @@ impl RawSubscription {
         self.rx.recv().await
     }
 
-    /// Wrapper for [`resubscribe`]. Create a new Subscription, starting from
-    /// the current tail element.
+    /// Wrapper for [`resubscribe`]. Create a new subscription at the current
+    /// channel tail.
+    ///
+    /// The new receiver gets messages sent after this call, not this
+    /// receiver's unread backlog.
     ///
     /// [`resubscribe`]: broadcast::Receiver::resubscribe
     pub fn resubscribe(&self) -> Self {
@@ -87,8 +93,8 @@ impl RawSubscription {
     }
 }
 
-/// An item in a typed [`Subscription`]. This is either the expected type, or
-/// some serialized value of another type.
+/// An item in a typed [`Subscription`]. This is either the expected type, or a
+/// raw value that could not be deserialized as that type.
 #[derive(Debug)]
 pub enum SubscriptionItem<T> {
     /// The expected item.
@@ -119,6 +125,17 @@ impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
 ///   [`SubscriptionItem::Other`].
 /// - The [`Subscription::recv_result`] and its variants will attempt to deserialize the
 ///   notifications and yield the `serde_json::Result` of the deserialization.
+///
+/// The receiver methods propagate broadcast lag errors. The typed stream
+/// adapters log and skip lag errors; [`SubscriptionStream`] also skips values
+/// that fail to deserialize, while [`SubResultStream`] yields those
+/// deserialization errors.
+///
+/// Dropping this receiver does not unsubscribe from the server. Use
+/// [`PubSubFrontend::unsubscribe`] with [`Subscription::local_id`] when the
+/// subscription is no longer needed.
+///
+/// [`PubSubFrontend::unsubscribe`]: crate::PubSubFrontend::unsubscribe
 #[derive(Debug)]
 #[must_use]
 pub struct Subscription<T> {
@@ -168,16 +185,16 @@ impl<T> Subscription<T> {
         self.inner.len()
     }
 
-    /// Wrapper for [`resubscribe`]. Create a new [`RawSubscription`], starting
-    /// from the current tail element.
+    /// Wrapper for [`resubscribe`]. Create a new [`RawSubscription`] at the
+    /// current channel tail, without copying unread messages.
     ///
     /// [`resubscribe`]: broadcast::Receiver::resubscribe
     pub fn resubscribe_inner(&self) -> RawSubscription {
         self.inner.resubscribe()
     }
 
-    /// Wrapper for [`resubscribe`]. Create a new `Subscription`, starting from
-    /// the current tail element.
+    /// Wrapper for [`resubscribe`]. Create a new `Subscription` at the current
+    /// channel tail, without copying unread messages.
     ///
     /// [`resubscribe`]: broadcast::Receiver::resubscribe
     pub fn resubscribe(&self) -> Self {
@@ -222,7 +239,7 @@ impl<T: DeserializeOwned> Subscription<T> {
 
     /// Convert the subscription into a stream.
     ///
-    /// Errors are logged and ignored.
+    /// Broadcast lag and deserialization errors are logged and skipped.
     pub fn into_stream(self) -> SubscriptionStream<T> {
         SubscriptionStream {
             id: self.inner.local_id,
@@ -232,6 +249,8 @@ impl<T: DeserializeOwned> Subscription<T> {
     }
 
     /// Convert the subscription into a stream that returns deserialization results.
+    ///
+    /// Broadcast lag errors are logged and skipped.
     pub fn into_result_stream(self) -> SubResultStream<T> {
         SubResultStream {
             id: self.inner.local_id,
@@ -240,7 +259,10 @@ impl<T: DeserializeOwned> Subscription<T> {
         }
     }
 
-    /// Convert the subscription into a stream that may yield unexpected types.
+    /// Convert the subscription into a stream that preserves values which do
+    /// not deserialize as `T`.
+    ///
+    /// Broadcast lag errors are logged and skipped.
     pub fn into_any_stream(self) -> SubAnyStream<T> {
         SubAnyStream {
             id: self.inner.local_id,
@@ -320,7 +342,8 @@ impl<T: DeserializeOwned> Subscription<T> {
 }
 
 /// A stream of notifications from the server, identified by a local ID. This
-/// stream may yield unexpected types.
+/// stream preserves values that do not deserialize as `T`, but logs and skips
+/// broadcast lag errors.
 #[derive(Debug)]
 pub struct SubAnyStream<T> {
     id: B256,
@@ -339,26 +362,37 @@ impl<T: DeserializeOwned> Stream for SubAnyStream<T> {
     type Item = SubscriptionItem<T>;
 
     fn poll_next(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
-        loop {
-            match ready!(self.inner.poll_next_unpin(cx)) {
-                Some(Ok(value)) => return task::Poll::Ready(Some(value.into())),
-                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
-                    // This is OK.
-                    debug!(%err, %self.id, "stream lagged");
-                    continue;
-                }
-                None => return task::Poll::Ready(None),
+        let this = self.get_mut();
+        poll_next_notification(&this.id, &mut this.inner, cx).map(|value| value.map(Into::into))
+    }
+}
+
+/// Polls the next notification of a subscription stream, logging and skipping broadcast lag
+/// errors.
+fn poll_next_notification(
+    id: &B256,
+    inner: &mut BroadcastStream<Box<RawValue>>,
+    cx: &mut task::Context<'_>,
+) -> task::Poll<Option<Box<RawValue>>> {
+    loop {
+        match ready!(inner.poll_next_unpin(cx)) {
+            Some(Ok(value)) => return task::Poll::Ready(Some(value)),
+            Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
+                // This is OK.
+                debug!(%err, self.id = %id, "stream lagged");
+                continue;
             }
+            None => return task::Poll::Ready(None),
         }
     }
 }
 
 /// A stream of notifications from the server, identified by a local ID. This
-/// stream will yield only the expected type, discarding any notifications of
-/// unexpected types.
+/// stream yields only the expected type, discarding values that fail to
+/// deserialize. Broadcast lag errors are also logged and skipped.
 #[derive(Debug)]
 pub struct SubscriptionStream<T> {
     id: B256,
@@ -381,20 +415,15 @@ impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
         loop {
-            match ready!(self.inner.poll_next_unpin(cx)) {
-                Some(Ok(value)) => match serde_json::from_str(value.get()) {
-                    Ok(item) => return task::Poll::Ready(Some(item)),
-                    Err(err) => {
-                        debug!(value = ?value.get(), %err, %self.id, "failed deserializing subscription item");
-                        continue;
-                    }
-                },
-                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
-                    // This is OK.
-                    debug!(%err, %self.id, "stream lagged");
-                    continue;
+            let this = &mut *self;
+            let Some(value) = ready!(poll_next_notification(&this.id, &mut this.inner, cx)) else {
+                return task::Poll::Ready(None);
+            };
+            match serde_json::from_str(value.get()) {
+                Ok(item) => return task::Poll::Ready(Some(item)),
+                Err(err) => {
+                    debug!(value = ?value.get(), %err, %self.id, "failed deserializing subscription item");
                 }
-                None => return task::Poll::Ready(None),
             }
         }
     }
@@ -403,7 +432,7 @@ impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
 /// A stream of notifications from the server, identified by a local ID.
 ///
 /// This stream will attempt to deserialize the notifications and yield the [`serde_json::Result`]
-/// of the deserialization.
+/// of the deserialization. Broadcast lag errors are logged and skipped.
 #[derive(Debug)]
 pub struct SubResultStream<T> {
     id: B256,
@@ -422,21 +451,11 @@ impl<T: DeserializeOwned> Stream for SubResultStream<T> {
     type Item = serde_json::Result<T>;
 
     fn poll_next(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
-        loop {
-            match ready!(self.inner.poll_next_unpin(cx)) {
-                Some(Ok(value)) => {
-                    return task::Poll::Ready(Some(serde_json::from_str(value.get())))
-                }
-                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
-                    // This is OK.
-                    debug!(%err, %self.id, "stream lagged");
-                    continue;
-                }
-                None => return task::Poll::Ready(None),
-            }
-        }
+        let this = self.get_mut();
+        poll_next_notification(&this.id, &mut this.inner, cx)
+            .map(|value| value.map(|value| serde_json::from_str(value.get())))
     }
 }

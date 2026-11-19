@@ -19,9 +19,21 @@ impl RequestManager {
         self.reqs.iter()
     }
 
+    /// Discard ordinary requests whose callers are no longer waiting.
+    pub(crate) fn remove_cancelled(&mut self) {
+        // Internal resubscriptions have no response receiver, but still need
+        // their acknowledgement to restore subscription delivery.
+        self.reqs.retain(|_, req| req.is_subscription() || !req.tx.is_closed());
+    }
+
     /// Insert a new in-flight request.
     pub(crate) fn insert(&mut self, in_flight: InFlight) {
         self.reqs.insert(in_flight.request.id().clone(), in_flight);
+    }
+
+    /// Drain all pending requests when the service terminates.
+    pub(crate) fn drain(&mut self) -> impl Iterator<Item = InFlight> + '_ {
+        self.reqs.drain().map(|(_, request)| request)
     }
 
     /// Handle a response by sending the payload to the waiter.

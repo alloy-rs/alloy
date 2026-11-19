@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [contract] Preserve revert error sources ([#4411](https://github.com/alloy-rs/alloy/issues/4411))
+- [contract] Scope contract event queries ([#4410](https://github.com/alloy-rs/alloy/issues/4410))
+- [provider] Honor block selection in call batching and multicall ([#4252](https://github.com/alloy-rs/alloy/issues/4252))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Miscellaneous Tasks
+
+- Move function-local `use`s to module scope ([#4478](https://github.com/alloy-rs/alloy/issues/4478))
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Testing
+
+- Run multicall and anvil blob tests without a mainnet fork ([#4404](https://github.com/alloy-rs/alloy/issues/4404))
+- [contract] Use unfunded signer in fill_eth_call ([#4388](https://github.com/alloy-rs/alloy/issues/4388))
+- Remove trivial tests in small crates and signers ([#4370](https://github.com/alloy-rs/alloy/issues/4370))
+
+## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
+
+## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08
+
+### Bug Fixes
+
+- [contract] Resolve block tags in chunked event queries ([#4145](https://github.com/alloy-rs/alloy/issues/4145))
+
+### Documentation
+
+- [contract] Remove stale .await guidance from CallBuilder ([#4178](https://github.com/alloy-rs/alloy/issues/4178))
+
+### Features
+
+- [contract] Add chunked event query streams ([#4180](https://github.com/alloy-rs/alloy/issues/4180))
+
+### Performance
+
+- [contract] Stop chunked event queries after fallback failure ([#4175](https://github.com/alloy-rs/alloy/issues/4175))
+
+## [2.4.0](https://github.com/alloy-rs/alloy/releases/tag/v2.4.0) - 2026-08-12
+
+### Documentation
+
+- Clarify public API behavior ([#4123](https://github.com/alloy-rs/alloy/issues/4123))
+
+### Features
+
+- [contract] Add call timeout futures ([#4119](https://github.com/alloy-rs/alloy/issues/4119))
+- [contract] Convert multicall errors ([#4118](https://github.com/alloy-rs/alloy/issues/4118))
+
+### Miscellaneous Tasks
+
+- Release 2.4.0
+
+## [2.3.0](https://github.com/alloy-rs/alloy/releases/tag/v2.3.0) - 2026-08-03
+
+### Miscellaneous Tasks
+
+- Release 2.3.0
+
 ## [2.2.0](https://github.com/alloy-rs/alloy/releases/tag/v2.2.0) - 2026-07-17
 
 ### Miscellaneous Tasks

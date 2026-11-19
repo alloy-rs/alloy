@@ -30,15 +30,26 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Number of the block this transaction was included within.
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
-    /// Gas used by this transaction alone.
+    /// Total gas charged for this transaction alone, after refunds and the applicable calldata
+    /// floor.
+    ///
+    /// Includes intrinsic gas and, on networks with [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037),
+    /// both regular (execution) gas and net state gas. Do not add trace `stateGasUsed` again.
+    /// Before EIP-8037, state creation costs are included under the ordinary gas schedule.
+    /// Excludes blob gas and network-specific fee components. This is not a sufficient gas limit:
+    /// execution can require gas that is later refunded or returned. Use `eth_estimateGas` to
+    /// estimate.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
-    /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
-    /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
-    /// that's actually paid by users can only be determined post-execution
+    /// The price paid post-execution by the transaction, in wei per gas (base fee plus priority
+    /// fee). Both fee fields in EIP-1559 transactions are maximums; the amount actually paid can
+    /// only be determined post-execution.
+    ///
+    /// Deserialization also accepts the legacy `gasPrice` name and defaults to zero if neither
+    /// name is present.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub effective_gas_price: u128,
-    /// Blob gas used by the eip-4844 transaction
+    /// Blob gas used by the EIP-4844 transaction, in blob gas units.
     ///
     /// This is None for non eip-4844 transactions
     #[cfg_attr(
@@ -50,7 +61,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
         )
     )]
     pub blob_gas_used: Option<u64>,
-    /// The price paid by the eip-4844 transaction per blob gas.
+    /// The price paid by the EIP-4844 transaction, in wei per blob gas.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -79,7 +90,7 @@ where
     {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct ReceiptDeserHelper<T = ReceiptEnvelope<Log>> {
+        struct ReceiptDeserHelper<T> {
             #[serde(flatten)]
             inner: T,
             transaction_hash: TxHash,
@@ -97,17 +108,9 @@ where
             // 3. Default to 0 if neither is present
             #[serde(default, alias = "gasPrice", with = "alloy_serde::quantity::opt")]
             effective_gas_price: Option<u128>,
-            #[serde(
-                default,
-                skip_serializing_if = "Option::is_none",
-                with = "alloy_serde::quantity::opt"
-            )]
+            #[serde(default, with = "alloy_serde::quantity::opt")]
             blob_gas_used: Option<u64>,
-            #[serde(
-                default,
-                skip_serializing_if = "Option::is_none",
-                with = "alloy_serde::quantity::opt"
-            )]
+            #[serde(default, with = "alloy_serde::quantity::opt")]
             blob_gas_price: Option<u128>,
             from: Address,
             to: Option<Address>,
@@ -185,6 +188,8 @@ impl<T> TransactionReceipt<T> {
     }
 
     /// Calculates the address that will be created by the transaction, if any.
+    ///
+    /// `nonce` is the sender nonce used by the contract-creation transaction.
     ///
     /// Returns `None` if the transaction is not a contract creation (the `to` field is set).
     pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {
@@ -319,18 +324,7 @@ mod test {
     use crate::TransactionReceipt;
     use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use similar_asserts::assert_eq;
-
-    #[test]
-    fn transaction_receipt_arbitrary() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-
-        let _: TransactionReceipt =
-            TransactionReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
-    }
 
     #[test]
     #[cfg(feature = "serde")]

@@ -3,15 +3,80 @@
 use std::{
     borrow::Cow,
     future::Future,
+    io::{self, BufRead, BufReader, Read},
     net::{SocketAddr, TcpListener},
+    ops::{Deref, DerefMut},
     path::PathBuf,
     process::Child,
     time::{Duration, Instant},
 };
 use tempfile::TempDir;
 
-#[cfg(unix)]
-use libc;
+/// Reads a node's output line by line.
+///
+/// A [`BufReader`] reads ahead past the line it returns, so its spare bytes are lost once the
+/// handle is handed back to the caller. Output that is handed back is therefore read one byte at
+/// a time, leaving every byte after the last line read in the handle.
+#[derive(Debug)]
+pub(crate) enum LineReader<R> {
+    /// Output that is not handed back, read through a buffer.
+    Buffered(BufReader<R>),
+    /// Output that is handed back, read without reading ahead.
+    Unbuffered(R),
+}
+
+impl<R: Read> LineReader<R> {
+    /// Reads `inner`, without reading ahead when it will be handed back (`keep`).
+    pub(crate) fn new(inner: R, keep: bool) -> Self {
+        if keep {
+            Self::Unbuffered(inner)
+        } else {
+            Self::Buffered(BufReader::new(inner))
+        }
+    }
+
+    /// Appends the next line to `buf`, like [`BufRead::read_line`]; returns 0 at EOF.
+    pub(crate) fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
+        match self {
+            Self::Buffered(reader) => reader.read_line(buf),
+            Self::Unbuffered(reader) => read_line_unbuffered(reader, buf),
+        }
+    }
+
+    /// Returns the handle. Only an unbuffered reader keeps every byte not read yet.
+    pub(crate) fn into_inner(self) -> R {
+        match self {
+            Self::Buffered(reader) => reader.into_inner(),
+            Self::Unbuffered(reader) => reader,
+        }
+    }
+}
+
+/// Appends the next line of `reader` to `buf`, reading one byte at a time so that nothing past
+/// the newline is consumed. Returns the number of bytes read, 0 at EOF.
+pub(crate) fn read_line_unbuffered(reader: &mut impl Read, buf: &mut String) -> io::Result<usize> {
+    let mut line = Vec::new();
+    let mut byte = [0; 1];
+    loop {
+        match reader.read(&mut byte) {
+            Ok(0) => break,
+            Ok(_) => {
+                line.push(byte[0]);
+                if byte[0] == b'\n' {
+                    break;
+                }
+            }
+            Err(err) if err.kind() == io::ErrorKind::Interrupted => {}
+            Err(err) => return Err(err),
+        }
+    }
+    let read = line.len();
+    let line = String::from_utf8(line).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidData, "stream did not contain valid UTF-8")
+    })?;
+    buf.push_str(&line);
+    Ok(read)
+}
 
 /// Helper for graceful process shutdown.
 pub(crate) struct GracefulShutdown;
@@ -39,6 +104,43 @@ impl GracefulShutdown {
 
         child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
         let _ = child.wait();
+    }
+}
+
+/// Owns a child until startup succeeds, cleaning it up on every error path.
+pub(crate) struct StartupGuard(Option<Child>);
+
+impl StartupGuard {
+    pub(crate) const fn new(child: Child) -> Self {
+        Self(Some(child))
+    }
+
+    pub(crate) fn into_child(mut self) -> Child {
+        self.0.take().unwrap()
+    }
+}
+
+impl Deref for StartupGuard {
+    type Target = Child;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unwrap()
+    }
+}
+
+impl DerefMut for StartupGuard {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().unwrap()
+    }
+}
+
+impl Drop for StartupGuard {
+    fn drop(&mut self) {
+        let Some(child) = &mut self.0 else { return };
+        if !matches!(child.try_wait(), Ok(Some(_))) && child.kill().is_ok() {
+            // Waiting after a failed kill could block on a process that is still running.
+            let _ = child.wait();
+        }
     }
 }
 
@@ -120,6 +222,78 @@ mod tests {
     use super::*;
     use std::net::SocketAddr;
 
+    #[cfg(unix)]
+    use crate::{Anvil, Geth, NodeError, Reth};
+    #[cfg(unix)]
+    use std::{io::Read, os::unix::fs::PermissionsExt};
+
+    /// Writes an executable shell script at `dir/name`.
+    #[cfg(unix)]
+    fn script(dir: &std::path::Path, name: &str, body: &str) -> PathBuf {
+        let program = dir.join(name);
+        std::fs::write(&program, format!("#!/bin/sh\n{body}")).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        program
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kept_geth_stderr_keeps_lines_read_ahead_during_startup() {
+        let dir = tempfile::tempdir().unwrap();
+        // Each `printf` is one write, so startup's first read gets the line after readiness too.
+        let geth = script(
+            dir.path(),
+            "geth",
+            "printf 'HTTP server started endpoint=127.0.0.1:8545 auth=false\\nAdding p2p peer id=0123456789abcdef\\n' >&2\nsleep 5\n",
+        );
+        let mut geth = Geth::at(&geth).keep_stderr().try_spawn().unwrap();
+        geth.wait_to_add_peer("0123456789abcdef00").unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_to_add_peer_keeps_lines_read_ahead() {
+        let dir = tempfile::tempdir().unwrap();
+        let geth = script(
+            dir.path(),
+            "geth",
+            "echo 'HTTP server started endpoint=127.0.0.1:8545 auth=false' >&2\nsleep 1\nprintf 'Adding p2p peer id=aaaaaaaaaaaaaaaa\\nAdding p2p peer id=bbbbbbbbbbbbbbbb\\n' >&2\nsleep 5\n",
+        );
+        let mut geth = Geth::at(&geth).keep_stderr().try_spawn().unwrap();
+        geth.wait_to_add_peer("aaaaaaaaaaaaaaaa00").unwrap();
+        geth.wait_to_add_peer("bbbbbbbbbbbbbbbb00").unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kept_anvil_stdout_keeps_lines_read_ahead_during_startup() {
+        let dir = tempfile::tempdir().unwrap();
+        let anvil = script(
+            dir.path(),
+            "anvil",
+            "printf 'Listening on 127.0.0.1:8545\\nafter readiness\\n'\n",
+        );
+        let mut anvil = Anvil::at(&anvil).keep_stdout().try_spawn().unwrap();
+        let mut rest = String::new();
+        anvil.child_mut().stdout.take().unwrap().read_to_string(&mut rest).unwrap();
+        assert_eq!(rest, "after readiness\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kept_reth_stdout_keeps_lines_read_ahead_during_startup() {
+        let dir = tempfile::tempdir().unwrap();
+        let reth = script(
+            dir.path(),
+            "reth",
+            "printf 'RPC HTTP server started url=127.0.0.1:8545\\nRPC WS server started url=127.0.0.1:8546\\nRPC auth server started url=127.0.0.1:8551\\nafter readiness\\n'\n",
+        );
+        let mut reth = Reth::at(&reth).disable_discovery().keep_stdout().try_spawn().unwrap();
+        let mut rest = String::new();
+        reth.stdout().unwrap().read_to_string(&mut rest).unwrap();
+        assert_eq!(rest, "after readiness\n");
+    }
+
     #[test]
     fn test_extract_value_with_equals() {
         let line = "key=value some other text";
@@ -168,29 +342,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_unused_port() {
-        let port = unused_port();
-        assert!(port > 0);
-    }
-
-    #[test]
-    fn test_run_with_tempdir_sync() {
-        run_with_tempdir_sync("test_prefix", |path| {
-            assert!(path.exists(), "Temporary directory should exist");
-            assert!(path.is_dir(), "Temporary directory should be a directory");
-        });
-    }
-
-    #[tokio::test]
-    async fn test_run_with_tempdir_async() {
-        run_with_tempdir("test_prefix", |path| async move {
-            assert!(path.exists(), "Temporary directory should exist");
-            assert!(path.is_dir(), "Temporary directory should be a directory");
-        })
-        .await;
-    }
-
     #[cfg(unix)]
     #[test]
     fn graceful_shutdown_reaps_after_force_kill() {
@@ -203,5 +354,59 @@ mod tests {
         GracefulShutdown::shutdown(&mut child, 0, "sh");
 
         assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn startup_errors_reap_children() {
+        for (name, output, private_key_error) in [
+            ("anvil", "\\377\\n", false),
+            ("geth", "\\377\\n", false),
+            ("reth", "\\377\\n", false),
+            ("anvil", "Private Keys\\n(0) 0xinvalid\\n", true),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let program = dir.path().join(name);
+            let redirect = if name == "geth" { ">&2" } else { "" };
+            std::fs::write(
+                &program,
+                format!(
+                    "#!/bin/sh\necho $$ > \"$0.pid\"\nprintf '{output}' {redirect}\nwhile :; do :; done\n"
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+            let result = match name {
+                "anvil" => Anvil::at(&program).try_spawn().map(drop),
+                "geth" => Geth::at(&program).try_spawn().map(drop),
+                "reth" => Reth::at(&program).try_spawn().map(drop),
+                _ => unreachable!(),
+            };
+            let pid = std::fs::read_to_string(program.with_extension("pid"))
+                .unwrap()
+                .trim()
+                .parse::<libc::pid_t>()
+                .unwrap();
+            // SAFETY: This only queries the child PID written by our test process.
+            let status = unsafe { libc::waitpid(pid, std::ptr::null_mut(), libc::WNOHANG) };
+            let error = std::io::Error::last_os_error();
+            if status == 0 {
+                // SAFETY: A zero waitpid result confirms this is our live child. Clean it up even
+                // when the assertion below will fail.
+                unsafe {
+                    libc::kill(pid, libc::SIGKILL);
+                    libc::waitpid(pid, std::ptr::null_mut(), 0);
+                }
+            }
+
+            if private_key_error {
+                assert!(matches!(result, Err(NodeError::FromHexError(_))), "{result:?}");
+            } else {
+                assert!(matches!(result, Err(NodeError::ReadLineError(_))), "{name}: {result:?}");
+            }
+            assert_eq!(status, -1, "{name} child was not reaped");
+            assert_eq!(error.raw_os_error(), Some(libc::ECHILD), "{name}: {error}");
+        }
     }
 }

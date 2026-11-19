@@ -103,6 +103,11 @@ pub struct PrivacyHint {
     pub hash: bool,
     /// The hash of the bundle should be shared.
     pub tx_hash: bool,
+    /// The swap logs of the bundle's transactions (Uniswap V2/V3, Curve and Balancer) should be
+    /// shared, stripped down to the pool and the swap event signature.
+    ///
+    /// Serialized as `special_logs`; `default_logs` is accepted as an alias.
+    pub special_logs: bool,
 }
 
 impl PrivacyHint {
@@ -146,6 +151,13 @@ impl PrivacyHint {
         self
     }
 
+    /// Sets the flag indicating inclusion of special logs and returns the modified `PrivacyHint`
+    /// instance.
+    pub const fn with_special_logs(mut self) -> Self {
+        self.special_logs = true;
+        self
+    }
+
     /// Checks if calldata inclusion flag is set.
     pub const fn has_calldata(&self) -> bool {
         self.calldata
@@ -176,76 +188,76 @@ impl PrivacyHint {
         self.tx_hash
     }
 
-    /// Calculates the number of hints set within the `PrivacyHint` instance.
-    const fn num_hints(&self) -> usize {
-        let mut num_hints = 0;
-        if self.calldata {
-            num_hints += 1;
-        }
-        if self.contract_address {
-            num_hints += 1;
-        }
-        if self.logs {
-            num_hints += 1;
-        }
-        if self.function_selector {
-            num_hints += 1;
-        }
-        if self.hash {
-            num_hints += 1;
-        }
-        if self.tx_hash {
-            num_hints += 1;
-        }
-        num_hints
+    /// Checks if special logs inclusion flag is set.
+    pub const fn has_special_logs(&self) -> bool {
+        self.special_logs
+    }
+
+    /// Returns the hint flags in [`PRIVACY_HINT_VARIANTS`] order.
+    const fn flags(&self) -> [bool; 7] {
+        [
+            self.calldata,
+            self.contract_address,
+            self.logs,
+            self.function_selector,
+            self.hash,
+            self.tx_hash,
+            self.special_logs,
+        ]
+    }
+
+    /// Returns mutable references to the hint flags in [`PRIVACY_HINT_VARIANTS`] order.
+    const fn flags_mut(&mut self) -> [&mut bool; 7] {
+        [
+            &mut self.calldata,
+            &mut self.contract_address,
+            &mut self.logs,
+            &mut self.function_selector,
+            &mut self.hash,
+            &mut self.tx_hash,
+            &mut self.special_logs,
+        ]
     }
 }
 
 impl Serialize for PrivacyHint {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut seq = serializer.serialize_seq(Some(self.num_hints()))?;
-        if self.calldata {
-            seq.serialize_element("calldata")?;
-        }
-        if self.contract_address {
-            seq.serialize_element("contract_address")?;
-        }
-        if self.logs {
-            seq.serialize_element("logs")?;
-        }
-        if self.function_selector {
-            seq.serialize_element("function_selector")?;
-        }
-        if self.hash {
-            seq.serialize_element("hash")?;
-        }
-        if self.tx_hash {
-            seq.serialize_element("tx_hash")?;
+        let flags = self.flags();
+        let mut seq = serializer.serialize_seq(Some(flags.iter().filter(|set| **set).count()))?;
+        for (name, set) in PRIVACY_HINT_VARIANTS.iter().zip(flags) {
+            if set {
+                seq.serialize_element(name)?;
+            }
         }
         seq.end()
     }
 }
 
 /// All supported privacy hint variants.
-const PRIVACY_HINT_VARIANTS: &[&str] =
-    &["calldata", "contract_address", "logs", "function_selector", "hash", "tx_hash"];
+const PRIVACY_HINT_VARIANTS: &[&str] = &[
+    "calldata",
+    "contract_address",
+    "logs",
+    "function_selector",
+    "hash",
+    "tx_hash",
+    "special_logs",
+];
+
+/// Alias the MEV-Share node accepts for the `special_logs` hint.
+const DEFAULT_LOGS_HINT: &str = "default_logs";
 
 impl<'de> Deserialize<'de> for PrivacyHint {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let hints = Vec::<String>::deserialize(deserializer)?;
         let mut privacy_hint = Self::default();
         for hint in hints {
-            match hint.as_str() {
-                "calldata" => privacy_hint.calldata = true,
-                "contract_address" => privacy_hint.contract_address = true,
-                "logs" => privacy_hint.logs = true,
-                "function_selector" => privacy_hint.function_selector = true,
-                "hash" => privacy_hint.hash = true,
-                "tx_hash" => privacy_hint.tx_hash = true,
-                _ => {
-                    return Err(serde::de::Error::unknown_variant(&hint, PRIVACY_HINT_VARIANTS));
-                }
-            }
+            let name = if hint == DEFAULT_LOGS_HINT { "special_logs" } else { hint.as_str() };
+            let Some(idx) = PRIVACY_HINT_VARIANTS.iter().position(|variant| *variant == name)
+            else {
+                return Err(serde::de::Error::unknown_variant(&hint, PRIVACY_HINT_VARIANTS));
+            };
+            *privacy_hint.flags_mut()[idx] = true;
         }
         Ok(privacy_hint)
     }
