@@ -25,7 +25,7 @@ pub(crate) fn serialize<S>(val: &U256, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    serializer.serialize_str(&val.to_string())
+    serializer.collect_str(val)
 }
 
 #[cfg(test)]
