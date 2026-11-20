@@ -12,6 +12,10 @@ pub use retry::{
     OrRetryPolicyFn, RateLimitRetryPolicy, RetryBackoffLayer, RetryBackoffService, RetryPolicy,
 };
 
+/// TimeoutLayer
+mod timeout;
+pub use timeout::{TimeoutLayer, TimeoutService};
+
 /// FallbackLayer
 mod fallback;
 pub use fallback::{FallbackLayer, FallbackService};

@@ -50,6 +50,10 @@ pub enum TransportErrorKind {
         retry_after: Duration,
     },
 
+    /// The operation did not complete within the given duration.
+    #[error("timed out after {0:?}")]
+    Timeout(Duration),
+
     /// Custom error.
     #[error("{0}")]
     Custom(#[source] Box<dyn StdError + Send + Sync + 'static>),
@@ -105,6 +109,11 @@ impl TransportErrorKind {
         RpcError::Transport(Self::BackendGone)
     }
 
+    /// Instantiate a new `TransportError::Timeout`.
+    pub const fn timeout(duration: Duration) -> TransportError {
+        RpcError::Transport(Self::Timeout(duration))
+    }
+
     /// Instantiate a new `TransportError::PubsubUnavailable`.
     pub const fn pubsub_unavailable() -> TransportError {
         RpcError::Transport(Self::PubsubUnavailable)
@@ -134,6 +143,11 @@ impl TransportErrorKind {
     /// Returns true if this is [`TransportErrorKind::PubsubUnavailable`].
     pub const fn is_pubsub_unavailable(&self) -> bool {
         matches!(self, Self::PubsubUnavailable)
+    }
+
+    /// Returns true if this is [`TransportErrorKind::Timeout`].
+    pub const fn is_timeout(&self) -> bool {
+        matches!(self, Self::Timeout(_))
     }
 
     /// Returns true if this is [`TransportErrorKind::BackendGone`].
