@@ -695,21 +695,43 @@ pub struct BlockOverrides {
     )]
     pub gas_limit: Option<u64>,
     /// Overrides the coinbase address of the block.
+    ///
+    /// Serialized as `feeRecipient`, the name used by the execution-apis spec and by geth,
+    /// Erigon and Nethermind. `coinbase` is still accepted when deserializing.
     #[cfg_attr(
         feature = "serde",
-        serde(default, skip_serializing_if = "Option::is_none", alias = "feeRecipient")
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "feeRecipient",
+            alias = "coinbase"
+        )
     )]
     pub coinbase: Option<Address>,
     /// Overrides the prevrandao of the block.
+    ///
+    /// Serialized as `prevRandao`. `random` is still accepted when deserializing.
     #[cfg_attr(
         feature = "serde",
-        serde(default, skip_serializing_if = "Option::is_none", alias = "prevRandao")
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "prevRandao",
+            alias = "random"
+        )
     )]
     pub random: Option<B256>,
     /// Overrides the basefee of the block.
+    ///
+    /// Serialized as `baseFeePerGas`. `baseFee` is still accepted when deserializing.
     #[cfg_attr(
         feature = "serde",
-        serde(default, skip_serializing_if = "Option::is_none", alias = "baseFeePerGas")
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "baseFeePerGas",
+            alias = "baseFee"
+        )
     )]
     pub base_fee: Option<U256>,
     /// Overrides the blob base fee of the block.
@@ -1060,6 +1082,27 @@ mod tests {
             }]))
         );
         assert_eq!(serde_json::to_string(&overrides).unwrap(), s);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn block_overrides_spec_field_names() {
+        // execution-apis names these `feeRecipient`, `prevRandao` and `baseFeePerGas`. geth
+        // ignores the old names in `eth_call` and rejects them in `eth_simulateV1`.
+        let overrides = BlockOverrides::default()
+            .with_coinbase(Address::with_last_byte(1))
+            .with_random(B256::with_last_byte(2))
+            .with_base_fee(U256::from(3));
+        let s = serde_json::to_string(&overrides).unwrap();
+        assert_eq!(
+            s,
+            r#"{"feeRecipient":"0x0000000000000000000000000000000000000001","prevRandao":"0x0000000000000000000000000000000000000000000000000000000000000002","baseFeePerGas":"0x3"}"#
+        );
+        assert_eq!(serde_json::from_str::<BlockOverrides>(&s).unwrap(), overrides);
+
+        // The old names are still accepted.
+        let old = r#"{"coinbase":"0x0000000000000000000000000000000000000001","random":"0x0000000000000000000000000000000000000000000000000000000000000002","baseFee":"0x3"}"#;
+        assert_eq!(serde_json::from_str::<BlockOverrides>(old).unwrap(), overrides);
     }
 
     #[test]
