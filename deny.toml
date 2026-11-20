@@ -18,6 +18,9 @@ ignore = [
     # https://rustsec.org/advisories/RUSTSEC-2026-0441 pin-utils is unmaintained
     # and is pulled in transitively with no safe upgrade available.
     "RUSTSEC-2026-0441",
+    # https://rustsec.org/advisories/RUSTSEC-2026-0543 chrono is unmaintained and is pulled in by
+    # gcloud-sdk 0.29, dropping it requires the breaking bump to gcloud-sdk 0.34.
+    "RUSTSEC-2026-0543",
 ]
 
 [bans]
