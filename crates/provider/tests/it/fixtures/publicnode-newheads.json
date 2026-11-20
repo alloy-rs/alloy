@@ -1,0 +1,48 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "eth_subscribe",
+    "params": [
+      "newHeads"
+    ]
+  },
+  {
+    "jsonrpc": "2.0",
+    "result": "0xfa63b16ae3dd8436d52a140d446bc393",
+    "id": 1
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "eth_subscription",
+    "params": {
+      "result": {
+        "baseFeePerGas": "0x3b33988",
+        "blobGasUsed": "0x80000",
+        "blockAccessListHash": null,
+        "difficulty": "0x0",
+        "excessBlobGas": "0xa9ee3fb",
+        "extraData": "0x546974616e2028746974616e6275696c6465722e78797a29",
+        "gasLimit": "0x3938700",
+        "gasUsed": "0x280bdf2",
+        "hash": "0x3132120bb4562854fbe53f874102fb11acd480ad9a179df3cc221bab69d985e4",
+        "logsBloom": "0x5dfb7eef4f77bffff4ce93ddff953cbe3fff7fbdffff97f5b6bfbfdefd7dfd9f7fdf7ddeeffd7b3feb9fffebfd6f3dfffffff9deffbfffff77ebbffddf7e7fe7d6efffffbefdcd69dde7ef7fbdfffff9fdfffd779e57baae7afe5fffffbffbbd5edf7f77deffffeabfff9ebfbf3faae9deff76ef2dd5ffcfbcbbefd77f9fffddd77f6d7ffffbefffef6ff3ff7fff5e3eff6df1cbf3effe8f26bf8f7f7fff7fbbfbffde7fcfbffdf7fedfcef1fd6ef7ffffbfff7fd3fdf3e98df6feebeedffbf3efefffeff3bfffff4eef3fbeffbdfeffdfdffffff7adf255d7bf7f77ff66effeb6bdffceef7ffd3fbfeeffabfff71efeffaffdfbeffefffedbdf77ffaebe7f2a",
+        "miner": "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97",
+        "mixHash": "0xc55be9885d203e200c0a7ca6d134a72eab61f1016444de9f81bceb9911c6c827",
+        "nonce": "0x0000000000000000",
+        "number": "0x19221f7",
+        "parentBeaconBlockRoot": "0xc11e0887a27c68a89df4deb9e9a91699da57ff271a8ef2a3eb784e6344cac35b",
+        "parentHash": "0x42e0d993b03f4de92291eaa2e0bff7475f2e6d2a8b593384b24400e6517bb038",
+        "receiptsRoot": "0x1a92da0d519f3ab32f315d6ff427b5520802b8dc92c675cbf51d6fe062f72561",
+        "requestsHash": "0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+        "slotNumber": null,
+        "stateRoot": "0xbf48d623d3ed838da1d5b2592c25b1f1a34314ab270c6cdd17822a492515a28c",
+        "timestamp": "0x6aed7aa7",
+        "transactionsRoot": "0x337b3725c10edffe0f85d8cc01b108185ba23e8b1efe132f4bfc8cbffea76ecb",
+        "withdrawalsRoot": "0xb5ff37aedc8dde5c7d6e4b5eef1c76b6f69ca2b308857ec3f920498822c530ad"
+      },
+      "subscription": "0xfa63b16ae3dd8436d52a140d446bc393"
+    }
+  }
+]
