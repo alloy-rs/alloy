@@ -101,7 +101,7 @@ impl WsBackend<Fuse<WsStream>> {
 
     /// Send a message to the websocket.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), WsErr> {
-        self.socket.send(WsMessage::Text(msg.get().to_owned())).await
+        self.socket.send(WsMessage::Text(Box::<str>::from(msg).into())).await
     }
 
     /// Spawn this backend on a loop.
