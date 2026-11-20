@@ -62,7 +62,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, FillTransaction,
-    Filter, FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
+    Filter, FilterChanges, Log, SignTransaction, StorageValuesRequest, StorageValuesResponse,
 };
 use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
@@ -813,7 +813,10 @@ where
         self.inner.send_transaction_sync_internal(tx).await
     }
 
-    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+    async fn sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<SignTransaction<N::TransactionResponse>> {
         let tx = self.fill(tx).await?;
         let tx = tx.try_into_request().map_err(TransportError::local_usage)?;
         self.inner.sign_transaction(tx).await
@@ -822,9 +825,9 @@ where
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    ) -> TransportResult<FillTransaction<N::UnsignedTx>>
     where
-        N::TxEnvelope: RpcRecv,
+        N::UnsignedTx: RpcRecv,
     {
         self.inner.fill_transaction(tx).await
     }
@@ -934,7 +937,7 @@ impl RecommendedFillers for AnyNetwork {
 mod forwarding_tests {
     use super::*;
     use crate::ProviderBuilder;
-    use alloy_consensus::TxEnvelope;
+    use alloy_consensus::TypedTransaction;
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types_eth::{TransactionReceipt, TransactionRequest};
     use alloy_transport::mock::Asserter;
@@ -1002,7 +1005,7 @@ mod forwarding_tests {
         async fn fill_transaction(
             &self,
             tx: TransactionRequest,
-        ) -> TransportResult<FillTransaction<TxEnvelope>> {
+        ) -> TransportResult<FillTransaction<TypedTransaction>> {
             self.record("fill_transaction");
             self.inner.fill_transaction(tx).await
         }

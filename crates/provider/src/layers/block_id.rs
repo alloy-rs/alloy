@@ -18,7 +18,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, Bundle, EIP1186AccountProofResponse, EthCallResponse, FeeHistory,
-    FillTransaction, Filter, FilterChanges, Index, Log, StorageValuesRequest,
+    FillTransaction, Filter, FilterChanges, Index, Log, SignTransaction, StorageValuesRequest,
     StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
@@ -439,16 +439,19 @@ impl<P: Provider<N>, N: Network> Provider<N> for BlockIdProvider<P, N> {
         self.inner.send_transaction_sync_internal(tx).await
     }
 
-    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+    async fn sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<SignTransaction<N::TransactionResponse>> {
         self.inner.sign_transaction(tx).await
     }
 
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    ) -> TransportResult<FillTransaction<N::UnsignedTx>>
     where
-        N::TxEnvelope: RpcRecv,
+        N::UnsignedTx: RpcRecv,
     {
         self.inner.fill_transaction(tx).await
     }
