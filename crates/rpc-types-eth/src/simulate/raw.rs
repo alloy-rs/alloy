@@ -20,8 +20,10 @@ use serde_json::value::RawValue;
 /// `jsonrpsee` deserialize all parameters before the handler runs, so a [`SimulatePayload`]
 /// parameter would be decoded without any limits.
 ///
-/// Both variants serialize like a [`SimulatePayload`]: raw input is written unchanged, so the
-/// type can be forwarded or used by clients in place of [`SimulatePayload`].
+/// Serializing [`Self::Raw`] directly to JSON text preserves the original JSON. Converting it
+/// to [`serde_json::Value`] parses that text again using the rules for a generic JSON value.
+/// To forward a request with enforced limits, serialize the [`SimulatePayload`] returned by
+/// [`Self::parse`].
 ///
 /// Deserialization requires a `serde_json` deserializer and does not work inside
 /// `#[serde(untagged)]` or `#[serde(flatten)]` containers, which buffer their input.
@@ -43,7 +45,8 @@ use serde_json::value::RawValue;
 /// ));
 ///
 /// let payload = payload.parse(2, 16)?;
-/// assert_eq!(payload.block_state_calls.len(), 2);
+/// let forwarded = serde_json::to_value(&payload)?;
+/// assert_eq!(forwarded["blockStateCalls"].as_array().unwrap().len(), 2);
 /// # Ok::<(), Box<dyn core::error::Error>>(())
 /// ```
 #[derive(Clone, Debug, Serialize)]
@@ -224,6 +227,22 @@ mod tests {
         let wrapped = serde_json::from_str::<RawSimulatePayload>(input).unwrap();
         assert_matches!(&wrapped, RawSimulatePayload::Raw(raw) if raw.get() == input);
         assert_eq!(serde_json::to_string(&wrapped).unwrap(), input);
+    }
+
+    #[test]
+    fn forwards_the_parsed_simulation_fields() {
+        let input = r#"{"$serde_json::private::RawValue":"metadata","blockStateCalls":[{"calls":[]}],"validation":true}"#;
+        let wrapped: RawSimulatePayload = serde_json::from_str(input).unwrap();
+        assert_eq!(serde_json::to_string(&wrapped).unwrap(), input);
+        assert!(serde_json::to_value(&wrapped).is_err());
+
+        let forwarded = serde_json::to_value(wrapped.parse(1, 0).unwrap()).unwrap();
+        let expected = SimulatePayload::<TransactionRequest> {
+            block_state_calls: vec![SimBlock::default()],
+            validation: true,
+            ..Default::default()
+        };
+        assert_eq!(forwarded, serde_json::to_value(expected).unwrap());
     }
 
     #[test]
