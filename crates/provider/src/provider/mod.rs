@@ -52,6 +52,8 @@ pub use multicall::*;
 mod erased;
 pub use erased::DynProvider;
 
+pub(crate) mod forward;
+
 #[cfg(feature = "pubsub")]
 mod subscription;
 #[cfg(feature = "pubsub")]

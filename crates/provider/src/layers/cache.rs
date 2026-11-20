@@ -1,36 +1,21 @@
-#[cfg(feature = "pubsub")]
-use crate::GetSubscription;
-use crate::{
-    utils, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, PendingTransaction,
-    PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
-    ProviderCall, ProviderLayer, RootProvider, RpcWithBlock, SendableTx,
-};
-use alloy_eips::{eip7928::BlockAccessList, BlockId};
-use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
+use crate::{provider::forward, utils, Provider, ProviderCall, ProviderLayer, RpcWithBlock};
+use alloy_eips::BlockId;
+use alloy_json_rpc::{RpcError, RpcSend};
 use alloy_network::Network;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{
-    keccak256, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256,
-    U128, U256, U64,
+    keccak256, Address, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
-use alloy_rpc_client::NoParams;
-#[cfg(feature = "pubsub")]
-use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{
-    erc4337::TransactionConditional,
-    simulate::{SimulatePayload, SimulatedBlock},
-    AccessListResult, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse, EthCallResponse,
-    FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, StorageValuesRequest,
-    StorageValuesResponse, SyncStatus,
+    BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log, StorageValuesRequest,
+    StorageValuesResponse,
 };
 use alloy_transport::{TransportErrorKind, TransportResult};
 use lru::LruCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use serde_json::value::RawValue;
 use std::{
-    borrow::Cow, future::IntoFuture, io::BufReader, marker::PhantomData, num::NonZero,
-    path::PathBuf, sync::Arc,
+    future::IntoFuture, io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc,
 };
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
@@ -141,16 +126,16 @@ macro_rules! cache_rpc_call_with_block {
     }};
 }
 
-#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-impl<P, N> Provider<N> for CacheProvider<P, N>
+impl<P, N> forward::ForwardingProvider<N> for CacheProvider<P, N>
 where
     P: Provider<N>,
     N: Network,
 {
+    type Inner = P;
+
     #[inline(always)]
-    fn root(&self) -> &RootProvider<N> {
-        self.inner.root()
+    fn inner_provider(&self) -> &P {
+        &self.inner
     }
 
     fn get_block_receipts(
@@ -397,358 +382,11 @@ where
             }))
         })
     }
-
-    fn get_accounts(&self) -> ProviderCall<NoParams, Vec<Address>> {
-        self.inner.get_accounts()
-    }
-
-    fn get_blob_base_fee(&self) -> ProviderCall<NoParams, U128, u128> {
-        self.inner.get_blob_base_fee()
-    }
-
-    fn get_block_number(&self) -> ProviderCall<NoParams, U64, BlockNumber> {
-        self.inner.get_block_number()
-    }
-
-    fn call<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
-        self.inner.call(tx)
-    }
-
-    fn call_many<'req>(
-        &self,
-        bundles: &'req [Bundle],
-    ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
-        self.inner.call_many(bundles)
-    }
-
-    fn simulate<'req>(
-        &self,
-        payload: &'req SimulatePayload,
-    ) -> RpcWithBlock<&'req SimulatePayload, Vec<SimulatedBlock<N::BlockResponse>>> {
-        self.inner.simulate(payload)
-    }
-
-    fn get_chain_id(&self) -> ProviderCall<NoParams, U64, u64> {
-        self.inner.get_chain_id()
-    }
-
-    fn create_access_list<'a>(
-        &self,
-        request: &'a N::TransactionRequest,
-    ) -> RpcWithBlock<&'a N::TransactionRequest, AccessListResult> {
-        self.inner.create_access_list(request)
-    }
-
-    fn estimate_gas<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
-        self.inner.estimate_gas(tx)
-    }
-
-    async fn get_fee_history(
-        &self,
-        block_count: u64,
-        last_block: BlockNumberOrTag,
-        reward_percentiles: &[f64],
-    ) -> TransportResult<FeeHistory> {
-        self.inner.get_fee_history(block_count, last_block, reward_percentiles).await
-    }
-
-    fn get_gas_price(&self) -> ProviderCall<NoParams, U128, u128> {
-        self.inner.get_gas_price()
-    }
-
-    fn get_account_info(
-        &self,
-        address: Address,
-    ) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
-        self.inner.get_account_info(address)
-    }
-
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
-        self.inner.get_account(address)
-    }
-
-    fn get_block(&self, block: BlockId) -> EthGetBlock<N::BlockResponse> {
-        self.inner.get_block(block)
-    }
-
-    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N::BlockResponse> {
-        self.inner.get_block_by_hash(hash)
-    }
-
-    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N::BlockResponse> {
-        self.inner.get_block_by_number(number)
-    }
-
-    async fn get_block_transaction_count_by_hash(
-        &self,
-        hash: BlockHash,
-    ) -> TransportResult<Option<u64>> {
-        self.inner.get_block_transaction_count_by_hash(hash).await
-    }
-
-    async fn get_block_transaction_count_by_number(
-        &self,
-        block_number: BlockNumberOrTag,
-    ) -> TransportResult<Option<u64>> {
-        self.inner.get_block_transaction_count_by_number(block_number).await
-    }
-
-    async fn get_block_access_list(
-        &self,
-        block: BlockId,
-    ) -> TransportResult<Option<BlockAccessList>> {
-        self.inner.get_block_access_list(block).await
-    }
-
-    async fn get_block_access_list_by_hash(
-        &self,
-        hash: BlockHash,
-    ) -> TransportResult<Option<BlockAccessList>> {
-        self.inner.get_block_access_list_by_hash(hash).await
-    }
-
-    async fn get_block_access_list_by_number(
-        &self,
-        number: BlockNumberOrTag,
-    ) -> TransportResult<Option<BlockAccessList>> {
-        self.inner.get_block_access_list_by_number(number).await
-    }
-
-    async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
-        self.inner.get_block_access_list_raw(block).await
-    }
-
-    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
-        self.inner.get_header(block).await
-    }
-
-    async fn get_header_by_hash(
-        &self,
-        hash: BlockHash,
-    ) -> TransportResult<Option<N::HeaderResponse>> {
-        self.inner.get_header_by_hash(hash).await
-    }
-
-    async fn get_header_by_number(
-        &self,
-        number: BlockNumberOrTag,
-    ) -> TransportResult<Option<N::HeaderResponse>> {
-        self.inner.get_header_by_number(number).await
-    }
-
-    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<B256>> {
-        self.inner.watch_blocks().await
-    }
-
-    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<B256>> {
-        self.inner.watch_pending_transactions().await
-    }
-
-    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
-        self.inner.watch_logs(filter).await
-    }
-
-    async fn watch_full_pending_transactions(
-        &self,
-    ) -> TransportResult<FilterPollerBuilder<N::TransactionResponse>> {
-        self.inner.watch_full_pending_transactions().await
-    }
-
-    async fn get_filter_changes_dyn(&self, id: U256) -> TransportResult<FilterChanges> {
-        self.inner.get_filter_changes_dyn(id).await
-    }
-
-    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<Log>> {
-        self.inner.get_filter_logs(id).await
-    }
-
-    async fn uninstall_filter(&self, id: U256) -> TransportResult<bool> {
-        self.inner.uninstall_filter(id).await
-    }
-
-    async fn watch_pending_transaction(
-        &self,
-        config: PendingTransactionConfig,
-    ) -> Result<PendingTransaction, PendingTransactionError> {
-        self.inner.watch_pending_transaction(config).await
-    }
-
-    fn get_transaction_by_sender_nonce(
-        &self,
-        sender: Address,
-        nonce: u64,
-    ) -> ProviderCall<(Address, U64), Option<N::TransactionResponse>> {
-        self.inner.get_transaction_by_sender_nonce(sender, nonce)
-    }
-
-    fn get_transaction_by_block_hash_and_index(
-        &self,
-        block_hash: B256,
-        index: usize,
-    ) -> ProviderCall<(B256, Index), Option<N::TransactionResponse>> {
-        self.inner.get_transaction_by_block_hash_and_index(block_hash, index)
-    }
-
-    fn get_raw_transaction_by_block_hash_and_index(
-        &self,
-        block_hash: B256,
-        index: usize,
-    ) -> ProviderCall<(B256, Index), Option<Bytes>> {
-        self.inner.get_raw_transaction_by_block_hash_and_index(block_hash, index)
-    }
-
-    fn get_transaction_by_block_number_and_index(
-        &self,
-        block_number: BlockNumberOrTag,
-        index: usize,
-    ) -> ProviderCall<(BlockNumberOrTag, Index), Option<N::TransactionResponse>> {
-        self.inner.get_transaction_by_block_number_and_index(block_number, index)
-    }
-
-    fn get_raw_transaction_by_block_number_and_index(
-        &self,
-        block_number: BlockNumberOrTag,
-        index: usize,
-    ) -> ProviderCall<(BlockNumberOrTag, Index), Option<Bytes>> {
-        self.inner.get_raw_transaction_by_block_number_and_index(block_number, index)
-    }
-
-    async fn get_uncle(&self, tag: BlockId, idx: u64) -> TransportResult<Option<N::BlockResponse>> {
-        self.inner.get_uncle(tag, idx).await
-    }
-
-    async fn get_uncle_count(&self, tag: BlockId) -> TransportResult<u64> {
-        self.inner.get_uncle_count(tag).await
-    }
-
-    fn get_max_priority_fee_per_gas(&self) -> ProviderCall<NoParams, U128, u128> {
-        self.inner.get_max_priority_fee_per_gas()
-    }
-
-    async fn new_block_filter(&self) -> TransportResult<U256> {
-        self.inner.new_block_filter().await
-    }
-
-    async fn new_filter(&self, filter: &Filter) -> TransportResult<U256> {
-        self.inner.new_filter(filter).await
-    }
-
-    async fn new_pending_transactions_filter(&self, full: bool) -> TransportResult<U256> {
-        self.inner.new_pending_transactions_filter(full).await
-    }
-
-    async fn send_raw_transaction(
-        &self,
-        encoded_tx: &[u8],
-    ) -> TransportResult<PendingTransactionBuilder<N>> {
-        self.inner.send_raw_transaction(encoded_tx).await
-    }
-
-    async fn send_raw_transaction_sync(
-        &self,
-        encoded_tx: &[u8],
-    ) -> TransportResult<N::ReceiptResponse> {
-        self.inner.send_raw_transaction_sync(encoded_tx).await
-    }
-
-    async fn send_raw_transaction_conditional(
-        &self,
-        encoded_tx: &[u8],
-        conditional: TransactionConditional,
-    ) -> TransportResult<PendingTransactionBuilder<N>> {
-        self.inner.send_raw_transaction_conditional(encoded_tx, conditional).await
-    }
-
-    async fn send_transaction_internal(
-        &self,
-        tx: SendableTx<N>,
-    ) -> TransportResult<PendingTransactionBuilder<N>> {
-        self.inner.send_transaction_internal(tx).await
-    }
-
-    async fn send_transaction_sync_internal(
-        &self,
-        tx: SendableTx<N>,
-    ) -> TransportResult<N::ReceiptResponse> {
-        self.inner.send_transaction_sync_internal(tx).await
-    }
-
-    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
-        self.inner.sign_transaction(tx).await
-    }
-
-    async fn fill_transaction(
-        &self,
-        tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
-    where
-        N::TxEnvelope: RpcRecv,
-    {
-        self.inner.fill_transaction(tx).await
-    }
-
-    async fn fill_and_sign_transaction(
-        &self,
-        tx: N::TransactionRequest,
-    ) -> TransportResult<N::TxEnvelope> {
-        self.inner.fill_and_sign_transaction(tx).await
-    }
-
-    #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
-        self.inner.subscribe_blocks()
-    }
-
-    #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
-        self.inner.subscribe_pending_transactions()
-    }
-
-    #[cfg(feature = "pubsub")]
-    fn subscribe_full_pending_transactions(
-        &self,
-    ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
-        self.inner.subscribe_full_pending_transactions()
-    }
-
-    #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
-        self.inner.subscribe_logs(filter)
-    }
-
-    #[cfg(feature = "pubsub")]
-    async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
-        self.inner.unsubscribe(id).await
-    }
-
-    fn syncing(&self) -> ProviderCall<NoParams, SyncStatus> {
-        self.inner.syncing()
-    }
-
-    fn get_client_version(&self) -> ProviderCall<NoParams, String> {
-        self.inner.get_client_version()
-    }
-
-    fn get_sha3(&self, data: &[u8]) -> ProviderCall<(String,), B256> {
-        self.inner.get_sha3(data)
-    }
-
-    fn get_net_version(&self) -> ProviderCall<NoParams, U64, u64> {
-        self.inner.get_net_version()
-    }
-
-    async fn raw_request_dyn(
-        &self,
-        method: Cow<'static, str>,
-        params: &RawValue,
-    ) -> TransportResult<Box<RawValue>> {
-        self.inner.raw_request_dyn(method, params).await
-    }
-
-    fn transaction_request(&self) -> N::TransactionRequest {
-        self.inner.transaction_request()
-    }
 }
+
+forward::impl_provider_forwarding!(
+    impl[P, N] Provider<N> for CacheProvider<P, N> where [P: Provider<N>, N: Network]
+);
 
 /// Internal type to handle different types of requests and generating their param hashes.
 struct RequestType<Params: RpcSend> {
@@ -907,10 +545,11 @@ impl SharedCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{ProviderBuilder, RootProvider};
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil};
     use alloy_primitives::{b256, bytes, hex, utils::Unit, Bytes, FixedBytes};
+    use alloy_rpc_client::NoParams;
     use alloy_rpc_types_eth::{BlockId, Transaction, TransactionReceipt, TransactionRequest};
     use alloy_transport::mock::Asserter;
 
