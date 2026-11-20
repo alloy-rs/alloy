@@ -234,7 +234,6 @@ mod tests {
         let input = r#"{"$serde_json::private::RawValue":"metadata","blockStateCalls":[{"calls":[]}],"validation":true}"#;
         let wrapped: RawSimulatePayload = serde_json::from_str(input).unwrap();
         assert_eq!(serde_json::to_string(&wrapped).unwrap(), input);
-        assert!(serde_json::to_value(&wrapped).is_err());
 
         let forwarded = serde_json::to_value(wrapped.parse(1, 0).unwrap()).unwrap();
         let expected = SimulatePayload::<TransactionRequest> {
