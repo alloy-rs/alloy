@@ -29,6 +29,7 @@ alloy-signer.workspace = true
 
 async-trait.workspace = true
 gcloud-sdk = { workspace = true, features = [
+    "auth-default-crypto",
     "google-cloud-kms-v1",
     "google-longrunning",
     "tls-webpki-roots",
