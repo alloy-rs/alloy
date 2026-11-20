@@ -1,12 +1,19 @@
 use crate::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    utils::Spawnable, Authorization, TransportError, TransportErrorKind, TransportResult,
+};
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio_tungstenite::{
-    tungstenite::{self, client::IntoClientRequest, Message},
+    tungstenite::{
+        self,
+        client::IntoClientRequest,
+        protocol::{frame::coding::CloseCode, CloseFrame},
+        Message,
+    },
     MaybeTlsStream, WebSocketStream,
 };
 
@@ -146,7 +153,7 @@ impl PubSubConnect for WsConnect {
         let req = request.map_err(TransportErrorKind::custom)?;
         let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
             .await
-            .map_err(TransportErrorKind::custom)?;
+            .map_err(handshake_error)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
@@ -155,6 +162,42 @@ impl PubSubConnect for WsConnect {
 
         Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
     }
+}
+
+/// Classifies a failed handshake.
+///
+/// A 4xx response, other than 408 and 429, is a client error that reconnecting won't fix, e.g.
+/// rejected credentials or an unknown path.
+fn handshake_error(err: tungstenite::Error) -> TransportError {
+    match &err {
+        tungstenite::Error::Http(response)
+            if response.status().is_client_error()
+                && !matches!(
+                    response.status(),
+                    http::StatusCode::REQUEST_TIMEOUT | http::StatusCode::TOO_MANY_REQUESTS
+                ) =>
+        {
+            TransportErrorKind::non_retryable(err)
+        }
+        _ => TransportErrorKind::custom(err),
+    }
+}
+
+/// Returns a non-retryable error if the close frame's code means that reconnecting won't help: a
+/// protocol error (1002), unsupported (1003) or invalid (1007) data, a policy violation (1008), or
+/// a missing extension (1010).
+fn close_error(frame: &CloseFrame) -> Option<TransportError> {
+    matches!(
+        frame.code,
+        CloseCode::Protocol
+            | CloseCode::Unsupported
+            | CloseCode::Invalid
+            | CloseCode::Policy
+            | CloseCode::Extension
+    )
+    .then(|| {
+        TransportErrorKind::non_retryable_str(&format!("WS server closed the connection: {frame}"))
+    })
 }
 
 /// Install a default rustls crypto provider if none is set.
@@ -205,6 +248,8 @@ impl WsBackend<TungsteniteStream> {
     pub fn spawn(mut self) {
         let fut = async move {
             let mut errored = false;
+            // Set when the server closed the connection for a reason reconnecting won't fix.
+            let mut close_err = None;
             let mut expecting_pong = false;
             let keepalive = sleep(self.keepalive_interval);
             tokio::pin!(keepalive);
@@ -267,6 +312,9 @@ impl WsBackend<TungsteniteStream> {
                                 if item.is_pong() {
                                     expecting_pong = false;
                                 }
+                                if let Message::Close(Some(frame)) = &item {
+                                    close_err = close_error(frame);
+                                }
                                 errored = self.handle(item).is_err();
                                 if errored { break }
                             },
@@ -285,7 +333,10 @@ impl WsBackend<TungsteniteStream> {
                 }
             }
             if errored {
-                self.interface.close_with_error();
+                match close_err {
+                    Some(err) => self.interface.close_with_transport_error(err),
+                    None => self.interface.close_with_error(),
+                }
             }
         };
         fut.spawn_task()
@@ -308,6 +359,60 @@ mod tests {
             assert_eq!(ws.url(), url);
             assert_eq!(ws.auth(), auth.as_ref(), "{url}");
         }
+    }
+
+    #[test]
+    fn close_codes_classify_retryability() {
+        for (code, non_retryable) in [
+            (1000, false),
+            (1001, false),
+            (1002, true),
+            (1003, true),
+            (1006, false),
+            (1007, true),
+            (1008, true),
+            (1009, false),
+            (1010, true),
+            (1011, false),
+            (1012, false),
+            (1013, false),
+            (4000, false),
+        ] {
+            let frame = CloseFrame { code: CloseCode::from(code), reason: "reason".into() };
+            let err = close_error(&frame);
+            assert_eq!(err.is_some(), non_retryable, "{code}");
+            if let Some(err) = err {
+                assert!(err.as_transport_err().unwrap().is_non_retryable());
+                assert_eq!(
+                    err.to_string(),
+                    format!("WS server closed the connection: reason ({code})")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn handshake_client_errors_are_non_retryable() {
+        for (status, non_retryable) in [
+            (400, true),
+            (401, true),
+            (403, true),
+            (404, true),
+            (408, false),
+            (429, false),
+            (500, false),
+            (503, false),
+        ] {
+            let response = http::Response::builder().status(status).body(None).unwrap();
+            let err = handshake_error(tungstenite::Error::Http(Box::new(response)));
+            assert_eq!(
+                err.as_transport_err().unwrap().is_non_retryable(),
+                non_retryable,
+                "{status}"
+            );
+        }
+        let err = handshake_error(tungstenite::Error::ConnectionClosed);
+        assert!(!err.as_transport_err().unwrap().is_non_retryable());
     }
 
     #[test]

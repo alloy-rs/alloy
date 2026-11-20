@@ -1,10 +1,30 @@
 use crate::RawSubscription;
 use alloy_json_rpc::SerializedRequest;
-use alloy_primitives::B256;
+use alloy_primitives::{keccak256, Keccak256, B256};
 use parking_lot::Mutex;
 use serde_json::value::RawValue;
 use std::{fmt, hash::Hash, ops::DerefMut};
 use tokio::sync::broadcast;
+
+/// Returns the local id of a subscription request.
+///
+/// Identical `eth_subscribe` requests get the same id, so they share one subscription. The id
+/// commits to the method as well as the params. Requests of other methods may stream a bounded
+/// range, e.g. `debug_subscribe` with `traceChain`, so each of them gets its own id, derived from
+/// the whole request including its id.
+pub(crate) fn subscription_local_id(request: &SerializedRequest) -> B256 {
+    if request.method() != "eth_subscribe" {
+        return keccak256(request.serialized().get());
+    }
+    let method = request.method();
+    let mut hasher = Keccak256::new();
+    hasher.update((method.len() as u64).to_be_bytes());
+    hasher.update(method);
+    if let Some(params) = request.params() {
+        hasher.update(params.get());
+    }
+    hasher.finalize()
+}
 
 /// An active subscription.
 pub(crate) struct ActiveSubscription {
@@ -22,6 +42,10 @@ pub(crate) struct ActiveSubscription {
     /// This is wrapped in a [`Mutex`] to allow for mutable access to the receiver without making
     /// [`ActiveSubscription::subscribe`] require mutable self.
     pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
+    /// The number of callers that were handed the local id but have not fetched a receiver yet.
+    pub(crate) pending_claims: usize,
+    /// The number of consecutive backends that died before acknowledging the resubscription.
+    pub(crate) unacked_resubscribes: u32,
 }
 
 // NB: We implement this to prevent any incorrect future implementations.
@@ -58,6 +82,7 @@ impl fmt::Debug for ActiveSubscription {
             .field("local_id", &self.local_id)
             .field("request", &self.request)
             .field("subscribers", &self.tx.receiver_count())
+            .field("pending_claims", &self.pending_claims)
             .finish()
     }
 }
@@ -65,9 +90,24 @@ impl fmt::Debug for ActiveSubscription {
 impl ActiveSubscription {
     /// Create a new active subscription.
     pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
-        let local_id = request.params_hash();
+        let local_id = subscription_local_id(&request);
         let (tx, rx) = broadcast::channel(channel_size);
-        Self { request, local_id, tx, rx: Mutex::new(Some(rx)) }
+        Self {
+            request,
+            local_id,
+            tx,
+            rx: Mutex::new(Some(rx)),
+            pending_claims: 0,
+            unacked_resubscribes: 0,
+        }
+    }
+
+    /// Returns `true` if anyone holds a receiver for this subscription, or is about to fetch one.
+    ///
+    /// The stored initial receiver does not count.
+    pub(crate) fn has_consumers(&self) -> bool {
+        let initial = usize::from(self.rx.lock().is_some());
+        self.pending_claims > 0 || self.tx.receiver_count() > initial
     }
 
     /// Serialize the request as a boxed [`RawValue`].
@@ -79,15 +119,9 @@ impl ActiveSubscription {
 
     /// Get a subscription.
     pub(crate) fn subscribe(&self) -> RawSubscription {
-        if self.tx.is_empty() {
-            // If there are no pending notifications, we can subscribe directly and return a new
-            // subscriber.
-            return RawSubscription { rx: self.tx.subscribe(), local_id: self.local_id };
-        }
-
-        // If there are pending notifications, we need to ensure that they are not dropped.
-        // Hence, we first try to return the initial receiver (if it exists), which will receive
-        // those pending notifications.
+        // The first receiver is the initial one, so that notifications received before it was
+        // requested are not dropped. Later receivers start at the tail: the initial receiver may
+        // still hold notifications that other receivers already consumed.
         // Ref: <https://github.com/alloy-rs/alloy/issues/2187>
         RawSubscription {
             rx: self.rx.lock().deref_mut().take().unwrap_or_else(|| self.tx.subscribe()),
