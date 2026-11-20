@@ -101,8 +101,13 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
 
     let n = rewards.len();
 
-    let median =
-        if n % 2 == 0 { (*rewards[n / 2 - 1] + *rewards[n / 2]) / 2 } else { *rewards[n / 2] };
+    let median = if n % 2 == 0 {
+        let lower = *rewards[n / 2 - 1];
+        let upper = *rewards[n / 2];
+        lower + (upper - lower) / 2
+    } else {
+        *rewards[n / 2]
+    };
 
     std::cmp::max(median, EIP1559_MIN_PRIORITY_FEE)
 }
@@ -116,10 +121,10 @@ pub fn eip1559_default_estimator(
     rewards: &[Vec<u128>],
 ) -> Eip1559Estimation {
     let max_priority_fee_per_gas = estimate_priority_fee(rewards);
-    let potential_max_fee = base_fee_per_gas * EIP1559_BASE_FEE_MULTIPLIER;
+    let potential_max_fee = base_fee_per_gas.saturating_mul(EIP1559_BASE_FEE_MULTIPLIER);
 
     Eip1559Estimation {
-        max_fee_per_gas: potential_max_fee + max_priority_fee_per_gas,
+        max_fee_per_gas: potential_max_fee.saturating_add(max_priority_fee_per_gas),
         max_priority_fee_per_gas,
     }
 }
@@ -210,6 +215,12 @@ mod tests {
         assert_eq!(super::estimate_priority_fee(&rewards), EIP1559_MIN_PRIORITY_FEE);
 
         assert_eq!(super::estimate_priority_fee(&[]), EIP1559_MIN_PRIORITY_FEE);
+
+        assert_eq!(super::estimate_priority_fee(&[vec![u128::MAX], vec![u128::MAX]]), u128::MAX);
+        assert_eq!(
+            super::estimate_priority_fee(&[vec![u128::MAX - 1], vec![u128::MAX]]),
+            u128::MAX - 1
+        );
     }
 
     #[test]
@@ -241,6 +252,19 @@ mod tests {
                 max_fee_per_gas: 200_000_000_000_u128,
                 max_priority_fee_per_gas: 200_000_000_000_u128
             }
+        );
+
+        assert_eq!(
+            super::eip1559_default_estimator(u128::MAX, &[]),
+            Eip1559Estimation {
+                max_fee_per_gas: u128::MAX,
+                max_priority_fee_per_gas: EIP1559_MIN_PRIORITY_FEE,
+            }
+        );
+
+        assert_eq!(
+            super::eip1559_default_estimator(u128::MAX / 2, &[vec![2]]),
+            Eip1559Estimation { max_fee_per_gas: u128::MAX, max_priority_fee_per_gas: 2 }
         );
     }
 }
