@@ -1,17 +1,36 @@
 use crate::{
     bindings::{ArbSys, IMulticall3},
-    Caller, Provider, ProviderCall, ProviderLayer, RootProvider, ARB_SYS_ADDRESS,
-    MULTICALL3_ADDRESS,
+    utils::{Eip1559Estimation, Eip1559Estimator},
+    Caller, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, PendingTransaction,
+    PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
+    ProviderCall, ProviderLayer, RootProvider, RpcWithBlock, SendableTx, WatchBlocks,
+    WatchBlocksFrom, WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchHeaders, WatchLogsFrom,
+    ARB_SYS_ADDRESS, MULTICALL3_ADDRESS,
 };
-use alloy_eips::BlockId;
+#[cfg(feature = "pubsub")]
+use crate::{GetSubscription, SubFullBlocks};
+use alloy_eips::{eip7928::BlockAccessList, BlockId, BlockNumberOrTag};
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, U256};
-use alloy_rpc_client::WeakClient;
+use alloy_primitives::{
+    Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
+};
+use alloy_rpc_client::{NoParams, WeakClient};
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
+use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
+    simulate::{SimulatePayload, SimulatedBlock},
+    AccessListResult, Bundle, EIP1186AccountProofResponse, EthCallResponse, FeeHistory,
+    FillTransaction, Filter, FilterChanges, Index, Log, StorageValuesRequest,
+    StorageValuesResponse, SyncStatus,
+};
 use alloy_sol_types::{SolCall, SolType, SolValue};
 use alloy_transport::{
     utils::Spawnable, SharedTransportError, TransportErrorKind, TransportResult,
 };
-use std::{fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
+use serde_json::value::RawValue;
+use std::{borrow::Cow, fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
@@ -44,6 +63,16 @@ const DEFAULT_WAIT: Duration = Duration::from_millis(1);
 /// However, this only works when requests are made in parallel, for example when using the
 /// [`tokio::join!`] macro or in multiple threads/tasks, as otherwise the requests will be sent one
 /// by one as normal, but with an added delay.
+///
+/// This layer intercepts [`Provider::call`], [`Provider::get_balance`],
+/// [`Provider::get_block_number`] and [`Provider::get_chain_id`]. Requests sent through the
+/// batching backend, including its single-request fallback, target `latest` even if an inner
+/// [`BlockIdLayer`](crate::layers::BlockIdLayer) sets a different default.
+///
+/// Other RPC methods are forwarded to the inner provider, preserving its overrides and default
+/// block. An `eth_call` that is not batchable instead goes directly through the root RPC client,
+/// preserving explicit call parameters but bypassing the inner provider's `call` override and
+/// default block.
 ///
 /// # Examples
 ///
@@ -199,6 +228,8 @@ impl<N: Network> CallBatchMsgKind<N> {
 }
 
 /// A provider that batches multiple requests into a single request.
+///
+/// Ordinary RPC methods delegate to the inner provider to preserve its overrides.
 ///
 /// See [`CallBatchLayer`] for more information.
 pub struct CallBatchProvider<P, N: Network = Ethereum> {
@@ -458,13 +489,19 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     }
 }
 
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, N> {
     fn root(&self) -> &RootProvider<N> {
         self.provider.root()
     }
 
-    fn call(&self, tx: <N as Network>::TransactionRequest) -> crate::EthCall<N, Bytes> {
-        crate::EthCall::call(CallBatchCaller::new(self), tx)
+    fn get_accounts(&self) -> ProviderCall<NoParams, Vec<Address>> {
+        self.provider.get_accounts()
+    }
+
+    fn get_blob_base_fee(&self) -> ProviderCall<NoParams, U128, u128> {
+        self.provider.get_blob_base_fee()
     }
 
     fn get_block_number(
@@ -479,6 +516,24 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         ))
     }
 
+    fn call(&self, tx: <N as Network>::TransactionRequest) -> crate::EthCall<N, Bytes> {
+        crate::EthCall::call(CallBatchCaller::new(self), tx)
+    }
+
+    fn call_many<'req>(
+        &self,
+        bundles: &'req [Bundle],
+    ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
+        self.provider.call_many(bundles)
+    }
+
+    fn simulate<'req>(
+        &self,
+        payload: &'req SimulatePayload,
+    ) -> RpcWithBlock<&'req SimulatePayload, Vec<SimulatedBlock<N::BlockResponse>>> {
+        self.provider.simulate(payload)
+    }
+
     fn get_chain_id(
         &self,
     ) -> crate::ProviderCall<
@@ -489,6 +544,52 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         crate::ProviderCall::BoxedFuture(Box::pin(
             self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::ChainId),
         ))
+    }
+
+    fn create_access_list<'a>(
+        &self,
+        request: &'a N::TransactionRequest,
+    ) -> RpcWithBlock<&'a N::TransactionRequest, AccessListResult> {
+        self.provider.create_access_list(request)
+    }
+
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
+        self.provider.estimate_gas(tx)
+    }
+
+    async fn estimate_eip1559_fees_with(
+        &self,
+        estimator: Eip1559Estimator,
+    ) -> TransportResult<Eip1559Estimation> {
+        self.provider.estimate_eip1559_fees_with(estimator).await
+    }
+
+    async fn estimate_eip1559_fees(&self) -> TransportResult<Eip1559Estimation> {
+        self.provider.estimate_eip1559_fees().await
+    }
+
+    async fn get_fee_history(
+        &self,
+        block_count: u64,
+        last_block: BlockNumberOrTag,
+        reward_percentiles: &[f64],
+    ) -> TransportResult<FeeHistory> {
+        self.provider.get_fee_history(block_count, last_block, reward_percentiles).await
+    }
+
+    fn get_gas_price(&self) -> ProviderCall<NoParams, U128, u128> {
+        self.provider.get_gas_price()
+    }
+
+    fn get_account_info(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
+        self.provider.get_account_info(address)
+    }
+
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
+        self.provider.get_account(address)
     }
 
     fn get_balance(&self, address: Address) -> crate::RpcWithBlock<Address, U256, U256> {
@@ -504,6 +605,445 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
                 ))
             }
         })
+    }
+
+    fn get_block(&self, block: BlockId) -> EthGetBlock<N::BlockResponse> {
+        self.provider.get_block(block)
+    }
+
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N::BlockResponse> {
+        self.provider.get_block_by_hash(hash)
+    }
+
+    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N::BlockResponse> {
+        self.provider.get_block_by_number(number)
+    }
+
+    async fn get_block_transaction_count_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<u64>> {
+        self.provider.get_block_transaction_count_by_hash(hash).await
+    }
+
+    async fn get_block_transaction_count_by_number(
+        &self,
+        block_number: BlockNumberOrTag,
+    ) -> TransportResult<Option<u64>> {
+        self.provider.get_block_transaction_count_by_number(block_number).await
+    }
+
+    fn get_block_receipts(
+        &self,
+        block: BlockId,
+    ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
+        self.provider.get_block_receipts(block)
+    }
+
+    async fn get_block_access_list(
+        &self,
+        block: BlockId,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.provider.get_block_access_list(block).await
+    }
+
+    async fn get_block_access_list_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.provider.get_block_access_list_by_hash(hash).await
+    }
+
+    async fn get_block_access_list_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<BlockAccessList>> {
+        self.provider.get_block_access_list_by_number(number).await
+    }
+
+    async fn get_block_access_list_raw(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+        self.provider.get_block_access_list_raw(block).await
+    }
+
+    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
+        self.provider.get_header(block).await
+    }
+
+    async fn get_header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.provider.get_header_by_hash(hash).await
+    }
+
+    async fn get_header_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.provider.get_header_by_number(number).await
+    }
+
+    fn get_code_at(&self, address: Address) -> crate::RpcWithBlock<Address, Bytes> {
+        self.provider.get_code_at(address)
+    }
+
+    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<B256>> {
+        self.provider.watch_blocks().await
+    }
+
+    async fn watch_full_blocks(&self) -> TransportResult<WatchBlocks<N::BlockResponse>> {
+        self.provider.watch_full_blocks().await
+    }
+
+    async fn watch_headers(&self) -> TransportResult<WatchHeaders<N::HeaderResponse>> {
+        self.provider.watch_headers().await
+    }
+
+    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<B256>> {
+        self.provider.watch_pending_transactions().await
+    }
+
+    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
+        self.provider.watch_logs(filter).await
+    }
+
+    fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
+        self.provider.watch_blocks_from(start_block)
+    }
+
+    fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
+        self.provider.watch_canonical_blocks_from(start_block)
+    }
+
+    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom<N> {
+        self.provider.watch_logs_from(start_block, filter)
+    }
+
+    fn watch_canonical_logs_from(
+        &self,
+        start_block: u64,
+        filter: &Filter,
+    ) -> WatchCanonicalLogsFrom<N> {
+        self.provider.watch_canonical_logs_from(start_block, filter)
+    }
+
+    async fn watch_full_pending_transactions(
+        &self,
+    ) -> TransportResult<FilterPollerBuilder<N::TransactionResponse>> {
+        self.provider.watch_full_pending_transactions().await
+    }
+
+    async fn get_filter_changes<R: RpcRecv>(&self, id: U256) -> TransportResult<Vec<R>>
+    where
+        Self: Sized,
+    {
+        // Arc's auto_impl retains the trait default for generic methods; call P directly.
+        self.provider.as_ref().get_filter_changes(id).await
+    }
+
+    async fn get_filter_changes_dyn(&self, id: U256) -> TransportResult<FilterChanges> {
+        self.provider.get_filter_changes_dyn(id).await
+    }
+
+    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<Log>> {
+        self.provider.get_filter_logs(id).await
+    }
+
+    async fn uninstall_filter(&self, id: U256) -> TransportResult<bool> {
+        self.provider.uninstall_filter(id).await
+    }
+
+    async fn watch_pending_transaction(
+        &self,
+        config: PendingTransactionConfig,
+    ) -> Result<PendingTransaction, PendingTransactionError> {
+        self.provider.watch_pending_transaction(config).await
+    }
+
+    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+        self.provider.get_logs(filter).await
+    }
+
+    fn get_proof(
+        &self,
+        address: Address,
+        keys: Vec<StorageKey>,
+    ) -> RpcWithBlock<(Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+        self.provider.get_proof(address, keys)
+    }
+
+    fn get_storage_at(
+        &self,
+        address: Address,
+        key: U256,
+    ) -> RpcWithBlock<(Address, U256), StorageValue> {
+        self.provider.get_storage_at(address, key)
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.provider.get_storage_values(requests)
+    }
+
+    fn get_transaction_by_sender_nonce(
+        &self,
+        sender: Address,
+        nonce: u64,
+    ) -> ProviderCall<(Address, U64), Option<N::TransactionResponse>> {
+        self.provider.get_transaction_by_sender_nonce(sender, nonce)
+    }
+
+    fn get_transaction_by_hash(
+        &self,
+        hash: TxHash,
+    ) -> ProviderCall<(TxHash,), Option<N::TransactionResponse>> {
+        self.provider.get_transaction_by_hash(hash)
+    }
+
+    fn get_transaction_by_block_hash_and_index(
+        &self,
+        block_hash: B256,
+        index: usize,
+    ) -> ProviderCall<(B256, Index), Option<N::TransactionResponse>> {
+        self.provider.get_transaction_by_block_hash_and_index(block_hash, index)
+    }
+
+    fn get_raw_transaction_by_block_hash_and_index(
+        &self,
+        block_hash: B256,
+        index: usize,
+    ) -> ProviderCall<(B256, Index), Option<Bytes>> {
+        self.provider.get_raw_transaction_by_block_hash_and_index(block_hash, index)
+    }
+
+    fn get_transaction_by_block_number_and_index(
+        &self,
+        block_number: BlockNumberOrTag,
+        index: usize,
+    ) -> ProviderCall<(BlockNumberOrTag, Index), Option<N::TransactionResponse>> {
+        self.provider.get_transaction_by_block_number_and_index(block_number, index)
+    }
+
+    fn get_raw_transaction_by_block_number_and_index(
+        &self,
+        block_number: BlockNumberOrTag,
+        index: usize,
+    ) -> ProviderCall<(BlockNumberOrTag, Index), Option<Bytes>> {
+        self.provider.get_raw_transaction_by_block_number_and_index(block_number, index)
+    }
+
+    fn get_raw_transaction_by_hash(&self, hash: TxHash) -> ProviderCall<(TxHash,), Option<Bytes>> {
+        self.provider.get_raw_transaction_by_hash(hash)
+    }
+
+    fn get_transaction_count(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, U64, u64, fn(U64) -> u64> {
+        self.provider.get_transaction_count(address)
+    }
+
+    fn get_transaction_receipt(
+        &self,
+        hash: TxHash,
+    ) -> ProviderCall<(TxHash,), Option<N::ReceiptResponse>> {
+        self.provider.get_transaction_receipt(hash)
+    }
+
+    async fn get_uncle(&self, tag: BlockId, idx: u64) -> TransportResult<Option<N::BlockResponse>> {
+        self.provider.get_uncle(tag, idx).await
+    }
+
+    async fn get_uncle_count(&self, tag: BlockId) -> TransportResult<u64> {
+        self.provider.get_uncle_count(tag).await
+    }
+
+    fn get_max_priority_fee_per_gas(&self) -> ProviderCall<NoParams, U128, u128> {
+        self.provider.get_max_priority_fee_per_gas()
+    }
+
+    async fn new_block_filter(&self) -> TransportResult<U256> {
+        self.provider.new_block_filter().await
+    }
+
+    async fn new_filter(&self, filter: &Filter) -> TransportResult<U256> {
+        self.provider.new_filter(filter).await
+    }
+
+    async fn new_pending_transactions_filter(&self, full: bool) -> TransportResult<U256> {
+        self.provider.new_pending_transactions_filter(full).await
+    }
+
+    async fn send_raw_transaction(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.provider.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_sync(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.provider.send_raw_transaction_sync(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.provider.send_raw_transaction_conditional(encoded_tx, conditional).await
+    }
+
+    async fn send_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.provider.send_transaction(tx).await
+    }
+
+    async fn send_tx_envelope(
+        &self,
+        tx: N::TxEnvelope,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.provider.send_tx_envelope(tx).await
+    }
+
+    async fn send_transaction_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.provider.send_transaction_internal(tx).await
+    }
+
+    async fn send_transaction_sync(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.provider.send_transaction_sync(tx).await
+    }
+
+    async fn send_transaction_sync_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.provider.send_transaction_sync_internal(tx).await
+    }
+
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        self.provider.sign_transaction(tx).await
+    }
+
+    async fn fill_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
+        self.provider.fill_transaction(tx).await
+    }
+
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        self.provider.fill_and_sign_transaction(tx).await
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
+        self.provider.subscribe_blocks()
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_full_blocks(&self) -> SubFullBlocks<N> {
+        self.provider.subscribe_full_blocks()
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
+        self.provider.subscribe_pending_transactions()
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_full_pending_transactions(
+        &self,
+    ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
+        self.provider.subscribe_full_pending_transactions()
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+        self.provider.subscribe_logs(filter)
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe<Params, R>(&self, params: Params) -> GetSubscription<Params, R>
+    where
+        Params: RpcSend,
+        R: RpcRecv,
+        Self: Sized,
+    {
+        self.provider.as_ref().subscribe(params)
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_to<R>(&self, method: &'static str) -> GetSubscription<NoParams, R>
+    where
+        R: RpcRecv,
+        Self: Sized,
+    {
+        self.provider.as_ref().subscribe_to(method)
+    }
+
+    #[cfg(feature = "pubsub")]
+    async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
+        self.provider.unsubscribe(id).await
+    }
+
+    fn syncing(&self) -> ProviderCall<NoParams, SyncStatus> {
+        self.provider.syncing()
+    }
+
+    fn get_client_version(&self) -> ProviderCall<NoParams, String> {
+        self.provider.get_client_version()
+    }
+
+    fn get_sha3(&self, data: &[u8]) -> ProviderCall<(String,), B256> {
+        self.provider.get_sha3(data)
+    }
+
+    fn get_net_version(&self) -> ProviderCall<NoParams, U64, u64> {
+        self.provider.get_net_version()
+    }
+
+    async fn raw_request<Params, R>(
+        &self,
+        method: Cow<'static, str>,
+        params: Params,
+    ) -> TransportResult<R>
+    where
+        Params: RpcSend,
+        R: RpcRecv,
+        Self: Sized,
+    {
+        self.provider.as_ref().raw_request(method, params).await
+    }
+
+    async fn raw_request_dyn(
+        &self,
+        method: Cow<'static, str>,
+        params: &RawValue,
+    ) -> TransportResult<Box<RawValue>> {
+        self.provider.raw_request_dyn(method, params).await
+    }
+
+    fn transaction_request(&self) -> N::TransactionRequest {
+        self.provider.transaction_request()
     }
 }
 
@@ -550,7 +1090,10 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{
+        layers::{BlockIdLayer, CacheLayer},
+        ProviderBuilder,
+    };
     use alloy_network::{Ethereum, TransactionBuilder};
     use alloy_primitives::{address, hex};
     use alloy_rpc_types_eth::{BlockOverrides, TransactionRequest};
@@ -572,6 +1115,542 @@ mod tests {
                 .collect::<Vec<_>>()
                 .abi_encode(),
         )
+    }
+
+    #[tokio::test]
+    async fn latest_block_number_by_id_is_batched() {
+        let asserter = Asserter::new();
+        // Answer both request shapes so a batching regression fails on the captured requests,
+        // rather than on response decoding.
+        let transport = tower::ServiceBuilder::new()
+            .map_request({
+                let asserter = asserter.clone();
+                move |request: alloy_json_rpc::RequestPacket| {
+                    match request.as_single().unwrap().method() {
+                        "eth_call" => push_m3_success(
+                            &asserter,
+                            &[(true, 123u64.abi_encode()), (true, 1u64.abi_encode())],
+                        ),
+                        "eth_blockNumber" => asserter.push_success(&U64::from(123)),
+                        "eth_chainId" => asserter.push_success(&U64::from(1)),
+                        method => panic!("unexpected RPC method: {method}"),
+                    }
+                    request
+                }
+            })
+            .service(alloy_transport::mock::MockTransport::new(asserter.clone()));
+        let root: RootProvider = ProviderBuilder::default()
+            .connect_client(alloy_rpc_client::RpcClient::new(transport, true));
+        let provider = CallBatchLayer::new().layer(root);
+
+        let (block_number, chain_id) = tokio::join!(
+            provider.get_block_number_by_id(BlockId::latest()),
+            provider.get_chain_id(),
+        );
+        assert_eq!(block_number.unwrap(), Some(123));
+        assert_eq!(chain_id.unwrap(), 1);
+
+        let requests = asserter.take_requests();
+        let methods: Vec<_> = requests.iter().map(|request| request.method()).collect();
+        assert_eq!(requests.len(), 1, "unexpected RPC methods: {methods:?}");
+        assert_eq!(requests[0].method(), "eth_call");
+        let (tx, block): (TransactionRequest, BlockId) =
+            serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+        assert_eq!(block, BlockId::latest());
+        assert_eq!(tx.to, Some(MULTICALL3_ADDRESS.into()));
+        let aggregate = IMulticall3::aggregate3Call::abi_decode(tx.input.input().unwrap()).unwrap();
+        assert_eq!(aggregate.calls.len(), 2);
+        for (call, calldata) in aggregate.calls.iter().zip([
+            IMulticall3::getBlockNumberCall {}.abi_encode(),
+            IMulticall3::getChainIdCall {}.abi_encode(),
+        ]) {
+            assert_eq!(call.target, MULTICALL3_ADDRESS);
+            assert!(call.allowFailure);
+            assert_eq!(call.callData.as_ref(), calldata.as_slice());
+        }
+    }
+
+    #[tokio::test]
+    async fn call_batch_should_preserve_inner_default_block() {
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::from_static(&[0x01]));
+        asserter.push_success(&Bytes::from_static(&[0x02]));
+
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        historical.get_code_at(Address::ZERO).await.unwrap();
+
+        let batched = CallBatchLayer::new().layer(historical);
+        batched.get_code_at(Address::ZERO).await.unwrap();
+
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 2);
+        for request in &requests {
+            assert_eq!(request.method(), "eth_getCode");
+        }
+        let before: serde_json::Value =
+            serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+        let after: serde_json::Value =
+            serde_json::from_str(requests[1].params().unwrap().get()).unwrap();
+        assert_eq!(before[1], "0x7b");
+        assert_eq!(after[1], before[1]);
+    }
+
+    #[tokio::test]
+    async fn non_batched_code_preserves_explicit_blocks() {
+        let asserter = Asserter::new();
+        let code = Bytes::from_static(&[0x01]);
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        let provider = CallBatchLayer::new().layer(historical);
+
+        for block in [BlockId::number(456), BlockId::latest()] {
+            asserter.push_success(&code);
+            assert_eq!(provider.get_code_at(Address::ZERO).block_id(block).await.unwrap(), code);
+            let requests = asserter.take_requests();
+            assert_eq!(requests.len(), 1);
+            assert_eq!(requests[0].method(), "eth_getCode");
+            let params: serde_json::Value =
+                serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+            assert_eq!(params, serde_json::json!([Address::ZERO, block]));
+        }
+    }
+
+    #[tokio::test]
+    async fn non_batched_code_defaults_to_latest_without_block_layer() {
+        let asserter = Asserter::new();
+        let code = Bytes::from_static(&[0x01]);
+        asserter.push_success(&code);
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let provider = CallBatchLayer::new().layer(root);
+
+        assert_eq!(provider.get_code_at(Address::ZERO).await.unwrap(), code);
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method(), "eth_getCode");
+        let params: serde_json::Value =
+            serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+        assert_eq!(params, serde_json::json!([Address::ZERO, "latest"]));
+    }
+
+    #[tokio::test]
+    async fn non_batched_code_preserves_inner_cache() {
+        let asserter = Asserter::new();
+        let code = Bytes::from_static(&[0x01]);
+        asserter.push_success(&code);
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        let cached = CacheLayer::new(10).layer(historical);
+        let provider = CallBatchLayer::new().layer(cached);
+
+        assert_eq!(provider.get_code_at(Address::ZERO).await.unwrap(), code);
+        assert_eq!(provider.get_code_at(Address::ZERO).await.unwrap(), code);
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 1, "the second request should be served by the inner cache");
+        assert_eq!(requests[0].method(), "eth_getCode");
+        let params: serde_json::Value =
+            serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+        assert_eq!(params, serde_json::json!([Address::ZERO, "0x7b"]));
+    }
+
+    fn assert_rpc_block(asserter: &Asserter, method: &str, block: BlockId) {
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method(), method);
+        let params: serde_json::Value =
+            serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+        assert_eq!(params.as_array().unwrap().last().unwrap(), &serde_json::json!(block));
+    }
+
+    // Exercise the inner default and caller-supplied blocks using the real RPC builders.
+    macro_rules! assert_non_batched_block {
+        ($name:ident, $method:literal, $response:expr, | $provider:ident | $call:expr) => {
+            #[tokio::test]
+            async fn $name() {
+                let asserter = Asserter::new();
+                let root: RootProvider =
+                    ProviderBuilder::default().connect_mocked_client(asserter.clone());
+                let $provider = BlockIdLayer::new(123u64.into()).layer(root);
+                asserter.push_success(&$response);
+                ($call).await.unwrap();
+                assert_rpc_block(&asserter, $method, BlockId::number(123));
+
+                let $provider = CallBatchLayer::new().layer($provider);
+                for block in [None, Some(BlockId::number(456)), Some(BlockId::latest())] {
+                    asserter.push_success(&$response);
+                    match block {
+                        Some(block) => ($call).block_id(block).await.unwrap(),
+                        None => ($call).await.unwrap(),
+                    };
+                    assert_rpc_block(&asserter, $method, block.unwrap_or(BlockId::number(123)));
+                }
+            }
+        };
+    }
+
+    assert_non_batched_block!(
+        forwards_storage_default_block,
+        "eth_getStorageAt",
+        alloy_primitives::B256::ZERO,
+        |provider| provider.get_storage_at(Address::ZERO, U256::ZERO)
+    );
+    assert_non_batched_block!(
+        forwards_transaction_count_default_block,
+        "eth_getTransactionCount",
+        alloy_primitives::U64::from(7),
+        |provider| provider.get_transaction_count(Address::ZERO)
+    );
+    assert_non_batched_block!(
+        forwards_access_list_default_block,
+        "eth_createAccessList",
+        alloy_rpc_types_eth::AccessListResult::default(),
+        |provider| provider.create_access_list(&TransactionRequest::default())
+    );
+    assert_non_batched_block!(
+        forwards_proof_default_block,
+        "eth_getProof",
+        alloy_rpc_types_eth::EIP1186AccountProofResponse::default(),
+        |provider| provider.get_proof(Address::ZERO, vec![])
+    );
+    assert_non_batched_block!(
+        forwards_storage_values_default_block,
+        "eth_getStorageValues",
+        alloy_rpc_types_eth::StorageValuesResponse::default(),
+        |provider| provider
+            .get_storage_values(alloy_rpc_types_eth::StorageValuesRequest::default())
+    );
+    assert_non_batched_block!(
+        forwards_account_default_block,
+        "eth_getAccount",
+        alloy_consensus::TrieAccount::default(),
+        |provider| provider.get_account(Address::ZERO)
+    );
+    assert_non_batched_block!(
+        forwards_account_info_default_block,
+        "eth_getAccountInfo",
+        alloy_rpc_types_eth::AccountInfo::default(),
+        |provider| provider.get_account_info(Address::ZERO)
+    );
+    assert_non_batched_block!(
+        forwards_simulate_default_block,
+        "eth_simulateV1",
+        Vec::<alloy_rpc_types_eth::simulate::SimulatedBlock>::new(),
+        |provider| provider.simulate(&alloy_rpc_types_eth::simulate::SimulatePayload::default())
+    );
+
+    #[tokio::test]
+    async fn forwards_estimate_gas_default_block() {
+        let asserter = Asserter::new();
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        asserter.push_success(&alloy_primitives::U64::from(21_000));
+        assert_eq!(historical.estimate_gas(TransactionRequest::default()).await.unwrap(), 21_000);
+        assert_rpc_block(&asserter, "eth_estimateGas", BlockId::number(123));
+
+        let provider = CallBatchLayer::new().layer(historical);
+        for block in [None, Some(BlockId::number(456)), Some(BlockId::latest())] {
+            asserter.push_success(&alloy_primitives::U64::from(21_000));
+            let call = provider.estimate_gas(TransactionRequest::default());
+            let gas = match block {
+                Some(block) => call.block(block).await.unwrap(),
+                None => call.await.unwrap(),
+            };
+            assert_eq!(gas, 21_000);
+            assert_rpc_block(&asserter, "eth_estimateGas", block.unwrap_or(BlockId::number(123)));
+        }
+    }
+
+    #[tokio::test]
+    async fn forwards_cached_logs() {
+        let asserter = Asserter::new();
+        asserter.push_success(&Vec::<alloy_rpc_types_eth::Log>::new());
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let provider = CallBatchLayer::new().layer(CacheLayer::new(10).layer(root));
+        let filter = alloy_rpc_types_eth::Filter::new().from_block(123).to_block(123);
+        for _ in 0..2 {
+            assert!(provider.get_logs(&filter).await.unwrap().is_empty());
+        }
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method(), "eth_getLogs");
+    }
+
+    #[tokio::test]
+    async fn forwards_cached_block_receipts() {
+        let asserter = Asserter::new();
+        asserter.push_success(&Some(Vec::<alloy_rpc_types_eth::TransactionReceipt>::new()));
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let provider = CallBatchLayer::new().layer(CacheLayer::new(10).layer(root));
+        for _ in 0..2 {
+            assert_eq!(
+                provider.get_block_receipts(BlockId::number(123)).await.unwrap(),
+                Some(vec![])
+            );
+        }
+        assert_rpc_block(&asserter, "eth_getBlockReceipts", BlockId::number(123));
+    }
+
+    #[derive(Clone, Debug)]
+    struct Recorder {
+        inner: RootProvider,
+        calls: Arc<std::sync::Mutex<Vec<&'static str>>>,
+    }
+
+    impl Recorder {
+        fn record(&self, method: &'static str) {
+            self.calls.lock().unwrap().push(method);
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Provider for Recorder {
+        fn root(&self) -> &RootProvider {
+            self.inner.root()
+        }
+
+        fn get_accounts(&self) -> ProviderCall<alloy_rpc_client::NoParams, Vec<Address>> {
+            self.record("get_accounts");
+            self.inner.get_accounts()
+        }
+
+        fn get_gas_price(
+            &self,
+        ) -> ProviderCall<alloy_rpc_client::NoParams, alloy_primitives::U128, u128> {
+            self.record("get_gas_price");
+            self.inner.get_gas_price()
+        }
+
+        fn get_transaction_by_hash(
+            &self,
+            hash: alloy_primitives::TxHash,
+        ) -> ProviderCall<(alloy_primitives::TxHash,), Option<alloy_rpc_types_eth::Transaction>>
+        {
+            self.record("get_transaction_by_hash");
+            self.inner.get_transaction_by_hash(hash)
+        }
+
+        async fn get_header(
+            &self,
+            block: BlockId,
+        ) -> TransportResult<Option<alloy_rpc_types_eth::Header>> {
+            self.record("get_header");
+            self.inner.get_header(block).await
+        }
+
+        fn call_many<'req>(
+            &self,
+            bundles: &'req [alloy_rpc_types_eth::Bundle],
+        ) -> crate::EthCallMany<'req, Ethereum, Vec<Vec<alloy_rpc_types_eth::EthCallResponse>>>
+        {
+            self.record("call_many");
+            self.inner.call_many(bundles)
+        }
+
+        fn call(&self, tx: TransactionRequest) -> crate::EthCall<Ethereum, Bytes> {
+            self.record("call");
+            self.inner.call(tx)
+        }
+
+        async fn send_transaction(
+            &self,
+            _tx: TransactionRequest,
+        ) -> TransportResult<crate::PendingTransactionBuilder<Ethereum>> {
+            self.record("send_transaction");
+            Err(TransportErrorKind::custom_str("recorder"))
+        }
+
+        async fn get_filter_changes<R: alloy_json_rpc::RpcRecv>(
+            &self,
+            _id: U256,
+        ) -> TransportResult<Vec<R>> {
+            self.record("get_filter_changes");
+            Ok(vec![])
+        }
+
+        async fn raw_request<Params, R>(
+            &self,
+            _method: std::borrow::Cow<'static, str>,
+            _params: Params,
+        ) -> TransportResult<R>
+        where
+            Params: alloy_json_rpc::RpcSend,
+            R: alloy_json_rpc::RpcRecv,
+        {
+            self.record("raw_request");
+            Err(TransportErrorKind::custom_str("recorder"))
+        }
+
+        #[cfg(feature = "pubsub")]
+        fn subscribe<Params, R>(&self, params: Params) -> crate::GetSubscription<Params, R>
+        where
+            Params: alloy_json_rpc::RpcSend,
+            R: alloy_json_rpc::RpcRecv,
+        {
+            self.record("subscribe");
+            self.inner.subscribe(params)
+        }
+
+        #[cfg(feature = "pubsub")]
+        fn subscribe_to<R>(
+            &self,
+            method: &'static str,
+        ) -> crate::GetSubscription<alloy_rpc_client::NoParams, R>
+        where
+            R: alloy_json_rpc::RpcRecv,
+        {
+            self.record("subscribe_to");
+            self.inner.subscribe_to(method)
+        }
+    }
+
+    #[tokio::test]
+    async fn forwards_non_batched_inner_overrides() {
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(Asserter::new());
+        let provider = CallBatchLayer::new().layer(Recorder { inner: root, calls: calls.clone() });
+        let _ = provider.get_accounts().await;
+        let _ = provider.get_gas_price().await;
+        let _ = provider.get_transaction_by_hash(alloy_primitives::B256::ZERO).await;
+        let _ = provider.call_many(&[]).await;
+        let _ = provider.send_transaction(TransactionRequest::default()).await;
+        let _ = provider.get_filter_changes::<alloy_primitives::B256>(U256::ZERO).await;
+        let _ = provider.raw_request::<_, serde_json::Value>("custom".into(), ()).await;
+        assert_eq!(
+            *calls.lock().unwrap(),
+            [
+                "get_accounts",
+                "get_gas_price",
+                "get_transaction_by_hash",
+                "call_many",
+                "send_transaction",
+                "get_filter_changes",
+                "raw_request",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "pubsub")]
+    async fn forwards_generic_subscription_overrides() {
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(Asserter::new());
+        let provider = CallBatchLayer::new().layer(Recorder { inner: root, calls: calls.clone() });
+        drop(provider.subscribe::<_, alloy_primitives::B256>((
+            alloy_rpc_types_eth::pubsub::SubscriptionKind::NewHeads,
+        )));
+        drop(provider.subscribe_to::<alloy_primitives::B256>("custom_subscription"));
+        assert_eq!(*calls.lock().unwrap(), ["subscribe", "subscribe_to"]);
+    }
+
+    #[tokio::test]
+    async fn forwards_with_any_network_and_type_erasure() {
+        let asserter = Asserter::new();
+        asserter.push_success(&alloy_primitives::U64::from(21_000));
+        let root: RootProvider<alloy_network::AnyNetwork> =
+            ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        let provider = CallBatchLayer::new().layer(historical).erased();
+        assert_eq!(provider.estimate_gas(Default::default()).await.unwrap(), 21_000);
+        assert_rpc_block(&asserter, "eth_estimateGas", BlockId::number(123));
+    }
+
+    #[tokio::test]
+    async fn block_number_by_id_preserves_inner_header_dispatch() {
+        let asserter = Asserter::new();
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let provider = CallBatchLayer::new().layer(Recorder { inner: root, calls: calls.clone() });
+
+        assert_eq!(provider.get_block_number_by_id(BlockId::number(456)).await.unwrap(), Some(456));
+        assert!(asserter.requests().is_empty());
+        assert!(calls.lock().unwrap().is_empty());
+
+        let mut header: alloy_rpc_types_eth::Header = Default::default();
+        header.inner.number = 77;
+        for block in [BlockId::hash(B256::repeat_byte(1)), BlockId::safe()] {
+            asserter.push_success(&Some(header.clone()));
+            assert_eq!(provider.get_block_number_by_id(block).await.unwrap(), Some(77));
+            let requests = asserter.take_requests();
+            assert_eq!(requests.len(), 1);
+            let params: serde_json::Value =
+                serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+            match block {
+                BlockId::Hash(hash) => {
+                    assert_eq!(requests[0].method(), "eth_getHeaderByHash");
+                    assert_eq!(params, serde_json::json!([hash.block_hash]));
+                }
+                BlockId::Number(number) => {
+                    assert_eq!(requests[0].method(), "eth_getHeaderByNumber");
+                    assert_eq!(params, serde_json::json!([number]));
+                }
+            }
+        }
+        asserter.push_success(&Option::<alloy_rpc_types_eth::Header>::None);
+        assert_eq!(provider.get_block_number_by_id(BlockId::hash(B256::ZERO)).await.unwrap(), None);
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method(), "eth_getHeaderByHash");
+        assert_eq!(*calls.lock().unwrap(), ["get_header", "get_header", "get_header"]);
+    }
+
+    #[tokio::test]
+    async fn non_batchable_calls_keep_existing_root_dispatch() {
+        let asserter = Asserter::new();
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let recorder = Recorder { inner: root, calls: calls.clone() };
+        let historical = BlockIdLayer::new(123u64.into()).layer(recorder);
+        let tx = TransactionRequest::default().with_to(COUNTER_ADDRESS).with_gas_limit(21_000);
+        asserter.push_success(&Bytes::new());
+        historical.call(tx.clone()).await.unwrap();
+        assert_rpc_block(&asserter, "eth_call", BlockId::number(123));
+        assert_eq!(*calls.lock().unwrap(), ["call"]);
+        calls.lock().unwrap().clear();
+
+        let provider = CallBatchLayer::new().layer(historical);
+        for block in [None, Some(BlockId::number(456))] {
+            asserter.push_success(&Bytes::new());
+            let call = provider.call(tx.clone());
+            match block {
+                Some(block) => call.block(block).await.unwrap(),
+                None => call.await.unwrap(),
+            };
+            if let Some(block) = block {
+                assert_rpc_block(&asserter, "eth_call", block);
+            } else {
+                let requests = asserter.take_requests();
+                assert_eq!(requests.len(), 1);
+                assert_eq!(requests[0].method(), "eth_call");
+                let params: serde_json::Value =
+                    serde_json::from_str(requests[0].params().unwrap().get()).unwrap();
+                assert_eq!(params, serde_json::json!([tx]));
+            }
+        }
+        // This documents an existing limitation, not the ideal intended behavior.
+        assert!(calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn batchable_calls_keep_latest_with_inner_default() {
+        let asserter = Asserter::new();
+        let root: RootProvider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+        let historical = BlockIdLayer::new(123u64.into()).layer(root);
+        let provider = CallBatchLayer::new().layer(historical);
+        let tx =
+            TransactionRequest::default().with_to(COUNTER_ADDRESS).with_input(hex!("0x8381f58a"));
+        let code = Bytes::from_static(&[0x01]);
+
+        // The backend's single-request path still overrides the inner historical default.
+        asserter.push_success(&code);
+        assert_eq!(provider.call(tx.clone()).await.unwrap(), code);
+        assert_rpc_block(&asserter, "eth_call", BlockId::latest());
+
+        push_m3_success(&asserter, &[(true, code.to_vec()), (true, U256::from(7).abi_encode())]);
+        let (call, balance) =
+            tokio::join!(provider.call(tx), provider.get_balance(COUNTER_ADDRESS));
+        assert_eq!(call.unwrap(), code);
+        assert_eq!(balance.unwrap(), U256::from(7));
+        assert_rpc_block(&asserter, "eth_call", BlockId::latest());
     }
 
     #[tokio::test]
