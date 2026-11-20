@@ -75,8 +75,6 @@ pub enum ConversionError {
         /// Actual item count.
         actual: usize,
     },
-    /// Blob cell and proof counts did not match the request, or their optional positions differed.
-    InvalidBlobCellsAndProofs,
 }
 
 impl core::fmt::Display for ConversionError {
@@ -90,9 +88,6 @@ impl core::fmt::Display for ConversionError {
             Self::TooManyItems { field, max, actual } => {
                 write!(f, "too many {field}: expected at most {max}, got {actual}")
             }
-            Self::InvalidBlobCellsAndProofs => f.write_str(
-                "blob cells and proofs must match the requested indices and optional positions",
-            ),
         }
     }
 }

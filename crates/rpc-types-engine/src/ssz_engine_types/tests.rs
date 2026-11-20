@@ -426,14 +426,11 @@ fn blob_response_conversions_preserve_availability_and_order() {
         blob_cells: vec![Some(Cell::repeat_byte(1)), None],
         proofs: vec![Some(Bytes48::repeat_byte(2)), None],
     };
-    let indices_bitarray = B128::from(((1u128 << 127) | 1).to_le_bytes());
-    let v4 =
-        BlobsV4Response::try_from((vec![None, Some(legacy_partial)], indices_bitarray)).unwrap();
+    let v4 = BlobsV4Response::try_from(vec![None, Some(legacy_partial)]).unwrap();
     assert!(!v4.entries[0].available);
-    assert_eq!(v4.entries[0].contents, BlobCellsAndProofs::default());
     assert!(v4.entries[1].available);
     assert!(v4.entries[1].contents.blob_cells[0].is_some());
-    assert!(v4.entries[1].contents.proofs[127].is_none());
+    assert!(v4.entries[1].contents.proofs[1].is_none());
 }
 
 #[test]
@@ -785,12 +782,17 @@ fn blob_v4_response_preserves_cell_indices() {
             expected.proofs[index] = proof.into();
         }
 
-        let response =
-            BlobsV4Response::try_from((vec![Some(legacy)], B128::new(bitarray))).unwrap();
-        assert_eq!(response.entries[0].contents.blob_cells.len(), CELLS_PER_EXT_BLOB);
-        assert_eq!(response.entries[0].contents.proofs.len(), CELLS_PER_EXT_BLOB);
-        assert_eq!(response.entries[0].contents, expected, "indices: {indices:?}");
-        assert_roundtrip(&response);
+        let encoded =
+            BlobsV4Response::encode_with_indices(&[None, Some(legacy)], B128::new(bitarray))
+                .unwrap();
+        let expected = BlobsV4Response {
+            entries: vec![
+                BlobEntry { available: false, contents: BlobCellsAndProofs::default() },
+                BlobEntry { available: true, contents: expected },
+            ],
+        };
+        assert_eq!(encoded, expected.as_ssz_bytes(), "indices: {indices:?}");
+        assert_eq!(BlobsV4Response::from_ssz_bytes(&encoded).unwrap(), expected);
     }
 }
 
@@ -806,11 +808,11 @@ fn blob_v4_response_rejects_invalid_cells_and_proofs() {
         (vec![None], vec![Some(Bytes48::ZERO)]),
     ] {
         assert_eq!(
-            BlobsV4Response::try_from((
-                vec![Some(BlobCellsAndProofsV1 { blob_cells, proofs })],
+            BlobsV4Response::encode_with_indices(
+                &[Some(BlobCellsAndProofsV1 { blob_cells, proofs })],
                 indices_bitarray,
-            )),
-            Err(ConversionError::InvalidBlobCellsAndProofs),
+            ),
+            Err(BlobsV4ConversionError::InvalidBlobCellsAndProofs),
         );
     }
 }
@@ -818,11 +820,7 @@ fn blob_v4_response_rejects_invalid_cells_and_proofs() {
 #[test]
 fn blob_v4_response_rejects_too_many_blobs() {
     assert_eq!(
-        BlobsV4Response::try_from((vec![None; MAX_BLOBS_REQUEST + 1], B128::ZERO)),
-        Err(ConversionError::TooManyItems {
-            field: "blobs",
-            max: MAX_BLOBS_REQUEST,
-            actual: MAX_BLOBS_REQUEST + 1,
-        }),
+        BlobsV4Response::encode_with_indices(&vec![None; MAX_BLOBS_REQUEST + 1], B128::ZERO),
+        Err(BlobsV4ConversionError::TooManyBlobs(MAX_BLOBS_REQUEST + 1)),
     );
 }
