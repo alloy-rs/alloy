@@ -1,4 +1,5 @@
 use super::*;
+use alloy_eips::eip7594::{BlobCellMask, CELLS_PER_EXT_BLOB};
 
 /// V1-V3 blob request container.
 ///
@@ -58,6 +59,9 @@ pub type BlobsV2Response = BlobsResponse<BlobAndProofV2>;
 pub type BlobsV3Response = BlobsResponse<BlobAndProofV2>;
 
 /// V4 partial cell-range response.
+///
+/// Convert compact JSON-RPC results together with the request's index bitarray so cells and proofs
+/// are placed at their original indices in the 128-entry REST-SSZ lists.
 pub type BlobsV4Response = BlobsResponse<BlobCellsAndProofs>;
 
 /// Blob cells and proofs with REST-SSZ optional cell positions.
@@ -66,10 +70,10 @@ pub type BlobsV4Response = BlobsResponse<BlobCellsAndProofs>;
 /// union encoding.
 #[derive(Clone, Debug, Default, PartialEq, Eq, ssz_derive::Encode)]
 pub struct BlobCellsAndProofs {
-    /// Requested blob cells.
+    /// Blob cells indexed by cell index, with empty optionals for unrequested or missing cells.
     #[ssz(with = "cells")]
     pub blob_cells: Vec<Optional<Cell>>,
-    /// KZG proofs for the requested blob cells.
+    /// KZG proofs indexed by cell index, with the same empty positions as `blob_cells`.
     #[ssz(with = "proofs")]
     pub proofs: Vec<Optional<Bytes48>>,
 }
@@ -118,7 +122,7 @@ impl<T: ssz::Encode + ssz::Decode> BlobEntry<T> {
 impl<T: ssz::Encode + ssz::Decode> BlobsResponse<T> {
     fn from_values<V>(
         values: Vec<V>,
-        convert: impl FnMut(V) -> BlobEntry<T>,
+        convert: impl FnMut(V) -> Result<BlobEntry<T>, ConversionError>,
     ) -> Result<Self, ConversionError> {
         if values.len() > MAX_BLOBS_REQUEST {
             return Err(ConversionError::TooManyItems {
@@ -127,42 +131,64 @@ impl<T: ssz::Encode + ssz::Decode> BlobsResponse<T> {
                 actual: values.len(),
             });
         }
-        Ok(Self { entries: values.into_iter().map(convert).collect() })
+        Ok(Self { entries: values.into_iter().map(convert).collect::<Result<_, _>>()? })
     }
 }
 
 impl TryFrom<Vec<Option<BlobAndProofV1>>> for BlobsV1Response {
     type Error = ConversionError;
     fn try_from(value: Vec<Option<BlobAndProofV1>>) -> Result<Self, Self::Error> {
-        Self::from_values(value, |value| BlobEntry::from_optional(value, zero_blob_v1))
+        Self::from_values(value, |value| Ok(BlobEntry::from_optional(value, zero_blob_v1)))
     }
 }
 
 impl TryFrom<Vec<BlobAndProofV2>> for BlobsV2Response {
     type Error = ConversionError;
     fn try_from(value: Vec<BlobAndProofV2>) -> Result<Self, Self::Error> {
-        Self::from_values(value, |contents| BlobEntry { available: true, contents })
+        Self::from_values(value, |contents| Ok(BlobEntry { available: true, contents }))
     }
 }
 
 impl TryFrom<Vec<Option<BlobAndProofV2>>> for BlobsV3Response {
     type Error = ConversionError;
     fn try_from(value: Vec<Option<BlobAndProofV2>>) -> Result<Self, Self::Error> {
-        Self::from_values(value, |value| BlobEntry::from_optional(value, zero_blob_v2))
+        Self::from_values(value, |value| Ok(BlobEntry::from_optional(value, zero_blob_v2)))
     }
 }
 
-impl TryFrom<Vec<Option<BlobCellsAndProofsV1>>> for BlobsV4Response {
+impl TryFrom<(Vec<Option<BlobCellsAndProofsV1>>, B128)> for BlobsV4Response {
     type Error = ConversionError;
-    fn try_from(value: Vec<Option<BlobCellsAndProofsV1>>) -> Result<Self, Self::Error> {
+    fn try_from(
+        (value, indices_bitarray): (Vec<Option<BlobCellsAndProofsV1>>, B128),
+    ) -> Result<Self, Self::Error> {
+        let cell_mask = BlobCellMask::new(indices_bitarray);
         Self::from_values(value, |value| {
-            BlobEntry::from_optional(
-                value.map(|contents| BlobCellsAndProofs {
-                    blob_cells: contents.blob_cells.into_iter().map(Optional::from).collect(),
-                    proofs: contents.proofs.into_iter().map(Optional::from).collect(),
-                }),
-                BlobCellsAndProofs::default,
-            )
+            let Some(contents) = value else {
+                return Ok(BlobEntry { available: false, contents: BlobCellsAndProofs::default() });
+            };
+            if contents.blob_cells.len() != cell_mask.count()
+                || contents.proofs.len() != cell_mask.count()
+                || contents
+                    .blob_cells
+                    .iter()
+                    .zip(&contents.proofs)
+                    .any(|(cell, proof)| cell.is_some() != proof.is_some())
+            {
+                return Err(ConversionError::InvalidBlobCellsAndProofs);
+            }
+
+            let mut indexed = BlobCellsAndProofs {
+                blob_cells: vec![Optional::none(); CELLS_PER_EXT_BLOB],
+                proofs: vec![Optional::none(); CELLS_PER_EXT_BLOB],
+            };
+            for (index, (cell, proof)) in cell_mask
+                .selected_indices()
+                .zip(contents.blob_cells.into_iter().zip(contents.proofs))
+            {
+                indexed.blob_cells[index] = cell.into();
+                indexed.proofs[index] = proof.into();
+            }
+            Ok(BlobEntry { available: true, contents: indexed })
         })
     }
 }
