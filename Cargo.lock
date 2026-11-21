@@ -1097,6 +1097,7 @@ dependencies = [
  "alloy-json-rpc",
  "alloy-rpc-types-engine",
  "alloy-transport",
+ "http 1.5.0",
  "http-body-util",
  "hyper",
  "hyper-tls",

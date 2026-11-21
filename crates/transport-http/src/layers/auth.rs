@@ -1,7 +1,9 @@
-use crate::hyper::{header::AUTHORIZATION, Request, Response};
+use alloy_json_rpc::RequestPacket;
 use alloy_rpc_types_engine::{Claims, JwtSecret};
 use alloy_transport::{TransportError, TransportErrorKind};
-use hyper::header::HeaderValue;
+use http::header::{HeaderValue, AUTHORIZATION};
+#[cfg(feature = "hyper")]
+use http::{Request, Response};
 use jsonwebtoken::get_current_timestamp;
 use std::{
     future::Future,
@@ -14,6 +16,10 @@ use tower::{Layer, Service};
 /// in the requests.
 ///
 /// The generated token is inserted into the [`AUTHORIZATION`] header of the request.
+///
+/// The layer can wrap a service of [`RequestPacket`]s, such as [`Http`](crate::Http) with a
+/// `reqwest` client, or, with the `hyper` feature, a service of [`http::Request`]s such as
+/// [`HyperClient`](crate::HyperClient).
 #[derive(Clone, Debug)]
 pub struct AuthLayer {
     secret: JwtSecret,
@@ -94,8 +100,67 @@ impl<S> AuthService<S> {
 
         Ok(format!("Bearer {token}"))
     }
+
+    /// Returns the [`AUTHORIZATION`] header value for the next request, reusing the most recent
+    /// claim while it is still within the latency buffer.
+    fn authorization(&mut self) -> Result<HeaderValue, TransportError> {
+        let token = if self.validate() {
+            // Encodes the most recent claim into a token.
+            self.secret
+                .encode(self.most_recent_claim.as_ref().unwrap())
+                .map(|token| format!("Bearer {token}"))
+        } else {
+            // Creates a new Claim and encodes it into a token.
+            self.create_token_from_secret()
+        }
+        .map_err(TransportErrorKind::custom)?;
+
+        Ok(HeaderValue::from_str(&token).unwrap())
+    }
 }
 
+/// Sets the token on the packet's HTTP headers, which the HTTP transports send with the request.
+///
+/// A batch is sent as a single HTTP request with the headers of all its requests combined, so the
+/// token is set on the last request and any other [`AUTHORIZATION`] header in the packet is
+/// removed.
+impl<S> Service<RequestPacket> for AuthService<S>
+where
+    S: Service<RequestPacket, Error = TransportError>,
+    S::Future: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = TransportError;
+    type Future = Pin<Box<dyn Future<Output = Result<S::Response, TransportError>> + Send>>;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut req: RequestPacket) -> Self::Future {
+        let token = match self.authorization() {
+            Ok(token) => token,
+            Err(e) => return Box::pin(async move { Err(e) }),
+        };
+
+        let requests = req.requests_mut();
+        for request in requests.iter_mut() {
+            if let Some(headers) = request.extensions_mut().get_mut::<http::HeaderMap>() {
+                headers.remove(AUTHORIZATION);
+            }
+        }
+        if let Some(last) = requests.last_mut() {
+            last.headers_mut().insert(AUTHORIZATION, token);
+        }
+
+        Box::pin(self.inner.call(req))
+    }
+}
+
+#[cfg(feature = "hyper")]
 impl<S, B, ResBody> Service<Request<B>> for AuthService<S>
 where
     S: Service<hyper::Request<B>, Response = Response<ResBody>> + Clone + Send + Sync + 'static,
@@ -120,19 +185,9 @@ where
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
         let mut req = req;
-        let res = if self.validate() {
-            // Encodes the most recent claim into a token.
-            self.secret
-                .encode(self.most_recent_claim.as_ref().unwrap())
-                .map(|token| format!("Bearer {token}"))
-        } else {
-            // Creates a new Claim and encodes it into a token.
-            self.create_token_from_secret()
-        };
-
-        match res {
+        match self.authorization() {
             Ok(token) => {
-                req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
+                req.headers_mut().insert(AUTHORIZATION, token);
 
                 let mut this = self.clone();
 
@@ -140,10 +195,7 @@ where
                     async move { this.inner.call(req).await.map_err(TransportErrorKind::custom) },
                 )
             }
-            Err(e) => {
-                let e = TransportErrorKind::custom(e);
-                Box::pin(async move { Err(e) })
-            }
+            Err(e) => Box::pin(async move { Err(e) }),
         }
     }
 }
