@@ -372,6 +372,11 @@ eip712 = [
     "alloy-signer-trezor?/eip712",
     "alloy-signer-turnkey?/eip712",
 ]
+eip7702 = [
+    "alloy-signer?/eip7702",
+    "alloy-signer-ledger?/eip7702",
+    "alloy-signer-local?/eip7702",
+]
 more-tuple-impls = ["alloy-core/more-tuple-impls", "alloy-provider/more-tuple-impls"]
 
 arbitrary = [
