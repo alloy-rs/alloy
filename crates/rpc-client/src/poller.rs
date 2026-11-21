@@ -340,9 +340,12 @@ impl<Resp> PollerStream<Resp> {
 
     /// Pauses the poller until it's unpaused.
     ///
-    /// While paused the poller will not initiate new rpc requests
+    /// While paused the poller will not initiate new rpc requests.
+    /// Has no effect if the poller has already finished.
     pub fn pause(&mut self) {
-        self.state = PollState::Paused;
+        if !matches!(self.state, PollState::Finished) {
+            self.state = PollState::Paused;
+        }
     }
 
     /// Unpauses the poller.
@@ -546,6 +549,23 @@ fn _assert_unpin() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pause_preserves_termination() {
+        let mut stream = PollerBuilder::<(), ()>::new(WeakClient::new(), "test", ()).into_stream();
+        assert_eq!(stream.next().now_or_never(), Some(None));
+        assert!(stream.is_terminated());
+
+        for _ in 0..2 {
+            stream.pause();
+            assert!(stream.is_terminated());
+            assert_eq!(stream.next().now_or_never(), Some(None));
+
+            stream.unpause();
+            assert!(stream.is_terminated());
+            assert_eq!(stream.next().now_or_never(), Some(None));
+        }
+    }
 
     #[test]
     #[should_panic(expected = "channel size must be non-zero")]
