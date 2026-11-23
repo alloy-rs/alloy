@@ -192,8 +192,8 @@ impl PubSubConnect for WsConnect {
     }
 }
 
-/// Connects like [`tokio_tungstenite::connect_async_with_config`], with `connect_timeout` applied to
-/// each step: the host lookup, the TCP connect to each resolved address in turn, and the TLS and
+/// Connects like [`tokio_tungstenite::connect_async_with_config`], with `connect_timeout` applied
+/// to each step: the host lookup, the TCP connect to each resolved address in turn, and the TLS and
 /// WebSocket handshakes.
 ///
 /// A deadline per address, rather than one for the whole attempt, lets an unanswered address fall
