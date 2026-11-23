@@ -21,7 +21,7 @@ pub use hyper;
 pub use hyper_util;
 
 mod layers;
-#[cfg(all(not(target_family = "wasm"), feature = "jwt-auth"))]
+#[cfg(all(not(target_family = "wasm"), feature = "auth-layer"))]
 pub use layers::{AuthLayer, AuthService};
 #[cfg(all(not(target_family = "wasm"), feature = "traceparent"))]
 pub use layers::{TraceParentLayer, TraceParentService};

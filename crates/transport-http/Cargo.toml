@@ -43,6 +43,7 @@ hyper-tls = { workspace = true, optional = true }
 
 # auth layer
 alloy-rpc-types-engine = { workspace = true, optional = true }
+http = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
 
 # trace propagation
@@ -74,8 +75,12 @@ hyper = [
     "hyper-tls",
 ]
 hyper-tls = ["hyper", "dep:hyper-tls"]
-jwt-auth = [
-    "hyper",
+jwt-auth = ["auth-layer", "hyper"]
+# `AuthLayer` without enabling an HTTP client.
+auth-layer = [
+    "dep:alloy-json-rpc",
+    "dep:http",
+    "dep:tower",
     "dep:alloy-rpc-types-engine",
     "alloy-rpc-types-engine/jwt-aws-lc-rs",
     "alloy-rpc-types-engine/serde",
