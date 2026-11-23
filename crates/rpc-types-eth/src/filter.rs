@@ -1171,20 +1171,14 @@ where
 }
 
 #[cfg(feature = "serde")]
-impl<'a, T> serde::Deserialize<'a> for ValueOrArray<T>
+impl<'de, T> serde::Deserialize<'de> for ValueOrArray<T>
 where
-    T: serde::de::DeserializeOwned,
+    T: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'a>,
+        D: serde::Deserializer<'de>,
     {
-        let value = serde_json::Value::deserialize(deserializer)?;
-
-        if value.is_null() {
-            return Ok(Self::Array(Vec::new()));
-        }
-
         #[derive(serde::Deserialize)]
         #[serde(untagged)]
         enum Variadic<T> {
@@ -1192,11 +1186,12 @@ where
             Array(Vec<T>),
         }
 
-        match serde_json::from_value::<Variadic<T>>(value).map_err(|err| {
+        match Option::<Variadic<T>>::deserialize(deserializer).map_err(|err| {
             serde::de::Error::custom(format!("Invalid variadic value or array type: {err}"))
         })? {
-            Variadic::Value(val) => Ok(Self::Value(val)),
-            Variadic::Array(arr) => Ok(Self::Array(arr)),
+            None => Ok(Self::Array(Vec::new())),
+            Some(Variadic::Value(val)) => Ok(Self::Value(val)),
+            Some(Variadic::Array(arr)) => Ok(Self::Array(arr)),
         }
     }
 }
@@ -1755,6 +1750,32 @@ mod tests {
         let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn filter_rejects_object_valued_addresses_and_topics() {
+        for input in [
+            r#"{"address":{"unexpected":1}}"#,
+            r#"{"address":[{"unexpected":1}]}"#,
+            r#"{"topics":[{"unexpected":1}]}"#,
+            r#"{"topics":[[{"unexpected":1}]]}"#,
+        ] {
+            assert!(serde_json::from_str::<Filter>(input).is_err(), "{input}");
+        }
+        let null = serde_json::from_str::<ValueOrArray<Option<Address>>>("null").unwrap();
+        assert_eq!(null, ValueOrArray::Array(vec![]));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn value_or_array_preserves_map_keys() {
+        use alloc::collections::BTreeMap;
+
+        let input = r#"{"$serde_json::private::RawValue":"metadata"}"#;
+        let expected = serde_json::from_str::<BTreeMap<String, String>>(input).unwrap();
+        let parsed = serde_json::from_str::<ValueOrArray<BTreeMap<String, String>>>(input).unwrap();
+        assert_eq!(parsed, ValueOrArray::Value(expected));
     }
 
     #[test]

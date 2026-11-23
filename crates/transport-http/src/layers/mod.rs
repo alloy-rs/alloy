@@ -2,9 +2,9 @@
 //! these inject headers into the HTTP requests.
 #![cfg(not(target_family = "wasm"))]
 
-#[cfg(feature = "jwt-auth")]
+#[cfg(feature = "auth-layer")]
 mod auth;
-#[cfg(feature = "jwt-auth")]
+#[cfg(feature = "auth-layer")]
 pub use auth::{AuthLayer, AuthService};
 
 #[cfg(feature = "traceparent")]
