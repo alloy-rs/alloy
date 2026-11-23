@@ -385,7 +385,7 @@ mod tests {
         let sender = {
             let client = client.clone();
             tokio::spawn(async move {
-                for id in 1.. {
+                for id in 1..=u64::MAX {
                     tokio::spawn(client.send(request(id)));
                     sleep(Duration::from_millis(20)).await;
                 }
