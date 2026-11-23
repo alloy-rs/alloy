@@ -213,6 +213,10 @@ impl BuiltInConnectionString {
                 if let Some(ws_config) = config.ws_config {
                     ws_connect = ws_connect.with_config(ws_config);
                 }
+                #[cfg(not(target_family = "wasm"))]
+                if let Some(connect_timeout) = config.ws_connect_timeout {
+                    ws_connect = ws_connect.with_connect_timeout(connect_timeout);
+                }
 
                 // Apply retry configuration
                 if let Some(max_retries) = config.max_retries {
@@ -375,6 +379,11 @@ pub struct ConnectionConfig {
     /// WebSocket-specific configuration.
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
+    /// Deadline for one WebSocket connection attempt, including reconnect attempts.
+    ///
+    /// Ignored for HTTP and IPC.
+    #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
+    pub ws_connect_timeout: Option<Duration>,
 }
 
 impl ConnectionConfig {
@@ -386,6 +395,8 @@ impl ConnectionConfig {
             retry_interval: None,
             #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
             ws_config: None,
+            #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
+            ws_connect_timeout: None,
         }
     }
 
@@ -416,6 +427,15 @@ impl ConnectionConfig {
     #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
     pub const fn with_ws_config(mut self, config: alloy_transport_ws::WebSocketConfig) -> Self {
         self.ws_config = Some(config);
+        self
+    }
+
+    /// Set the deadline for one WebSocket connection attempt, including reconnect attempts.
+    ///
+    /// Ignored for HTTP and IPC.
+    #[cfg(all(feature = "ws-base", not(target_family = "wasm")))]
+    pub const fn with_ws_connect_timeout(mut self, connect_timeout: Duration) -> Self {
+        self.ws_connect_timeout = Some(connect_timeout);
         self
     }
 }

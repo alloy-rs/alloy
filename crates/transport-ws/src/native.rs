@@ -34,6 +34,9 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
+    /// The deadline for one connection attempt, including the TCP, TLS and WebSocket handshakes.
+    /// Default is no deadline.
+    connect_timeout: Option<Duration>,
 }
 
 impl WsConnect {
@@ -52,6 +55,7 @@ impl WsConnect {
             max_retries: 10,
             retry_interval: Duration::from_secs(3),
             keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
+            connect_timeout: None,
         }
     }
 
@@ -108,14 +112,33 @@ impl WsConnect {
 
     /// Sets the keepalive ping interval.
     ///
-    /// A ping is sent if no other messages have been sent within this interval.
-    /// If the server does not respond with a pong before the next ping is due,
-    /// the connection is considered dead and will be closed.
+    /// A ping is sent if nothing has been received from the server within this interval.
+    /// If nothing, including the pong, is received before the next ping is due, the connection
+    /// is considered dead and will be closed. Requests sent in the meantime do not delay the
+    /// ping, so a connection that stopped answering is detected while requests keep being sent.
     ///
     /// Default is 10 seconds.
     pub const fn with_keepalive_interval(mut self, keepalive_interval: Duration) -> Self {
         self.keepalive_interval = keepalive_interval;
         self
+    }
+
+    /// Sets the deadline for one connection attempt, including the TCP, TLS and WebSocket
+    /// handshakes.
+    ///
+    /// It applies to the initial connection and to every reconnect attempt. An attempt that
+    /// exceeds it fails, and reconnects are retried as configured with
+    /// [`with_max_retries`](Self::with_max_retries).
+    ///
+    /// Default is no deadline.
+    pub const fn with_connect_timeout(mut self, connect_timeout: Duration) -> Self {
+        self.connect_timeout = Some(connect_timeout);
+        self
+    }
+
+    /// Get the deadline for one connection attempt, if any.
+    pub const fn connect_timeout(&self) -> Option<Duration> {
+        self.connect_timeout
     }
 }
 
@@ -144,9 +167,18 @@ impl PubSubConnect for WsConnect {
 
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
-            .await
-            .map_err(TransportErrorKind::custom)?;
+        let connect = tokio_tungstenite::connect_async_with_config(req, self.config, false);
+        let (socket, _) = match self.connect_timeout {
+            Some(connect_timeout) => {
+                tokio::time::timeout(connect_timeout, connect).await.map_err(|_| {
+                    TransportErrorKind::custom_str(&format!(
+                        "WS connection timed out after {connect_timeout:?}"
+                    ))
+                })?
+            }
+            None => connect.await,
+        }
+        .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
@@ -213,11 +245,13 @@ impl WsBackend<TungsteniteStream> {
                 // 1. New dispatch to server.
                 // 2. Keepalive.
                 // 3. Response or notification from server.
-                // This ensures that keepalive is sent only if no other messages
-                // have been sent in the keepalive interval. And prioritizes new
-                // dispatches over responses from the server. This will fail if
-                // the client saturates the task with dispatches, but that's
-                // probably not a big deal.
+                // This prioritizes new dispatches over responses from the
+                // server. The keepalive timer is reset only by messages
+                // received from the server, so a ping is sent if nothing has
+                // been received in the keepalive interval, however many
+                // dispatches were sent. Resetting it on dispatches would hide
+                // a connection that stopped answering for as long as requests
+                // keep being sent.
                 tokio::select! {
                     biased;
                     // we've received a new dispatch, so we send it via
@@ -226,8 +260,6 @@ impl WsBackend<TungsteniteStream> {
                     inst = self.interface.recv_from_frontend() => {
                         match inst {
                             Some(msg) => {
-                                // Reset the keepalive timer.
-                                keepalive.set(sleep(self.keepalive_interval));
                                 if let Err(err) = self.send(msg).await {
                                     error!(%err, "WS connection error");
                                     errored = true;
@@ -240,11 +272,11 @@ impl WsBackend<TungsteniteStream> {
                             },
                         }
                     },
-                    // Send a ping to the server, if no other messages have been
-                    // sent within the keepalive interval.
+                    // Send a ping to the server, if nothing has been received
+                    // within the keepalive interval.
                     _ = &mut keepalive => {
-                        // Still expecting a pong from the previous ping,
-                        // meaning connection is errored.
+                        // Nothing received since the previous ping, meaning
+                        // the connection is errored.
                         if expecting_pong {
                             error!("WS server missed a pong");
                             errored = true;
@@ -264,9 +296,10 @@ impl WsBackend<TungsteniteStream> {
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
-                                if item.is_pong() {
-                                    expecting_pong = false;
-                                }
+                                // Any message from the server shows the
+                                // connection is alive.
+                                expecting_pong = false;
+                                keepalive.set(sleep(self.keepalive_interval));
                                 errored = self.handle(item).is_err();
                                 if errored { break }
                             },
@@ -315,5 +348,74 @@ mod tests {
         let ws =
             WsConnect::new("wss://user:pass@example.com").with_auth(Authorization::bearer("tok"));
         assert_eq!(ws.auth(), Some(&Authorization::bearer("tok")));
+    }
+
+    /// Request with the given id, as the frontend sends it.
+    fn request(id: u64) -> alloy_json_rpc::SerializedRequest {
+        alloy_json_rpc::Request::new("eth_chainId", alloy_json_rpc::Id::Number(id), ())
+            .serialize()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn keepalive_detects_silent_server_while_requests_are_sent() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        // Completes one WebSocket handshake, then never reads or writes again, like a server
+        // behind a half-open TCP connection. Reconnects are refused.
+        let (silent_tx, silent_rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            drop(listener);
+            let socket = tokio_tungstenite::accept_async(stream).await.unwrap();
+            let _ = silent_tx.send(socket);
+        });
+
+        let client = WsConnect::new(format!("ws://{addr}"))
+            .with_keepalive_interval(Duration::from_millis(100))
+            .with_max_retries(1)
+            .with_retry_interval(Duration::from_millis(10))
+            .into_service()
+            .await
+            .unwrap();
+        let _socket = silent_rx.await.unwrap();
+
+        // Keep sending requests more often than the keepalive interval.
+        let first = tokio::spawn(client.send(request(0)));
+        let sender = {
+            let client = client.clone();
+            tokio::spawn(async move {
+                for id in 1.. {
+                    tokio::spawn(client.send(request(id)));
+                    sleep(Duration::from_millis(20)).await;
+                }
+            })
+        };
+
+        let response = tokio::time::timeout(Duration::from_secs(5), first)
+            .await
+            .expect("a silent server must be detected while requests are sent")
+            .unwrap();
+        sender.abort();
+        assert!(response.is_err(), "{response:?}");
+    }
+
+    #[tokio::test]
+    async fn connect_times_out_on_unanswered_handshake() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        // Accepts the TCP connection but never answers the WebSocket handshake.
+        tokio::spawn(async move {
+            let (_stream, _) = listener.accept().await.unwrap();
+            std::future::pending::<()>().await;
+        });
+
+        let ws =
+            WsConnect::new(format!("ws://{addr}")).with_connect_timeout(Duration::from_millis(100));
+        let err = tokio::time::timeout(Duration::from_secs(5), ws.connect())
+            .await
+            .expect("the connect deadline must end the attempt")
+            .unwrap_err();
+        assert_eq!(err.to_string(), "WS connection timed out after 100ms");
     }
 }
