@@ -224,9 +224,12 @@ impl From<AddressHashMap<Vec<StorageKey>>> for StorageValuesRequest {
 /// Maps contract addresses to the retrieved storage values. Each inner array
 /// corresponds positionally 1:1 with the input slots for that address.
 ///
+/// In human-readable formats, values serialize as 32-byte hex strings, as in the execution-apis
+/// spec and `eth_getStorageAt`. Deserialization also accepts quantity-encoded values.
+///
 /// See also <https://github.com/ethereum/execution-apis/issues/752>.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct StorageValuesResponse(pub AddressHashMap<Vec<StorageValue>>);
 
@@ -264,6 +267,24 @@ impl StorageValuesResponse {
     /// Consumes the wrapper, returning the inner map.
     pub fn into_inner(self) -> AddressHashMap<Vec<StorageValue>> {
         self.0
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for StorageValuesResponse {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        struct Values<'a>(&'a [StorageValue]);
+
+        impl serde::Serialize for Values<'_> {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.collect_seq(self.0.iter().map(|value| B256::from(*value)))
+            }
+        }
+
+        if !serializer.is_human_readable() {
+            return self.0.serialize(serializer);
+        }
+        serializer.collect_map(self.0.iter().map(|(address, values)| (address, Values(values))))
     }
 }
 
@@ -359,5 +380,30 @@ mod tests {
             let decoded: AccountInfo = rmp_serde::from_slice(&bytes).unwrap();
             assert_eq!(decoded, info);
         }
+    }
+
+    #[test]
+    fn storage_values_response_serializes_full_width_values() {
+        // From execution-apis tests/eth_getStorageValues/get-storage-values-multiple-addresses.io
+        let result = serde_json::json!({
+            "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df": [
+                "0x0000000000000000000000000000000000000000000000000000000000000033"
+            ],
+            "0xc1cadaffffffffffffffffffffffffffffffffff": [
+                "0x0000000000000000000000000000000000000000000000000000000000000000"
+            ]
+        });
+        let response: StorageValuesResponse = serde_json::from_value(result.clone()).unwrap();
+        assert_eq!(
+            response.get(&"0x7dcd17433742f4c0ca53122ab541d0ba67fc27df".parse().unwrap()),
+            Some(&vec![U256::from(0x33)])
+        );
+        assert_eq!(serde_json::to_value(&response).unwrap(), result);
+
+        let quantities = serde_json::json!({
+            "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df": ["0x33"],
+            "0xc1cadaffffffffffffffffffffffffffffffffff": ["0x0"]
+        });
+        assert_eq!(serde_json::from_value::<StorageValuesResponse>(quantities).unwrap(), response);
     }
 }
