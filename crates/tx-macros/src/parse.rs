@@ -1,6 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Attribute, Data, DeriveInput, Error, Fields, Generics, Ident, Path, Result, Type};
+use syn::{
+    meta::ParseNestedMeta, parse::Parse, Attribute, Data, DeriveInput, Error, Fields, Generics,
+    Ident, LitInt, LitStr, Path, Result, Type,
+};
 
 /// Parsed input of the TransactionEnvelope derive macro.
 pub(crate) struct EnvelopeArgs {
@@ -56,23 +59,18 @@ impl EnvelopeArgs {
         for attr in envelope_attrs(&input.attrs) {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("tx_type_name") {
-                    args.tx_type_name = Some(meta.value()?.parse()?);
+                    set(&mut args.tx_type_name, &meta, parse_value(&meta)?)
                 } else if meta.path.is_ident("alloy_consensus") {
-                    args.alloy_consensus = Some(meta.value()?.parse()?);
+                    set(&mut args.alloy_consensus, &meta, parse_value(&meta)?)
                 } else if meta.path.is_ident("typed") {
-                    args.typed = Some(meta.value()?.parse()?);
+                    set(&mut args.typed, &meta, parse_value(&meta)?)
                 } else if meta.path.is_ident("serde_cfg") {
-                    let content;
-                    syn::parenthesized!(content in meta.input);
-                    args.serde_cfg = Some(content.parse()?);
+                    set(&mut args.serde_cfg, &meta, parse_list(&meta)?)
                 } else if meta.path.is_ident("arbitrary_cfg") {
-                    let content;
-                    syn::parenthesized!(content in meta.input);
-                    args.arbitrary_cfg = Some(content.parse()?);
+                    set(&mut args.arbitrary_cfg, &meta, parse_list(&meta)?)
                 } else {
-                    return Err(meta.error("unknown `envelope` attribute"));
+                    Err(meta.error("unknown `envelope` attribute"))
                 }
-                Ok(())
             })?;
         }
 
@@ -81,21 +79,17 @@ impl EnvelopeArgs {
             let mut typed = None;
             for attr in envelope_attrs(&variant.attrs) {
                 attr.parse_nested_meta(|meta| {
-                    if meta.path.is_ident("ty") || meta.path.is_ident("flatten") {
-                        if kind.is_some() {
-                            return Err(meta.error("expected only one of `ty` or `flatten`"));
-                        }
-                        kind = Some(if meta.path.is_ident("ty") {
-                            VariantKind::Typed(
-                                meta.value()?.parse::<syn::LitInt>()?.base10_parse()?,
-                            )
-                        } else {
-                            VariantKind::Flattened
-                        });
+                    let new_kind = if meta.path.is_ident("ty") {
+                        VariantKind::Typed(parse_value::<LitInt>(&meta)?.base10_parse()?)
+                    } else if meta.path.is_ident("flatten") {
+                        VariantKind::Flattened
                     } else if meta.path.is_ident("typed") {
-                        typed = Some(meta.value()?.parse()?);
+                        return set(&mut typed, &meta, parse_value(&meta)?);
                     } else {
                         return Err(meta.error("unknown `envelope` attribute"));
+                    };
+                    if kind.replace(new_kind).is_some() {
+                        return Err(meta.error("expected only one of `ty` or `flatten`"));
                     }
                     Ok(())
                 })?;
@@ -157,8 +151,33 @@ fn envelope_attrs(attrs: &[Attribute]) -> impl Iterator<Item = &Attribute> {
     attrs.iter().filter(|attr| attr.path().is_ident("envelope"))
 }
 
+/// Stores an attribute value, rejecting a key that was already set.
+fn set<T>(slot: &mut Option<T>, meta: &ParseNestedMeta<'_>, value: T) -> Result<()> {
+    if slot.replace(value).is_some() {
+        return Err(meta.error("duplicate `envelope` attribute"));
+    }
+    Ok(())
+}
+
+/// Parses `key = value`, also accepting the value as a string literal (`key = "value"`).
+fn parse_value<T: Parse>(meta: &ParseNestedMeta<'_>) -> Result<T> {
+    let input = meta.value()?;
+    if input.peek(LitStr) {
+        input.parse::<LitStr>()?.parse()
+    } else {
+        input.parse()
+    }
+}
+
+/// Parses the contents of `key(...)`.
+fn parse_list(meta: &ParseNestedMeta<'_>) -> Result<TokenStream> {
+    let content;
+    syn::parenthesized!(content in meta.input);
+    content.parse()
+}
+
 /// Kind of the envelope variant.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub(crate) enum VariantKind {
     /// A standalone transaction with a type tag.
     Typed(u8),
