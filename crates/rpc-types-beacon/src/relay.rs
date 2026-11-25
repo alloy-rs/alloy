@@ -853,6 +853,36 @@ mod tests {
     }
 
     #[test]
+    fn older_relay_types_reject_amsterdam_payloads() {
+        let bid = amsterdam_bid_submission_with_builder_requests();
+        for requests in
+            [serde_json::to_value(&bid.execution_requests).unwrap(), serde_json::json!({})]
+        {
+            let mut json = serde_json::to_value(&bid).unwrap();
+            // Payload strictness must also work independently of builder request strictness.
+            json["execution_requests"] = requests;
+            assert!(serde_json::from_value::<SubmitBlockRequest>(json.clone()).is_err());
+            assert!(serde_json::from_value::<SignedBidSubmissionV4>(json.clone()).is_err());
+            assert!(serde_json::from_value::<SignedBidSubmissionV5>(json.clone()).is_err());
+            assert!(serde_json::from_value::<SignedBidSubmissionV6>(json.clone()).is_ok());
+
+            json["registered_gas_limit"] = "30000000".into();
+            json["parent_beacon_block_root"] =
+                serde_json::to_value(B256::repeat_byte(0x14)).unwrap();
+            assert!(
+                serde_json::from_value::<BuilderBlockValidationRequestV3>(json.clone()).is_err()
+            );
+            assert!(
+                serde_json::from_value::<BuilderBlockValidationRequestV4>(json.clone()).is_err()
+            );
+            assert!(
+                serde_json::from_value::<BuilderBlockValidationRequestV5>(json.clone()).is_err()
+            );
+            assert!(serde_json::from_value::<BuilderBlockValidationRequestV6>(json).is_ok());
+        }
+    }
+
+    #[test]
     fn amsterdam_bid_submission_builder_requests_roundtrip() {
         let bid = amsterdam_bid_submission_with_builder_requests();
         let json = serde_json::to_value(&bid).unwrap();
@@ -925,7 +955,11 @@ mod tests {
     fn test_can_parse_validation_request_body() {
         const VALIDATION_REQUEST_BODY: &str = include_str!("examples/relay_single_payload.json");
 
-        let _validation_request_body: BuilderBlockValidationRequest =
+        // This Capella fixture contains withdrawals and must not decode as Bellatrix.
+        assert!(
+            serde_json::from_str::<BuilderBlockValidationRequest>(VALIDATION_REQUEST_BODY).is_err()
+        );
+        let _validation_request_body: BuilderBlockValidationRequestV2 =
             serde_json::from_str(VALIDATION_REQUEST_BODY).unwrap();
     }
 
