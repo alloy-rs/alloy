@@ -91,46 +91,19 @@ pub fn derive_transaction_envelope(input: TokenStream) -> TokenStream {
 
 /// Expand the transaction envelope derive macro.
 fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::TokenStream, Error> {
-    use darling::FromDeriveInput;
+    let args = EnvelopeArgs::from_derive_input(input)?;
 
-    // Parse the input with darling
-    let args = EnvelopeArgs::from_derive_input(&input)
-        .map_err(|e| Error::new_spanned(&input.ident, e.to_string()))?;
-
-    // Extract config values before consuming args
-    let input_type_name = args.ident.clone();
+    let input_type_name = args.ident;
     let tx_type_enum_name = args
         .tx_type_name
-        .clone()
         .unwrap_or_else(|| Ident::new(&format!("{input_type_name}Type"), input_type_name.span()));
-    let alloy_consensus =
-        args.alloy_consensus.clone().unwrap_or_else(|| parse_quote!(::alloy_consensus));
-    let generics = args.generics.clone();
-    let typed = args.typed.clone();
-    let serde_cfg = match args.serde_cfg.as_ref() {
-        Some(syn::Meta::List(list)) => list.tokens.clone(),
-        Some(_) => {
-            return Err(Error::new_spanned(
-                &input.ident,
-                "serde_cfg must be a list like `serde_cfg(feature = \"serde\")`",
-            ))
-        }
-        // this is always true
-        None => quote! { all() },
-    };
-
-    let arbitrary_cfg = match args.arbitrary_cfg.as_ref() {
-        Some(syn::Meta::List(list)) => list.tokens.clone(),
-        Some(_) => {
-            return Err(Error::new_spanned(
-                &input.ident,
-                "arbitrary_cfg must be a list like `arbitrary_cfg(feature = \"arbitrary\")`",
-            ))
-        }
-        None => quote! { all() },
-    };
-
-    let variants = GroupedVariants::from_args(args)?;
+    let alloy_consensus = args.alloy_consensus.unwrap_or_else(|| parse_quote!(::alloy_consensus));
+    let generics = args.generics;
+    let typed = args.typed;
+    // `all()` is always true.
+    let serde_cfg = args.serde_cfg.unwrap_or_else(|| quote! { all() });
+    let arbitrary_cfg = args.arbitrary_cfg.unwrap_or_else(|| quote! { all() });
+    let variants = GroupedVariants::new(args.variants);
 
     let alloy_primitives = quote! { #alloy_consensus::private::alloy_primitives };
     let alloy_eips = quote! { #alloy_consensus::private::alloy_eips };
