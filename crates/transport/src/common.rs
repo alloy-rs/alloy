@@ -1,4 +1,5 @@
 use base64::{engine::general_purpose, Engine};
+use percent_encoding::percent_decode_str;
 use std::fmt;
 
 /// Basic, bearer or raw authentication in http or websocket transport.
@@ -19,9 +20,15 @@ impl Authorization {
     ///
     /// Returns [`Authorization::Basic`] if the URL contains userinfo (i.e.
     /// `user:pass@host` or `user@host`).
+    ///
+    /// The username and password are percent-decoded. A password that does not
+    /// decode to valid UTF-8 is treated as absent, and a username that does not
+    /// decode to valid UTF-8 yields `None`. This matches how the default HTTP
+    /// transport reads credentials from a URL.
     pub fn extract_from_url(url: &url::Url) -> Option<Self> {
-        let username = url.username();
-        let password = url.password();
+        let username = percent_decode_str(url.username()).decode_utf8().ok()?;
+        let password =
+            url.password().and_then(|password| percent_decode_str(password).decode_utf8().ok());
 
         // Userinfo is present when the username is non-empty or a password was
         // explicitly provided (even if empty, e.g. `:pass@host`).
@@ -77,6 +84,24 @@ mod tests {
             ("http://localhost:password@domain.com", Some("localhost:password")),
             ("http://127.0.0.1:8080", None),
             ("http://:secret@domain.com", Some(":secret")),
+        ] {
+            let auth = Authorization::extract_from_url(&Url::parse(url).unwrap());
+            let expected = credentials.map(|credentials| {
+                Authorization::Basic(general_purpose::STANDARD.encode(credentials))
+            });
+            assert_eq!(auth, expected, "{url}");
+        }
+    }
+
+    #[test]
+    fn test_extract_from_url_decodes_credentials() {
+        for (url, credentials) in [
+            ("wss://user:p%40ss@host", Some("user:p@ss")),
+            ("wss://user:abc==@host", Some("user:abc==")),
+            ("wss://us%3Aer:plain@host", Some("us:er:plain")),
+            ("wss://us%C3%A9r:p%C3%A4ss@host", Some("usér:päss")),
+            ("wss://user:%FF@host", Some("user:")),
+            ("wss://%FF:pass@host", None),
         ] {
             let auth = Authorization::extract_from_url(&Url::parse(url).unwrap());
             let expected = credentials.map(|credentials| {

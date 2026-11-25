@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [rpc-types-mev] Use mev-share keys in SimBundleOverrides ([#4540](https://github.com/alloy-rs/alloy/issues/4540))
+- [rpc-types-mev] Serialize EthCallBundle timestamp/timeout/gas_limit as plain integers ([#3763](https://github.com/alloy-rs/alloy/issues/3763))
+- [rpc-types-mev] Don't panic on missing isSimulated ([#4322](https://github.com/alloy-rs/alloy/issues/4322))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Features
+
+- [rpc-types-mev] Add the special_logs privacy hint ([#4525](https://github.com/alloy-rs/alloy/issues/4525))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Testing
+
+- [rpc-types] Remove trivial tests and dedupe fixtures ([#4367](https://github.com/alloy-rs/alloy/issues/4367))
+
 ## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
 
 ## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08

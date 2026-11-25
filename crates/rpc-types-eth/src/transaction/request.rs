@@ -16,6 +16,12 @@ use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
 
+#[cfg(feature = "serde")]
+use alloy_eips::{
+    eip4844::{Blob, BlobTransactionSidecar, Bytes48},
+    eip7594::BlobTransactionSidecarEip7594,
+};
+
 /// Represents _all_ transaction requests to/from RPC.
 ///
 /// Transaction type selection is field-driven. The [`Self::transaction_type`] field is retained
@@ -31,7 +37,7 @@ pub struct TransactionRequest {
     /// The address of the transaction author.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub from: Option<Address>,
-    /// The destination address of the transaction.
+    /// The transaction destination.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub to: Option<TxKind>,
     /// The legacy gas price.
@@ -139,7 +145,12 @@ pub struct TransactionRequest {
     /// Blob sidecar for EIP-4844 transactions.
     #[cfg_attr(
         feature = "serde",
-        serde(default, flatten, skip_serializing_if = "Option::is_none")
+        serde(
+            default,
+            flatten,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "deserialize_flattened_sidecar"
+        )
     )]
     pub sidecar: Option<BlobTransactionSidecarVariant>,
     /// Authorization list for EIP-7702 transactions.
@@ -369,6 +380,14 @@ impl TransactionRequest {
     /// - max priority fee per gas
     pub const fn has_eip1559_fields(&self) -> bool {
         self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
+    }
+
+    /// Returns true if `gas_price` is set together with `max_fee_per_gas` or
+    /// `max_priority_fee_per_gas`.
+    ///
+    /// Checks field presence, so zero-valued fee fields also conflict.
+    pub const fn has_conflicting_fee_fields(&self) -> bool {
+        self.gas_price.is_some() && self.has_eip1559_fields()
     }
 
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
@@ -1368,7 +1387,7 @@ pub(super) mod serde_bincode_compat {
     pub struct TransactionRequest<'a> {
         /// The address of the transaction author.
         pub from: Option<Address>,
-        /// The destination address of the transaction.
+        /// The transaction destination.
         pub to: Option<TxKind>,
         /// The legacy gas price.
         pub gas_price: Option<u128>,
@@ -1744,11 +1763,55 @@ pub struct FillTransaction<T = TypedTransaction> {
     pub tx: T,
 }
 
+/// Deserializes the flattened [`TransactionRequest::sidecar`].
+///
+/// A flattened `Option<T>` turns every error of `T` into `None`, which would silently drop
+/// malformed blobs, commitments or proofs. Incomplete sidecars still give `None`, since clients
+/// such as viem send `blobs` without `commitments` and `proofs`. `proofs` and `cellProofs`
+/// together are an error, as they are for [`BlobTransactionSidecarVariant`].
+#[cfg(feature = "serde")]
+fn deserialize_flattened_sidecar<'de, D>(
+    deserializer: D,
+) -> Result<Option<BlobTransactionSidecarVariant>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(serde::Deserialize)]
+    #[serde(transparent)]
+    struct Blobs(#[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")] Vec<Blob>);
+
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SidecarFields {
+        blobs: Option<Blobs>,
+        commitments: Option<Vec<Bytes48>>,
+        proofs: Option<Vec<Bytes48>>,
+        cell_proofs: Option<Vec<Bytes48>>,
+    }
+
+    let fields = <SidecarFields as serde::Deserialize>::deserialize(deserializer)?;
+    Ok(match (fields.blobs, fields.commitments, fields.proofs, fields.cell_proofs) {
+        (Some(Blobs(blobs)), Some(commitments), Some(proofs), None) => {
+            Some(BlobTransactionSidecar { blobs, commitments, proofs }.into())
+        }
+        (Some(Blobs(blobs)), Some(commitments), None, Some(cell_proofs)) => {
+            Some(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs }.into())
+        }
+        (_, _, Some(_), Some(_)) => {
+            return Err(serde::de::Error::custom(
+                "Both 'cellProofs' and 'proofs' cannot be present",
+            ))
+        }
+        _ => None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::Authorization;
     use alloy_consensus::BlobTransactionSidecarEip7594;
+    use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, BlobTransactionSidecar, Bytes48};
     use alloy_primitives::b256;
     #[cfg(feature = "serde")]
     use alloy_serde::WithOtherFields;
@@ -1848,6 +1911,29 @@ mod tests {
         let req = serde_json::from_str::<TransactionRequest>(&json.to_string()).unwrap();
 
         assert!(req.sidecar.is_none()); // Sidecar won't be deserialized.
+
+        // `cellProofs` in place of `proofs` gives the EIP-7594 sidecar.
+        let mut json_7594 = json.clone();
+        json_7594["cellProofs"] = serde_json::json!([zero_48]);
+        let req = serde_json::from_value::<TransactionRequest>(json_7594).unwrap();
+        assert!(req.sidecar.as_ref().unwrap().is_eip7594());
+        let serialized = serde_json::to_string(&req).unwrap();
+        assert_eq!(serde_json::from_str::<TransactionRequest>(&serialized).unwrap(), req);
+
+        // `proofs` and `cellProofs` together are rejected.
+        let mut json_both = json.clone();
+        json_both["proofs"] = serde_json::json!([zero_48]);
+        json_both["cellProofs"] = serde_json::json!([zero_48]);
+        let err = serde_json::from_value::<TransactionRequest>(json_both).unwrap_err();
+        assert_eq!(err.to_string(), "Both 'cellProofs' and 'proofs' cannot be present");
+
+        json["blobs"] = serde_json::json!(["0x00"]);
+        let sidecar_err = serde_json::from_value::<BlobTransactionSidecarVariant>(
+            serde_json::json!({ "blobs": ["0x00"], "commitments": [], "proofs": [] }),
+        )
+        .unwrap_err();
+        let err = serde_json::from_value::<TransactionRequest>(json).unwrap_err();
+        assert_eq!(err.to_string(), sidecar_err.to_string());
     }
 
     #[test]
@@ -1982,8 +2068,6 @@ mod tests {
 
         // EIP-4844 with sidecar
         {
-            use alloy_eips::eip4844::{Blob, BlobTransactionSidecar};
-
             // Positive case
             let sidecar =
                 BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
@@ -2044,8 +2128,6 @@ mod tests {
 
         // EIP-4844 with EIP-7594 sidecar
         {
-            use alloy_eips::eip4844::Blob;
-
             // Positive case
             let sidecar = BlobTransactionSidecarEip7594::new(
                 vec![Blob::repeat_byte(0xFA)],
@@ -2223,8 +2305,6 @@ mod tests {
 
     #[test]
     fn set_blob_sidecar_7594_populates_versioned_hashes() {
-        use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, Bytes48};
-
         // Create a sidecar with a known commitment
         let commitment = Bytes48::repeat_byte(0x42);
         let sidecar = BlobTransactionSidecarEip7594::new(
@@ -2247,6 +2327,59 @@ mod tests {
         let hashes = tx_request.blob_versioned_hashes.unwrap();
         assert_eq!(hashes.len(), 1);
         assert_eq!(hashes[0], expected_hash);
+    }
+
+    #[test]
+    fn transaction_conversions_preserve_contract_creation() {
+        let legacy = TxLegacy {
+            chain_id: Some(1),
+            nonce: 7,
+            gas_price: 2,
+            gas_limit: 53_000,
+            to: TxKind::Create,
+            value: U256::from(3),
+            input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+        };
+        let request: TransactionRequest = legacy.clone().into();
+        assert_eq!(request.to, Some(TxKind::Create));
+        assert_eq!(request.build_legacy().unwrap(), legacy);
+
+        let request: TransactionRequest = TypedTransaction::Legacy(legacy.clone()).into();
+        assert_eq!(request.to, Some(TxKind::Create));
+
+        let envelope =
+            TxEnvelope::Legacy(legacy.into_signed(Signature::new(U256::ZERO, U256::ZERO, false)));
+        let request: TransactionRequest = envelope.into();
+        assert_eq!(request.to, Some(TxKind::Create));
+
+        let eip2930 = TxEip2930 {
+            chain_id: 1,
+            nonce: 7,
+            gas_price: 2,
+            gas_limit: 53_000,
+            to: TxKind::Create,
+            value: U256::from(3),
+            access_list: Default::default(),
+            input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+        };
+        let request: TransactionRequest = eip2930.clone().into();
+        assert_eq!(request.to, Some(TxKind::Create));
+        assert_eq!(request.build_2930().unwrap(), eip2930);
+
+        let eip1559 = TxEip1559 {
+            chain_id: 1,
+            nonce: 7,
+            gas_limit: 53_000,
+            max_fee_per_gas: 2,
+            max_priority_fee_per_gas: 1,
+            to: TxKind::Create,
+            value: U256::from(3),
+            access_list: Default::default(),
+            input: Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]),
+        };
+        let request: TransactionRequest = eip1559.clone().into();
+        assert_eq!(request.to, Some(TxKind::Create));
+        assert_eq!(request.build_1559().unwrap(), eip1559);
     }
 }
 

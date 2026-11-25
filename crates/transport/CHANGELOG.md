@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [transport] Decode URL credentials, send them with hyper ([#4534](https://github.com/alloy-rs/alloy/issues/4534))
+- [transport] Rotate failed transports in fallback ([#4530](https://github.com/alloy-rs/alloy/issues/4530))
+- [transport] Recognize the IPv4 loopback range ([#4495](https://github.com/alloy-rs/alloy/issues/4495))
+- [json-rpc] Retry transient Infura precondition failures ([#4492](https://github.com/alloy-rs/alloy/issues/4492))
+- [rpc] Preserve preparation and shutdown errors ([#4427](https://github.com/alloy-rs/alloy/issues/4427))
+- [transport] Preserve retry failure context ([#4408](https://github.com/alloy-rs/alloy/issues/4408))
+- [transport] Rank failed fallback transports last ([#4336](https://github.com/alloy-rs/alloy/issues/4336))
+- [transport] Avoid divide by zero for a zero avg_cost in the retry layer ([#4277](https://github.com/alloy-rs/alloy/issues/4277))
+- [transport] Treat [::1] urls as local ([#4338](https://github.com/alloy-rs/alloy/issues/4338))
+- [transport] Keep batch when retry is not taken ([#4335](https://github.com/alloy-rs/alloy/issues/4335))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Features
+
+- [transport] Record mock transport requests ([#4301](https://github.com/alloy-rs/alloy/issues/4301))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Refactor
+
+- Dedupe transport stack internals ([#4363](https://github.com/alloy-rs/alloy/issues/4363))
+
+### Testing
+
+- Remove trivial tests in small crates and signers ([#4370](https://github.com/alloy-rs/alloy/issues/4370))
+
 ## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
 
 ### Features

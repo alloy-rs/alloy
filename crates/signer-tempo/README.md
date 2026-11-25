@@ -1,6 +1,6 @@
 # alloy-signer-tempo
 
-Read-only [Tempo wallet](https://github.com/tempoxyz/wallet) keystore reader
+Read-only [Tempo wallet](https://github.com/tempoxyz/wallet-cli) keystore reader
 for alloy. Parses the file that `tempo wallet login` writes and exposes the
 materialized signer plus optional Keychain-mode metadata. No network I/O.
 
@@ -45,7 +45,8 @@ Out: writing/rotating keys, decoding `key_authorization` to a typed value
 (the RLP bytes are exposed opaquely), any network I/O.
 
 Lookup is metadata extraction, not authorization enforcement. It filters for
-available secp256k1 key material and checks expiry at lookup time, but it does
+available secp256k1 key material and checks expiry at lookup time. In Keychain
+mode, a recorded key address must match the private key's derived address. It does
 not enforce the recorded chain ID, spending limits, authorization, or expiry
 when the signer is later used. Returned signers have no chain ID configured;
 configure transaction chain IDs separately.

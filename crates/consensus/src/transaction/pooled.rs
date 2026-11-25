@@ -266,6 +266,8 @@ mod tests {
         }
     }
 
+    /// Converts legacy EIP-4844 sidecars to EIP-7594 and checks that the result validates and
+    /// roundtrips through [`PooledTransaction`].
     #[test]
     #[cfg(feature = "kzg")]
     fn convert_to_eip7594() {
@@ -289,7 +291,7 @@ mod tests {
             else {
                 panic!("Expected EIP-4844 transaction");
             };
-            let tx = tx.into_parts().0;
+            let (tx, sig, hash) = tx.into_parts();
             assert!(!tx.sidecar.blobs().is_empty());
             assert!(tx.validate_blob(kzg_settings.get()).is_ok());
 
@@ -301,45 +303,9 @@ mod tests {
 
             assert!(!tx.sidecar.blobs().is_empty());
             assert!(tx.validate_blob(kzg_settings.get()).is_ok());
-        }
-    }
 
-    /// Tests that `PooledTransaction` (with [`BlobTransactionSidecarEip7594`]) can encode and
-    /// decode EIP-7594 blob transactions round-trip.
-    #[test]
-    #[cfg(feature = "kzg")]
-    fn pooled_transaction_eip7594_roundtrip() {
-        // Decode legacy 4844 test data, convert sidecar to EIP-7594, then verify
-        // PooledTransaction roundtrips correctly with the new sidecar format.
-        type VariantPooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
-
-        let kzg_settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::default();
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/4844rlp");
-        let dir = std::fs::read_dir(path).expect("Unable to read folder");
-        for entry in dir {
-            let entry = entry.unwrap();
-            let content = std::fs::read_to_string(entry.path()).unwrap();
-            let raw = hex::decode(content.trim()).unwrap();
-            let VariantPooledTransaction::Eip4844(tx) =
-                VariantPooledTransaction::decode_2718(&mut raw.as_ref())
-                    .map_err(|err| {
-                        panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
-                    })
-                    .unwrap()
-            else {
-                panic!("Expected EIP-4844 transaction");
-            };
-
-            // Convert the sidecar from EIP-4844 to EIP-7594
-            let (tx_with_sidecar, sig, hash) = tx.into_parts();
-            let tx_eip7594 = tx_with_sidecar
-                .try_map_sidecar(|sidecar| {
-                    sidecar.try_into_eip7594_with_settings(kzg_settings.get())
-                })
-                .unwrap();
-
-            // Build a PooledTransaction (EIP-7594) and roundtrip encode/decode
-            let pooled_tx: PooledTransaction = Signed::new_unchecked(tx_eip7594, sig, hash).into();
+            let tx = tx.map_sidecar(|sidecar| sidecar.into_eip7594().unwrap());
+            let pooled_tx: PooledTransaction = Signed::new_unchecked(tx, sig, hash).into();
             assert!(pooled_tx.is_eip4844());
 
             let encoded = pooled_tx.encoded_2718();

@@ -1,5 +1,5 @@
 use super::*;
-use alloy_eips::eip4895::Withdrawal;
+use alloy_eips::{eip4895::Withdrawal, eip7594::CELLS_PER_EXT_BLOB};
 use alloy_primitives::{Address, Bloom, Bytes};
 use ssz::{Decode, Encode};
 
@@ -754,4 +754,73 @@ fn witness_bounds() {
     ] {
         assert_eq!(ExecutionWitness::from_ssz_bytes(&witness.as_ssz_bytes()).is_ok(), valid);
     }
+}
+
+#[test]
+fn blob_v4_response_preserves_cell_indices() {
+    for indices in [
+        vec![],
+        vec![127],
+        vec![0, 7, 8, 63, 64, 127],
+        (0..CELLS_PER_EXT_BLOB).step_by(2).collect(),
+        (0..CELLS_PER_EXT_BLOB).collect(),
+    ] {
+        let mut bitarray = [0u8; 16];
+        let mut legacy = BlobCellsAndProofsV1::default();
+        let mut expected = BlobCellsAndProofs {
+            blob_cells: vec![Optional::none(); CELLS_PER_EXT_BLOB],
+            proofs: vec![Optional::none(); CELLS_PER_EXT_BLOB],
+        };
+        for (position, &index) in indices.iter().enumerate() {
+            bitarray[index / 8] |= 1 << (index % 8);
+            let byte = u8::try_from(index).unwrap();
+            let cell = (position != 1).then_some(Cell::repeat_byte(byte));
+            let proof = (position != 1).then_some(Bytes48::repeat_byte(byte));
+            legacy.blob_cells.push(cell);
+            legacy.proofs.push(proof);
+            expected.blob_cells[index] = cell.into();
+            expected.proofs[index] = proof.into();
+        }
+
+        let encoded =
+            BlobsV4Response::encode_with_indices(&[None, Some(legacy)], B128::new(bitarray))
+                .unwrap();
+        let expected = BlobsV4Response {
+            entries: vec![
+                BlobEntry { available: false, contents: BlobCellsAndProofs::default() },
+                BlobEntry { available: true, contents: expected },
+            ],
+        };
+        assert_eq!(encoded, expected.as_ssz_bytes(), "indices: {indices:?}");
+        assert_eq!(BlobsV4Response::from_ssz_bytes(&encoded).unwrap(), expected);
+    }
+}
+
+#[test]
+fn blob_v4_response_rejects_invalid_cells_and_proofs() {
+    let indices_bitarray = B128::from(1u128.to_le_bytes());
+    for (blob_cells, proofs) in [
+        (vec![], vec![]),
+        (vec![None; 2], vec![None; 2]),
+        (vec![None], vec![]),
+        (vec![], vec![None]),
+        (vec![Some(Cell::ZERO)], vec![None]),
+        (vec![None], vec![Some(Bytes48::ZERO)]),
+    ] {
+        assert_eq!(
+            BlobsV4Response::encode_with_indices(
+                &[Some(BlobCellsAndProofsV1 { blob_cells, proofs })],
+                indices_bitarray,
+            ),
+            Err(BlobsV4ConversionError::InvalidBlobCellsAndProofs),
+        );
+    }
+}
+
+#[test]
+fn blob_v4_response_rejects_too_many_blobs() {
+    assert_eq!(
+        BlobsV4Response::encode_with_indices(&vec![None; MAX_BLOBS_REQUEST + 1], B128::ZERO),
+        Err(BlobsV4ConversionError::TooManyBlobs(MAX_BLOBS_REQUEST + 1)),
+    );
 }

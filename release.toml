@@ -5,6 +5,8 @@ allow-branch = ["main"]
 sign-commit = true
 sign-tag = true
 shared-version = true
+# Publishing happens in CI (.github/workflows/release.yml) when the tag is pushed.
+publish = false
 pre-release-commit-message = "chore: release {{version}}"
 tag-prefix = "" # tag only once instead of per every crate
 rate-limit.existing-packages = 50

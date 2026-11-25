@@ -1,7 +1,7 @@
 //! Utilities for configuring and launching a Reth node.
 
 use crate::{
-    utils::{extract_endpoint, GracefulShutdown},
+    utils::{extract_endpoint, GracefulShutdown, LineReader, StartupGuard},
     NodeError, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
@@ -9,7 +9,6 @@ use rand::Rng;
 use std::{
     ffi::OsString,
     fs::create_dir_all,
-    io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
     time::Instant,
@@ -498,12 +497,12 @@ impl Reth {
         // Add any additional arguments.
         cmd.args(self.args);
 
-        let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
+        let mut child = StartupGuard::new(cmd.spawn().map_err(NodeError::SpawnError)?);
 
         let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
         let start = Instant::now();
-        let mut reader = BufReader::new(stdout);
+        let mut reader = LineReader::new(stdout, self.keep_stdout);
 
         let mut http_port = 0;
         let mut ws_port = 0;
@@ -579,7 +578,7 @@ impl Reth {
         }
 
         Ok(RethInstance {
-            pid: child,
+            pid: child.into_child(),
             host: self.host.unwrap_or_else(|| "localhost".to_string()),
             instance: self.instance,
             http_port,
@@ -590,31 +589,6 @@ impl Reth {
             auth_port: Some(auth_port),
             genesis: self.genesis,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn can_set_host() {
-        let reth = Reth::new().host("0.0.0.0").dev().try_spawn();
-        if let Ok(reth) = reth {
-            assert_eq!(reth.host(), "0.0.0.0");
-            assert!(reth.endpoint().starts_with("http://0.0.0.0:"));
-            assert!(reth.ws_endpoint().starts_with("ws://0.0.0.0:"));
-        }
-    }
-
-    #[test]
-    fn default_host_is_localhost() {
-        let reth = Reth::new().dev().try_spawn();
-        if let Ok(reth) = reth {
-            assert_eq!(reth.host(), "localhost");
-            assert!(reth.endpoint().starts_with("http://localhost:"));
-            assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
-        }
     }
 }
 

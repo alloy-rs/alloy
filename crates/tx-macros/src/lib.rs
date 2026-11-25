@@ -71,7 +71,9 @@ use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Ident};
 ///   generated typed-transaction enum. By default, the macro syntactically unwraps `Signed<T>` and
 ///   `Sealed<T>` to `T`; other field types are reused unchanged.
 /// - A variant's `#[serde(...)]` options are forwarded to the macro's internal representation when
-///   Serde generation is enabled.
+///   Serde generation is enabled. That representation serializes by reference, so `with` and
+///   `serialize_with` functions are called with a `&&T` for a field of type `T`; a generic function
+///   must therefore accept the reference type.
 ///
 /// # Generated API
 ///

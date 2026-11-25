@@ -1,12 +1,12 @@
-use crate::{Http, HttpConnect};
+use crate::{body::BodyError, Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
-    utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
-    TransportFut, TransportResult,
+    utils::guess_local_url, Authorization, BoxTransport, TransportConnect, TransportError,
+    TransportErrorKind, TransportFut, TransportResult,
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
-    body::{Bytes, Incoming},
+    body::{Body, Buf, Bytes, Incoming},
     header, Request, Response,
 };
 use hyper_util::client::legacy::Error;
@@ -114,6 +114,19 @@ where
             builder = builder.header(name, value);
         }
 
+        // Hyper does not send the URL userinfo, so send it as basic auth unless the request
+        // already carries credentials.
+        if let Some(headers) = builder.headers_mut() {
+            if !headers.contains_key(header::AUTHORIZATION) {
+                if let Some(auth) = Authorization::extract_from_url(&self.url) {
+                    let mut value = header::HeaderValue::try_from(auth.to_string())
+                        .map_err(TransportErrorKind::custom)?;
+                    value.set_sensitive(true);
+                    headers.insert(header::AUTHORIZATION, value);
+                }
+            }
+        }
+
         let ser = req.serialize().map_err(TransportError::ser_err)?;
         // convert the Box<RawValue> into a hyper request<B>
         let body = ser.get().as_bytes().to_owned().into();
@@ -130,9 +143,35 @@ where
 
         debug!(%status, "received response from server");
 
-        let body = resp.into_body().collect().await.map(|body| body.to_bytes());
+        let body = collect_body(resp.into_body(), self.settings.max_response_size()).await;
         crate::handle_response(status.as_u16(), retry_after, body)
     }
+}
+
+/// Collects the response body, failing as soon as it exceeds `max` bytes, if set.
+async fn collect_body<B: Body>(body: B, max: Option<usize>) -> Result<Bytes, BodyError<B::Error>> {
+    let Some(max) = max else {
+        return body.collect().await.map(|body| body.to_bytes()).map_err(BodyError::Read);
+    };
+    if body.size_hint().lower() > max as u64 {
+        return Err(BodyError::TooLarge(max));
+    }
+
+    let mut body = std::pin::pin!(body);
+    let mut buf = Vec::new();
+    while let Some(frame) = body.frame().await {
+        let Ok(mut data) = frame.map_err(BodyError::Read)?.into_data() else { continue };
+        if buf.len() + data.remaining() > max {
+            return Err(BodyError::TooLarge(max));
+        }
+        while data.has_remaining() {
+            let chunk = data.chunk();
+            let len = chunk.len();
+            buf.extend_from_slice(chunk);
+            data.advance(len);
+        }
+    }
+    Ok(buf.into())
 }
 
 impl TransportConnect for HttpConnect<HyperTransport> {
@@ -165,7 +204,12 @@ where
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
-        let span = debug_span!("HyperTransport", url = %this.url);
+        let span = debug_span!(
+            "HyperTransport",
+            scheme = this.url.scheme(),
+            host = this.url.host_str().unwrap_or_default(),
+            port = this.url.port_or_known_default(),
+        );
         Box::pin(this.do_hyper(req).instrument(span.or_current()))
     }
 }

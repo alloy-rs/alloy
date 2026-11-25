@@ -12,7 +12,10 @@ use futures::try_join;
 ///
 /// This filler can be used to compose any number of fillers in layers by recursively joining them.
 ///
-/// The left filler is called before the right filler.
+/// Ready fillers run [`TxFiller::prepare`] concurrently on the same transaction request.
+/// Their prepared values are then applied by [`TxFiller::fill`] from left to right.
+/// Both preparations finish before either [`TxFiller::fill`] is called.
+/// [`TxFiller::fill_sync`] also runs from left to right.
 ///
 /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
 #[derive(Clone, Copy, Debug, Default)]

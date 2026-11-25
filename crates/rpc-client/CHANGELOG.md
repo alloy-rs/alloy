@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [transport] Decode URL credentials, send them with hyper ([#4534](https://github.com/alloy-rs/alloy/issues/4534))
+- [rpc-client] Apply ConnectionConfig auth to HTTP transports ([#4472](https://github.com/alloy-rs/alloy/issues/4472))
+- [rpc-client] Return subscription errors ([#4426](https://github.com/alloy-rs/alloy/issues/4426))
+- [rpc-client] Avoid sending empty JSON-RPC batches ([#4400](https://github.com/alloy-rs/alloy/issues/4400))
+- [rpc-client] Preserve pubsub frontend in connect_with_config ([#4273](https://github.com/alloy-rs/alloy/issues/4273))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Performance
+
+- Shrink monomorphized RPC call path ([#4450](https://github.com/alloy-rs/alloy/issues/4450))
+
+### Testing
+
+- Remove trivial tests in small crates and signers ([#4370](https://github.com/alloy-rs/alloy/issues/4370))
+
 ## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
 
 ## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08

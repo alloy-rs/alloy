@@ -7,7 +7,6 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
@@ -41,8 +40,8 @@ zeroize = { workspace = true, optional = true, features = [
 eth-keystore = { version = "0.5.0", default-features = false, optional = true }
 
 # mnemonic
-coins-bip32 = { version = "0.12", default-features = false, optional = true }
-coins-bip39 = { version = "0.12", default-features = false, features = [
+coins-bip32 = { version = "0.14", default-features = false, optional = true }
+coins-bip39 = { version = "0.14", default-features = false, features = [
     "english",
 ], optional = true }
 
