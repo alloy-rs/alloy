@@ -89,6 +89,7 @@ std = [
 	"alloy-eip7928/std",
 	"alloy-eip8141/std",
 	"derive_more/std",
+	"sha2?/std",
 	"either/std",
 	"serde_with?/std",
 	"borsh?/std"
