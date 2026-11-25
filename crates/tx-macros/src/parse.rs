@@ -80,7 +80,7 @@ impl EnvelopeArgs {
             for attr in envelope_attrs(&variant.attrs) {
                 attr.parse_nested_meta(|meta| {
                     let new_kind = if meta.path.is_ident("ty") {
-                        VariantKind::Typed(parse_value::<LitInt>(&meta)?.base10_parse()?)
+                        VariantKind::Typed(parse_ty(&meta)?)
                     } else if meta.path.is_ident("flatten") {
                         VariantKind::Flattened
                     } else if meta.path.is_ident("typed") {
@@ -168,6 +168,17 @@ fn parse_value<T: Parse>(meta: &ParseNestedMeta<'_>) -> Result<T> {
         input.parse::<LitStr>()?.parse()
     } else {
         input.parse()
+    }
+}
+
+/// Parses `ty = N`, also accepting `ty = "N"`, which is parsed with `str::parse` like darling did.
+fn parse_ty(meta: &ParseNestedMeta<'_>) -> Result<u8> {
+    let input = meta.value()?;
+    if input.peek(LitStr) {
+        let lit = input.parse::<LitStr>()?;
+        lit.value().parse().map_err(|e| Error::new(lit.span(), e))
+    } else {
+        input.parse::<LitInt>()?.base10_parse()
     }
 }
 
