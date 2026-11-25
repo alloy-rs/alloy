@@ -5,7 +5,9 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594},
+    eip7594::{
+        decode_fixed_list, decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594,
+    },
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -74,10 +76,9 @@ impl BlobTransactionSidecar {
         self.versioned_hashes().enumerate().flat_map(move |(i, blob_versioned_hash)| {
             versioned_hashes.iter().enumerate().filter_map(move |(j, target_hash)| {
                 if blob_versioned_hash == *target_hash {
-                    if let Some((blob, proof)) =
-                        self.blobs.get(i).copied().zip(self.proofs.get(i).copied())
+                    if let Some((blob, proof)) = self.blobs.get(i).zip(self.proofs.get(i).copied())
                     {
-                        return Some((j, BlobAndProofV1 { blob: Box::new(blob), proof }));
+                        return Some((j, BlobAndProofV1 { blob: box_blob(blob), proof }));
                     }
                 }
                 None
@@ -169,10 +170,13 @@ impl Iterator for BlobTransactionSidecarIntoIter {
         }
         let index = self.next_index + n;
         self.next_index = index + 1;
+        // Copy from the slice, then advance, to avoid a second copy through the stack.
+        let blob = box_blob(self.blobs.as_slice().get(n)?);
+        self.blobs.nth(n);
         self.remaining -= n + 1;
         Some(BlobTransactionSidecarItem {
             index: index as u64,
-            blob: Box::new(self.blobs.nth(n)?),
+            blob,
             kzg_commitment: self.commitments.nth(n)?,
             kzg_proof: self.proofs.nth(n)?,
         })
@@ -199,13 +203,15 @@ impl DoubleEndedIterator for BlobTransactionSidecarIntoIter {
         }
         let index = self.next_index + self.remaining - n - 1;
         // Skip unmatched trailing values when the sidecar's vectors have unequal lengths.
-        let blob = self.blobs.nth_back(self.blobs.len() - self.remaining + n)?;
+        let back = self.blobs.len() - self.remaining + n;
+        let blob = box_blob(self.blobs.as_slice().iter().nth_back(back)?);
+        self.blobs.nth_back(back);
         let commitment = self.commitments.nth_back(self.commitments.len() - self.remaining + n)?;
         let proof = self.proofs.nth_back(self.proofs.len() - self.remaining + n)?;
         self.remaining -= n + 1;
         Some(BlobTransactionSidecarItem {
             index: index as u64,
-            blob: Box::new(blob),
+            blob,
             kzg_commitment: commitment,
             kzg_proof: proof,
         })
@@ -524,9 +530,9 @@ impl BlobTransactionSidecar {
     #[doc(hidden)]
     pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
-            blobs: Decodable::decode(buf)?,
-            commitments: Decodable::decode(buf)?,
-            proofs: Decodable::decode(buf)?,
+            blobs: decode_fixed_list(buf)?,
+            commitments: decode_fixed_list(buf)?,
+            proofs: decode_fixed_list(buf)?,
         })
     }
 
@@ -585,6 +591,11 @@ impl Decodable7594 for BlobTransactionSidecar {
     fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode_fields(buf)
     }
+}
+
+/// Boxes a copy of `blob`, copying the 128 KiB once instead of through the stack.
+pub(crate) fn box_blob(blob: &Blob) -> Box<Blob> {
+    Box::write(Box::new_uninit(), *blob)
 }
 
 /// Helper function to deserialize boxed blobs from an existing [`MapAccess`]

@@ -462,7 +462,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{transaction::Either, Signed, TxEip4844, TxEip8141, TxEnvelope, TxLegacy};
+    use crate::{
+        transaction::Either, SignableTransaction, Signed, TxEip4844, TxEip8141, TxEnvelope,
+        TxLegacy,
+    };
+    use alloy_primitives::{Address, Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
@@ -504,9 +508,6 @@ mod tests {
 
     #[test]
     fn decode_sealed_roundtrip_with_transactions() {
-        use crate::{SignableTransaction, TxLegacy};
-        use alloy_primitives::{Address, Signature, TxKind, U256};
-
         let tx = TxLegacy {
             nonce: 1,
             gas_price: 100,

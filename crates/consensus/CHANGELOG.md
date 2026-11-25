@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [consensus] Enforce low-s in Signed::recover_signer ([#4541](https://github.com/alloy-rs/alloy/issues/4541))
+- [consensus] Align EIP-8141 types with Bogota devnet 2 ([#4443](https://github.com/alloy-rs/alloy/issues/4443))
+- [eips] Enforce RLP wrapper lengths ([#4493](https://github.com/alloy-rs/alloy/issues/4493))
+- [consensus] Keep backend recovery errors opaque ([#4425](https://github.com/alloy-rs/alloy/issues/4425))
+- [consensus] Delegate signed encoding of typed tx ([#4344](https://github.com/alloy-rs/alloy/issues/4344))
+- [consensus] Exclude sidecar from decoded 4844 hash ([#4396](https://github.com/alloy-rs/alloy/issues/4396))
+- [consensus] Remove unused MAX_NONCE_KEYS import ([#4286](https://github.com/alloy-rs/alloy/issues/4286))
+
+### Features
+
+- [eips] Add EIP-8141 transaction type helpers ([#4280](https://github.com/alloy-rs/alloy/issues/4280))
+- [consensus] Add FrameReceiptEnvelope ([#4283](https://github.com/alloy-rs/alloy/issues/4283))
+- [consensus] Add InMemorySize and bincode compat for TxEip8141 ([#4281](https://github.com/alloy-rs/alloy/issues/4281))
+- [consensus] Add EIP-8250 keyed frame nonces ([#4276](https://github.com/alloy-rs/alloy/issues/4276))
+
+### Miscellaneous Tasks
+
+- Move function-local `use`s to module scope ([#4478](https://github.com/alloy-rs/alloy/issues/4478))
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Other
+
+- "fix(consensus)!: enforce low-s in Signed::recover_signer" ([#4543](https://github.com/alloy-rs/alloy/issues/4543))
+
+### Performance
+
+- [tx-macros] Serialize envelopes and typed transactions without cloning ([#4452](https://github.com/alloy-rs/alloy/issues/4452))
+- [consensus] Deserialize ReceiptEnvelope in a single pass ([#4455](https://github.com/alloy-rs/alloy/issues/4455))
+
+### Refactor
+
+- Delegate Transaction impls via macro ([#4364](https://github.com/alloy-rs/alloy/issues/4364))
+
+### Testing
+
+- Build C crypto libraries optimized in dev and merge duplicate EIP-7594 conversion tests ([#4402](https://github.com/alloy-rs/alloy/issues/4402))
+- Remove trivial tests in eips, genesis and consensus ([#4369](https://github.com/alloy-rs/alloy/issues/4369))
+
 ## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
 
 ### Bug Fixes

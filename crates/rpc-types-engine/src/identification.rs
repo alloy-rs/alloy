@@ -24,6 +24,8 @@ pub enum ClientCode {
     GE,
     /// Grandine
     GR,
+    /// ethlambda
+    LA,
     /// Lighthouse
     LH,
     /// Lodestar
@@ -60,6 +62,7 @@ impl ClientCode {
             Self::EX => "ethrex",
             Self::GE => "Geth",
             Self::GR => "Grandine",
+            Self::LA => "ethlambda",
             Self::LH => "Lighthouse",
             Self::LS => "Lodestar",
             Self::NM => "Nethermind",
@@ -121,7 +124,7 @@ mod tests {
     #[cfg(feature = "serde")]
     fn registered_client_codes_serde() {
         // Codes reserved in the execution-apis client code list.
-        for code in ["CN", "EX", "NE"] {
+        for code in ["CN", "EX", "LA", "NE"] {
             let s = format!(
                 r#"{{"code":"{code}","name":"client","version":"v1.0.0","commit":"fa4ff922"}}"#
             );
