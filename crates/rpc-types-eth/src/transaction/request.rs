@@ -1877,7 +1877,10 @@ struct Blobs(#[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs"
 /// A [`serde::Deserializer`] that decodes a struct from a map only.
 ///
 /// Derived struct impls also accept an array of the fields in order, which the
-/// `#[serde(flatten)]` derive [`TransactionRequest`] used before rejected.
+/// `#[serde(flatten)]` derive [`TransactionRequest`] used before rejected. Asking for a map also
+/// leaves the entries in place when the request is flattened into another type, such as
+/// `WithOtherFields`: asking for a struct would remove them from the entries that type's other
+/// flattened fields see.
 #[cfg(feature = "serde")]
 struct MapOnly<D>(D);
 
@@ -1898,7 +1901,7 @@ impl<'de, D: serde::Deserializer<'de>> serde::Deserializer<'de> for MapOnly<D> {
         _fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error> {
-        self.0.deserialize_map(visitor)
+        self.0.deserialize_map(MapOnlyVisitor(visitor))
     }
 
     fn is_human_readable(&self) -> bool {
@@ -1909,6 +1912,25 @@ impl<'de, D: serde::Deserializer<'de>> serde::Deserializer<'de> for MapOnly<D> {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf
         option unit unit_struct newtype_struct seq tuple tuple_struct map enum identifier
         ignored_any
+    }
+}
+
+/// A [`serde::de::Visitor`] that passes only maps to the visitor it wraps.
+///
+/// Some formats ignore the map hint and visit a sequence, which a derived visitor accepts.
+#[cfg(feature = "serde")]
+struct MapOnlyVisitor<V>(V);
+
+#[cfg(feature = "serde")]
+impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for MapOnlyVisitor<V> {
+    type Value = V::Value;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.0.expecting(formatter)
+    }
+
+    fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+        self.0.visit_map(map)
     }
 }
 
@@ -2494,6 +2516,10 @@ mod tests {
         use super::*;
         use arbitrary::{Arbitrary, Unstructured};
         use rand::{rngs::StdRng, Rng, SeedableRng};
+        use serde::{
+            de::value::{self, SeqDeserializer},
+            Deserialize,
+        };
         use similar_asserts::assert_eq;
 
         /// [`TransactionRequest`] decoded by the `#[serde(flatten)]` derive it used before.
@@ -2760,6 +2786,19 @@ mod tests {
             let flattened: FlattenedOuter = serde_json::from_str(json).unwrap();
             assert_eq!(outer.request, FlattenedTransactionRequest::into_request(flattened.request));
             assert_eq!(outer.other, flattened.other);
+        }
+
+        /// Formats that ignore the map hint, such as MessagePack, visit a sequence.
+        #[test]
+        fn rejects_sequence_without_map_hint() {
+            // One unit for each field, which decodes every field to `None`.
+            let fields = || SeqDeserializer::<_, value::Error>::new([(); 20].into_iter());
+            let err = TransactionRequest::deserialize(fields()).unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                "invalid type: sequence, expected struct TransactionRequest"
+            );
+            assert_eq!(FlattenedTransactionRequest::deserialize(fields()).err(), Some(err));
         }
     }
 }
