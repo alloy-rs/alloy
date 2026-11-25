@@ -24,6 +24,8 @@ pub use block::*;
 
 mod call;
 pub use call::{Bundle, EthCallResponse, StateContext, TransactionIndex};
+#[cfg(feature = "serde")]
+pub use call::{CallManyLimitExceeded, CallManyList, CallManySeed, RawCallMany, RawCallManyError};
 
 pub mod error;
 
