@@ -1,8 +1,8 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Group, TokenStream};
 use quote::quote;
 use syn::{
     meta::ParseNestedMeta, parse::Parse, Attribute, Data, DeriveInput, Error, Fields, Generics,
-    Ident, LitInt, LitStr, Path, Result, Type,
+    Ident, LitInt, LitStr, Meta, Path, Result, Type,
 };
 
 /// Parsed input of the TransactionEnvelope derive macro.
@@ -105,7 +105,7 @@ impl EnvelopeArgs {
             let mut doc_attrs = Vec::new();
             for attr in variant.attrs {
                 if attr.path().is_ident("serde") {
-                    if let syn::Meta::List(list) = attr.meta {
+                    if let Meta::List(list) = attr.meta {
                         serde_attrs = Some(list.tokens);
                     }
                 } else if attr.path().is_ident("doc") {
@@ -146,9 +146,11 @@ impl EnvelopeArgs {
     }
 }
 
-/// Returns the `#[envelope(...)]` attributes.
+/// Returns the `#[envelope(...)]` attributes, skipping empty `#[envelope]` ones.
 fn envelope_attrs(attrs: &[Attribute]) -> impl Iterator<Item = &Attribute> {
-    attrs.iter().filter(|attr| attr.path().is_ident("envelope"))
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("envelope") && !matches!(attr.meta, Meta::Path(_)))
 }
 
 /// Stores an attribute value, rejecting a key that was already set.
@@ -169,11 +171,9 @@ fn parse_value<T: Parse>(meta: &ParseNestedMeta<'_>) -> Result<T> {
     }
 }
 
-/// Parses the contents of `key(...)`.
+/// Parses the contents of `key(...)`, `key[...]` or `key{...}`.
 fn parse_list(meta: &ParseNestedMeta<'_>) -> Result<TokenStream> {
-    let content;
-    syn::parenthesized!(content in meta.input);
-    content.parse()
+    Ok(meta.input.parse::<Group>()?.stream())
 }
 
 /// Kind of the envelope variant.
