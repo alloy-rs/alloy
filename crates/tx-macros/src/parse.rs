@@ -1,8 +1,8 @@
 use proc_macro2::{Group, TokenStream};
 use quote::quote;
 use syn::{
-    ext::IdentExt, meta::ParseNestedMeta, parse::Parse, Attribute, Data, DeriveInput, Error,
-    Fields, Generics, Ident, LitInt, LitStr, Meta, Path, Result, Type,
+    meta::ParseNestedMeta, parse::Parse, Attribute, Data, DeriveInput, Error, Fields, Generics,
+    Ident, LitInt, LitStr, Meta, Path, Result, Type,
 };
 
 /// Parsed input of the TransactionEnvelope derive macro.
@@ -171,14 +171,15 @@ fn parse_value<T: Parse>(meta: &ParseNestedMeta<'_>) -> Result<T> {
     }
 }
 
-/// Parses `key = ident`, also accepting `key = "ident"`. Bare keywords such as `Self` are accepted,
-/// like darling did.
+/// Parses `key = ident`, also accepting `key = "ident"`. Like darling, a bare value is read as a
+/// single-segment path, so path keywords such as `Self` are accepted but `true` is not.
 fn parse_ident(meta: &ParseNestedMeta<'_>) -> Result<Ident> {
     let input = meta.value()?;
     if input.peek(LitStr) {
         input.parse::<LitStr>()?.parse()
     } else {
-        Ident::parse_any(input)
+        let path = input.parse::<Path>()?;
+        path.get_ident().cloned().ok_or_else(|| Error::new_spanned(path, "expected identifier"))
     }
 }
 
@@ -424,6 +425,24 @@ mod tests {
                     }
                 ),
                 "unknown `envelope` attribute",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1, typed = false)]
+                        A(u8),
+                    }
+                ),
+                "expected",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1, typed = a::B)]
+                        A(u8),
+                    }
+                ),
+                "expected identifier",
             ),
             (
                 syn::parse_quote!(
