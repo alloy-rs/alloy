@@ -140,7 +140,9 @@ impl LocalSigner<Secp256k1Credential> {
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         loop {
-            if let Ok(secret_key) = SecretKey::from_byte_array(rng.gen()) {
+            let mut bytes = [0u8; 32];
+            rng.fill_bytes(&mut bytes);
+            if let Ok(secret_key) = SecretKey::from_byte_array(bytes) {
                 return Self::from_secp256k1(secret_key);
             }
         }
