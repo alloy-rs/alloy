@@ -25,7 +25,7 @@ rustdoc-args = [
 workspace = true
 
 [dependencies]
-syn = "3.0"
+syn = { version = "3.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 
