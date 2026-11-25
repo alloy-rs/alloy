@@ -200,8 +200,12 @@ impl StructLog {
 /// Tracing response objects
 ///
 /// Note: This deserializes untagged, so it's possible that a custom javascript tracer response
-/// matches another variant, for example a js tracer that returns `{}` would be deserialized as
-/// [GethTrace::NoopTracer]
+/// matches another variant.
+///
+/// An empty object `{}` is ambiguous: it is the response of the `noopTracer` and also of the
+/// `4byteTracer` for a transaction without calls. It deserializes as
+/// [`GethTrace::FourByteTracer`] with an empty map, which [`GethTrace::try_into_noop_frame`]
+/// also accepts.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GethTrace {
@@ -266,11 +270,30 @@ geth_trace_frames! {
     FourByteTracer(FourByteFrame) => is_four_byte, try_into_four_byte_frame;
     PreStateTracer(PreStateFrame) => is_pre_state, try_into_pre_state_frame;
     StateGasTracer(StateGasTrace) => is_state_gas, try_into_state_gas_trace;
-    NoopTracer(NoopFrame) => is_noop, try_into_noop_frame;
     MuxTracer(MuxFrame) => is_mux, try_into_mux_frame;
 }
 
 impl GethTrace {
+    /// Returns true if this is a [`GethTrace::NoopTracer`].
+    ///
+    /// A deserialized `noopTracer` response is an empty [`GethTrace::FourByteTracer`], see
+    /// [`GethTrace::try_into_noop_frame`].
+    pub const fn is_noop(&self) -> bool {
+        matches!(self, Self::NoopTracer(_))
+    }
+
+    /// Try to convert the inner tracer to [`NoopFrame`].
+    ///
+    /// Also accepts an empty [`GethTrace::FourByteTracer`], which is what the `noopTracer`
+    /// response `{}` deserializes to.
+    pub fn try_into_noop_frame(self) -> Result<NoopFrame, UnexpectedTracerError> {
+        match self {
+            Self::NoopTracer(inner) => Ok(inner),
+            Self::FourByteTracer(frame) if frame.0.is_empty() => Ok(NoopFrame::default()),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
     /// Returns true if this is a JS trace
     pub const fn is_js(&self) -> bool {
         matches!(self, Self::JS(_))
@@ -282,6 +305,12 @@ impl GethTrace {
             Self::JS(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
+    }
+}
+
+impl From<NoopFrame> for GethTrace {
+    fn from(value: NoopFrame) -> Self {
+        Self::NoopTracer(value)
     }
 }
 
@@ -571,6 +600,24 @@ impl GethDebugTracingOptions {
     {
         self.tracer_config = config.into();
         self
+    }
+
+    /// Returns whether call logs are requested by `callTracer`, `erc7562Tracer`, or a
+    /// `callTracer` inside `muxTracer`.
+    ///
+    /// This only checks for `withLog: true`; it does not validate the full tracer configuration.
+    pub fn records_call_logs(&self) -> bool {
+        let config = match &self.tracer {
+            Some(GethDebugTracerType::BuiltInTracer(
+                GethDebugBuiltInTracerType::CallTracer | GethDebugBuiltInTracerType::Erc7562Tracer,
+            )) => Some(&self.tracer_config.0),
+            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::MuxTracer)) => {
+                self.tracer_config.0.get("callTracer")
+            }
+            _ => None,
+        };
+        config.and_then(|config| config.get("withLog")).and_then(serde_json::Value::as_bool)
+            == Some(true)
     }
 }
 
@@ -1025,5 +1072,45 @@ mod tests {
         assert_eq!(config.disable_code, Some(true));
         assert_eq!(config.disable_storage, Some(true));
         assert!(!config.code_enabled());
+    }
+
+    #[test]
+    fn records_call_logs() {
+        for tracer in ["callTracer", "erc7562Tracer", "muxTracer"] {
+            for (config, expected) in [
+                (serde_json::json!({ "withLog": true }), true),
+                (serde_json::json!({ "withLog": false }), false),
+                (serde_json::json!({ "withLog": "true" }), false),
+                (serde_json::json!({}), false),
+                (serde_json::Value::Null, false),
+            ] {
+                let config = if tracer == "muxTracer" {
+                    serde_json::json!({ "callTracer": config })
+                } else {
+                    config
+                };
+                let opts = serde_json::from_value::<GethDebugTracingOptions>(serde_json::json!({
+                    "tracer": tracer,
+                    "tracerConfig": config,
+                }))
+                .unwrap();
+                assert_eq!(opts.records_call_logs(), expected, "{opts:?}");
+            }
+        }
+
+        for options in [
+            serde_json::json!({}),
+            serde_json::json!({ "tracerConfig": { "withLog": true } }),
+            serde_json::json!({ "tracer": "prestateTracer", "tracerConfig": { "withLog": true } }),
+            serde_json::json!({ "tracer": "customTracer", "tracerConfig": { "withLog": true } }),
+            serde_json::json!({ "tracer": "muxTracer" }),
+            serde_json::json!({ "tracer": "muxTracer", "tracerConfig": { "withLog": true } }),
+            serde_json::json!({ "tracer": "muxTracer", "tracerConfig": {
+                "prestateTracer": { "withLog": true }
+            } }),
+        ] {
+            let opts = serde_json::from_value::<GethDebugTracingOptions>(options).unwrap();
+            assert!(!opts.records_call_logs(), "{opts:?}");
+        }
     }
 }

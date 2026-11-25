@@ -285,6 +285,7 @@ impl<'a> serde::Deserialize<'a> for Params {
 mod tests {
     use super::*;
     use alloy_primitives::hex;
+    use core::str::FromStr;
     use similar_asserts::assert_eq;
 
     #[test]
@@ -340,8 +341,6 @@ mod tests {
 
     #[test]
     fn subscription_kind_str_roundtrip() {
-        use core::str::FromStr;
-
         for kind in [
             SubscriptionKind::NewHeads,
             SubscriptionKind::Logs,

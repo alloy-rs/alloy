@@ -3,6 +3,9 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_client::{ConnectionConfig, RpcClient};
 use alloy_transport::layers::RetryBackoffLayer;
 use alloy_transport_ws::WsConnect;
+use futures::{SinkExt, StreamExt};
+use tokio::net::TcpListener;
+use tokio_tungstenite::tungstenite::Message;
 
 // <https://github.com/alloy-rs/alloy/issues/1972>
 // <https://github.com/alloy-rs/alloy/issues/2362>
@@ -41,10 +44,6 @@ async fn ws_retry_pubsub_connect_with_config() -> Result<(), Box<dyn std::error:
 // <https://github.com/alloy-rs/alloy/issues/1601>
 #[tokio::test]
 async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Error>> {
-    use futures::{SinkExt, StreamExt};
-    use tokio::net::TcpListener;
-    use tokio_tungstenite::tungstenite::Message;
-
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
 
@@ -81,8 +80,6 @@ async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Er
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     });
-
-    use alloy_provider::{Provider, ProviderBuilder};
 
     let ws_provider = ProviderBuilder::new().connect(format!("ws://{addr}").as_str()).await?;
     let mut request = ws_provider.client().request("subscribe_hello", ());
@@ -165,10 +162,6 @@ async fn debug_trace_chain_subscription() -> Result<(), Box<dyn std::error::Erro
 // extracted and sent as an Authorization header.
 #[tokio::test]
 async fn ws_basic_auth_from_url() -> Result<(), Box<dyn std::error::Error>> {
-    use futures::{SinkExt, StreamExt};
-    use tokio::net::TcpListener;
-    use tokio_tungstenite::tungstenite::Message;
-
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
 

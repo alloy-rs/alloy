@@ -7,6 +7,15 @@ use crate::{
 use alloc::{string::String, vec::Vec};
 use alloy_primitives::{Bytes, U256};
 
+#[cfg(feature = "serde")]
+mod limited;
+#[cfg(feature = "serde")]
+pub use limited::{SimulatePayloadLimitExceeded, SimulatePayloadSeed};
+#[cfg(feature = "serde")]
+mod raw;
+#[cfg(feature = "serde")]
+pub use raw::{RawSimulatePayload, RawSimulatePayloadError};
+
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
 
@@ -137,6 +146,10 @@ pub struct SimCallResult {
 /// validate transaction sequences, and whether to return full transaction objects.
 /// The RPC accepts at most [`MAX_SIMULATE_BLOCKS`] blocks; this type and its builder methods do not
 /// enforce that limit.
+/// Servers parsing untrusted input can use `SimulatePayloadSeed` (with the `serde` feature) to
+/// enforce their own block and call limits during deserialization.
+/// Servers whose limits are only known inside the request handler can take a `RawSimulatePayload`
+/// parameter instead and decode it there with those limits.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(

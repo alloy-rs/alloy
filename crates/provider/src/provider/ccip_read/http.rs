@@ -2,6 +2,7 @@
 
 use super::{CcipReadGateway, CcipReadGatewayError, CcipReadRequest};
 use alloy_primitives::Bytes;
+use futures::TryStreamExt;
 use reqwest::{header::CONTENT_TYPE, Url};
 use serde::{Deserialize, Serialize};
 
@@ -211,36 +212,6 @@ impl Attempt {
 }
 
 /// Reads the response body, rejecting bodies larger than `max_response_size`.
-#[cfg(not(target_family = "wasm"))]
-async fn read_body(
-    mut response: reqwest::Response,
-    status: u16,
-    max_response_size: usize,
-) -> Result<Vec<u8>, CcipReadGatewayError> {
-    if response.content_length().is_some_and(|length| length > max_response_size as u64) {
-        return Err(size_limit_error(status));
-    }
-    let mut body = Vec::new();
-    loop {
-        match response.chunk().await {
-            Ok(Some(chunk)) => {
-                if body.len() + chunk.len() > max_response_size {
-                    return Err(size_limit_error(status));
-                }
-                body.extend_from_slice(&chunk);
-            }
-            Ok(None) => return Ok(body),
-            Err(err) => {
-                return Err(CcipReadGatewayError::new(format!(
-                    "failed reading gateway response: {err}"
-                )))
-            }
-        }
-    }
-}
-
-/// Reads the response body, rejecting bodies larger than `max_response_size`.
-#[cfg(target_family = "wasm")]
 async fn read_body(
     response: reqwest::Response,
     status: u16,
@@ -249,13 +220,17 @@ async fn read_body(
     if response.content_length().is_some_and(|length| length > max_response_size as u64) {
         return Err(size_limit_error(status));
     }
-    let body = response.bytes().await.map_err(|err| {
+    let mut chunks = std::pin::pin!(response.bytes_stream());
+    let mut body = Vec::new();
+    while let Some(chunk) = chunks.try_next().await.map_err(|err| {
         CcipReadGatewayError::new(format!("failed reading gateway response: {err}"))
-    })?;
-    if body.len() > max_response_size {
-        return Err(size_limit_error(status));
+    })? {
+        if body.len() + chunk.len() > max_response_size {
+            return Err(size_limit_error(status));
+        }
+        body.extend_from_slice(&chunk);
     }
-    Ok(body.to_vec())
+    Ok(body)
 }
 
 fn size_limit_error(status: u16) -> CcipReadGatewayError {
@@ -299,6 +274,10 @@ fn response_message(body: &[u8]) -> String {
 mod tests {
     use super::*;
     use alloy_primitives::{address, bytes, Address};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
 
     fn message(attempt: &Attempt) -> &str {
         match attempt {
@@ -385,5 +364,29 @@ mod tests {
 
         let error = gateway.request(&request(vec!["not a url".into()]), 1024).await.unwrap_err();
         assert!(error.message.contains("invalid CCIP Read gateway URL"));
+    }
+
+    #[tokio::test]
+    async fn rejects_oversized_body_without_content_length() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let _ = stream.read(&mut [0; 4096]).await;
+            let head =
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n";
+            stream.write_all(head.as_bytes()).await.unwrap();
+            // Send an endless body so that buffering it whole would never finish.
+            while stream.write_all(&[b' '; 1024]).await.is_ok() {}
+        });
+
+        let request = CcipReadRequest {
+            sender: Address::ZERO,
+            urls: vec![format!("http://{addr}/{{data}}")],
+            data: Bytes::new(),
+        };
+        let error = HttpCcipReadGateway::default().request(&request, 4096).await.unwrap_err();
+        assert_eq!(error.status, Some(200));
+        assert_eq!(error.message, "gateway response exceeded configured size limit");
     }
 }

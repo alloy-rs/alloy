@@ -65,6 +65,10 @@ impl RetryBackoffLayer {
 
     /// Sets the average Compute Unit (CU) cost per request. Defaults to `20` CU.
     ///
+    /// A value of `0` is treated as `1` when computing the compute-budget backoff, so that
+    /// the calculation can never divide by zero. Pass the actual average cost of the
+    /// requests sent through this layer whenever it is known.
+    ///
     /// Based on Alchemy’s published Compute Unit (CU) table, most frequently used
     /// JSON-RPC methods fall within the `10–20` CU range, with only a small number
     /// of higher-cost outliers (such as log queries or transaction submissions).
@@ -206,6 +210,9 @@ impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
 /// request whose response was lost. Use this service only for operations that
 /// are safe to execute more than once, or route non-idempotent methods around
 /// this layer.
+///
+/// When retries are exhausted, the returned custom error retains the last
+/// [`TransportError`] as its [`std::error::Error::source`].
 #[derive(Debug, Clone)]
 pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
@@ -269,11 +276,15 @@ where
 
     fn call(&mut self, request: RequestPacket) -> Self::Future {
         let inner = self.inner.clone();
-        let this = self.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
+        let policy = self.policy.clone();
+        let max_rate_limit_retries = self.max_rate_limit_retries;
+        let initial_backoff = self.initial_backoff();
+        let compute_units_per_second = self.compute_units_per_second;
+        let requests_enqueued = self.requests_enqueued.clone();
+        let avg_cost = self.avg_cost;
         Box::pin(async move {
-            let (_queued_request, ahead_in_queue) =
-                QueuedRequest::new(this.requests_enqueued.clone());
+            let (_queued_request, ahead_in_queue) = QueuedRequest::new(requests_enqueued.clone());
             let mut rate_limit_retry_number: u32 = 0;
             loop {
                 let res = inner.call(request.clone()).await;
@@ -286,25 +297,23 @@ where
                     Err(e) => (e, None),
                 };
 
-                let should_retry = this.policy.should_retry(&err);
+                let should_retry = policy.should_retry(&err);
                 if should_retry {
                     rate_limit_retry_number += 1;
-                    if rate_limit_retry_number > this.max_rate_limit_retries {
-                        return Err(TransportErrorKind::custom_str(&format!(
-                            "Max retries exceeded {err}"
-                        )));
+                    if rate_limit_retry_number > max_rate_limit_retries {
+                        return Err(TransportErrorKind::custom(RetryError(err)));
                     }
                     trace!(%err, "retrying request");
 
-                    let current_queued_reqs = this.requests_enqueued.load(Ordering::SeqCst) as u64;
+                    let current_queued_reqs = requests_enqueued.load(Ordering::SeqCst) as u64;
 
                     // use the backoff requested by the error, or fall back to the initial backoff
-                    let backoff_hint = this.policy.backoff_hint(&err);
-                    let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
+                    let backoff_hint = policy.backoff_hint(&err);
+                    let next_backoff = backoff_hint.unwrap_or(initial_backoff);
 
                     let seconds_to_wait_for_compute_budget = compute_unit_offset_in_secs(
-                        this.avg_cost,
-                        this.compute_units_per_second,
+                        avg_cost,
+                        compute_units_per_second,
                         current_queued_reqs,
                         ahead_in_queue,
                     );
@@ -331,6 +340,11 @@ where
     }
 }
 
+/// Retains the structured failure when the retry budget is exhausted.
+#[derive(Debug, thiserror::Error)]
+#[error("Max retries exceeded {0}")]
+struct RetryError(#[source] TransportError);
+
 /// Calculates an offset in seconds by taking into account the number of currently queued requests,
 /// number of requests that were ahead in the queue when the request was first issued, the average
 /// cost a weighted request (heuristic), and the number of available compute units per seconds.
@@ -339,6 +353,7 @@ where
 /// is supposed to wait to not get rate limited. The budget per second is
 /// `compute_units_per_second`, assuming an average cost of `avg_cost` this allows (in theory)
 /// `compute_units_per_second / avg_cost` requests per seconds without getting rate limited.
+/// An `avg_cost` of `0` is treated as `1`, so this never divides by zero.
 /// By taking into account the number of concurrent request and the position in queue when the
 /// request was first issued and determine the number of seconds a request is supposed to wait, if
 /// at all
@@ -348,7 +363,10 @@ fn compute_unit_offset_in_secs(
     current_queued_requests: u64,
     ahead_in_queue: u64,
 ) -> u64 {
-    let request_capacity_per_second = compute_units_per_second.saturating_div(avg_cost).max(1);
+    // `avg_cost` is user-configurable and may be `0`. `saturating_div` only saturates the
+    // overflow case, it still panics on a zero divisor, so clamp the divisor to `1`.
+    let request_capacity_per_second =
+        compute_units_per_second.saturating_div(avg_cost.max(1)).max(1);
     if current_queued_requests > request_capacity_per_second {
         current_queued_requests.min(ahead_in_queue).saturating_div(request_capacity_per_second)
     } else {
@@ -386,5 +404,121 @@ mod tests {
         assert_eq!(offset, 0);
         let offset = compute_unit_offset_in_secs(17, 10, 2, 2);
         assert_eq!(offset, 2);
+    }
+
+    #[test]
+    fn test_compute_unit_offset_with_zero_avg_cost() {
+        // A zero `avg_cost` is clamped to `1` and must not panic.
+        let offset = compute_unit_offset_in_secs(0, 10, 0, 0);
+        assert_eq!(offset, 0);
+        let offset = compute_unit_offset_in_secs(0, 10, 20, 20);
+        assert_eq!(offset, 2);
+    }
+
+    #[tokio::test]
+    async fn retry_with_zero_avg_cost_does_not_panic() {
+        // Regression test: a retryable error used to divide by zero and panic when the
+        // average unit cost was configured as `0`.
+        let inner = tower::service_fn(|_| -> TransportFut<'static> {
+            Box::pin(async { Err(TransportErrorKind::custom_str("429 Too Many Requests")) })
+        });
+        let mut service = RetryBackoffLayer::new(1, 0, 10).with_avg_unit_cost(0).layer(inner);
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        let err = service.call(request).await.unwrap_err();
+        assert!(err.to_string().contains("Max retries exceeded"));
+    }
+
+    #[tokio::test]
+    async fn retry_exhaustion_preserves_http_error() {
+        for max_retries in [0, 1] {
+            let inner = tower::service_fn(|_| -> TransportFut<'static> {
+                Box::pin(async {
+                    Err(TransportErrorKind::http_error_with_retry_after(
+                        429,
+                        "rate limited".to_owned(),
+                        Some(Duration::ZERO),
+                    ))
+                })
+            });
+            let mut service = RetryBackoffLayer::new(max_retries, 0, 10).layer(inner);
+            let request = RequestPacket::Single(
+                alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                    .serialize()
+                    .unwrap(),
+            );
+
+            let err = service.call(request).await.unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                "Max retries exceeded HTTP error 429 with body: rate limited"
+            );
+            let TransportError::Transport(kind) = err else { panic!("expected transport error") };
+            let source = kind.as_custom().unwrap().source().unwrap();
+            let source = source.downcast_ref::<TransportError>().unwrap();
+            let TransportError::Transport(source) = source else { panic!("expected HTTP error") };
+            assert_eq!(source.as_http_error().unwrap().status, 429);
+            assert_eq!(source.as_http_error().unwrap().body, "rate limited");
+            assert_eq!(source.retry_after(), Some(Duration::ZERO));
+        }
+    }
+
+    #[tokio::test]
+    async fn retry_exhaustion_preserves_rpc_error() {
+        let inner = tower::service_fn(|_| -> TransportFut<'static> {
+            Box::pin(async {
+                Err(TransportError::ErrorResp(
+                    serde_json::from_str(
+                        r#"{"code":-32005,"message":"rate limited","data":{"limit":10}}"#,
+                    )
+                    .unwrap(),
+                ))
+            })
+        });
+        let mut service = RetryBackoffLayer::new(0, 0, 10).layer(inner);
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        let err = service.call(request).await.unwrap_err();
+        let TransportError::Transport(kind) = err else { panic!("expected transport error") };
+        let source = kind.as_custom().unwrap().source().unwrap();
+        let source = source.downcast_ref::<TransportError>().unwrap();
+        let TransportError::ErrorResp(source) = source else { panic!("expected RPC error") };
+        assert_eq!(source.code, -32005);
+        assert_eq!(source.message, "rate limited");
+        assert_eq!(source.data.as_ref().unwrap().get(), r#"{"limit":10}"#);
+    }
+
+    #[tokio::test]
+    async fn request_retains_only_one_inner_service_clone() {
+        let state = Arc::new(AtomicU32::new(0));
+        let inner_state = state.clone();
+        let inner = tower::service_fn(move |_| -> TransportFut<'static> {
+            inner_state.fetch_add(1, Ordering::Relaxed);
+            Box::pin(std::future::pending())
+        });
+        let mut service = RetryBackoffLayer::new(1, 0, 10).layer(inner);
+        let request = RequestPacket::Single(
+            alloy_json_rpc::Request::new("test", alloy_json_rpc::Id::Number(1), ())
+                .serialize()
+                .unwrap(),
+        );
+
+        let mut future = service.call(request);
+        // The observer, replacement service, and in-flight service each own one reference.
+        assert_eq!(Arc::strong_count(&state), 3);
+        assert!(futures::poll!(&mut future).is_pending());
+        assert_eq!(state.load(Ordering::Relaxed), 1);
+        assert_eq!(Arc::strong_count(&state), 3);
+
+        drop(future);
+        assert_eq!(Arc::strong_count(&state), 2);
     }
 }

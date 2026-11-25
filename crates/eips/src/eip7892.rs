@@ -44,7 +44,8 @@ pub struct BlobScheduleBlobParams {
     pub osaka: BlobParams,
     /// All Time-based scheduled updates to blob parameters after Osaka.
     ///
-    /// These are ordered by activation timestamps in natural order.
+    /// The builder orders these by activation timestamp. Direct field updates may use any order;
+    /// lookup always selects the highest active timestamp.
     ///
     /// This can include blobparams for hardforks after osaka (e.g. amsterdam) that are interleaved
     /// with BPOs.
@@ -70,14 +71,21 @@ impl BlobScheduleBlobParams {
         scheduled: impl IntoIterator<Item = (u64, BlobParams)>,
     ) -> Self {
         self.scheduled = scheduled.into_iter().collect();
+        self.scheduled.sort_by_key(|(timestamp, _)| *timestamp);
         self
     }
 
     /// Returns the highest active blob parameters at the given timestamp.
     ///
+    /// When multiple entries share a timestamp, the last configured entry takes precedence.
+    ///
     /// Note: this does only scan the entries scheduled by timestamp and not cancun or prague.
     pub fn active_scheduled_params_at_timestamp(&self, timestamp: u64) -> Option<&BlobParams> {
-        self.scheduled.iter().rev().find(|(ts, _)| timestamp >= *ts).map(|(_, params)| params)
+        self.scheduled
+            .iter()
+            .filter(|(ts, _)| timestamp >= *ts)
+            .max_by_key(|(ts, _)| *ts)
+            .map(|(_, params)| params)
     }
 
     /// Returns the configured Cancun [`BlobParams`].
@@ -99,5 +107,30 @@ impl BlobScheduleBlobParams {
 impl Default for BlobScheduleBlobParams {
     fn default() -> Self {
         Self::mainnet()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+
+    #[test]
+    fn scheduled_params_are_ordered() {
+        let schedule = BlobScheduleBlobParams::mainnet()
+            .with_scheduled([(200, BlobParams::bpo2()), (100, BlobParams::bpo1())]);
+        assert_eq!(schedule.scheduled, vec![(100, BlobParams::bpo1()), (200, BlobParams::bpo2())]);
+        assert_eq!(schedule.active_scheduled_params_at_timestamp(99), None);
+        assert_eq!(schedule.active_scheduled_params_at_timestamp(100), Some(&BlobParams::bpo1()));
+        assert_eq!(schedule.active_scheduled_params_at_timestamp(200), Some(&BlobParams::bpo2()));
+    }
+
+    #[test]
+    fn scheduled_params_allow_unordered_field_updates() {
+        let mut schedule = BlobScheduleBlobParams::mainnet();
+        schedule.scheduled =
+            vec![(200, BlobParams::bpo1()), (200, BlobParams::bpo2()), (100, BlobParams::osaka())];
+        assert_eq!(schedule.active_scheduled_params_at_timestamp(199), Some(&BlobParams::osaka()));
+        assert_eq!(schedule.active_scheduled_params_at_timestamp(300), Some(&BlobParams::bpo2()));
     }
 }

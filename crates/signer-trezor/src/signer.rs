@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use std::fmt;
 use trezor_client::{
     client::{InteractionType, Trezor},
-    protos,
+    protos::{self, MessageType},
     transport::ProtoMessage,
     TrezorMessage,
 };
@@ -227,8 +227,6 @@ impl TrezorSigner {
         client: &mut Trezor,
         request: S,
     ) -> Result<R, TrezorError> {
-        use protos::MessageType;
-
         let mut response = client.call_raw(request)?;
         loop {
             response = match response.message_type() {
@@ -435,8 +433,6 @@ impl TrezorSigner {
     #[cfg(feature = "eip712")]
     #[instrument(skip_all, fields(primary_type = data.primary_type()), ret)]
     async fn sign_typed_data_flow(&self, data: &TrezorTypedData) -> Result<Signature, TrezorError> {
-        use protos::MessageType;
-
         let mut client = self.get_client()?;
         let mut req = protos::EthereumSignTypedData::new();
         req.address_n = Self::convert_path(&self.derivation);

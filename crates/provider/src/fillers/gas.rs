@@ -51,7 +51,9 @@ pub enum GasFillable {
 ///   and `max_priority_fee_per_gas` fields if unset.
 /// - If the network does not support EIP-1559, it will fallback to the legacy tx and populate the
 ///   `gas_limit` and `gas_price` fields if unset. This fallback only triggers when the latest block
-///   header has no base fee.
+///   header has no base fee and the request sets neither `max_fee_per_gas` nor
+///   `max_priority_fee_per_gas`. If one of them is set, filling fails with
+///   [`RpcError::UnsupportedFeature`], because a legacy tx would drop that fee.
 /// - If the filler was created with [`GasFiller::legacy`], it skips EIP-1559 estimation entirely
 ///   and always populates the `gas_limit` and `gas_price` fields if unset.
 ///
@@ -189,7 +191,13 @@ impl<N: Network> TxFiller<N> for GasFiller {
             match self.prepare_1559(provider, tx).await {
                 // fallback to legacy
                 Ok(estimate) => Ok(estimate),
-                Err(RpcError::UnsupportedFeature(_)) => self.prepare_legacy(provider, tx).await,
+                // A legacy transaction would drop a caller-set EIP-1559 fee.
+                Err(RpcError::UnsupportedFeature(_))
+                    if tx.max_fee_per_gas().is_none()
+                        && tx.max_priority_fee_per_gas().is_none() =>
+                {
+                    self.prepare_legacy(provider, tx).await
+                }
                 Err(e) => Err(e),
             }
         }
@@ -208,8 +216,22 @@ impl<N: Network> TxFiller<N> for GasFiller {
                 }
                 GasFillable::Eip1559 { gas_limit, estimate } => {
                     builder.set_gas_limit(gas_limit);
-                    builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
-                    builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+                    // Keep caller-set fees and fill only the missing ones, ensuring the priority
+                    // fee does not exceed the max fee. A caller-set priority fee replaces the
+                    // estimated one in the max fee, keeping the estimated base fee headroom.
+                    let tx_priority_fee = builder.max_priority_fee_per_gas();
+                    let max_fee =
+                        builder.max_fee_per_gas().unwrap_or_else(|| match tx_priority_fee {
+                            Some(priority_fee) => estimate
+                                .max_fee_per_gas
+                                .saturating_sub(estimate.max_priority_fee_per_gas)
+                                .saturating_add(priority_fee),
+                            None => estimate.max_fee_per_gas,
+                        });
+                    let priority_fee = tx_priority_fee
+                        .unwrap_or_else(|| estimate.max_priority_fee_per_gas.min(max_fee));
+                    builder.set_max_fee_per_gas(max_fee);
+                    builder.set_max_priority_fee_per_gas(priority_fee);
                 }
             }
         };
@@ -370,7 +392,7 @@ mod tests {
     use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
     use alloy_network::Ethereum;
     use alloy_primitives::{address, U256};
-    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_rpc_types_eth::{Block, FeeHistory, TransactionRequest};
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
@@ -467,6 +489,95 @@ mod tests {
             panic!("expected a signed envelope");
         };
         assert!(envelope.is_legacy());
+    }
+
+    async fn fill_eip1559_fees(
+        max_fee_per_gas: Option<u128>,
+        max_priority_fee_per_gas: Option<u128>,
+    ) -> (u128, Option<u128>) {
+        let estimator = Eip1559Estimator::new(|_, _| Eip1559Estimation {
+            max_fee_per_gas: 3_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000,
+        });
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .filler(GasFiller::new(estimator))
+            .with_simple_nonce_management()
+            .fetch_chain_id()
+            .connect_anvil_with_wallet();
+
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas: Some(21000),
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
+            ..Default::default()
+        };
+
+        let SendableTx::Envelope(envelope) = provider.fill(tx).await.unwrap() else {
+            panic!("expected a signed envelope");
+        };
+        (envelope.max_fee_per_gas(), envelope.max_priority_fee_per_gas())
+    }
+
+    #[tokio::test]
+    async fn keeps_max_fee_per_gas() {
+        assert_eq!(
+            fill_eip1559_fees(Some(5_000_000_000), None).await,
+            (5_000_000_000, Some(1_000_000_000))
+        );
+        // The estimated priority fee is clamped to the caller's max fee.
+        assert_eq!(
+            fill_eip1559_fees(Some(500_000_000), None).await,
+            (500_000_000, Some(500_000_000))
+        );
+    }
+
+    #[tokio::test]
+    async fn keeps_max_priority_fee_per_gas() {
+        // The caller's priority fee replaces the estimated one in the max fee.
+        assert_eq!(
+            fill_eip1559_fees(None, Some(2_000_000_000)).await,
+            (4_000_000_000, Some(2_000_000_000))
+        );
+        assert_eq!(
+            fill_eip1559_fees(None, Some(4_000_000_000)).await,
+            (6_000_000_000, Some(4_000_000_000))
+        );
+    }
+
+    #[tokio::test]
+    async fn no_legacy_fallback_with_eip1559_fee() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .connect_mocked_client(asserter.clone());
+        let fee_history = FeeHistory {
+            oldest_block: 1,
+            base_fee_per_gas: vec![0, 0],
+            gas_used_ratio: vec![0.5],
+            reward: Some(vec![vec![0]]),
+            ..Default::default()
+        };
+
+        for (max_fee_per_gas, max_priority_fee_per_gas) in [(Some(1), None), (None, Some(1))] {
+            // The latest block has no base fee, so EIP-1559 estimation is unsupported.
+            asserter.push_success(&fee_history);
+            asserter.push_success(&<Block>::default());
+            let tx = TransactionRequest {
+                gas: Some(21000),
+                max_fee_per_gas,
+                max_priority_fee_per_gas,
+                ..Default::default()
+            };
+
+            let err =
+                <GasFiller as TxFiller<Ethereum>>::prepare(&GasFiller::default(), &provider, &tx)
+                    .await
+                    .unwrap_err();
+            assert!(matches!(err, RpcError::UnsupportedFeature(_)), "{err:?}");
+        }
     }
 
     #[test]

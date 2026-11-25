@@ -723,6 +723,11 @@ pub struct BlockOverrides {
         serde(default, skip_serializing_if = "Option::is_none", alias = "parentBeaconBlockRoot")
     )]
     pub beacon_root: Option<B256>,
+    /// Overrides the withdrawals of the block.
+    ///
+    /// Only used by `eth_simulateV1` — not applicable to `eth_call` or `eth_estimateGas`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub withdrawals: Option<Withdrawals>,
     /// A dictionary that maps blockNumber to a user-defined hash. It can be queried from the
     /// EVM opcode BLOCKHASH.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -741,6 +746,7 @@ impl BlockOverrides {
             && self.base_fee.is_none()
             && self.blob_base_fee.is_none()
             && self.beacon_root.is_none()
+            && self.withdrawals.is_none()
             && self.block_hash.is_none()
     }
 
@@ -798,6 +804,12 @@ impl BlockOverrides {
         self
     }
 
+    /// Sets the withdrawals override
+    pub fn with_withdrawals(mut self, withdrawals: Withdrawals) -> Self {
+        self.withdrawals = Some(withdrawals);
+        self
+    }
+
     /// Adds a block hash override for a specific block number
     pub fn append_block_hash(mut self, block_number: u64, hash: B256) -> Self {
         let hash_map = self.block_hash.get_or_insert_with(Default::default);
@@ -849,6 +861,7 @@ pub struct BadBlock<B = Block> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_eips::eip4895::Withdrawal;
     use alloy_primitives::{hex, keccak256, Bloom, B64};
     use similar_asserts::assert_eq;
 
@@ -1031,6 +1044,25 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
+    fn block_overrides_withdrawals() {
+        // `withdrawals` is part of the execution-apis `BlockOverrides` schema.
+        let s = r#"{"withdrawals":[{"index":"0x1","validatorIndex":"0x2","address":"0x0000000000000000000000000000000000000003","amount":"0x4"}]}"#;
+        let overrides = serde_json::from_str::<BlockOverrides>(s).unwrap();
+        assert!(!overrides.is_empty());
+        assert_eq!(
+            overrides.withdrawals,
+            Some(Withdrawals::new(vec![Withdrawal {
+                index: 1,
+                validator_index: 2,
+                address: Address::with_last_byte(3),
+                amount: 4,
+            }]))
+        );
+        assert_eq!(serde_json::to_string(&overrides).unwrap(), s);
+    }
+
+    #[test]
     fn block_overrides_is_empty() {
         assert!(BlockOverrides::default().is_empty());
 
@@ -1044,6 +1076,7 @@ mod tests {
             BlockOverrides::default().with_base_fee(U256::from(20)),
             BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1)),
             BlockOverrides::default().with_beacon_root(B256::with_last_byte(1)),
+            BlockOverrides::default().with_withdrawals(Withdrawals::default()),
         ] {
             assert!(!overrides.is_empty(), "{overrides:?}");
         }

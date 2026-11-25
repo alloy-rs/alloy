@@ -187,9 +187,13 @@ pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
             return Err(Eip2718Error::UnexpectedType(actual));
         }
 
+        let (tx, signature) = Self::rlp_decode_with_signature(buf)?;
+        if !tx.encoding_is_hash_preimage() {
+            return Ok(Signed::new_unhashed(tx, signature));
+        }
+
         // OPT: We avoid re-serializing by calculating the hash directly
         // from the original buffer contents.
-        let (tx, signature) = Self::rlp_decode_with_signature(buf)?;
         let total_len = tx.eip2718_encoded_length(&signature);
         let hash = keccak256(&original_buf[..total_len]);
 
@@ -223,6 +227,12 @@ pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
     /// flag.
     fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
         Self::network_decode_with_type(buf, Self::DEFAULT_TX_TYPE)
+    }
+
+    /// Returns whether the eip2718 encoding is the preimage of the transaction
+    /// hash. If so, decoding hashes the input buffer instead of re-encoding.
+    fn encoding_is_hash_preimage(&self) -> bool {
+        true
     }
 }
 

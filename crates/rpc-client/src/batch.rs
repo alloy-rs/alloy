@@ -33,6 +33,8 @@ pub(crate) type ChannelMap = HashMap<Id, Channel>;
 /// [`Self::send`] returns a future, and the transport is not called until that
 /// future is polled. Await the batch before awaiting its [`Waiter`]s.
 ///
+/// Empty batches complete successfully without accessing the transport.
+///
 /// Responses are matched to waiters by JSON-RPC ID, not response order.
 /// Missing IDs produce a per-waiter error; responses with unknown IDs are
 /// ignored.
@@ -201,6 +203,11 @@ impl BatchFuture {
             unreachable!("Called poll_prepared in incorrect state")
         };
 
+        if requests.is_empty() {
+            self.set(Self::Complete);
+            return Poll::Ready(Ok(()));
+        }
+
         if let Err(e) = task::ready!(transport.poll_ready(cx)) {
             self.set(Self::Complete);
             return Poll::Ready(Err(e));
@@ -274,5 +281,57 @@ impl Future for BatchFuture {
         }
 
         panic!("Called poll on BatchFuture in invalid state")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RpcClient;
+    use alloy_transport::mock::Asserter;
+
+    #[derive(Clone, Debug)]
+    struct UnusedTransport;
+
+    impl Service<RequestPacket> for UnusedTransport {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(&mut self, _: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+            panic!("empty batches must not poll transport readiness");
+        }
+
+        fn call(&mut self, _: RequestPacket) -> Self::Future {
+            panic!("empty batches must not call the transport");
+        }
+    }
+
+    #[tokio::test]
+    async fn empty_batch_does_not_access_transport() {
+        let client = RpcClient::new(UnusedTransport, true);
+
+        client.new_batch().await.unwrap();
+        client.new_batch().send().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn non_empty_batch_sends_requests() {
+        let asserter = Asserter::new();
+        asserter.push_success(&1_u64);
+        asserter.push_success(&2_u64);
+        let client = RpcClient::mocked(asserter.clone());
+        let mut batch = client.new_batch();
+        let first = batch.add_call::<_, u64>("first", &()).unwrap();
+        let second = batch.add_call::<_, u64>("second", &()).unwrap();
+
+        batch.await.unwrap();
+
+        assert_eq!(first.await.unwrap(), 1);
+        assert_eq!(second.await.unwrap(), 2);
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].method(), "first");
+        assert_eq!(requests[1].method(), "second");
     }
 }

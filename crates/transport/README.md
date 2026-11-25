@@ -36,10 +36,11 @@ if let j::ResponsePacket::Single(r) = resp {
 
 Low-level Ethereum JSON-RPC transport abstraction.
 
-This crate handles RPC connection and request management. It builds an
-`RpcClient` on top of the [tower `Service`] abstraction, and provides
-futures for simple and batch RPC requests as well as a unified `TransportError`
-type.
+This crate defines the `Transport` abstraction on top of [tower `Service`],
+with transport boxing, connection traits, middleware, and a unified
+`TransportError` type. Transports exchange serialized JSON-RPC request and
+response packets. Request construction, response deserialization, and batching
+are provided by [alloy-rpc-client].
 
 Typically, this crate should not be used directly. Most EVM users will want to
 use the [alloy-provider] crate, which provides a high-level API for interacting

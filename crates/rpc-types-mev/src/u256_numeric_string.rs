@@ -25,6 +25,24 @@ pub(crate) fn serialize<S>(val: &U256, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let val: u128 = (*val).try_into().map_err(serde::ser::Error::custom)?;
-    serializer.serialize_str(&val.to_string())
+    serializer.collect_str(val)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Serialize;
+
+    #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+    struct NumericString(#[serde(with = "crate::u256_numeric_string")] U256);
+
+    #[test]
+    fn round_trip_values_above_u128_max() {
+        for value in [U256::from(u128::MAX) + U256::from(1u8), U256::MAX] {
+            let json = format!("\"{value}\"");
+            let deserialized: NumericString = serde_json::from_str(&json).unwrap();
+            assert_eq!(deserialized, NumericString(value));
+            assert_eq!(serde_json::to_string(&deserialized).unwrap(), json);
+        }
+    }
 }
