@@ -1,8 +1,8 @@
 use proc_macro2::{Group, TokenStream};
 use quote::quote;
 use syn::{
-    meta::ParseNestedMeta, parse::Parse, Attribute, Data, DeriveInput, Error, Fields, Generics,
-    Ident, LitInt, LitStr, Meta, Path, Result, Type,
+    ext::IdentExt, meta::ParseNestedMeta, parse::Parse, Attribute, Data, DeriveInput, Error,
+    Fields, Generics, Ident, LitInt, LitStr, Meta, Path, Result, Type,
 };
 
 /// Parsed input of the TransactionEnvelope derive macro.
@@ -59,11 +59,11 @@ impl EnvelopeArgs {
         for attr in envelope_attrs(&input.attrs) {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("tx_type_name") {
-                    set(&mut args.tx_type_name, &meta, parse_value(&meta)?)
+                    set(&mut args.tx_type_name, &meta, parse_ident(&meta)?)
                 } else if meta.path.is_ident("alloy_consensus") {
                     set(&mut args.alloy_consensus, &meta, parse_value(&meta)?)
                 } else if meta.path.is_ident("typed") {
-                    set(&mut args.typed, &meta, parse_value(&meta)?)
+                    set(&mut args.typed, &meta, parse_ident(&meta)?)
                 } else if meta.path.is_ident("serde_cfg") {
                     set(&mut args.serde_cfg, &meta, parse_list(&meta)?)
                 } else if meta.path.is_ident("arbitrary_cfg") {
@@ -84,7 +84,7 @@ impl EnvelopeArgs {
                     } else if meta.path.is_ident("flatten") {
                         VariantKind::Flattened
                     } else if meta.path.is_ident("typed") {
-                        return set(&mut typed, &meta, parse_value(&meta)?);
+                        return set(&mut typed, &meta, parse_ident(&meta)?);
                     } else {
                         return Err(meta.error("unknown `envelope` attribute"));
                     };
@@ -168,6 +168,17 @@ fn parse_value<T: Parse>(meta: &ParseNestedMeta<'_>) -> Result<T> {
         input.parse::<LitStr>()?.parse()
     } else {
         input.parse()
+    }
+}
+
+/// Parses `key = ident`, also accepting `key = "ident"`. Bare keywords such as `Self` are accepted,
+/// like darling did.
+fn parse_ident(meta: &ParseNestedMeta<'_>) -> Result<Ident> {
+    let input = meta.value()?;
+    if input.peek(LitStr) {
+        input.parse::<LitStr>()?.parse()
+    } else {
+        Ident::parse_any(input)
     }
 }
 
@@ -326,5 +337,126 @@ mod tests {
             VariantKind::Typed(10).serde_tag_and_aliases(),
             ("0xa".to_string(), vec!["0x0a".to_string(), "0xA".to_string()])
         );
+    }
+
+    fn parse(input: DeriveInput) -> Result<EnvelopeArgs> {
+        EnvelopeArgs::from_derive_input(input)
+    }
+
+    #[test]
+    fn accepts_darling_compatible_attributes() {
+        let args = parse(syn::parse_quote! {
+            #[envelope]
+            #[envelope(alloy_consensus = "crate", tx_type_name = "MyTxType")]
+            #[envelope(serde_cfg[feature = "serde"], arbitrary_cfg { feature = "arbitrary" })]
+            enum E {
+                #[envelope(ty = "+10", typed = Self)]
+                A(Signed<TxA>),
+                #[envelope(flatten)]
+                B(Inner),
+                #[envelope(ty = 0x7e, typed = "Custom")]
+                C(Signed<TxC>),
+            }
+        })
+        .unwrap();
+
+        let alloy_consensus = args.alloy_consensus.unwrap();
+        assert_eq!(quote!(#alloy_consensus).to_string(), "crate");
+        assert_eq!(args.tx_type_name.unwrap(), "MyTxType");
+        assert_eq!(args.serde_cfg.unwrap().to_string(), "feature = \"serde\"");
+        assert_eq!(args.arbitrary_cfg.unwrap().to_string(), "feature = \"arbitrary\"");
+        assert!(matches!(args.variants[0].kind, VariantKind::Typed(10)));
+        assert_eq!(args.variants[0].typed.as_ref().unwrap(), "Self");
+        assert!(matches!(args.variants[1].kind, VariantKind::Flattened));
+        assert!(matches!(args.variants[2].kind, VariantKind::Typed(0x7e)));
+        assert_eq!(args.variants[2].typed.as_ref().unwrap(), "Custom");
+    }
+
+    #[test]
+    fn rejects_invalid_attributes() {
+        for (input, msg) in [
+            (
+                syn::parse_quote!(
+                    struct S;
+                ),
+                "can only be derived for enums",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        A(u8),
+                    }
+                ),
+                "expected `#[envelope(ty = N)]`",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1, flatten)]
+                        A(u8),
+                    }
+                ),
+                "only one of",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 256)]
+                        A(u8),
+                    }
+                ),
+                "number too large",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = "0x7e")]
+                        A(u8),
+                    }
+                ),
+                "invalid digit",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(foo)]
+                        A(u8),
+                    }
+                ),
+                "unknown `envelope` attribute",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1, typed = A, typed = B)]
+                        A(u8),
+                    }
+                ),
+                "duplicate",
+            ),
+            (
+                syn::parse_quote!(
+                    #[envelope(tx_type_name = A)]
+                    #[envelope(tx_type_name = B)]
+                    enum E {
+                        #[envelope(ty = 1)]
+                        A(u8),
+                    }
+                ),
+                "duplicate",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1)]
+                        A(u8, u8),
+                    }
+                ),
+                "expected exactly one field, found 2",
+            ),
+        ] {
+            let err = parse(input).err().unwrap().to_string();
+            assert!(err.contains(msg), "{err:?} does not contain {msg:?}");
+        }
     }
 }
