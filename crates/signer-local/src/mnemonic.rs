@@ -54,6 +54,7 @@ impl<W: Wordlist> fmt::Debug for MnemonicBuilder<W> {
             .field("derivation_path", &self.derivation_path)
             .field("password", &self.password.as_ref().map(|_| "<redacted>"))
             .field("write_to", &self.write_to)
+            .field("_wordlist", &self._wordlist)
             .finish()
     }
 }
@@ -587,6 +588,7 @@ mod tests {
         assert!(!dbg.contains(PASSWORD), "{dbg}");
         assert!(dbg.contains(r#"phrase: Some("<redacted>")"#), "{dbg}");
         assert!(dbg.contains(r#"password: Some("<redacted>")"#), "{dbg}");
+        assert!(dbg.contains("_wordlist: PhantomData<"), "{dbg}");
     }
 
     #[test]
