@@ -182,6 +182,12 @@ impl Serialize for TraceFilterRequest {
         if let Value::Object(map) = &mut filter {
             for (key, tag) in [("fromBlock", self.from_tag), ("toBlock", self.to_tag)] {
                 if let Some(tag) = tag {
+                    // A bound is either a number in the filter or a tag, never both.
+                    if map.contains_key(key) {
+                        return Err(ser::Error::custom(format_args!(
+                            "{key} is set both as a number and as a tag"
+                        )));
+                    }
                     map.insert(key.to_string(), Value::String(tag.to_string()));
                 }
             }
@@ -799,5 +805,16 @@ mod tests {
         assert_eq!(request.from_tag, Some(BlockNumberOrTag::Latest));
         let err = serde_json::from_str::<TraceFilterRequest>(r#"{"unknown":0}"#).unwrap_err();
         assert!(err.to_string().starts_with("unknown field `unknown`"), "{err}");
+    }
+
+    #[test]
+    fn trace_filter_request_rejects_conflicting_bounds() {
+        let request = TraceFilterRequest {
+            filter: TraceFilter::default().from_block(1),
+            from_tag: Some(BlockNumberOrTag::Latest),
+            to_tag: None,
+        };
+        let err = serde_json::to_value(&request).unwrap_err();
+        assert_eq!(err.to_string(), "fromBlock is set both as a number and as a tag");
     }
 }
