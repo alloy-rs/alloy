@@ -26,8 +26,9 @@ impl core::error::Error for CallManyLimitExceeded {}
 pub trait CallManyList: Sized {
     /// Deserializes the list, decoding at most `max_calls` calls.
     ///
-    /// Calls past the limit are consumed without being deserialized, and the result is
-    /// [`CallManyLimitExceeded`]. Calls are counted like [`Self::call_count`].
+    /// The first call past the limit and everything after it are consumed without being
+    /// deserialized, and the result is [`CallManyLimitExceeded`]. Calls are counted like
+    /// [`Self::call_count`].
     fn deserialize_limited<'de, D: Deserializer<'de>>(
         deserializer: D,
         max_calls: usize,
@@ -236,7 +237,10 @@ impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for BundleSeed<'_, TxReq
     type Value = Option<Bundle<TxReq>>;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
-        if self.budget.exceeded {
+        // Every bundle counts as at least one call, so one that starts with no call left is past
+        // the limit whatever it contains.
+        if self.budget.remaining == 0 {
+            self.budget.exceeded = true;
             IgnoredAny::deserialize(deserializer)?;
             return Ok(None);
         }
@@ -245,9 +249,9 @@ impl<'de, TxReq: Deserialize<'de>> DeserializeSeed<'de> for BundleSeed<'_, TxReq
             &["transactions", "blockOverride"],
             BundleVisitor { budget: &mut *self.budget, marker: self.marker },
         )?;
-        // An empty bundle counts as one call.
-        if bundle.transactions.is_empty() && !self.budget.charge() {
-            return Ok(None);
+        // An empty bundle counts as one call, which the check above left room for.
+        if bundle.transactions.is_empty() {
+            self.budget.charge();
         }
         Ok((!self.budget.exceeded).then_some(bundle))
     }
@@ -278,6 +282,11 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for BundleVisitor<'_, TxReq> {
         let mut transactions = None;
         let mut block_override = None;
         while let Some(key) = map.next_key::<BundleField>()? {
+            // Past the limit the rest of the bundle is only consumed.
+            if self.budget.exceeded {
+                map.next_value::<IgnoredAny>()?;
+                continue;
+            }
             match key {
                 BundleField::Transactions => {
                     if transactions.is_some() {
@@ -307,6 +316,11 @@ impl<'de, TxReq: Deserialize<'de>> Visitor<'de> for BundleVisitor<'_, TxReq> {
         let transactions = seq
             .next_element_seed(TransactionsSeed { budget: &mut *self.budget, marker: self.marker })?
             .ok_or_else(|| A::Error::invalid_length(0, &self))?;
+        // Past the limit the rest of the bundle is only consumed.
+        if self.budget.exceeded {
+            while seq.next_element::<IgnoredAny>()?.is_some() {}
+            return Ok(Bundle { transactions, block_override: None });
+        }
         let block_override = seq.next_element::<Option<BlockOverrides>>()?.flatten();
         if seq.next_element::<IgnoredAny>()?.is_some() {
             return Err(A::Error::invalid_length(3, &self));
@@ -428,8 +442,9 @@ mod tests {
 
     #[test]
     fn decodes_array_encoded_bundles() {
-        let input = r#"[[[{}, {}], null], [[{}]]]"#;
+        let input = r#"[[[{}, {}], {"number":"0x2"}], [[{}]]]"#;
         let expected = serde_json::from_str::<Vec<Bundle<TransactionRequest>>>(input).unwrap();
+        assert!(expected[0].block_override.is_some());
         assert_eq!(parse::<Vec<Bundle<TransactionRequest>>>(input, 3).unwrap().unwrap(), expected);
         assert_eq!(
             parse::<Vec<Bundle<TransactionRequest>>>(input, 2).unwrap(),
@@ -438,10 +453,14 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_transactions() {
+    fn rejects_duplicate_fields() {
         let input = r#"[{"transactions":[{}],"transactions":[]}]"#;
         let err = parse::<Vec<Bundle<TransactionRequest>>>(input, 8).unwrap_err();
         assert_eq!(err.to_string(), "duplicate field `transactions` at line 1 column 36");
+
+        let input = r#"[{"transactions":[],"blockOverride":null,"blockOverride":null}]"#;
+        let err = parse::<Vec<Bundle<TransactionRequest>>>(input, 8).unwrap_err();
+        assert_eq!(err.to_string(), "duplicate field `blockOverride` at line 1 column 56");
     }
 
     #[test]
@@ -459,6 +478,24 @@ mod tests {
             parse::<Vec<(TransactionRequest, Vec<String>)>>(input, 1).unwrap(),
             Err(CallManyLimitExceeded)
         );
+    }
+
+    /// Input that only fails to decode after the first call past the limit is a limit error.
+    #[test]
+    fn skips_bundles_past_the_limit_without_decoding() {
+        for input in [
+            r#"[{"transactions":[{}]},123]"#,
+            r#"[{"transactions":[{}]},{"blockOverride":123,"transactions":[]}]"#,
+            r#"[{"transactions":[{},{}],"blockOverride":123}]"#,
+            r#"[[[{},{}],123,{}]]"#,
+        ] {
+            assert!(parse::<Vec<Bundle<TransactionRequest>>>(input, 8).is_err(), "{input}");
+            assert_eq!(
+                parse::<Vec<Bundle<TransactionRequest>>>(input, 1).unwrap(),
+                Err(CallManyLimitExceeded),
+                "{input}"
+            );
+        }
     }
 
     #[test]
