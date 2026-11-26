@@ -1,6 +1,7 @@
 use super::*;
 
-/// Stateless execution witness returned by `POST /payloads/witness`.
+/// Stateless execution witness returned by `POST /payloads/witness` and
+/// `GET /payloads/{payloadId}/witness`.
 ///
 /// Items are opaque byte lists following the execution-specs stateless witness. For Amsterdam,
 /// `headers` holds between 1 and 256 parent-linked headers in oldest-to-newest order, ending at the
@@ -58,6 +59,11 @@ impl ssz::Decode for PayloadStatusWithWitness {
         if payload_status.status != PayloadStatusKind::Valid && witness.is_some() {
             return Err(ssz::DecodeError::BytesInvalid(
                 "execution witness is only valid for VALID payload status".into(),
+            ));
+        }
+        if payload_status.status == PayloadStatusKind::Valid && witness.is_none() {
+            return Err(ssz::DecodeError::BytesInvalid(
+                "VALID payload status requires an execution witness".into(),
             ));
         }
         Ok(Self { payload_status, witness })

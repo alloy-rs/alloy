@@ -736,6 +736,17 @@ fn witness_response_omits_witness_for_non_valid_status() {
 }
 
 #[test]
+fn witness_response_requires_witness_for_valid_status() {
+    let response = PayloadStatusWithWitness::new(witness_status(PayloadStatusKind::Valid), None);
+    assert_eq!(
+        PayloadStatusWithWitness::from_ssz_bytes(&response.as_ssz_bytes()),
+        Err(ssz::DecodeError::BytesInvalid(
+            "VALID payload status requires an execution witness".into(),
+        )),
+    );
+}
+
+#[test]
 fn built_payload_witness_has_two_offsets_and_requires_witness() {
     let response = BuiltPayloadWithWitness {
         built_payload: BuiltPayloadAmsterdam {
