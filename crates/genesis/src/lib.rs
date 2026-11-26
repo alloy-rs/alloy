@@ -875,10 +875,17 @@ impl ChainConfig {
 
         scheduled.sort_by_key(|(timestamp, _)| *timestamp);
 
+        let prague = prague.unwrap_or_else(BlobParams::prague);
+
         BlobScheduleBlobParams {
             cancun: cancun.unwrap_or_else(BlobParams::cancun),
-            prague: prague.unwrap_or_else(BlobParams::prague),
-            osaka: osaka.unwrap_or_else(BlobParams::osaka),
+            prague,
+            // Without an osaka entry, Osaka keeps the chain's Prague blob counts.
+            osaka: osaka.unwrap_or_else(|| {
+                prague
+                    .with_blob_base_cost(eip7840::BLOB_BASE_COST)
+                    .with_max_blobs_per_tx(eip7594::MAX_BLOBS_PER_TX_FUSAKA)
+            }),
             scheduled,
         }
     }
@@ -1174,6 +1181,32 @@ mod tests {
                 .collect();
             assert_eq!(entries, vec![(10, 10, 15), (20, 14, 21), (30, 21, 32)]);
         }
+    }
+
+    #[test]
+    fn blob_schedule_osaka_falls_back_to_prague() {
+        let config: ChainConfig = serde_json::from_value(json!({
+            "chainId": 1,
+            "osakaTime": 10,
+            "blobSchedule": {
+                "cancun": { "target": 3, "max": 6, "baseFeeUpdateFraction": 3338477 },
+                "prague": { "target": 9, "max": 12, "baseFeeUpdateFraction": 7509807 }
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            config.blob_schedule_blob_params().osaka,
+            BlobParams {
+                target_blob_count: 9,
+                max_blob_count: 12,
+                update_fraction: 7509807,
+                max_blobs_per_tx: 6,
+                blob_base_cost: 8192,
+                ..BlobParams::osaka()
+            }
+        );
+        assert_eq!(ChainConfig::default().blob_schedule_blob_params().osaka, BlobParams::osaka());
     }
 
     #[test]

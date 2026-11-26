@@ -43,7 +43,7 @@ impl Secp256k1Credential {
     ///
     /// This exposes private-key material. Do not log or disclose it.
     #[inline]
-    pub const fn into_inner(self) -> SecretKey {
+    pub fn into_inner(self) -> SecretKey {
         self.0
     }
 
@@ -87,6 +87,15 @@ impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
             .ok_or_else(|| SignatureError::from_source("invalid recovery id"))?;
 
         Ok((k256_sig, k256_rec_id))
+    }
+}
+
+/// Overwrites the credential's secret key. [`SecretKey`] is `Copy`, so copies taken from
+/// [`inner`](Secp256k1Credential::inner) or [`into_inner`](Secp256k1Credential::into_inner) are
+/// not erased.
+impl Drop for Secp256k1Credential {
+    fn drop(&mut self) {
+        self.0.non_secure_erase();
     }
 }
 
@@ -142,7 +151,7 @@ impl LocalSigner<Secp256k1Credential> {
     /// clear copies as soon as practical.
     #[inline]
     pub fn to_bytes(&self) -> B256 {
-        B256::from_slice(&self.credential.0.secret_bytes())
+        B256::from_slice(&self.credential.0[..])
     }
 
     /// Convenience function that returns this signer's ethereum public key as a [`B512`] byte
@@ -160,7 +169,7 @@ impl LocalSigner<Secp256k1Credential> {
     /// The resulting signer will have the same address, private key, and chain ID.
     #[inline]
     pub fn to_k256(&self) -> crate::PrivateKeySigner {
-        let mut signer = crate::PrivateKeySigner::from_slice(&self.credential.0.secret_bytes())
+        let mut signer = crate::PrivateKeySigner::from_slice(&self.credential.0[..])
             .expect("valid secp256k1 key bytes should be valid k256 key bytes");
         signer.set_chain_id(self.chain_id);
         signer

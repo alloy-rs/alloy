@@ -270,3 +270,28 @@ async fn timeout_applies_while_waiting_for_confirmations() {
         assert!(harness.paused.is_paused(), "{received_at_block:?}");
     }
 }
+
+/// Watchers registered at the same instant (coarse clocks, e.g. browser timers) must each keep
+/// their own timeout.
+#[test]
+fn timeouts_registered_at_the_same_instant_reap_every_watcher() {
+    let (_blocks, stream) = futures::channel::mpsc::unbounded::<Block>();
+    let mut heartbeat = Heartbeat::<Ethereum, _>::new(stream, Arc::default());
+    let now = Instant::now();
+    let mut receivers = Vec::new();
+    for tx_hash in [B256::with_last_byte(1), B256::with_last_byte(2)] {
+        let (tx, rx) = oneshot::channel();
+        let config = PendingTransactionConfig::new(tx_hash).with_timeout(Some(Duration::ZERO));
+        let watcher = TxWatcher { config, received_at_block: None, reap_at: None, tx };
+        heartbeat.handle_watch_ix_at(watcher, now);
+        receivers.push(rx);
+    }
+
+    std::thread::sleep(Duration::from_millis(1));
+    heartbeat.reap_timeouts();
+
+    for mut rx in receivers {
+        assert!(matches!(rx.try_recv(), Ok(Err(WatchTxError::Timeout))), "watcher not reaped");
+    }
+    assert!(!heartbeat.has_pending_transactions());
+}

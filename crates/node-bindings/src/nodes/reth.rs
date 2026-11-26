@@ -1,7 +1,7 @@
 //! Utilities for configuring and launching a Reth node.
 
 use crate::{
-    utils::{extract_endpoint, GracefulShutdown, StartupGuard},
+    utils::{extract_endpoint, GracefulShutdown, LineReader, StartupGuard},
     NodeError, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
@@ -9,7 +9,6 @@ use rand::Rng;
 use std::{
     ffi::OsString,
     fs::create_dir_all,
-    io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
     time::Instant,
@@ -503,7 +502,7 @@ impl Reth {
         let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
         let start = Instant::now();
-        let mut reader = BufReader::new(stdout);
+        let mut reader = LineReader::new(stdout, self.keep_stdout);
 
         let mut http_port = 0;
         let mut ws_port = 0;

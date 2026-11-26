@@ -13,6 +13,7 @@ use serde::{
     ser::SerializeSeq,
     Deserialize, Deserializer, Serialize, Serializer,
 };
+use serde_json::Value;
 
 /// Operation type enum for `InternalOperation` struct
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -198,7 +199,6 @@ where
     S: Serializer,
     T: Serialize,
 {
-    use serde_json::Value;
     match txs {
         BlockTransactions::Hashes(hashes) => hashes.serialize(serializer),
         BlockTransactions::Uncle => serializer.serialize_seq(Some(0))?.end(),

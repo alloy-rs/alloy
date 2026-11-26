@@ -11,6 +11,7 @@ mod expand;
 mod parse;
 mod serde;
 
+use darling::FromDeriveInput;
 use expand::Expander;
 use parse::{EnvelopeArgs, GroupedVariants};
 use proc_macro::TokenStream;
@@ -93,8 +94,6 @@ pub fn derive_transaction_envelope(input: TokenStream) -> TokenStream {
 
 /// Expand the transaction envelope derive macro.
 fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::TokenStream, Error> {
-    use darling::FromDeriveInput;
-
     // Parse the input with darling
     let args = EnvelopeArgs::from_derive_input(&input)
         .map_err(|e| Error::new_spanned(&input.ident, e.to_string()))?;
