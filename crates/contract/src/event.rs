@@ -344,11 +344,15 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
             ));
         };
 
-        let from =
-            resolve_block_tag(&self.provider, from_block.unwrap_or(BlockNumberOrTag::Earliest))
-                .await?;
-        let to =
-            resolve_block_tag(&self.provider, to_block.unwrap_or(BlockNumberOrTag::Latest)).await?;
+        let from_tag = from_block.unwrap_or(BlockNumberOrTag::Earliest);
+        let to_tag = to_block.unwrap_or(BlockNumberOrTag::Latest);
+        let from = resolve_block_tag(&self.provider, from_tag).await?;
+        // A moving block tag can resolve differently between RPC calls.
+        let to = if from_tag == to_tag {
+            from
+        } else {
+            resolve_block_tag(&self.provider, to_tag).await?
+        };
 
         if from > to {
             return Err(RpcError::local_usage_str(&format!(
@@ -870,6 +874,30 @@ mod tests {
         let err = chunked.query_raw().await.unwrap_err();
         assert!(err.is_local_usage_error(), "expected a local usage error, got: {err}");
         assert!(asserter.read_q().is_empty(), "expected the initial request to reach the RPC");
+    }
+
+    #[tokio::test]
+    async fn chunked_query_stream_resolves_identical_block_tags_once() {
+        let asserter = Asserter::new();
+        asserter.push_success(&10_u64);
+        let log = Log { block_number: Some(10), ..Default::default() };
+        asserter.push_success(&[&log]);
+        let provider =
+            alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
+        let chunked =
+            event.from_block(BlockNumberOrTag::Latest).to_block(BlockNumberOrTag::Latest).chunked();
+
+        let logs = chunked.query_raw_stream().await.unwrap().try_collect::<Vec<_>>().await.unwrap();
+        assert_eq!(logs, [log]);
+
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].method(), "eth_blockNumber");
+        assert_eq!(requests[1].method(), "eth_getLogs");
+        let (filter,): (Filter,) =
+            serde_json::from_str(requests[1].params().unwrap().get()).unwrap();
+        assert_eq!(filter.block_option, Filter::new().from_block(10).to_block(10).block_option);
     }
 
     #[tokio::test]
