@@ -5,8 +5,9 @@ use crate::parity::{
     TransactionTrace,
 };
 use alloy_primitives::{map::AddressHashSet, Address, BlockHash};
-use alloy_rpc_types_eth::FilterBlockOption;
-use serde::{Deserialize, Serialize};
+use alloy_rpc_types_eth::{BlockNumberOrTag, FilterBlockOption};
+use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::{Map, Value};
 
 /// Trace filter.
 ///
@@ -147,6 +148,91 @@ impl From<TraceFilterBlockOption> for FilterBlockOption {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, thiserror::Error)]
 #[error("cannot specify both blockHash and fromBlock/toBlock, choose one or the other")]
 pub struct TraceFilterBlockConflict;
+
+/// A `trace_filter` parameter: a [`TraceFilter`] whose `fromBlock` and `toBlock` may also be a
+/// block tag.
+///
+/// [`TraceFilter`] types its bounds as block numbers. When deserializing, a bound given as exactly
+/// one of the tags `earliest`, `latest`, `safe`, `finalized` or `pending` is taken out before the
+/// rest is parsed as a [`TraceFilter`], whose `from_block` or `to_block` is then `None`; numeric
+/// bounds are parsed by [`TraceFilter`]. A repeated member is rejected, as [`TraceFilter`] rejects
+/// it.
+///
+/// Servers resolve the tags to block numbers. A tag combined with `block_hash`, or a `pending`
+/// tag, is for them to reject, since [`TraceFilter::block_option`] does not see the tags.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TraceFilterRequest {
+    /// The filter, without the bounds given as tags.
+    pub filter: TraceFilter,
+    /// The `fromBlock` bound, when given as a tag.
+    pub from_tag: Option<BlockNumberOrTag>,
+    /// The `toBlock` bound, when given as a tag.
+    pub to_tag: Option<BlockNumberOrTag>,
+}
+
+impl From<TraceFilter> for TraceFilterRequest {
+    fn from(filter: TraceFilter) -> Self {
+        Self { filter, from_tag: None, to_tag: None }
+    }
+}
+
+impl Serialize for TraceFilterRequest {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut filter = serde_json::to_value(&self.filter).map_err(ser::Error::custom)?;
+        if let Value::Object(map) = &mut filter {
+            for (key, tag) in [("fromBlock", self.from_tag), ("toBlock", self.to_tag)] {
+                if let Some(tag) = tag {
+                    map.insert(key.to_string(), Value::String(tag.to_string()));
+                }
+            }
+        }
+        filter.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for TraceFilterRequest {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let mut filter = deserializer.deserialize_map(UniqueKeysVisitor)?;
+        let mut take_tag = |key: &str| {
+            let tag = match filter.get(key)?.as_str()? {
+                "earliest" => BlockNumberOrTag::Earliest,
+                "latest" => BlockNumberOrTag::Latest,
+                "safe" => BlockNumberOrTag::Safe,
+                "finalized" => BlockNumberOrTag::Finalized,
+                "pending" => BlockNumberOrTag::Pending,
+                _ => return None,
+            };
+            filter.remove(key);
+            Some(tag)
+        };
+        let from_tag = take_tag("fromBlock");
+        let to_tag = take_tag("toBlock");
+        let filter = TraceFilter::deserialize(Value::Object(filter)).map_err(de::Error::custom)?;
+        Ok(Self { filter, from_tag, to_tag })
+    }
+}
+
+/// Collects a JSON object, rejecting a repeated member.
+struct UniqueKeysVisitor;
+
+impl<'de> de::Visitor<'de> for UniqueKeysVisitor {
+    type Value = Map<String, Value>;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("a trace filter object")
+    }
+
+    fn visit_map<A: de::MapAccess<'de>>(self, mut access: A) -> Result<Self::Value, A::Error> {
+        let mut map = Map::new();
+        while let Some((key, value)) = access.next_entry::<String, Value>()? {
+            if map.contains_key(&key) {
+                return Err(de::Error::custom(format_args!("duplicate field `{key}`")));
+            }
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+}
 
 /// How to apply `from_address` and `to_address` filters.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -633,5 +719,44 @@ mod tests {
         assert!(!m5.matches(&trace));
         assert!(!m6.matches(&trace));
         assert!(!m7.matches(&trace));
+    }
+
+    #[test]
+    fn trace_filter_request_takes_tags() {
+        let request: TraceFilterRequest =
+            serde_json::from_value(json!({ "fromBlock": "safe", "toBlock": "0x2" })).unwrap();
+        assert_eq!(request.from_tag, Some(BlockNumberOrTag::Safe));
+        assert_eq!(request.to_tag, None);
+        assert_eq!(request.filter, TraceFilter::default().to_block(2));
+        assert_eq!(
+            serde_json::to_value(&request).unwrap(),
+            json!({
+                "fromBlock": "safe",
+                "toBlock": "0x2",
+                "fromAddress": [],
+                "toAddress": [],
+                "mode": "intersection",
+            })
+        );
+
+        // Numeric bounds are parsed as before, and tags are matched exactly.
+        let request: TraceFilterRequest =
+            serde_json::from_value(json!({ "fromBlock": "0x1" })).unwrap();
+        assert_eq!(request, TraceFilter::default().from_block(1).into());
+        assert!(
+            serde_json::from_value::<TraceFilterRequest>(json!({ "toBlock": "LATEST" })).is_err()
+        );
+        assert!(serde_json::from_value::<TraceFilterRequest>(json!({ "unknown": 1 })).is_err());
+    }
+
+    #[test]
+    fn trace_filter_request_rejects_duplicate_members() {
+        for json in [
+            r#"{"blockHash":"0x0000000000000000000000000000000000000000000000000000000000000001","blockHash":null,"fromBlock":"latest"}"#,
+            r#"{"fromBlock":"latest","fromBlock":"0x1"}"#,
+        ] {
+            let err = serde_json::from_str::<TraceFilterRequest>(json).unwrap_err();
+            assert!(err.to_string().starts_with("duplicate field"), "{json}: {err}");
+        }
     }
 }
