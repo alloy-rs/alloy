@@ -11,6 +11,13 @@ pub(super) fn check(actual: usize, max: usize, field: &str) -> Result<(), Decode
     Ok(())
 }
 
+/// Returns the item count declared by the first offset of a list of variable-size items.
+///
+/// An unreadable offset counts as zero so that the list decoder reports it.
+fn declared_len(bytes: &[u8]) -> usize {
+    ssz::read_offset(bytes).map_or(0, |offset| offset / ssz::BYTES_PER_LENGTH_OFFSET)
+}
+
 pub(crate) trait Validate {
     fn validate(&self) -> Result<(), DecodeError>;
 }
@@ -108,16 +115,14 @@ macro_rules! bounded_list {
                 pub(crate) fn from_ssz_bytes<T: Decode>(
                     bytes: &[u8],
                 ) -> Result<Vec<T>, DecodeError> {
-                    if bytes.is_empty() {
-                        return Ok(Vec::new());
-                    }
                     // Check the count before allocating the list or decoding any items.
-                    if T::is_ssz_fixed_len() {
-                        check(bytes.len().div_ceil(T::ssz_fixed_len()), $limit, stringify!($name))?;
-                        Vec::<T>::from_ssz_bytes(bytes)
+                    let len = if T::is_ssz_fixed_len() {
+                        bytes.len().div_ceil(T::ssz_fixed_len())
                     } else {
-                        ssz::decode_list_of_variable_length_items(bytes, Some($limit))
-                    }
+                        declared_len(bytes)
+                    };
+                    check(len, $limit, stringify!($name))?;
+                    Vec::<T>::from_ssz_bytes(bytes)
                 }
             }
         }
@@ -139,8 +144,8 @@ macro_rules! bounded_byte_lists {
                 pub(crate) use super::super::encode::{is_ssz_fixed_len, ssz_fixed_len};
                 use super::super::*;
                 pub(crate) fn from_ssz_bytes(bytes: &[u8]) -> Result<Vec<Bytes>, DecodeError> {
-                    let values: Vec<Bytes> =
-                        ssz::decode_list_of_variable_length_items(bytes, Some($limit))?;
+                    check(declared_len(bytes), $limit, stringify!($name))?;
+                    let values = Vec::<Bytes>::from_ssz_bytes(bytes)?;
                     for value in &values {
                         check(value.len(), $max_bytes, stringify!($name))?;
                     }
@@ -197,20 +202,27 @@ mod tests {
     #[test]
     fn byte_lists_reject_count_before_item_offsets() {
         type Decoder = fn(&[u8]) -> Result<Vec<Bytes>, DecodeError>;
-        for (limit, decode) in [
-            (MAX_WITNESS_ITEMS, witness_state::decode::from_ssz_bytes as Decoder),
-            (MAX_WITNESS_ITEMS, witness_codes::decode::from_ssz_bytes as Decoder),
-            (MAX_WITNESS_HEADERS, witness_headers::decode::from_ssz_bytes as Decoder),
+        for (name, limit, decode) in [
+            ("witness_state", MAX_WITNESS_ITEMS, witness_state::decode::from_ssz_bytes as Decoder),
+            ("witness_codes", MAX_WITNESS_ITEMS, witness_codes::decode::from_ssz_bytes as Decoder),
+            (
+                "witness_headers",
+                MAX_WITNESS_HEADERS,
+                witness_headers::decode::from_ssz_bytes as Decoder,
+            ),
         ] {
             // The first offset declares an over-limit count; the remaining offsets are invalid.
             // The count must be rejected before collecting items or inspecting their offsets.
             let mut bytes = vec![0; (limit + 1) * ssz::BYTES_PER_LENGTH_OFFSET];
             let first_offset = u32::try_from(bytes.len()).unwrap().to_le_bytes();
             bytes[..4].copy_from_slice(&first_offset);
-            assert!(matches!(
+            assert_eq!(
                 decode(&bytes),
-                Err(DecodeError::BytesInvalid(message)) if message.contains("exceeds maximum")
-            ));
+                Err(DecodeError::BytesInvalid(format!(
+                    "{name} exceeds SSZ bound: {} > {limit}",
+                    limit + 1
+                )))
+            );
         }
     }
 
