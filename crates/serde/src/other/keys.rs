@@ -18,14 +18,23 @@ use serde_json::{Error, Value};
 ///
 /// Returns an error if a map key is not a string. Keys removed up to that point are keys of
 /// `value`.
-pub(super) fn remove_keys<T: Serialize>(
-    value: &T,
-    map: &mut BTreeMap<String, Value>,
-) -> Result<(), Error> {
+pub(super) fn remove_keys<T: Serialize, M: KeySet>(value: &T, map: &mut M) -> Result<(), Error> {
     value.serialize(KeyRemover(map))
 }
 
-struct KeyRemover<'a>(&'a mut BTreeMap<String, Value>);
+/// A set of keys that keys can be removed from.
+pub(super) trait KeySet {
+    /// Removes `key` if it is present.
+    fn remove_key(&mut self, key: &str);
+}
+
+impl KeySet for BTreeMap<String, Value> {
+    fn remove_key(&mut self, key: &str) {
+        self.remove(key);
+    }
+}
+
+struct KeyRemover<'a, M>(&'a mut M);
 
 macro_rules! ignore {
     ($($method:ident($($ty:ty)?))*) => {$(
@@ -35,7 +44,7 @@ macro_rules! ignore {
     )*};
 }
 
-impl Serializer for KeyRemover<'_> {
+impl<M: KeySet> Serializer for KeyRemover<'_, M> {
     type Ok = ();
     type Error = Error;
     type SerializeSeq = Ignore;
@@ -81,7 +90,7 @@ impl Serializer for KeyRemover<'_> {
         variant: &'static str,
         _: &T,
     ) -> Result<(), Error> {
-        self.0.remove(variant);
+        self.0.remove_key(variant);
         Ok(())
     }
 
@@ -104,7 +113,7 @@ impl Serializer for KeyRemover<'_> {
         variant: &'static str,
         _: usize,
     ) -> Result<Ignore, Error> {
-        self.0.remove(variant);
+        self.0.remove_key(variant);
         Ok(Ignore)
     }
 
@@ -123,12 +132,12 @@ impl Serializer for KeyRemover<'_> {
         variant: &'static str,
         _: usize,
     ) -> Result<Ignore, Error> {
-        self.0.remove(variant);
+        self.0.remove_key(variant);
         Ok(Ignore)
     }
 }
 
-impl SerializeStruct for KeyRemover<'_> {
+impl<M: KeySet> SerializeStruct for KeyRemover<'_, M> {
     type Ok = ();
     type Error = Error;
 
@@ -137,7 +146,7 @@ impl SerializeStruct for KeyRemover<'_> {
         key: &'static str,
         _: &T,
     ) -> Result<(), Error> {
-        self.0.remove(key);
+        self.0.remove_key(key);
         Ok(())
     }
 
@@ -146,7 +155,7 @@ impl SerializeStruct for KeyRemover<'_> {
     }
 }
 
-impl SerializeMap for KeyRemover<'_> {
+impl<M: KeySet> SerializeMap for KeyRemover<'_, M> {
     type Ok = ();
     type Error = Error;
 
@@ -236,7 +245,7 @@ impl SerializeStructVariant for Ignore {
 }
 
 /// Removes a string map key from the map and rejects every other key type.
-struct KeyCapture<'a>(&'a mut BTreeMap<String, Value>);
+struct KeyCapture<'a, M>(&'a mut M);
 
 macro_rules! reject {
     ($($method:ident($($ty:ty)?))*) => {$(
@@ -246,7 +255,7 @@ macro_rules! reject {
     )*};
 }
 
-impl Serializer for KeyCapture<'_> {
+impl<M: KeySet> Serializer for KeyCapture<'_, M> {
     type Ok = ();
     type Error = Error;
     type SerializeSeq = Impossible<(), Error>;
@@ -258,7 +267,7 @@ impl Serializer for KeyCapture<'_> {
     type SerializeStructVariant = Impossible<(), Error>;
 
     fn serialize_str(self, key: &str) -> Result<(), Error> {
-        self.0.remove(key);
+        self.0.remove_key(key);
         Ok(())
     }
 

@@ -3,14 +3,20 @@
 use alloc::{collections::BTreeMap, format, string::String};
 use core::{
     fmt,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use keys::KeySet;
+use serde::{
+    de::{DeserializeOwned, MapAccess, Visitor},
+    Deserialize, Serialize,
+};
 use serde_json::Value;
 
 #[cfg(any(test, feature = "arbitrary"))]
 mod arbitrary_;
 
+mod buffered;
 mod keys;
 
 /// Generic type for capturing additional fields when deserializing structs.
@@ -248,38 +254,98 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct WithOtherFieldsHelper<T> {
-            #[serde(flatten)]
-            inner: T,
-            #[serde(flatten)]
-            other: OtherFields,
-        }
+        struct ObjectVisitor<T>(PhantomData<fn() -> T>);
 
-        let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
-        // remove all fields present in the inner struct from the other fields, this is to avoid
-        // duplicate fields in the catch all other fields because serde flatten does not exclude
-        // already deserialized fields when deserializing the other fields.
-        if keys::remove_keys(&helper.inner, &mut helper.other).is_err() {
-            // Not every key is a string: let `serde_json` stringify them.
-            if let Value::Object(map) =
-                serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
-            {
-                for key in map.keys() {
-                    helper.other.remove(key);
+        impl<'de, T: Deserialize<'de> + Serialize> Visitor<'de> for ObjectVisitor<T> {
+            type Value = WithOtherFields<T>;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("struct WithOtherFieldsHelper")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+                // Buffer the object once. The inner value reads the entries by reference, and
+                // only the entries it neither took nor serializes become other fields.
+                let mut entries = buffered::Entries::read(map)?;
+                if entries.has_byte_strings() {
+                    // A byte string cannot become another field, wherever it is. Whether that
+                    // is an error depends on what the inner value leaves in place, which serde's
+                    // own flattening settles.
+                    return deserialize_flattened(entries.deserializer());
                 }
+                let inner = T::deserialize(buffered::Flat::new(&mut entries));
+                if entries.asked_for_option() {
+                    // serde decides through a private hook whether a flattened `Option` is
+                    // `None`, so that case goes through its own flattening.
+                    return deserialize_flattened(entries.deserializer());
+                }
+                let inner = inner?;
+                if keys::remove_keys(&inner, &mut entries).is_err() {
+                    // Not every key is a string: let `serde_json` stringify them.
+                    if let Value::Object(map) =
+                        serde_json::to_value(&inner).map_err(serde::de::Error::custom)?
+                    {
+                        for key in map.keys() {
+                            entries.remove_key(key);
+                        }
+                    }
+                }
+
+                Ok(WithOtherFields { inner, other: OtherFields::new(entries.into_other()?) })
             }
         }
 
-        Ok(Self { inner: helper.inner, other: helper.other })
+        deserializer.deserialize_map(ObjectVisitor(PhantomData))
     }
+}
+
+/// Deserializes through `#[serde(flatten)]`, which buffers the object and copies every field the
+/// inner value leaves in place into the other fields before removing them again.
+fn deserialize_flattened<'de, T, D>(deserializer: D) -> Result<WithOtherFields<T>, D::Error>
+where
+    T: Deserialize<'de> + Serialize,
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct WithOtherFieldsHelper<T> {
+        #[serde(flatten)]
+        inner: T,
+        #[serde(flatten)]
+        other: OtherFields,
+    }
+
+    let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
+    // remove all fields present in the inner struct from the other fields, this is to avoid
+    // duplicate fields in the catch all other fields because serde flatten does not exclude
+    // already deserialized fields when deserializing the other fields.
+    if keys::remove_keys(&helper.inner, &mut helper.other.inner).is_err() {
+        // Not every key is a string: let `serde_json` stringify them.
+        if let Value::Object(map) =
+            serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
+        {
+            for key in map.keys() {
+                helper.other.remove(key);
+            }
+        }
+    }
+
+    Ok(WithOtherFields { inner: helper.inner, other: helper.other })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::string::ToString;
-    use rand::Rng;
+    use alloc::{
+        string::{String, ToString},
+        vec::Vec,
+    };
+    use alloy_primitives::B256;
+    use arbitrary::{Arbitrary, Unstructured};
+    use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
+    use serde::de::{
+        value::{self, MapDeserializer},
+        IntoDeserializer,
+    };
     use serde_json::json;
     use similar_asserts::assert_eq;
 
@@ -364,5 +430,217 @@ mod tests {
 
         let expected = r#"{"a":42,"b":"Hello","extra":99}"#;
         assert_eq!(serialized, expected);
+    }
+
+    /// Decodes `json` through the buffer and through `#[serde(flatten)]`, as text, from a reader
+    /// and from a `Value`, expects the same result each time and returns whether it decoded.
+    fn matches_flattened<T>(json: &str) -> bool
+    where
+        T: DeserializeOwned + Serialize + PartialEq + fmt::Debug,
+    {
+        let buffered =
+            serde_json::from_str::<WithOtherFields<T>>(json).map_err(|err| err.to_string());
+        let mut deserializer = serde_json::Deserializer::from_str(json);
+        let flattened =
+            deserialize_flattened::<T, _>(&mut deserializer).map_err(|err| err.to_string());
+        assert_eq!(buffered, flattened, "{json}");
+
+        // A reader hands out owned strings.
+        let mut deserializer = serde_json::Deserializer::from_reader(json.as_bytes());
+        assert_eq!(
+            serde_json::from_reader::<_, WithOtherFields<T>>(json.as_bytes())
+                .map_err(|err| err.to_string()),
+            deserialize_flattened::<T, _>(&mut deserializer).map_err(|err| err.to_string()),
+            "{json}"
+        );
+
+        // A `Value` keeps the last of a repeated key.
+        if let Ok(value) = serde_json::from_str::<Value>(json) {
+            assert_eq!(
+                serde_json::from_value::<WithOtherFields<T>>(value.clone())
+                    .map_err(|err| err.to_string()),
+                deserialize_flattened::<T, _>(value).map_err(|err| err.to_string()),
+                "{json}"
+            );
+        }
+
+        buffered.is_ok()
+    }
+
+    #[test]
+    fn deserialize_matches_flattened() {
+        /// Takes the entries it names. `b` is read but not written back when it is `None`, and
+        /// serde reads the units of taken entries from an empty object or array too.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Named {
+            a: Option<u64>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            b: Option<String>,
+            #[serde(default)]
+            c: Vec<u64>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            x: Option<Unit>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            y: Option<()>,
+            #[serde(default)]
+            z: Vec<Unit>,
+        }
+
+        /// Sees all entries and leaves them in place.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Flattening {
+            #[serde(flatten)]
+            named: Named,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Newtype(Named);
+
+        /// Takes the entry named like one of its variants.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        enum Tagged {
+            A(u64),
+            B { x: u64 },
+            C,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        #[serde(untagged)]
+        enum Untagged {
+            Named(Named),
+            Map(BTreeMap<String, Value>),
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Unit;
+
+        const KEYS: &[&str] = &["a", "b", "c", "x", "y", "z"];
+        const VALUES: &[&str] = &[
+            "null",
+            "0",
+            "7",
+            "-1",
+            "1.5",
+            "true",
+            r#""s""#,
+            "[]",
+            "[1,2]",
+            r#"[1,"s"]"#,
+            "{}",
+            r#"{"x":1}"#,
+            r#"{"x":1,"x":2}"#,
+            "[{}]",
+            "[[],null]",
+        ];
+
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut bytes = [0u8; 256];
+        let mut decoded = 0;
+        for _ in 0..500 {
+            // Fields no inner type knows, with keys that need escaping.
+            rng.fill(bytes.as_mut_slice());
+            let unknown = OtherFields::arbitrary(&mut Unstructured::new(&bytes)).unwrap();
+            let mut entries: Vec<(String, String)> = unknown
+                .iter()
+                .map(|(key, value)| (serde_json::to_string(key).unwrap(), value.to_string()))
+                .collect();
+            // Fields the inner types know, valid or not, possibly repeated.
+            for _ in 0..rng.gen_range(0..6) {
+                let key = KEYS[rng.gen_range(0..KEYS.len())];
+                let value = VALUES[rng.gen_range(0..VALUES.len())];
+                entries.push((format!("{key:?}"), value.to_string()));
+            }
+            entries.shuffle(&mut rng);
+            let fields: Vec<String> =
+                entries.iter().map(|(key, value)| format!("{key}:{value}")).collect();
+            let json = format!("{{{}}}", fields.join(","));
+
+            decoded += usize::from(matches_flattened::<Named>(&json));
+            matches_flattened::<Flattening>(&json);
+            matches_flattened::<Newtype>(&json);
+            matches_flattened::<Tagged>(&json);
+            matches_flattened::<Untagged>(&json);
+            matches_flattened::<Unit>(&json);
+            matches_flattened::<Option<Named>>(&json);
+            matches_flattened::<BTreeMap<String, Value>>(&json);
+            matches_flattened::<WithOtherFields<Named>>(&json);
+            // Not something that can be flattened.
+            matches_flattened::<u64>(&json);
+            matches_flattened::<Vec<u64>>(&json);
+        }
+        // Enough objects decode for the comparison to mean something.
+        assert!(decoded > 50, "{decoded}");
+
+        for json in ["{}", "[]", "null", "1", r#""a""#] {
+            matches_flattened::<Named>(json);
+            matches_flattened::<Option<Named>>(json);
+        }
+    }
+
+    /// Formats other than JSON have byte strings, which the buffer has to keep.
+    #[test]
+    fn deserialize_byte_strings_matches_flattened() {
+        #[derive(Clone, Copy)]
+        enum Scalar {
+            Bytes(&'static [u8]),
+            Number(u64),
+        }
+
+        impl<'de> serde::Deserializer<'de> for Scalar {
+            type Error = value::Error;
+
+            fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+                match self {
+                    Self::Bytes(bytes) => visitor.visit_borrowed_bytes(bytes),
+                    Self::Number(number) => visitor.visit_u64(number),
+                }
+            }
+
+            serde::forward_to_deserialize_any! {
+                bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes
+                byte_buf option unit unit_struct newtype_struct seq tuple tuple_struct map struct
+                enum identifier ignored_any
+            }
+        }
+
+        impl IntoDeserializer<'_, value::Error> for Scalar {
+            type Deserializer = Self;
+
+            fn into_deserializer(self) -> Self {
+                self
+            }
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Named {
+            hash: B256,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Flattening {
+            #[serde(flatten)]
+            named: Named,
+        }
+
+        let object = || {
+            MapDeserializer::new(
+                [("hash", Scalar::Bytes(&[0x11; 32])), ("height", Scalar::Number(7))].into_iter(),
+            )
+        };
+
+        // A struct takes its byte string out of the entries.
+        let named = WithOtherFields::<Named>::deserialize(object()).unwrap();
+        assert_eq!(named.inner.hash, B256::repeat_byte(0x11));
+        assert_eq!(
+            named.other,
+            OtherFields::new(BTreeMap::from([("height".to_string(), json!(7))]))
+        );
+        assert_eq!(named, deserialize_flattened(object()).unwrap());
+
+        // A flattened field leaves it in place, where it is no valid other field.
+        let err = WithOtherFields::<Flattening>::deserialize(object()).unwrap_err();
+        assert_eq!(err.to_string(), "invalid type: byte array, expected any valid JSON value");
+        assert_eq!(err, deserialize_flattened::<Flattening, _>(object()).unwrap_err());
     }
 }
