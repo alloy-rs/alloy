@@ -291,7 +291,7 @@ mod tests {
             r#""type":"0x1","status":"0x1","root":{"a":1}"#,
             // unknown and escaped keys
             r#""type":"0x1","status":"0x1","blockHash":"ROOT","gasUsed":"0x1","other":{"status":"0x0"}"#,
-            r#""type":"0x1","status":"0x1""#,
+            r#""\u0074ype":"0x1","stat\u0075s":"0x1","oth\u0065r":1"#,
             // repeated keys
             r#""type":"0x1","type":"0x1","status":"0x1""#,
             r#""type":"0x1","status":"0x1","status":"0x1""#,
