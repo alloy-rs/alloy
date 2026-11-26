@@ -1,6 +1,12 @@
-use crate::{Provider, ProviderLayer, RootProvider};
+use crate::{
+    EthCall, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider, SendableTx,
+};
+use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
 use alloy_node_bindings::{Anvil, AnvilInstance};
+use alloy_primitives::{Bytes, U64};
+use alloy_rpc_types_eth::{erc4337::TransactionConditional, FillTransaction};
+use alloy_transport::TransportResult;
 use reqwest::Url;
 use std::{
     marker::PhantomData,
@@ -74,9 +80,121 @@ impl<P: Provider<N>, N: Network> AnvilProvider<P, N> {
     }
 }
 
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<P: Provider<N>, N: Network> Provider<N> for AnvilProvider<P, N> {
     #[inline(always)]
     fn root(&self) -> &RootProvider<N> {
         self.inner.root()
+    }
+
+    async fn send_raw_transaction(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_sync(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.inner.send_raw_transaction_sync(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_raw_transaction_conditional(encoded_tx, conditional).await
+    }
+
+    async fn send_transaction_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_transaction_internal(tx).await
+    }
+
+    async fn send_transaction_sync_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.inner.send_transaction_sync_internal(tx).await
+    }
+
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        self.inner.sign_transaction(tx).await
+    }
+
+    async fn fill_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
+        self.inner.fill_transaction(tx).await
+    }
+
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        self.inner.fill_and_sign_transaction(tx).await
+    }
+
+    fn transaction_request(&self) -> N::TransactionRequest {
+        self.inner.transaction_request()
+    }
+
+    fn call(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
+        self.inner.call(tx)
+    }
+
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
+        self.inner.estimate_gas(tx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ProviderBuilder;
+    use alloy_primitives::Address;
+    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_signer_local::PrivateKeySigner;
+    use alloy_transport::mock::Asserter;
+    use serde_json::{json, Value};
+
+    #[tokio::test]
+    async fn forwards_calls_to_inner_wallet() {
+        let asserter = Asserter::new();
+        let signer = PrivateKeySigner::random();
+        let from = signer.address();
+        let wallet = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .wallet(signer)
+            .connect_mocked_client(asserter.clone());
+        let provider = AnvilLayer::default().layer(wallet);
+
+        // The empty mock fails every request; only the `from` set by the inner wallet matters.
+        let tx = TransactionRequest::default().to(Address::ZERO);
+        let _ = provider.call(tx.clone()).await;
+        let _ = provider.estimate_gas(tx).await;
+
+        let sent: Vec<_> = asserter
+            .requests()
+            .iter()
+            .map(|req| {
+                let body: Value = serde_json::from_str(req.serialized().get()).unwrap();
+                (req.method().to_string(), body["params"][0]["from"].clone())
+            })
+            .collect();
+        assert_eq!(
+            sent,
+            [("eth_call".to_string(), json!(from)), ("eth_estimateGas".to_string(), json!(from))]
+        );
     }
 }
