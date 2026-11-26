@@ -42,6 +42,7 @@ fn poll(pending: &mut PendingTransaction) -> Option<Result<TxHash, PendingTransa
 }
 
 const TX: TxHash = B256::with_last_byte(1);
+const OTHER: TxHash = B256::with_last_byte(9);
 
 #[tokio::test(start_paused = true)]
 async fn confirms_after_required_confirmations() {
@@ -74,6 +75,8 @@ async fn already_mined_tx_counts_confirmations_from_its_block() {
     ];
     for (received_at_block, confirmations, immediately) in cases {
         let harness = Harness::new();
+        // Keep the heartbeat unpaused so it records the blocks.
+        let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
         harness.block(1, &[]);
         harness.block(2, &[TX]);
         harness.block(3, &[]);
@@ -173,6 +176,8 @@ async fn lookbehind_keeps_last_ten_canonical_blocks() {
     ];
     for (blocks, found) in cases {
         let harness = Harness::new();
+        // Keep the heartbeat unpaused so it records the blocks.
+        let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
         for &(number, includes_tx) in &blocks {
             harness.block(number, if includes_tx { &[TX] } else { &[] });
         }
@@ -182,6 +187,27 @@ async fn lookbehind_keeps_last_ten_canonical_blocks() {
         settle().await;
         assert_eq!(poll(&mut pending).is_some(), found, "{blocks:?}");
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn ignores_blocks_while_paused() {
+    let harness = Harness::new();
+    let mut pending = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
+    harness.block(1, &[OTHER]);
+    settle().await;
+    assert!(poll(&mut pending).is_some());
+    assert!(harness.paused.is_paused());
+
+    // A block the stream had buffered before pausing can be reorged out, so it must not be
+    // matched later.
+    harness.block(2, &[TX]);
+    settle().await;
+    let config = PendingTransactionConfig::new(TX).with_timeout(Some(Duration::ZERO));
+    let res = harness.watch(config, None).await.await;
+    assert!(
+        matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+        "{res:?}"
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -214,6 +240,8 @@ async fn second_watcher_for_same_tx_does_not_replace_first() {
 #[tokio::test(start_paused = true)]
 async fn chain_gap_keeps_every_watcher_for_same_tx() {
     let harness = Harness::new();
+    // Keep the heartbeat unpaused so it records block 1.
+    let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
     harness.block(1, &[TX]);
     settle().await;
     let config = PendingTransactionConfig::new(TX).with_required_confirmations(3);
@@ -252,6 +280,8 @@ async fn timeout_reaps_only_the_watcher_that_set_it() {
 async fn timeout_applies_while_waiting_for_confirmations() {
     for received_at_block in [None, Some(1)] {
         let harness = Harness::new();
+        // Keep the heartbeat unpaused so it records block 1.
+        let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
         harness.block(1, &[TX]);
         settle().await;
 
@@ -266,6 +296,7 @@ async fn timeout_applies_while_waiting_for_confirmations() {
             matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
             "{received_at_block:?}: {res:?}"
         );
+        harness.block(2, &[OTHER]);
         settle().await;
         assert!(harness.paused.is_paused(), "{received_at_block:?}");
     }
@@ -294,4 +325,19 @@ fn timeouts_registered_at_the_same_instant_reap_every_watcher() {
         assert!(matches!(rx.try_recv(), Ok(Err(WatchTxError::Timeout))), "watcher not reaped");
     }
     assert!(!heartbeat.has_pending_transactions());
+}
+
+#[test]
+fn does_not_pause_while_watches_are_queued() {
+    let (_blocks, stream) = futures::channel::mpsc::unbounded::<Block>();
+    let mut heartbeat = Heartbeat::<Ethereum, _>::new(stream, Arc::default());
+    heartbeat.past_blocks.push_back((1, [TX].into_iter().collect()));
+    let (ix_tx, ixns) = mpsc::channel(1);
+    let (tx, _rx) = oneshot::channel();
+    let config = PendingTransactionConfig::new(TX);
+    ix_tx.try_send(TxWatcher { config, received_at_block: None, reap_at: None, tx }).unwrap();
+
+    heartbeat.update_pause_state(&ixns);
+    assert!(!heartbeat.paused.is_paused());
+    assert_eq!(heartbeat.past_blocks.len(), 1);
 }

@@ -1242,6 +1242,50 @@ mod tests {
         assert_ne!(reorged_block.header.hash, new_block.header.hash);
     }
 
+    // A reorg while the heartbeat is paused must not let a later watch resolve from the
+    // reorged-out block.
+    #[tokio::test]
+    async fn test_watch_after_reorg_while_paused() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let accounts = provider.get_accounts().await.unwrap();
+
+        let tx = TransactionRequest::default().with_to(Address::ZERO).with_value(U256::from(1));
+        // Mine manually so the heartbeat, not the receipt check, sees the transaction's block.
+        provider.anvil_set_auto_mine(false).await.unwrap();
+        let pending = provider.send_transaction(tx).await.unwrap().register().await.unwrap();
+        provider.evm_mine(None).await.unwrap();
+        let tx_hash = pending.await.unwrap();
+
+        let replacement = TransactionRequest::default()
+            .with_from(accounts[1])
+            .with_to(Address::ZERO)
+            .with_value(U256::from(2));
+        provider
+            .anvil_reorg(ReorgOptions {
+                depth: 1,
+                tx_block_pairs: vec![(TransactionData::JSON(replacement), 0)],
+            })
+            .await
+            .unwrap();
+        assert!(provider.get_transaction_receipt(tx_hash).await.unwrap().is_none());
+
+        let res = provider
+            .watch_pending_transaction(
+                crate::PendingTransactionConfig::new(tx_hash)
+                    .with_timeout(Some(std::time::Duration::from_secs(1))),
+            )
+            .await
+            .unwrap()
+            .await;
+        assert!(
+            matches!(
+                res,
+                Err(crate::PendingTransactionError::TxWatcher(crate::WatchTxError::Timeout))
+            ),
+            "{res:?}"
+        );
+    }
+
     #[tokio::test]
     async fn test_anvil_rollback() {
         let provider = ProviderBuilder::new().connect_anvil();
