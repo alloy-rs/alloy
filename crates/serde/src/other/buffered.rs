@@ -29,14 +29,27 @@ use serde_json::Value;
 /// Searching every entry for every key is quadratic if the inner value keeps all of them.
 pub(super) const LINEAR_SEARCH_LIMIT: usize = 32;
 
-/// A buffered value. Strings borrow from the input where the input allows it.
+/// A buffered value, as the input handed it out. Strings borrow from the input where the input
+/// allows it.
 #[derive(Debug)]
 pub(super) enum Buffered<'de> {
+    /// The unit value, which is what JSON's `null` is read as.
     Null,
+    None,
+    Some(Box<Self>),
+    Newtype(Box<Self>),
     Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
     U64(u64),
+    I8(i8),
+    I16(i16),
+    I32(i32),
     I64(i64),
+    F32(f32),
     F64(f64),
+    Char(char),
     Str(Cow<'de, str>),
     Bytes(Cow<'de, [u8]>),
     Seq(Vec<Self>),
@@ -49,10 +62,20 @@ impl Buffered<'_> {
     fn unexpected(&self) -> Unexpected<'_> {
         match self {
             Self::Null => Unexpected::Unit,
+            Self::None | Self::Some(_) => Unexpected::Option,
+            Self::Newtype(_) => Unexpected::NewtypeStruct,
             Self::Bool(value) => Unexpected::Bool(*value),
+            Self::U8(value) => Unexpected::Unsigned((*value).into()),
+            Self::U16(value) => Unexpected::Unsigned((*value).into()),
+            Self::U32(value) => Unexpected::Unsigned((*value).into()),
             Self::U64(value) => Unexpected::Unsigned(*value),
+            Self::I8(value) => Unexpected::Signed((*value).into()),
+            Self::I16(value) => Unexpected::Signed((*value).into()),
+            Self::I32(value) => Unexpected::Signed((*value).into()),
             Self::I64(value) => Unexpected::Signed(*value),
+            Self::F32(value) => Unexpected::Float((*value).into()),
             Self::F64(value) => Unexpected::Float(*value),
+            Self::Char(value) => Unexpected::Char(*value),
             Self::Str(value) => Unexpected::Str(value),
             Self::Bytes(value) => Unexpected::Bytes(value),
             Self::Seq(_) => Unexpected::Seq,
@@ -61,8 +84,8 @@ impl Buffered<'_> {
     }
 }
 
-/// Buffers a value and notes whether it holds what JSON has not: a byte string, or a map with a
-/// key that is no string.
+/// Buffers a value and notes whether it holds what cannot be JSON: a byte string, a newtype, or a
+/// map with a key that is no string.
 #[derive(Clone, Copy)]
 struct BufferedSeed<'a>(&'a Cell<bool>);
 
@@ -103,16 +126,48 @@ impl<'de> Visitor<'de> for BufferedSeed<'_> {
         Ok(Buffered::Bool(value))
     }
 
+    fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E> {
+        Ok(Buffered::U8(value))
+    }
+
+    fn visit_u16<E>(self, value: u16) -> Result<Self::Value, E> {
+        Ok(Buffered::U16(value))
+    }
+
+    fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E> {
+        Ok(Buffered::U32(value))
+    }
+
     fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
         Ok(Buffered::U64(value))
+    }
+
+    fn visit_i8<E>(self, value: i8) -> Result<Self::Value, E> {
+        Ok(Buffered::I8(value))
+    }
+
+    fn visit_i16<E>(self, value: i16) -> Result<Self::Value, E> {
+        Ok(Buffered::I16(value))
+    }
+
+    fn visit_i32<E>(self, value: i32) -> Result<Self::Value, E> {
+        Ok(Buffered::I32(value))
     }
 
     fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
         Ok(Buffered::I64(value))
     }
 
+    fn visit_f32<E>(self, value: f32) -> Result<Self::Value, E> {
+        Ok(Buffered::F32(value))
+    }
+
     fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E> {
         Ok(Buffered::F64(value))
+    }
+
+    fn visit_char<E>(self, value: char) -> Result<Self::Value, E> {
+        Ok(Buffered::Char(value))
     }
 
     fn visit_borrowed_str<E>(self, value: &'de str) -> Result<Self::Value, E> {
@@ -147,18 +202,19 @@ impl<'de> Visitor<'de> for BufferedSeed<'_> {
     }
 
     fn visit_none<E>(self) -> Result<Self::Value, E> {
-        Ok(Buffered::Null)
+        Ok(Buffered::None)
     }
 
     fn visit_some<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
-        deserializer.deserialize_any(self)
+        Ok(Buffered::Some(Box::new(deserializer.deserialize_any(self)?)))
     }
 
     fn visit_newtype_struct<D: Deserializer<'de>>(
         self,
         deserializer: D,
     ) -> Result<Self::Value, D::Error> {
-        deserializer.deserialize_any(self)
+        self.0.set(true);
+        Ok(Buffered::Newtype(Box::new(deserializer.deserialize_any(self)?)))
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -232,8 +288,10 @@ impl<'de> Visitor<'de> for KeySeed<'_> {
     }
 
     visit_other_key! {
-        visit_bool(bool) visit_u64(u64) visit_i64(i64) visit_f64(f64)
-        visit_borrowed_bytes(&'de [u8]) visit_bytes(&[u8]) visit_byte_buf(Vec<u8>)
+        visit_bool(bool) visit_u8(u8) visit_u16(u16) visit_u32(u32) visit_u64(u64) visit_i8(i8)
+        visit_i16(i16) visit_i32(i32) visit_i64(i64) visit_f32(f32) visit_f64(f64)
+        visit_char(char) visit_borrowed_bytes(&'de [u8]) visit_bytes(&[u8])
+        visit_byte_buf(Vec<u8>)
     }
 
     fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
@@ -293,8 +351,8 @@ impl<'de> Entries<'de> {
         Ok(Self { entries, pairs, has_non_json: has_non_json.get(), asked_for_option: false })
     }
 
-    /// Whether the object holds a byte string or a key that is no string. JSON has neither, and
-    /// other fields are JSON.
+    /// Whether the object holds a byte string, a newtype or a key that is no string. None of them
+    /// can be JSON, and other fields are JSON.
     pub(super) const fn has_non_json(&self) -> bool {
         self.has_non_json
     }
@@ -507,7 +565,7 @@ impl<'de, E: de::Error> Ref<'_, 'de, E> {
         visitor: V,
     ) -> Result<V::Value, E> {
         let mut map = MapDeserializer::new(
-            entries.iter().map(|(key, value)| (Ref::<E>::new(key), Ref::<E>::new(value))),
+            entries.iter().map(|(key, value)| (PairKey(Ref::<E>::new(key)), Ref::<E>::new(value))),
         );
         let value = visitor.visit_map(&mut map)?;
         map.end()?;
@@ -533,7 +591,13 @@ macro_rules! deserialize_integer {
     ($($method:ident)*) => {$(
         fn $method<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, E> {
             match self.value {
+                Buffered::U8(value) => visitor.visit_u8(*value),
+                Buffered::U16(value) => visitor.visit_u16(*value),
+                Buffered::U32(value) => visitor.visit_u32(*value),
                 Buffered::U64(value) => visitor.visit_u64(*value),
+                Buffered::I8(value) => visitor.visit_i8(*value),
+                Buffered::I16(value) => visitor.visit_i16(*value),
+                Buffered::I32(value) => visitor.visit_i32(*value),
                 Buffered::I64(value) => visitor.visit_i64(*value),
                 _ => Err(self.invalid_type(&visitor)),
             }
@@ -545,8 +609,15 @@ macro_rules! deserialize_float {
     ($($method:ident)*) => {$(
         fn $method<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, E> {
             match self.value {
+                Buffered::F32(value) => visitor.visit_f32(*value),
                 Buffered::F64(value) => visitor.visit_f64(*value),
+                Buffered::U8(value) => visitor.visit_u8(*value),
+                Buffered::U16(value) => visitor.visit_u16(*value),
+                Buffered::U32(value) => visitor.visit_u32(*value),
                 Buffered::U64(value) => visitor.visit_u64(*value),
+                Buffered::I8(value) => visitor.visit_i8(*value),
+                Buffered::I16(value) => visitor.visit_i16(*value),
+                Buffered::I32(value) => visitor.visit_i32(*value),
                 Buffered::I64(value) => visitor.visit_i64(*value),
                 _ => Err(self.invalid_type(&visitor)),
             }
@@ -572,10 +643,23 @@ impl<'de, E: de::Error> Deserializer<'de> for Ref<'_, 'de, E> {
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, E> {
         match self.value {
             Buffered::Null => visitor.visit_unit(),
+            Buffered::None => visitor.visit_none(),
+            Buffered::Some(value) => visitor.visit_some(Self::with_taken(value, self.taken)),
+            Buffered::Newtype(value) => {
+                visitor.visit_newtype_struct(Self::with_taken(value, self.taken))
+            }
             Buffered::Bool(value) => visitor.visit_bool(*value),
+            Buffered::U8(value) => visitor.visit_u8(*value),
+            Buffered::U16(value) => visitor.visit_u16(*value),
+            Buffered::U32(value) => visitor.visit_u32(*value),
             Buffered::U64(value) => visitor.visit_u64(*value),
+            Buffered::I8(value) => visitor.visit_i8(*value),
+            Buffered::I16(value) => visitor.visit_i16(*value),
+            Buffered::I32(value) => visitor.visit_i32(*value),
             Buffered::I64(value) => visitor.visit_i64(*value),
+            Buffered::F32(value) => visitor.visit_f32(*value),
             Buffered::F64(value) => visitor.visit_f64(*value),
+            Buffered::Char(value) => visitor.visit_char(*value),
             Buffered::Str(value) => Self::visit_str(value, visitor),
             Buffered::Bytes(value) => Self::visit_bytes(value, visitor),
             Buffered::Seq(items) => Self::visit_seq(items, self.taken, visitor),
@@ -600,6 +684,7 @@ impl<'de, E: de::Error> Deserializer<'de> for Ref<'_, 'de, E> {
 
     fn deserialize_char<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, E> {
         match self.value {
+            Buffered::Char(value) => visitor.visit_char(*value),
             Buffered::Str(value) => Self::visit_str(value, visitor),
             _ => Err(self.invalid_type(&visitor)),
         }
@@ -622,7 +707,10 @@ impl<'de, E: de::Error> Deserializer<'de> for Ref<'_, 'de, E> {
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, E> {
         match self.value {
+            Buffered::None => visitor.visit_none(),
+            Buffered::Some(value) => visitor.visit_some(Self::with_taken(value, self.taken)),
             Buffered::Null => visitor.visit_unit(),
+            // JSON does not say whether a value is optional.
             _ => visitor.visit_some(self),
         }
     }
@@ -655,6 +743,8 @@ impl<'de, E: de::Error> Deserializer<'de> for Ref<'_, 'de, E> {
         _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, E> {
+        // JSON does not say whether a value is a newtype. An input that does is read by serde's
+        // own flattening.
         visitor.visit_newtype_struct(self)
     }
 
@@ -722,6 +812,8 @@ impl<'de, E: de::Error> Deserializer<'de> for Ref<'_, 'de, E> {
         match self.value {
             Buffered::Str(value) => Self::visit_str(value, visitor),
             Buffered::Bytes(value) => Self::visit_bytes(value, visitor),
+            // serde names a field or variant by its position with these two widths only.
+            Buffered::U8(value) => visitor.visit_u8(*value),
             Buffered::U64(value) => visitor.visit_u64(*value),
             _ => Err(self.invalid_type(&visitor)),
         }
@@ -733,6 +825,32 @@ impl<'de, E: de::Error> Deserializer<'de> for Ref<'_, 'de, E> {
 }
 
 impl<'de, E: de::Error> IntoDeserializer<'de, E> for Ref<'_, 'de, E> {
+    type Deserializer = Self;
+
+    fn into_deserializer(self) -> Self {
+        self
+    }
+}
+
+/// Reads a key of [`Buffered::Pairs`] as the input handed it out, whatever is asked for. Its only
+/// reader is serde's own flattening, which asks the input and not a buffer.
+struct PairKey<'a, 'de, E>(Ref<'a, 'de, E>);
+
+impl<'de, E: de::Error> Deserializer<'de> for PairKey<'_, 'de, E> {
+    type Error = E;
+
+    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, E> {
+        self.0.deserialize_any(visitor)
+    }
+
+    forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf
+        option unit unit_struct newtype_struct seq tuple tuple_struct map struct enum identifier
+        ignored_any
+    }
+}
+
+impl<'de, E: de::Error> IntoDeserializer<'de, E> for PairKey<'_, 'de, E> {
     type Deserializer = Self;
 
     fn into_deserializer(self) -> Self {

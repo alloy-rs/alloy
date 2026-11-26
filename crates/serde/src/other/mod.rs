@@ -267,9 +267,10 @@ where
                 // only the entries it neither took nor serializes become other fields.
                 let mut entries = buffered::Entries::read(map)?;
                 if entries.has_non_json() {
-                    // A byte string cannot become another field, wherever it is, and neither can
-                    // a map with a key that is no string. Whether that is an error depends on
-                    // what the inner value leaves in place, which serde's own flattening settles.
+                    // A byte string, a newtype and a map with a key that is no string cannot
+                    // become another field, wherever they are. Whether that is an error depends
+                    // on what the inner value leaves in place, which serde's own flattening
+                    // settles.
                     return deserialize_flattened(buffered::Ref::new(&entries.into_object()));
                 }
                 let inner = T::deserialize(buffered::Flat::new(&mut entries));
@@ -333,7 +334,7 @@ mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
     use serde::de::{
-        value::{self, MapDeserializer},
+        value::{self, MapDeserializer, SeqDeserializer},
         IntoDeserializer,
     };
     use serde_json::json;
@@ -646,9 +647,20 @@ mod tests {
     fn deserialize_non_json_matches_flattened() {
         #[derive(Clone, Copy)]
         enum Input {
+            Unit,
+            None,
+            Some(&'static Self),
+            Newtype(&'static Self),
             Str(&'static str),
+            Char(char),
             Bytes(&'static [u8]),
             Number(u64),
+            U8(u8),
+            U16(u16),
+            U32(u32),
+            I16(i16),
+            F32(f32),
+            Seq(&'static [Self]),
             Map(&'static [(Self, Self)]),
         }
 
@@ -657,9 +669,22 @@ mod tests {
 
             fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
                 match self {
+                    Self::Unit => visitor.visit_unit(),
+                    Self::None => visitor.visit_none(),
+                    Self::Some(value) => visitor.visit_some(*value),
+                    Self::Newtype(value) => visitor.visit_newtype_struct(*value),
                     Self::Str(string) => visitor.visit_borrowed_str(string),
+                    Self::Char(char) => visitor.visit_char(char),
                     Self::Bytes(bytes) => visitor.visit_borrowed_bytes(bytes),
                     Self::Number(number) => visitor.visit_u64(number),
+                    Self::U8(number) => visitor.visit_u8(number),
+                    Self::U16(number) => visitor.visit_u16(number),
+                    Self::U32(number) => visitor.visit_u32(number),
+                    Self::I16(number) => visitor.visit_i16(number),
+                    Self::F32(number) => visitor.visit_f32(number),
+                    Self::Seq(items) => {
+                        visitor.visit_seq(SeqDeserializer::new(items.iter().copied()))
+                    }
                     Self::Map(entries) => {
                         visitor.visit_map(MapDeserializer::new(entries.iter().copied()))
                     }
@@ -751,6 +776,12 @@ mod tests {
             "invalid type: integer `1`, expected a string"
         );
 
+        for key in [Input::U16(1), Input::I16(-1), Input::Char('a'), Input::Unit, Input::None] {
+            let entries: &'static [(Input, Input)] =
+                Vec::leak(alloc::vec![(Input::Str("limits"), Input::Map(&[])), (key, HASH)]);
+            assert!(decode::<Limits>(Input::Map(entries)).is_err());
+        }
+
         // A struct takes its map out of the entries, whatever the keys are.
         let object = Input::Map(&[
             (Input::Str("limits"), Input::Map(&[(Input::Number(1), Input::Number(7))])),
@@ -774,5 +805,187 @@ mod tests {
         let names = decode::<Names>(object).unwrap();
         assert_eq!(names.inner.names, BTreeMap::from([("a".to_string(), 7)]));
         assert_eq!(names.other, height());
+
+        /// Leaves the entries of `T` in place.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Flattened<T> {
+            #[serde(flatten)]
+            inner: T,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Field<T> {
+            field: T,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Id(u64);
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        enum Kind {
+            A,
+            B,
+        }
+
+        /// A number that is read from one callback only.
+        macro_rules! only {
+            ($name:ident($ty:ty), $visit:ident, $hint:ident) => {
+                #[derive(Debug, PartialEq, Serialize)]
+                struct $name($ty);
+
+                impl<'de> Deserialize<'de> for $name {
+                    fn deserialize<D: serde::Deserializer<'de>>(
+                        deserializer: D,
+                    ) -> Result<Self, D::Error> {
+                        struct OnlyVisitor;
+
+                        impl Visitor<'_> for OnlyVisitor {
+                            type Value = $name;
+
+                            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                                f.write_str(stringify!($ty))
+                            }
+
+                            fn $visit<E>(self, value: $ty) -> Result<$name, E> {
+                                Ok($name(value))
+                            }
+                        }
+
+                        deserializer.$hint(OnlyVisitor)
+                    }
+                }
+            };
+        }
+        only!(Single(f32), visit_f32, deserialize_f32);
+        only!(Byte(u8), visit_u8, deserialize_u8);
+        only!(Short(i16), visit_i16, deserialize_i16);
+
+        /// Decodes `{"field": value}` with a struct that takes the entry and with one that
+        /// leaves it in place. Both have to agree with serde's own flattening.
+        fn field<T>(value: &'static Input) -> [Result<T, String>; 2]
+        where
+            T: DeserializeOwned + Serialize + PartialEq + fmt::Debug,
+        {
+            let entries: &'static [(Input, Input)] =
+                Vec::leak(alloc::vec![(Input::Str("field"), *value)]);
+            let object = Input::Map(entries);
+            [
+                decode::<Field<T>>(object).map(|decoded| decoded.inner.field),
+                decode::<Flattened<Field<T>>>(object).map(|decoded| decoded.inner.inner.field),
+            ]
+        }
+
+        // An option remembers whether it was given a value.
+        assert_eq!(field::<Option<()>>(&Input::Some(&Input::Unit)), [Ok(Some(())), Ok(Some(()))]);
+        assert_eq!(field::<Option<()>>(&Input::None), [Ok(None), Ok(None)]);
+        assert_eq!(field::<Option<()>>(&Input::Unit), [Ok(None), Ok(None)]);
+        assert_eq!(
+            field::<Option<u64>>(&Input::Some(&Input::Number(7))),
+            [Ok(Some(7)), Ok(Some(7))]
+        );
+        // serde reads the unit of a taken entry from an empty map too, also inside an option.
+        assert_eq!(
+            field::<Option<()>>(&Input::Some(&Input::Map(&[]))),
+            [Ok(Some(())), Ok(Some(()))]
+        );
+
+        // No value is no unit.
+        assert_eq!(field::<()>(&Input::Unit), [Ok(()), Ok(())]);
+        let err = "invalid type: Option value, expected unit".to_string();
+        assert_eq!(field::<()>(&Input::None), [Err(err.clone()), Err(err)]);
+
+        // A newtype is read by a newtype only, and is no other field.
+        const PAIR: Input = Input::Seq(&[Input::Number(1), Input::Number(2)]);
+        assert_eq!(field::<(u64, u64)>(&PAIR), [Ok((1, 2)), Ok((1, 2))]);
+        let err = "invalid type: newtype struct, expected a tuple of size 2".to_string();
+        assert_eq!(field::<(u64, u64)>(&Input::Newtype(&PAIR)), [Err(err.clone()), Err(err)]);
+        assert_eq!(
+            field::<Id>(&Input::Newtype(&Input::Number(7))),
+            [
+                Ok(Id(7)),
+                Err("invalid type: newtype struct, expected any valid JSON value".to_string())
+            ]
+        );
+        assert_eq!(field::<Id>(&Input::Number(7)), [Ok(Id(7)), Ok(Id(7))]);
+
+        // Only integers of 8 and 64 bits name a variant by its position.
+        // Left in place, a map with such a key is no other field.
+        let err = "invalid type: integer `1`, expected a string key".to_string();
+        assert_eq!(
+            field::<Kind>(&Input::Map(&[(Input::U8(1), Input::Unit)])),
+            [Ok(Kind::B), Err(err.clone())]
+        );
+        assert_eq!(
+            field::<Kind>(&Input::Map(&[(Input::Number(1), Input::Unit)])),
+            [Ok(Kind::B), Err(err)]
+        );
+        for key in [Input::U16(1), Input::U32(1), Input::I16(1)] {
+            let entries: &'static [(Input, Input)] = Vec::leak(alloc::vec![(key, Input::Unit)]);
+            let err = "invalid type: integer `1`, expected variant identifier".to_string();
+            let value: &'static [Input] = Vec::leak(alloc::vec![Input::Map(entries)]);
+            let [taken, in_place] = field::<Kind>(&value[0]);
+            assert_eq!(taken, Err(err));
+            assert!(in_place.is_err());
+        }
+
+        // The same holds for the tag of an enum.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        #[serde(tag = "tag")]
+        enum Internal {
+            A,
+            B,
+        }
+        const TAG: Input = Input::Str("tag");
+        assert_eq!(
+            field::<Internal>(&Input::Map(&[(TAG, Input::U8(1))])),
+            [Ok(Internal::B), Ok(Internal::B)]
+        );
+        let err = "invalid type: integer `1`, expected variant identifier".to_string();
+        assert_eq!(
+            field::<Internal>(&Input::Map(&[(TAG, Input::U16(1))])),
+            [Err(err.clone()), Err(err)]
+        );
+
+        // Integers keep their width, floats their precision, and a character is no string.
+        assert_eq!(field::<u64>(&Input::U16(7)), [Ok(7), Ok(7)]);
+        assert_eq!(field::<i64>(&Input::I16(-7)), [Ok(-7), Ok(-7)]);
+        assert_eq!(field::<f64>(&Input::F32(1.5)), [Ok(1.5), Ok(1.5)]);
+        assert_eq!(field::<Single>(&Input::F32(1.5)), [Ok(Single(1.5)), Ok(Single(1.5))]);
+        assert_eq!(field::<Byte>(&Input::U8(7)), [Ok(Byte(7)), Ok(Byte(7))]);
+        assert_eq!(field::<Short>(&Input::I16(-7)), [Ok(Short(-7)), Ok(Short(-7))]);
+        assert_eq!(field::<char>(&Input::Char('a')), [Ok('a'), Ok('a')]);
+        let err = "invalid type: character `a`, expected a string".to_string();
+        assert_eq!(field::<String>(&Input::Char('a')), [Err(err.clone()), Err(err.clone())]);
+        assert_eq!(
+            field::<BTreeMap<String, u64>>(&Input::Map(&[(Input::Char('a'), Input::Number(7))])),
+            [Err(err.clone()), Err(err)]
+        );
+
+        // All of them but the newtype are other fields like the JSON they stand for.
+        let object = Input::Map(&[
+            (Input::Str("hash"), HASH),
+            (Input::Str("none"), Input::None),
+            (Input::Str("some"), Input::Some(&Input::U8(7))),
+            (Input::Str("char"), Input::Char('a')),
+            (Input::Str("float"), Input::F32(1.5)),
+            (Input::Str("short"), Input::I16(-7)),
+        ]);
+        let named = decode::<Named>(object).unwrap();
+        assert_eq!(
+            named.other,
+            OtherFields::new(BTreeMap::from([
+                ("none".to_string(), json!(null)),
+                ("some".to_string(), json!(7)),
+                ("char".to_string(), json!("a")),
+                ("float".to_string(), json!(1.5)),
+                ("short".to_string(), json!(-7)),
+            ]))
+        );
+        let object =
+            Input::Map(&[(Input::Str("hash"), HASH), (Input::Str("id"), Input::Newtype(&PAIR))]);
+        assert_eq!(
+            decode::<Named>(object).unwrap_err(),
+            "invalid type: newtype struct, expected any valid JSON value"
+        );
     }
 }
