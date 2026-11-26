@@ -595,12 +595,18 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         !self.unconfirmed.is_empty() || !self.waiting_confs.is_empty()
     }
 
-    /// Update the pause state based on whether we have pending transactions.
-    fn update_pause_state(&mut self) {
-        let should_pause = !self.has_pending_transactions();
+    /// Update the pause state based on whether we have pending or queued transactions.
+    fn update_pause_state(&mut self, ixns: &mpsc::Receiver<TxWatcher>) {
+        // Queued watches may still need the lookbehind, which pausing clears.
+        let should_pause = !self.has_pending_transactions() && ixns.is_empty();
         if self.paused.is_paused() != should_pause {
             debug!(paused = should_pause, "updating heartbeat pause state");
             self.paused.set_paused(should_pause);
+            if should_pause {
+                // Blocks are not tracked while paused, so the lookbehind could go stale through
+                // a reorg. Drop it so new watches cannot match on a reorged-out block.
+                self.past_blocks.clear();
+            }
         }
     }
 
@@ -672,6 +678,12 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// the latest block.
     fn handle_new_block(&mut self, block: N::BlockResponse) {
         let block_height = block.header().as_ref().number();
+        // The stream can still yield buffered blocks after we pause. Nothing is watched, and
+        // recording them would refill the lookbehind that pausing cleared.
+        if self.paused.is_paused() {
+            trace!(%block_height, "ignoring block while paused");
+            return;
+        }
         debug!(%block_height, "handling block");
 
         // Add the block the lookbehind.
@@ -751,7 +763,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
         'shutdown: loop {
             {
-                self.update_pause_state();
+                self.update_pause_state(&ixns);
 
                 let next_reap = self.next_reap();
                 let sleep = std::pin::pin!(sleep_until(next_reap.into()));

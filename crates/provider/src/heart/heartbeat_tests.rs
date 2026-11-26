@@ -42,6 +42,7 @@ fn poll(pending: &mut PendingTransaction) -> Option<Result<TxHash, PendingTransa
 }
 
 const TX: TxHash = B256::with_last_byte(1);
+const OTHER: TxHash = B256::with_last_byte(9);
 
 #[tokio::test(start_paused = true)]
 async fn confirms_after_required_confirmations() {
@@ -74,6 +75,8 @@ async fn already_mined_tx_counts_confirmations_from_its_block() {
     ];
     for (received_at_block, confirmations, immediately) in cases {
         let harness = Harness::new();
+        // Keep the heartbeat unpaused so it records the blocks.
+        let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
         harness.block(1, &[]);
         harness.block(2, &[TX]);
         harness.block(3, &[]);
@@ -173,6 +176,8 @@ async fn lookbehind_keeps_last_ten_canonical_blocks() {
     ];
     for (blocks, found) in cases {
         let harness = Harness::new();
+        // Keep the heartbeat unpaused so it records the blocks.
+        let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
         for &(number, includes_tx) in &blocks {
             harness.block(number, if includes_tx { &[TX] } else { &[] });
         }
@@ -182,6 +187,27 @@ async fn lookbehind_keeps_last_ten_canonical_blocks() {
         settle().await;
         assert_eq!(poll(&mut pending).is_some(), found, "{blocks:?}");
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn ignores_blocks_while_paused() {
+    let harness = Harness::new();
+    let mut pending = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
+    harness.block(1, &[OTHER]);
+    settle().await;
+    assert!(poll(&mut pending).is_some());
+    assert!(harness.paused.is_paused());
+
+    // A block the stream had buffered before pausing can be reorged out, so it must not be
+    // matched later.
+    harness.block(2, &[TX]);
+    settle().await;
+    let config = PendingTransactionConfig::new(TX).with_timeout(Some(Duration::ZERO));
+    let res = harness.watch(config, None).await.await;
+    assert!(
+        matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+        "{res:?}"
+    );
 }
 
 #[tokio::test(start_paused = true)]
