@@ -123,7 +123,6 @@ bounded_list!(blob_hashes, MAX_BLOBS_REQUEST);
 bounded_list!(blob_entries, MAX_BLOBS_REQUEST);
 bounded_list!(cells, 128);
 bounded_list!(proofs, 128);
-bounded_list!(public_keys, MAX_TXS_PER_PAYLOAD);
 
 macro_rules! bounded_byte_lists {
     ($name:ident, $limit:expr, $max_bytes:expr) => {
