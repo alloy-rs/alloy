@@ -181,6 +181,36 @@ where
         }
     }
 
+    async fn sign_message(&self, message: &[u8]) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_message(message).await,
+            Self::Right(signer) => signer.sign_message(message).await,
+        }
+    }
+
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
+        &self,
+        payload: &T,
+        domain: &Eip712Domain,
+    ) -> Result<Sig>
+    where
+        Self: Sized,
+    {
+        match self {
+            Self::Left(signer) => signer.sign_typed_data(payload, domain).await,
+            Self::Right(signer) => signer.sign_typed_data(payload, domain).await,
+        }
+    }
+
+    #[cfg(feature = "eip712")]
+    async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_dynamic_typed_data(payload).await,
+            Self::Right(signer) => signer.sign_dynamic_typed_data(payload).await,
+        }
+    }
+
     fn address(&self) -> Address {
         match self {
             Self::Left(signer) => signer.address(),
@@ -212,6 +242,32 @@ where
         match self {
             Self::Left(signer) => signer.sign_hash_sync(hash),
             Self::Right(signer) => signer.sign_hash_sync(hash),
+        }
+    }
+
+    fn sign_message_sync(&self, message: &[u8]) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_message_sync(message),
+            Self::Right(signer) => signer.sign_message_sync(message),
+        }
+    }
+
+    #[cfg(feature = "eip712")]
+    fn sign_typed_data_sync<T: SolStruct>(&self, payload: &T, domain: &Eip712Domain) -> Result<Sig>
+    where
+        Self: Sized,
+    {
+        match self {
+            Self::Left(signer) => signer.sign_typed_data_sync(payload, domain),
+            Self::Right(signer) => signer.sign_typed_data_sync(payload, domain),
+        }
+    }
+
+    #[cfg(feature = "eip712")]
+    fn sign_dynamic_typed_data_sync(&self, payload: &TypedData) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_dynamic_typed_data_sync(payload),
+            Self::Right(signer) => signer.sign_dynamic_typed_data_sync(payload),
         }
     }
 
@@ -349,5 +405,99 @@ mod tests {
         test_unsized_unimplemented_signer_sync(
             &(Arc::new(UnimplementedSigner) as Arc<dyn SignerSync + Send + Sync>),
         );
+    }
+
+    /// `Either` must forward every signing method, not fall back to `sign_hash`, because hardware
+    /// signers such as Ledger and Trezor reject raw hash signing.
+    #[tokio::test]
+    async fn either_forwards_signing_methods() {
+        #[cfg(feature = "eip712")]
+        alloy_sol_types::sol! {
+            #[derive(Default, serde::Serialize)]
+            struct Eip712Data {
+                uint64 a;
+            }
+        }
+
+        struct NoHashSigner;
+
+        #[cfg_attr(target_family = "wasm", async_trait(?Send))]
+        #[cfg_attr(not(target_family = "wasm"), async_trait)]
+        impl Signer<u8> for NoHashSigner {
+            async fn sign_hash(&self, _hash: &B256) -> Result<u8> {
+                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+            }
+
+            async fn sign_message(&self, _message: &[u8]) -> Result<u8> {
+                Ok(1)
+            }
+
+            #[cfg(feature = "eip712")]
+            async fn sign_typed_data<T: SolStruct + Send + Sync>(
+                &self,
+                _payload: &T,
+                _domain: &Eip712Domain,
+            ) -> Result<u8> {
+                Ok(2)
+            }
+
+            #[cfg(feature = "eip712")]
+            async fn sign_dynamic_typed_data(&self, _payload: &TypedData) -> Result<u8> {
+                Ok(3)
+            }
+
+            fn address(&self) -> Address {
+                Address::ZERO
+            }
+
+            fn chain_id(&self) -> Option<ChainId> {
+                None
+            }
+
+            fn set_chain_id(&mut self, _chain_id: Option<ChainId>) {}
+        }
+
+        impl SignerSync<u8> for NoHashSigner {
+            fn sign_hash_sync(&self, _hash: &B256) -> Result<u8> {
+                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+            }
+
+            fn sign_message_sync(&self, _message: &[u8]) -> Result<u8> {
+                Ok(1)
+            }
+
+            #[cfg(feature = "eip712")]
+            fn sign_typed_data_sync<T: SolStruct>(
+                &self,
+                _payload: &T,
+                _domain: &Eip712Domain,
+            ) -> Result<u8> {
+                Ok(2)
+            }
+
+            #[cfg(feature = "eip712")]
+            fn sign_dynamic_typed_data_sync(&self, _payload: &TypedData) -> Result<u8> {
+                Ok(3)
+            }
+
+            fn chain_id_sync(&self) -> Option<ChainId> {
+                None
+            }
+        }
+
+        for signer in [Either::Left(NoHashSigner), Either::Right(NoHashSigner)] {
+            assert_eq!(signer.sign_message(b"hello").await.unwrap(), 1);
+            assert_eq!(signer.sign_message_sync(b"hello").unwrap(), 1);
+            #[cfg(feature = "eip712")]
+            {
+                let data = Eip712Data::default();
+                let domain = Eip712Domain::default();
+                assert_eq!(signer.sign_typed_data(&data, &domain).await.unwrap(), 2);
+                assert_eq!(signer.sign_typed_data_sync(&data, &domain).unwrap(), 2);
+                let dynamic = TypedData::from_struct(&data, None);
+                assert_eq!(signer.sign_dynamic_typed_data(&dynamic).await.unwrap(), 3);
+                assert_eq!(signer.sign_dynamic_typed_data_sync(&dynamic).unwrap(), 3);
+            }
+        }
     }
 }
