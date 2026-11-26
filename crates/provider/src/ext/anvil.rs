@@ -1242,8 +1242,8 @@ mod tests {
         assert_ne!(reorged_block.header.hash, new_block.header.hash);
     }
 
-    // <https://linear.app/alloy/issue/OSS-1509>: a reorg while the heartbeat is paused must not
-    // let a later watch resolve from the reorged-out block.
+    // A reorg while the heartbeat is paused must not let a later watch resolve from the
+    // reorged-out block.
     #[tokio::test]
     async fn test_watch_after_reorg_while_paused() {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
