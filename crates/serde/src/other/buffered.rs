@@ -13,7 +13,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{cell::Cell, fmt, marker::PhantomData};
+use core::{cell::Cell, fmt, marker::PhantomData, mem::size_of};
 use serde::{
     de::{
         self,
@@ -218,7 +218,7 @@ impl<'de> Visitor<'de> for BufferedSeed<'_> {
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        let mut items = Vec::new();
+        let mut items = with_capacity_hint(seq.size_hint());
         while let Some(item) = seq.next_element_seed(self)? {
             items.push(item);
         }
@@ -226,7 +226,7 @@ impl<'de> Visitor<'de> for BufferedSeed<'_> {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-        let mut entries = Vec::new();
+        let mut entries = with_capacity_hint(map.size_hint());
         while let Some(key) = map.next_key_seed(KeySeed(self))? {
             match key {
                 Key::Str(key) => entries.push((key, map.next_value_seed(self)?)),
@@ -235,6 +235,14 @@ impl<'de> Visitor<'de> for BufferedSeed<'_> {
         }
         Ok(Buffered::Map(entries))
     }
+}
+
+/// A vector with room for the number of elements the input states, up to 1 MiB of them as in
+/// serde's own buffer: the input may state any length.
+fn with_capacity_hint<T>(hint: Option<usize>) -> Vec<T> {
+    const MAX_PREALLOC_BYTES: usize = 1024 * 1024;
+
+    Vec::with_capacity(hint.unwrap_or(0).min(MAX_PREALLOC_BYTES / size_of::<T>().max(1)))
 }
 
 /// A map key as it is read. JSON only has strings.
@@ -337,7 +345,7 @@ impl<'de> Entries<'de> {
     pub(super) fn read<A: MapAccess<'de>>(mut map: A) -> Result<Self, A::Error> {
         let has_non_json = Cell::new(false);
         let seed = BufferedSeed(&has_non_json);
-        let mut entries = Vec::new();
+        let mut entries = with_capacity_hint(map.size_hint());
         let mut pairs = None;
         while let Some(key) = map.next_key_seed(KeySeed(seed))? {
             match key {
@@ -1085,5 +1093,76 @@ impl<'de, E: de::Error> MapAccess<'de> for NamedEntries<'_, 'de, E> {
             Some(value) => seed.deserialize(Ref::taken(&value)),
             None => Err(E::custom("value is missing")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::de::value::Error;
+
+    /// A sequence or map that states a length and holds nothing.
+    struct Stated(usize);
+
+    impl<'de> SeqAccess<'de> for Stated {
+        type Error = Error;
+
+        fn next_element_seed<T: DeserializeSeed<'de>>(
+            &mut self,
+            _seed: T,
+        ) -> Result<Option<T::Value>, Error> {
+            Ok(None)
+        }
+
+        fn size_hint(&self) -> Option<usize> {
+            Some(self.0)
+        }
+    }
+
+    impl<'de> MapAccess<'de> for Stated {
+        type Error = Error;
+
+        fn next_key_seed<K: DeserializeSeed<'de>>(
+            &mut self,
+            _seed: K,
+        ) -> Result<Option<K::Value>, Error> {
+            Ok(None)
+        }
+
+        fn next_value_seed<V: DeserializeSeed<'de>>(
+            &mut self,
+            _seed: V,
+        ) -> Result<V::Value, Error> {
+            Err(de::Error::custom("value is missing"))
+        }
+
+        fn size_hint(&self) -> Option<usize> {
+            Some(self.0)
+        }
+    }
+
+    /// The capacities the buffer reserves for a sequence, a map and an object of `len` elements.
+    fn reserved(len: usize) -> [usize; 3] {
+        let flag = Cell::new(false);
+        let Ok(Buffered::Seq(items)) = BufferedSeed(&flag).visit_seq(Stated(len)) else {
+            panic!("no sequence")
+        };
+        let Ok(Buffered::Map(entries)) = BufferedSeed(&flag).visit_map(Stated(len)) else {
+            panic!("no map")
+        };
+        let object = Entries::read(Stated(len)).unwrap();
+        [items.capacity(), entries.capacity(), object.entries.capacity()]
+    }
+
+    #[test]
+    fn reserves_the_stated_length() {
+        assert!(reserved(100).iter().all(|capacity| *capacity >= 100));
+
+        // The input may state any length.
+        const MAX_BYTES: usize = 1024 * 1024;
+        let [items, entries, object] = reserved(usize::MAX);
+        assert_eq!(items, MAX_BYTES / size_of::<Buffered<'_>>());
+        assert_eq!(entries, MAX_BYTES / size_of::<(Cow<'_, str>, Buffered<'_>)>());
+        assert_eq!(object, MAX_BYTES / size_of::<Option<(Cow<'_, str>, Buffered<'_>)>>());
     }
 }
