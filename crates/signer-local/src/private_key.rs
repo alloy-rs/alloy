@@ -477,4 +477,24 @@ mod tests {
             "0x51fde55a7d696da3b318b21e231dec5ff4b33e895f191b2988e122e969b20e90".parse().unwrap();
         assert_eq!(signer.public_key(), B512::from_str("0x2bcb56445551cd344c9be67cfe27652932d7088c17b6c3c8dad622a5c8e8caf4574d68fa12355e7fefbe2377911016124b9284283527dd2ead05c7b6e5585fbd").unwrap());
     }
+
+    #[tokio::test]
+    #[cfg(feature = "eip7702")]
+    async fn test_sign_authorization() {
+        use crate::Signer;
+        let signer = PrivateKeySigner::random();
+        let auth = alloy_eip7702::Authorization {
+            chain_id: alloy_primitives::U256::from(1),
+            address: address!("0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9"),
+            nonce: 10,
+        };
+
+        let sig_sync = signer.sign_authorization_sync(&auth).unwrap();
+        let sig_async = signer.sign_authorization(&auth).await.unwrap();
+
+        assert_eq!(sig_sync, sig_async);
+
+        let hash = auth.signature_hash();
+        assert_eq!(sig_sync.recover_address_from_prehash(&hash).unwrap(), signer.address());
+    }
 }

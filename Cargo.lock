@@ -825,6 +825,7 @@ name = "alloy-signer"
 version = "2.6.1"
 dependencies = [
  "alloy-dyn-abi",
+ "alloy-eip7702",
  "alloy-primitives",
  "alloy-sol-types",
  "assert_matches",
@@ -920,6 +921,7 @@ version = "2.6.1"
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
+ "alloy-eip7702",
  "alloy-network",
  "alloy-primitives",
  "alloy-signer",
