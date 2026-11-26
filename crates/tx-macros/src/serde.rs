@@ -1,5 +1,5 @@
 use crate::parse::{GroupedVariants, ProcessedVariant};
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use syn::{Ident, Path};
 
@@ -297,10 +297,10 @@ impl<'a> SerdeGenerator<'a> {
             let arm = quote! { UntaggedTxTypes::UntaggedLegacy(tx) => Self::#name(tx), };
             let attempt_variant = quote! {
                 #[serde(deserialize_with = #deserialize_with)]
-                UntaggedLegacy(#ty),
+                __UntaggedLegacy(#ty),
             };
             let attempt_arm =
-                quote! { Attempt::UntaggedLegacy(tx) => Ok(Self::UntaggedLegacy(tx)), };
+                quote! { __Attempt::__UntaggedLegacy(tx) => Ok(Self::UntaggedLegacy(tx)), };
 
             (variant, arm, attempt_variant, attempt_arm)
         } else {
@@ -349,6 +349,9 @@ impl<'a> SerdeGenerator<'a> {
                 (quote! {}, quote! {}, quote! {}, quote! {})
             };
 
+        // The items declared inside the functions below share a scope with the types of the
+        // variants, so their names start with `__`, like the generics next to those of the
+        // envelope.
         quote! {
             impl #generics UntaggedTxTypes #ty_generics where #serde_bounds {
                 /// Buffers the input and tries the tagged variants, the flattened variants and the
@@ -359,10 +362,10 @@ impl<'a> SerdeGenerator<'a> {
                 {
                     /// The error of the tagged attempt, which is more useful than the untagged
                     /// error
-                    ///  > "data did not match any variant of untagged enum Attempt"
-                    struct TaggedError<T, E>(E, core::marker::PhantomData<T>);
+                    ///  > "data did not match any variant of untagged enum __Attempt"
+                    struct __TaggedError<T, E>(E, core::marker::PhantomData<T>);
 
-                    impl<'de, T, E> #serde::Deserialize<'de> for TaggedError<T, E>
+                    impl<'de, T, E> #serde::Deserialize<'de> for __TaggedError<T, E>
                     where
                         T: #serde::Deserialize<'de>,
                         E: #serde::de::Error,
@@ -379,22 +382,22 @@ impl<'a> SerdeGenerator<'a> {
                     }
 
                     // `untagged` buffers the input once and lets every variant read the buffer
-                    // by reference. `Failed` is last: it is reached only if the tagged attempt
+                    // by reference. `__Failed` is last: it is reached only if the tagged attempt
                     // failed, and repeats it to keep its error.
                     #[derive(#serde::Deserialize)]
                     #[serde(untagged, bound = #attempt_bounds_str, crate = #serde_str)]
-                    enum Attempt #attempt_generics {
-                        Tagged(TaggedTxTypes #ty_generics),
+                    enum __Attempt #attempt_generics {
+                        __Tagged(TaggedTxTypes #ty_generics),
                         #(#flattened_names(#flattened_tys),)*
                         #legacy_attempt_variant
-                        Failed(TaggedError<TaggedTxTypes #ty_generics, __E>),
+                        __Failed(__TaggedError<TaggedTxTypes #ty_generics, __E>),
                     }
 
                     match #serde::Deserialize::deserialize(deserializer)? {
-                        Attempt::Tagged(tx) => Ok(Self::Tagged(tx)),
-                        #(Attempt::#flattened_names(tx) => Ok(Self::#flattened_names(tx)),)*
+                        __Attempt::__Tagged(tx) => Ok(Self::Tagged(tx)),
+                        #(__Attempt::#flattened_names(tx) => Ok(Self::#flattened_names(tx)),)*
                         #legacy_attempt_arm
-                        Attempt::Failed(TaggedError(err, _)) => Err(err),
+                        __Attempt::__Failed(__TaggedError(err, _)) => Err(err),
                     }
                 }
             }
@@ -405,52 +408,72 @@ impl<'a> SerdeGenerator<'a> {
                     D: #serde::Deserializer<'de>,
                 {
                     /// A key of the object, with the `type` key recognized without allocating.
-                    enum Key<'de> {
+                    enum __Key<'de> {
                         Type,
                         Borrowed(&'de str),
                         Owned(#serde_json::Value),
                     }
 
-                    impl<'de> #serde::Deserialize<'de> for Key<'de> {
+                    impl<'de> #serde::Deserialize<'de> for __Key<'de> {
                         fn deserialize<D: #serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                            struct KeyVisitor;
+                            struct __KeyVisitor;
 
-                            impl<'de> #serde::de::Visitor<'de> for KeyVisitor {
-                                type Value = Key<'de>;
+                            impl<'de> #serde::de::Visitor<'de> for __KeyVisitor {
+                                type Value = __Key<'de>;
 
                                 fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                                     f.write_str("a string key")
                                 }
 
-                                fn visit_borrowed_str<E: #serde::de::Error>(self, key: &'de str) -> Result<Key<'de>, E> {
-                                    Ok(if key == "type" { Key::Type } else { Key::Borrowed(key) })
+                                fn visit_borrowed_str<E: #serde::de::Error>(self, key: &'de str) -> Result<__Key<'de>, E> {
+                                    Ok(if key == "type" { __Key::Type } else { __Key::Borrowed(key) })
                                 }
 
-                                fn visit_str<E: #serde::de::Error>(self, key: &str) -> Result<Key<'de>, E> {
-                                    Ok(if key == "type" { Key::Type } else { Key::Owned(key.into()) })
+                                fn visit_str<E: #serde::de::Error>(self, key: &str) -> Result<__Key<'de>, E> {
+                                    Ok(if key == "type" { __Key::Type } else { __Key::Owned(key.into()) })
                                 }
                             }
 
-                            deserializer.deserialize_str(KeyVisitor)
+                            deserializer.deserialize_str(__KeyVisitor)
                         }
                     }
 
-                    /// The value of a `type` key.
+                    /// The value of a `type` key, or the first element of an array.
                     #[derive(#serde::Deserialize)]
                     #[serde(untagged, crate = #serde_str)]
-                    enum Tag<'a> {
+                    enum __Tag<'a> {
                         Borrowed(&'a str),
                         Other(#serde_json::Value),
+                    }
+
+                    impl<'de> __Tag<'de> {
+                        /// Hands the tag to a reader of the buffered input.
+                        fn replay<S, E>(self, seed: S) -> Result<S::Value, E>
+                        where
+                            S: #serde::de::DeserializeSeed<'de>,
+                            E: #serde::de::Error,
+                        {
+                            match self {
+                                Self::Borrowed(tag) => seed.deserialize(#serde::de::value::BorrowedStrDeserializer::new(tag)),
+                                // A buffered unsigned integer selects the variant at that position.
+                                // A signed one is rejected like every other tag that is no string.
+                                Self::Other(#serde_json::Value::Number(tag)) => match tag.as_i64() {
+                                    Some(tag) => seed.deserialize(#serde::de::value::I64Deserializer::new(tag)),
+                                    None => seed.deserialize(tag).map_err(E::custom),
+                                },
+                                Self::Other(tag) => seed.deserialize(tag).map_err(E::custom),
+                            }
+                        }
                     }
 
                     /// The entries of the object as its readers get them: the entry that was read
                     /// ahead of `map` first, and `type` values in a form that cannot select a
                     /// variant by position.
-                    struct Entries<'de, M> {
+                    struct __Entries<'de, M> {
                         /// A key that was read ahead.
-                        key: Option<Key<'de>>,
+                        key: Option<__Key<'de>>,
                         /// A `type` value that was read ahead.
-                        tag: Option<Tag<'de>>,
+                        tag: Option<__Tag<'de>>,
                         /// Whether the first `type` value already selected the variant, which
                         /// makes another `type` key a duplicate.
                         dispatched: bool,
@@ -459,7 +482,7 @@ impl<'a> SerdeGenerator<'a> {
                         map: M,
                     }
 
-                    impl<'de, M: #serde::de::MapAccess<'de>> #serde::de::MapAccess<'de> for Entries<'de, M> {
+                    impl<'de, M: #serde::de::MapAccess<'de>> #serde::de::MapAccess<'de> for __Entries<'de, M> {
                         type Error = M::Error;
 
                         fn next_key_seed<K: #serde::de::DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>, M::Error> {
@@ -476,12 +499,12 @@ impl<'a> SerdeGenerator<'a> {
                                     }
                                 },
                             };
-                            self.is_type = matches!(key, Key::Type);
+                            self.is_type = matches!(key, __Key::Type);
                             match key {
-                                Key::Type if self.dispatched => Err(#serde::de::Error::duplicate_field("type")),
-                                Key::Type => seed.deserialize(BorrowedStrDeserializer::new("type")),
-                                Key::Borrowed(key) => seed.deserialize(BorrowedStrDeserializer::new(key)),
-                                Key::Owned(key) => seed.deserialize(key).map_err(#serde::de::Error::custom),
+                                __Key::Type if self.dispatched => Err(#serde::de::Error::duplicate_field("type")),
+                                __Key::Type => seed.deserialize(BorrowedStrDeserializer::new("type")),
+                                __Key::Borrowed(key) => seed.deserialize(BorrowedStrDeserializer::new(key)),
+                                __Key::Owned(key) => seed.deserialize(key).map_err(#serde::de::Error::custom),
                             }
                             .map(Some)
                         }
@@ -492,33 +515,76 @@ impl<'a> SerdeGenerator<'a> {
                                 None if self.is_type => self.map.next_value()?,
                                 None => return self.map.next_value_seed(seed),
                             };
-                            match tag {
-                                Tag::Borrowed(tag) => seed.deserialize(#serde::de::value::BorrowedStrDeserializer::new(tag)),
-                                // A buffered unsigned integer selects the variant at that position.
-                                // A signed one is rejected like every other tag that is no string.
-                                Tag::Other(#serde_json::Value::Number(tag)) => match tag.as_i64() {
-                                    Some(tag) => seed.deserialize(#serde::de::value::I64Deserializer::new(tag)),
-                                    None => seed.deserialize(tag).map_err(#serde::de::Error::custom),
-                                },
-                                Tag::Other(tag) => seed.deserialize(tag).map_err(#serde::de::Error::custom),
-                            }
+                            tag.replay(seed)
                         }
                     }
 
-                    struct EnvelopeVisitor<#unwrapped_generics> {
+                    /// The elements of an array as its readers get them. serde reads the first
+                    /// one as the tag, so it is handed out like a `type` value.
+                    struct __Elements<A> {
+                        first: bool,
+                        seq: A,
+                    }
+
+                    impl<'de, A: #serde::de::SeqAccess<'de>> #serde::de::SeqAccess<'de> for __Elements<A> {
+                        type Error = A::Error;
+
+                        fn next_element_seed<T: #serde::de::DeserializeSeed<'de>>(&mut self, seed: T) -> Result<Option<T::Value>, A::Error> {
+                            if !core::mem::take(&mut self.first) {
+                                return self.seq.next_element_seed(seed);
+                            }
+                            match self.seq.next_element::<__Tag<'de>>()? {
+                                Some(tag) => tag.replay(seed).map(Some),
+                                None => Ok(None),
+                            }
+                        }
+
+                        fn size_hint(&self) -> Option<usize> {
+                            self.seq.size_hint()
+                        }
+                    }
+
+                    struct __EnvelopeVisitor<#unwrapped_generics> {
                         #human_readable_field
                         marker: core::marker::PhantomData<fn() -> UntaggedTxTypes #ty_generics>,
                     }
 
-                    impl<'de, #unwrapped_generics> #serde::de::Visitor<'de> for EnvelopeVisitor #ty_generics where #serde_bounds {
+                    impl<'de, #unwrapped_generics> #serde::de::Visitor<'de> for __EnvelopeVisitor #ty_generics where #serde_bounds {
                         type Value = UntaggedTxTypes #ty_generics;
 
                         fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                             f.write_str("a transaction object")
                         }
 
-                        fn visit_map<M: #serde::de::MapAccess<'de>>(self, map: M) -> Result<Self::Value, M::Error> {
-                            let #entries_mut entries = Entries {
+                        // Every other value goes to the buffer as well: a flattened variant may
+                        // accept it.
+
+                        fn visit_bool<__E: #serde::de::Error>(self, value: bool) -> Result<Self::Value, __E> {
+                            UntaggedTxTypes::deserialize_buffered(#serde::de::value::BoolDeserializer::new(value))
+                        }
+
+                        fn visit_i64<__E: #serde::de::Error>(self, value: i64) -> Result<Self::Value, __E> {
+                            UntaggedTxTypes::deserialize_buffered(#serde::de::value::I64Deserializer::new(value))
+                        }
+
+                        fn visit_u64<__E: #serde::de::Error>(self, value: u64) -> Result<Self::Value, __E> {
+                            UntaggedTxTypes::deserialize_buffered(#serde::de::value::U64Deserializer::new(value))
+                        }
+
+                        fn visit_f64<__E: #serde::de::Error>(self, value: f64) -> Result<Self::Value, __E> {
+                            UntaggedTxTypes::deserialize_buffered(#serde::de::value::F64Deserializer::new(value))
+                        }
+
+                        fn visit_str<__E: #serde::de::Error>(self, value: &str) -> Result<Self::Value, __E> {
+                            UntaggedTxTypes::deserialize_buffered(#serde::de::value::StrDeserializer::new(value))
+                        }
+
+                        fn visit_unit<__E: #serde::de::Error>(self) -> Result<Self::Value, __E> {
+                            UntaggedTxTypes::deserialize_buffered(#serde::de::value::UnitDeserializer::new())
+                        }
+
+                        fn visit_map<__M: #serde::de::MapAccess<'de>>(self, map: __M) -> Result<Self::Value, __M::Error> {
+                            let #entries_mut entries = __Entries {
                                 key: None,
                                 tag: None,
                                 dispatched: false,
@@ -532,13 +598,13 @@ impl<'a> SerdeGenerator<'a> {
                             UntaggedTxTypes::deserialize_buffered(#serde::de::value::MapAccessDeserializer::new(entries))
                         }
 
-                        fn visit_seq<A: #serde::de::SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
-                            UntaggedTxTypes::deserialize_buffered(#serde::de::value::SeqAccessDeserializer::new(seq))
+                        fn visit_seq<__A: #serde::de::SeqAccess<'de>>(self, seq: __A) -> Result<Self::Value, __A::Error> {
+                            UntaggedTxTypes::deserialize_buffered(#serde::de::value::SeqAccessDeserializer::new(__Elements { first: true, seq }))
                         }
                     }
 
                     #human_readable_let
-                    deserializer.deserialize_any(EnvelopeVisitor::<#unwrapped_generics> {
+                    deserializer.deserialize_any(__EnvelopeVisitor::<#unwrapped_generics> {
                         #human_readable_init
                         marker: core::marker::PhantomData,
                     })
@@ -553,9 +619,10 @@ impl<'a> SerdeGenerator<'a> {
     /// deserialized straight into that variant, without buffering it. Everything else goes to
     /// the buffer, including the entry that was already read.
     ///
-    /// The dispatch is only generated if there are no flattened variants, which could accept
-    /// an object that the tagged variant rejects, and only covers typed variants without
-    /// custom serde attributes.
+    /// The dispatch is only generated if no other variant can take over the object or the tag:
+    /// there are no flattened variants, which could accept an object that the tagged variant
+    /// rejects, and no typed variant is `untagged` or has an `alias`. It only covers typed
+    /// variants without custom serde attributes.
     fn generate_type_first_dispatch(&self) -> Option<TokenStream> {
         let serde = &self.serde;
         let serde_json = &self.serde_json;
@@ -565,19 +632,28 @@ impl<'a> SerdeGenerator<'a> {
             return None;
         }
 
+        let changes_matching = |attrs: &TokenStream| {
+            attrs.clone().into_iter().any(|token| {
+                matches!(token, TokenTree::Ident(ident) if ident == "untagged" || ident == "alias")
+            })
+        };
+        if self.variants.typed.iter().filter_map(|v| v.serde_attrs.as_ref()).any(changes_matching) {
+            return None;
+        }
+
         let arms = self.variants.typed.iter().filter(|v| v.serde_attrs.is_none()).map(|v| {
             let ProcessedVariant { name, ty, kind, .. } = v;
             let (rename, aliases) = kind.serde_tag_and_aliases();
             let deserialize = if v.is_legacy() {
-                quote! { #alloy_consensus::transaction::signed_legacy_serde::deserialize(map_deserializer) }
+                quote! { #alloy_consensus::transaction::signed_legacy_serde::deserialize(rest) }
             } else {
-                quote! { <#ty as #serde::Deserialize>::deserialize(map_deserializer) }
+                quote! { <#ty as #serde::Deserialize>::deserialize(rest) }
             };
 
             quote! {
                 Some(#rename #(| #aliases)*) => {
                     entries.dispatched = true;
-                    let map_deserializer = #serde::de::value::MapAccessDeserializer::new(entries);
+                    let rest = #alloy_consensus::private::TaggedEntries(entries);
                     return #deserialize.map(|tx| UntaggedTxTypes::Tagged(TaggedTxTypes::#name(tx)));
                 }
             }
@@ -588,18 +664,18 @@ impl<'a> SerdeGenerator<'a> {
             // buffer to keep decoding the same way.
             if self.human_readable {
                 match entries.map.next_key()? {
-                    Some(Key::Type) => {
-                        let tag: Tag<'de> = entries.map.next_value()?;
+                    Some(__Key::Type) => {
+                        let tag: __Tag<'de> = entries.map.next_value()?;
                         let known = match &tag {
-                            Tag::Borrowed(tag) => Some(*tag),
-                            Tag::Other(#serde_json::Value::String(tag)) => Some(tag.as_str()),
-                            Tag::Other(_) => None,
+                            __Tag::Borrowed(tag) => Some(*tag),
+                            __Tag::Other(#serde_json::Value::String(tag)) => Some(tag.as_str()),
+                            __Tag::Other(_) => None,
                         };
                         match known {
                             #(#arms)*
                             _ => {}
                         }
-                        entries.key = Some(Key::Type);
+                        entries.key = Some(__Key::Type);
                         entries.tag = Some(tag);
                     }
                     Some(key) => entries.key = Some(key),

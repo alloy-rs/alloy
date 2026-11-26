@@ -134,6 +134,8 @@ pub mod serde_bincode_compat {
 
 #[doc(hidden)]
 pub mod private {
+    #[cfg(feature = "serde")]
+    pub use crate::transaction::TaggedEntries;
     pub use alloy_eips;
     pub use alloy_primitives;
     pub use alloy_rlp;

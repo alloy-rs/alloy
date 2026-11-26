@@ -1937,7 +1937,7 @@ mod tests {
     fn decode_from_value(json: &str) -> Result<TxEnvelope, String> {
         #[derive(serde::Deserialize)]
         #[serde(tag = "type")]
-        enum Tagged {
+        enum TaggedTxTypes {
             #[serde(
                 rename = "0x0",
                 alias = "0x00",
@@ -1956,12 +1956,12 @@ mod tests {
 
         let value =
             serde_json::from_str::<serde_json::Value>(json).map_err(|err| err.to_string())?;
-        match <Tagged as serde::Deserialize>::deserialize(&value) {
-            Ok(Tagged::Legacy(tx)) => Ok(tx.into()),
-            Ok(Tagged::Eip2930(tx)) => Ok(tx.into()),
-            Ok(Tagged::Eip1559(tx)) => Ok(tx.into()),
-            Ok(Tagged::Eip4844(tx)) => Ok(tx.into()),
-            Ok(Tagged::Eip7702(tx)) => Ok(tx.into()),
+        match <TaggedTxTypes as serde::Deserialize>::deserialize(&value) {
+            Ok(TaggedTxTypes::Legacy(tx)) => Ok(tx.into()),
+            Ok(TaggedTxTypes::Eip2930(tx)) => Ok(tx.into()),
+            Ok(TaggedTxTypes::Eip1559(tx)) => Ok(tx.into()),
+            Ok(TaggedTxTypes::Eip4844(tx)) => Ok(tx.into()),
+            Ok(TaggedTxTypes::Eip7702(tx)) => Ok(tx.into()),
             Err(err) => crate::transaction::untagged_legacy_serde::deserialize(&value)
                 .map(Into::into)
                 .map_err(|_| err.to_string()),
@@ -2064,6 +2064,33 @@ mod tests {
         }
         // Enough of the edited transactions still decode for the comparison to mean something.
         assert!(decoded > 500, "{decoded}");
+    }
+
+    /// Input that is no object reaches the same decoders as before and fails the same way.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_non_objects_match_value_buffering() {
+        let message = |err: String| err.split(" at line ").next().unwrap().to_string();
+        for json in [
+            "null",
+            "true",
+            "2",
+            "-1",
+            "1.5",
+            r#""0x2""#,
+            "[]",
+            // `2` is the position of the EIP-1559 variant.
+            "[2]",
+            r#"[2,{"nonce":"0x0"}]"#,
+            r#"["0x2"]"#,
+            r#"["0x9"]"#,
+        ] {
+            assert_eq!(
+                serde_json::from_str::<TxEnvelope>(json).map_err(|err| message(err.to_string())),
+                decode_from_value(json).map_err(message),
+                "{json}"
+            );
+        }
     }
 
     #[test]
