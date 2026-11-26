@@ -1,6 +1,10 @@
-use crate::{Provider, ProviderLayer, RootProvider};
+use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider, SendableTx};
+use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
 use alloy_node_bindings::{Anvil, AnvilInstance};
+use alloy_primitives::Bytes;
+use alloy_rpc_types_eth::{erc4337::TransactionConditional, FillTransaction};
+use alloy_transport::TransportResult;
 use reqwest::Url;
 use std::{
     marker::PhantomData,
@@ -74,9 +78,72 @@ impl<P: Provider<N>, N: Network> AnvilProvider<P, N> {
     }
 }
 
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<P: Provider<N>, N: Network> Provider<N> for AnvilProvider<P, N> {
     #[inline(always)]
     fn root(&self) -> &RootProvider<N> {
         self.inner.root()
+    }
+
+    async fn send_raw_transaction(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_sync(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.inner.send_raw_transaction_sync(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_raw_transaction_conditional(encoded_tx, conditional).await
+    }
+
+    async fn send_transaction_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_transaction_internal(tx).await
+    }
+
+    async fn send_transaction_sync_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.inner.send_transaction_sync_internal(tx).await
+    }
+
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        self.inner.sign_transaction(tx).await
+    }
+
+    async fn fill_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
+        self.inner.fill_transaction(tx).await
+    }
+
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        self.inner.fill_and_sign_transaction(tx).await
+    }
+
+    fn transaction_request(&self) -> N::TransactionRequest {
+        self.inner.transaction_request()
     }
 }
