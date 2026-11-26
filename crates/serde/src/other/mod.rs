@@ -267,17 +267,17 @@ where
                 // Buffer the object once. The inner value reads the entries by reference, and
                 // only the entries it neither took nor serializes become other fields.
                 let mut entries = buffered::Entries::read(map)?;
-                if entries.has_byte_strings() {
-                    // A byte string cannot become another field, wherever it is. Whether that
-                    // is an error depends on what the inner value leaves in place, which serde's
-                    // own flattening settles.
-                    return deserialize_flattened(entries.deserializer());
+                if entries.has_non_json() {
+                    // A byte string cannot become another field, wherever it is, and neither can
+                    // a map with a key that is no string. Whether that is an error depends on
+                    // what the inner value leaves in place, which serde's own flattening settles.
+                    return deserialize_flattened(buffered::Ref::new(&entries.into_object()));
                 }
                 let inner = T::deserialize(buffered::Flat::new(&mut entries));
                 if entries.asked_for_option() {
                     // serde decides through a private hook whether a flattened `Option` is
                     // `None`, so that case goes through its own flattening.
-                    return deserialize_flattened(entries.deserializer());
+                    return deserialize_flattened(buffered::Ref::new(&entries.into_object()));
                 }
                 let inner = inner?;
                 if keys::remove_keys(&inner, &mut entries).is_err() {
@@ -515,6 +515,36 @@ mod tests {
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
         struct Unit;
 
+        /// A map key that is read as a newtype.
+        #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+        struct Id(String);
+
+        /// A map key that is read as an enum.
+        #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        enum Kind {
+            A,
+            B,
+        }
+
+        /// Takes maps whose keys are no plain strings.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Keyed {
+            #[serde(default)]
+            ids: BTreeMap<Id, u64>,
+            #[serde(default)]
+            kinds: BTreeMap<Kind, u64>,
+            #[serde(default)]
+            options: BTreeMap<Option<String>, u64>,
+        }
+
+        /// Leaves them in place.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct FlatteningKeyed {
+            #[serde(flatten)]
+            keyed: Keyed,
+        }
+
         const KEYS: &[&str] = &["a", "b", "c", "x", "y", "z"];
         const VALUES: &[&str] = &[
             "null",
@@ -533,10 +563,14 @@ mod tests {
             "[{}]",
             "[[],null]",
         ];
+        const KEYED_KEYS: [&str; 3] = ["ids", "kinds", "options"];
+        const KEYED_VALUES: &[&str] =
+            &["{}", r#"{"a":1}"#, r#"{"a":1,"b":2}"#, r#"{"x":1}"#, r#"{"a":{}}"#, "null"];
 
         let mut rng = StdRng::seed_from_u64(0);
         let mut bytes = [0u8; 256];
         let mut decoded = 0;
+        let mut decoded_keyed = [0; 3];
         for _ in 0..500 {
             // Fields no inner type knows, with keys that need escaping.
             rng.fill(bytes.as_mut_slice());
@@ -551,12 +585,25 @@ mod tests {
                 let value = VALUES[rng.gen_range(0..VALUES.len())];
                 entries.push((format!("{key:?}"), value.to_string()));
             }
+            // Maps whose keys are read as a newtype, as an enum or as an option.
+            for _ in 0..rng.gen_range(0..3) {
+                let key = KEYED_KEYS[rng.gen_range(0..KEYED_KEYS.len())];
+                let value = KEYED_VALUES[rng.gen_range(0..KEYED_VALUES.len())];
+                entries.push((format!("{key:?}"), value.to_string()));
+            }
             entries.shuffle(&mut rng);
             let fields: Vec<String> =
                 entries.iter().map(|(key, value)| format!("{key}:{value}")).collect();
             let json = format!("{{{}}}", fields.join(","));
 
             decoded += usize::from(matches_flattened::<Named>(&json));
+            let keyed = matches_flattened::<Keyed>(&json);
+            for (decoded, key) in decoded_keyed.iter_mut().zip(KEYED_KEYS) {
+                *decoded += usize::from(keyed && json.contains(&format!(r#""{key}":{{""#)));
+            }
+            matches_flattened::<FlatteningKeyed>(&json);
+            matches_flattened::<BTreeMap<Id, Value>>(&json);
+            matches_flattened::<BTreeMap<Kind, Value>>(&json);
             matches_flattened::<Flattening>(&json);
             matches_flattened::<Newtype>(&json);
             matches_flattened::<Tagged>(&json);
@@ -571,6 +618,7 @@ mod tests {
         }
         // Enough objects decode for the comparison to mean something.
         assert!(decoded > 50, "{decoded}");
+        assert!(decoded_keyed.iter().all(|decoded| *decoded > 20), "{decoded_keyed:?}");
 
         for json in ["{}", "[]", "null", "1", r#""a""#] {
             matches_flattened::<Named>(json);
@@ -578,22 +626,29 @@ mod tests {
         }
     }
 
-    /// Formats other than JSON have byte strings, which the buffer has to keep.
+    /// Formats other than JSON have byte strings and keys that are no strings, which the buffer
+    /// has to keep.
     #[test]
-    fn deserialize_byte_strings_matches_flattened() {
+    fn deserialize_non_json_matches_flattened() {
         #[derive(Clone, Copy)]
-        enum Scalar {
+        enum Input {
+            Str(&'static str),
             Bytes(&'static [u8]),
             Number(u64),
+            Map(&'static [(Self, Self)]),
         }
 
-        impl<'de> serde::Deserializer<'de> for Scalar {
+        impl<'de> serde::Deserializer<'de> for Input {
             type Error = value::Error;
 
             fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
                 match self {
+                    Self::Str(string) => visitor.visit_borrowed_str(string),
                     Self::Bytes(bytes) => visitor.visit_borrowed_bytes(bytes),
                     Self::Number(number) => visitor.visit_u64(number),
+                    Self::Map(entries) => {
+                        visitor.visit_map(MapDeserializer::new(entries.iter().copied()))
+                    }
                 }
             }
 
@@ -604,7 +659,7 @@ mod tests {
             }
         }
 
-        impl IntoDeserializer<'_, value::Error> for Scalar {
+        impl IntoDeserializer<'_, value::Error> for Input {
             type Deserializer = Self;
 
             fn into_deserializer(self) -> Self {
@@ -623,24 +678,87 @@ mod tests {
             named: Named,
         }
 
-        let object = || {
-            MapDeserializer::new(
-                [("hash", Scalar::Bytes(&[0x11; 32])), ("height", Scalar::Number(7))].into_iter(),
-            )
-        };
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Limits {
+            limits: BTreeMap<u64, u64>,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct FlatteningLimits {
+            #[serde(flatten)]
+            limits: Limits,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Names {
+            names: BTreeMap<String, u64>,
+        }
+
+        /// Decodes `input` with the buffer, which has to agree with serde's own flattening.
+        fn decode<T>(input: Input) -> Result<WithOtherFields<T>, String>
+        where
+            T: DeserializeOwned + Serialize + PartialEq + fmt::Debug,
+        {
+            let buffered = WithOtherFields::<T>::deserialize(input).map_err(|err| err.to_string());
+            assert_eq!(buffered, deserialize_flattened(input).map_err(|err| err.to_string()));
+            buffered
+        }
+
+        const HASH: Input = Input::Bytes(&[0x11; 32]);
+        let height = || OtherFields::new(BTreeMap::from([("height".to_string(), json!(7))]));
 
         // A struct takes its byte string out of the entries.
-        let named = WithOtherFields::<Named>::deserialize(object()).unwrap();
+        let object =
+            Input::Map(&[(Input::Str("hash"), HASH), (Input::Str("height"), Input::Number(7))]);
+        let named = decode::<Named>(object).unwrap();
         assert_eq!(named.inner.hash, B256::repeat_byte(0x11));
-        assert_eq!(
-            named.other,
-            OtherFields::new(BTreeMap::from([("height".to_string(), json!(7))]))
-        );
-        assert_eq!(named, deserialize_flattened(object()).unwrap());
+        assert_eq!(named.other, height());
 
         // A flattened field leaves it in place, where it is no valid other field.
-        let err = WithOtherFields::<Flattening>::deserialize(object()).unwrap_err();
-        assert_eq!(err.to_string(), "invalid type: byte array, expected any valid JSON value");
-        assert_eq!(err, deserialize_flattened::<Flattening, _>(object()).unwrap_err());
+        assert_eq!(
+            decode::<Flattening>(object).unwrap_err(),
+            "invalid type: byte array, expected any valid JSON value"
+        );
+
+        // A key of the object may come as bytes.
+        let object =
+            Input::Map(&[(Input::Bytes(b"hash"), HASH), (Input::Str("height"), Input::Number(7))]);
+        let named = decode::<Named>(object).unwrap();
+        assert_eq!(named.inner.hash, B256::repeat_byte(0x11));
+        assert_eq!(named.other, height());
+
+        // A key that is no string is no other field.
+        let object = Input::Map(&[
+            (Input::Str("limits"), Input::Map(&[])),
+            (Input::Number(1), Input::Number(7)),
+        ]);
+        assert_eq!(
+            decode::<Limits>(object).unwrap_err(),
+            "invalid type: integer `1`, expected a string"
+        );
+
+        // A struct takes its map out of the entries, whatever the keys are.
+        let object = Input::Map(&[
+            (Input::Str("limits"), Input::Map(&[(Input::Number(1), Input::Number(7))])),
+            (Input::Str("height"), Input::Number(7)),
+        ]);
+        let limits = decode::<Limits>(object).unwrap();
+        assert_eq!(limits.inner.limits, BTreeMap::from([(1, 7)]));
+        assert_eq!(limits.other, height());
+
+        // A flattened field leaves it in place, where an integer is no key of another field.
+        assert_eq!(
+            decode::<FlatteningLimits>(object).unwrap_err(),
+            "invalid type: integer `1`, expected a string key"
+        );
+
+        // The key of a nested map may come as bytes too.
+        let object = Input::Map(&[
+            (Input::Str("names"), Input::Map(&[(Input::Bytes(b"a"), Input::Number(7))])),
+            (Input::Str("height"), Input::Number(7)),
+        ]);
+        let names = decode::<Names>(object).unwrap();
+        assert_eq!(names.inner.names, BTreeMap::from([("a".to_string(), 7)]));
+        assert_eq!(names.other, height());
     }
 }

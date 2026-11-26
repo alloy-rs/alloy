@@ -8,6 +8,7 @@
 use super::keys::KeySet;
 use alloc::{
     borrow::Cow,
+    boxed::Box,
     collections::BTreeMap,
     string::{String, ToString},
     vec::Vec,
@@ -36,6 +37,8 @@ pub(super) enum Buffered<'de> {
     Bytes(Cow<'de, [u8]>),
     Seq(Vec<Self>),
     Map(Vec<(Cow<'de, str>, Self)>),
+    /// A map with a key that is no string. Only serde's own flattening reads one, as a whole.
+    Pairs(Vec<(Self, Self)>),
 }
 
 impl Buffered<'_> {
@@ -49,14 +52,33 @@ impl Buffered<'_> {
             Self::Str(value) => Unexpected::Str(value),
             Self::Bytes(value) => Unexpected::Bytes(value),
             Self::Seq(_) => Unexpected::Seq,
-            Self::Map(_) => Unexpected::Map,
+            Self::Map(_) | Self::Pairs(_) => Unexpected::Map,
         }
     }
 }
 
-/// Buffers a value and notes whether it holds a byte string.
+/// Buffers a value and notes whether it holds what JSON has not: a byte string, or a map with a
+/// key that is no string.
 #[derive(Clone, Copy)]
 struct BufferedSeed<'a>(&'a Cell<bool>);
+
+impl<'de> BufferedSeed<'_> {
+    /// Buffers a map from `key` on, its first key that is no string.
+    fn pairs<A: MapAccess<'de>>(
+        self,
+        entries: impl Iterator<Item = (Cow<'de, str>, Buffered<'de>)>,
+        key: Buffered<'de>,
+        map: &mut A,
+    ) -> Result<Buffered<'de>, A::Error> {
+        self.0.set(true);
+        let mut pairs: Vec<_> = entries.map(|(key, value)| (Buffered::Str(key), value)).collect();
+        pairs.push((key, map.next_value_seed(self)?));
+        while let Some(key) = map.next_key_seed(self)? {
+            pairs.push((key, map.next_value_seed(self)?));
+        }
+        Ok(Buffered::Pairs(pairs))
+    }
+}
 
 impl<'de> DeserializeSeed<'de> for BufferedSeed<'_> {
     type Value = Buffered<'de>;
@@ -145,43 +167,96 @@ impl<'de> Visitor<'de> for BufferedSeed<'_> {
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
         let mut entries = Vec::new();
-        while let Some(key) = map.next_key_seed(KeySeed)? {
-            entries.push((key, map.next_value_seed(self)?));
+        while let Some(key) = map.next_key_seed(KeySeed(self))? {
+            match key {
+                Key::Str(key) => entries.push((key, map.next_value_seed(self)?)),
+                Key::Other(key) => return self.pairs(entries.into_iter(), *key, &mut map),
+            }
         }
         Ok(Buffered::Map(entries))
     }
 }
 
-/// Reads a map key, borrowing it where the input allows it.
-struct KeySeed;
+/// A map key as it is read. JSON only has strings.
+enum Key<'de> {
+    Str(Cow<'de, str>),
+    Other(Box<Buffered<'de>>),
+}
 
-impl<'de> DeserializeSeed<'de> for KeySeed {
-    type Value = Cow<'de, str>;
+impl<'de> Key<'de> {
+    fn other(key: Buffered<'de>) -> Self {
+        Self::Other(Box::new(key))
+    }
+}
+
+/// Reads a map key, borrowing a string where the input allows it.
+struct KeySeed<'a>(BufferedSeed<'a>);
+
+impl<'de> DeserializeSeed<'de> for KeySeed<'_> {
+    type Value = Key<'de>;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
-        struct KeyVisitor;
+        deserializer.deserialize_any(self)
+    }
+}
 
-        impl<'de> Visitor<'de> for KeyVisitor {
-            type Value = Cow<'de, str>;
-
-            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.write_str("a string key")
-            }
-
-            fn visit_borrowed_str<E>(self, key: &'de str) -> Result<Self::Value, E> {
-                Ok(Cow::Borrowed(key))
-            }
-
-            fn visit_str<E>(self, key: &str) -> Result<Self::Value, E> {
-                Ok(Cow::Owned(key.to_string()))
-            }
-
-            fn visit_string<E>(self, key: String) -> Result<Self::Value, E> {
-                Ok(Cow::Owned(key))
-            }
+macro_rules! visit_other_key {
+    ($($method:ident($ty:ty))*) => {$(
+        fn $method<E: de::Error>(self, key: $ty) -> Result<Self::Value, E> {
+            self.0.$method(key).map(Key::other)
         }
+    )*};
+}
 
-        deserializer.deserialize_str(KeyVisitor)
+impl<'de> Visitor<'de> for KeySeed<'_> {
+    type Value = Key<'de>;
+
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("a map key")
+    }
+
+    fn visit_borrowed_str<E>(self, key: &'de str) -> Result<Self::Value, E> {
+        Ok(Key::Str(Cow::Borrowed(key)))
+    }
+
+    fn visit_str<E>(self, key: &str) -> Result<Self::Value, E> {
+        Ok(Key::Str(Cow::Owned(key.to_string())))
+    }
+
+    fn visit_string<E>(self, key: String) -> Result<Self::Value, E> {
+        Ok(Key::Str(Cow::Owned(key)))
+    }
+
+    visit_other_key! {
+        visit_bool(bool) visit_u64(u64) visit_i64(i64) visit_f64(f64)
+        visit_borrowed_bytes(&'de [u8]) visit_bytes(&[u8]) visit_byte_buf(Vec<u8>)
+    }
+
+    fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+        self.0.visit_unit().map(Key::other)
+    }
+
+    fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+        self.0.visit_none().map(Key::other)
+    }
+
+    fn visit_some<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+        self.0.visit_some(deserializer).map(Key::other)
+    }
+
+    fn visit_newtype_struct<D: Deserializer<'de>>(
+        self,
+        deserializer: D,
+    ) -> Result<Self::Value, D::Error> {
+        self.0.visit_newtype_struct(deserializer).map(Key::other)
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
+        self.0.visit_seq(seq).map(Key::other)
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+        self.0.visit_map(map).map(Key::other)
     }
 }
 
@@ -189,24 +264,35 @@ impl<'de> DeserializeSeed<'de> for KeySeed {
 #[derive(Debug)]
 pub(super) struct Entries<'de> {
     entries: Vec<Option<(Cow<'de, str>, Buffered<'de>)>>,
-    has_byte_strings: bool,
+    /// The whole object instead, if one of its keys is no string.
+    pairs: Option<Buffered<'de>>,
+    has_non_json: bool,
     asked_for_option: bool,
 }
 
 impl<'de> Entries<'de> {
     /// Buffers the entries of `map`.
     pub(super) fn read<A: MapAccess<'de>>(mut map: A) -> Result<Self, A::Error> {
-        let has_byte_strings = Cell::new(false);
+        let has_non_json = Cell::new(false);
+        let seed = BufferedSeed(&has_non_json);
         let mut entries = Vec::new();
-        while let Some(key) = map.next_key_seed(KeySeed)? {
-            entries.push(Some((key, map.next_value_seed(BufferedSeed(&has_byte_strings))?)));
+        let mut pairs = None;
+        while let Some(key) = map.next_key_seed(KeySeed(seed))? {
+            match key {
+                Key::Str(key) => entries.push(Some((key, map.next_value_seed(seed)?))),
+                Key::Other(key) => {
+                    pairs = Some(seed.pairs(entries.drain(..).flatten(), *key, &mut map)?);
+                    break;
+                }
+            }
         }
-        Ok(Self { entries, has_byte_strings: has_byte_strings.get(), asked_for_option: false })
+        Ok(Self { entries, pairs, has_non_json: has_non_json.get(), asked_for_option: false })
     }
 
-    /// Whether a value holds a byte string, which no other field can hold.
-    pub(super) const fn has_byte_strings(&self) -> bool {
-        self.has_byte_strings
+    /// Whether the object holds a byte string or a key that is no string. JSON has neither, and
+    /// other fields are JSON.
+    pub(super) const fn has_non_json(&self) -> bool {
+        self.has_non_json
     }
 
     /// Whether the inner value asked [`Flat`] for an `Option`, which it cannot answer.
@@ -214,19 +300,12 @@ impl<'de> Entries<'de> {
         self.asked_for_option
     }
 
-    /// Reads the entries that are left as a map.
-    pub(super) fn deserializer<'a, E: de::Error + 'a>(
-        &'a self,
-    ) -> impl Deserializer<'de, Error = E> + 'a
-    where
-        'de: 'a,
-    {
-        MapDeserializer::new(
-            self.entries
-                .iter()
-                .flatten()
-                .map(|(key, value)| (KeyRef(key, PhantomData), Ref::<E>::new(value))),
-        )
+    /// Returns the entries that are left as a map, for serde's own flattening to read.
+    pub(super) fn into_object(self) -> Buffered<'de> {
+        match self.pairs {
+            Some(pairs) => pairs,
+            None => Buffered::Map(self.entries.into_iter().flatten().collect()),
+        }
     }
 
     /// Returns the entries that are left, as the other fields of the object.
@@ -249,7 +328,8 @@ impl KeySet for Entries<'_> {
     }
 }
 
-/// Reads a buffered key.
+/// Reads a buffered key. As in serde's own buffer, a string is also read as an option, as a
+/// newtype and as the name of a variant.
 struct KeyRef<'a, 'de, E>(&'a Cow<'de, str>, PhantomData<E>);
 
 impl<'de, E: de::Error> Deserializer<'de> for KeyRef<'_, 'de, E> {
@@ -262,10 +342,35 @@ impl<'de, E: de::Error> Deserializer<'de> for KeyRef<'_, 'de, E> {
         }
     }
 
+    fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, E> {
+        visitor.visit_some(self)
+    }
+
+    fn deserialize_newtype_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, E> {
+        visitor.visit_newtype_struct(self)
+    }
+
+    fn deserialize_enum<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, E> {
+        visitor.visit_enum(EnumRef {
+            variant: self.0,
+            value: None,
+            taken: false,
+            marker: PhantomData,
+        })
+    }
+
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf
-        option unit unit_struct newtype_struct seq tuple tuple_struct map struct enum identifier
-        ignored_any
+        unit unit_struct seq tuple tuple_struct map struct identifier ignored_any
     }
 }
 
@@ -287,7 +392,7 @@ pub(super) struct Ref<'a, 'de, E> {
 }
 
 impl<'a, 'de, E> Ref<'a, 'de, E> {
-    const fn new(value: &'a Buffered<'de>) -> Self {
+    pub(super) const fn new(value: &'a Buffered<'de>) -> Self {
         Self { value, taken: false, marker: PhantomData }
     }
 
@@ -326,6 +431,18 @@ impl<'de, E: de::Error> Ref<'_, 'de, E> {
             MapDeserializer::new(entries.iter().map(|(key, value)| {
                 (KeyRef(key, PhantomData), Ref::<E>::with_taken(value, taken))
             }));
+        let value = visitor.visit_map(&mut map)?;
+        map.end()?;
+        Ok(value)
+    }
+
+    fn visit_pairs<V: Visitor<'de>>(
+        entries: &[(Buffered<'de>, Buffered<'de>)],
+        visitor: V,
+    ) -> Result<V::Value, E> {
+        let mut map = MapDeserializer::new(
+            entries.iter().map(|(key, value)| (Ref::<E>::new(key), Ref::<E>::new(value))),
+        );
         let value = visitor.visit_map(&mut map)?;
         map.end()?;
         Ok(value)
@@ -397,6 +514,7 @@ impl<'de, E: de::Error> Deserializer<'de> for Ref<'_, 'de, E> {
             Buffered::Bytes(value) => Self::visit_bytes(value, visitor),
             Buffered::Seq(items) => Self::visit_seq(items, self.taken, visitor),
             Buffered::Map(entries) => Self::visit_map(entries, self.taken, visitor),
+            Buffered::Pairs(entries) => Self::visit_pairs(entries, visitor),
         }
     }
 
@@ -497,6 +615,7 @@ impl<'de, E: de::Error> Deserializer<'de> for Ref<'_, 'de, E> {
     fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, E> {
         match self.value {
             Buffered::Map(entries) => Self::visit_map(entries, self.taken, visitor),
+            Buffered::Pairs(entries) => Self::visit_pairs(entries, visitor),
             _ => Err(self.invalid_type(&visitor)),
         }
     }
