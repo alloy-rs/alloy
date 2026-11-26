@@ -6,7 +6,7 @@ use crate::{
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, Bytes, U256, U64};
 use alloy_rpc_client::WeakClient;
 use alloy_rpc_types_eth::{erc4337::TransactionConditional, FillTransaction};
 use alloy_sol_types::{SolCall, SolType, SolValue};
@@ -570,6 +570,10 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
     fn transaction_request(&self) -> N::TransactionRequest {
         self.provider.transaction_request()
     }
+
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> crate::EthCall<N, U64, u64> {
+        self.provider.estimate_gas(tx)
+    }
 }
 
 struct CallBatchCaller<N: Network> {
@@ -850,6 +854,11 @@ mod tests {
                 self.calls.lock().unwrap().push("sign_transaction");
                 self.root.sign_transaction(tx).await
             }
+
+            fn estimate_gas(&self, tx: TransactionRequest) -> crate::EthCall<Ethereum, U64, u64> {
+                self.calls.lock().unwrap().push("estimate_gas");
+                self.root.estimate_gas(tx)
+            }
         }
 
         let calls = Arc::new(Mutex::new(Vec::new()));
@@ -862,7 +871,11 @@ mod tests {
         // The empty mock fails every request; only reaching the recorder matters.
         let _ = provider.send_transaction(TransactionRequest::default()).await;
         let _ = provider.sign_transaction(TransactionRequest::default()).await;
+        let _ = provider.estimate_gas(TransactionRequest::default()).await;
 
-        assert_eq!(*calls.lock().unwrap(), ["send_transaction_internal", "sign_transaction"]);
+        assert_eq!(
+            *calls.lock().unwrap(),
+            ["send_transaction_internal", "sign_transaction", "estimate_gas"]
+        );
     }
 }
