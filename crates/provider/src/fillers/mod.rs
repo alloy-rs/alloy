@@ -817,7 +817,13 @@ where
         match self.fill(tx).await? {
             // A local signer (e.g. `WalletFiller`) already produced the signed envelope.
             SendableTx::Envelope(envelope) => Ok(envelope.encoded_2718().into()),
-            SendableTx::Builder(tx) => self.inner.sign_transaction(tx).await,
+            SendableTx::Builder(tx) => {
+                if let FillerControlFlow::Missing(missing) = self.filler.status(&tx) {
+                    let message = format!("missing properties: {missing:?}");
+                    return Err(RpcError::local_usage_str(&message));
+                }
+                self.inner.sign_transaction(tx).await
+            }
         }
     }
 
@@ -1175,6 +1181,24 @@ mod tests {
         assert_eq!(
             alloy_consensus::transaction::SignerRecoverable::recover_signer(&envelope).unwrap(),
             from
+        );
+    }
+
+    #[tokio::test]
+    async fn sign_transaction_rejects_incomplete_request() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = crate::ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .wallet(alloy_signer_local::PrivateKeySigner::random())
+            .connect_mocked_client(asserter.clone());
+
+        let tx = TransactionRequest { to: Some(Address::ZERO.into()), ..Default::default() };
+        let err = provider.sign_transaction(tx).await.unwrap_err();
+
+        assert!(asserter.requests().is_empty());
+        assert_eq!(
+            err.to_string(),
+            r#"local usage error: missing properties: [("Wallet", ["nonce", "gas_limit", "max_fee_per_gas", "max_priority_fee_per_gas"])]"#
         );
     }
 }
