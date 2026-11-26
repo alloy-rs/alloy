@@ -620,9 +620,10 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
+    use alloy_consensus::TxEnvelope;
     use alloy_network::{Ethereum, TransactionBuilder};
     use alloy_primitives::{address, hex};
-    use alloy_rpc_types_eth::{BlockOverrides, TransactionRequest};
+    use alloy_rpc_types_eth::{BlockOverrides, TransactionReceipt, TransactionRequest};
     use alloy_transport::mock::Asserter;
 
     // https://etherscan.io/address/0xcA11bde05977b3631167028862bE2a173976CA11#code
@@ -850,9 +851,25 @@ mod tests {
                 self.root.send_transaction_internal(tx).await
             }
 
+            async fn send_transaction_sync_internal(
+                &self,
+                tx: SendableTx<Ethereum>,
+            ) -> TransportResult<TransactionReceipt> {
+                self.calls.lock().unwrap().push("send_transaction_sync_internal");
+                self.root.send_transaction_sync_internal(tx).await
+            }
+
             async fn sign_transaction(&self, tx: TransactionRequest) -> TransportResult<Bytes> {
                 self.calls.lock().unwrap().push("sign_transaction");
                 self.root.sign_transaction(tx).await
+            }
+
+            async fn fill_and_sign_transaction(
+                &self,
+                tx: TransactionRequest,
+            ) -> TransportResult<TxEnvelope> {
+                self.calls.lock().unwrap().push("fill_and_sign_transaction");
+                self.root.fill_and_sign_transaction(tx).await
             }
 
             fn estimate_gas(&self, tx: TransactionRequest) -> crate::EthCall<Ethereum, U64, u64> {
@@ -870,12 +887,20 @@ mod tests {
 
         // The empty mock fails every request; only reaching the recorder matters.
         let _ = provider.send_transaction(TransactionRequest::default()).await;
+        let _ = provider.send_transaction_sync(TransactionRequest::default()).await;
         let _ = provider.sign_transaction(TransactionRequest::default()).await;
+        let _ = provider.fill_and_sign_transaction(TransactionRequest::default()).await;
         let _ = provider.estimate_gas(TransactionRequest::default()).await;
 
         assert_eq!(
             *calls.lock().unwrap(),
-            ["send_transaction_internal", "sign_transaction", "estimate_gas"]
+            [
+                "send_transaction_internal",
+                "send_transaction_sync_internal",
+                "sign_transaction",
+                "fill_and_sign_transaction",
+                "estimate_gas",
+            ]
         );
     }
 }
