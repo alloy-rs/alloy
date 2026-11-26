@@ -515,6 +515,13 @@ impl<L: Encodable2718, R: Encodable2718> Encodable2718 for either::Either<L, R> 
             Self::Right(r) => r.encode_2718(out),
         }
     }
+
+    fn trie_hash(&self) -> B256 {
+        match self {
+            Self::Left(l) => l.trie_hash(),
+            Self::Right(r) => r.trie_hash(),
+        }
+    }
 }
 
 impl<L: Typed2718, R: Typed2718> Typed2718 for either::Either<L, R> {
