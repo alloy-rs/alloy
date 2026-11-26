@@ -5,6 +5,15 @@ use alloc::{
 };
 use alloy_primitives::Bytes;
 
+#[cfg(feature = "serde")]
+mod limited;
+#[cfg(feature = "serde")]
+pub use limited::{CallManyLimitExceeded, CallManyList, CallManySeed};
+#[cfg(feature = "serde")]
+mod raw;
+#[cfg(feature = "serde")]
+pub use raw::{RawCallMany, RawCallManyError};
+
 /// Bundle of transactions
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
