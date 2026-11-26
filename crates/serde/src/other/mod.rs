@@ -6,7 +6,6 @@ use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-use keys::KeySet;
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     Deserialize, Serialize,
@@ -280,16 +279,7 @@ where
                     return deserialize_flattened(buffered::Ref::new(&entries.into_object()));
                 }
                 let inner = inner?;
-                if keys::remove_keys(&inner, &mut entries).is_err() {
-                    // Not every key is a string: let `serde_json` stringify them.
-                    if let Value::Object(map) =
-                        serde_json::to_value(&inner).map_err(serde::de::Error::custom)?
-                    {
-                        for key in map.keys() {
-                            entries.remove_key(key);
-                        }
-                    }
-                }
+                entries.remove_keys_of(&inner).map_err(serde::de::Error::custom)?;
 
                 Ok(WithOtherFields { inner, other: OtherFields::new(entries.into_other()?) })
             }
@@ -545,6 +535,7 @@ mod tests {
             keyed: Keyed,
         }
 
+        const LIMIT: usize = buffered::LINEAR_SEARCH_LIMIT;
         const KEYS: &[&str] = &["a", "b", "c", "x", "y", "z"];
         const VALUES: &[&str] = &[
             "null",
@@ -571,6 +562,7 @@ mod tests {
         let mut bytes = [0u8; 256];
         let mut decoded = 0;
         let mut decoded_keyed = [0; 3];
+        let mut decoded_many = [0; 2];
         for _ in 0..500 {
             // Fields no inner type knows, with keys that need escaping.
             rng.fill(bytes.as_mut_slice());
@@ -591,12 +583,22 @@ mod tests {
                 let value = KEYED_VALUES[rng.gen_range(0..KEYED_VALUES.len())];
                 entries.push((format!("{key:?}"), value.to_string()));
             }
+            // More entries than are searched one by one to remove a key, with repeated keys.
+            let many = rng.gen_ratio(1, 3);
+            if many {
+                for _ in 0..rng.gen_range(LIMIT..3 * LIMIT) {
+                    let key = format!("k{}", rng.gen_range(0..2 * LIMIT));
+                    entries.push((format!("{key:?}"), rng.gen_range(0..9).to_string()));
+                }
+            }
             entries.shuffle(&mut rng);
             let fields: Vec<String> =
                 entries.iter().map(|(key, value)| format!("{key}:{value}")).collect();
             let json = format!("{{{}}}", fields.join(","));
 
-            decoded += usize::from(matches_flattened::<Named>(&json));
+            let named = matches_flattened::<Named>(&json);
+            decoded += usize::from(named);
+            decoded_many[0] += usize::from(many && named);
             let keyed = matches_flattened::<Keyed>(&json);
             for (decoded, key) in decoded_keyed.iter_mut().zip(KEYED_KEYS) {
                 *decoded += usize::from(keyed && json.contains(&format!(r#""{key}":{{""#)));
@@ -610,7 +612,8 @@ mod tests {
             matches_flattened::<Untagged>(&json);
             matches_flattened::<Unit>(&json);
             matches_flattened::<Option<Named>>(&json);
-            matches_flattened::<BTreeMap<String, Value>>(&json);
+            let map = matches_flattened::<BTreeMap<String, Value>>(&json);
+            decoded_many[1] += usize::from(many && map);
             matches_flattened::<WithOtherFields<Named>>(&json);
             // Not something that can be flattened.
             matches_flattened::<u64>(&json);
@@ -619,6 +622,17 @@ mod tests {
         // Enough objects decode for the comparison to mean something.
         assert!(decoded > 50, "{decoded}");
         assert!(decoded_keyed.iter().all(|decoded| *decoded > 20), "{decoded_keyed:?}");
+        assert!(decoded_many.iter().all(|decoded| *decoded > 20), "{decoded_many:?}");
+
+        // Around the limit, with a repeated key. The inner value keeps one key, all or none.
+        for entries in LIMIT - 1..=LIMIT + 2 {
+            let fields: Vec<String> =
+                (0..entries).map(|i| format!(r#""{}":{i}"#, ["a", "k"][i.min(1)])).collect();
+            let json = format!("{{{}}}", fields.join(","));
+            assert!(matches_flattened::<Named>(&json));
+            assert!(matches_flattened::<BTreeMap<String, Value>>(&json));
+            assert!(matches_flattened::<Unit>(&json));
+        }
 
         for json in ["{}", "[]", "null", "1", r#""a""#] {
             matches_flattened::<Named>(json);

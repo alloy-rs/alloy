@@ -5,7 +5,7 @@
 //! does not let the second reader skip the entries the first one used. [`Flat`] and [`Ref`] answer
 //! every hint the way serde's `FlatMapDeserializer` and `ContentRefDeserializer` do.
 
-use super::keys::KeySet;
+use super::keys::{self, KeySet};
 use alloc::{
     borrow::Cow,
     boxed::Box,
@@ -21,9 +21,13 @@ use serde::{
         DeserializeSeed, EnumAccess, IntoDeserializer, MapAccess, SeqAccess, Unexpected,
         VariantAccess, Visitor,
     },
-    forward_to_deserialize_any, Deserialize, Deserializer,
+    forward_to_deserialize_any, Deserialize, Deserializer, Serialize,
 };
 use serde_json::Value;
+
+/// Objects with more entries than this get a sorted index to find the entries with a key.
+/// Searching every entry for every key is quadratic if the inner value keeps all of them.
+pub(super) const LINEAR_SEARCH_LIMIT: usize = 32;
 
 /// A buffered value. Strings borrow from the input where the input allows it.
 #[derive(Debug)]
@@ -308,6 +312,23 @@ impl<'de> Entries<'de> {
         }
     }
 
+    /// Removes the entries with the top-level keys that `value` serializes to. They are fields of
+    /// the inner value, not other fields.
+    pub(super) fn remove_keys_of<T: Serialize>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), serde_json::Error> {
+        if self.entries.len() <= LINEAR_SEARCH_LIMIT {
+            return remove_serialized_keys(value, self);
+        }
+        let mut keys = SortedKeys::new(&self.entries);
+        let result = remove_serialized_keys(value, &mut keys);
+        for position in keys.removed {
+            self.entries[position] = None;
+        }
+        result
+    }
+
     /// Returns the entries that are left, as the other fields of the object.
     pub(super) fn into_other<E: de::Error>(self) -> Result<BTreeMap<String, Value>, E> {
         let mut other = BTreeMap::new();
@@ -326,6 +347,51 @@ impl KeySet for Entries<'_> {
             }
         }
     }
+}
+
+/// The keys of many entries, sorted to find the entries with a key without reading all of them.
+struct SortedKeys<'a> {
+    /// The key and the position of every entry that is left.
+    sorted: Vec<(&'a str, usize)>,
+    /// The positions of the entries to remove.
+    removed: Vec<usize>,
+}
+
+impl<'a> SortedKeys<'a> {
+    fn new(entries: &'a [Option<(Cow<'_, str>, Buffered<'_>)>]) -> Self {
+        let mut sorted: Vec<_> = entries
+            .iter()
+            .enumerate()
+            .filter_map(|(position, entry)| Some((&*entry.as_ref()?.0, position)))
+            .collect();
+        sorted.sort_unstable();
+        Self { sorted, removed: Vec::new() }
+    }
+}
+
+impl KeySet for SortedKeys<'_> {
+    fn remove_key(&mut self, key: &str) {
+        // The entries of a repeated key are next to each other.
+        let start = self.sorted.partition_point(|(name, _)| *name < key);
+        let named = self.sorted[start..].iter().take_while(|(name, _)| *name == key);
+        self.removed.extend(named.map(|(_, position)| position));
+    }
+}
+
+/// Removes the top-level keys that `value` serializes to from `keys`.
+fn remove_serialized_keys<T: Serialize, M: KeySet>(
+    value: &T,
+    keys: &mut M,
+) -> Result<(), serde_json::Error> {
+    if keys::remove_keys(value, keys).is_err() {
+        // Not every key is a string: let `serde_json` stringify them.
+        if let Value::Object(object) = serde_json::to_value(value)? {
+            for key in object.keys() {
+                keys.remove_key(key);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Reads a buffered key. As in serde's own buffer, a string is also read as an option, as a
