@@ -12,6 +12,7 @@ use crate::{
     BlobsBundleV1, BlobsBundleV2, ExecutionPayloadBodyV1 as LegacyExecutionPayloadBodyV1,
     ExecutionPayloadBodyV2 as LegacyExecutionPayloadBodyV2,
     ExecutionPayloadEnvelopeV2 as LegacyBuiltPayloadShanghai,
+    ExecutionPayloadEnvelopeV3 as LegacyBuiltPayloadCancun,
     ExecutionPayloadEnvelopeV4 as LegacyBuiltPayloadPrague,
     ExecutionPayloadEnvelopeV5 as LegacyBuiltPayloadOsaka,
     ExecutionPayloadEnvelopeV6 as LegacyBuiltPayloadAmsterdam, ExecutionPayloadFieldV2,

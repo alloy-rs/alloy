@@ -103,7 +103,7 @@ fn built_payloads_roundtrip() {
     assert_roundtrip(&BuiltPayloadParis { payload: payload_v1(), block_value: U256::from(1) });
     assert_roundtrip(&BuiltPayloadShanghai { payload: payload_v2(), block_value: U256::from(1) });
     assert_roundtrip(&BuiltPayloadCancun {
-        execution_payload: payload_v3(),
+        payload: payload_v3(),
         block_value: U256::from(1),
         blobs_bundle: BlobsBundleV1::empty(),
         should_override_builder: true,
@@ -129,6 +129,85 @@ fn built_payloads_roundtrip() {
         execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
         should_override_builder: true,
     });
+}
+
+#[test]
+fn cancun_built_payload_preserves_legacy_wire_format() {
+    for should_override_builder in [false, true] {
+        let mut payload = payload_v3();
+        payload.payload_inner.withdrawals = vec![Withdrawal::default(); 16];
+        payload.payload_inner.payload_inner.extra_data = vec![0; 32].into();
+        let legacy = LegacyBuiltPayloadCancun {
+            execution_payload: payload,
+            block_value: U256::from(42),
+            blobs_bundle: BlobsBundleV1::empty(),
+            should_override_builder,
+        };
+        let bytes = legacy.as_ssz_bytes();
+        let built = BuiltPayloadCancun::from(legacy.clone());
+        assert_eq!(built.as_ssz_bytes(), bytes);
+        assert_eq!(BuiltPayloadCancun::from_ssz_bytes(&bytes).unwrap(), built);
+        assert_eq!(LegacyBuiltPayloadCancun::from(built), legacy);
+    }
+}
+
+#[test]
+fn cancun_built_payload_accepts_transaction_limit() {
+    let mut payload = payload_v3();
+    payload.payload_inner.payload_inner.transactions = vec![Bytes::new(); MAX_TXS_PER_PAYLOAD];
+    let built = BuiltPayloadCancun {
+        payload,
+        block_value: U256::from(1),
+        blobs_bundle: BlobsBundleV1::empty(),
+        should_override_builder: false,
+    };
+    assert!(BuiltPayloadCancun::from_ssz_bytes(&built.as_ssz_bytes()).is_ok());
+}
+
+fn assert_cancun_built_payload_rejects(payload: ExecutionPayloadV3, field: &str) {
+    let legacy = LegacyBuiltPayloadCancun {
+        execution_payload: payload.clone(),
+        block_value: U256::from(1),
+        blobs_bundle: BlobsBundleV1::empty(),
+        should_override_builder: true,
+    };
+    let prague = BuiltPayloadPrague {
+        payload: payload.clone(),
+        block_value: legacy.block_value,
+        blobs_bundle: legacy.blobs_bundle.clone(),
+        execution_requests: Requests::default(),
+        should_override_builder: legacy.should_override_builder,
+    };
+    let submission =
+        ExecutionPayloadEnvelopeCancun { payload, parent_beacon_block_root: B256::ZERO };
+    assert!(BuiltPayloadPrague::from_ssz_bytes(&prague.as_ssz_bytes()).is_err());
+    assert!(ExecutionPayloadEnvelopeCancun::from_ssz_bytes(&submission.as_ssz_bytes()).is_err());
+
+    let Err(error) = BuiltPayloadCancun::from_ssz_bytes(&legacy.as_ssz_bytes()) else {
+        panic!("Cancun build response must reject an out-of-bounds execution payload");
+    };
+    assert!(matches!(error, ssz::DecodeError::BytesInvalid(message) if message.contains(field)));
+}
+
+#[test]
+fn cancun_built_payload_rejects_excess_withdrawals() {
+    let mut payload = payload_v3();
+    payload.payload_inner.withdrawals = vec![Withdrawal::default(); 17];
+    assert_cancun_built_payload_rejects(payload, "withdrawals");
+}
+
+#[test]
+fn cancun_built_payload_rejects_excess_extra_data() {
+    let mut payload = payload_v3();
+    payload.payload_inner.payload_inner.extra_data = vec![0; 33].into();
+    assert_cancun_built_payload_rejects(payload, "extra_data");
+}
+
+#[test]
+fn cancun_built_payload_rejects_excess_transactions() {
+    let mut payload = payload_v3();
+    payload.payload_inner.payload_inner.transactions = vec![Bytes::new(); MAX_TXS_PER_PAYLOAD + 1];
+    assert_cancun_built_payload_rejects(payload, "transactions");
 }
 
 #[test]
