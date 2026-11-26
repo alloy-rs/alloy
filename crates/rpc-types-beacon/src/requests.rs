@@ -28,6 +28,7 @@ impl<'de> Deserialize<'de> for ExecutionRequestsV4 {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct Helper {
             #[serde(default)]
             deposits: Option<Vec<DepositRequest>>,
@@ -84,6 +85,7 @@ impl<'de> Deserialize<'de> for ExecutionRequestsV5 {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct Helper {
             #[serde(default)]
             deposits: Option<Vec<DepositRequest>>,
@@ -385,6 +387,24 @@ mod ssz_requests_conversions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn requests_reject_unknown_fields() {
+        for value in [serde_json::Value::Null, serde_json::json!([])] {
+            let json = serde_json::json!({ "unknown": value });
+            assert!(serde_json::from_value::<ExecutionRequestsV4>(json.clone()).is_err());
+            assert!(serde_json::from_value::<ExecutionRequestsV5>(json).is_err());
+        }
+
+        for field in ["builder_deposits", "builder_exits"] {
+            let json = serde_json::json!({ field: [] });
+            assert!(serde_json::from_value::<ExecutionRequestsV4>(json.clone()).is_err());
+            assert_eq!(
+                serde_json::from_value::<ExecutionRequestsV5>(json).unwrap(),
+                ExecutionRequestsV5::default()
+            );
+        }
+    }
 
     #[test]
     fn deserde_requests_v4() {

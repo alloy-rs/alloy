@@ -211,7 +211,7 @@ pub mod beacon_api_payload_attributes {
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct BeaconExecutionPayloadV1<'a> {
     parent_hash: Cow<'a, B256>,
     fee_recipient: Cow<'a, Address>,
@@ -232,43 +232,6 @@ struct BeaconExecutionPayloadV1<'a> {
     base_fee_per_gas: U256,
     block_hash: Cow<'a, B256>,
     transactions: Cow<'a, [Bytes]>,
-}
-
-impl<'a> From<BeaconExecutionPayloadV1<'a>> for ExecutionPayloadV1 {
-    fn from(payload: BeaconExecutionPayloadV1<'a>) -> Self {
-        let BeaconExecutionPayloadV1 {
-            parent_hash,
-            fee_recipient,
-            state_root,
-            receipts_root,
-            logs_bloom,
-            prev_randao,
-            block_number,
-            gas_limit,
-            gas_used,
-            timestamp,
-            extra_data,
-            base_fee_per_gas,
-            block_hash,
-            transactions,
-        } = payload;
-        Self {
-            parent_hash: parent_hash.into_owned(),
-            fee_recipient: fee_recipient.into_owned(),
-            state_root: state_root.into_owned(),
-            receipts_root: receipts_root.into_owned(),
-            logs_bloom: logs_bloom.into_owned(),
-            prev_randao: prev_randao.into_owned(),
-            block_number,
-            gas_limit,
-            gas_used,
-            timestamp,
-            extra_data: extra_data.into_owned(),
-            base_fee_per_gas,
-            block_hash: block_hash.into_owned(),
-            transactions: transactions.into_owned(),
-        }
-    }
 }
 
 impl<'a> From<&'a ExecutionPayloadV1> for BeaconExecutionPayloadV1<'a> {
@@ -330,12 +293,15 @@ pub mod beacon_payload_v1 {
     where
         D: Deserializer<'de>,
     {
-        BeaconExecutionPayloadV1::deserialize(deserializer).map(Into::into)
+        match beacon_payload::deserialize(deserializer)? {
+            ExecutionPayload::V1(payload) => Ok(payload),
+            _ => Err(serde::de::Error::custom("expected beacon execution payload V1")),
+        }
     }
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct BeaconExecutionPayloadV2<'a> {
     /// Inner V1 payload
     #[serde(flatten)]
@@ -344,13 +310,6 @@ struct BeaconExecutionPayloadV2<'a> {
     /// See <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2>
     #[serde_as(as = "Vec<BeaconWithdrawal>")]
     withdrawals: Vec<Withdrawal>,
-}
-
-impl<'a> From<BeaconExecutionPayloadV2<'a>> for ExecutionPayloadV2 {
-    fn from(payload: BeaconExecutionPayloadV2<'a>) -> Self {
-        let BeaconExecutionPayloadV2 { payload_inner, withdrawals } = payload;
-        Self { payload_inner: payload_inner.into(), withdrawals }
-    }
 }
 
 impl<'a> From<&'a ExecutionPayloadV2> for BeaconExecutionPayloadV2<'a> {
@@ -384,12 +343,15 @@ pub mod beacon_payload_v2 {
     where
         D: Deserializer<'de>,
     {
-        BeaconExecutionPayloadV2::deserialize(deserializer).map(Into::into)
+        match beacon_payload::deserialize(deserializer)? {
+            ExecutionPayload::V2(payload) => Ok(payload),
+            _ => Err(serde::de::Error::custom("expected beacon execution payload V2")),
+        }
     }
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct BeaconExecutionPayloadV3<'a> {
     /// Inner V2 payload
     #[serde(flatten)]
@@ -398,13 +360,6 @@ struct BeaconExecutionPayloadV3<'a> {
     blob_gas_used: u64,
     #[serde_as(as = "DisplayFromStr")]
     excess_blob_gas: u64,
-}
-
-impl<'a> From<BeaconExecutionPayloadV3<'a>> for ExecutionPayloadV3 {
-    fn from(payload: BeaconExecutionPayloadV3<'a>) -> Self {
-        let BeaconExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas } = payload;
-        Self { payload_inner: payload_inner.into(), blob_gas_used, excess_blob_gas }
-    }
 }
 
 impl<'a> From<&'a ExecutionPayloadV3> for BeaconExecutionPayloadV3<'a> {
@@ -439,7 +394,10 @@ pub mod beacon_payload_v3 {
     where
         D: Deserializer<'de>,
     {
-        BeaconExecutionPayloadV3::deserialize(deserializer).map(Into::into)
+        match beacon_payload::deserialize(deserializer)? {
+            ExecutionPayload::V3(payload) => Ok(payload),
+            _ => Err(serde::de::Error::custom("expected beacon execution payload V3")),
+        }
     }
 }
 
@@ -447,7 +405,7 @@ pub mod beacon_payload_v3 {
 ///
 /// See also <https://github.com/alloy-rs/alloy/pull/3330>
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct BeaconExecutionPayloadV4<'a> {
     /// Inner V3 payload
     #[serde(flatten)]
@@ -457,17 +415,6 @@ struct BeaconExecutionPayloadV4<'a> {
     /// The slot number corresponding to this block, calculated in the consensus layer.
     #[serde_as(as = "DisplayFromStr")]
     slot_number: u64,
-}
-
-impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
-    fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
-        let BeaconExecutionPayloadV4 { payload_inner, block_access_list, slot_number } = payload;
-        Self {
-            payload_inner: payload_inner.into(),
-            block_access_list: block_access_list.into_owned(),
-            slot_number,
-        }
-    }
 }
 
 impl<'a> From<&'a ExecutionPayloadV4> for BeaconExecutionPayloadV4<'a> {
@@ -502,14 +449,116 @@ pub mod beacon_payload_v4 {
     where
         D: Deserializer<'de>,
     {
-        BeaconExecutionPayloadV4::deserialize(deserializer).map(Into::into)
+        match beacon_payload::deserialize(deserializer)? {
+            ExecutionPayload::V4(payload) => Ok(payload),
+            _ => Err(serde::de::Error::custom("expected beacon execution payload V4")),
+        }
+    }
+}
+
+/// A flat decoder prevents later-fork fields from being ignored by flattened helpers.
+#[serde_as]
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BeaconExecutionPayloadFields {
+    parent_hash: B256,
+    fee_recipient: Address,
+    state_root: B256,
+    receipts_root: B256,
+    logs_bloom: Bloom,
+    prev_randao: B256,
+    #[serde_as(as = "DisplayFromStr")]
+    block_number: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    gas_limit: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    gas_used: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    timestamp: u64,
+    extra_data: Bytes,
+    #[serde_as(as = "DisplayFromStr")]
+    base_fee_per_gas: U256,
+    block_hash: B256,
+    transactions: Vec<Bytes>,
+    #[serde(default, deserialize_with = "deserialize_present::<_, _, Vec<BeaconWithdrawal>>")]
+    withdrawals: Option<Vec<Withdrawal>>,
+    #[serde(default, deserialize_with = "deserialize_present::<_, _, DisplayFromStr>")]
+    blob_gas_used: Option<u64>,
+    #[serde(default, deserialize_with = "deserialize_present::<_, _, DisplayFromStr>")]
+    excess_blob_gas: Option<u64>,
+    #[serde(default, deserialize_with = "deserialize_present::<_, _, serde_with::Same>")]
+    block_access_list: Option<Bytes>,
+    #[serde(default, deserialize_with = "deserialize_present::<_, _, DisplayFromStr>")]
+    slot_number: Option<u64>,
+}
+
+/// Fork fields may be omitted, but must not be null when present.
+fn deserialize_present<'de, D, T, A>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    A: serde_with::DeserializeAs<'de, T>,
+{
+    A::deserialize_as(deserializer).map(Some)
+}
+
+impl BeaconExecutionPayloadFields {
+    fn into_payload(self) -> Result<ExecutionPayload, &'static str> {
+        let v1 = ExecutionPayloadV1 {
+            parent_hash: self.parent_hash,
+            fee_recipient: self.fee_recipient,
+            state_root: self.state_root,
+            receipts_root: self.receipts_root,
+            logs_bloom: self.logs_bloom,
+            prev_randao: self.prev_randao,
+            block_number: self.block_number,
+            gas_limit: self.gas_limit,
+            gas_used: self.gas_used,
+            timestamp: self.timestamp,
+            extra_data: self.extra_data,
+            base_fee_per_gas: self.base_fee_per_gas,
+            block_hash: self.block_hash,
+            transactions: self.transactions,
+        };
+        let no_v3_or_v4_fields = self.blob_gas_used.is_none()
+            && self.excess_blob_gas.is_none()
+            && self.block_access_list.is_none()
+            && self.slot_number.is_none();
+        let Some(withdrawals) = self.withdrawals else {
+            return if no_v3_or_v4_fields {
+                Ok(ExecutionPayload::V1(v1))
+            } else {
+                Err("incomplete beacon execution payload field set")
+            };
+        };
+        let v2 = ExecutionPayloadV2 { payload_inner: v1, withdrawals };
+        let (Some(blob_gas_used), Some(excess_blob_gas)) =
+            (self.blob_gas_used, self.excess_blob_gas)
+        else {
+            return if no_v3_or_v4_fields {
+                Ok(ExecutionPayload::V2(v2))
+            } else {
+                Err("incomplete beacon execution payload field set")
+            };
+        };
+        let v3 = ExecutionPayloadV3 { payload_inner: v2, blob_gas_used, excess_blob_gas };
+        match (self.block_access_list, self.slot_number) {
+            (Some(block_access_list), Some(slot_number)) => {
+                Ok(ExecutionPayload::V4(ExecutionPayloadV4 {
+                    payload_inner: v3,
+                    block_access_list,
+                    slot_number,
+                }))
+            }
+            (None, None) => Ok(ExecutionPayload::V3(v3)),
+            _ => Err("incomplete beacon execution payload field set"),
+        }
     }
 }
 
 /// Represents all possible payload versions.
 ///
-/// Variants are declared newest first, so that deserialization tries them in that order.
-#[derive(Debug, Serialize, Deserialize)]
+/// Used only for serialization; deserialization validates the complete field set.
+#[derive(Debug, Serialize)]
 #[serde(untagged)]
 enum BeaconExecutionPayload<'a> {
     /// V4 payload (Amsterdam)
@@ -520,17 +569,6 @@ enum BeaconExecutionPayload<'a> {
     V2(BeaconExecutionPayloadV2<'a>),
     /// V1 payload
     V1(BeaconExecutionPayloadV1<'a>),
-}
-
-impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
-    fn from(payload: BeaconExecutionPayload<'a>) -> Self {
-        match payload {
-            BeaconExecutionPayload::V1(payload) => Self::V1(ExecutionPayloadV1::from(payload)),
-            BeaconExecutionPayload::V2(payload) => Self::V2(ExecutionPayloadV2::from(payload)),
-            BeaconExecutionPayload::V3(payload) => Self::V3(ExecutionPayloadV3::from(payload)),
-            BeaconExecutionPayload::V4(payload) => Self::V4(ExecutionPayloadV4::from(payload)),
-        }
-    }
 }
 
 impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
@@ -573,7 +611,29 @@ pub mod beacon_payload {
     where
         D: Deserializer<'de>,
     {
-        BeaconExecutionPayload::deserialize(deserializer).map(Into::into)
+        struct PayloadVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for PayloadVisitor {
+            type Value = ExecutionPayload;
+
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("a beacon execution payload object")
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                BeaconExecutionPayloadFields::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?
+                .into_payload()
+                .map_err(serde::de::Error::custom)
+            }
+        }
+
+        // A derived `Deserialize` also accepts the positional sequence form.
+        deserializer.deserialize_map(PayloadVisitor)
     }
 }
 
@@ -594,6 +654,133 @@ mod tests {
     use super::*;
     use alloy_rpc_types_engine::PayloadAttributes;
     use similar_asserts::assert_eq;
+
+    fn amsterdam_payload_json() -> serde_json::Value {
+        let bid: serde_json::Value = serde_json::from_str(include_str!(
+            "examples/relay_builder_block_validation_request_v4.json"
+        ))
+        .unwrap();
+        let mut payload = bid["execution_payload"].clone();
+        payload["block_access_list"] = "0xaabbcc".into();
+        payload["slot_number"] = "6".into();
+        payload
+    }
+
+    #[test]
+    fn beacon_payload_requires_complete_fork_fields() {
+        let fields =
+            ["withdrawals", "blob_gas_used", "excess_blob_gas", "block_access_list", "slot_number"];
+        // Only the V1, V2, V3 and V4 field sets are valid.
+        for mask in 0..32 {
+            let mut json = amsterdam_payload_json();
+            for (index, field) in fields.iter().enumerate() {
+                if mask & (1 << index) == 0 {
+                    json.as_object_mut().unwrap().remove(*field);
+                }
+            }
+            let result = execution_payload_from_beacon_str(&json.to_string());
+            if matches!(mask, 0 | 1 | 7 | 31) {
+                let payload = result.unwrap();
+                assert_eq!(
+                    json,
+                    serde_json::to_value(BeaconExecutionPayload::from(&payload)).unwrap()
+                );
+                let body: BeaconBlockBody =
+                    serde_json::from_value(serde_json::json!({ "execution_payload": json }))
+                        .unwrap();
+                assert_eq!(body.execution_payload, payload);
+                match mask {
+                    0 => assert!(matches!(payload, ExecutionPayload::V1(_))),
+                    1 => assert!(matches!(payload, ExecutionPayload::V2(_))),
+                    7 => assert!(matches!(payload, ExecutionPayload::V3(_))),
+                    31 => assert!(matches!(payload, ExecutionPayload::V4(_))),
+                    _ => unreachable!(),
+                }
+            } else {
+                assert!(result.is_err(), "accepted incomplete field set {mask:#07b}");
+                assert!(serde_json::from_value::<BeaconBlockBody>(
+                    serde_json::json!({ "execution_payload": json })
+                )
+                .is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn beacon_payload_rejects_unknown_and_null_fields() {
+        for field in
+            ["withdrawals", "blob_gas_used", "excess_blob_gas", "block_access_list", "slot_number"]
+        {
+            let mut json = amsterdam_payload_json();
+            json[field] = serde_json::Value::Null;
+            assert!(execution_payload_from_beacon_str(&json.to_string()).is_err(), "{field}");
+        }
+
+        // A null later-fork field must not be read as an omitted one.
+        let mut json = amsterdam_payload_json();
+        json["block_access_list"] = serde_json::Value::Null;
+        json["slot_number"] = serde_json::Value::Null;
+        assert!(execution_payload_from_beacon_str(&json.to_string()).is_err());
+
+        for value in [serde_json::Value::Null, serde_json::json!(1)] {
+            let mut json = amsterdam_payload_json();
+            json["unknown"] = value;
+            assert!(execution_payload_from_beacon_str(&json.to_string()).is_err());
+        }
+    }
+
+    #[test]
+    fn beacon_payload_rejects_positional_arrays() {
+        let json = amsterdam_payload_json();
+        let seq = [
+            "parent_hash",
+            "fee_recipient",
+            "state_root",
+            "receipts_root",
+            "logs_bloom",
+            "prev_randao",
+            "block_number",
+            "gas_limit",
+            "gas_used",
+            "timestamp",
+            "extra_data",
+            "base_fee_per_gas",
+            "block_hash",
+            "transactions",
+            "withdrawals",
+            "blob_gas_used",
+            "excess_blob_gas",
+            "block_access_list",
+            "slot_number",
+        ]
+        .map(|field| json[field].clone());
+        assert!(execution_payload_from_beacon_str(&serde_json::json!(seq).to_string()).is_err());
+    }
+
+    #[test]
+    fn beacon_payload_helpers_require_the_requested_version() {
+        let mut json = amsterdam_payload_json();
+        for version in (1..=4).rev() {
+            assert_eq!(beacon_payload_v1::deserialize(json.clone()).is_ok(), version == 1);
+            assert_eq!(beacon_payload_v2::deserialize(json.clone()).is_ok(), version == 2);
+            assert_eq!(beacon_payload_v3::deserialize(json.clone()).is_ok(), version == 3);
+            assert_eq!(beacon_payload_v4::deserialize(json.clone()).is_ok(), version == 4);
+            match version {
+                4 => {
+                    json.as_object_mut().unwrap().remove("block_access_list");
+                    json.as_object_mut().unwrap().remove("slot_number");
+                }
+                3 => {
+                    json.as_object_mut().unwrap().remove("blob_gas_used");
+                    json.as_object_mut().unwrap().remove("excess_blob_gas");
+                }
+                2 => {
+                    json.as_object_mut().unwrap().remove("withdrawals");
+                }
+                _ => {}
+            }
+        }
+    }
 
     #[test]
     fn serde_get_payload_header_response() {
