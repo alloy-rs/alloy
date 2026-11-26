@@ -393,6 +393,27 @@ mod tests {
         assert_eq!(serde_json::to_string(&Wrapper::Ethereum(tx.clone())).unwrap(), json);
         let Wrapper::Ethereum(decoded) = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, tx);
+
+        // An envelope with flattened variants always buffers its input.
+        let fields = json.strip_prefix(r#"{"type":"0x2","#).unwrap().strip_suffix('}').unwrap();
+        let Wrapper::Ethereum(decoded) =
+            serde_json::from_str(&format!(r#"{{{fields},"type":"0x2"}}"#)).unwrap();
+        assert_eq!(decoded, tx);
+
+        let decode_error = |json: &str| {
+            let err = serde_json::from_str::<Wrapper>(json).unwrap_err().to_string();
+            err.split(" at line ").next().unwrap().to_string()
+        };
+        // `2` is the position of the EIP-1559 variant of the flattened envelope.
+        assert_eq!(
+            decode_error(&format!(r#"{{"type":2,{fields}}}"#)),
+            "invalid type: integer `2`, expected variant identifier"
+        );
+        // The error is the one of the wrapper's own tagged variants, of which there are none.
+        assert_eq!(
+            decode_error(&format!(r#"{{"type":"0x2",{fields},"type":"0x2"}}"#)),
+            "unknown variant `0x2`, there are no variants"
+        );
     }
 
     #[test]

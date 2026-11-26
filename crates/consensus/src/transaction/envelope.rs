@@ -1046,6 +1046,13 @@ mod tests {
     use alloy_rlp::Decodable;
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
+    #[cfg(feature = "serde")]
+    use alloc::string::{String, ToString};
+    #[cfg(feature = "serde")]
+    use arbitrary::{Arbitrary, Unstructured};
+    #[cfg(feature = "serde")]
+    use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
+
     #[test]
     fn assert_encodable() {
         fn assert_encodable<T: Encodable2718>() {}
@@ -1876,6 +1883,187 @@ mod tests {
         assert!(from_str(r#"["0x2"]"#.to_string()).is_err());
         assert!(from_str(r#""0x2""#.to_string()).is_err());
         assert!(from_str("{}".to_string()).is_err());
+    }
+
+    /// Returns the fields of an EIP-1559 transaction without its `type`, and the message of the
+    /// error that decoding a document gives, without its position.
+    #[cfg(feature = "serde")]
+    fn eip1559_fields_and_decode_error() -> (String, impl Fn(&str) -> String) {
+        let tx = TxEip1559 { chain_id: 1, gas_limit: 21_000, ..Default::default() };
+        let envelope: TxEnvelope = tx.into_signed(Signature::test_signature()).into();
+        let json = serde_json::to_string(&envelope).unwrap();
+        let fields = json.strip_prefix(r#"{"type":"0x2","#).unwrap().strip_suffix('}').unwrap();
+
+        (fields.to_string(), |json| {
+            let err = serde_json::from_str::<TxEnvelope>(json).unwrap_err().to_string();
+            err.split(" at line ").next().unwrap().to_string()
+        })
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_type_is_no_variant_position() {
+        let (fields, decode_error) = eip1559_fields_and_decode_error();
+
+        // `2` is also the position of the EIP-1559 variant.
+        for json in [format!(r#"{{"type":2,{fields}}}"#), format!(r#"{{{fields},"type":2}}"#)] {
+            assert_eq!(
+                decode_error(&json),
+                "invalid type: integer `2`, expected variant identifier",
+                "{json}"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_rejects_repeated_keys() {
+        let (fields, decode_error) = eip1559_fields_and_decode_error();
+
+        for (json, key) in [
+            (format!(r#"{{"type":"0x2",{fields},"type":"0x2"}}"#), "type"),
+            (format!(r#"{{"type":"0x2",{fields},"type":"0x0"}}"#), "type"),
+            (format!(r#"{{{fields},"type":"0x2","type":"0x2"}}"#), "type"),
+            (format!(r#"{{"type":"0x2",{fields},"nonce":"0x0"}}"#), "nonce"),
+            (format!(r#"{{{fields},"nonce":"0x0","type":"0x2"}}"#), "nonce"),
+        ] {
+            assert_eq!(decode_error(&json), format!("duplicate field `{key}`"), "{json}");
+        }
+    }
+
+    /// Decodes an envelope the way it was decoded before `type` was read up front: buffer a
+    /// `serde_json::Value`, try the tagged variants on it, then an untagged legacy transaction.
+    #[cfg(feature = "serde")]
+    fn decode_from_value(json: &str) -> Result<TxEnvelope, String> {
+        #[derive(serde::Deserialize)]
+        #[serde(tag = "type")]
+        enum Tagged {
+            #[serde(
+                rename = "0x0",
+                alias = "0x00",
+                with = "crate::transaction::signed_legacy_serde"
+            )]
+            Legacy(Signed<TxLegacy>),
+            #[serde(rename = "0x1", alias = "0x01")]
+            Eip2930(Signed<TxEip2930>),
+            #[serde(rename = "0x2", alias = "0x02")]
+            Eip1559(Signed<TxEip1559>),
+            #[serde(rename = "0x3", alias = "0x03")]
+            Eip4844(Signed<TxEip4844Variant>),
+            #[serde(rename = "0x4", alias = "0x04")]
+            Eip7702(Signed<TxEip7702>),
+        }
+
+        let value =
+            serde_json::from_str::<serde_json::Value>(json).map_err(|err| err.to_string())?;
+        match <Tagged as serde::Deserialize>::deserialize(&value) {
+            Ok(Tagged::Legacy(tx)) => Ok(tx.into()),
+            Ok(Tagged::Eip2930(tx)) => Ok(tx.into()),
+            Ok(Tagged::Eip1559(tx)) => Ok(tx.into()),
+            Ok(Tagged::Eip4844(tx)) => Ok(tx.into()),
+            Ok(Tagged::Eip7702(tx)) => Ok(tx.into()),
+            Err(err) => crate::transaction::untagged_legacy_serde::deserialize(&value)
+                .map(Into::into)
+                .map_err(|_| err.to_string()),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_matches_value_buffering() {
+        /// Tags, and values that are wrong for most fields.
+        const VALUES: &[&str] = &[
+            r#""0x0""#,
+            r#""0x00""#,
+            r#""0x1""#,
+            r#""0x2""#,
+            r#""0x02""#,
+            r#""0x3""#,
+            r#""0x4""#,
+            r#""0x5""#,
+            r#""""#,
+            r#""0xzz""#,
+            "null",
+            "0",
+            "2",
+            "-1",
+            "1.5",
+            "true",
+            "[]",
+            r#"{"a":1}"#,
+        ];
+
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut bytes = [0u8; 1024];
+        let mut decoded = 0;
+        for case in 0..2000 {
+            rng.fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+            let signature = Signature::new(U256::from(rng.gen::<u128>()), U256::from(1), rng.gen());
+            let envelope: TxEnvelope = match case % 5 {
+                0 => Signed::new_unhashed(TxLegacy::arbitrary(&mut u).unwrap(), signature).into(),
+                1 => Signed::new_unhashed(TxEip2930::arbitrary(&mut u).unwrap(), signature).into(),
+                2 => Signed::new_unhashed(TxEip1559::arbitrary(&mut u).unwrap(), signature).into(),
+                3 => Signed::new_unhashed(TxEip4844::arbitrary(&mut u).unwrap(), signature).into(),
+                _ => Signed::new_unhashed(TxEip7702::arbitrary(&mut u).unwrap(), signature).into(),
+            };
+            let json = serde_json::to_string(&envelope).unwrap();
+            assert_eq!(
+                serde_json::from_str::<TxEnvelope>(&json).ok(),
+                decode_from_value(&json).ok()
+            );
+
+            let object = serde_json::from_str::<serde_json::Map<_, _>>(&json).unwrap();
+            let mut entries: Vec<(String, String)> =
+                object.iter().map(|(key, value)| (key.clone(), value.to_string())).collect();
+
+            // Edits that keep the keys unique: the buffered value kept the last of a repeated
+            // key, which is the one case that decodes differently.
+            for _ in 0..rng.gen_range(0..3) {
+                let value = VALUES[rng.gen_range(0..VALUES.len())].to_string();
+                let at = rng.gen_range(0..entries.len());
+                match rng.gen_range(0..4) {
+                    0 => entries[at].1 = value,
+                    1 => {
+                        entries.remove(at);
+                    }
+                    2 => match entries.iter_mut().find(|(key, _)| key == "type") {
+                        Some(entry) => entry.1 = value,
+                        None => entries.push(("type".to_string(), value)),
+                    },
+                    _ => {
+                        if entries.iter().all(|(key, _)| key != "extra") {
+                            entries.push(("extra".to_string(), value));
+                        }
+                    }
+                }
+            }
+
+            // `type` first, last, in sorted position or anywhere.
+            match (rng.gen_range(0..4), entries.iter().position(|(key, _)| key == "type")) {
+                (0, Some(at)) => {
+                    let entry = entries.remove(at);
+                    entries.insert(0, entry);
+                }
+                (1, Some(at)) => {
+                    let entry = entries.remove(at);
+                    entries.push(entry);
+                }
+                (2, _) => entries.shuffle(&mut rng),
+                _ => {}
+            }
+
+            let fields: Vec<String> =
+                entries.iter().map(|(key, value)| format!("{key:?}:{value}")).collect();
+            let json = format!("{{{}}}", fields.join(","));
+            let expected = decode_from_value(&json).ok();
+            decoded += usize::from(expected.is_some());
+            assert_eq!(serde_json::from_str::<TxEnvelope>(&json).ok(), expected, "{json}");
+            // A reader hands out owned strings.
+            assert_eq!(serde_json::from_reader(json.as_bytes()).ok(), expected, "{json}");
+        }
+        // Enough of the edited transactions still decode for the comparison to mean something.
+        assert!(decoded > 500, "{decoded}");
     }
 
     #[test]
