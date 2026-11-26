@@ -1053,7 +1053,12 @@ mod tests {
     #[cfg(feature = "serde")]
     use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
     #[cfg(feature = "serde")]
-    use serde::de::value::{BorrowedBytesDeserializer, MapDeserializer};
+    use serde::de::{
+        value::{
+            BorrowedBytesDeserializer, BorrowedStrDeserializer, MapDeserializer, UnitDeserializer,
+        },
+        IntoDeserializer,
+    };
 
     #[test]
     fn assert_encodable() {
@@ -2136,6 +2141,57 @@ mod tests {
             <TxEnvelope as serde::Deserialize>::deserialize(object).unwrap_err().to_string(),
             "invalid type: byte array, expected any valid JSON value"
         );
+    }
+
+    /// An input other than JSON may hand out the `type` value as an option.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_optional_type() {
+        type Error = serde::de::value::Error;
+
+        struct Optional<D>(Option<D>);
+
+        impl<'de, D: serde::Deserializer<'de>> serde::Deserializer<'de> for Optional<D> {
+            type Error = D::Error;
+
+            fn deserialize_any<V: serde::de::Visitor<'de>>(
+                self,
+                visitor: V,
+            ) -> Result<V::Value, D::Error> {
+                match self.0 {
+                    Some(tag) => visitor.visit_some(tag),
+                    None => visitor.visit_none(),
+                }
+            }
+
+            serde::forward_to_deserialize_any! {
+                bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes
+                byte_buf option unit unit_struct newtype_struct seq tuple tuple_struct map struct
+                enum identifier ignored_any
+            }
+        }
+
+        impl<'de, D: serde::Deserializer<'de>> IntoDeserializer<'de, D::Error> for Optional<D> {
+            type Deserializer = Self;
+
+            fn into_deserializer(self) -> Self {
+                self
+            }
+        }
+
+        /// The error of an object that has a `type` and nothing else.
+        fn decode_error<'de, T: IntoDeserializer<'de, Error>>(tag: T) -> String {
+            let object = MapDeserializer::new([("type", tag)].into_iter());
+            <TxEnvelope as serde::Deserialize>::deserialize(object).unwrap_err().to_string()
+        }
+
+        let tag = || BorrowedStrDeserializer::<Error>::new("0x2");
+        assert_eq!(decode_error(tag()), "missing field `hash`");
+        assert_eq!(decode_error(Optional(Some(tag()))), "missing field `hash`");
+
+        let null = decode_error(UnitDeserializer::<Error>::new());
+        assert_eq!(null, "invalid type: unit value, expected variant identifier");
+        assert_eq!(decode_error(Optional::<UnitDeserializer<Error>>(None)), null);
     }
 
     #[test]

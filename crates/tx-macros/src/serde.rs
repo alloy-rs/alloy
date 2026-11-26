@@ -485,6 +485,14 @@ impl<'a> SerdeGenerator<'a> {
                                     Ok(__Tag::Other(#serde_json::Value::Null))
                                 }
 
+                                fn visit_none<E: #serde::de::Error>(self) -> Result<__Tag<'de>, E> {
+                                    Ok(__Tag::Other(#serde_json::Value::Null))
+                                }
+
+                                fn visit_some<D: #serde::Deserializer<'de>>(self, deserializer: D) -> Result<__Tag<'de>, D::Error> {
+                                    #serde::Deserialize::deserialize(deserializer)
+                                }
+
                                 fn visit_seq<A: #serde::de::SeqAccess<'de>>(self, seq: A) -> Result<__Tag<'de>, A::Error> {
                                     #serde::Deserialize::deserialize(#serde::de::value::SeqAccessDeserializer::new(seq)).map(__Tag::Other)
                                 }

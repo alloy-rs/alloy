@@ -2,14 +2,15 @@
 //! whose tag it read from the first key of an object.
 
 use serde::{
-    de::{value::MapAccessDeserializer, MapAccess, Visitor},
+    de::{value::MapAccessDeserializer, Error, IgnoredAny, MapAccess, Unexpected, Visitor},
     forward_to_deserialize_any, Deserializer,
 };
 
 /// The entries of a transaction object that follow its leading `type`.
 ///
 /// This answers the hints of a variant the way serde's tagged enums do: a newtype struct and an
-/// `Option` read the entries as their content, where [`MapAccessDeserializer`] rejects them.
+/// `Option` read the entries as their content and no entries are a unit, where
+/// [`MapAccessDeserializer`] rejects all three.
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct TaggedEntries<M>(pub M);
@@ -23,6 +24,21 @@ impl<'de, M: MapAccess<'de>> Deserializer<'de> for TaggedEntries<M> {
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, M::Error> {
         visitor.visit_some(self)
+    }
+
+    fn deserialize_unit<V: Visitor<'de>>(mut self, visitor: V) -> Result<V::Value, M::Error> {
+        match self.0.next_key::<IgnoredAny>()? {
+            None => visitor.visit_unit(),
+            Some(_) => Err(Error::invalid_type(Unexpected::Map, &visitor)),
+        }
+    }
+
+    fn deserialize_unit_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, M::Error> {
+        self.deserialize_unit(visitor)
     }
 
     fn deserialize_newtype_struct<V: Visitor<'de>>(
@@ -43,14 +59,15 @@ impl<'de, M: MapAccess<'de>> Deserializer<'de> for TaggedEntries<M> {
     }
 
     forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf unit
-        unit_struct seq tuple tuple_struct map struct identifier ignored_any
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf seq
+        tuple tuple_struct map struct identifier ignored_any
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::ToString;
     use serde::{
         de::value::{Error, MapDeserializer},
         Deserialize,
@@ -78,5 +95,22 @@ mod tests {
         assert_eq!(Newtype::deserialize(entries()), Ok(Newtype(Fields { a: 1 })));
         assert_eq!(Option::deserialize(entries()), Ok(Some(Fields { a: 1 })));
         assert_eq!(Enum::deserialize(entries()), Ok(Enum::A(1)));
+
+        #[derive(Debug, PartialEq, Deserialize)]
+        struct Unit;
+
+        let no_entries =
+            || TaggedEntries(MapDeserializer::<_, Error>::new(core::iter::empty::<(&str, u64)>()));
+
+        assert_eq!(<()>::deserialize(no_entries()), Ok(()));
+        assert_eq!(Unit::deserialize(no_entries()), Ok(Unit));
+        assert_eq!(
+            <()>::deserialize(entries()).unwrap_err().to_string(),
+            "invalid type: map, expected unit"
+        );
+        assert_eq!(
+            Unit::deserialize(entries()).unwrap_err().to_string(),
+            "invalid type: map, expected unit struct Unit"
+        );
     }
 }
