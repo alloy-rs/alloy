@@ -171,7 +171,7 @@ impl Claims {
     pub fn is_exp_valid(&self) -> bool {
         let Some(exp) = self.exp else { return true };
         let now_secs = get_current_timestamp();
-        exp + JWT_EXP_GRACE_PERIOD_SECS.as_secs() >= now_secs
+        exp.saturating_add(JWT_EXP_GRACE_PERIOD_SECS.as_secs()) >= now_secs
     }
 }
 
@@ -451,6 +451,13 @@ mod tests {
         let result = secret.validate(&jwt);
 
         assert!(matches!(result, Err(JwtError::JwtDecodingError(_))));
+    }
+
+    #[test]
+    fn is_exp_valid_does_not_overflow_on_max_exp() {
+        // `exp + leeway` would overflow for `u64::MAX`.
+        let claims = Claims { iat: get_current_timestamp(), exp: Some(u64::MAX) };
+        assert!(claims.is_exp_valid());
     }
 
     #[test]
