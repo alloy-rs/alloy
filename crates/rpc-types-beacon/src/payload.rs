@@ -611,9 +611,29 @@ pub mod beacon_payload {
     where
         D: Deserializer<'de>,
     {
-        BeaconExecutionPayloadFields::deserialize(deserializer)?
-            .into_payload()
-            .map_err(serde::de::Error::custom)
+        struct PayloadVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for PayloadVisitor {
+            type Value = ExecutionPayload;
+
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("a beacon execution payload object")
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                BeaconExecutionPayloadFields::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?
+                .into_payload()
+                .map_err(serde::de::Error::custom)
+            }
+        }
+
+        // A derived `Deserialize` also accepts the positional sequence form.
+        deserializer.deserialize_map(PayloadVisitor)
     }
 }
 
@@ -696,11 +716,45 @@ mod tests {
             assert!(execution_payload_from_beacon_str(&json.to_string()).is_err(), "{field}");
         }
 
+        // A null later-fork field must not be read as an omitted one.
+        let mut json = amsterdam_payload_json();
+        json["block_access_list"] = serde_json::Value::Null;
+        json["slot_number"] = serde_json::Value::Null;
+        assert!(execution_payload_from_beacon_str(&json.to_string()).is_err());
+
         for value in [serde_json::Value::Null, serde_json::json!(1)] {
             let mut json = amsterdam_payload_json();
             json["unknown"] = value;
             assert!(execution_payload_from_beacon_str(&json.to_string()).is_err());
         }
+    }
+
+    #[test]
+    fn beacon_payload_rejects_positional_arrays() {
+        let json = amsterdam_payload_json();
+        let seq = [
+            "parent_hash",
+            "fee_recipient",
+            "state_root",
+            "receipts_root",
+            "logs_bloom",
+            "prev_randao",
+            "block_number",
+            "gas_limit",
+            "gas_used",
+            "timestamp",
+            "extra_data",
+            "base_fee_per_gas",
+            "block_hash",
+            "transactions",
+            "withdrawals",
+            "blob_gas_used",
+            "excess_blob_gas",
+            "block_access_list",
+            "slot_number",
+        ]
+        .map(|field| json[field].clone());
+        assert!(execution_payload_from_beacon_str(&serde_json::json!(seq).to_string()).is_err());
     }
 
     #[test]
