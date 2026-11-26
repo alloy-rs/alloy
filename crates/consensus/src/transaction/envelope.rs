@@ -1052,6 +1052,8 @@ mod tests {
     use arbitrary::{Arbitrary, Unstructured};
     #[cfg(feature = "serde")]
     use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
+    #[cfg(feature = "serde")]
+    use serde::de::value::{BorrowedBytesDeserializer, MapDeserializer};
 
     #[test]
     fn assert_encodable() {
@@ -2091,6 +2093,49 @@ mod tests {
                 "{json}"
             );
         }
+
+        // A `type` that is no borrowed string is kept as a `Value` until it is read.
+        let tx: TxEnvelope =
+            Signed::new_unhashed(TxEip1559::default(), Signature::test_signature()).into();
+        let json = serde_json::to_string(&tx).unwrap();
+        let fields = json.strip_prefix(r#"{"type":"0x2","#).unwrap().strip_suffix('}').unwrap();
+        let mut decoded = 0;
+        for tag in [
+            // An escape makes the string an owned one.
+            r#""\u0030x2""#,
+            "null",
+            "true",
+            "2",
+            "-1",
+            "1.5",
+            "[]",
+            r#"["0x2"]"#,
+            r#"{"a":1}"#,
+        ] {
+            for json in
+                [format!(r#"{{"type":{tag},{fields}}}"#), format!(r#"{{{fields},"type":{tag}}}"#)]
+            {
+                let expected = decode_from_value(&json).map_err(message);
+                decoded += usize::from(expected.is_ok());
+                assert_eq!(
+                    serde_json::from_str::<TxEnvelope>(&json)
+                        .map_err(|err| message(err.to_string())),
+                    expected,
+                    "{json}"
+                );
+            }
+        }
+        // Only the escaped tag is one.
+        assert_eq!(decoded, 2);
+
+        // A byte string is no tag, even where it holds the characters of one.
+        let object = MapDeserializer::<_, serde::de::value::Error>::new(
+            [("type", BorrowedBytesDeserializer::new(b"0x0"))].into_iter(),
+        );
+        assert_eq!(
+            <TxEnvelope as serde::Deserialize>::deserialize(object).unwrap_err().to_string(),
+            "invalid type: byte array, expected any valid JSON value"
+        );
     }
 
     #[test]

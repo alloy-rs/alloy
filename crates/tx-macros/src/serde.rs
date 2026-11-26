@@ -439,11 +439,63 @@ impl<'a> SerdeGenerator<'a> {
                     }
 
                     /// The value of a `type` key, or the first element of an array.
-                    #[derive(#serde::Deserialize)]
-                    #[serde(untagged, crate = #serde_str)]
-                    enum __Tag<'a> {
-                        Borrowed(&'a str),
+                    enum __Tag<'de> {
+                        Borrowed(&'de str),
                         Other(#serde_json::Value),
+                    }
+
+                    impl<'de> #serde::Deserialize<'de> for __Tag<'de> {
+                        fn deserialize<D: #serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                            struct __TagVisitor;
+
+                            // A tag is a string that mostly borrows from the input. Anything else
+                            // is kept as the value `serde_json` reads it as.
+                            impl<'de> #serde::de::Visitor<'de> for __TagVisitor {
+                                type Value = __Tag<'de>;
+
+                                fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                                    f.write_str("any valid JSON value")
+                                }
+
+                                fn visit_borrowed_str<E: #serde::de::Error>(self, tag: &'de str) -> Result<__Tag<'de>, E> {
+                                    Ok(__Tag::Borrowed(tag))
+                                }
+
+                                fn visit_str<E: #serde::de::Error>(self, tag: &str) -> Result<__Tag<'de>, E> {
+                                    Ok(__Tag::Other(tag.into()))
+                                }
+
+                                fn visit_bool<E: #serde::de::Error>(self, tag: bool) -> Result<__Tag<'de>, E> {
+                                    Ok(__Tag::Other(tag.into()))
+                                }
+
+                                fn visit_i64<E: #serde::de::Error>(self, tag: i64) -> Result<__Tag<'de>, E> {
+                                    Ok(__Tag::Other(tag.into()))
+                                }
+
+                                fn visit_u64<E: #serde::de::Error>(self, tag: u64) -> Result<__Tag<'de>, E> {
+                                    Ok(__Tag::Other(tag.into()))
+                                }
+
+                                fn visit_f64<E: #serde::de::Error>(self, tag: f64) -> Result<__Tag<'de>, E> {
+                                    Ok(__Tag::Other(tag.into()))
+                                }
+
+                                fn visit_unit<E: #serde::de::Error>(self) -> Result<__Tag<'de>, E> {
+                                    Ok(__Tag::Other(#serde_json::Value::Null))
+                                }
+
+                                fn visit_seq<A: #serde::de::SeqAccess<'de>>(self, seq: A) -> Result<__Tag<'de>, A::Error> {
+                                    #serde::Deserialize::deserialize(#serde::de::value::SeqAccessDeserializer::new(seq)).map(__Tag::Other)
+                                }
+
+                                fn visit_map<A: #serde::de::MapAccess<'de>>(self, map: A) -> Result<__Tag<'de>, A::Error> {
+                                    #serde::Deserialize::deserialize(#serde::de::value::MapAccessDeserializer::new(map)).map(__Tag::Other)
+                                }
+                            }
+
+                            deserializer.deserialize_any(__TagVisitor)
+                        }
                     }
 
                     impl<'de> __Tag<'de> {
