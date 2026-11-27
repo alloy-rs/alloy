@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [transport] Decode URL credentials, send them with hyper ([#4534](https://github.com/alloy-rs/alloy/issues/4534))
+- [transport-http] Omit URL credentials from debug spans ([#4438](https://github.com/alloy-rs/alloy/issues/4438))
+- [transport-http] Send cached jwt as bearer token ([#4339](https://github.com/alloy-rs/alloy/issues/4339))
+- [transport-http] Make TraceParentService Clone ([#4340](https://github.com/alloy-rs/alloy/issues/4340))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Features
+
+- [transport-http] Add HttpTransportSettings with a max response size ([#4254](https://github.com/alloy-rs/alloy/issues/4254))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+
+### Refactor
+
+- Dedupe transport stack internals ([#4363](https://github.com/alloy-rs/alloy/issues/4363))
+
 ## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
 
 ## [2.4.2](https://github.com/alloy-rs/alloy/releases/tag/v2.4.2) - 2026-09-08

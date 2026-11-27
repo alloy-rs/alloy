@@ -12,6 +12,7 @@ use crate::{
     BlobsBundleV1, BlobsBundleV2, ExecutionPayloadBodyV1 as LegacyExecutionPayloadBodyV1,
     ExecutionPayloadBodyV2 as LegacyExecutionPayloadBodyV2,
     ExecutionPayloadEnvelopeV2 as LegacyBuiltPayloadShanghai,
+    ExecutionPayloadEnvelopeV3 as LegacyBuiltPayloadCancun,
     ExecutionPayloadEnvelopeV4 as LegacyBuiltPayloadPrague,
     ExecutionPayloadEnvelopeV5 as LegacyBuiltPayloadOsaka,
     ExecutionPayloadEnvelopeV6 as LegacyBuiltPayloadAmsterdam, ExecutionPayloadFieldV2,
@@ -26,7 +27,7 @@ use alloy_eips::{
     eip7594::Cell,
     eip7685::Requests,
 };
-use alloy_primitives::{Address, Bytes, FixedBytes, B128, B256, U256};
+use alloy_primitives::{Address, Bytes, B128, B256, U256};
 
 use alloc::{
     boxed::Box,
@@ -36,8 +37,8 @@ use alloc::{
 
 mod bounds;
 use bounds::{
-    blob_entries, blob_hashes, body_entries, body_hashes, cells, proofs, public_keys,
-    witness_codes, witness_headers, witness_state,
+    blob_entries, blob_hashes, body_entries, body_hashes, cells, proofs, witness_codes,
+    witness_headers, witness_state,
 };
 
 /// Maximum number of blobs in a REST-SSZ request or response.

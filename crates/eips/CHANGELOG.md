@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [eips] Drop trailing zero bytes from EIP-7251 code ([#4535](https://github.com/alloy-rs/alloy/issues/4535))
+- [consensus] Align EIP-8141 types with Bogota devnet 2 ([#4443](https://github.com/alloy-rs/alloy/issues/4443))
+- [eips] Enforce RLP wrapper lengths ([#4493](https://github.com/alloy-rs/alloy/issues/4493))
+- [eips] Reject + sign in block number strings ([#4488](https://github.com/alloy-rs/alloy/issues/4488))
+- [eips] Distinguish invalid setup points ([#4422](https://github.com/alloy-rs/alloy/issues/4422))
+- [eips] Validate blob parameter schedules ([#4421](https://github.com/alloy-rs/alloy/issues/4421))
+- [eips] Avoid division by zero with zero blob capacity ([#4373](https://github.com/alloy-rs/alloy/issues/4373))
+- [eips] Update frame contract constants for frames devnet  ([#4393](https://github.com/alloy-rs/alloy/issues/4393))
+- [eips] Decode blob cell masks as little-endian ([#4243](https://github.com/alloy-rs/alloy/issues/4243))
+
+### Documentation
+
+- Clarify public contracts and examples ([#4419](https://github.com/alloy-rs/alloy/issues/4419))
+
+### Features
+
+- [eips] Add EIP-8141 transaction type helpers ([#4280](https://github.com/alloy-rs/alloy/issues/4280))
+- [consensus] Add EIP-8250 keyed frame nonces ([#4276](https://github.com/alloy-rs/alloy/issues/4276))
+-  feat(eips): add EIP-8272 recent-root constants ([#4239](https://github.com/alloy-rs/alloy/issues/4239))
+- [eips] Add lenient_block_number_or_tag::opt deserializer ([#4259](https://github.com/alloy-rs/alloy/issues/4259))
+- [eips] Add EIP-6110 deposit log encoding helpers ([#4244](https://github.com/alloy-rs/alloy/issues/4244))
+
+### Miscellaneous Tasks
+
+- Move function-local `use`s to module scope ([#4478](https://github.com/alloy-rs/alloy/issues/4478))
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Performance
+
+- [eips] Compute fake exponential in u128 ([#4526](https://github.com/alloy-rs/alloy/issues/4526))
+- [eips] Avoid redundant blob copies in sidecars ([#4454](https://github.com/alloy-rs/alloy/issues/4454))
+- [eips] Hash nonce keys without heap allocation ([#4289](https://github.com/alloy-rs/alloy/issues/4289))
+
+### Refactor
+
+- [eips] Iterate sidecars lazily ([#4423](https://github.com/alloy-rs/alloy/issues/4423))
+- [eips] Deduplicate blob sidecar internals ([#4379](https://github.com/alloy-rs/alloy/issues/4379))
+
+### Testing
+
+- Remove trivial tests in eips, genesis and consensus ([#4369](https://github.com/alloy-rs/alloy/issues/4369))
+
 ## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
 
 ### Documentation

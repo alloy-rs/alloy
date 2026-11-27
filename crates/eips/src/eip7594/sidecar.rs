@@ -5,12 +5,12 @@ use crate::{
     },
     eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
 };
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use alloy_primitives::{B128, B256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, EMPTY_LIST_CODE};
 
-use super::{decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594};
-use crate::eip4844::VersionedHashIter;
+use super::{decode_fixed_list, decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594};
+use crate::eip4844::{box_blob, VersionedHashIter};
 #[cfg(feature = "kzg")]
 use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 
@@ -1001,10 +1001,10 @@ impl BlobTransactionSidecarEip7594 {
                         .cell_proofs
                         .get(proof_range)
                         .filter(|proofs| proofs.len() == CELLS_PER_EXT_BLOB);
-                    if let Some((blob, proofs)) = maybe_blob.copied().zip(maybe_proofs) {
+                    if let Some((blob, proofs)) = maybe_blob.zip(maybe_proofs) {
                         return Some((
                             j,
-                            BlobAndProofV2 { blob: Box::new(blob), proofs: proofs.to_vec() },
+                            BlobAndProofV2 { blob: box_blob(blob), proofs: proofs.to_vec() },
                         ));
                     }
                 }
@@ -1141,9 +1141,9 @@ impl BlobTransactionSidecarEip7594 {
     #[doc(hidden)]
     pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
-            blobs: Decodable::decode(buf)?,
-            commitments: Decodable::decode(buf)?,
-            cell_proofs: Decodable::decode(buf)?,
+            blobs: decode_fixed_list(buf)?,
+            commitments: decode_fixed_list(buf)?,
+            cell_proofs: decode_fixed_list(buf)?,
         })
     }
 

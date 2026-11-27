@@ -11,7 +11,7 @@ use alloy_primitives::{
 use alloy_transport::{utils::Spawnable, TransportError};
 use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
     future::Future,
     sync::Arc,
@@ -497,8 +497,9 @@ pub(crate) struct Heartbeat<N, S> {
     /// Ordered map of transactions waiting for confirmations.
     waiting_confs: BTreeMap<u64, Vec<TxWatcher>>,
 
-    /// Ordered map of transactions to reap at a certain time.
-    reap_at: BTreeMap<Instant, B256>,
+    /// Ordered set of transactions to reap at a certain time. Keyed by both so that watchers
+    /// whose timeouts fall on the same instant each keep their entry.
+    reap_at: BTreeSet<(Instant, B256)>,
 
     /// Whether the heartbeat is currently paused.
     paused: Arc<Paused>,
@@ -533,18 +534,19 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// long time from now (i.e. will not be woken).
     fn next_reap(&self) -> Instant {
         self.reap_at
-            .first_key_value()
-            .map(|(k, _)| *k)
+            .first()
+            .map(|(at, _)| *at)
             .unwrap_or_else(|| Instant::now() + Duration::from_secs(60_000))
     }
 
     /// Reap any timeout
     fn reap_timeouts(&mut self) {
         let now = Instant::now();
-        let to_keep = self.reap_at.split_off(&now);
+        // Everything at or after now is kept, as no hash sorts below the zero hash.
+        let to_keep = self.reap_at.split_off(&(now, B256::ZERO));
         let to_reap = std::mem::replace(&mut self.reap_at, to_keep);
 
-        for tx_hash in to_reap.values() {
+        for (_, tx_hash) in &to_reap {
             let Some(watchers) = self.unconfirmed.get_mut(tx_hash) else { continue };
             for watcher in watchers.extract_if(.., |w| w.reap_at.is_some_and(|at| at < now)) {
                 debug!(tx=%tx_hash, "reaped");
@@ -593,25 +595,36 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         !self.unconfirmed.is_empty() || !self.waiting_confs.is_empty()
     }
 
-    /// Update the pause state based on whether we have pending transactions.
-    fn update_pause_state(&mut self) {
-        let should_pause = !self.has_pending_transactions();
+    /// Update the pause state based on whether we have pending or queued transactions.
+    fn update_pause_state(&mut self, ixns: &mpsc::Receiver<TxWatcher>) {
+        // Queued watches may still need the lookbehind, which pausing clears.
+        let should_pause = !self.has_pending_transactions() && ixns.is_empty();
         if self.paused.is_paused() != should_pause {
             debug!(paused = should_pause, "updating heartbeat pause state");
             self.paused.set_paused(should_pause);
+            if should_pause {
+                // Blocks are not tracked while paused, so the lookbehind could go stale through
+                // a reorg. Drop it so new watches cannot match on a reorged-out block.
+                self.past_blocks.clear();
+            }
         }
     }
 
     /// Handle a watch instruction by adding it to the watch list, and
     /// potentially adding it to our `reap_at` list.
-    fn handle_watch_ix(&mut self, mut to_watch: TxWatcher) {
+    fn handle_watch_ix(&mut self, to_watch: TxWatcher) {
+        self.handle_watch_ix_at(to_watch, Instant::now());
+    }
+
+    /// [`Self::handle_watch_ix`], with the timeout measured from `now`.
+    fn handle_watch_ix_at(&mut self, mut to_watch: TxWatcher, now: Instant) {
         // Start watching for the transaction.
         debug!(tx=%to_watch.config.tx_hash, "watching");
         trace!(?to_watch.config, ?to_watch.received_at_block);
         if let Some(timeout) = to_watch.config.timeout {
-            let reap_at = Instant::now() + timeout;
+            let reap_at = now + timeout;
             to_watch.reap_at = Some(reap_at);
-            self.reap_at.insert(reap_at, to_watch.config.tx_hash);
+            self.reap_at.insert((reap_at, to_watch.config.tx_hash));
         }
         if let Some(received_at_block) = to_watch.received_at_block {
             // Transaction is already confirmed, we just need to wait for the required
@@ -665,6 +678,12 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// the latest block.
     fn handle_new_block(&mut self, block: N::BlockResponse) {
         let block_height = block.header().as_ref().number();
+        // The stream can still yield buffered blocks after we pause. Nothing is watched, and
+        // recording them would refill the lookbehind that pausing cleared.
+        if self.paused.is_paused() {
+            trace!(%block_height, "ignoring block while paused");
+            return;
+        }
         debug!(%block_height, "handling block");
 
         // Add the block the lookbehind.
@@ -744,7 +763,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
         'shutdown: loop {
             {
-                self.update_pause_state();
+                self.update_pause_state(&ixns);
 
                 let next_reap = self.next_reap();
                 let sleep = std::pin::pin!(sleep_until(next_reap.into()));

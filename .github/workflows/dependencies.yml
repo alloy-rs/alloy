@@ -1,0 +1,18 @@
+# Runs `cargo update` weekly, resolving only releases older than the 7-day cooldown.
+
+name: Dependencies
+
+on:
+  schedule:
+    - cron: "0 0 * * SUN"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  update:
+    if: github.repository == 'alloy-rs/alloy'
+    permissions:
+      contents: read
+      id-token: write
+    uses: tempoxyz/gh-actions/.github/workflows/cargo-update-pr.yml@b5c4ebd2f59f0c41d7663e2e84b713527321a35e # 2026-11-25T18-33-58Z-b5c4ebd2

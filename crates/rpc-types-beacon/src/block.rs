@@ -814,6 +814,8 @@ mod tests {
     #[cfg(feature = "ssz")]
     mod ssz_tests {
         use super::*;
+        use alloy_primitives::{Address, Bloom, U256};
+        use alloy_rpc_types_engine::ExecutionPayloadV1;
         use ssz::{Decode, Encode};
 
         /// Stand-in execution payload for the generic container tests.
@@ -924,9 +926,6 @@ mod tests {
         /// Bellatrix envelope roundtrips with a real `ExecutionPayloadV1`.
         #[test]
         fn ssz_roundtrip_signed_block_bellatrix_real_payload() {
-            use alloy_primitives::{Address, Bloom, U256};
-            use alloy_rpc_types_engine::ExecutionPayloadV1;
-
             let payload = ExecutionPayloadV1 {
                 parent_hash: B256::repeat_byte(0x01),
                 fee_recipient: Address::repeat_byte(0x02),

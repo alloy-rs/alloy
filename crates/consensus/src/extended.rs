@@ -5,6 +5,7 @@ use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result, IsTyped2718},
     Decodable2718, Encodable2718, Typed2718,
 };
+use alloy_primitives::B256;
 use alloy_rlp::{BufMut, Decodable, Encodable, Result as RlpResult};
 
 /// An enum that combines two different transaction types.
@@ -175,6 +176,13 @@ where
             Self::Other(tx) => tx.encode_2718(out),
         }
     }
+
+    fn trie_hash(&self) -> B256 {
+        match self {
+            Self::BuiltIn(envelope) => envelope.trie_hash(),
+            Self::Other(tx) => tx.trie_hash(),
+        }
+    }
 }
 
 impl<B, T> Encodable for Extended<B, T>
@@ -218,5 +226,31 @@ where
 impl<Eip4844, Tx> From<EthereumTxEnvelope<Eip4844>> for Extended<EthereumTxEnvelope<Eip4844>, Tx> {
     fn from(value: EthereumTxEnvelope<Eip4844>) -> Self {
         Self::BuiltIn(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{transaction::TxEip4844Variant, EthereumTxEnvelope, Signed, TxEip4844};
+    use alloy_eips::eip4844::BlobTransactionSidecar;
+    use alloy_primitives::{keccak256, Signature};
+
+    // `trie_hash` must forward to the inner envelope so a pooled blob tx hashes without its
+    // sidecar.
+    #[test]
+    fn trie_hash_excludes_sidecar() {
+        let tx = TxEip4844Variant::TxEip4844WithSidecar(
+            TxEip4844::default().with_sidecar(BlobTransactionSidecar::default()),
+        );
+        let signed = Signed::new_unhashed(tx, Signature::test_signature());
+        let hash = *signed.hash();
+        let envelope = EthereumTxEnvelope::Eip4844(signed);
+        assert_ne!(hash, keccak256(envelope.encoded_2718()));
+
+        let extended = Extended::<_, EthereumTxEnvelope<TxEip4844Variant>>::BuiltIn(envelope);
+        assert_eq!(extended.trie_hash(), hash);
+        let either = either::Either::<_, EthereumTxEnvelope<TxEip4844>>::Left(extended);
+        assert_eq!(either.trie_hash(), hash);
     }
 }

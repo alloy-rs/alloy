@@ -1,12 +1,14 @@
 use crate::{
     bindings::{ArbSys, IMulticall3},
-    Caller, Provider, ProviderCall, ProviderLayer, RootProvider, ARB_SYS_ADDRESS,
-    MULTICALL3_ADDRESS,
+    Caller, PendingTransactionBuilder, Provider, ProviderCall, ProviderLayer, RootProvider,
+    SendableTx, ARB_SYS_ADDRESS, MULTICALL3_ADDRESS,
 };
 use alloy_eips::BlockId;
+use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, Bytes, U256, U64};
 use alloy_rpc_client::WeakClient;
+use alloy_rpc_types_eth::{erc4337::TransactionConditional, FillTransaction};
 use alloy_sol_types::{SolCall, SolType, SolValue};
 use alloy_transport::{
     utils::Spawnable, SharedTransportError, TransportErrorKind, TransportResult,
@@ -458,6 +460,8 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     }
 }
 
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, N> {
     fn root(&self) -> &RootProvider<N> {
         self.provider.root()
@@ -505,6 +509,71 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
             }
         })
     }
+
+    async fn send_raw_transaction(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.provider.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_sync(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.provider.send_raw_transaction_sync(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.provider.send_raw_transaction_conditional(encoded_tx, conditional).await
+    }
+
+    async fn send_transaction_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.provider.send_transaction_internal(tx).await
+    }
+
+    async fn send_transaction_sync_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.provider.send_transaction_sync_internal(tx).await
+    }
+
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        self.provider.sign_transaction(tx).await
+    }
+
+    async fn fill_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
+        self.provider.fill_transaction(tx).await
+    }
+
+    async fn fill_and_sign_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::TxEnvelope> {
+        self.provider.fill_and_sign_transaction(tx).await
+    }
+
+    fn transaction_request(&self) -> N::TransactionRequest {
+        self.provider.transaction_request()
+    }
+
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> crate::EthCall<N, U64, u64> {
+        self.provider.estimate_gas(tx)
+    }
 }
 
 struct CallBatchCaller<N: Network> {
@@ -551,9 +620,10 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
+    use alloy_consensus::TxEnvelope;
     use alloy_network::{Ethereum, TransactionBuilder};
     use alloy_primitives::{address, hex};
-    use alloy_rpc_types_eth::{BlockOverrides, TransactionRequest};
+    use alloy_rpc_types_eth::{BlockOverrides, TransactionReceipt, TransactionRequest};
     use alloy_transport::mock::Asserter;
 
     // https://etherscan.io/address/0xcA11bde05977b3631167028862bE2a173976CA11#code
@@ -753,5 +823,84 @@ mod tests {
             tokio::join!(provider.get_balance(COUNTER_ADDRESS), provider.get_chain_id());
         assert_eq!(single, U256::from(200));
         assert_eq!(batched.unwrap(), U256::from(200));
+    }
+
+    #[tokio::test]
+    async fn forwards_transaction_methods_to_inner() {
+        use std::sync::Mutex;
+
+        /// Records which transaction methods reach it, standing in for an inner filler or
+        /// wallet layer that the batch layer must not bypass.
+        #[derive(Clone, Debug)]
+        struct Recorder {
+            root: RootProvider<Ethereum>,
+            calls: Arc<Mutex<Vec<&'static str>>>,
+        }
+
+        #[async_trait::async_trait]
+        impl Provider<Ethereum> for Recorder {
+            fn root(&self) -> &RootProvider<Ethereum> {
+                &self.root
+            }
+
+            async fn send_transaction_internal(
+                &self,
+                tx: SendableTx<Ethereum>,
+            ) -> TransportResult<PendingTransactionBuilder<Ethereum>> {
+                self.calls.lock().unwrap().push("send_transaction_internal");
+                self.root.send_transaction_internal(tx).await
+            }
+
+            async fn send_transaction_sync_internal(
+                &self,
+                tx: SendableTx<Ethereum>,
+            ) -> TransportResult<TransactionReceipt> {
+                self.calls.lock().unwrap().push("send_transaction_sync_internal");
+                self.root.send_transaction_sync_internal(tx).await
+            }
+
+            async fn sign_transaction(&self, tx: TransactionRequest) -> TransportResult<Bytes> {
+                self.calls.lock().unwrap().push("sign_transaction");
+                self.root.sign_transaction(tx).await
+            }
+
+            async fn fill_and_sign_transaction(
+                &self,
+                tx: TransactionRequest,
+            ) -> TransportResult<TxEnvelope> {
+                self.calls.lock().unwrap().push("fill_and_sign_transaction");
+                self.root.fill_and_sign_transaction(tx).await
+            }
+
+            fn estimate_gas(&self, tx: TransactionRequest) -> crate::EthCall<Ethereum, U64, u64> {
+                self.calls.lock().unwrap().push("estimate_gas");
+                self.root.estimate_gas(tx)
+            }
+        }
+
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let recorder = Recorder {
+            root: RootProvider::new(alloy_rpc_client::RpcClient::mocked(Asserter::new())),
+            calls: calls.clone(),
+        };
+        let provider = CallBatchProvider::new(recorder, &CallBatchLayer::new());
+
+        // The empty mock fails every request; only reaching the recorder matters.
+        let _ = provider.send_transaction(TransactionRequest::default()).await;
+        let _ = provider.send_transaction_sync(TransactionRequest::default()).await;
+        let _ = provider.sign_transaction(TransactionRequest::default()).await;
+        let _ = provider.fill_and_sign_transaction(TransactionRequest::default()).await;
+        let _ = provider.estimate_gas(TransactionRequest::default()).await;
+
+        assert_eq!(
+            *calls.lock().unwrap(),
+            [
+                "send_transaction_internal",
+                "send_transaction_sync_internal",
+                "sign_transaction",
+                "fill_and_sign_transaction",
+                "estimate_gas",
+            ]
+        );
     }
 }

@@ -38,6 +38,7 @@ governor = { version = "0.10", default-features = false, features = [
 ], optional = true }
 futures.workspace = true
 parking_lot.workspace = true
+percent-encoding.workspace = true
 derive_more.workspace = true
 auto_impl.workspace = true
 

@@ -490,6 +490,36 @@ pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert!(denominator != 0, "attempt to divide by zero");
 
+    // Blob fee inputs stay well within `u128`, which is much cheaper than the wide arithmetic that
+    // only inputs with overflowing intermediate values need.
+    fake_exponential_u128(factor, numerator, denominator)
+        .unwrap_or_else(|| fake_exponential_u512(factor, numerator, denominator))
+}
+
+/// [`fake_exponential`] in `u128` arithmetic.
+///
+/// Returns `None` if an intermediate value overflows, otherwise the result is the same as
+/// [`fake_exponential_u512`].
+#[inline]
+fn fake_exponential_u128(factor: u128, numerator: u128, denominator: u128) -> Option<u128> {
+    let mut i = 1;
+    let mut output = 0u128;
+    let mut numerator_accum = factor.checked_mul(denominator)?;
+
+    while numerator_accum > 0 {
+        output = output.checked_add(numerator_accum)?;
+
+        // accum = (accum * numerator) / (denominator * i)
+        numerator_accum = numerator_accum.checked_mul(numerator)? / denominator.checked_mul(i)?;
+
+        i += 1;
+    }
+
+    Some(output / denominator)
+}
+
+/// [`fake_exponential`] in `U512` arithmetic, saturating at [`u128::MAX`].
+fn fake_exponential_u512(factor: u128, numerator: u128, denominator: u128) -> u128 {
     let mut i = U512::from(1);
     let denominator = U512::from(denominator);
     let numerator = U512::from(numerator);
@@ -656,6 +686,27 @@ mod tests {
             fake_exponential(u128::MAX - 1, 0, BLOB_GASPRICE_UPDATE_FRACTION),
             u128::MAX - 1
         );
+    }
+
+    #[test]
+    fn fake_exp_u128_matches_u512() {
+        for update_fraction in [
+            BLOB_GASPRICE_UPDATE_FRACTION,
+            crate::eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
+            crate::eip7892::BPO2_BASE_UPDATE_FRACTION as u128,
+        ] {
+            for excess in (0..400_000_000).step_by(1_234_567) {
+                let expected = fake_exponential_u512(1, excess, update_fraction);
+                if let Some(actual) = fake_exponential_u128(1, excess, update_fraction) {
+                    assert_eq!(actual, expected, "test: {excess}, {update_fraction}");
+                }
+                assert_eq!(fake_exponential(1, excess, update_fraction), expected);
+            }
+
+            // A blob fee above 1 ETH per blob gas is still computed without the fallback.
+            let excess = 42 * update_fraction;
+            assert!(fake_exponential_u128(1, excess, update_fraction).unwrap() > 10u128.pow(18));
+        }
     }
 
     #[test]

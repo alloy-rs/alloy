@@ -94,6 +94,12 @@ impl<E> ErrorPayload<E> {
             return true;
         }
 
+        // The message of a reverted call carries the revert reason, which the contract chooses, so
+        // it must not be matched against the rate limit phrases below.
+        if is_revert_message(&self.message) {
+            return false;
+        }
+
         // alternative alchemy error for specific IPs
         if self.code == -32016 && self.message.contains("rate limit") {
             return true;
@@ -125,6 +131,9 @@ impl<E> ErrorPayload<E> {
         match self.message.as_ref() {
             // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
             "header not found" => true,
+            // Infura can return this transiently for block fetches.
+            // <https://github.com/alloy-rs/alloy/issues/4477>
+            "precondition failure" if self.code == -32603 => true,
             // also thrown by infura if out of budget for the day and ratelimited
             "daily request count exceeded, request rate limited" => true,
             msg => {
@@ -137,6 +146,14 @@ impl<E> ErrorPayload<E> {
             }
         }
     }
+}
+
+/// Returns true if the error message reports a reverted call, e.g. `execution reverted: <reason>`.
+///
+/// Clients differ in case and wording, so any mention of a revert counts.
+fn is_revert_message(message: &str) -> bool {
+    const REVERT: &[u8] = b"revert";
+    message.as_bytes().windows(REVERT.len()).any(|window| window.eq_ignore_ascii_case(REVERT))
 }
 
 impl<T> From<T> for ErrorPayload<T>
@@ -375,11 +392,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use alloy_primitives::U256;
+    use alloy_primitives::{B256, U256};
     use alloy_sol_types::sol;
+    use serde_json::value::RawValue;
 
     use super::BorrowedErrorPayload;
-    use crate::ErrorPayload;
+    use crate::{ErrorPayload, RpcError};
 
     #[test]
     fn smooth_borrowing() {
@@ -446,11 +464,44 @@ mod test {
     }
 
     #[test]
-    fn extract_transaction_hash_box_raw_value() {
-        use crate::RpcError;
-        use alloy_primitives::B256;
-        use serde_json::value::RawValue;
+    fn infura_precondition_failure() {
+        for (code, message, retryable) in [
+            (-32603, "precondition failure", true),
+            (-32603, "internal error", false),
+            (-32602, "precondition failure", false),
+        ] {
+            let payload: ErrorPayload = ErrorPayload { code, message: message.into(), data: None };
+            assert_eq!(payload.is_retry_err(), retryable, "{payload}");
+        }
+    }
 
+    #[test]
+    fn revert_reason_is_not_retry_err() {
+        let data = RawValue::from_string(r#""0x08c379a0""#.into()).unwrap();
+        for (code, message) in [
+            (3, "execution reverted: rate limit exceeded"),
+            (3, "execution reverted: max rate exceeded"),
+            (3, "execution reverted: withdraw request limit reached"),
+            (-32000, "execution reverted: too many requests"),
+            (-32603, "execution reverted: credits limited"),
+            (-32000, "Execution reverted: rate limit exceeded"),
+            (-32000, "VM Exception while processing transaction: revert rate limit exceeded"),
+            (-32016, "execution reverted: rate limit exceeded"),
+            (-32012, "execution reverted: credits limited"),
+            (-32007, "execution reverted: request limit reached"),
+        ] {
+            let payload: ErrorPayload =
+                ErrorPayload { code, message: message.into(), data: Some(data.clone()) };
+            assert!(!payload.is_retry_err(), "{payload}");
+        }
+
+        let payload: ErrorPayload =
+            ErrorPayload { code: -32000, message: "rate limit exceeded".into(), data: None };
+        assert!(payload.is_retry_err());
+    }
+
+    #[test]
+    fn extract_transaction_hash_box_raw_value() {
         let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         let json = format!(r#"{{"code":5,"message":"insufficient funds","data":"{}"}}"#, tx_hash);
 

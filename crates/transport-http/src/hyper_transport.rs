@@ -1,8 +1,8 @@
 use crate::{body::BodyError, Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
-    utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
-    TransportFut, TransportResult,
+    utils::guess_local_url, Authorization, BoxTransport, TransportConnect, TransportError,
+    TransportErrorKind, TransportFut, TransportResult,
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
@@ -112,6 +112,19 @@ where
         // Add any additional headers from the request packet.
         for (name, value) in req.headers().iter() {
             builder = builder.header(name, value);
+        }
+
+        // Hyper does not send the URL userinfo, so send it as basic auth unless the request
+        // already carries credentials.
+        if let Some(headers) = builder.headers_mut() {
+            if !headers.contains_key(header::AUTHORIZATION) {
+                if let Some(auth) = Authorization::extract_from_url(&self.url) {
+                    let mut value = header::HeaderValue::try_from(auth.to_string())
+                        .map_err(TransportErrorKind::custom)?;
+                    value.set_sensitive(true);
+                    headers.insert(header::AUTHORIZATION, value);
+                }
+            }
         }
 
         let ser = req.serialize().map_err(TransportError::ser_err)?;

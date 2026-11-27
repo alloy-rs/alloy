@@ -1,7 +1,7 @@
 //! Utilities for launching an Anvil instance.
 
 use crate::{
-    utils::{GracefulShutdown, StartupGuard},
+    utils::{GracefulShutdown, LineReader, StartupGuard},
     NodeError, NODE_STARTUP_TIMEOUT,
 };
 use alloy_hardforks::EthereumHardfork;
@@ -12,7 +12,6 @@ use alloy_signer_local::LocalSigner;
 use k256::{ecdsa::SigningKey, SecretKey as K256SecretKey};
 use std::{
     ffi::OsString,
-    io::{BufRead, BufReader},
     net::SocketAddr,
     path::PathBuf,
     process::{Child, Command},
@@ -455,7 +454,7 @@ impl Anvil {
         let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
         let start = Instant::now();
-        let mut reader = BufReader::new(stdout);
+        let mut reader = LineReader::new(stdout, self.keep_stdout);
         let timeout = self.timeout.map(Duration::from_millis).unwrap_or(NODE_STARTUP_TIMEOUT);
 
         let mut private_keys = Vec::new();

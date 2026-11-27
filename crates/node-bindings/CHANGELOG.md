@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/alloy-rs/alloy/releases/tag/v2.6.1) - 2026-11-16
+
+## [2.6.0](https://github.com/alloy-rs/alloy/releases/tag/v2.6.0) - 2026-11-16
+
+### Bug Fixes
+
+- [node-bindings] Keep output lines read ahead of kept handles ([#4513](https://github.com/alloy-rs/alloy/issues/4513))
+- [node-bindings] Guard startup ownership ([#4409](https://github.com/alloy-rs/alloy/issues/4409))
+- [node-bindings] Stop spinning on EOF in wait_to_add_peer ([#4385](https://github.com/alloy-rs/alloy/issues/4385))
+- [node-bindings] Fail fast when node exits early ([#4318](https://github.com/alloy-rs/alloy/issues/4318))
+- [node-bindings] Report auto-selected geth auth port ([#4317](https://github.com/alloy-rs/alloy/issues/4317))
+
+### Documentation
+
+- [node-bindings] Fix docs.rs links to Anvil/Geth/Reth ([#4397](https://github.com/alloy-rs/alloy/issues/4397))
+
+### Miscellaneous Tasks
+
+- Remove redundant package homepages ([#4405](https://github.com/alloy-rs/alloy/issues/4405))
+- Remove dead code, no-op attributes and stale docs ([#4366](https://github.com/alloy-rs/alloy/issues/4366))
+
+### Testing
+
+- [node-bindings] Spawn reth with a temp datadir in host tests ([#4403](https://github.com/alloy-rs/alloy/issues/4403))
+- Remove trivial tests in small crates and signers ([#4370](https://github.com/alloy-rs/alloy/issues/4370))
+
 ## [2.5.0](https://github.com/alloy-rs/alloy/releases/tag/v2.5.0) - 2026-09-23
 
 ### Bug Fixes
