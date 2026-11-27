@@ -5,7 +5,7 @@ use std::fmt;
 /// Basic, bearer or raw authentication in http or websocket transport.
 ///
 /// Use to inject username and password or an auth token into requests.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Authorization {
     /// [RFC7617](https://datatracker.ietf.org/doc/html/rfc7617) HTTP Basic Auth.
     Basic(String),
@@ -60,6 +60,17 @@ impl Authorization {
     }
 }
 
+impl fmt::Debug for Authorization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let variant = match self {
+            Self::Basic(_) => "Basic",
+            Self::Bearer(_) => "Bearer",
+            Self::Raw(_) => "Raw",
+        };
+        f.debug_tuple(variant).field(&format_args!("<redacted>")).finish()
+    }
+}
+
 impl fmt::Display for Authorization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -74,6 +85,18 @@ impl fmt::Display for Authorization {
 mod tests {
     use super::*;
     use url::Url;
+
+    #[test]
+    fn debug_omits_credentials() {
+        for (auth, expected) in [
+            (Authorization::bearer("tok"), "Bearer(<redacted>)"),
+            (Authorization::raw("tok"), "Raw(<redacted>)"),
+            (Authorization::basic("user", "pass"), "Basic(<redacted>)"),
+        ] {
+            assert_eq!(format!("{auth:?}"), expected);
+        }
+        assert_eq!(Authorization::bearer("tok").to_string(), "Bearer tok");
+    }
 
     #[test]
     fn test_extract_from_url() {
