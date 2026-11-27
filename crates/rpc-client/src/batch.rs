@@ -37,7 +37,8 @@ pub(crate) type ChannelMap = HashMap<Id, Channel>;
 ///
 /// Responses are matched to waiters by JSON-RPC ID, not response order.
 /// Missing IDs produce a per-waiter error; responses with unknown IDs are
-/// ignored.
+/// ignored. If the server rejects the whole batch with a single error that has
+/// a null ID, every waiter receives that error.
 #[derive(Debug)]
 #[must_use = "a BatchRequest does nothing unless it is awaited or `send()` is awaited"]
 pub struct BatchRequest<'a> {
@@ -243,6 +244,12 @@ impl BatchFuture {
 
         // Send all responses via channels
         match responses {
+            // Forward a batch-level null-ID error to all waiters
+            ResponsePacket::Single(single) if single.id.is_none() && single.is_error() => {
+                for (_, tx) in channels.drain() {
+                    let _ = tx.send(transform_response(single.clone()));
+                }
+            }
             ResponsePacket::Single(single) => {
                 if let Some(tx) = channels.remove(&single.id) {
                     let _ = tx.send(transform_response(single));
@@ -304,6 +311,47 @@ mod tests {
 
         fn call(&mut self, _: RequestPacket) -> Self::Future {
             panic!("empty batches must not call the transport");
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct ReplyTransport(&'static str);
+
+    impl Service<RequestPacket> for ReplyTransport {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(&mut self, _: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _: RequestPacket) -> Self::Future {
+            let packet = serde_json::from_str(self.0).unwrap();
+            Box::pin(async move { Ok(packet) })
+        }
+    }
+
+    #[tokio::test]
+    async fn batch_level_error_is_delivered_to_every_call() {
+        let client = RpcClient::new(
+            ReplyTransport(
+                r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32010,"message":"The batch request was too large","data":"Exceeded max limit of 1"}}"#,
+            ),
+            true,
+        );
+        let mut batch = client.new_batch();
+        let first = batch.add_call::<_, u64>("first", &()).unwrap();
+        let second = batch.add_call::<_, u64>("second", &()).unwrap();
+
+        batch.await.unwrap();
+
+        for waiter in [first, second] {
+            let err = waiter.await.unwrap_err();
+            let payload = err.as_error_resp().expect("expected an error response");
+            assert_eq!(payload.code, -32010);
+            assert_eq!(payload.message, "The batch request was too large");
+            assert_eq!(payload.data.as_ref().unwrap().get(), r#""Exceeded max limit of 1""#);
         }
     }
 
