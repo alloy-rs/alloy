@@ -353,8 +353,7 @@ impl Encodable for ReceiptEnvelope {
 
 impl Decodable for ReceiptEnvelope {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::network_decode(buf)
-            .map_or_else(|_| Err(alloy_rlp::Error::Custom("Unexpected type")), Ok)
+        Ok(Self::network_decode(buf)?)
     }
 }
 
@@ -730,6 +729,20 @@ mod test {
             ReceiptEnvelope::network_decode(&mut tagged_network.as_slice()),
             Err(Eip2718Error::UnexpectedType(0))
         ));
-        assert!(ReceiptEnvelope::decode(&mut tagged_network.as_slice()).is_err());
+        assert_eq!(
+            ReceiptEnvelope::decode(&mut tagged_network.as_slice()),
+            Err(alloy_rlp::Error::Custom("Unexpected type flag"))
+        );
+    }
+
+    #[test]
+    fn decodable_preserves_rlp_error() {
+        let mut encoded = Vec::new();
+        ReceiptEnvelope::<Log>::Eip1559(Default::default()).network_encode(&mut encoded);
+        encoded.truncate(encoded.len() - 5);
+        assert_eq!(
+            ReceiptEnvelope::decode(&mut encoded.as_slice()),
+            Err(alloy_rlp::Error::InputTooShort)
+        );
     }
 }
