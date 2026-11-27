@@ -220,7 +220,7 @@ pub struct Deposit {
     /// Branch in the deposit tree (proof).
     ///
     /// The spec defines this as a fixed vector of [`Deposit::PROOF_LEN`] roots; SSZ encoding
-    /// writes the roots as they are, so other lengths produce invalid encodings.
+    /// pads a shorter proof with zero roots and truncates a longer one.
     pub proof: Vec<B256>,
     /// The deposit data.
     pub data: DepositData,
@@ -514,9 +514,9 @@ mod ssz_impls {
         }
 
         fn ssz_append(&self, buf: &mut Vec<u8>) {
-            debug_assert_eq!(self.proof.len(), Self::PROOF_LEN);
-            for root in &self.proof {
-                buf.extend_from_slice(root.as_slice());
+            // `Encode` can't fail: pad or truncate a malformed proof so the layout stays fixed.
+            for i in 0..Self::PROOF_LEN {
+                buf.extend_from_slice(self.proof.get(i).unwrap_or(&B256::ZERO).as_slice());
             }
             self.data.ssz_append(buf);
         }
@@ -933,6 +933,15 @@ mod tests {
             // Any other length is rejected.
             assert!(Deposit::from_ssz_bytes(&spec[..1239]).is_err());
             assert!(Deposit::from_ssz_bytes(&[spec.as_slice(), &[0]].concat()).is_err());
+            // A malformed proof still encodes to the fixed layout.
+            let mut short = sample_deposit();
+            short.proof.pop();
+            let mut padded = sample_deposit();
+            padded.proof[Deposit::PROOF_LEN - 1] = B256::ZERO;
+            assert_eq!(short.as_ssz_bytes(), padded.as_ssz_bytes());
+            let mut long = sample_deposit();
+            long.proof.push(B256::repeat_byte(0xff));
+            assert_eq!(long.as_ssz_bytes(), spec);
         }
 
         /// A Phase0 block with one deposit encodes to the spec layout and decodes back.
