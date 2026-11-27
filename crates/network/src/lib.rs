@@ -100,6 +100,17 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     /// The JSON body of a block response.
     type BlockResponse: RpcObject
         + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
+
+    // -- Signing --
+
+    /// Converts an unsigned transaction that carries its own authorization into an envelope.
+    ///
+    /// Wallets call this before signing and return the envelope as is, without requiring a signing
+    /// credential for the sender. Networks whose transactions are all authorized by an outer
+    /// signature keep the default, which hands the transaction back unchanged.
+    fn try_into_presigned(tx: Self::UnsignedTx) -> Result<Self::TxEnvelope, Self::UnsignedTx> {
+        Err(tx)
+    }
 }
 
 /// Utility to implement IntoWallet for signer over the specified network.
