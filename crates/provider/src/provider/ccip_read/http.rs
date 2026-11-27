@@ -268,7 +268,8 @@ fn classify_response(status: u16, content_type: &str, body: &[u8]) -> Attempt {
     }
 }
 
-/// Maximum length in bytes of gateway-derived error messages.
+/// Maximum bytes kept in a JSON decode error message or taken from a non-2xx response body
+/// before lossy UTF-8 conversion, which can expand the latter to 3,072 bytes.
 const MESSAGE_LIMIT: usize = 1_024;
 
 /// Returns the beginning of an error response body as a message.
