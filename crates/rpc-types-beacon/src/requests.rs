@@ -179,12 +179,17 @@ mod ssz_requests_conversions {
     impl TryFrom<&Requests> for ExecutionRequestsV4 {
         type Error = TryFromRequestsError;
 
+        /// Each request type may appear at most once.
         fn try_from(value: &Requests) -> Result<Self, Self::Error> {
             let mut requests = Self::default();
+            let mut seen = [false; 256];
 
             for request in value.iter() {
                 let (request_type, payload) =
                     request.split_first().ok_or(TryFromRequestsError::EmptyRequest)?;
+                if core::mem::replace(&mut seen[*request_type as usize], true) {
+                    return Err(TryFromRequestsError::DuplicateRequestType(*request_type));
+                }
 
                 match *request_type {
                     DEPOSIT_REQUEST_TYPE => {
@@ -231,6 +236,9 @@ mod ssz_requests_conversions {
         /// Requests of request_type exceeds the size limit for that type
         #[error("requests_data payload for request_type {0} exceeds size limit {1}")]
         RequestPayloadSizeExceeded(u8, usize),
+        /// A request_type appears more than once.
+        #[error("duplicate request_type: {0}")]
+        DuplicateRequestType(u8),
     }
 
     impl From<&ExecutionRequestsV4> for Requests {
@@ -258,16 +266,22 @@ mod ssz_requests_conversions {
     impl TryFrom<&Requests> for ExecutionRequestsV5 {
         type Error = TryFromRequestsError;
 
+        /// Each request type may appear at most once.
+        ///
         /// Takes the two EIP-8282 request types out of the body and defers the rest to
         /// [`ExecutionRequestsV4`], which still rejects any type byte neither of us knows.
         fn try_from(value: &Requests) -> Result<Self, Self::Error> {
             let mut builder_deposits = Vec::new();
             let mut builder_exits = Vec::new();
             let mut rest = Vec::with_capacity(value.len());
+            let mut seen = [false; 256];
 
             for request in value.iter() {
                 let (request_type, payload) =
                     request.split_first().ok_or(TryFromRequestsError::EmptyRequest)?;
+                if core::mem::replace(&mut seen[*request_type as usize], true) {
+                    return Err(TryFromRequestsError::DuplicateRequestType(*request_type));
+                }
 
                 match *request_type {
                     BUILDER_DEPOSIT_REQUEST_TYPE => {
@@ -380,6 +394,42 @@ mod ssz_requests_conversions {
                 Err(TryFromRequestsError::UnknownRequestType(BUILDER_DEPOSIT_REQUEST_TYPE))
             ));
             Ok(())
+        }
+
+        #[test]
+        fn test_from_requests_rejects_duplicate_types() {
+            let withdrawals = Bytes::from_iter(
+                core::iter::once(WITHDRAWAL_REQUEST_TYPE)
+                    .chain(vec![WithdrawalRequest::default()].as_ssz_bytes()),
+            );
+            let withdrawal_type_only = Bytes::from(vec![WITHDRAWAL_REQUEST_TYPE]);
+            let deposits = Bytes::from(vec![DEPOSIT_REQUEST_TYPE]);
+            let exits = Bytes::from(vec![BUILDER_EXIT_REQUEST_TYPE]);
+
+            // A type-only duplicate must not erase the earlier entry.
+            let repeated = Requests::new(vec![withdrawals.clone(), withdrawal_type_only]);
+            assert!(matches!(
+                ExecutionRequestsV4::try_from(&repeated),
+                Err(TryFromRequestsError::DuplicateRequestType(WITHDRAWAL_REQUEST_TYPE))
+            ));
+            assert!(matches!(
+                ExecutionRequestsV5::try_from(&repeated),
+                Err(TryFromRequestsError::DuplicateRequestType(WITHDRAWAL_REQUEST_TYPE))
+            ));
+            let repeated_exits = Requests::new(vec![exits.clone(), exits.clone()]);
+            assert!(matches!(
+                ExecutionRequestsV5::try_from(&repeated_exits),
+                Err(TryFromRequestsError::DuplicateRequestType(BUILDER_EXIT_REQUEST_TYPE))
+            ));
+
+            // Unique types convert regardless of order, also across V5's split.
+            let descending = Requests::new(vec![withdrawals.clone(), deposits]);
+            let v4 = ExecutionRequestsV4::try_from(&descending).unwrap();
+            assert_eq!(v4.withdrawals, vec![WithdrawalRequest::default()]);
+            assert!(ExecutionRequestsV5::try_from(&descending).is_ok());
+            let unordered = Requests::new(vec![exits, withdrawals]);
+            let v5 = ExecutionRequestsV5::try_from(&unordered).unwrap();
+            assert_eq!(v5.withdrawals, vec![WithdrawalRequest::default()]);
         }
     }
 }
