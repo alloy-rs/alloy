@@ -216,12 +216,19 @@ pub struct DepositData {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#deposit>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Deposit {
     /// Branch in the deposit tree (proof).
+    ///
+    /// The spec defines this as a fixed vector of [`Deposit::PROOF_LEN`] roots; SSZ encoding
+    /// writes the roots as they are, so other lengths produce invalid encodings.
     pub proof: Vec<B256>,
     /// The deposit data.
     pub data: DepositData,
+}
+
+impl Deposit {
+    /// Number of roots in a deposit proof (`DEPOSIT_CONTRACT_TREE_DEPTH + 1`).
+    pub const PROOF_LEN: usize = 33;
 }
 
 /// A voluntary exit message.
@@ -489,6 +496,53 @@ pub type SignedBeaconBlockElectra<T = serde_json::Value> =
 #[cfg(feature = "ssz")]
 mod ssz_impls {
     use super::*;
+
+    const DEPOSIT_PROOF_BYTES: usize = Deposit::PROOF_LEN * 32;
+
+    /// `Deposit` is a fixed-size container: `Vector[Bytes32, 33]` followed by `DepositData`.
+    impl ssz::Encode for Deposit {
+        fn is_ssz_fixed_len() -> bool {
+            true
+        }
+
+        fn ssz_fixed_len() -> usize {
+            DEPOSIT_PROOF_BYTES + <DepositData as ssz::Encode>::ssz_fixed_len()
+        }
+
+        fn ssz_bytes_len(&self) -> usize {
+            <Self as ssz::Encode>::ssz_fixed_len()
+        }
+
+        fn ssz_append(&self, buf: &mut Vec<u8>) {
+            debug_assert_eq!(self.proof.len(), Self::PROOF_LEN);
+            for root in &self.proof {
+                buf.extend_from_slice(root.as_slice());
+            }
+            self.data.ssz_append(buf);
+        }
+    }
+
+    impl ssz::Decode for Deposit {
+        fn is_ssz_fixed_len() -> bool {
+            true
+        }
+
+        fn ssz_fixed_len() -> usize {
+            <Self as ssz::Encode>::ssz_fixed_len()
+        }
+
+        fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+            let expected = <Self as ssz::Decode>::ssz_fixed_len();
+            if bytes.len() != expected {
+                return Err(ssz::DecodeError::InvalidByteLength { len: bytes.len(), expected });
+            }
+            let (proof, data) = bytes.split_at(DEPOSIT_PROOF_BYTES);
+            Ok(Self {
+                proof: proof.as_chunks::<32>().0.iter().copied().map(B256::from).collect(),
+                data: DepositData::from_ssz_bytes(data)?,
+            })
+        }
+    }
 
     /// Width of a field in the container's fixed section: its own length if fixed-size, else a
     /// 4-byte offset into the variable section.
@@ -838,6 +892,91 @@ mod tests {
             assert!(<SyncAggregate as Encode>::is_ssz_fixed_len());
             assert_eq!(<SyncAggregate as Decode>::ssz_fixed_len(), 160);
             assert_eq!(sample_sync_aggregate().as_ssz_bytes().len(), 160);
+        }
+
+        fn sample_deposit() -> Deposit {
+            Deposit {
+                proof: (0..33u8).map(|i| B256::repeat_byte(0xa0 + i)).collect(),
+                data: DepositData {
+                    pubkey: crate::BlsPublicKey::repeat_byte(0x11),
+                    withdrawal_credentials: B256::repeat_byte(0x22),
+                    amount: 32_000_000_000,
+                    signature: crate::BlsSignature::repeat_byte(0x33),
+                },
+            }
+        }
+
+        /// Spec layout of a `Deposit`: 33 inline roots, then pubkey, credentials, amount (LE),
+        /// signature; 1240 bytes with no offsets.
+        fn spec_deposit_bytes(d: &Deposit) -> Vec<u8> {
+            let mut out: Vec<u8> = d.proof.iter().flat_map(|r| r.0).collect();
+            out.extend_from_slice(d.data.pubkey.as_slice());
+            out.extend_from_slice(d.data.withdrawal_credentials.as_slice());
+            out.extend_from_slice(&d.data.amount.to_le_bytes());
+            out.extend_from_slice(d.data.signature.as_slice());
+            assert_eq!(out.len(), 1240);
+            out
+        }
+
+        #[test]
+        fn deposit_ssz_matches_spec_layout() {
+            let deposit = sample_deposit();
+            let spec = spec_deposit_bytes(&deposit);
+            assert!(<Deposit as Encode>::is_ssz_fixed_len());
+            assert_eq!(<Deposit as Decode>::ssz_fixed_len(), 1240);
+            assert_eq!(deposit.as_ssz_bytes(), spec);
+            assert_eq!(Deposit::from_ssz_bytes(&spec).unwrap(), deposit);
+            // A list of fixed-size items is their plain concatenation.
+            let two = [spec.clone(), spec.clone()].concat();
+            assert_eq!(vec![deposit.clone(), deposit].as_ssz_bytes(), two);
+            assert_eq!(Vec::<Deposit>::from_ssz_bytes(&two).unwrap().len(), 2);
+            // Any other length is rejected.
+            assert!(Deposit::from_ssz_bytes(&spec[..1239]).is_err());
+            assert!(Deposit::from_ssz_bytes(&[spec.as_slice(), &[0]].concat()).is_err());
+        }
+
+        /// A Phase0 block with one deposit encodes to the spec layout and decodes back.
+        #[test]
+        fn ssz_signed_block_phase0_with_deposit() {
+            let deposit = sample_deposit();
+            let block = |deposits| SignedBeaconBlock {
+                message: BeaconBlock {
+                    slot: 1,
+                    proposer_index: 2,
+                    parent_root: B256::repeat_byte(0x01),
+                    state_root: B256::repeat_byte(0x02),
+                    body: BeaconBlockBodyPhase0 {
+                        randao_reveal: crate::BlsSignature::repeat_byte(0x03),
+                        eth1_data: Eth1Data {
+                            deposit_root: B256::repeat_byte(0x04),
+                            deposit_count: 1,
+                            block_hash: B256::repeat_byte(0x05),
+                        },
+                        graffiti: B256::repeat_byte(0x06),
+                        proposer_slashings: vec![],
+                        attester_slashings: vec![],
+                        attestations: vec![],
+                        deposits,
+                        voluntary_exits: vec![],
+                    },
+                },
+                signature: crate::BlsSignature::repeat_byte(0x07),
+            };
+            // Build the spec bytes from the empty block: the deposit goes at the (empty) end of
+            // the variable section and the trailing `voluntary_exits` offset moves past it.
+            // Offsets: 100 (signed block fixed) + 84 (block fixed) + 200 + 4 * 4 into the body.
+            let mut spec = block(vec![]).as_ssz_bytes();
+            assert_eq!(spec.len(), 100 + 84 + 220);
+            let exits_off = 100 + 84 + 200 + 16;
+            spec[exits_off..exits_off + 4].copy_from_slice(&(220u32 + 1240).to_le_bytes());
+            spec.extend_from_slice(&spec_deposit_bytes(&deposit));
+
+            let block = block(vec![deposit]);
+            assert_eq!(block.as_ssz_bytes(), spec);
+            assert_eq!(
+                SignedBeaconBlock::<BeaconBlockBodyPhase0>::from_ssz_bytes(&spec).unwrap(),
+                block
+            );
         }
 
         #[test]
