@@ -262,6 +262,7 @@ fn classify_response(status: u16, content_type: &str, body: &[u8]) -> Attempt {
         Err(err) => {
             let mut message = format!("invalid gateway response: {err}");
             message.truncate(message.floor_char_boundary(MESSAGE_LIMIT));
+            message.shrink_to_fit();
             Attempt::Retry(CcipReadGatewayError::http(status, message))
         }
     }
@@ -355,7 +356,10 @@ mod tests {
         for fill in ['z', '\u{e9}'] {
             let body = format!("{{\"data\":\"{}\"}}", fill.to_string().repeat(4096));
             let attempt = classify_response(200, "application/json", body.as_bytes());
-            assert!(matches!(attempt, Attempt::Retry(_)), "{attempt:?}");
+            assert!(
+                matches!(&attempt, Attempt::Retry(error) if error.message.capacity() <= MESSAGE_LIMIT),
+                "{attempt:?}"
+            );
             let message = message(&attempt);
             assert!(message.starts_with("invalid gateway response"), "{message}");
             assert!(message.len() <= MESSAGE_LIMIT && message.len() > MESSAGE_LIMIT - 4);
