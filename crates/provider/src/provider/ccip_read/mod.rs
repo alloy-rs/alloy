@@ -364,6 +364,9 @@ impl<G: CcipReadGateway> CcipReadClient<G> {
             bounds::batch(&data, context.config)?;
             let call = abi::queryCall::abi_decode(&data)
                 .map_err(|err| CcipReadError::InvalidBatch(err.to_string()))?;
+            // The decoded requests own copies of their data, so release the encoded batch before
+            // awaiting them; otherwise every nested level keeps its parent's buffer alive.
+            drop(data);
 
             let requests = call.requests.into_iter().map(|request| {
                 let request = CcipReadRequest {
@@ -1040,6 +1043,45 @@ mod tests {
             .unwrap()
             .reason
             .contains("budget"));
+    }
+
+    #[tokio::test]
+    async fn releases_batch_data_before_fetching_requests() {
+        #[derive(Debug)]
+        struct ProbeGateway(Bytes);
+
+        #[async_trait::async_trait]
+        impl CcipReadGateway for ProbeGateway {
+            async fn request(
+                &self,
+                _request: &CcipReadRequest,
+                _max_response_size: usize,
+            ) -> Result<Bytes, CcipReadGatewayError> {
+                Ok(Bytes::from(vec![u8::from(self.0 .0.is_unique())]))
+            }
+        }
+
+        let sender = address!("1111111111111111111111111111111111111111");
+        let leaf = abi::BatchGatewayRequest {
+            sender,
+            urls: vec!["https://example.com".into()],
+            data: Bytes::new(),
+        };
+        let data: Bytes = abi::queryCall { requests: vec![leaf] }.abi_encode().into();
+        let client = CcipReadClient::new(ProbeGateway(data.clone()));
+        let context = BatchContext::new(client.config());
+
+        let encoded = client
+            .fetch(
+                CcipReadRequest { sender, urls: vec![BATCH_GATEWAY_SENTINEL.into()], data },
+                &context,
+            )
+            .await
+            .unwrap();
+        let batch = abi::queryCall::abi_decode_returns(&encoded).unwrap();
+
+        assert_eq!(batch.failures, vec![false]);
+        assert_eq!(batch.responses[0], bytes!("01"), "batch data still held by local_batch");
     }
 
     #[tokio::test]
