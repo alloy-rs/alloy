@@ -873,29 +873,34 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_transport::mock::Asserter;
 
-    #[test]
-    fn block_number_overflow_is_a_decode_error() {
-        let number = U256::from(u64::MAX) + U256::ONE;
-        assert!(matches!(decode_block_number(number), Err(MulticallError::DecodeError(_))));
-    }
-
     #[tokio::test]
-    async fn aggregate_methods_accept_max_block_number() {
+    async fn aggregate_methods_check_block_number() {
         let asserter = Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let multicall = provider.multicall();
         let hash = B256::repeat_byte(0x11);
-        let output = blockAndAggregateReturn {
-            blockNumber: U256::from(u64::MAX),
-            blockHash: hash,
-            returnData: vec![],
-        };
         // Both Multicall3 methods return the same ABI tuple.
-        let bytes = Bytes::from(blockAndAggregateCall::abi_encode_returns(&output));
-        asserter.push_success(&bytes);
+        let encode = |number| {
+            Bytes::from(blockAndAggregateCall::abi_encode_returns(&blockAndAggregateReturn {
+                blockNumber: number,
+                blockHash: hash,
+                returnData: vec![],
+            }))
+        };
+
+        let max = encode(U256::from(u64::MAX));
+        asserter.push_success(&max);
         assert_eq!(multicall.block_and_aggregate().await.unwrap(), (u64::MAX, hash, ()));
-        asserter.push_success(&bytes);
+        asserter.push_success(&max);
         assert_eq!(multicall.try_block_and_aggregate(true).await.unwrap(), (u64::MAX, hash, ()));
+
+        let overflow = encode(U256::from(u64::MAX) + U256::ONE);
+        asserter.push_success(&overflow);
+        let err = multicall.block_and_aggregate().await.unwrap_err();
+        assert!(matches!(err, MulticallError::DecodeError(_)), "{err:?}");
+        asserter.push_success(&overflow);
+        let err = multicall.try_block_and_aggregate(true).await.unwrap_err();
+        assert!(matches!(err, MulticallError::DecodeError(_)), "{err:?}");
     }
 
     #[tokio::test]
