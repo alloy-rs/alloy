@@ -17,6 +17,13 @@ use std::fmt;
 mod error;
 pub use error::LocalSignerError;
 
+#[cfg(feature = "keystore")]
+mod keystore;
+#[cfg(feature = "keystore")]
+pub use keystore::{
+    CipherparamsJson, CryptoJson, EthKeystore, KdfType, KdfparamsType, KeystoreError,
+};
+
 #[cfg(feature = "mnemonic")]
 mod mnemonic;
 #[cfg(feature = "mnemonic")]
