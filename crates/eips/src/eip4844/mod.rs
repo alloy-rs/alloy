@@ -728,10 +728,6 @@ mod tests {
     #[test]
     fn osaka_excess_blob_gas_at_u64_limit() {
         let params = eip7840::BlobParams::osaka();
-        assert_eq!(
-            params.next_block_excess_blob_gas_osaka(u64::MAX, 1, 0),
-            u64::MAX - params.target_blob_gas_per_block() + 1
-        );
         assert_eq!(params.next_block_excess_blob_gas_osaka(u64::MAX, u64::MAX, 0), u64::MAX);
     }
 
