@@ -1,10 +1,8 @@
 //! Misc types related to the 4844
 
-#[cfg(feature = "ssz")]
-use crate::eip7594::CELLS_PER_EXT_BLOB;
 use crate::{
     eip4844::{Blob, Bytes48},
-    eip7594::Cell,
+    eip7594::{Cell, CELLS_PER_EXT_BLOB},
 };
 use alloc::{boxed::Box, vec::Vec};
 
@@ -60,13 +58,35 @@ impl ssz::Decode for BlobAndProofV1 {
 
 /// Blob type returned in responses to `engine_getBlobsV2`: <https://github.com/ethereum/execution-apis/pull/630>
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct BlobAndProofV2 {
     /// The blob data.
     pub blob: Box<Blob>,
     /// The cell proofs for the blob.
     pub proofs: Vec<Bytes48>,
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BlobAndProofV2 {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Helper {
+            blob: Box<Blob>,
+            proofs: Vec<Bytes48>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        if helper.proofs.len() > CELLS_PER_EXT_BLOB {
+            return Err(serde::de::Error::custom(format!(
+                "Invalid BlobAndProofV2: expected at most {CELLS_PER_EXT_BLOB} proofs, got {}",
+                helper.proofs.len()
+            )));
+        }
+
+        Ok(Self { blob: helper.blob, proofs: helper.proofs })
+    }
 }
 
 #[cfg(feature = "ssz")]
@@ -120,12 +140,52 @@ impl ssz::Decode for BlobAndProofV2 {
 /// Blob cells type returned in responses to `engine_getBlobsV4`:
 /// <https://github.com/ethereum/execution-apis/pull/774>
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct BlobCellsAndProofsV1 {
     /// The requested blob cells.
     pub blob_cells: Vec<Option<Cell>>,
     /// The KZG proofs for the requested blob cells.
     pub proofs: Vec<Option<Bytes48>>,
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BlobCellsAndProofsV1 {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            blob_cells: Vec<Option<Cell>>,
+            proofs: Vec<Option<Bytes48>>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        if helper.blob_cells.len() > CELLS_PER_EXT_BLOB {
+            return Err(serde::de::Error::custom(format!(
+                "Invalid BlobCellsAndProofsV1: expected at most {CELLS_PER_EXT_BLOB} blob cells, got {}",
+                helper.blob_cells.len()
+            )));
+        }
+
+        if helper.blob_cells.len() != helper.proofs.len() {
+            return Err(serde::de::Error::custom(format!(
+                "Invalid BlobCellsAndProofsV1: blob_cells length {} does not match proofs length {}",
+                helper.blob_cells.len(),
+                helper.proofs.len()
+            )));
+        }
+
+        if helper
+            .blob_cells
+            .iter()
+            .zip(&helper.proofs)
+            .any(|(cell, proof)| cell.is_some() != proof.is_some())
+        {
+            return Err(serde::de::Error::custom(
+                "Invalid BlobCellsAndProofsV1: blob_cells and proofs must have matching null positions",
+            ));
+        }
+
+        Ok(Self { blob_cells: helper.blob_cells, proofs: helper.proofs })
+    }
 }
 
 #[cfg(feature = "ssz")]
@@ -331,5 +391,49 @@ mod serde_tests {
         let json = serde_json::to_string(&blob_cells_and_proofs).unwrap();
         assert!(json.contains("\"blob_cells\""));
         assert!(!json.contains("\"blobCells\""));
+    }
+
+    #[test]
+    fn blob_and_proof_v2_serde_rejects_too_many_proofs() {
+        let value = BlobAndProofV2 {
+            blob: Box::new(Blob::ZERO),
+            proofs: vec![Bytes48::ZERO; CELLS_PER_EXT_BLOB + 1],
+        };
+        let json = serde_json::to_value(&value).unwrap();
+        let err = serde_json::from_value::<BlobAndProofV2>(json).unwrap_err();
+        assert!(err.to_string().contains("BlobAndProofV2"));
+    }
+
+    #[test]
+    fn blob_cells_and_proofs_v1_serde_rejects_too_many_cells() {
+        let value = BlobCellsAndProofsV1 {
+            blob_cells: vec![Some(Cell::ZERO); CELLS_PER_EXT_BLOB + 1],
+            proofs: vec![Some(Bytes48::ZERO); CELLS_PER_EXT_BLOB + 1],
+        };
+        let json = serde_json::to_value(&value).unwrap();
+        let err = serde_json::from_value::<BlobCellsAndProofsV1>(json).unwrap_err();
+        assert!(err.to_string().contains("expected at most"));
+    }
+
+    #[test]
+    fn blob_cells_and_proofs_v1_serde_rejects_mismatched_lengths() {
+        let value = BlobCellsAndProofsV1 {
+            blob_cells: vec![Some(Cell::ZERO)],
+            proofs: vec![Some(Bytes48::ZERO), Some(Bytes48::ZERO)],
+        };
+        let json = serde_json::to_value(&value).unwrap();
+        let err = serde_json::from_value::<BlobCellsAndProofsV1>(json).unwrap_err();
+        assert!(err.to_string().contains("does not match"));
+    }
+
+    #[test]
+    fn blob_cells_and_proofs_v1_serde_rejects_mismatched_null_positions() {
+        let value = BlobCellsAndProofsV1 {
+            blob_cells: vec![Some(Cell::ZERO), None],
+            proofs: vec![None, Some(Bytes48::ZERO)],
+        };
+        let json = serde_json::to_value(&value).unwrap();
+        let err = serde_json::from_value::<BlobCellsAndProofsV1>(json).unwrap_err();
+        assert!(err.to_string().contains("matching null positions"));
     }
 }
