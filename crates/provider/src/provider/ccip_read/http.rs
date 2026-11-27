@@ -76,9 +76,11 @@ impl HttpCcipReadGateway {
         };
         let response = match request.send().await {
             Ok(response) => response,
+            // The URL may be up to `max_url_length` bytes, so leave it out of the message.
             Err(err) => {
                 return Attempt::Retry(CcipReadGatewayError::new(format!(
-                    "gateway request failed: {err}"
+                    "gateway request failed: {}",
+                    err.without_url()
                 )))
             }
         };
@@ -377,6 +379,19 @@ mod tests {
 
         let error = gateway.request(&request(vec!["not a url".into()]), 1024).await.unwrap_err();
         assert!(error.message.contains("invalid CCIP Read gateway URL"));
+    }
+
+    #[tokio::test]
+    async fn send_error_omits_url() {
+        // Longer than `http::Uri` accepts, so the request fails before any I/O.
+        let request = CcipReadRequest {
+            sender: Address::ZERO,
+            urls: vec![format!("http://127.0.0.1:9/{}", "{data}".repeat(64))],
+            data: vec![0; 1024].into(),
+        };
+        let error = HttpCcipReadGateway::default().request(&request, 1024).await.unwrap_err();
+        assert!(error.message.starts_with("gateway request failed: "), "{}", error.message);
+        assert!(!error.message.contains("127.0.0.1"), "{}", error.message);
     }
 
     #[tokio::test]
