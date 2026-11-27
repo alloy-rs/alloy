@@ -57,6 +57,10 @@ impl PubSubFrontend {
     /// best effort: during reconnection it can race with a replacement
     /// subscription response, so success does not confirm server-side teardown.
     ///
+    /// Identical subscribe requests share one local ID. Each call releases one
+    /// of them, and the subscription is only closed once every subscribe
+    /// response for that ID has been released.
+    ///
     /// [`RawSubscription`]: crate::RawSubscription
     pub fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.tx

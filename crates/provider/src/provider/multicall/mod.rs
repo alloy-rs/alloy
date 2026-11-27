@@ -593,13 +593,15 @@ where
         T::decode_return_results(&output)
     }
 
-    /// Call the `blockAndAggregate` function
+    /// Call the `blockAndAggregate` function.
+    ///
+    /// Returns [`MulticallError::DecodeError`] if the block number does not fit in a `u64`.
     pub async fn block_and_aggregate(&self) -> Result<(u64, B256, T::SuccessReturns)> {
         let call = self.to_block_and_aggregate_call();
         let output = self.build_and_call(call, None).await?;
         let blockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         let result = T::decode_return_results(&returnData)?;
-        Ok((blockNumber.to::<u64>(), blockHash, T::try_into_success(result)?))
+        Ok((decode_block_number(blockNumber)?, blockHash, T::try_into_success(result)?))
     }
     /// Sends the `blockAndAggregate` function as a transaction
     pub async fn send_block_and_aggregate(&self) -> Result<PendingTransactionBuilder<N>> {
@@ -607,7 +609,9 @@ where
         self.build_and_send(call, None).await
     }
 
-    /// Call the `tryBlockAndAggregate` function
+    /// Call the `tryBlockAndAggregate` function.
+    ///
+    /// Returns [`MulticallError::DecodeError`] if the block number does not fit in a `u64`.
     pub async fn try_block_and_aggregate(
         &self,
         require_success: bool,
@@ -615,7 +619,7 @@ where
         let call = self.to_try_block_and_aggregate_call(require_success);
         let output = self.build_and_call(call, None).await?;
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
-        Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
+        Ok((decode_block_number(blockNumber)?, blockHash, T::decode_return_results(&returnData)?))
     }
 
     /// Sends the `tryBlockAndAggregate` function as a transaction  
@@ -857,11 +861,47 @@ where
     }
 }
 
+fn decode_block_number(number: U256) -> Result<u64> {
+    u64::try_from(number).map_err(|_| {
+        MulticallError::DecodeError(alloy_sol_types::Error::custom("block number exceeds u64::MAX"))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
     use alloy_transport::mock::Asserter;
+
+    #[tokio::test]
+    async fn aggregate_methods_check_block_number() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let multicall = provider.multicall();
+        let hash = B256::repeat_byte(0x11);
+        // Both Multicall3 methods return the same ABI tuple.
+        let encode = |number| {
+            Bytes::from(blockAndAggregateCall::abi_encode_returns(&blockAndAggregateReturn {
+                blockNumber: number,
+                blockHash: hash,
+                returnData: vec![],
+            }))
+        };
+
+        let max = encode(U256::from(u64::MAX));
+        asserter.push_success(&max);
+        assert_eq!(multicall.block_and_aggregate().await.unwrap(), (u64::MAX, hash, ()));
+        asserter.push_success(&max);
+        assert_eq!(multicall.try_block_and_aggregate(true).await.unwrap(), (u64::MAX, hash, ()));
+
+        let overflow = encode(U256::from(u64::MAX) + U256::ONE);
+        asserter.push_success(&overflow);
+        let err = multicall.block_and_aggregate().await.unwrap_err();
+        assert!(matches!(err, MulticallError::DecodeError(_)), "{err:?}");
+        asserter.push_success(&overflow);
+        let err = multicall.try_block_and_aggregate(true).await.unwrap_err();
+        assert!(matches!(err, MulticallError::DecodeError(_)), "{err:?}");
+    }
 
     #[tokio::test]
     async fn empty_call_output_is_not_deployed() {

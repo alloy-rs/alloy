@@ -21,7 +21,7 @@ pub const BLOB_BASE_COST: u64 = 2_u64.pow(13);
 )]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct BlobParams {
-    /// Target blob count for the block.
+    /// Target blob count for the block. Serde rejects values above `max_blob_count`.
     pub target_blob_count: u64,
     /// Max blob count for the block.
     pub max_blob_count: u64,
@@ -117,22 +117,24 @@ impl BlobParams {
 
     /// Returns the maximum available blob gas in a block.
     ///
-    /// This is `max blob count * DATA_GAS_PER_BLOB`
+    /// This is `max blob count * DATA_GAS_PER_BLOB`, saturating at [`u64::MAX`].
     pub const fn max_blob_gas_per_block(&self) -> u64 {
-        self.max_blob_count * DATA_GAS_PER_BLOB
+        self.max_blob_count.saturating_mul(DATA_GAS_PER_BLOB)
     }
 
     /// Returns the blob gas target per block.
     ///
-    /// This is `target blob count * DATA_GAS_PER_BLOB`
+    /// This is `target blob count * DATA_GAS_PER_BLOB`, saturating at [`u64::MAX`].
     pub const fn target_blob_gas_per_block(&self) -> u64 {
-        self.target_blob_count * DATA_GAS_PER_BLOB
+        self.target_blob_count.saturating_mul(DATA_GAS_PER_BLOB)
     }
 
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas`, `blob_gas_used` and `base_fee_per_gas`.
     ///
     /// When `max_blob_count` is zero, falls back to the pre-Osaka excess blob gas calculation.
+    /// If directly constructed with a target above the maximum, the EIP-7918 scaled usage is zero.
+    /// The final excess saturates at [`u64::MAX`].
     #[inline]
     pub fn next_block_excess_blob_gas_osaka(
         &self,
@@ -140,22 +142,24 @@ impl BlobParams {
         blob_gas_used: u64,
         base_fee_per_gas: u64,
     ) -> u64 {
-        let next_excess_blob_gas = excess_blob_gas + blob_gas_used;
-        let target_blob_gas = self.target_blob_gas_per_block();
-        if next_excess_blob_gas < target_blob_gas {
+        let total = u128::from(excess_blob_gas) + u128::from(blob_gas_used);
+        let target_blob_gas = u128::from(self.target_blob_count) * u128::from(DATA_GAS_PER_BLOB);
+        if total < target_blob_gas {
             return 0;
         }
 
-        if U256::from(self.blob_base_cost) * U256::from(base_fee_per_gas)
+        let excess = if U256::from(self.blob_base_cost) * U256::from(base_fee_per_gas)
             > U256::from(DATA_GAS_PER_BLOB) * U256::from(self.calc_blob_fee(excess_blob_gas))
             && self.max_blob_count > 0
         {
-            let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
-                / self.max_blob_count;
-            excess_blob_gas + scaled_excess
+            let count_above_target = self.max_blob_count.saturating_sub(self.target_blob_count);
+            let scaled_usage = u128::from(blob_gas_used) * u128::from(count_above_target)
+                / u128::from(self.max_blob_count);
+            u128::from(excess_blob_gas) + scaled_usage
         } else {
-            next_excess_blob_gas - target_blob_gas
-        }
+            total - target_blob_gas
+        };
+        u64::try_from(excess).unwrap_or(u64::MAX)
     }
 
     /// Calculates the blob fee for block based on its `excess_blob_gas`.
@@ -206,6 +210,9 @@ mod serde_impl {
             if update_fraction == 0 {
                 return Err("blob base fee update fraction must be nonzero");
             }
+            if target_blob_count > max_blob_count {
+                return Err("target blob count must not exceed max blob count");
+            }
 
             Ok(Self {
                 target_blob_count,
@@ -232,6 +239,28 @@ mod tests {
         }))
         .unwrap_err();
         assert_eq!(err.to_string(), "blob base fee update fraction must be nonzero");
+    }
+
+    #[test]
+    fn rejects_target_above_max() {
+        let err = serde_json::from_value::<BlobParams>(serde_json::json!({
+            "baseFeeUpdateFraction": 1,
+            "max": 6,
+            "target": 7,
+        }))
+        .unwrap_err();
+        assert_eq!(err.to_string(), "target blob count must not exceed max blob count");
+    }
+
+    #[test]
+    fn accepts_zero_blob_capacity() {
+        let params = serde_json::from_value::<BlobParams>(serde_json::json!({
+            "baseFeeUpdateFraction": 1,
+            "max": 0,
+            "target": 0,
+        }))
+        .unwrap();
+        assert_eq!((params.target_blob_count, params.max_blob_count), (0, 0));
     }
 
     #[test]

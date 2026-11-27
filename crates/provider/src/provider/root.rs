@@ -83,7 +83,14 @@ impl<N: Network> RootProvider<N> {
         self.pubsub_frontend()?.get_subscription(id).await.map(Subscription::from)
     }
 
-    /// Unsubscribes from the subscription corresponding to the given RPC subscription ID.
+    /// Releases one subscribe call's hold on a subscription.
+    ///
+    /// Identical subscribe requests, including the provider's internal `newHeads`
+    /// subscription, share one ID and one stream. The server subscription is cancelled
+    /// and the stream ends only after every subscribe call for that ID has unsubscribed,
+    /// so call this once per subscribe call and drop your own stream to stop receiving.
+    /// A subscribe call whose stream was dropped without unsubscribing, or that was
+    /// cancelled after the server responded, still counts as a holder.
     #[cfg(feature = "pubsub")]
     pub fn unsubscribe(&self, id: alloy_primitives::B256) -> alloy_transport::TransportResult<()> {
         self.pubsub_frontend()?.unsubscribe(id)

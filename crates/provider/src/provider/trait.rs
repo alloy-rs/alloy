@@ -1782,7 +1782,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         GetSubscription::new(self.weak_client(), rpc_call)
     }
 
-    /// Cancels a subscription given the subscription ID.
+    /// Releases one subscribe call's hold on a subscription.
+    ///
+    /// Identical subscribe requests, including the provider's internal `newHeads`
+    /// subscription, share one ID and one stream. The server subscription is cancelled
+    /// and the stream ends only after every subscribe call for that ID has unsubscribed,
+    /// so call this once per subscribe call and drop your own stream to stop receiving.
+    /// A subscribe call whose stream was dropped without unsubscribing, or that was
+    /// cancelled after the server responded, still counts as a holder.
     #[cfg(feature = "pubsub")]
     async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.root().unsubscribe(id)

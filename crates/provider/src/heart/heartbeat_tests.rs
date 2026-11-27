@@ -230,6 +230,46 @@ async fn pauses_while_nothing_is_watched() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn pauses_once_watchers_are_dropped() {
+    // Dropped while unconfirmed.
+    let harness = Harness::new();
+    drop(harness.watch(PendingTransactionConfig::new(TX), None).await);
+    harness.block(1, &[]);
+    settle().await;
+    assert!(harness.paused.is_paused());
+
+    // Dropped while waiting for confirmations.
+    let harness = Harness::new();
+    let config = PendingTransactionConfig::new(TX).with_required_confirmations(10);
+    let waiting = harness.watch(config, None).await;
+    harness.block(1, &[TX]);
+    settle().await;
+    assert!(!harness.paused.is_paused());
+    drop(waiting);
+    harness.block(2, &[]);
+    settle().await;
+    assert!(harness.paused.is_paused());
+
+    // A remaining watcher for the same tx keeps the heartbeat running and still resolves, both
+    // while unconfirmed and while waiting for confirmations.
+    for (confirmations, first, last) in [(1, &[][..], &[TX][..]), (3, &[TX][..], &[][..])] {
+        let harness = Harness::new();
+        let config = PendingTransactionConfig::new(TX).with_required_confirmations(confirmations);
+        let dropped = harness.watch(config.clone(), None).await;
+        let mut kept = harness.watch(config, None).await;
+        harness.block(1, first);
+        settle().await;
+        drop(dropped);
+        harness.block(2, &[]);
+        settle().await;
+        assert!(!harness.paused.is_paused(), "{confirmations}");
+        harness.block(3, last);
+        settle().await;
+        assert_eq!(poll(&mut kept).unwrap().unwrap(), TX, "{confirmations}");
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn second_watcher_for_same_tx_does_not_replace_first() {
     let harness = Harness::new();
     let first = harness.watch(PendingTransactionConfig::new(TX), None).await;

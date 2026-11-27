@@ -76,9 +76,11 @@ impl HttpCcipReadGateway {
         };
         let response = match request.send().await {
             Ok(response) => response,
+            // The URL may be up to `max_url_length` bytes, so leave it out of the message.
             Err(err) => {
                 return Attempt::Retry(CcipReadGatewayError::new(format!(
-                    "gateway request failed: {err}"
+                    "gateway request failed: {}",
+                    err.without_url()
                 )))
             }
         };
@@ -257,17 +259,22 @@ fn classify_response(status: u16, content_type: &str, body: &[u8]) -> Attempt {
     }
     match serde_json::from_slice::<GatewayResponse>(body) {
         Ok(response) => Attempt::Data(response.data),
-        Err(err) => Attempt::Retry(CcipReadGatewayError::http(
-            status,
-            format!("invalid gateway response: {err}"),
-        )),
+        Err(err) => {
+            let mut message = format!("invalid gateway response: {err}");
+            message.truncate(message.floor_char_boundary(MESSAGE_LIMIT));
+            message.shrink_to_fit();
+            Attempt::Retry(CcipReadGatewayError::http(status, message))
+        }
     }
 }
 
+/// Maximum bytes kept in a JSON decode error message or taken from a non-2xx response body
+/// before lossy UTF-8 conversion, which can expand the latter to 3,072 bytes.
+const MESSAGE_LIMIT: usize = 1_024;
+
 /// Returns the beginning of an error response body as a message.
 fn response_message(body: &[u8]) -> String {
-    const LIMIT: usize = 1_024;
-    String::from_utf8_lossy(&body[..body.len().min(LIMIT)]).into_owned()
+    String::from_utf8_lossy(&body[..body.len().min(MESSAGE_LIMIT)]).into_owned()
 }
 
 #[cfg(test)]
@@ -345,6 +352,19 @@ mod tests {
             assert!(matches!(attempt, Attempt::Retry(_)), "{attempt:?}");
             assert!(message(&attempt).contains("invalid gateway response"));
         }
+
+        // Decode errors embed the rejected value; the message stays within the limit.
+        for fill in ['z', '\u{e9}'] {
+            let body = format!("{{\"data\":\"{}\"}}", fill.to_string().repeat(4096));
+            let attempt = classify_response(200, "application/json", body.as_bytes());
+            assert!(
+                matches!(&attempt, Attempt::Retry(error) if error.message.capacity() <= MESSAGE_LIMIT),
+                "{attempt:?}"
+            );
+            let message = message(&attempt);
+            assert!(message.starts_with("invalid gateway response"), "{message}");
+            assert!(message.len() <= MESSAGE_LIMIT && message.len() > MESSAGE_LIMIT - 4);
+        }
     }
 
     #[tokio::test]
@@ -364,6 +384,19 @@ mod tests {
 
         let error = gateway.request(&request(vec!["not a url".into()]), 1024).await.unwrap_err();
         assert!(error.message.contains("invalid CCIP Read gateway URL"));
+    }
+
+    #[tokio::test]
+    async fn send_error_omits_url() {
+        // Longer than `http::Uri` accepts, so the request fails before any I/O.
+        let request = CcipReadRequest {
+            sender: Address::ZERO,
+            urls: vec![format!("http://127.0.0.1:9/{}", "{data}".repeat(64))],
+            data: vec![0; 1024].into(),
+        };
+        let error = HttpCcipReadGateway::default().request(&request, 1024).await.unwrap_err();
+        assert!(error.message.starts_with("gateway request failed: "), "{}", error.message);
+        assert!(!error.message.contains("127.0.0.1"), "{}", error.message);
     }
 
     #[tokio::test]

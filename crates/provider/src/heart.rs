@@ -821,6 +821,17 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         }
         debug!(%block_height, "handling block");
 
+        // Drop watchers whose `PendingTransaction` is gone, so they no longer keep us unpaused.
+        // Once per block keeps this off the per-registration path.
+        self.unconfirmed.retain(|_, watchers| {
+            watchers.retain(|w| !w.tx.is_closed());
+            !watchers.is_empty()
+        });
+        self.waiting_confs.retain(|_, watchers| {
+            watchers.retain(|w| !w.tx.is_closed());
+            !watchers.is_empty()
+        });
+
         // Add the block the lookbehind.
         // The value is chosen arbitrarily to not have a huge memory footprint but still
         // catch most cases where user subscribes for an already mined transaction.
