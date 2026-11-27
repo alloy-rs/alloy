@@ -227,6 +227,7 @@ mod ssz_requests_conversions {
 
     /// Errors possible converting a [Requests] to [ExecutionRequestsV4] or [ExecutionRequestsV5]
     #[derive(Debug, thiserror::Error)]
+    #[non_exhaustive]
     pub enum TryFromRequestsError {
         /// One of the Bytes is empty or has no request_data after the request_type.
         #[error("empty bytes in requests body")]
