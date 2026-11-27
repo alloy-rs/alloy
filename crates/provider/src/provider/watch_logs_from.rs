@@ -119,6 +119,8 @@ impl<N: Network> WatchLogsFrom<N> {
     }
 
     /// Sets the poll interval used when the stream is caught up to the configured head tag.
+    ///
+    /// A zero interval is treated as one millisecond.
     pub const fn poll_interval(mut self, poll_interval: Duration) -> Self {
         self.poll_interval = poll_interval;
         self
@@ -537,7 +539,7 @@ fn normalize_range_logs_if_matches(
 #[cfg(test)]
 mod tests {
     use super::{
-        super::watch_logs_test_utils::{assert_batch, block, log, MockChain},
+        super::watch_logs_test_utils::{assert_batch, assert_completes, block, log, MockChain},
         *,
     };
     use crate::Provider;
@@ -545,6 +547,21 @@ mod tests {
     use alloy_rpc_types_eth::Block;
     use futures::{Stream, StreamExt};
     use tokio::time::timeout;
+
+    #[test]
+    fn zero_poll_interval_yields_when_ahead_of_fixed_head() {
+        assert_completes(|| {
+            let chain = MockChain::new();
+            let provider = chain.provider();
+            let mut stream = provider
+                .watch_logs_from(1, &Filter::new())
+                .block_tag(BlockNumberOrTag::Number(0))
+                .poll_interval(Duration::ZERO)
+                .into_stream();
+            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+            assert!(Pin::new(&mut stream).poll_next(&mut cx).is_pending());
+        });
+    }
 
     async fn next_batch<S>(stream: &mut S) -> BlockLogs<Ethereum>
     where
