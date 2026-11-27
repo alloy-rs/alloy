@@ -1,6 +1,9 @@
 use super::*;
+use crate::ProviderBuilder;
 use alloy_network::Ethereum;
+use alloy_primitives::{Address, Bloom, U64};
 use alloy_rpc_types_eth::{Block, BlockTransactions};
+use alloy_transport::mock::Asserter;
 
 struct Harness {
     blocks: futures::channel::mpsc::UnboundedSender<Block>,
@@ -362,7 +365,11 @@ fn timeouts_registered_at_the_same_instant_reap_every_watcher() {
     heartbeat.reap_timeouts();
 
     for mut rx in receivers {
-        assert!(matches!(rx.try_recv(), Ok(Err(WatchTxError::Timeout))), "watcher not reaped");
+        let res = rx.try_recv();
+        assert!(
+            matches!(res, Ok(Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout)))),
+            "watcher not reaped"
+        );
     }
     assert!(!heartbeat.has_pending_transactions());
 }
@@ -380,4 +387,123 @@ fn does_not_pause_while_watches_are_queued() {
     heartbeat.update_pause_state(&ixns);
     assert!(!heartbeat.paused.is_paused());
     assert_eq!(heartbeat.past_blocks.len(), 1);
+}
+
+fn fork_block(number: u64, hash: u8, txs: &[TxHash]) -> Block {
+    let mut block: Block = Block::default();
+    block.header.inner.number = number;
+    block.header.hash = B256::with_last_byte(hash);
+    block.header.inner.parent_hash = B256::with_last_byte(hash - 1);
+    block.transactions = BlockTransactions::Hashes(txs.to_vec());
+    block
+}
+
+fn receipt(number: u64, hash: Option<u8>) -> serde_json::Value {
+    serde_json::json!({
+        "transactionHash": TX, "transactionIndex": "0x0", "blockHash": hash.map(B256::with_last_byte),
+        "blockNumber": U64::from(number), "from": Address::ZERO, "to": null, "contractAddress": null,
+        "gasUsed": "0x5208", "cumulativeGasUsed": "0x5208", "effectiveGasPrice": "0x1",
+        "status": "0x1", "logs": [], "logsBloom": Bloom::ZERO, "type": "0x0"
+    })
+}
+
+#[tokio::test(start_paused = true)]
+async fn receipt_seed_from_another_fork_does_not_confirm() {
+    let asserter = Asserter::new();
+    let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+    // The receipt is from fork A at block 10, but the heartbeat only samples fork B.
+    asserter.push_success(&receipt(10, Some(11)));
+    asserter.push_success(&U64::from(11));
+    asserter.push_success(&fork_block(10, 30, &[]));
+    asserter.push_success(&fork_block(11, 31, &[]));
+    // The recheck finds fork B at block 10, and the transaction is not mined there.
+    asserter.push_success(&fork_block(10, 30, &[]));
+    for _ in 0..3 {
+        asserter.push_success(&Option::<serde_json::Value>::None);
+    }
+
+    let mut pending = PendingTransactionBuilder::new(provider.root().clone(), TX)
+        .with_required_confirmations(2)
+        .register()
+        .await
+        .unwrap();
+    settle().await;
+    assert!(poll(&mut pending).is_none(), "orphaned receipt falsely confirmed");
+    assert!(asserter.read_q().is_empty());
+
+    // Once fork B mines the transaction, the block stream confirms it.
+    asserter.push_success(&U64::from(12));
+    asserter.push_success(&fork_block(11, 31, &[]));
+    asserter.push_success(&fork_block(12, 32, &[TX]));
+    asserter.push_success(&U64::from(13));
+    asserter.push_success(&fork_block(13, 33, &[]));
+    for _ in 0..2 {
+        tokio::time::advance(provider.client().poll_interval()).await;
+        settle().await;
+    }
+    assert_eq!(poll(&mut pending).unwrap().unwrap(), TX);
+}
+
+#[tokio::test(start_paused = true)]
+async fn receipt_seeded_public_watches_require_canonical_inclusion() {
+    // A receipt without a block hash can't be rechecked, so its height doesn't count.
+    let asserter = Asserter::new();
+    let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+    asserter.push_success(&receipt(10, None));
+    asserter.push_success(&U64::from(11));
+    asserter.push_success(&fork_block(10, 30, &[]));
+    asserter.push_success(&fork_block(11, 31, &[]));
+
+    let builder = PendingTransactionBuilder::new(provider.root().clone(), TX);
+    let mut watch = Box::pin(builder.with_required_confirmations(2).watch());
+    assert!(watch.as_mut().now_or_never().is_none());
+    settle().await;
+    assert!(watch.as_mut().now_or_never().is_none(), "unchecked receipt confirmed");
+    assert!(asserter.read_q().is_empty());
+}
+
+#[tokio::test]
+async fn restarted_watch_keeps_the_original_deadline() {
+    let asserter = Asserter::new();
+    let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+    asserter.push_success(&fork_block(10, 30, &[]));
+    for _ in 0..3 {
+        asserter.push_success(&Option::<serde_json::Value>::None);
+    }
+    let (tx, rx) = oneshot::channel();
+    let config = PendingTransactionConfig::new(TX)
+        .with_required_confirmations(2)
+        .with_timeout(Some(Duration::from_millis(200)));
+    let inclusion = BlockNumHash::new(10, B256::with_last_byte(11));
+    let pending = PendingTransaction { tx_hash: TX, rx }.recheck_inclusion(
+        provider.root().clone(),
+        config,
+        inclusion,
+    );
+
+    // The orphaned inclusion is found after the deadline, so the restarted watch times out now.
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    tx.send(Ok(())).unwrap();
+    let res =
+        tokio::time::timeout(Duration::from_millis(100), pending).await.expect("timeout renewed");
+    assert!(
+        matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+        "{res:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn dropping_a_rechecked_watch_releases_the_heartbeat_watcher() {
+    let provider = ProviderBuilder::new().connect_mocked_client(Asserter::new());
+    let (tx, rx) = oneshot::channel();
+    let config = PendingTransactionConfig::new(TX).with_required_confirmations(2);
+    let pending = PendingTransaction { tx_hash: TX, rx }.recheck_inclusion(
+        provider.root().clone(),
+        config,
+        BlockNumHash::default(),
+    );
+    settle().await;
+    drop(pending);
+    settle().await;
+    assert!(tx.is_closed(), "the heartbeat watcher outlives the dropped watch");
 }

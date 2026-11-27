@@ -2,8 +2,10 @@
 
 use crate::{blocks::Paused, Provider, RootProvider};
 use alloy_consensus::BlockHeader;
+use alloy_eips::BlockNumHash;
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, Network};
+use alloy_network_primitives::{HeaderResponse, ReceiptResponse};
 use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
     TxHash, B256,
@@ -13,7 +15,7 @@ use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
-    future::Future,
+    future::{Future, IntoFuture},
     sync::Arc,
     time::Duration,
 };
@@ -399,14 +401,14 @@ struct TxWatcher {
     received_at_block: Option<u64>,
     /// When the watcher times out. Set by the heartbeat if a timeout is configured.
     reap_at: Option<Instant>,
-    tx: oneshot::Sender<Result<(), WatchTxError>>,
+    tx: oneshot::Sender<Result<(), PendingTransactionError>>,
 }
 
 impl TxWatcher {
     /// Notify the waiter.
     fn notify(self, result: Result<(), WatchTxError>) {
         debug!(tx=%self.config.tx_hash, "notifying");
-        let _ = self.tx.send(result);
+        let _ = self.tx.send(result.map_err(Into::into));
     }
 }
 
@@ -422,7 +424,7 @@ pub struct PendingTransaction {
     pub(crate) tx_hash: TxHash,
     /// The receiver for the notification.
     // TODO: send a receipt?
-    pub(crate) rx: oneshot::Receiver<Result<(), WatchTxError>>,
+    pub(crate) rx: oneshot::Receiver<Result<(), PendingTransactionError>>,
 }
 
 impl fmt::Debug for PendingTransaction {
@@ -444,6 +446,70 @@ impl PendingTransaction {
     pub const fn tx_hash(&self) -> &TxHash {
         &self.tx_hash
     }
+
+    /// Rechecks a watch seeded from a receipt once the heartbeat confirms it, since the receipt may
+    /// come from a fork the block stream never sampled. If `inclusion` was orphaned, the watch
+    /// restarts from the current receipt with what is left of the original timeout.
+    pub(crate) fn recheck_inclusion<N: Network>(
+        self,
+        provider: RootProvider<N>,
+        mut config: PendingTransactionConfig,
+        mut inclusion: BlockNumHash,
+    ) -> Self {
+        let tx_hash = self.tx_hash;
+        let deadline = config.timeout.and_then(|timeout| Instant::now().checked_add(timeout));
+        let (mut tx, rx) = oneshot::channel();
+        async move {
+            let recheck = async {
+                let mut pending = self;
+                loop {
+                    (&mut pending).await?;
+                    // If the block can't be fetched, keep the heartbeat's answer.
+                    let block = lookup(|| provider.get_block_by_number(inclusion.number.into()));
+                    match block.await {
+                        Some(block) if block.header().hash() != inclusion.hash => {}
+                        _ => return Ok(()),
+                    }
+                    // A receipt still pointing at the orphaned block is stale, so leave it to the
+                    // block stream.
+                    let receipt = lookup(|| provider.get_transaction_receipt(tx_hash)).await;
+                    let seed = receipt
+                        .and_then(|receipt| receipt.block_hash_num())
+                        .filter(|seed| *seed != inclusion);
+                    config.timeout =
+                        deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()));
+                    pending = provider
+                        .get_heart()
+                        .watch_tx(config.clone(), seed.map(|seed| seed.number))
+                        .await
+                        .map_err(|_| PendingTransactionError::FailedToRegister)?;
+                    // Without a usable receipt, the block stream finds the transaction once mined.
+                    let Some(seed) = seed else { return (&mut pending).await.map(drop) };
+                    inclusion = seed;
+                }
+            };
+            let result = select! {
+                _ = tx.closed() => return,
+                result = recheck => result,
+            };
+            let _ = tx.send(result);
+        }
+        .spawn_task();
+        Self { tx_hash, rx }
+    }
+}
+
+/// Fetches a value, retrying errors and empty responses like `NewBlocks` does.
+async fn lookup<T, E, F>(fetch: impl Fn() -> F) -> Option<T>
+where
+    F: IntoFuture<Output = Result<Option<T>, E>>,
+{
+    for _ in 0..3 {
+        if let Ok(Some(value)) = fetch().await {
+            return Some(value);
+        }
+    }
+    None
 }
 
 impl Future for PendingTransaction {
