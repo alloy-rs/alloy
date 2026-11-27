@@ -459,12 +459,19 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 
 /// Calculates the `excess_blob_gas` from the parent header's `blob_gas_used` and `excess_blob_gas`.
 ///
+/// The result saturates at [`u64::MAX`] if the excess after subtracting the target exceeds it.
+///
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`calc_excess_blob_gas`).
 #[inline]
 pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
-    let next_excess_blob_gas = parent_excess_blob_gas + parent_blob_gas_used;
-    next_excess_blob_gas.saturating_sub(TARGET_DATA_GAS_PER_BLOCK_DENCUN)
+    let total = parent_excess_blob_gas as u128 + parent_blob_gas_used as u128;
+    let excess = total.saturating_sub(TARGET_DATA_GAS_PER_BLOCK_DENCUN as u128);
+    if excess > u64::MAX as u128 {
+        u64::MAX
+    } else {
+        excess as u64
+    }
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -602,6 +609,15 @@ mod tests {
         }
     }
 
+    #[test]
+    fn calc_excess_blob_gas_at_u64_limit() {
+        assert_eq!(
+            calc_excess_blob_gas(u64::MAX, 1),
+            u64::MAX - TARGET_DATA_GAS_PER_BLOCK_DENCUN + 1
+        );
+        assert_eq!(calc_excess_blob_gas(u64::MAX, TARGET_DATA_GAS_PER_BLOCK_DENCUN + 1), u64::MAX);
+    }
+
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L60
     #[test]
     fn test_calc_blob_fee() {
@@ -710,6 +726,46 @@ mod tests {
     }
 
     #[test]
+    fn osaka_excess_blob_gas_at_u64_limit() {
+        let params = eip7840::BlobParams::osaka();
+        assert_eq!(params.next_block_excess_blob_gas_osaka(u64::MAX, u64::MAX, 0), u64::MAX);
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_with_wide_target() {
+        // This schedule targets exactly 2^64 gas.
+        let params = eip7840::BlobParams {
+            target_blob_count: 1 << 47,
+            max_blob_count: 1 << 47,
+            ..eip7840::BlobParams::osaka()
+        };
+        assert_eq!(params.target_blob_gas_per_block(), u64::MAX);
+        assert_eq!(params.max_blob_gas_per_block(), u64::MAX);
+        assert_eq!(params.next_block_excess_blob_gas_osaka(1, u64::MAX - 1, 17), 0);
+        assert_eq!(params.next_block_excess_blob_gas_osaka(u64::MAX, 2, 0), 1);
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_with_scaled_usage() {
+        // Keep the reserve price active even at maximum parent excess.
+        let params = eip7840::BlobParams {
+            update_fraction: u64::MAX as u128,
+            ..eip7840::BlobParams::osaka()
+        };
+        // Osaka scales usage by (9 - 6) / 9.
+        let used = u64::MAX - 1;
+        assert_eq!(params.next_block_excess_blob_gas_osaka(0, used, 100), used / 3);
+        // The scaled usage is one, so the final addition exceeds u64::MAX.
+        assert_eq!(params.next_block_excess_blob_gas_osaka(u64::MAX, 3, 100), u64::MAX);
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_with_target_above_max() {
+        let params = eip7840::BlobParams { target_blob_count: 10, ..eip7840::BlobParams::osaka() };
+        assert_eq!(params.next_block_excess_blob_gas_osaka(42, 11 * DATA_GAS_PER_BLOB, 17), 42);
+    }
+
+    #[test]
     fn osaka_excess_blob_gas_with_zero_blob_capacity() {
         let params = crate::eip7840::BlobParams {
             target_blob_count: 0,
@@ -734,6 +790,8 @@ mod tests {
 
             assert_eq!(actual, expected, "test: {t:?}");
         }
+
+        assert_eq!(params.next_block_excess_blob_gas_osaka(1, 2, 17), 3);
     }
 
     #[test]
