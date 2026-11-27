@@ -597,7 +597,8 @@ impl ExecutionPayloadEnvelopeV4 {
     ///
     /// # Errors
     ///
-    /// Returns an error if KZG proof computation fails.
+    /// Returns an error if the blobs bundle has mismatched lengths or if KZG proof computation
+    /// fails.
     #[cfg(feature = "kzg")]
     pub fn try_into_v5(
         self,
@@ -612,7 +613,8 @@ impl ExecutionPayloadEnvelopeV4 {
     ///
     /// # Errors
     ///
-    /// Returns an error if KZG proof computation fails.
+    /// Returns an error if the blobs bundle has mismatched lengths or if KZG proof computation
+    /// fails.
     #[cfg(feature = "kzg")]
     pub fn try_into_v5_with_settings(
         self,
