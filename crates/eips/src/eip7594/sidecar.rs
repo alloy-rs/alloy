@@ -1285,8 +1285,8 @@ impl Decodable7594 for BlobTransactionSidecarEip7594 {
 /// A set of cell indices, one bit per column of an extended blob.
 ///
 /// Used for the cells requested by `engine_getBlobsV4` and for the `cell_mask` of eth/72
-/// ([EIP-8070]) announcements and `GetCells` requests. Both encode it as a 16-byte, little-endian
-/// bitarray.
+/// ([EIP-8070]) announcements, `GetCells` requests and `Cells` responses. Both encode it as a
+/// 16-byte, little-endian bitarray.
 ///
 /// # Examples
 ///
