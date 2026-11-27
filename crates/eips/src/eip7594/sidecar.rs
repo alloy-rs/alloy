@@ -566,7 +566,10 @@ impl BlobTransactionSidecarEip7594 {
     /// `cell_mask` identifies the cells supplied for each commitment. `cells` must be flattened in
     /// blob-major order: all selected cells for `commitments[0]`, followed by all selected cells
     /// for `commitments[1]`, and so on. At least half of the 128 extended blob cells must be
-    /// selected. The recovered sidecar contains the complete blob data and all 128 cell proofs.
+    /// selected, and only the first half of the selected cells is used. The recovered sidecar
+    /// contains the complete blob data and all 128 cell proofs.
+    ///
+    /// Recovery is cheapest when cells `0..64` are selected, since they hold the blob itself.
     ///
     /// Recovery authenticates each reconstructed blob by recomputing and comparing its
     /// commitment. It does not verify proofs for the input cells; callers accepting untrusted
@@ -622,8 +625,15 @@ impl BlobTransactionSidecarEip7594 {
             return Ok(Self::new(Vec::new(), commitments, Vec::new()));
         }
 
+        // Any half of the cells determines the blob, so the cells past the first half are not
+        // used and a corrupt one among them can't fail the recovery.
+        let needed = CELLS_PER_EXT_BLOB / 2;
         let cell_indices =
-            cell_mask.selected_indices().map(|index| index as u64).collect::<Vec<_>>();
+            cell_mask.selected_indices().take(needed).map(|index| index as u64).collect::<Vec<_>>();
+        // The first half of the extended cells is the blob itself. When all of it is present,
+        // the blob is copied out and only its proofs are computed, skipping the erasure recovery.
+        let blob_half = (1u128 << needed) - 1;
+        let has_blob_half = cell_mask.bits() & blob_half == blob_half;
         let mut blobs = Vec::with_capacity(commitments.len());
         let cell_proof_capacity = commitments
             .len()
@@ -634,10 +644,18 @@ impl BlobTransactionSidecarEip7594 {
         for (blob_index, (blob_cells, expected_commitment)) in
             cells.chunks_exact(cells_per_blob).zip(&commitments).enumerate()
         {
-            let ckzg_cells = crate::eip7594::Cell::slice_as_ckzg(blob_cells);
-            let (recovered_cells, recovered_proofs) =
-                settings.recover_cells_and_kzg_proofs(&cell_indices, ckzg_cells)?;
-            let blob = reconstruct_blob(recovered_cells.as_ref());
+            // The check above ensures `cells_per_blob >= needed`.
+            let blob_cells = &blob_cells[..needed];
+            let (blob, recovered_proofs) = if has_blob_half {
+                let blob = reconstruct_blob(blob_cells);
+                let (_, proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
+                (blob, proofs)
+            } else {
+                let ckzg_cells = crate::eip7594::Cell::slice_as_ckzg(blob_cells);
+                let (recovered_cells, proofs) =
+                    settings.recover_cells_and_kzg_proofs(&cell_indices, ckzg_cells)?;
+                (reconstruct_blob(c_kzg::Cell::slice_as_alloy(recovered_cells.as_ref())), proofs)
+            };
 
             let commitment = settings.blob_to_kzg_commitment(blob.as_ckzg())?;
             let commitment = Bytes48::from_ckzg(commitment.to_bytes());
@@ -1211,17 +1229,14 @@ impl From<c_kzg::Error> for BlobCellRecoveryError {
     }
 }
 
+// Builds a blob from cells in the canonical EIP-7594 order. The first half is the original blob
+// data and the rest is the extension used for sampling and proofs, so only the first half is read.
 #[cfg(feature = "kzg")]
-fn reconstruct_blob(recovered_cells: &[c_kzg::Cell; CELLS_PER_EXT_BLOB]) -> Blob {
-    // `RecoverCells` returns cells in the canonical EIP-7594 order. The first half is the
-    // original blob data; the remaining cells are the extension used for sampling and proofs.
-    // The KZG backend performs the recovery, while this wrapper only materializes the original
-    // blob cells.
+fn reconstruct_blob(cells: &[crate::eip7594::Cell]) -> Blob {
     let mut blob = [0u8; BYTES_PER_BLOB];
-    for (cell_index, cell) in recovered_cells.iter().take(CELLS_PER_EXT_BLOB / 2).enumerate() {
-        let start = cell_index * crate::eip7594::BYTES_PER_CELL;
-        let end = start + crate::eip7594::BYTES_PER_CELL;
-        blob[start..end].copy_from_slice(cell.as_alloy().as_slice());
+    let (chunks, _) = blob.as_chunks_mut::<{ crate::eip7594::BYTES_PER_CELL }>();
+    for (chunk, cell) in chunks.iter_mut().zip(cells) {
+        *chunk = cell.0;
     }
     Blob::new(blob)
 }
@@ -1791,6 +1806,42 @@ mod tests {
         assert_eq!(recovered.blobs, sidecar.blobs);
         assert_eq!(recovered.commitments, sidecar.commitments);
         assert_eq!(recovered.cell_proofs, sidecar.cell_proofs);
+    }
+
+    /// The blob half, which skips the erasure recovery, and the extension half give the same
+    /// sidecar, and cells past the first half are not used.
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn recover_sparse_blobs_from_either_half_of_the_cells() {
+        let settings = EnvKzgSettings::Default.get();
+        let sidecar = BlobTransactionSidecarEip7594::try_from_blobs_with_settings(
+            vec![Blob::repeat_byte(0x01), Blob::repeat_byte(0x02)],
+            settings,
+        )
+        .unwrap();
+        let recover = |cell_mask: BlobCellMask, cells: &[crate::eip7594::Cell]| {
+            BlobTransactionSidecarEip7594::try_recover_from_cells_with_settings(
+                sidecar.commitments.clone(),
+                cell_mask,
+                cells,
+                settings,
+            )
+        };
+
+        let half = CELLS_PER_EXT_BLOB / 2;
+        let blob_half = BlobCellMask::from_bits(u128::MAX >> half);
+        let extension_half = BlobCellMask::from_bits(u128::MAX << half);
+        for cell_mask in [blob_half, extension_half] {
+            let cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+            assert_eq!(recover(cell_mask, &cells).unwrap(), sidecar);
+        }
+
+        let cell_mask = BlobCellMask::from_bits(u128::MAX >> (half / 2));
+        let mut cells = sparse_cells_for_mask(&sidecar, cell_mask, settings);
+        let per_blob = cell_mask.count();
+        cells[half][0] ^= 0xff;
+        cells[per_blob + half][0] ^= 0xff;
+        assert_eq!(recover(cell_mask, &cells).unwrap(), sidecar);
     }
 
     #[test]
