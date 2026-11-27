@@ -1,6 +1,9 @@
 use crate::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    utils::{redact_url, Spawnable},
+    Authorization, TransportErrorKind, TransportResult,
+};
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -15,7 +18,7 @@ type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 /// Simple connection details for a websocket connection.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WsConnect {
     /// The URL to connect to.
     url: String,
@@ -34,6 +37,22 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
+}
+
+impl std::fmt::Debug for WsConnect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("WsConnect");
+        match url::Url::parse(&self.url) {
+            Ok(url) => d.field("url", &redact_url(&url).as_str()),
+            Err(_) => d.field("url", &format_args!("<redacted>")),
+        };
+        d.field("auth", &self.auth)
+            .field("config", &self.config)
+            .field("max_retries", &self.max_retries)
+            .field("retry_interval", &self.retry_interval)
+            .field("keepalive_interval", &self.keepalive_interval)
+            .finish()
+    }
 }
 
 impl WsConnect {
@@ -315,5 +334,15 @@ mod tests {
         let ws =
             WsConnect::new("wss://user:pass@example.com").with_auth(Authorization::bearer("tok"));
         assert_eq!(ws.auth(), Some(&Authorization::bearer("tok")));
+    }
+
+    #[test]
+    fn debug_redacts_url_credentials() {
+        let debug = format!("{:?}", WsConnect::new("wss://user:pass@example.com/rpc"));
+        assert!(debug.starts_with(
+            r#"WsConnect { url: "wss://redacted:redacted@example.com/rpc", auth: Some(Basic(<redacted>))"#
+        ), "{debug}");
+        let debug = format!("{:?}", WsConnect::new("wss://user:pass@[bad"));
+        assert!(debug.starts_with("WsConnect { url: <redacted>, auth: None"), "{debug}");
     }
 }

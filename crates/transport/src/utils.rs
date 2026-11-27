@@ -29,6 +29,19 @@ pub fn guess_local_url(s: impl AsRef<str>) -> bool {
     _guess_local_url(s.as_ref())
 }
 
+/// Returns a copy of the URL with its username and password, if any, replaced
+/// by `redacted`, for use in `Debug` output.
+pub fn redact_url(url: &Url) -> Url {
+    let mut url = url.clone();
+    if !url.username().is_empty() {
+        let _ = url.set_username("redacted");
+    }
+    if url.password().is_some() {
+        let _ = url.set_password(Some("redacted"));
+    }
+    url
+}
+
 #[doc(hidden)]
 pub trait Spawnable {
     /// Spawn the future as a task.
@@ -75,7 +88,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::guess_local_url;
+    use super::{guess_local_url, redact_url};
+    use url::Url;
 
     #[test]
     fn guesses_local_urls() {
@@ -94,6 +108,19 @@ mod tests {
             ("not a url", false),
         ] {
             assert_eq!(guess_local_url(url), local, "{url}");
+        }
+    }
+
+    #[test]
+    fn redacts_url_credentials() {
+        for (url, expected) in [
+            ("https://user:pass@host/rpc", "https://redacted:redacted@host/rpc"),
+            ("https://user@host/rpc", "https://redacted@host/rpc"),
+            ("https://:pass@host/rpc", "https://:redacted@host/rpc"),
+            ("wss://host:8546/rpc?key=1", "wss://host:8546/rpc?key=1"),
+        ] {
+            let url: Url = url.parse().unwrap();
+            assert_eq!(redact_url(&url).as_str(), expected);
         }
     }
 }
