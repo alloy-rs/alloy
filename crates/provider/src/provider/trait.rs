@@ -1916,8 +1916,8 @@ impl<N: Network> Provider<N> for RootProvider<N> {
                 if config.required_confirmations() <= 1 {
                     return Ok(PendingTransaction::ready(*config.tx_hash()));
                 }
-                // Preserve block identity. This is only a scheduling hint until canonical
-                // inclusion is checked before delivering the confirmation result.
+                // Transaction has custom confirmations, so let the heart know about its block
+                // number and let it handle the situation. The block hash is rechecked at the end.
                 receipt.block_hash_num()
             } else {
                 None
@@ -1925,14 +1925,13 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 
         let pending = self
             .get_heart()
-            .watch_tx(config.clone(), inclusion)
+            .watch_tx(config.clone(), inclusion.map(|inclusion| inclusion.number))
             .await
             .map_err(|_| PendingTransactionError::FailedToRegister)?;
-        if config.required_confirmations() > 1 {
-            Ok(pending.with_confirmation_check(self.clone(), config))
-        } else {
-            Ok(pending)
-        }
+        Ok(match inclusion {
+            Some(inclusion) => pending.recheck_inclusion(self.clone(), config, inclusion),
+            None => pending,
+        })
     }
 }
 
