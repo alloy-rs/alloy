@@ -855,4 +855,34 @@ mod tests {
         assert!(sub.recv().await.is_err());
         assert!(!service.subs.contains(&local_id));
     }
+
+    #[tokio::test]
+    async fn last_release_resets_holders() {
+        let (handle, mut interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect::default(),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+
+        // Subscribing again after a full teardown starts from a single holder.
+        for (id, server_id) in [(1, "0x1"), (2, "0x2")] {
+            let request =
+                Request::new("eth_subscribe", Id::Number(id), ["newHeads"]).serialize().unwrap();
+            let (in_flight, response) = InFlight::new(request, 16);
+            service.service_request(in_flight).unwrap();
+            interface.from_frontend.try_recv().unwrap();
+            let resp = format!(r#"{{"jsonrpc":"2.0","id":{id},"result":"{server_id}"}}"#);
+            service.handle_item(serde_json::from_str(&resp).unwrap()).unwrap();
+            response.await.unwrap().unwrap();
+            let local_id = *service.subs.iter().next().unwrap().0;
+
+            service.service_unsubscribe(local_id).unwrap();
+            let unsub = interface.from_frontend.try_recv().unwrap();
+            assert!(unsub.get().contains(&format!(r#""params":["{server_id}"]"#)));
+        }
+    }
 }
