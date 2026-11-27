@@ -139,6 +139,10 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
+        // Other holders of the same subscription still use it.
+        if !self.subs.release(local_id) {
+            return Ok(());
+        }
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
             // A string id keeps the reply from matching a request issued by `RpcClient`,
             // which allocates numeric ids. It is not tracked in `in_flights`, so the reply is
@@ -196,14 +200,20 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
 
         let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
+        let local_id = *sub.local_id();
 
         // Serialized B256 is always a valid serialized U256 too.
-        let ser_alias = to_json_raw_value(sub.local_id())?;
+        let ser_alias = to_json_raw_value(&local_id)?;
 
-        // We send back a success response with the new subscription ID.
-        // We don't care if the channel is dead.
-        let _ =
-            in_flight.tx.send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) }));
+        // We send back a success response with the new subscription ID. Only a delivered
+        // response counts as a holder; re-subscriptions after a reconnect have no waiter.
+        if in_flight
+            .tx
+            .send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) }))
+            .is_ok()
+        {
+            self.subs.acquire(local_id);
+        }
 
         Ok(())
     }
@@ -796,5 +806,53 @@ mod tests {
             1,
             "default close_with_error should trigger exactly one reconnect"
         );
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_keeps_shared_subscription_until_last_holder() {
+        let (handle, mut interface) = ConnectionHandle::new();
+        let (replacement, mut replacement_interface) = ConnectionHandle::new();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let mut service = PubSubService {
+            handle,
+            connector: MockConnect(Arc::new(Mutex::new(Some(replacement)))),
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+
+        // Two holders subscribe with identical params and share one local id.
+        for (id, server_id) in [(1, "0x1"), (2, "0x2")] {
+            let request =
+                Request::new("eth_subscribe", Id::Number(id), ["newHeads"]).serialize().unwrap();
+            let (in_flight, response) = InFlight::new(request, 16);
+            service.service_request(in_flight).unwrap();
+            interface.from_frontend.try_recv().unwrap();
+            let resp = format!(r#"{{"jsonrpc":"2.0","id":{id},"result":"{server_id}"}}"#);
+            service.handle_item(serde_json::from_str(&resp).unwrap()).unwrap();
+            response.await.unwrap().unwrap();
+        }
+        let local_id = *service.subs.iter().next().unwrap().0;
+        let mut sub = service.subs.get_subscription(local_id).unwrap();
+
+        // Re-subscribing after a reconnect does not add a holder.
+        service.reconnect().await.unwrap();
+        replacement_interface.from_frontend.try_recv().unwrap();
+        let resp = r#"{"jsonrpc":"2.0","id":1,"result":"0x3"}"#;
+        service.handle_item(serde_json::from_str(resp).unwrap()).unwrap();
+
+        // The first release leaves the subscription open for the other holder.
+        service.service_unsubscribe(local_id).unwrap();
+        assert!(replacement_interface.from_frontend.try_recv().is_err());
+        let notification = r#"{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0x3","result":"0x5"}}"#;
+        service.handle_item(serde_json::from_str(notification).unwrap()).unwrap();
+        assert_eq!(sub.recv().await.unwrap().get(), r#""0x5""#);
+
+        // The last release unsubscribes on the server and closes the channel.
+        service.service_unsubscribe(local_id).unwrap();
+        let unsub = replacement_interface.from_frontend.try_recv().unwrap();
+        assert!(unsub.get().contains(r#""method":"eth_unsubscribe","params":["0x3"]"#));
+        assert!(sub.recv().await.is_err());
+        assert!(!service.subs.contains(&local_id));
     }
 }
