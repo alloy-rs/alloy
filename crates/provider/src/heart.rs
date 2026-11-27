@@ -597,6 +597,17 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
     /// Update the pause state based on whether we have pending or queued transactions.
     fn update_pause_state(&mut self, ixns: &mpsc::Receiver<TxWatcher>) {
+        // Drop watchers whose `PendingTransaction` is gone, so they no longer keep us unpaused.
+        // This runs on the next wakeup, which is at latest the next block while unpaused.
+        self.unconfirmed.retain(|_, watchers| {
+            watchers.retain(|w| !w.tx.is_closed());
+            !watchers.is_empty()
+        });
+        self.waiting_confs.retain(|_, watchers| {
+            watchers.retain(|w| !w.tx.is_closed());
+            !watchers.is_empty()
+        });
+
         // Queued watches may still need the lookbehind, which pausing clears.
         let should_pause = !self.has_pending_transactions() && ixns.is_empty();
         if self.paused.is_paused() != should_pause {
