@@ -257,17 +257,20 @@ fn classify_response(status: u16, content_type: &str, body: &[u8]) -> Attempt {
     }
     match serde_json::from_slice::<GatewayResponse>(body) {
         Ok(response) => Attempt::Data(response.data),
-        Err(err) => Attempt::Retry(CcipReadGatewayError::http(
-            status,
-            format!("invalid gateway response: {err}"),
-        )),
+        Err(err) => {
+            let mut message = format!("invalid gateway response: {err}");
+            message.truncate(message.floor_char_boundary(MESSAGE_LIMIT));
+            Attempt::Retry(CcipReadGatewayError::http(status, message))
+        }
     }
 }
 
+/// Maximum length in bytes of gateway-derived error messages.
+const MESSAGE_LIMIT: usize = 1_024;
+
 /// Returns the beginning of an error response body as a message.
 fn response_message(body: &[u8]) -> String {
-    const LIMIT: usize = 1_024;
-    String::from_utf8_lossy(&body[..body.len().min(LIMIT)]).into_owned()
+    String::from_utf8_lossy(&body[..body.len().min(MESSAGE_LIMIT)]).into_owned()
 }
 
 #[cfg(test)]
@@ -344,6 +347,16 @@ mod tests {
             let attempt = classify_response(200, "application/json", body);
             assert!(matches!(attempt, Attempt::Retry(_)), "{attempt:?}");
             assert!(message(&attempt).contains("invalid gateway response"));
+        }
+
+        // Decode errors embed the rejected value; the message stays within the limit.
+        for fill in ['z', '\u{e9}'] {
+            let body = format!("{{\"data\":\"{}\"}}", fill.to_string().repeat(4096));
+            let attempt = classify_response(200, "application/json", body.as_bytes());
+            assert!(matches!(attempt, Attempt::Retry(_)), "{attempt:?}");
+            let message = message(&attempt);
+            assert!(message.starts_with("invalid gateway response"), "{message}");
+            assert!(message.len() <= MESSAGE_LIMIT && message.len() > MESSAGE_LIMIT - 4);
         }
     }
 
