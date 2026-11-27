@@ -1,7 +1,7 @@
 use crate::common::{Privacy, ProtocolVersion, Validity};
 
 use alloy_eips::BlockId;
-use alloy_primitives::{Bytes, TxHash, U256};
+use alloy_primitives::{Address, Bytes, TxHash, U256};
 use alloy_rpc_types_eth::{BlockOverrides, Log};
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -232,8 +232,8 @@ pub struct SimBundleOverrides {
     pub timeout: Option<u64>,
 }
 
-/// Serializes [`BlockOverrides`] with the `blockNumber` and `timestamp` keys that mev-share
-/// expects, instead of `number` and `time`.
+/// Serializes [`BlockOverrides`] with the `blockNumber`, `timestamp`, `coinbase` and `baseFee`
+/// keys that mev-share expects, instead of `number`, `time`, `feeRecipient` and `baseFeePerGas`.
 fn serialize_sim_block_overrides<S: Serializer>(
     overrides: &BlockOverrides,
     serializer: S,
@@ -245,6 +245,10 @@ fn serialize_sim_block_overrides<S: Serializer>(
         block_number: Option<U256>,
         #[serde(with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
         timestamp: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        coinbase: Option<Address>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        base_fee: Option<U256>,
         #[serde(flatten)]
         overrides: BlockOverrides,
     }
@@ -253,6 +257,8 @@ fn serialize_sim_block_overrides<S: Serializer>(
     SimBlockOverrides {
         block_number: overrides.number.take(),
         timestamp: overrides.time.take(),
+        coinbase: overrides.coinbase.take(),
+        base_fee: overrides.base_fee.take(),
         overrides,
     }
     .serialize(serializer)
@@ -460,6 +466,8 @@ mod tests {
                 number: Some(U256::from(100)),
                 time: Some(1234),
                 gas_limit: Some(30_000_000),
+                coinbase: Some(Address::with_last_byte(1)),
+                base_fee: Some(U256::from(7)),
                 ..Default::default()
             },
             timeout: Some(5),
@@ -468,7 +476,7 @@ mod tests {
         let json = serde_json::to_string(&overrides).unwrap();
         assert_eq!(
             json,
-            r#"{"blockNumber":"0x64","timestamp":"0x4d2","gasLimit":"0x1c9c380","timeout":5}"#
+            r#"{"blockNumber":"0x64","timestamp":"0x4d2","coinbase":"0x0000000000000000000000000000000000000001","baseFee":"0x7","gasLimit":"0x1c9c380","timeout":5}"#
         );
         assert_eq!(serde_json::from_str::<SimBundleOverrides>(&json).unwrap(), overrides);
     }
