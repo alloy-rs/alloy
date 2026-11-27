@@ -696,8 +696,9 @@ impl Filter {
 
     /// Returns `true` if the block number matches the locally evaluable range.
     ///
-    /// Numeric bounds are inclusive. Dynamic tags such as `latest`, `safe`, and `pending` are not
-    /// resolved here and therefore do not impose a numeric bound.
+    /// Numeric bounds are inclusive, and `earliest` is treated as block 0. Dynamic tags such as
+    /// `latest`, `safe`, and `pending` are not resolved here and therefore do not impose a numeric
+    /// bound.
     pub const fn matches_block_range(&self, block_number: u64) -> bool {
         if let Some(BlockNumberOrTag::Number(num)) = self.block_option.get_from_block() {
             if *num > block_number {
@@ -707,7 +708,7 @@ impl Filter {
 
         match self.block_option.get_to_block() {
             Some(BlockNumberOrTag::Number(num)) => *num >= block_number,
-            Some(BlockNumberOrTag::Earliest) => false,
+            Some(BlockNumberOrTag::Earliest) => block_number == 0,
             _ => true,
         }
     }
@@ -2374,6 +2375,25 @@ mod tests {
         let wrong_hash = B256::with_last_byte(0xcd);
         assert!(!filter.matches_block(&BlockNumHash { number: 0, hash: wrong_hash }));
         assert!(!filter.matches_block(&BlockNumHash { number: 999, hash: wrong_hash }));
+    }
+
+    #[test]
+    fn test_matches_block_range_earliest() {
+        for (filter, matches_genesis) in [
+            (Filter::new().to_block(BlockNumberOrTag::Earliest), true),
+            (
+                Filter::new()
+                    .from_block(BlockNumberOrTag::Earliest)
+                    .to_block(BlockNumberOrTag::Earliest),
+                true,
+            ),
+            (Filter::new().from_block(0).to_block(BlockNumberOrTag::Earliest), true),
+            (Filter::new().from_block(1).to_block(BlockNumberOrTag::Earliest), false),
+        ] {
+            assert_eq!(filter.matches_block_range(0), matches_genesis, "filter: {filter:?}");
+            assert!(!filter.matches_block_range(1), "filter: {filter:?}");
+            assert!(!filter.matches_block_range(u64::MAX), "filter: {filter:?}");
+        }
     }
 
     #[test]
