@@ -931,6 +931,7 @@ mod tests {
             assert_eq!(vec![deposit.clone(), deposit].as_ssz_bytes(), two);
             assert_eq!(Vec::<Deposit>::from_ssz_bytes(&two).unwrap().len(), 2);
             // Any other length is rejected.
+            assert!(Deposit::from_ssz_bytes(&spec[..32]).is_err());
             assert!(Deposit::from_ssz_bytes(&spec[..1239]).is_err());
             assert!(Deposit::from_ssz_bytes(&[spec.as_slice(), &[0]].concat()).is_err());
             // A malformed proof still encodes to the fixed layout.
