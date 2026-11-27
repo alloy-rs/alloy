@@ -320,6 +320,8 @@ impl fmt::Debug for BlobGasEstimator {
 }
 
 /// Filler for the `max_fee_per_blob_gas` field in blob transactions.
+///
+/// Estimated fees are clamped to at least [`BLOB_TX_MIN_BLOB_GASPRICE`].
 #[derive(Clone, Debug, Default)]
 pub struct BlobGasFiller {
     /// The blob gas estimator to use.
@@ -368,7 +370,11 @@ where
 
         let blob_gas_used_ratio = fee_history.blob_gas_used_ratio;
 
-        Ok(self.estimator.estimate(base_fee_per_blob_gas, &blob_gas_used_ratio))
+        // The final estimate, including custom estimator output, must satisfy `status`'s floor.
+        Ok(self
+            .estimator
+            .estimate(base_fee_per_blob_gas, &blob_gas_used_ratio)
+            .max(BLOB_TX_MIN_BLOB_GASPRICE))
     }
 
     async fn fill(
