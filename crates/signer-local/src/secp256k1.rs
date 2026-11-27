@@ -75,9 +75,9 @@ impl From<SecretKey> for Secp256k1Credential {
 impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
     fn sign_prehash(&self, prehash: &[u8]) -> Result<(K256Signature, RecoveryId), SignatureError> {
         let msg =
-            Message::from_digest_slice(prehash).map_err(|_| SignatureError::from_source(""))?;
+            Message::from_digest(prehash.try_into().map_err(|_| SignatureError::from_source(""))?);
 
-        let sig = SECP256K1.sign_ecdsa_recoverable(&msg, &self.0);
+        let sig = SECP256K1.sign_ecdsa_recoverable(msg, &self.0);
         let (rec_id, data) = sig.serialize_compact();
 
         // Convert secp256k1 signature to k256 signature
@@ -127,7 +127,8 @@ impl LocalSigner<Secp256k1Credential> {
     /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a byte slice.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, secp256k1::Error> {
-        SecretKey::from_slice(bytes).map(Self::from_secp256k1)
+        let bytes = bytes.try_into().map_err(|_| secp256k1::Error::InvalidSecretKey)?;
+        SecretKey::from_byte_array(bytes).map(Self::from_secp256k1)
     }
 
     /// Creates a new random keypair seeded with [`rand::thread_rng()`].
@@ -139,8 +140,15 @@ impl LocalSigner<Secp256k1Credential> {
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        let (secret_key, _) = SECP256K1.generate_keypair(rng);
-        Self::from_secp256k1(secret_key)
+        // secp256k1's `rand` feature uses rand 0.9, while this API shares rand 0.8 with the k256
+        // signer and keystore helpers.
+        loop {
+            let mut bytes = [0; 32];
+            rng.fill_bytes(&mut bytes);
+            if let Ok(secret_key) = SecretKey::from_byte_array(bytes) {
+                return Self::from_secp256k1(secret_key);
+            }
+        }
     }
 
     /// Serializes this [`LocalSigner`]'s [`SecretKey`] as a [`B256`] byte array.
@@ -548,4 +556,64 @@ mod tests {
             sig2.recover_address_from_msg(message).unwrap()
         );
     }
+
+    #[test]
+    fn rejects_invalid_secret_keys() {
+        for bytes in [&[0; 31][..], &[0; 32], &[0; 33], &[0xff; 32]] {
+            assert_eq!(
+                Secp256k1Signer::from_slice(bytes).unwrap_err(),
+                secp256k1::Error::InvalidSecretKey
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_prehash_lengths() {
+        let signer = Secp256k1Signer::from_bytes(&B256::with_last_byte(1)).unwrap();
+        for prehash in [&[0; 31][..], &[0; 33]] {
+            let err = signer.credential.sign_prehash(prehash).unwrap_err();
+            assert_eq!(err.to_string(), "signature error: ");
+        }
+    }
+
+    #[test]
+    fn random_with_retries_invalid_scalars() {
+        let mut rng = ScalarRng { attempts: 0 };
+        let signer = Secp256k1Signer::random_with(&mut rng);
+        assert_eq!(rng.attempts, 3);
+        assert_eq!(signer.to_bytes(), B256::with_last_byte(1));
+        assert_eq!(signer.address(), address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
+    }
+
+    struct ScalarRng {
+        attempts: usize,
+    }
+
+    impl rand::RngCore for ScalarRng {
+        fn next_u32(&mut self) -> u32 {
+            panic!("the signer requests complete scalar bytes");
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            panic!("the signer requests complete scalar bytes");
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            let bytes = match self.attempts {
+                0 => B256::ZERO,
+                1 => B256::repeat_byte(0xff),
+                2 => B256::with_last_byte(1),
+                _ => panic!("the third scalar is valid"),
+            };
+            dest.copy_from_slice(bytes.as_slice());
+            self.attempts += 1;
+        }
+
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+
+    impl CryptoRng for ScalarRng {}
 }

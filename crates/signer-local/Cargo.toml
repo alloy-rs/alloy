@@ -53,6 +53,7 @@ yubihsm = { version = "0.42", features = [
 ], optional = true }
 
 # secp256k1
+# `rand` randomizes the blinding of the global context the signer uses.
 secp256k1 = { workspace = true, optional = true, features = [
     "recovery",
     "rand",
