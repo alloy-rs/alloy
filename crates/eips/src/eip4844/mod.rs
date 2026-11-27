@@ -739,6 +739,8 @@ mod tests {
             max_blob_count: 1 << 47,
             ..eip7840::BlobParams::osaka()
         };
+        assert_eq!(params.target_blob_gas_per_block(), u64::MAX);
+        assert_eq!(params.max_blob_gas_per_block(), u64::MAX);
         assert_eq!(params.next_block_excess_blob_gas_osaka(1, u64::MAX - 1, 17), 0);
         assert_eq!(params.next_block_excess_blob_gas_osaka(u64::MAX, 2, 0), 1);
     }

@@ -117,16 +117,16 @@ impl BlobParams {
 
     /// Returns the maximum available blob gas in a block.
     ///
-    /// This is `max blob count * DATA_GAS_PER_BLOB`
+    /// This is `max blob count * DATA_GAS_PER_BLOB`, saturating at [`u64::MAX`].
     pub const fn max_blob_gas_per_block(&self) -> u64 {
-        self.max_blob_count * DATA_GAS_PER_BLOB
+        self.max_blob_count.saturating_mul(DATA_GAS_PER_BLOB)
     }
 
     /// Returns the blob gas target per block.
     ///
-    /// This is `target blob count * DATA_GAS_PER_BLOB`
+    /// This is `target blob count * DATA_GAS_PER_BLOB`, saturating at [`u64::MAX`].
     pub const fn target_blob_gas_per_block(&self) -> u64 {
-        self.target_blob_count * DATA_GAS_PER_BLOB
+        self.target_blob_count.saturating_mul(DATA_GAS_PER_BLOB)
     }
 
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
