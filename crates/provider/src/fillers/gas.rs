@@ -597,4 +597,29 @@ mod tests {
             FillerControlFlow::Ready
         );
     }
+
+    #[tokio::test]
+    async fn blob_gas_estimate_is_floored() {
+        let sidecar =
+            SidecarBuilder::<SimpleCoder>::from_slice(b"Hello World").build_4844().unwrap();
+        let tx = TransactionRequest { sidecar: Some(sidecar.into()), ..Default::default() };
+        let fee_history = FeeHistory { base_fee_per_blob_gas: vec![0, 0], ..Default::default() };
+
+        for (estimator, expected) in [
+            (BlobGasEstimator::default(), BLOB_TX_MIN_BLOB_GASPRICE),
+            (BlobGasEstimator::new(|_, _| 0), BLOB_TX_MIN_BLOB_GASPRICE),
+            (BlobGasEstimator::new(|_, _| 42), 42),
+        ] {
+            let asserter = alloy_transport::mock::Asserter::new();
+            let provider = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .with_blob_gas_estimator(estimator)
+                .connect_mocked_client(asserter.clone());
+            // A second `eth_feeHistory` request fails, so `status` must accept the filled fee.
+            asserter.push_success(&fee_history);
+
+            let filled = provider.fill(tx.clone()).await.unwrap();
+            assert_eq!(filled.as_builder().unwrap().max_fee_per_blob_gas(), Some(expected));
+        }
+    }
 }
