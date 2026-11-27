@@ -1903,23 +1903,29 @@ impl<N: Network> Provider<N> for RootProvider<N> {
         &self,
         config: PendingTransactionConfig,
     ) -> Result<PendingTransaction, PendingTransactionError> {
-        let block_number =
+        let inclusion =
             if let Some(receipt) = self.get_transaction_receipt(*config.tx_hash()).await? {
                 // The transaction is already confirmed.
                 if config.required_confirmations() <= 1 {
                     return Ok(PendingTransaction::ready(*config.tx_hash()));
                 }
-                // Transaction has custom confirmations, so let the heart know about its block
-                // number and let it handle the situation.
-                receipt.block_number()
+                // Preserve block identity. This is only a scheduling hint until canonical
+                // inclusion is checked before delivering the confirmation result.
+                receipt.block_hash_num()
             } else {
                 None
             };
 
-        self.get_heart()
-            .watch_tx(config, block_number)
+        let pending = self
+            .get_heart()
+            .watch_tx(config.clone(), inclusion)
             .await
-            .map_err(|_| PendingTransactionError::FailedToRegister)
+            .map_err(|_| PendingTransactionError::FailedToRegister)?;
+        if config.required_confirmations() > 1 {
+            Ok(pending.with_confirmation_check(self.clone(), config))
+        } else {
+            Ok(pending)
+        }
     }
 }
 

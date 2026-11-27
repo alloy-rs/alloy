@@ -2,8 +2,10 @@
 
 use crate::{blocks::Paused, Provider, RootProvider};
 use alloy_consensus::BlockHeader;
+use alloy_eips::BlockNumHash;
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, Network};
+use alloy_network_primitives::{HeaderResponse, ReceiptResponse};
 use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
     TxHash, B256,
@@ -25,14 +27,19 @@ use tokio::{
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::{
     std::Instant,
-    tokio::{interval, sleep_until},
+    tokio::{interval, sleep, sleep_until},
 };
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use {
     std::time::Instant,
-    tokio::time::{interval, sleep_until},
+    tokio::time::{interval, sleep, sleep_until},
 };
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+type TimeoutInstant = wasmtimer::std::Instant;
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+type TimeoutInstant = tokio::time::Instant;
 
 #[cfg(test)]
 mod heartbeat_tests;
@@ -180,18 +187,20 @@ impl<N: Network> PendingTransactionBuilder<N> {
 
     /// Sets the timeout for the background confirmation watch.
     ///
-    /// The timeout starts when the background watcher processes the registration, after the
-    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
-    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
+    /// The timeout starts when the watch is registered, after the initial receipt lookup.
+    /// Receipt RPCs are outside this timeout, so it is not an overall deadline for `watch` or
+    /// `get_receipt`. Canonical confirmation checks are covered by the watch timeout.
+    /// `None` disables the watch timeout.
     pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.config.set_timeout(timeout);
     }
 
     /// Sets the timeout for the background confirmation watch.
     ///
-    /// The timeout starts when the background watcher processes the registration, after the
-    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
-    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
+    /// The timeout starts when the watch is registered, after the initial receipt lookup.
+    /// Receipt RPCs are outside this timeout, so it is not an overall deadline for `watch` or
+    /// `get_receipt`. Canonical confirmation checks are covered by the watch timeout.
+    /// `None` disables the watch timeout.
     pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.config.timeout = timeout;
         self
@@ -350,18 +359,20 @@ impl PendingTransactionConfig {
 
     /// Sets the timeout for the background confirmation watch.
     ///
-    /// The timeout starts when the background watcher processes the registration, after the
-    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
-    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
+    /// The timeout starts when the watch is registered, after the initial receipt lookup.
+    /// Receipt RPCs are outside this timeout, so it is not an overall deadline for `watch` or
+    /// `get_receipt`. Canonical confirmation checks are covered by the watch timeout.
+    /// `None` disables the watch timeout.
     pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.timeout = timeout;
     }
 
     /// Sets the timeout for the background confirmation watch.
     ///
-    /// The timeout starts when the background watcher processes the registration, after the
-    /// initial receipt lookup. Receipt RPCs are outside this timeout, so it is not an overall
-    /// deadline for `watch` or `get_receipt`. `None` disables the watch timeout.
+    /// The timeout starts when the watch is registered, after the initial receipt lookup.
+    /// Receipt RPCs are outside this timeout, so it is not an overall deadline for `watch` or
+    /// `get_receipt`. Canonical confirmation checks are covered by the watch timeout.
+    /// `None` disables the watch timeout.
     pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.timeout = timeout;
         self
@@ -396,18 +407,30 @@ struct TxWatcher {
     config: PendingTransactionConfig,
     /// The block at which the transaction was received. To be filled once known.
     /// Invariant: any confirmed transaction in `Heart` has this value set.
-    received_at_block: Option<u64>,
+    received_at_block: Option<BlockNumHash>,
     /// When the watcher times out. Set by the heartbeat if a timeout is configured.
     reap_at: Option<Instant>,
-    tx: oneshot::Sender<Result<(), WatchTxError>>,
+    /// Whether registration may use the lookbehind. Disabled after failed canonical validation.
+    check_past_blocks: bool,
+    tx: oneshot::Sender<Result<TxConfirmation, PendingTransactionError>>,
 }
 
 impl TxWatcher {
     /// Notify the waiter.
-    fn notify(self, result: Result<(), WatchTxError>) {
+    fn notify(self, result: Result<BlockNumHash, WatchTxError>) {
         debug!(tx=%self.config.tx_hash, "notifying");
+        let result = result
+            .map(|tip| TxConfirmation { inclusion: self.received_at_block.unwrap_or(tip), tip })
+            .map_err(PendingTransactionError::from);
         let _ = self.tx.send(result);
     }
+}
+
+/// Inclusion and the sampled block that supplied the required confirmations.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct TxConfirmation {
+    inclusion: BlockNumHash,
+    tip: BlockNumHash,
 }
 
 /// Represents a transaction that is yet to be confirmed a specified number of times.
@@ -422,7 +445,7 @@ pub struct PendingTransaction {
     pub(crate) tx_hash: TxHash,
     /// The receiver for the notification.
     // TODO: send a receipt?
-    pub(crate) rx: oneshot::Receiver<Result<(), WatchTxError>>,
+    pub(crate) rx: oneshot::Receiver<Result<TxConfirmation, PendingTransactionError>>,
 }
 
 impl fmt::Debug for PendingTransaction {
@@ -435,7 +458,85 @@ impl PendingTransaction {
     /// Creates a ready pending transaction.
     pub fn ready(tx_hash: TxHash) -> Self {
         let (tx, rx) = oneshot::channel();
-        tx.send(Ok(())).ok(); // Make sure that the receiver is notified already.
+        // Make sure that the receiver is notified already.
+        tx.send(Ok(TxConfirmation::default())).ok();
+        Self { tx_hash, rx }
+    }
+
+    /// Recheck the canonical chain before exposing a multi-confirmation result. Receipt seeds
+    /// are scheduling hints, and may belong to a fork the block stream has never observed.
+    pub(crate) fn with_confirmation_check<N: Network>(
+        self,
+        provider: RootProvider<N>,
+        config: PendingTransactionConfig,
+    ) -> Self {
+        let tx_hash = self.tx_hash;
+        let (mut tx, rx) = oneshot::channel();
+        // Start the timer before spawning, so scheduler delays cannot extend the deadline.
+        let timeout = config.timeout.map(sleep);
+        let deadline = timeout.as_ref().map(|timeout| timeout.deadline());
+        async move {
+            if deadline.is_some_and(|deadline| deadline <= TimeoutInstant::now()) {
+                let _ = tx.send(Err(WatchTxError::Timeout.into()));
+                return;
+            }
+            let validation = async {
+                let mut pending = self;
+                loop {
+                    let confirmation = pending.rx.await??;
+                    // Check the sampled tip first, then inclusion. Both must still be in the
+                    // canonical number-to-hash mapping, including transaction membership.
+                    let tip_is_canonical = provider
+                        .get_block_by_number(confirmation.tip.number.into())
+                        .await?
+                        .is_some_and(|block| block.header().num_hash() == confirmation.tip);
+                    if tip_is_canonical {
+                        let block = provider
+                            .get_block_by_number(confirmation.inclusion.number.into())
+                            .await?;
+                        if block.is_some_and(|block| {
+                            block.header().num_hash() == confirmation.inclusion
+                                && block.transactions().hashes().any(|hash| hash == tx_hash)
+                        }) {
+                            return Ok(confirmation);
+                        }
+                    }
+
+                    // Reconcile a reorged receipt, without matching the stale lookbehind or
+                    // renewing the original timeout. A fresh sample must advance the watch.
+                    let receipt = provider.get_transaction_receipt(tx_hash).await?;
+                    let inclusion = receipt.and_then(|receipt| receipt.block_hash_num());
+                    pending = provider
+                        .get_heart()
+                        .watch_tx_inner(config.clone(), inclusion, false)
+                        .await
+                        .map_err(|_| PendingTransactionError::FailedToRegister)?;
+                }
+            };
+            let timeout = async {
+                if let Some(timeout) = timeout {
+                    timeout.await;
+                } else {
+                    pending::<()>().await;
+                }
+            };
+            let result = select! {
+                biased;
+                _ = tx.closed() => return,
+                _ = timeout => Err(WatchTxError::Timeout.into()),
+                result = validation => result,
+            };
+            // Immediately-ready RPCs can finish before the timer driver has processed expiry.
+            let result = if result.is_ok()
+                && deadline.is_some_and(|deadline| deadline <= TimeoutInstant::now())
+            {
+                Err(WatchTxError::Timeout.into())
+            } else {
+                result
+            };
+            let _ = tx.send(result);
+        }
+        .spawn_task();
         Self { tx_hash, rx }
     }
 
@@ -472,11 +573,24 @@ impl HeartbeatHandle {
     pub(crate) async fn watch_tx(
         &self,
         config: PendingTransactionConfig,
-        received_at_block: Option<u64>,
+        received_at_block: Option<BlockNumHash>,
+    ) -> Result<PendingTransaction, PendingTransactionConfig> {
+        self.watch_tx_inner(config, received_at_block, true).await
+    }
+
+    async fn watch_tx_inner(
+        &self,
+        config: PendingTransactionConfig,
+        received_at_block: Option<BlockNumHash>,
+        check_past_blocks: bool,
     ) -> Result<PendingTransaction, PendingTransactionConfig> {
         let (tx, rx) = oneshot::channel();
         let tx_hash = config.tx_hash;
-        match self.tx.send(TxWatcher { config, received_at_block, reap_at: None, tx }).await {
+        match self
+            .tx
+            .send(TxWatcher { config, received_at_block, reap_at: None, check_past_blocks, tx })
+            .await
+        {
             Ok(()) => Ok(PendingTransaction { tx_hash, rx }),
             Err(e) => Err(e.0.config),
         }
@@ -488,8 +602,8 @@ pub(crate) struct Heartbeat<N, S> {
     /// The stream of incoming blocks to watch.
     stream: futures::stream::Fuse<S>,
 
-    /// Lookbehind blocks in form of mapping block number -> vector of transaction hashes.
-    past_blocks: VecDeque<(u64, B256HashSet)>,
+    /// Lookbehind block identities and their transaction hashes.
+    past_blocks: VecDeque<(BlockNumHash, B256HashSet)>,
 
     /// Transactions to watch for.
     unconfirmed: B256HashMap<Vec<TxWatcher>>,
@@ -526,7 +640,8 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         let to_keep = self.waiting_confs.split_off(&(current_height + 1));
         let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
         for watcher in to_notify.into_values().flatten() {
-            watcher.notify(Ok(()));
+            let tip = self.past_blocks.back().expect("confirmation requires a sampled block").0;
+            watcher.notify(Ok(tip));
         }
     }
 
@@ -577,9 +692,9 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             *waiters = std::mem::take(waiters).into_iter().filter_map(|mut watcher| {
                 if let Some(received_at_block) = watcher.received_at_block {
                     // All blocks after and _including_ the new height are reaped.
-                    if received_at_block >= new_height {
+                    if received_at_block.number >= new_height {
                         let hash = watcher.config.tx_hash;
-                        debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed after chain gap");
+                        debug!(tx=%hash, ?received_at_block, %new_height, "return to unconfirmed after chain gap");
                         watcher.received_at_block = None;
                         self.unconfirmed.entry(hash).or_default().push(watcher);
                         return None;
@@ -626,16 +741,30 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             to_watch.reap_at = Some(reap_at);
             self.reap_at.insert((reap_at, to_watch.config.tx_hash));
         }
+        if to_watch.check_past_blocks {
+            if let Some(inclusion) = to_watch.received_at_block {
+                if self.past_blocks.iter().any(|(block, txs)| {
+                    block.number == inclusion.number
+                        && (*block != inclusion || !txs.contains(&to_watch.config.tx_hash))
+                }) {
+                    to_watch.received_at_block = None;
+                }
+            }
+        }
         if let Some(received_at_block) = to_watch.received_at_block {
-            // Transaction is already confirmed, we just need to wait for the required
-            // confirmations.
+            // A receipt seeds the schedule, not proof of canonical inclusion. The public
+            // pending transaction validates block identity and membership before success.
             let confirmations = to_watch.config.required_confirmations;
-            let confirmed_at = received_at_block + confirmations - 1;
-            let current_height =
-                self.past_blocks.back().map(|(h, _)| *h).unwrap_or(received_at_block);
+            let confirmed_at =
+                received_at_block.number.saturating_add(confirmations.saturating_sub(1));
+            let tip = if to_watch.check_past_blocks {
+                self.past_blocks.back().map(|(block, _)| *block).unwrap_or(received_at_block)
+            } else {
+                received_at_block
+            };
 
-            if confirmed_at <= current_height {
-                to_watch.notify(Ok(()));
+            if confirmed_at <= tip.number {
+                to_watch.notify(Ok(tip));
             } else {
                 self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
             }
@@ -644,19 +773,21 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
         // Transaction may be confirmed already, check the lookbehind history first.
         // If so, insert it into the waiting list.
-        for (block_height, txs) in self.past_blocks.iter().rev() {
+        for (block, txs) in self.past_blocks.iter().rev().filter(|_| to_watch.check_past_blocks) {
+            let block_height = block.number;
             if txs.contains(&to_watch.config.tx_hash) {
                 let confirmations = to_watch.config.required_confirmations;
-                let confirmed_at = *block_height + confirmations - 1;
-                let current_height = self.past_blocks.back().map(|(h, _)| *h).unwrap();
+                let confirmed_at = block_height.saturating_add(confirmations.saturating_sub(1));
+                let tip = self.past_blocks.back().unwrap().0;
 
-                if confirmed_at <= current_height {
-                    to_watch.notify(Ok(()));
+                if confirmed_at <= tip.number {
+                    to_watch.received_at_block = Some(*block);
+                    to_watch.notify(Ok(tip));
                 } else {
                     debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
                     // Ensure reorg handling can move this watcher back if needed.
                     if to_watch.received_at_block.is_none() {
-                        to_watch.received_at_block = Some(*block_height);
+                        to_watch.received_at_block = Some(*block);
                     }
                     self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
                 }
@@ -670,14 +801,18 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     fn add_to_waiting_list(&mut self, watcher: TxWatcher, block_height: u64) {
         let confirmations = watcher.config.required_confirmations;
         debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-        self.waiting_confs.entry(block_height + confirmations - 1).or_default().push(watcher);
+        self.waiting_confs
+            .entry(block_height.saturating_add(confirmations.saturating_sub(1)))
+            .or_default()
+            .push(watcher);
     }
 
     /// Handle a new block by checking if any of the transactions we're
     /// watching are in it, and if so, notifying the watcher. Also updates
     /// the latest block.
     fn handle_new_block(&mut self, block: N::BlockResponse) {
-        let block_height = block.header().as_ref().number();
+        let block_id = block.header().num_hash();
+        let block_height = block_id.number;
         // The stream can still yield buffered blocks after we pause. Nothing is watched, and
         // recording them would refill the lookbehind that pausing cleared.
         if self.paused.is_paused() {
@@ -698,16 +833,25 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         }
         if let Some((last_height, _)) = self.past_blocks.back().as_ref() {
             // Check that the chain is continuous.
-            if *last_height + 1 != block_height {
+            if last_height.number + 1 != block_height
+                || last_height.hash != block.header().parent_hash()
+            {
                 // Move all the transactions that were reset by the reorg to the unconfirmed list.
                 // This can also happen if we unpaused the heartbeat after some time.
-                debug!(block_height, last_height, "reorg/unpause detected");
-                self.move_reorg_to_unconfirmed(block_height);
+                debug!(block_height, ?last_height, "reorg/unpause detected");
+                let reorg_height = if last_height.number + 1 == block_height {
+                    // An unconnected child does not reveal the fork point. Invalidate all
+                    // tracked inclusion rather than retaining an orphaned ancestor.
+                    0
+                } else {
+                    block_height
+                };
+                self.move_reorg_to_unconfirmed(reorg_height);
                 // Remove past blocks that are now invalid.
-                self.past_blocks.retain(|(h, _)| *h < block_height);
+                self.past_blocks.retain(|(block, _)| block.number < reorg_height);
             }
         }
-        self.past_blocks.push_back((block_height, block.transactions().hashes().collect()));
+        self.past_blocks.push_back((block_id, block.transactions().hashes().collect()));
 
         // Check if we are watching for any of the transactions in this block.
         let to_check: Vec<_> = block
@@ -720,13 +864,13 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // If `confirmations` is not more than 1 we can notify the watcher immediately.
             let confirmations = watcher.config.required_confirmations;
             if confirmations <= 1 {
-                watcher.notify(Ok(()));
+                watcher.notify(Ok(block_id));
                 continue;
             }
             // Otherwise add it to the waiting list.
 
             // Set the block at which the transaction was received.
-            watcher.received_at_block = Some(block_height);
+            watcher.received_at_block = Some(block_id);
             self.add_to_waiting_list(watcher, block_height);
         }
 
