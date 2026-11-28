@@ -102,12 +102,12 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
     let n = rewards.len();
 
     let median =
-        if n % 2 == 0 { (*rewards[n / 2 - 1] + *rewards[n / 2]) / 2 } else { *rewards[n / 2] };
+        if n % 2 == 0 { rewards[n / 2 - 1].midpoint(*rewards[n / 2]) } else { *rewards[n / 2] };
 
     std::cmp::max(median, EIP1559_MIN_PRIORITY_FEE)
 }
 
-/// The default EIP-1559 fee estimator.
+/// The default EIP-1559 fee estimator. The estimated maximum fee saturates at [`u128::MAX`].
 ///
 /// Based on the work by [MetaMask](https://github.com/MetaMask/core/blob/0fd4b397e7237f104d1c81579a0c4321624d076b/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56);
 /// constants for "medium" priority level are used.
@@ -116,10 +116,10 @@ pub fn eip1559_default_estimator(
     rewards: &[Vec<u128>],
 ) -> Eip1559Estimation {
     let max_priority_fee_per_gas = estimate_priority_fee(rewards);
-    let potential_max_fee = base_fee_per_gas * EIP1559_BASE_FEE_MULTIPLIER;
+    let potential_max_fee = base_fee_per_gas.saturating_mul(EIP1559_BASE_FEE_MULTIPLIER);
 
     Eip1559Estimation {
-        max_fee_per_gas: potential_max_fee + max_priority_fee_per_gas,
+        max_fee_per_gas: potential_max_fee.saturating_add(max_priority_fee_per_gas),
         max_priority_fee_per_gas,
     }
 }
