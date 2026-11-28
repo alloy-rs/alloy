@@ -215,12 +215,13 @@ pub struct DepositData {
 /// A deposit.
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#deposit>
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Deposit {
     /// Branch in the deposit tree (proof).
     ///
-    /// The spec defines this as a fixed vector of [`Deposit::PROOF_LEN`] roots; SSZ encoding
-    /// pads a shorter proof with zero roots and truncates a longer one.
+    /// The spec defines this as a fixed vector of [`Deposit::PROOF_LEN`] roots. JSON
+    /// deserialization rejects any other length. SSZ encoding still pads a shorter in-memory
+    /// proof with zero roots and truncates a longer one so the wire layout stays fixed.
     pub proof: Vec<B256>,
     /// The deposit data.
     pub data: DepositData,
@@ -229,6 +230,27 @@ pub struct Deposit {
 impl Deposit {
     /// Number of roots in a deposit proof (`DEPOSIT_CONTRACT_TREE_DEPTH + 1`).
     pub const PROOF_LEN: usize = 33;
+}
+
+impl<'de> Deserialize<'de> for Deposit {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Helper {
+            proof: Vec<B256>,
+            data: DepositData,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        if helper.proof.len() != Self::PROOF_LEN {
+            return Err(serde::de::Error::custom(format!(
+                "Invalid Deposit: expected proof length {}, got {}",
+                Self::PROOF_LEN,
+                helper.proof.len()
+            )));
+        }
+
+        Ok(Self { proof: helper.proof, data: helper.data })
+    }
 }
 
 /// A voluntary exit message.
@@ -835,6 +857,32 @@ mod tests {
         }"#;
         let change: SignedBlsToExecutionChange = serde_json::from_str(s).unwrap();
         assert_eq!(change.message.validator_index, 1);
+    }
+
+    #[test]
+    fn serde_deposit_rejects_wrong_proof_length() {
+        let mut short = Deposit {
+            proof: (0..Deposit::PROOF_LEN).map(|i| B256::repeat_byte(i as u8)).collect(),
+            data: DepositData {
+                pubkey: crate::BlsPublicKey::ZERO,
+                withdrawal_credentials: B256::ZERO,
+                amount: 0,
+                signature: crate::BlsSignature::ZERO,
+            },
+        };
+        let ok = serde_json::to_value(&short).unwrap();
+        assert!(serde_json::from_value::<Deposit>(ok).is_ok());
+
+        short.proof.pop();
+        let short_json = serde_json::to_value(&short).unwrap();
+        let err = serde_json::from_value::<Deposit>(short_json).unwrap_err();
+        assert!(err.to_string().contains("expected proof length"));
+
+        let mut long = short;
+        long.proof = (0..Deposit::PROOF_LEN + 1).map(|i| B256::repeat_byte(i as u8)).collect();
+        let long_json = serde_json::to_value(&long).unwrap();
+        let err = serde_json::from_value::<Deposit>(long_json).unwrap_err();
+        assert!(err.to_string().contains("expected proof length"));
     }
 
     #[test]
