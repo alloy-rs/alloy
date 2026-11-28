@@ -42,6 +42,10 @@ tokio-tungstenite = { workspace = true }
 [target.'cfg(target_family = "wasm")'.dependencies]
 ws_stream_wasm = "0.7.4"
 
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+alloy-json-rpc.workspace = true
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "time"] }
+
 [features]
 default = ["aws-lc-rs"]
 aws-lc-rs = ["rustls-tls", "rustls?/aws-lc-rs"]
