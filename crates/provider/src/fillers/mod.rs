@@ -214,6 +214,10 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     /// Performs any synchronous filling. This should be called before
     /// [`TxFiller::prepare`] and [`TxFiller::fill`] to fill in any properties
     /// that can be filled synchronously.
+    ///
+    /// [`TxFiller::prepare_and_fill`] calls it again between `prepare` and `fill`, so values
+    /// cached by `prepare` are applied before any filler signs the request. Implementations must
+    /// be idempotent.
     fn fill_sync(&self, tx: &mut SendableTx<N>);
 
     /// Prepares fillable properties, potentially by making an RPC request.
@@ -248,7 +252,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     fn prepare_and_fill<P>(
         &self,
         provider: &P,
-        tx: SendableTx<N>,
+        mut tx: SendableTx<N>,
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>)
     where
         P: Provider<N>,
@@ -260,6 +264,10 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
 
             let fillable =
                 self.prepare(provider, tx.as_builder().expect("checked by is_envelope")).await?;
+
+            // Apply values cached by `prepare`, such as a fetched chain ID, before a signer
+            // consumes the request.
+            self.fill_sync(&mut tx);
 
             self.fill(fillable, tx).await
         }
@@ -1182,6 +1190,37 @@ mod tests {
             alloy_consensus::transaction::SignerRecoverable::recover_signer(&envelope).unwrap(),
             from
         );
+    }
+
+    #[tokio::test]
+    async fn fetched_chain_id_is_applied_before_wallet_signs() {
+        let legacy = TransactionRequest {
+            to: Some(Address::ZERO.into()),
+            nonce: Some(0),
+            gas: Some(21_000),
+            gas_price: Some(1),
+            ..Default::default()
+        };
+        let eip1559 = TransactionRequest {
+            gas_price: None,
+            max_fee_per_gas: Some(2),
+            max_priority_fee_per_gas: Some(1),
+            ..legacy.clone()
+        };
+
+        for tx in [legacy, eip1559] {
+            let asserter = alloy_transport::mock::Asserter::new();
+            asserter.push_success(&U64::from(1337));
+            // The wallet is joined before a chain ID filler whose cache is still empty.
+            let provider = crate::ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .wallet(alloy_signer_local::PrivateKeySigner::random())
+                .fetch_chain_id()
+                .connect_mocked_client(asserter);
+
+            let envelope = provider.fill_and_sign_transaction(tx).await.unwrap();
+            assert_eq!(alloy_consensus::Transaction::chain_id(&envelope), Some(1337));
+        }
     }
 
     #[tokio::test]
