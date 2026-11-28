@@ -115,6 +115,7 @@ dependencies = [
  "c-kzg",
  "derive_more",
  "either",
+ "ephyra",
  "k256 0.13.4",
  "once_cell",
  "rand 0.8.8",
@@ -3376,6 +3377,30 @@ checksum = "d73999a2b8871e74c8b8bc23759ee9f3d85011b24fafc91a4b3b5c8cc8185501"
 dependencies = [
  "fsio",
  "indexmap 1.9.3",
+]
+
+[[package]]
+name = "ephyra"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd1a1caa1aec3df700ce0d4d791f725cbea8db09c6df739f1768c84bf3f44d67"
+dependencies = [
+ "ephyra-macros",
+ "rand_chacha 0.9.0",
+ "rand_core 0.9.5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ephyra-macros"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f9ccd9870afa5da6d9450ec5d7a1f5815cc4ef27c06b12cb8e0726796d5c9f9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
 ]
 
 [[package]]
