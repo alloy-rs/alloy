@@ -1179,7 +1179,6 @@ dependencies = [
 name = "alloy-tx-macros"
 version = "2.6.1"
 dependencies = [
- "darling 0.24.1",
  "proc-macro2",
  "quote",
  "syn 3.0.10",
@@ -2937,7 +2936,6 @@ dependencies = [
  "ident_case",
  "proc-macro2",
  "quote",
- "serde",
  "strsim",
  "syn 3.0.10",
 ]

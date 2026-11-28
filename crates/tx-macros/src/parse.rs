@@ -1,75 +1,210 @@
-use darling::{FromDeriveInput, FromMeta, FromVariant};
-use proc_macro2::TokenStream;
+use proc_macro2::{Group, TokenStream};
 use quote::quote;
-use syn::{Ident, Path, Type};
+use syn::{
+    meta::ParseNestedMeta, parse::Parse, Attribute, Data, DeriveInput, Error, Fields, Generics,
+    Ident, LitInt, LitStr, Meta, Path, Result, Type,
+};
 
-/// Container-level arguments for the TransactionEnvelope derive macro.
-#[derive(Debug, FromDeriveInput)]
-#[darling(attributes(envelope))]
+/// Parsed input of the TransactionEnvelope derive macro.
 pub(crate) struct EnvelopeArgs {
     /// The identifier of the input enum.
     pub ident: Ident,
 
     /// The generics of the input enum.
-    pub generics: syn::Generics,
+    pub generics: Generics,
 
     /// Custom name for the generated transaction type enum.
     /// Defaults to `{EnumName}Type`.
-    #[darling(default)]
     pub tx_type_name: Option<Ident>,
 
     /// Custom path to the alloy_consensus crate.
     /// Defaults to `::alloy_consensus`.
-    #[darling(default)]
     pub alloy_consensus: Option<Path>,
 
     /// Custom `cfg_attr` value for serde implementations.
-    #[darling(default)]
-    pub serde_cfg: Option<syn::Meta>,
+    pub serde_cfg: Option<TokenStream>,
 
     /// Custom `cfg_attr` value for arbitrary implementations.
-    #[darling(default)]
-    pub arbitrary_cfg: Option<syn::Meta>,
+    pub arbitrary_cfg: Option<TokenStream>,
 
     /// Optional typed transaction enum name to generate.
     /// When specified, generates a corresponding TypedTransaction enum.
-    #[darling(default)]
     pub typed: Option<Ident>,
 
-    /// The enum data (variants).
-    pub data: darling::ast::Data<EnvelopeVariant, ()>,
+    /// The enum variants.
+    pub variants: Vec<ProcessedVariant>,
 }
 
-/// Variant of transaction envelope enum.
-#[derive(Debug, FromVariant)]
-#[darling(attributes(envelope), forward_attrs(serde, doc))]
-pub(crate) struct EnvelopeVariant {
-    /// The identifier of the variant.
-    pub ident: Ident,
+impl EnvelopeArgs {
+    /// Parses the derive input and its `#[envelope(...)]` attributes.
+    pub(crate) fn from_derive_input(input: DeriveInput) -> Result<Self> {
+        let Data::Enum(data) = input.data else {
+            return Err(Error::new_spanned(
+                &input.ident,
+                "`TransactionEnvelope` can only be derived for enums",
+            ));
+        };
 
-    /// The fields of the variant.
-    pub fields: darling::ast::Fields<syn::Type>,
+        let mut args = Self {
+            ident: input.ident,
+            generics: input.generics,
+            tx_type_name: None,
+            alloy_consensus: None,
+            serde_cfg: None,
+            arbitrary_cfg: None,
+            typed: None,
+            variants: Vec::new(),
+        };
 
-    /// Kind of the variant.
-    #[darling(flatten)]
-    pub kind: VariantKind,
+        for attr in envelope_attrs(&input.attrs) {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("tx_type_name") {
+                    set(&mut args.tx_type_name, &meta, parse_ident(&meta)?)
+                } else if meta.path.is_ident("alloy_consensus") {
+                    set(&mut args.alloy_consensus, &meta, parse_value(&meta)?)
+                } else if meta.path.is_ident("typed") {
+                    set(&mut args.typed, &meta, parse_ident(&meta)?)
+                } else if meta.path.is_ident("serde_cfg") {
+                    set(&mut args.serde_cfg, &meta, parse_list(&meta)?)
+                } else if meta.path.is_ident("arbitrary_cfg") {
+                    set(&mut args.arbitrary_cfg, &meta, parse_list(&meta)?)
+                } else {
+                    Err(meta.error("unknown `envelope` attribute"))
+                }
+            })?;
+        }
 
-    /// Optional custom typed transaction type for this variant.
-    #[darling(default)]
-    pub typed: Option<Ident>,
+        for variant in data.variants {
+            let mut kind = None;
+            let mut typed = None;
+            for attr in envelope_attrs(&variant.attrs) {
+                attr.parse_nested_meta(|meta| {
+                    let new_kind = if meta.path.is_ident("ty") {
+                        VariantKind::Typed(parse_ty(&meta)?)
+                    } else if meta.path.is_ident("flatten") {
+                        VariantKind::Flattened
+                    } else if meta.path.is_ident("typed") {
+                        return set(&mut typed, &meta, parse_ident(&meta)?);
+                    } else {
+                        return Err(meta.error("unknown `envelope` attribute"));
+                    };
+                    if kind.replace(new_kind).is_some() {
+                        return Err(meta.error("expected only one of `ty` or `flatten`"));
+                    }
+                    Ok(())
+                })?;
+            }
+            let Some(kind) = kind else {
+                return Err(Error::new_spanned(
+                    &variant.ident,
+                    "expected `#[envelope(ty = N)]` or `#[envelope(flatten)]`",
+                ));
+            };
 
-    /// Forwarded attributes.
-    pub attrs: Vec<syn::Attribute>,
+            let mut serde_attrs = None;
+            let mut doc_attrs = Vec::new();
+            for attr in variant.attrs {
+                if attr.path().is_ident("serde") {
+                    if let Meta::List(list) = attr.meta {
+                        serde_attrs = Some(list.tokens);
+                    }
+                } else if attr.path().is_ident("doc") {
+                    doc_attrs.push(attr);
+                }
+            }
+
+            // Check that variant has exactly one unnamed field
+            let ty = match variant.fields {
+                Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
+                    fields.unnamed.into_iter().next().unwrap().ty
+                }
+                Fields::Unnamed(fields) => {
+                    return Err(Error::new_spanned(
+                        &variant.ident,
+                        format!("expected exactly one field, found {}", fields.unnamed.len()),
+                    ))
+                }
+                _ => {
+                    return Err(Error::new_spanned(
+                        &variant.ident,
+                        "TransactionEnvelope variants must have a single unnamed field",
+                    ))
+                }
+            };
+
+            args.variants.push(ProcessedVariant {
+                name: variant.ident,
+                ty,
+                kind,
+                serde_attrs,
+                doc_attrs,
+                typed,
+            });
+        }
+
+        Ok(args)
+    }
+}
+
+/// Returns the `#[envelope(...)]` attributes, skipping empty `#[envelope]` ones.
+fn envelope_attrs(attrs: &[Attribute]) -> impl Iterator<Item = &Attribute> {
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("envelope") && !matches!(attr.meta, Meta::Path(_)))
+}
+
+/// Stores an attribute value, rejecting a key that was already set.
+fn set<T>(slot: &mut Option<T>, meta: &ParseNestedMeta<'_>, value: T) -> Result<()> {
+    if slot.replace(value).is_some() {
+        return Err(meta.error("duplicate `envelope` attribute"));
+    }
+    Ok(())
+}
+
+/// Parses `key = value`, also accepting the value as a string literal (`key = "value"`).
+fn parse_value<T: Parse>(meta: &ParseNestedMeta<'_>) -> Result<T> {
+    let input = meta.value()?;
+    if input.peek(LitStr) {
+        input.parse::<LitStr>()?.parse()
+    } else {
+        input.parse()
+    }
+}
+
+/// Parses `key = ident`, also accepting `key = "ident"`. Like darling, a bare value is read as a
+/// single-segment path, so path keywords such as `Self` are accepted but `true` is not.
+fn parse_ident(meta: &ParseNestedMeta<'_>) -> Result<Ident> {
+    let input = meta.value()?;
+    if input.peek(LitStr) {
+        input.parse::<LitStr>()?.parse()
+    } else {
+        let path = input.parse::<Path>()?;
+        path.get_ident().cloned().ok_or_else(|| Error::new_spanned(path, "expected identifier"))
+    }
+}
+
+/// Parses `ty = N`, also accepting `ty = "N"`, which is parsed with `str::parse` like darling did.
+fn parse_ty(meta: &ParseNestedMeta<'_>) -> Result<u8> {
+    let input = meta.value()?;
+    if input.peek(LitStr) {
+        let lit = input.parse::<LitStr>()?;
+        lit.value().parse().map_err(|e| Error::new(lit.span(), e))
+    } else {
+        input.parse::<LitInt>()?.base10_parse()
+    }
+}
+
+/// Parses the contents of `key(...)`, `key[...]` or `key{...}`.
+fn parse_list(meta: &ParseNestedMeta<'_>) -> Result<TokenStream> {
+    Ok(meta.input.parse::<Group>()?.stream())
 }
 
 /// Kind of the envelope variant.
-#[derive(Debug, Clone, FromMeta)]
+#[derive(Clone, Debug)]
 pub(crate) enum VariantKind {
     /// A standalone transaction with a type tag.
-    #[darling(rename = "ty")]
     Typed(u8),
     /// Flattened envelope.
-    #[darling(word, rename = "flatten")]
     Flattened,
 }
 
@@ -96,7 +231,7 @@ impl VariantKind {
 }
 
 /// Processed variant information.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct ProcessedVariant {
     /// The variant name.
     pub name: Ident,
@@ -156,63 +291,7 @@ pub(crate) struct GroupedVariants {
 
 impl GroupedVariants {
     /// Create grouped variants from a list of processed variants.
-    pub(crate) fn from_args(args: EnvelopeArgs) -> darling::Result<Self> {
-        // Validate it's an enum
-        let variants = match args.data {
-            darling::ast::Data::Enum(variants) => variants,
-            _ => {
-                return Err(darling::Error::custom(
-                    "`TransactionEnvelope` can only be derived for enums",
-                )
-                .with_span(&args.ident));
-            }
-        };
-
-        let mut processed = Vec::new();
-        for variant in variants {
-            let EnvelopeVariant { ident, fields, kind, attrs, typed } = variant;
-
-            let mut serde_attrs = None;
-            let mut doc_attrs = Vec::new();
-
-            for attr in attrs {
-                if attr.path().is_ident("serde") {
-                    if let syn::Meta::List(list) = attr.meta {
-                        serde_attrs = Some(list.tokens);
-                    }
-                } else if attr.path().is_ident("doc") {
-                    doc_attrs.push(attr);
-                }
-            }
-
-            // Check that variant has exactly one unnamed field
-            let ty = match &fields.style {
-                darling::ast::Style::Tuple if fields.len() == 1 => fields.fields[0].clone(),
-                darling::ast::Style::Tuple => {
-                    return Err(darling::Error::custom(format!(
-                        "expected exactly one field, found {}",
-                        fields.len()
-                    ))
-                    .with_span(&ident))
-                }
-                _ => {
-                    return Err(darling::Error::custom(
-                        "TransactionEnvelope variants must have a single unnamed field",
-                    )
-                    .with_span(&ident))
-                }
-            };
-
-            processed.push(ProcessedVariant {
-                name: ident,
-                ty,
-                kind,
-                serde_attrs,
-                doc_attrs,
-                typed,
-            });
-        }
-
+    pub(crate) fn new(processed: Vec<ProcessedVariant>) -> Self {
         let typed =
             processed.iter().filter(|v| matches!(v.kind, VariantKind::Typed(_))).cloned().collect();
 
@@ -222,7 +301,7 @@ impl GroupedVariants {
             .cloned()
             .collect();
 
-        Ok(Self { all: processed, typed, flattened })
+        Self { all: processed, typed, flattened }
     }
 
     /// Find the legacy variant if it exists.
@@ -259,5 +338,144 @@ mod tests {
             VariantKind::Typed(10).serde_tag_and_aliases(),
             ("0xa".to_string(), vec!["0x0a".to_string(), "0xA".to_string()])
         );
+    }
+
+    fn parse(input: DeriveInput) -> Result<EnvelopeArgs> {
+        EnvelopeArgs::from_derive_input(input)
+    }
+
+    #[test]
+    fn accepts_darling_compatible_attributes() {
+        let args = parse(syn::parse_quote! {
+            #[envelope]
+            #[envelope(alloy_consensus = "crate", tx_type_name = "MyTxType")]
+            #[envelope(serde_cfg[feature = "serde"], arbitrary_cfg { feature = "arbitrary" })]
+            enum E {
+                #[envelope(ty = "+10", typed = Self)]
+                A(Signed<TxA>),
+                #[envelope(flatten)]
+                B(Inner),
+                #[envelope(ty = 0x7e, typed = "Custom")]
+                C(Signed<TxC>),
+            }
+        })
+        .unwrap();
+
+        let alloy_consensus = args.alloy_consensus.unwrap();
+        assert_eq!(quote!(#alloy_consensus).to_string(), "crate");
+        assert_eq!(args.tx_type_name.unwrap(), "MyTxType");
+        assert_eq!(args.serde_cfg.unwrap().to_string(), "feature = \"serde\"");
+        assert_eq!(args.arbitrary_cfg.unwrap().to_string(), "feature = \"arbitrary\"");
+        assert!(matches!(args.variants[0].kind, VariantKind::Typed(10)));
+        assert_eq!(args.variants[0].typed.as_ref().unwrap(), "Self");
+        assert!(matches!(args.variants[1].kind, VariantKind::Flattened));
+        assert!(matches!(args.variants[2].kind, VariantKind::Typed(0x7e)));
+        assert_eq!(args.variants[2].typed.as_ref().unwrap(), "Custom");
+    }
+
+    #[test]
+    fn rejects_invalid_attributes() {
+        for (input, msg) in [
+            (
+                syn::parse_quote!(
+                    struct S;
+                ),
+                "can only be derived for enums",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        A(u8),
+                    }
+                ),
+                "expected `#[envelope(ty = N)]`",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1, flatten)]
+                        A(u8),
+                    }
+                ),
+                "only one of",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 256)]
+                        A(u8),
+                    }
+                ),
+                "number too large",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = "0x7e")]
+                        A(u8),
+                    }
+                ),
+                "invalid digit",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(foo)]
+                        A(u8),
+                    }
+                ),
+                "unknown `envelope` attribute",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1, typed = false)]
+                        A(u8),
+                    }
+                ),
+                "expected",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1, typed = a::B)]
+                        A(u8),
+                    }
+                ),
+                "expected identifier",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1, typed = A, typed = B)]
+                        A(u8),
+                    }
+                ),
+                "duplicate",
+            ),
+            (
+                syn::parse_quote!(
+                    #[envelope(tx_type_name = A)]
+                    #[envelope(tx_type_name = B)]
+                    enum E {
+                        #[envelope(ty = 1)]
+                        A(u8),
+                    }
+                ),
+                "duplicate",
+            ),
+            (
+                syn::parse_quote!(
+                    enum E {
+                        #[envelope(ty = 1)]
+                        A(u8, u8),
+                    }
+                ),
+                "expected exactly one field, found 2",
+            ),
+        ] {
+            let err = parse(input).err().unwrap().to_string();
+            assert!(err.contains(msg), "{err:?} does not contain {msg:?}");
+        }
     }
 }
