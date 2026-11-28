@@ -486,4 +486,15 @@ mod tests {
             vec![(0, expected.clone()), (2, expected)]
         );
     }
+
+    #[test]
+    fn try_from_sidecar_rejects_counts_that_do_not_match() {
+        let (mut full, _) = fixture();
+        full.cell_proofs.pop();
+        assert!(matches!(
+            BlobTransactionCellSidecar::try_from_sidecar(&full, settings()),
+            Err(c_kzg::Error::MismatchLength(message))
+                if message == "2 blobs, 2 commitments and 255 cell proofs"
+        ));
+    }
 }
