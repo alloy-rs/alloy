@@ -58,12 +58,12 @@ auto_impl.workspace = true
 thiserror.workspace = true
 either.workspace = true
 once_cell = { workspace = true, features = ["race", "alloc"] }
-secp256k1 = { workspace = true, optional = true, features = ["recovery", "global-context", "std"] }
+secp256k1 = { workspace = true, optional = true, features = ["recovery", "std"] }
 
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary", "kzg", "serde"] }
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
-secp256k1 = { workspace = true, features = ["recovery", "global-context", "std", "rand"] }
+secp256k1 = { workspace = true, features = ["recovery", "std", "rand"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 bincode = { workspace = true, features = ["serde"] }
@@ -108,7 +108,8 @@ arbitrary = [
 	"alloy-serde?/arbitrary",
 	"alloy-trie/arbitrary",
 	"c-kzg?/arbitrary",
-	"alloy-tx-macros/arbitrary"
+	"alloy-tx-macros/arbitrary",
+	"secp256k1?/arbitrary"
 ]
 serde = [
 	"dep:serde",

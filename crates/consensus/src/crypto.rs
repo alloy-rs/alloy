@@ -296,7 +296,7 @@ mod impl_secp256k1 {
     pub(crate) use ::secp256k1::Error;
     use ::secp256k1::{
         ecdsa::{RecoverableSignature, RecoveryId, Signature as SecpSignature},
-        Message, PublicKey, SecretKey, SECP256K1,
+        Message, PublicKey, SecretKey,
     };
     use alloy_primitives::{keccak256, Address, Signature, B256, U256};
 
@@ -313,7 +313,7 @@ mod impl_secp256k1 {
         let sig =
             RecoverableSignature::from_compact(&sig[0..64], RecoveryId::try_from(sig[64] as i32)?)?;
 
-        let public = SECP256K1.recover_ecdsa(&Message::from_digest(*msg), &sig)?;
+        let public = sig.recover(Message::from_digest(*msg))?;
         Ok(public_key_to_address(public))
     }
 
@@ -327,7 +327,7 @@ mod impl_secp256k1 {
         let signature = SecpSignature::from_compact(&sig[0..64])?;
         let message = Message::from_digest(*msg);
 
-        SECP256K1.verify_ecdsa(&message, &signature, &public_key)?;
+        signature.verify(message, &public_key)?;
 
         Ok(public_key_to_address(public_key))
     }
@@ -335,14 +335,14 @@ mod impl_secp256k1 {
     /// Signs message with the given secret key.
     /// Returns the corresponding signature.
     pub fn sign_message(secret: B256, message: B256) -> Result<Signature, Error> {
-        let sec = SecretKey::from_slice(secret.as_ref())?;
-        let s = SECP256K1.sign_ecdsa_recoverable(&Message::from_digest(message.0), &sec);
+        let sec = SecretKey::from_secret_bytes(secret.0)?;
+        let s = RecoverableSignature::sign_ecdsa_recoverable(Message::from_digest(message.0), &sec);
         let (rec_id, data) = s.serialize_compact();
 
         let signature = Signature::new(
             U256::try_from_be_slice(&data[..32]).expect("The slice has at most 32 bytes"),
             U256::try_from_be_slice(&data[32..64]).expect("The slice has at most 32 bytes"),
-            i32::from(rec_id) != 0,
+            rec_id.to_u8() != 0,
         );
         Ok(signature)
     }
@@ -435,13 +435,13 @@ mod tests {
         use super::impl_secp256k1::*;
         use alloy_primitives::B256;
 
-        let (secret, public) = secp256k1::generate_keypair(&mut rand::thread_rng());
+        let (secret, public) = secp256k1::generate_keypair(&mut secp256k1::rand::rng());
         let signer = public_key_to_address(public);
 
         let message = b"hello world";
         let hash = alloy_primitives::keccak256(message);
-        let signature =
-            sign_message(B256::from_slice(&secret.secret_bytes()[..]), hash).expect("sign message");
+        let signature = sign_message(B256::from_slice(&secret.to_secret_bytes()[..]), hash)
+            .expect("sign message");
 
         let mut sig: [u8; 65] = [0; 65];
         sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
@@ -481,8 +481,8 @@ mod tests {
         use alloy_primitives::B256;
 
         let (secp256k1_secret, secp256k1_public) =
-            secp256k1::generate_keypair(&mut rand::thread_rng());
-        let k256_secret = k256::ecdsa::SigningKey::from_slice(&secp256k1_secret.secret_bytes())
+            secp256k1::generate_keypair(&mut secp256k1::rand::rng());
+        let k256_secret = k256::ecdsa::SigningKey::from_slice(&secp256k1_secret.to_secret_bytes())
             .expect("k256 secret");
         let k256_public = *k256_secret.verifying_key();
 
@@ -494,7 +494,7 @@ mod tests {
         let hash = alloy_primitives::keccak256(message);
 
         let secp256k1_signature = impl_secp256k1::sign_message(
-            B256::from_slice(&secp256k1_secret.secret_bytes()[..]),
+            B256::from_slice(&secp256k1_secret.to_secret_bytes()[..]),
             hash,
         )
         .expect("secp256k1 sign");
