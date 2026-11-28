@@ -74,10 +74,9 @@ impl From<SecretKey> for Secp256k1Credential {
 
 impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
     fn sign_prehash(&self, prehash: &[u8]) -> Result<(K256Signature, RecoveryId), SignatureError> {
-        let msg =
-            Message::from_digest_slice(prehash).map_err(|_| SignatureError::from_source(""))?;
+        let digest = prehash.try_into().map_err(|_| SignatureError::from_source(""))?;
 
-        let sig = SECP256K1.sign_ecdsa_recoverable(&msg, &self.0);
+        let sig = SECP256K1.sign_ecdsa_recoverable(Message::from_digest(digest), &self.0);
         let (rec_id, data) = sig.serialize_compact();
 
         // Convert secp256k1 signature to k256 signature
@@ -127,7 +126,8 @@ impl LocalSigner<Secp256k1Credential> {
     /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a byte slice.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, secp256k1::Error> {
-        SecretKey::from_slice(bytes).map(Self::from_secp256k1)
+        let bytes = bytes.try_into().map_err(|_| secp256k1::Error::InvalidSecretKey)?;
+        SecretKey::from_byte_array(bytes).map(Self::from_secp256k1)
     }
 
     /// Creates a new random keypair seeded with [`rand::thread_rng()`].
@@ -139,8 +139,13 @@ impl LocalSigner<Secp256k1Credential> {
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        let (secret_key, _) = SECP256K1.generate_keypair(rng);
-        Self::from_secp256k1(secret_key)
+        loop {
+            let mut bytes = [0u8; 32];
+            rng.fill(&mut bytes);
+            if let Ok(secret_key) = SecretKey::from_byte_array(bytes) {
+                return Self::from_secp256k1(secret_key);
+            }
+        }
     }
 
     /// Serializes this [`LocalSigner`]'s [`SecretKey`] as a [`B256`] byte array.
