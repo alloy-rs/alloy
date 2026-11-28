@@ -45,7 +45,8 @@ pub struct Eip1559Estimation {
 }
 
 impl Eip1559Estimation {
-    /// Scales the [`Eip1559Estimation`] by the given percentage value.
+    /// Increases both fees by the given percentage, rounding down to whole wei and saturating
+    /// at [`u128::MAX`].
     ///
     /// ```
     /// use alloy_eips::eip1559::Eip1559Estimation;
@@ -55,8 +56,13 @@ impl Eip1559Estimation {
     /// assert_eq!(est.max_priority_fee_per_gas, 110);
     /// ```
     pub const fn scale_by_pct(&mut self, pct: u64) {
-        self.max_fee_per_gas = self.max_fee_per_gas * (100 + pct as u128) / 100;
-        self.max_priority_fee_per_gas = self.max_priority_fee_per_gas * (100 + pct as u128) / 100;
+        const fn scale(fee: u128, pct: u64) -> u128 {
+            let factor = 100 + pct as u128;
+            // Split before multiplying so a representable quotient is always exact.
+            (fee / 100).saturating_mul(factor).saturating_add((fee % 100) * factor / 100)
+        }
+        self.max_fee_per_gas = scale(self.max_fee_per_gas, pct);
+        self.max_priority_fee_per_gas = scale(self.max_priority_fee_per_gas, pct);
     }
 
     /// Consumes the type and returns the scaled estimation.
