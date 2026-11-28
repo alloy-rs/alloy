@@ -29,6 +29,11 @@ mod envelope;
 pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;
 pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
 
+#[cfg(feature = "serde")]
+mod tagged_entries;
+#[cfg(feature = "serde")]
+pub use tagged_entries::TaggedEntries;
+
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
 pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
@@ -370,7 +375,7 @@ impl<T: TxHashRef + Clone> TxHashRef for Cow<'_, T> {
 
 #[cfg(all(test, feature = "serde"))]
 mod tests {
-    use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
+    use crate::{Signed, TransactionEnvelope, TxEip1559, TxEip2930, TxEnvelope, TxType};
     use alloy_primitives::Signature;
     use serde::{Serialize, Serializer};
 
@@ -393,6 +398,126 @@ mod tests {
         assert_eq!(serde_json::to_string(&Wrapper::Ethereum(tx.clone())).unwrap(), json);
         let Wrapper::Ethereum(decoded) = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, tx);
+
+        // An envelope with flattened variants always buffers its input.
+        let fields = json.strip_prefix(r#"{"type":"0x2","#).unwrap().strip_suffix('}').unwrap();
+        let Wrapper::Ethereum(decoded) =
+            serde_json::from_str(&format!(r#"{{{fields},"type":"0x2"}}"#)).unwrap();
+        assert_eq!(decoded, tx);
+
+        let decode_error = |json: &str| {
+            let err = serde_json::from_str::<Wrapper>(json).unwrap_err().to_string();
+            err.split(" at line ").next().unwrap().to_string()
+        };
+        // `2` is the position of the EIP-1559 variant of the flattened envelope.
+        assert_eq!(
+            decode_error(&format!(r#"{{"type":2,{fields}}}"#)),
+            "invalid type: integer `2`, expected variant identifier"
+        );
+        // The error is the one of the wrapper's own tagged variants, of which there are none.
+        assert_eq!(
+            decode_error(&format!(r#"{{"type":"0x2",{fields},"type":"0x2"}}"#)),
+            "unknown variant `0x2`, there are no variants"
+        );
+    }
+
+    #[test]
+    fn test_envelope_item_names() {
+        // Names the generated serde code could use for its own items.
+        type Tag = Signed<TxEip1559>;
+
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = TypedNamesTxType)]
+        enum TypedNames {
+            #[envelope(ty = 10)]
+            Tag(Tag),
+        }
+
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = FlattenedNamesTxType)]
+        enum FlattenedNames {
+            #[envelope(flatten)]
+            Failed(TxEnvelope),
+        }
+
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = GenericNamesTxType)]
+        enum GenericNames<M, A> {
+            #[envelope(ty = 10)]
+            First(Signed<M>),
+            #[envelope(ty = 11)]
+            Second(Signed<A>),
+        }
+
+        let tx = Signed::new_unhashed(
+            TxEip1559::default(),
+            Signature::new(Default::default(), Default::default(), Default::default()),
+        );
+        let json = serde_json::to_string(&TypedNames::Tag(tx.clone())).unwrap();
+        let TypedNames::Tag(decoded) = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, tx);
+
+        let json = serde_json::to_string(&TxEnvelope::from(tx.clone())).unwrap();
+        let FlattenedNames::Failed(decoded) = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, tx.clone().into());
+
+        let json = serde_json::to_string(&GenericNames::<TxEip1559, TxEip1559>::Second(tx.clone()))
+            .unwrap();
+        let GenericNames::<TxEip1559, TxEip1559>::Second(decoded) =
+            serde_json::from_str(&json).unwrap()
+        else {
+            panic!("decoded the other variant")
+        };
+        assert_eq!(decoded, tx);
+    }
+
+    #[test]
+    fn test_serde_attributed_variants_ignore_type_position() {
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = AliasedTxType)]
+        enum Aliased {
+            #[envelope(ty = 10)]
+            #[serde(alias = "0xb")]
+            First(Signed<TxEip1559>),
+            #[envelope(ty = 11)]
+            Second(Signed<TxEip1559>),
+        }
+
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = FallbackTxType)]
+        enum Fallback {
+            #[envelope(ty = 10)]
+            Typed(Signed<TxEip1559>),
+            #[envelope(ty = 11)]
+            #[serde(untagged)]
+            Untagged(Signed<TxEip2930>),
+        }
+
+        let signature = Signature::new(Default::default(), Default::default(), Default::default());
+        let tx = Signed::new_unhashed(TxEip1559::default(), signature);
+        let json = serde_json::to_string(&Aliased::Second(tx.clone())).unwrap();
+        let fields = json.strip_prefix(r#"{"type":"0xb","#).unwrap().strip_suffix('}').unwrap();
+        // serde matches a tag against the variants in the order they are declared.
+        let expected = Aliased::First(tx);
+        assert_eq!(serde_json::from_str::<Aliased>(&json).unwrap(), expected);
+        assert_eq!(
+            serde_json::from_str::<Aliased>(&format!(r#"{{{fields},"type":"0xb"}}"#)).unwrap(),
+            expected
+        );
+
+        // An object that is no `Typed` transaction falls back to the untagged variant.
+        let tx = Signed::new_unhashed(TxEip2930::default(), signature);
+        let json = serde_json::to_string(&tx).unwrap();
+        let fields = json.strip_prefix('{').unwrap().strip_suffix('}').unwrap();
+        let expected = Fallback::Untagged(tx);
+        assert_eq!(
+            serde_json::from_str::<Fallback>(&format!(r#"{{"type":"0xa",{fields}}}"#)).unwrap(),
+            expected
+        );
+        assert_eq!(
+            serde_json::from_str::<Fallback>(&format!(r#"{{{fields},"type":"0xa"}}"#)).unwrap(),
+            expected
+        );
     }
 
     #[test]

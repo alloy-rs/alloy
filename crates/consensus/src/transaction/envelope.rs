@@ -1046,6 +1046,20 @@ mod tests {
     use alloy_rlp::Decodable;
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
+    #[cfg(feature = "serde")]
+    use alloc::string::{String, ToString};
+    #[cfg(feature = "serde")]
+    use arbitrary::{Arbitrary, Unstructured};
+    #[cfg(feature = "serde")]
+    use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
+    #[cfg(feature = "serde")]
+    use serde::de::{
+        value::{
+            BorrowedBytesDeserializer, BorrowedStrDeserializer, MapDeserializer, UnitDeserializer,
+        },
+        IntoDeserializer,
+    };
+
     #[test]
     fn assert_encodable() {
         fn assert_encodable<T: Encodable2718>() {}
@@ -1835,6 +1849,349 @@ mod tests {
         }"#;
 
         assert!(serde_json::from_str::<TxEnvelope>(data_with_wrong_type).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_type_first() {
+        let legacy_fields = r#""nonce":"0x1","gasPrice":"0x4a817c800","gas":"0x15f90","to":"0x8fbeb4488a08d60979b5aa9e13dd00b2726320b2","value":"0x0","input":"0x","r":"0x5d71a4a548503f2916d10c6b1a1557a0e7352eb041acb2bac99d1ad6bb49fd45","s":"0x2627bf6d35be48b0e56c61733f63944c0ebcaa85cb4ed6bc7cba3161ba85e0e8","hash":"0x97efb58d2b42df8d68ab5899ff42b16c7e0af35ed86ae4adb8acaad7e444220c""#;
+        let from_str = |json: String| serde_json::from_str::<TxEnvelope>(&json);
+
+        // Type `0x0` first, `v` carries the EIP-155 parity.
+        let legacy = from_str(format!(r#"{{"type":"0x0","v":"0x1c",{legacy_fields}}}"#)).unwrap();
+        assert!(matches!(legacy, TxEnvelope::Legacy(_)));
+        assert!(from_str(format!(r#"{{"type":"0x00","v":"0x1c",{legacy_fields}}}"#)).is_ok());
+        // Legacy transactions need `v`; an untagged object without it is no fallback for a tagged
+        // one.
+        assert!(from_str(format!(r#"{{"type":"0x0",{legacy_fields}}}"#)).is_err());
+
+        // A null `type` is the untagged legacy fallback.
+        assert!(from_str(format!(r#"{{"type":null,"v":"0x1c",{legacy_fields}}}"#)).is_ok());
+        assert!(from_str(format!(r#"{{"v":"0x1c",{legacy_fields}}}"#)).is_ok());
+
+        // Unknown tags and tags that do not fit the fields are rejected.
+        assert!(from_str(format!(r#"{{"type":"0x12","v":"0x1c",{legacy_fields}}}"#)).is_err());
+        assert!(from_str(format!(r#"{{"type":"0x2","v":"0x1c",{legacy_fields}}}"#)).is_err());
+        assert!(from_str(format!(r#"{{"type":"0x1","v":"0x1c",{legacy_fields}}}"#)).is_err());
+
+        // Aliases, extra fields and a `type` that is not first.
+        let tx = TxEip1559 { chain_id: 1, gas_limit: 21_000, ..Default::default() };
+        let envelope: TxEnvelope = tx.into_signed(Signature::test_signature()).into();
+        let json = serde_json::to_string(&envelope).unwrap();
+        assert!(json.starts_with(r#"{"type":"0x2","#));
+        assert_eq!(from_str(json.clone()).unwrap(), envelope);
+        assert_eq!(from_str(json.replacen("0x2", "0x02", 1)).unwrap(), envelope);
+        assert_eq!(from_str(json.replacen("{", r#"{"gasPrice":"0x1","#, 1)).unwrap(), envelope);
+        let (type_field, rest) = json[1..].split_once(',').unwrap();
+        let rest = rest.strip_suffix('}').unwrap();
+        assert_eq!(from_str(format!("{{{rest},{type_field}}}")).unwrap(), envelope);
+
+        // Not an object.
+        assert!(from_str(r#"["0x2"]"#.to_string()).is_err());
+        assert!(from_str(r#""0x2""#.to_string()).is_err());
+        assert!(from_str("{}".to_string()).is_err());
+    }
+
+    /// Returns the fields of an EIP-1559 transaction without its `type`, and the message of the
+    /// error that decoding a document gives, without its position.
+    #[cfg(feature = "serde")]
+    fn eip1559_fields_and_decode_error() -> (String, impl Fn(&str) -> String) {
+        let tx = TxEip1559 { chain_id: 1, gas_limit: 21_000, ..Default::default() };
+        let envelope: TxEnvelope = tx.into_signed(Signature::test_signature()).into();
+        let json = serde_json::to_string(&envelope).unwrap();
+        let fields = json.strip_prefix(r#"{"type":"0x2","#).unwrap().strip_suffix('}').unwrap();
+
+        (fields.to_string(), |json| {
+            let err = serde_json::from_str::<TxEnvelope>(json).unwrap_err().to_string();
+            err.split(" at line ").next().unwrap().to_string()
+        })
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_type_is_no_variant_position() {
+        let (fields, decode_error) = eip1559_fields_and_decode_error();
+
+        // `2` is also the position of the EIP-1559 variant.
+        for json in [format!(r#"{{"type":2,{fields}}}"#), format!(r#"{{{fields},"type":2}}"#)] {
+            assert_eq!(
+                decode_error(&json),
+                "invalid type: integer `2`, expected variant identifier",
+                "{json}"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_rejects_repeated_keys() {
+        let (fields, decode_error) = eip1559_fields_and_decode_error();
+
+        for (json, key) in [
+            (format!(r#"{{"type":"0x2",{fields},"type":"0x2"}}"#), "type"),
+            (format!(r#"{{"type":"0x2",{fields},"type":"0x0"}}"#), "type"),
+            (format!(r#"{{{fields},"type":"0x2","type":"0x2"}}"#), "type"),
+            (format!(r#"{{"type":"0x2",{fields},"nonce":"0x0"}}"#), "nonce"),
+            (format!(r#"{{{fields},"nonce":"0x0","type":"0x2"}}"#), "nonce"),
+        ] {
+            assert_eq!(decode_error(&json), format!("duplicate field `{key}`"), "{json}");
+        }
+    }
+
+    /// Decodes an envelope the way it was decoded before `type` was read up front: buffer a
+    /// `serde_json::Value`, try the tagged variants on it, then an untagged legacy transaction.
+    #[cfg(feature = "serde")]
+    fn decode_from_value(json: &str) -> Result<TxEnvelope, String> {
+        #[derive(serde::Deserialize)]
+        #[serde(tag = "type")]
+        enum TaggedTxTypes {
+            #[serde(
+                rename = "0x0",
+                alias = "0x00",
+                with = "crate::transaction::signed_legacy_serde"
+            )]
+            Legacy(Signed<TxLegacy>),
+            #[serde(rename = "0x1", alias = "0x01")]
+            Eip2930(Signed<TxEip2930>),
+            #[serde(rename = "0x2", alias = "0x02")]
+            Eip1559(Signed<TxEip1559>),
+            #[serde(rename = "0x3", alias = "0x03")]
+            Eip4844(Signed<TxEip4844Variant>),
+            #[serde(rename = "0x4", alias = "0x04")]
+            Eip7702(Signed<TxEip7702>),
+        }
+
+        let value =
+            serde_json::from_str::<serde_json::Value>(json).map_err(|err| err.to_string())?;
+        match <TaggedTxTypes as serde::Deserialize>::deserialize(&value) {
+            Ok(TaggedTxTypes::Legacy(tx)) => Ok(tx.into()),
+            Ok(TaggedTxTypes::Eip2930(tx)) => Ok(tx.into()),
+            Ok(TaggedTxTypes::Eip1559(tx)) => Ok(tx.into()),
+            Ok(TaggedTxTypes::Eip4844(tx)) => Ok(tx.into()),
+            Ok(TaggedTxTypes::Eip7702(tx)) => Ok(tx.into()),
+            Err(err) => crate::transaction::untagged_legacy_serde::deserialize(&value)
+                .map(Into::into)
+                .map_err(|_| err.to_string()),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_matches_value_buffering() {
+        /// Tags, and values that are wrong for most fields.
+        const VALUES: &[&str] = &[
+            r#""0x0""#,
+            r#""0x00""#,
+            r#""0x1""#,
+            r#""0x2""#,
+            r#""0x02""#,
+            r#""0x3""#,
+            r#""0x4""#,
+            r#""0x5""#,
+            r#""""#,
+            r#""0xzz""#,
+            "null",
+            "0",
+            "2",
+            "-1",
+            "1.5",
+            "true",
+            "[]",
+            r#"{"a":1}"#,
+        ];
+
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut bytes = [0u8; 1024];
+        let mut decoded = 0;
+        for case in 0..2000 {
+            rng.fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+            let signature = Signature::new(U256::from(rng.gen::<u128>()), U256::from(1), rng.gen());
+            let envelope: TxEnvelope = match case % 5 {
+                0 => Signed::new_unhashed(TxLegacy::arbitrary(&mut u).unwrap(), signature).into(),
+                1 => Signed::new_unhashed(TxEip2930::arbitrary(&mut u).unwrap(), signature).into(),
+                2 => Signed::new_unhashed(TxEip1559::arbitrary(&mut u).unwrap(), signature).into(),
+                3 => Signed::new_unhashed(TxEip4844::arbitrary(&mut u).unwrap(), signature).into(),
+                _ => Signed::new_unhashed(TxEip7702::arbitrary(&mut u).unwrap(), signature).into(),
+            };
+            let json = serde_json::to_string(&envelope).unwrap();
+            assert_eq!(
+                serde_json::from_str::<TxEnvelope>(&json).ok(),
+                decode_from_value(&json).ok()
+            );
+
+            let object = serde_json::from_str::<serde_json::Map<_, _>>(&json).unwrap();
+            let mut entries: Vec<(String, String)> =
+                object.iter().map(|(key, value)| (key.clone(), value.to_string())).collect();
+
+            // Edits that keep the keys unique: the buffered value kept the last of a repeated
+            // key, which is the one case that decodes differently.
+            for _ in 0..rng.gen_range(0..3) {
+                let value = VALUES[rng.gen_range(0..VALUES.len())].to_string();
+                let at = rng.gen_range(0..entries.len());
+                match rng.gen_range(0..4) {
+                    0 => entries[at].1 = value,
+                    1 => {
+                        entries.remove(at);
+                    }
+                    2 => match entries.iter_mut().find(|(key, _)| key == "type") {
+                        Some(entry) => entry.1 = value,
+                        None => entries.push(("type".to_string(), value)),
+                    },
+                    _ => {
+                        if entries.iter().all(|(key, _)| key != "extra") {
+                            entries.push(("extra".to_string(), value));
+                        }
+                    }
+                }
+            }
+
+            // `type` first, last, in sorted position or anywhere.
+            match (rng.gen_range(0..4), entries.iter().position(|(key, _)| key == "type")) {
+                (0, Some(at)) => {
+                    let entry = entries.remove(at);
+                    entries.insert(0, entry);
+                }
+                (1, Some(at)) => {
+                    let entry = entries.remove(at);
+                    entries.push(entry);
+                }
+                (2, _) => entries.shuffle(&mut rng),
+                _ => {}
+            }
+
+            let fields: Vec<String> =
+                entries.iter().map(|(key, value)| format!("{key:?}:{value}")).collect();
+            let json = format!("{{{}}}", fields.join(","));
+            let expected = decode_from_value(&json).ok();
+            decoded += usize::from(expected.is_some());
+            assert_eq!(serde_json::from_str::<TxEnvelope>(&json).ok(), expected, "{json}");
+            // A reader hands out owned strings.
+            assert_eq!(serde_json::from_reader(json.as_bytes()).ok(), expected, "{json}");
+        }
+        // Enough of the edited transactions still decode for the comparison to mean something.
+        assert!(decoded > 500, "{decoded}");
+    }
+
+    /// Input that is no object reaches the same decoders as before and fails the same way.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_non_objects_match_value_buffering() {
+        let message = |err: String| err.split(" at line ").next().unwrap().to_string();
+        for json in [
+            "null",
+            "true",
+            "2",
+            "-1",
+            "1.5",
+            r#""0x2""#,
+            "[]",
+            // `2` is the position of the EIP-1559 variant.
+            "[2]",
+            r#"[2,{"nonce":"0x0"}]"#,
+            r#"["0x2"]"#,
+            r#"["0x9"]"#,
+        ] {
+            assert_eq!(
+                serde_json::from_str::<TxEnvelope>(json).map_err(|err| message(err.to_string())),
+                decode_from_value(json).map_err(message),
+                "{json}"
+            );
+        }
+
+        // A `type` that is no borrowed string is kept as a `Value` until it is read.
+        let tx: TxEnvelope =
+            Signed::new_unhashed(TxEip1559::default(), Signature::test_signature()).into();
+        let json = serde_json::to_string(&tx).unwrap();
+        let fields = json.strip_prefix(r#"{"type":"0x2","#).unwrap().strip_suffix('}').unwrap();
+        let mut decoded = 0;
+        for tag in [
+            // An escape makes the string an owned one.
+            r#""\u0030x2""#,
+            "null",
+            "true",
+            "2",
+            "-1",
+            "1.5",
+            "[]",
+            r#"["0x2"]"#,
+            r#"{"a":1}"#,
+        ] {
+            for json in
+                [format!(r#"{{"type":{tag},{fields}}}"#), format!(r#"{{{fields},"type":{tag}}}"#)]
+            {
+                let expected = decode_from_value(&json).map_err(message);
+                decoded += usize::from(expected.is_ok());
+                assert_eq!(
+                    serde_json::from_str::<TxEnvelope>(&json)
+                        .map_err(|err| message(err.to_string())),
+                    expected,
+                    "{json}"
+                );
+            }
+        }
+        // Only the escaped tag is one.
+        assert_eq!(decoded, 2);
+
+        // A byte string is no tag, even where it holds the characters of one.
+        let object = MapDeserializer::<_, serde::de::value::Error>::new(
+            [("type", BorrowedBytesDeserializer::new(b"0x0"))].into_iter(),
+        );
+        assert_eq!(
+            <TxEnvelope as serde::Deserialize>::deserialize(object).unwrap_err().to_string(),
+            "invalid type: byte array, expected any valid JSON value"
+        );
+    }
+
+    /// An input other than JSON may hand out the `type` value as an option.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_optional_type() {
+        type Error = serde::de::value::Error;
+
+        struct Optional<D>(Option<D>);
+
+        impl<'de, D: serde::Deserializer<'de>> serde::Deserializer<'de> for Optional<D> {
+            type Error = D::Error;
+
+            fn deserialize_any<V: serde::de::Visitor<'de>>(
+                self,
+                visitor: V,
+            ) -> Result<V::Value, D::Error> {
+                match self.0 {
+                    Some(tag) => visitor.visit_some(tag),
+                    None => visitor.visit_none(),
+                }
+            }
+
+            serde::forward_to_deserialize_any! {
+                bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes
+                byte_buf option unit unit_struct newtype_struct seq tuple tuple_struct map struct
+                enum identifier ignored_any
+            }
+        }
+
+        impl<'de, D: serde::Deserializer<'de>> IntoDeserializer<'de, D::Error> for Optional<D> {
+            type Deserializer = Self;
+
+            fn into_deserializer(self) -> Self {
+                self
+            }
+        }
+
+        /// The error of an object that has a `type` and nothing else.
+        fn decode_error<'de, T: IntoDeserializer<'de, Error>>(tag: T) -> String {
+            let object = MapDeserializer::new([("type", tag)].into_iter());
+            <TxEnvelope as serde::Deserialize>::deserialize(object).unwrap_err().to_string()
+        }
+
+        let tag = || BorrowedStrDeserializer::<Error>::new("0x2");
+        assert_eq!(decode_error(tag()), "missing field `hash`");
+        assert_eq!(decode_error(Optional(Some(tag()))), "missing field `hash`");
+
+        let null = decode_error(UnitDeserializer::<Error>::new());
+        assert_eq!(null, "invalid type: unit value, expected variant identifier");
+        assert_eq!(decode_error(Optional::<UnitDeserializer<Error>>(None)), null);
     }
 
     #[test]
