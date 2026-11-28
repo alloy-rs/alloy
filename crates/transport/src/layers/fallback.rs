@@ -14,7 +14,7 @@ use std::{
     },
     task::{Context, Poll},
 };
-use tower::{Layer, Service};
+use tower::{Layer, Service, ServiceExt};
 use tracing::trace;
 
 use crate::{TransportError, TransportErrorKind, TransportFut};
@@ -203,7 +203,10 @@ where
 
             let future = async move {
                 let start = Instant::now();
-                let result = transport.call(req_clone).await;
+                let result = match transport.transport.ready().await {
+                    Ok(service) => service.call(req_clone).await,
+                    Err(error) => Err(error),
+                };
                 trace!(
                     "Transport[{}] completed: latency={:?}, status={}",
                     transport.id,
@@ -268,7 +271,12 @@ where
             trace!("Trying transport[{}] sequentially", transport.id);
             transport.record_attempt(&self.attempts);
 
-            match transport.call(req_clone).await {
+            let result = match transport.transport.ready().await {
+                Ok(service) => service.call(req_clone).await,
+                Err(error) => Err(error),
+            };
+
+            match result {
                 Ok(response) => {
                     // Record success and return immediately
                     transport.track_success(start.elapsed());
@@ -679,6 +687,65 @@ mod tests {
     fn success_response(data: &str) -> ResponsePayload {
         let raw = serde_json::value::RawValue::from_string(format!("\"{}\"", data)).unwrap();
         ResponsePayload::Success(raw)
+    }
+
+    /// A transport that must be polled ready before each call, like
+    /// `tower::limit::ConcurrencyLimit`. A clone starts unready, and `fail_ready` makes
+    /// `poll_ready` return an error.
+    struct ReadinessGatedTransport {
+        inner: DelayedMockTransport,
+        ready: bool,
+        fail_ready: bool,
+    }
+
+    impl Clone for ReadinessGatedTransport {
+        fn clone(&self) -> Self {
+            Self { inner: self.inner.clone(), ready: false, fail_ready: self.fail_ready }
+        }
+    }
+
+    impl Service<RequestPacket> for ReadinessGatedTransport {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            if self.fail_ready {
+                return Poll::Ready(Err(TransportErrorKind::custom_str("not ready")));
+            }
+            self.ready = true;
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, req: RequestPacket) -> Self::Future {
+            assert!(std::mem::take(&mut self.ready), "poll_ready must be called first");
+            self.inner.call(req)
+        }
+    }
+
+    #[tokio::test]
+    async fn test_inner_transports_are_polled_ready() {
+        for method in ["eth_chainId", "eth_sendRawTransactionSync"] {
+            let failing = DelayedMockTransport::new(Duration::ZERO, success_response("0x0"));
+            let healthy = DelayedMockTransport::new(Duration::ZERO, success_response("0x1"));
+            let transports = vec![
+                ReadinessGatedTransport { inner: failing.clone(), ready: false, fail_ready: true },
+                ReadinessGatedTransport { inner: healthy.clone(), ready: false, fail_ready: false },
+            ];
+            let mut fallback = FallbackService::new(transports, 2);
+
+            let request = Request::new(method, Id::Number(1), ()).serialize().unwrap();
+            let response = fallback.call(RequestPacket::Single(request)).await.unwrap();
+
+            let ResponsePacket::Single(resp) = response else { panic!("unexpected batch") };
+            let ResponsePayload::Success(data) = resp.payload else { panic!("unexpected error") };
+            assert_eq!(data.get(), "\"0x1\"", "{method}");
+            assert_eq!(failing.call_count(), 0, "{method}");
+            assert_eq!(healthy.call_count(), 1, "{method}");
+            // The readiness error counts as a failed attempt.
+            let failed = fallback.transports.iter().find(|t| t.id == 0).unwrap();
+            assert_eq!(failed.metrics.read().successes, [false], "{method}");
+        }
     }
 
     #[tokio::test]
