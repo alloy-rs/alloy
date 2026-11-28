@@ -1,6 +1,9 @@
 use super::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    utils::{redact_url, Spawnable},
+    TransportErrorKind, TransportResult,
+};
 use futures::{
     sink::SinkExt,
     stream::{Fuse, StreamExt},
@@ -10,7 +13,7 @@ use std::time::Duration;
 use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
 
 /// Simple connection info for the websocket.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WsConnect {
     /// The URL to connect to.
     url: String,
@@ -25,6 +28,20 @@ pub struct WsConnect {
     /// The interval between keepalive pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
+}
+
+impl std::fmt::Debug for WsConnect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("WsConnect");
+        match url::Url::parse(&self.url) {
+            Ok(url) => d.field("url", &redact_url(&url).as_str()),
+            Err(_) => d.field("url", &format_args!("<redacted>")),
+        };
+        d.field("max_retries", &self.max_retries)
+            .field("retry_interval", &self.retry_interval)
+            .field("keepalive_interval", &self.keepalive_interval)
+            .finish()
+    }
 }
 
 impl WsConnect {

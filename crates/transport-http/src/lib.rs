@@ -38,7 +38,7 @@ pub use hyper_transport::{HyperClient, HyperResponse, HyperResponseFut, HyperTra
 ))]
 mod body;
 
-use alloy_transport::utils::guess_local_url;
+use alloy_transport::utils::{guess_local_url, redact_url};
 use core::str::FromStr;
 use std::marker::PhantomData;
 use url::Url;
@@ -127,13 +127,22 @@ where
 }
 
 /// Connection details for an HTTP transport.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[doc(hidden)]
 pub struct HttpConnect<T> {
     /// The URL to connect to.
     url: Url,
 
     _pd: PhantomData<T>,
+}
+
+impl<T> core::fmt::Debug for HttpConnect<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("HttpConnect")
+            .field("url", &redact_url(&self.url))
+            .field("_pd", &self._pd)
+            .finish()
+    }
 }
 
 impl<T> HttpConnect<T> {
@@ -167,11 +176,21 @@ impl<T> FromStr for HttpConnect<T> {
 /// Currently supported clients are:
 #[cfg_attr(feature = "reqwest", doc = " - [`reqwest`](::reqwest::Client)")]
 #[cfg_attr(feature = "hyper", doc = " - [`hyper`](hyper_util::client::legacy::Client)")]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Http<T> {
     client: T,
     url: Url,
     settings: HttpTransportSettings,
+}
+
+impl<T: core::fmt::Debug> core::fmt::Debug for Http<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Http")
+            .field("client", &self.client)
+            .field("url", &redact_url(&self.url))
+            .field("settings", &self.settings)
+            .finish()
+    }
 }
 
 impl<T> Http<T> {

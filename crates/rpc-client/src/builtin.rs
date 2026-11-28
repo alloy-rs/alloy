@@ -16,7 +16,7 @@ use alloy_transport_http::hyper::header;
 use reqwest::header;
 
 /// Connection string for built-in transports.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BuiltInConnectionString {
     /// HTTP transport.
@@ -28,6 +28,32 @@ pub enum BuiltInConnectionString {
     /// IPC transport.
     #[cfg(feature = "ipc")]
     Ipc(std::path::PathBuf),
+}
+
+impl std::fmt::Debug for BuiltInConnectionString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            #[cfg(any(feature = "reqwest", feature = "hyper"))]
+            Self::Http(url) => {
+                f.debug_tuple("Http").field(&alloy_transport::utils::redact_url(url)).finish()
+            }
+            #[cfg(feature = "ws-base")]
+            Self::Ws(url, auth) => f
+                .debug_tuple("Ws")
+                .field(&alloy_transport::utils::redact_url(url))
+                .field(auth)
+                .finish(),
+            #[cfg(feature = "ipc")]
+            Self::Ipc(path) => f.debug_tuple("Ipc").field(path).finish(),
+            #[cfg(not(any(
+                feature = "reqwest",
+                feature = "hyper",
+                feature = "ws-base",
+                feature = "ipc"
+            )))]
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl TransportConnect for BuiltInConnectionString {
