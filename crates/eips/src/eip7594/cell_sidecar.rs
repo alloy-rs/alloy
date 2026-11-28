@@ -10,7 +10,6 @@ use crate::{
 };
 use alloc::vec::Vec;
 use alloy_primitives::B256;
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
 #[cfg(feature = "kzg")]
 use crate::{
@@ -23,9 +22,6 @@ use crate::{
 /// All commitments and all [`CELLS_PER_EXT_BLOB`] proofs per blob are kept, so the transaction
 /// body can be served without its blobs. Cells are ordered by blob, then by ascending cell index.
 /// [`Self::new`] ensures the cell and proof counts match the commitments and the mask.
-///
-/// Its [`Encodable`] and [`Decodable`] implementations use `rlp([mask, commitments, proofs,
-/// cells])`, with the mask as a `u128`.
 ///
 /// # Examples
 ///
@@ -309,46 +305,6 @@ impl BlobTransactionCellSidecar {
         // overflow.
         (self.mask.bits() & ((1u128 << index) - 1)).count_ones() as usize
     }
-
-    // Returns the length of the encoded fields, without the list header.
-    fn fields_length(&self) -> usize {
-        self.mask.bits().length()
-            + self.commitments.length()
-            + self.proofs.length()
-            + self.cells.length()
-    }
-}
-
-impl Encodable for BlobTransactionCellSidecar {
-    fn encode(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.fields_length() }.encode(out);
-        self.mask.bits().encode(out);
-        self.commitments.encode(out);
-        self.proofs.encode(out);
-        self.cells.encode(out);
-    }
-
-    fn length(&self) -> usize {
-        Header { list: true, payload_length: self.fields_length() }.length_with_payload()
-    }
-}
-
-impl Decodable for BlobTransactionCellSidecar {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let mut fields = Header::decode_bytes(buf, true)?;
-        let mask = BlobCellMask::from_bits(Decodable::decode(&mut fields)?);
-        let sidecar = Self::new(
-            Decodable::decode(&mut fields)?,
-            Decodable::decode(&mut fields)?,
-            Decodable::decode(&mut fields)?,
-            mask,
-        )
-        .ok_or(alloy_rlp::Error::Custom("cell sidecar counts do not match"))?;
-        if !fields.is_empty() {
-            return Err(alloy_rlp::Error::ListLengthMismatch { expected: 0, got: fields.len() });
-        }
-        Ok(sidecar)
-    }
 }
 
 #[cfg(all(test, feature = "kzg"))]
@@ -356,7 +312,6 @@ mod tests {
     use super::*;
     use crate::eip4844::{env_settings::EnvKzgSettings, Blob};
     use alloc::vec;
-    use alloy_primitives::{b256, hex, keccak256};
 
     fn settings() -> &'static c_kzg::KzgSettings {
         EnvKzgSettings::Default.get()
@@ -529,40 +484,6 @@ mod tests {
             kept.match_versioned_hashes_cells(&request, BlobCellMask::from_bits(0b1101))
                 .collect::<Vec<_>>(),
             vec![(0, expected.clone()), (2, expected)]
-        );
-    }
-
-    #[test]
-    fn encoding_round_trips_and_is_pinned() {
-        let (_, all) = fixture();
-        let kept = subset(&all, BlobCellMask::from_bits(0b1011));
-        let encoded = alloy_rlp::encode(&kept);
-        assert_eq!(encoded.len(), kept.length());
-        assert_eq!(BlobTransactionCellSidecar::decode(&mut encoded.as_slice()).unwrap(), kept);
-        // reth's blob store persists this format, so changing it must be deliberate.
-        assert_eq!(encoded.len(), 24960);
-        // `list(24957 bytes) || mask 0b1011 || list(2 commitments)`, then the proofs and cells.
-        assert_eq!(encoded[..6], hex!("f9617d0bf862"));
-        assert_eq!(
-            keccak256(&encoded),
-            b256!("0x742b1fe64f3373584a06565e19373be52a44f3790489650a35ba3b6b2f96a992")
-        );
-
-        // A field after the cells is rejected.
-        let mut trailing = Vec::new();
-        Header { list: true, payload_length: kept.fields_length() + 1 }.encode(&mut trailing);
-        trailing.extend_from_slice(&encoded[encoded.len() - kept.fields_length()..]);
-        trailing.push(alloy_rlp::EMPTY_STRING_CODE);
-        assert_eq!(
-            BlobTransactionCellSidecar::decode(&mut trailing.as_slice()),
-            Err(alloy_rlp::Error::ListLengthMismatch { expected: 0, got: 1 })
-        );
-
-        let mut mismatched = kept;
-        mismatched.cells.pop();
-        assert_eq!(
-            BlobTransactionCellSidecar::decode(&mut alloy_rlp::encode(&mismatched).as_slice()),
-            Err(alloy_rlp::Error::Custom("cell sidecar counts do not match"))
         );
     }
 }
