@@ -3,14 +3,19 @@
 use alloc::{collections::BTreeMap, format, string::String};
 use core::{
     fmt,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{
+    de::{DeserializeOwned, MapAccess, Visitor},
+    Deserialize, Serialize,
+};
 use serde_json::Value;
 
 #[cfg(any(test, feature = "arbitrary"))]
 mod arbitrary_;
 
+mod buffered;
 mod keys;
 
 /// Generic type for capturing additional fields when deserializing structs.
@@ -248,38 +253,90 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct WithOtherFieldsHelper<T> {
-            #[serde(flatten)]
-            inner: T,
-            #[serde(flatten)]
-            other: OtherFields,
-        }
+        struct ObjectVisitor<T>(PhantomData<fn() -> T>);
 
-        let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
-        // remove all fields present in the inner struct from the other fields, this is to avoid
-        // duplicate fields in the catch all other fields because serde flatten does not exclude
-        // already deserialized fields when deserializing the other fields.
-        if keys::remove_keys(&helper.inner, &mut helper.other).is_err() {
-            // Not every key is a string: let `serde_json` stringify them.
-            if let Value::Object(map) =
-                serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
-            {
-                for key in map.keys() {
-                    helper.other.remove(key);
+        impl<'de, T: Deserialize<'de> + Serialize> Visitor<'de> for ObjectVisitor<T> {
+            type Value = WithOtherFields<T>;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("struct WithOtherFieldsHelper")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+                // Buffer the object once. The inner value reads the entries by reference, and
+                // only the entries it neither took nor serializes become other fields.
+                let mut entries = buffered::Entries::read(map)?;
+                if entries.has_non_json() {
+                    // A byte string, a newtype and a map with a key that is no string cannot
+                    // become another field, wherever they are. Whether that is an error depends
+                    // on what the inner value leaves in place, which serde's own flattening
+                    // settles.
+                    return deserialize_flattened(buffered::Ref::new(&entries.into_object()));
                 }
+                let inner = T::deserialize(buffered::Flat::new(&mut entries));
+                if entries.asked_for_option() {
+                    // serde decides through a private hook whether a flattened `Option` is
+                    // `None`, so that case goes through its own flattening.
+                    return deserialize_flattened(buffered::Ref::new(&entries.into_object()));
+                }
+                let inner = inner?;
+                entries.remove_keys_of(&inner).map_err(serde::de::Error::custom)?;
+
+                Ok(WithOtherFields { inner, other: OtherFields::new(entries.into_other()?) })
             }
         }
 
-        Ok(Self { inner: helper.inner, other: helper.other })
+        deserializer.deserialize_map(ObjectVisitor(PhantomData))
     }
+}
+
+/// Deserializes through `#[serde(flatten)]`, which buffers the object and copies every field the
+/// inner value leaves in place into the other fields before removing them again.
+fn deserialize_flattened<'de, T, D>(deserializer: D) -> Result<WithOtherFields<T>, D::Error>
+where
+    T: Deserialize<'de> + Serialize,
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct WithOtherFieldsHelper<T> {
+        #[serde(flatten)]
+        inner: T,
+        #[serde(flatten)]
+        other: OtherFields,
+    }
+
+    let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
+    // remove all fields present in the inner struct from the other fields, this is to avoid
+    // duplicate fields in the catch all other fields because serde flatten does not exclude
+    // already deserialized fields when deserializing the other fields.
+    if keys::remove_keys(&helper.inner, &mut helper.other.inner).is_err() {
+        // Not every key is a string: let `serde_json` stringify them.
+        if let Value::Object(map) =
+            serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
+        {
+            for key in map.keys() {
+                helper.other.remove(key);
+            }
+        }
+    }
+
+    Ok(WithOtherFields { inner: helper.inner, other: helper.other })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::string::ToString;
-    use rand::Rng;
+    use alloc::{
+        string::{String, ToString},
+        vec::Vec,
+    };
+    use alloy_primitives::B256;
+    use arbitrary::{Arbitrary, Unstructured};
+    use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
+    use serde::de::{
+        value::{self, MapDeserializer, SeqDeserializer},
+        IntoDeserializer,
+    };
     use serde_json::json;
     use similar_asserts::assert_eq;
 
@@ -364,5 +421,571 @@ mod tests {
 
         let expected = r#"{"a":42,"b":"Hello","extra":99}"#;
         assert_eq!(serialized, expected);
+    }
+
+    /// Decodes `json` through the buffer and through `#[serde(flatten)]`, as text, from a reader
+    /// and from a `Value`, expects the same result each time and returns whether it decoded.
+    fn matches_flattened<T>(json: &str) -> bool
+    where
+        T: DeserializeOwned + Serialize + PartialEq + fmt::Debug,
+    {
+        let buffered =
+            serde_json::from_str::<WithOtherFields<T>>(json).map_err(|err| err.to_string());
+        let mut deserializer = serde_json::Deserializer::from_str(json);
+        let flattened =
+            deserialize_flattened::<T, _>(&mut deserializer).map_err(|err| err.to_string());
+        assert_eq!(buffered, flattened, "{json}");
+
+        // A reader hands out owned strings.
+        let mut deserializer = serde_json::Deserializer::from_reader(json.as_bytes());
+        assert_eq!(
+            serde_json::from_reader::<_, WithOtherFields<T>>(json.as_bytes())
+                .map_err(|err| err.to_string()),
+            deserialize_flattened::<T, _>(&mut deserializer).map_err(|err| err.to_string()),
+            "{json}"
+        );
+
+        // A `Value` keeps the last of a repeated key.
+        if let Ok(value) = serde_json::from_str::<Value>(json) {
+            assert_eq!(
+                serde_json::from_value::<WithOtherFields<T>>(value.clone())
+                    .map_err(|err| err.to_string()),
+                deserialize_flattened::<T, _>(value).map_err(|err| err.to_string()),
+                "{json}"
+            );
+        }
+
+        buffered.is_ok()
+    }
+
+    #[test]
+    fn deserialize_matches_flattened() {
+        /// Takes the entries it names. `b` is read but not written back when it is `None`, and
+        /// serde reads the units of taken entries from an empty object or array too.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Named {
+            a: Option<u64>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            b: Option<String>,
+            #[serde(default)]
+            c: Vec<u64>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            x: Option<Unit>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            y: Option<()>,
+            #[serde(default)]
+            z: Vec<Unit>,
+        }
+
+        /// Sees all entries and leaves them in place.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Flattening {
+            #[serde(flatten)]
+            named: Named,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Newtype(Named);
+
+        /// Takes the entry named like one of its variants.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        enum Tagged {
+            A(u64),
+            B { x: u64 },
+            C,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        #[serde(untagged)]
+        enum Untagged {
+            Named(Named),
+            Map(BTreeMap<String, Value>),
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Unit;
+
+        /// A map key that is read as a newtype.
+        #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+        struct Id(String);
+
+        /// A map key that is read as an enum.
+        #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        enum Kind {
+            A,
+            B,
+        }
+
+        /// Takes maps whose keys are no plain strings.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Keyed {
+            #[serde(default)]
+            ids: BTreeMap<Id, u64>,
+            #[serde(default)]
+            kinds: BTreeMap<Kind, u64>,
+            #[serde(default)]
+            options: BTreeMap<Option<String>, u64>,
+        }
+
+        /// Leaves them in place.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct FlatteningKeyed {
+            #[serde(flatten)]
+            keyed: Keyed,
+        }
+
+        const LIMIT: usize = buffered::LINEAR_SEARCH_LIMIT;
+        const KEYS: &[&str] = &["a", "b", "c", "x", "y", "z"];
+        const VALUES: &[&str] = &[
+            "null",
+            "0",
+            "7",
+            "-1",
+            "1.5",
+            "true",
+            r#""s""#,
+            "[]",
+            "[1,2]",
+            r#"[1,"s"]"#,
+            "{}",
+            r#"{"x":1}"#,
+            r#"{"x":1,"x":2}"#,
+            "[{}]",
+            "[[],null]",
+        ];
+        const KEYED_KEYS: [&str; 3] = ["ids", "kinds", "options"];
+        const KEYED_VALUES: &[&str] =
+            &["{}", r#"{"a":1}"#, r#"{"a":1,"b":2}"#, r#"{"x":1}"#, r#"{"a":{}}"#, "null"];
+
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut bytes = [0u8; 256];
+        let mut decoded = 0;
+        let mut decoded_keyed = [0; 3];
+        let mut decoded_many = [0; 2];
+        for _ in 0..500 {
+            // Fields no inner type knows, with keys that need escaping.
+            rng.fill(bytes.as_mut_slice());
+            let unknown = OtherFields::arbitrary(&mut Unstructured::new(&bytes)).unwrap();
+            let mut entries: Vec<(String, String)> = unknown
+                .iter()
+                .map(|(key, value)| (serde_json::to_string(key).unwrap(), value.to_string()))
+                .collect();
+            // Fields the inner types know, valid or not, possibly repeated.
+            for _ in 0..rng.gen_range(0..6) {
+                let key = KEYS[rng.gen_range(0..KEYS.len())];
+                let value = VALUES[rng.gen_range(0..VALUES.len())];
+                entries.push((format!("{key:?}"), value.to_string()));
+            }
+            // Maps whose keys are read as a newtype, as an enum or as an option.
+            for _ in 0..rng.gen_range(0..3) {
+                let key = KEYED_KEYS[rng.gen_range(0..KEYED_KEYS.len())];
+                let value = KEYED_VALUES[rng.gen_range(0..KEYED_VALUES.len())];
+                entries.push((format!("{key:?}"), value.to_string()));
+            }
+            // More entries than are searched one by one to remove a key, with repeated keys.
+            let many = rng.gen_ratio(1, 3);
+            if many {
+                for _ in 0..rng.gen_range(LIMIT..3 * LIMIT) {
+                    let key = format!("k{}", rng.gen_range(0..2 * LIMIT));
+                    entries.push((format!("{key:?}"), rng.gen_range(0..9).to_string()));
+                }
+            }
+            entries.shuffle(&mut rng);
+            let fields: Vec<String> =
+                entries.iter().map(|(key, value)| format!("{key}:{value}")).collect();
+            let json = format!("{{{}}}", fields.join(","));
+
+            let named = matches_flattened::<Named>(&json);
+            decoded += usize::from(named);
+            decoded_many[0] += usize::from(many && named);
+            let keyed = matches_flattened::<Keyed>(&json);
+            for (decoded, key) in decoded_keyed.iter_mut().zip(KEYED_KEYS) {
+                *decoded += usize::from(keyed && json.contains(&format!(r#""{key}":{{""#)));
+            }
+            matches_flattened::<FlatteningKeyed>(&json);
+            matches_flattened::<BTreeMap<Id, Value>>(&json);
+            matches_flattened::<BTreeMap<Kind, Value>>(&json);
+            matches_flattened::<Flattening>(&json);
+            matches_flattened::<Newtype>(&json);
+            matches_flattened::<Tagged>(&json);
+            matches_flattened::<Untagged>(&json);
+            matches_flattened::<Unit>(&json);
+            matches_flattened::<Option<Named>>(&json);
+            let map = matches_flattened::<BTreeMap<String, Value>>(&json);
+            decoded_many[1] += usize::from(many && map);
+            matches_flattened::<WithOtherFields<Named>>(&json);
+            // Not something that can be flattened.
+            matches_flattened::<u64>(&json);
+            matches_flattened::<Vec<u64>>(&json);
+        }
+        // Enough objects decode for the comparison to mean something.
+        assert!(decoded > 50, "{decoded}");
+        assert!(decoded_keyed.iter().all(|decoded| *decoded > 20), "{decoded_keyed:?}");
+        assert!(decoded_many.iter().all(|decoded| *decoded > 20), "{decoded_many:?}");
+
+        // Around the limit, with a repeated key. The inner value keeps one key, all or none.
+        for entries in LIMIT - 1..=LIMIT + 2 {
+            let fields: Vec<String> =
+                (0..entries).map(|i| format!(r#""{}":{i}"#, ["a", "k"][i.min(1)])).collect();
+            let json = format!("{{{}}}", fields.join(","));
+            assert!(matches_flattened::<Named>(&json));
+            assert!(matches_flattened::<BTreeMap<String, Value>>(&json));
+            assert!(matches_flattened::<Unit>(&json));
+        }
+
+        for json in ["{}", "[]", "null", "1", r#""a""#] {
+            matches_flattened::<Named>(json);
+            matches_flattened::<Option<Named>>(json);
+        }
+    }
+
+    /// Formats other than JSON have byte strings and keys that are no strings, which the buffer
+    /// has to keep.
+    #[test]
+    fn deserialize_non_json_matches_flattened() {
+        #[derive(Clone, Copy)]
+        enum Input {
+            Unit,
+            None,
+            Some(&'static Self),
+            Newtype(&'static Self),
+            Str(&'static str),
+            Char(char),
+            Bytes(&'static [u8]),
+            Number(u64),
+            U8(u8),
+            U16(u16),
+            U32(u32),
+            I16(i16),
+            F32(f32),
+            Seq(&'static [Self]),
+            Map(&'static [(Self, Self)]),
+        }
+
+        impl<'de> serde::Deserializer<'de> for Input {
+            type Error = value::Error;
+
+            fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+                match self {
+                    Self::Unit => visitor.visit_unit(),
+                    Self::None => visitor.visit_none(),
+                    Self::Some(value) => visitor.visit_some(*value),
+                    Self::Newtype(value) => visitor.visit_newtype_struct(*value),
+                    Self::Str(string) => visitor.visit_borrowed_str(string),
+                    Self::Char(char) => visitor.visit_char(char),
+                    Self::Bytes(bytes) => visitor.visit_borrowed_bytes(bytes),
+                    Self::Number(number) => visitor.visit_u64(number),
+                    Self::U8(number) => visitor.visit_u8(number),
+                    Self::U16(number) => visitor.visit_u16(number),
+                    Self::U32(number) => visitor.visit_u32(number),
+                    Self::I16(number) => visitor.visit_i16(number),
+                    Self::F32(number) => visitor.visit_f32(number),
+                    Self::Seq(items) => {
+                        visitor.visit_seq(SeqDeserializer::new(items.iter().copied()))
+                    }
+                    Self::Map(entries) => {
+                        visitor.visit_map(MapDeserializer::new(entries.iter().copied()))
+                    }
+                }
+            }
+
+            serde::forward_to_deserialize_any! {
+                bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes
+                byte_buf option unit unit_struct newtype_struct seq tuple tuple_struct map struct
+                enum identifier ignored_any
+            }
+        }
+
+        impl IntoDeserializer<'_, value::Error> for Input {
+            type Deserializer = Self;
+
+            fn into_deserializer(self) -> Self {
+                self
+            }
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Named {
+            hash: B256,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Flattening {
+            #[serde(flatten)]
+            named: Named,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Limits {
+            limits: BTreeMap<u64, u64>,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct FlatteningLimits {
+            #[serde(flatten)]
+            limits: Limits,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Names {
+            names: BTreeMap<String, u64>,
+        }
+
+        /// Decodes `input` with the buffer, which has to agree with serde's own flattening.
+        fn decode<T>(input: Input) -> Result<WithOtherFields<T>, String>
+        where
+            T: DeserializeOwned + Serialize + PartialEq + fmt::Debug,
+        {
+            let buffered = WithOtherFields::<T>::deserialize(input).map_err(|err| err.to_string());
+            assert_eq!(buffered, deserialize_flattened(input).map_err(|err| err.to_string()));
+            buffered
+        }
+
+        const HASH: Input = Input::Bytes(&[0x11; 32]);
+        let height = || OtherFields::new(BTreeMap::from([("height".to_string(), json!(7))]));
+
+        // A struct takes its byte string out of the entries.
+        let object =
+            Input::Map(&[(Input::Str("hash"), HASH), (Input::Str("height"), Input::Number(7))]);
+        let named = decode::<Named>(object).unwrap();
+        assert_eq!(named.inner.hash, B256::repeat_byte(0x11));
+        assert_eq!(named.other, height());
+
+        // A flattened field leaves it in place, where it is no valid other field.
+        assert_eq!(
+            decode::<Flattening>(object).unwrap_err(),
+            "invalid type: byte array, expected any valid JSON value"
+        );
+
+        // A key of the object may come as bytes.
+        let object =
+            Input::Map(&[(Input::Bytes(b"hash"), HASH), (Input::Str("height"), Input::Number(7))]);
+        let named = decode::<Named>(object).unwrap();
+        assert_eq!(named.inner.hash, B256::repeat_byte(0x11));
+        assert_eq!(named.other, height());
+
+        // A key that is no string is no other field.
+        let object = Input::Map(&[
+            (Input::Str("limits"), Input::Map(&[])),
+            (Input::Number(1), Input::Number(7)),
+        ]);
+        assert_eq!(
+            decode::<Limits>(object).unwrap_err(),
+            "invalid type: integer `1`, expected a string"
+        );
+
+        for key in [Input::U16(1), Input::I16(-1), Input::Char('a'), Input::Unit, Input::None] {
+            let entries: &'static [(Input, Input)] =
+                Vec::leak(alloc::vec![(Input::Str("limits"), Input::Map(&[])), (key, HASH)]);
+            assert!(decode::<Limits>(Input::Map(entries)).is_err());
+        }
+
+        // A struct takes its map out of the entries, whatever the keys are.
+        let object = Input::Map(&[
+            (Input::Str("limits"), Input::Map(&[(Input::Number(1), Input::Number(7))])),
+            (Input::Str("height"), Input::Number(7)),
+        ]);
+        let limits = decode::<Limits>(object).unwrap();
+        assert_eq!(limits.inner.limits, BTreeMap::from([(1, 7)]));
+        assert_eq!(limits.other, height());
+
+        // A flattened field leaves it in place, where an integer is no key of another field.
+        assert_eq!(
+            decode::<FlatteningLimits>(object).unwrap_err(),
+            "invalid type: integer `1`, expected a string key"
+        );
+
+        // The key of a nested map may come as bytes too.
+        let object = Input::Map(&[
+            (Input::Str("names"), Input::Map(&[(Input::Bytes(b"a"), Input::Number(7))])),
+            (Input::Str("height"), Input::Number(7)),
+        ]);
+        let names = decode::<Names>(object).unwrap();
+        assert_eq!(names.inner.names, BTreeMap::from([("a".to_string(), 7)]));
+        assert_eq!(names.other, height());
+
+        /// Leaves the entries of `T` in place.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Flattened<T> {
+            #[serde(flatten)]
+            inner: T,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Field<T> {
+            field: T,
+        }
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Id(u64);
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        enum Kind {
+            A,
+            B,
+        }
+
+        /// A number that is read from one callback only.
+        macro_rules! only {
+            ($name:ident($ty:ty), $visit:ident, $hint:ident) => {
+                #[derive(Debug, PartialEq, Serialize)]
+                struct $name($ty);
+
+                impl<'de> Deserialize<'de> for $name {
+                    fn deserialize<D: serde::Deserializer<'de>>(
+                        deserializer: D,
+                    ) -> Result<Self, D::Error> {
+                        struct OnlyVisitor;
+
+                        impl Visitor<'_> for OnlyVisitor {
+                            type Value = $name;
+
+                            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                                f.write_str(stringify!($ty))
+                            }
+
+                            fn $visit<E>(self, value: $ty) -> Result<$name, E> {
+                                Ok($name(value))
+                            }
+                        }
+
+                        deserializer.$hint(OnlyVisitor)
+                    }
+                }
+            };
+        }
+        only!(Single(f32), visit_f32, deserialize_f32);
+        only!(Byte(u8), visit_u8, deserialize_u8);
+        only!(Short(i16), visit_i16, deserialize_i16);
+
+        /// Decodes `{"field": value}` with a struct that takes the entry and with one that
+        /// leaves it in place. Both have to agree with serde's own flattening.
+        fn field<T>(value: &'static Input) -> [Result<T, String>; 2]
+        where
+            T: DeserializeOwned + Serialize + PartialEq + fmt::Debug,
+        {
+            let entries: &'static [(Input, Input)] =
+                Vec::leak(alloc::vec![(Input::Str("field"), *value)]);
+            let object = Input::Map(entries);
+            [
+                decode::<Field<T>>(object).map(|decoded| decoded.inner.field),
+                decode::<Flattened<Field<T>>>(object).map(|decoded| decoded.inner.inner.field),
+            ]
+        }
+
+        // An option remembers whether it was given a value.
+        assert_eq!(field::<Option<()>>(&Input::Some(&Input::Unit)), [Ok(Some(())), Ok(Some(()))]);
+        assert_eq!(field::<Option<()>>(&Input::None), [Ok(None), Ok(None)]);
+        assert_eq!(field::<Option<()>>(&Input::Unit), [Ok(None), Ok(None)]);
+        assert_eq!(
+            field::<Option<u64>>(&Input::Some(&Input::Number(7))),
+            [Ok(Some(7)), Ok(Some(7))]
+        );
+        // serde reads the unit of a taken entry from an empty map too, also inside an option.
+        assert_eq!(
+            field::<Option<()>>(&Input::Some(&Input::Map(&[]))),
+            [Ok(Some(())), Ok(Some(()))]
+        );
+
+        // No value is no unit.
+        assert_eq!(field::<()>(&Input::Unit), [Ok(()), Ok(())]);
+        let err = "invalid type: Option value, expected unit".to_string();
+        assert_eq!(field::<()>(&Input::None), [Err(err.clone()), Err(err)]);
+
+        // A newtype is read by a newtype only, and is no other field.
+        const PAIR: Input = Input::Seq(&[Input::Number(1), Input::Number(2)]);
+        assert_eq!(field::<(u64, u64)>(&PAIR), [Ok((1, 2)), Ok((1, 2))]);
+        let err = "invalid type: newtype struct, expected a tuple of size 2".to_string();
+        assert_eq!(field::<(u64, u64)>(&Input::Newtype(&PAIR)), [Err(err.clone()), Err(err)]);
+        assert_eq!(
+            field::<Id>(&Input::Newtype(&Input::Number(7))),
+            [
+                Ok(Id(7)),
+                Err("invalid type: newtype struct, expected any valid JSON value".to_string())
+            ]
+        );
+        assert_eq!(field::<Id>(&Input::Number(7)), [Ok(Id(7)), Ok(Id(7))]);
+
+        // Only integers of 8 and 64 bits name a variant by its position.
+        // Left in place, a map with such a key is no other field.
+        let err = "invalid type: integer `1`, expected a string key".to_string();
+        assert_eq!(
+            field::<Kind>(&Input::Map(&[(Input::U8(1), Input::Unit)])),
+            [Ok(Kind::B), Err(err.clone())]
+        );
+        assert_eq!(
+            field::<Kind>(&Input::Map(&[(Input::Number(1), Input::Unit)])),
+            [Ok(Kind::B), Err(err)]
+        );
+        for key in [Input::U16(1), Input::U32(1), Input::I16(1)] {
+            let entries: &'static [(Input, Input)] = Vec::leak(alloc::vec![(key, Input::Unit)]);
+            let err = "invalid type: integer `1`, expected variant identifier".to_string();
+            let value: &'static [Input] = Vec::leak(alloc::vec![Input::Map(entries)]);
+            let [taken, in_place] = field::<Kind>(&value[0]);
+            assert_eq!(taken, Err(err));
+            assert!(in_place.is_err());
+        }
+
+        // The same holds for the tag of an enum.
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        #[serde(tag = "tag")]
+        enum Internal {
+            A,
+            B,
+        }
+        const TAG: Input = Input::Str("tag");
+        assert_eq!(
+            field::<Internal>(&Input::Map(&[(TAG, Input::U8(1))])),
+            [Ok(Internal::B), Ok(Internal::B)]
+        );
+        let err = "invalid type: integer `1`, expected variant identifier".to_string();
+        assert_eq!(
+            field::<Internal>(&Input::Map(&[(TAG, Input::U16(1))])),
+            [Err(err.clone()), Err(err)]
+        );
+
+        // Integers keep their width, floats their precision, and a character is no string.
+        assert_eq!(field::<u64>(&Input::U16(7)), [Ok(7), Ok(7)]);
+        assert_eq!(field::<i64>(&Input::I16(-7)), [Ok(-7), Ok(-7)]);
+        assert_eq!(field::<f64>(&Input::F32(1.5)), [Ok(1.5), Ok(1.5)]);
+        assert_eq!(field::<Single>(&Input::F32(1.5)), [Ok(Single(1.5)), Ok(Single(1.5))]);
+        assert_eq!(field::<Byte>(&Input::U8(7)), [Ok(Byte(7)), Ok(Byte(7))]);
+        assert_eq!(field::<Short>(&Input::I16(-7)), [Ok(Short(-7)), Ok(Short(-7))]);
+        assert_eq!(field::<char>(&Input::Char('a')), [Ok('a'), Ok('a')]);
+        let err = "invalid type: character `a`, expected a string".to_string();
+        assert_eq!(field::<String>(&Input::Char('a')), [Err(err.clone()), Err(err.clone())]);
+        assert_eq!(
+            field::<BTreeMap<String, u64>>(&Input::Map(&[(Input::Char('a'), Input::Number(7))])),
+            [Err(err.clone()), Err(err)]
+        );
+
+        // All of them but the newtype are other fields like the JSON they stand for.
+        let object = Input::Map(&[
+            (Input::Str("hash"), HASH),
+            (Input::Str("none"), Input::None),
+            (Input::Str("some"), Input::Some(&Input::U8(7))),
+            (Input::Str("char"), Input::Char('a')),
+            (Input::Str("float"), Input::F32(1.5)),
+            (Input::Str("short"), Input::I16(-7)),
+        ]);
+        let named = decode::<Named>(object).unwrap();
+        assert_eq!(
+            named.other,
+            OtherFields::new(BTreeMap::from([
+                ("none".to_string(), json!(null)),
+                ("some".to_string(), json!(7)),
+                ("char".to_string(), json!("a")),
+                ("float".to_string(), json!(1.5)),
+                ("short".to_string(), json!(-7)),
+            ]))
+        );
+        let object =
+            Input::Map(&[(Input::Str("hash"), HASH), (Input::Str("id"), Input::Newtype(&PAIR))]);
+        assert_eq!(
+            decode::<Named>(object).unwrap_err(),
+            "invalid type: newtype struct, expected any valid JSON value"
+        );
     }
 }
