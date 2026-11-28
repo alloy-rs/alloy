@@ -366,38 +366,28 @@ impl Decodable for TxLegacy {
     /// rather than deriving the chain ID from it. Use
     /// [`RlpEcdsaDecodableTx::rlp_decode_signed`] to decode signed transactions correctly.
     ///
-    /// The outer header is not required to be a list. Fields are read from the entire remaining
-    /// buffer, with the consumed length checked against the header only afterwards. In particular,
-    /// any bytes after the first six fields trigger an attempt to read three more fields, even if
-    /// those bytes are outside the declared payload.
+    /// The outer header may be a list or a string. Its payload length delimits this transaction
+    /// when more RLP items follow it in the buffer.
     ///
     /// Successful decoding does not establish a canonical signing payload. Requiring a list header
     /// or zero sentinel fields would reject previously accepted inputs and is a breaking change.
     fn decode(data: &mut &[u8]) -> Result<Self> {
         let header = Header::decode(data)?;
-        let remaining_len = data.len();
-
-        let transaction_payload_len = header.payload_length;
-
-        if transaction_payload_len > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-
-        let mut transaction = Self::rlp_decode_fields(data)?;
+        let (mut payload, rest) = data.split_at(header.payload_length);
+        let mut transaction = Self::rlp_decode_fields(&mut payload)?;
 
         // Preserve the permissive nine-field form: the seventh field is taken as chain_id, and
         // the last two fields need not be zero. Enforcing EIP-155 sentinels would be breaking.
-        if !data.is_empty() {
-            transaction.chain_id = Some(Decodable::decode(data)?);
-            let _: U256 = Decodable::decode(data)?; // r
-            let _: U256 = Decodable::decode(data)?; // s
+        if !payload.is_empty() {
+            transaction.chain_id = Some(Decodable::decode(&mut payload)?);
+            let _: U256 = Decodable::decode(&mut payload)?; // r
+            let _: U256 = Decodable::decode(&mut payload)?; // s
         }
 
-        let decoded = remaining_len - data.len();
-        if decoded != transaction_payload_len {
+        if !payload.is_empty() {
             return Err(alloy_rlp::Error::UnexpectedLength);
         }
-
+        *data = rest;
         Ok(transaction)
     }
 }
