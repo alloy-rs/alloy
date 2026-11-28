@@ -36,7 +36,9 @@ pub struct ForkScheduleResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpecResponse {
     /// The spec configuration as key-value pairs.
-    pub data: BTreeMap<String, String>,
+    ///
+    /// Most values are strings, but some are lists, e.g. `BLOB_SCHEDULE`.
+    pub data: BTreeMap<String, serde_json::Value>,
 }
 
 #[cfg(test)]
@@ -107,6 +109,32 @@ mod tests {
         assert_eq!(resp.data.len(), 3);
         assert_eq!(resp.data.get("SECONDS_PER_SLOT").unwrap(), "12");
         assert_eq!(resp.data.get("MAX_VALIDATORS_PER_COMMITTEE").unwrap(), "2048");
+
+        let serialized = serde_json::to_string(&resp).unwrap();
+        let deserialized: SpecResponse = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(resp, deserialized);
+    }
+
+    #[test]
+    fn serde_spec_response_blob_schedule() {
+        // excerpt of a mainnet `/eth/v1/config/spec` response after Fulu
+        let s = r#"{
+            "data": {
+                "SECONDS_PER_SLOT": "12",
+                "FULU_FORK_EPOCH": "411392",
+                "BLOB_SCHEDULE": [
+                    {"EPOCH": "412672", "MAX_BLOBS_PER_BLOCK": "15"},
+                    {"EPOCH": "419072", "MAX_BLOBS_PER_BLOCK": "21"}
+                ]
+            }
+        }"#;
+
+        let resp: SpecResponse = serde_json::from_str(s).unwrap();
+        assert_eq!(resp.data.len(), 3);
+        assert_eq!(resp.data.get("FULU_FORK_EPOCH").unwrap(), "411392");
+        let schedule = resp.data.get("BLOB_SCHEDULE").unwrap().as_array().unwrap();
+        assert_eq!(schedule.len(), 2);
+        assert_eq!(schedule[1]["MAX_BLOBS_PER_BLOCK"], "21");
 
         let serialized = serde_json::to_string(&resp).unwrap();
         let deserialized: SpecResponse = serde_json::from_str(&serialized).unwrap();
