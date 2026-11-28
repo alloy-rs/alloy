@@ -26,6 +26,8 @@ const FLAT_CALL: &str = r#"[{
 }]"#;
 const FOUR_BYTE: &str = r#"{"0x27dc297e-128": 1, "0x38cc4831-0": 2}"#;
 const STATE_GAS: &str = r#"{"gasUsed": "0x5208", "executionGasUsed": "0x5208", "stateGasUsed": "0x0", "gasRefund": "0x0"}"#;
+const KECCAK256_PREIMAGE: &str =
+    r#"{"0x5fe7f977e71dba2ea1a68e21057beebb9be2ac30c6410aa38d4f3fbe41dcffd2": "0x01"}"#;
 const EMPTY: &str = "{}";
 const JS: &str = r#""custom js tracer result""#;
 
@@ -40,6 +42,7 @@ const fn variant(trace: &GethTrace) -> &'static str {
         GethTrace::StateGasTracer(_) => "StateGasTracer",
         GethTrace::NoopTracer(_) => "NoopTracer",
         GethTrace::MuxTracer(_) => "MuxTracer",
+        GethTrace::Keccak256PreimageTracer(_) => "Keccak256PreimageTracer",
         GethTrace::JS(_) => "JS",
     }
 }
@@ -56,6 +59,7 @@ fn top_level_variants() {
         (PRESTATE, "PreStateTracer"),
         (PRESTATE_DIFF, "PreStateTracer"),
         (STATE_GAS, "StateGasTracer"),
+        (KECCAK256_PREIMAGE, "Keccak256PreimageTracer"),
         // `{}` is both the noopTracer response and an empty 4byteTracer response.
         (EMPTY, "FourByteTracer"),
         (&mux, "MuxTracer"),
