@@ -13,6 +13,7 @@ use std::{borrow::Cow, collections::BTreeMap, time::Duration};
 pub use self::{
     call::{CallConfig, CallFrame, CallKind, CallLogFrame, FlatCallConfig},
     four_byte::FourByteFrame,
+    keccak256_preimage::Keccak256PreimageFrame,
     noop::NoopFrame,
     pre_state::{
         AccountChangeKind, AccountState, DiffMode, DiffStateKind, PreStateConfig, PreStateFrame,
@@ -24,6 +25,7 @@ pub use self::{
 pub mod call;
 pub mod erc7562;
 pub mod four_byte;
+pub mod keccak256_preimage;
 pub mod mux;
 pub mod noop;
 pub mod pre_state;
@@ -225,6 +227,11 @@ pub enum GethTrace {
     StateGasTracer(StateGasTrace),
     /// An empty json response
     NoopTracer(NoopFrame),
+    /// The response for keccak256 preimage tracer
+    ///
+    /// Must be tried before [`GethTrace::MuxTracer`]: a map of hashes to hex strings also
+    /// deserializes as a [`MuxFrame`] keyed by [`GethDebugTracerType::JsTracer`].
+    Keccak256PreimageTracer(Keccak256PreimageFrame),
     /// The response for mux tracer
     MuxTracer(MuxFrame),
     /// Any other trace response, such as custom javascript response objects
@@ -271,6 +278,7 @@ geth_trace_frames! {
     PreStateTracer(PreStateFrame) => is_pre_state, try_into_pre_state_frame;
     StateGasTracer(StateGasTrace) => is_state_gas, try_into_state_gas_trace;
     MuxTracer(MuxFrame) => is_mux, try_into_mux_frame;
+    Keccak256PreimageTracer(Keccak256PreimageFrame) => is_keccak256_preimage, try_into_keccak256_preimage_frame;
 }
 
 impl GethTrace {
@@ -367,6 +375,11 @@ pub enum GethDebugBuiltInTracerType {
     /// RIP-7560)
     #[serde(rename = "erc7562Tracer")]
     Erc7562Tracer,
+    /// The keccak256PreimageTracer collects the preimage of every `KECCAK256` operation executed
+    /// during a transaction. The result is a [Keccak256PreimageFrame] mapping each hash to the
+    /// hashed bytes.
+    #[serde(rename = "keccak256PreimageTracer")]
+    Keccak256PreimageTracer,
 }
 
 /// Available tracers
@@ -402,6 +415,7 @@ impl GethDebugTracerType {
                 GethDebugBuiltInTracerType::NoopTracer => "noopTracer",
                 GethDebugBuiltInTracerType::MuxTracer => "muxTracer",
                 GethDebugBuiltInTracerType::Erc7562Tracer => "erc7562Tracer",
+                GethDebugBuiltInTracerType::Keccak256PreimageTracer => "keccak256PreimageTracer",
             },
             Self::JsTracer(code) => code,
         }
