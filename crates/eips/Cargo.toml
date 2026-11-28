@@ -66,6 +66,7 @@ borsh = { workspace = true, optional = true, features = ["derive"] }
 auto_impl.workspace = true
 
 [dev-dependencies]
+ephyra.workspace = true
 alloy-primitives = { workspace = true, features = [
 	"rand",
 	"serde",
