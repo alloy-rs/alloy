@@ -55,8 +55,15 @@ impl Eip1559Estimation {
     /// assert_eq!(est.max_priority_fee_per_gas, 110);
     /// ```
     pub const fn scale_by_pct(&mut self, pct: u64) {
-        self.max_fee_per_gas = self.max_fee_per_gas * (100 + pct as u128) / 100;
-        self.max_priority_fee_per_gas = self.max_priority_fee_per_gas * (100 + pct as u128) / 100;
+        let factor = 100 + pct as u128;
+        self.max_fee_per_gas = match self.max_fee_per_gas.checked_mul(factor) {
+            Some(scaled) => scaled / 100,
+            None => u128::MAX,
+        };
+        self.max_priority_fee_per_gas = match self.max_priority_fee_per_gas.checked_mul(factor) {
+            Some(scaled) => scaled / 100,
+            None => u128::MAX,
+        };
     }
 
     /// Consumes the type and returns the scaled estimation.
@@ -116,13 +123,14 @@ pub fn calc_next_block_base_fee(
     match gas_used.cmp(&gas_target) {
         core::cmp::Ordering::Equal => base_fee,
         core::cmp::Ordering::Greater => {
-            base_fee
-                + (core::cmp::max(
-                    // Ensure a minimum increase of 1.
-                    1,
-                    base_fee as u128 * (gas_used - gas_target) as u128
-                        / (gas_target as u128 * base_fee_params.max_change_denominator),
-                ) as u64)
+            let increase = core::cmp::max(
+                // Ensure a minimum increase of 1.
+                1,
+                base_fee as u128 * (gas_used - gas_target) as u128
+                    / (gas_target as u128 * base_fee_params.max_change_denominator),
+            ) as u64;
+            // Match the decrease path: never panic/wrap when the parent fee is already near u64::MAX.
+            base_fee.saturating_add(increase)
         }
         core::cmp::Ordering::Less => base_fee.saturating_sub(
             (base_fee as u128 * (gas_target - gas_used) as u128
@@ -268,5 +276,22 @@ mod tests {
         let p = BaseFeeParams::ethereum();
         // gas_target = 1 / 2 = 0; gas_used > 0 used to hit a divide-by-zero in the increase path.
         assert_eq!(calc_next_block_base_fee(1, 1, 1_000_000_000, p), 1_000_000_000);
+    }
+
+    #[test]
+    fn next_base_fee_saturates_at_u64_max() {
+        let p = BaseFeeParams::ethereum();
+        assert_eq!(calc_next_block_base_fee(15_000_001, 30_000_000, u64::MAX, p), u64::MAX);
+    }
+
+    #[test]
+    fn scale_by_pct_saturates_on_overflow() {
+        let est = Eip1559Estimation {
+            max_fee_per_gas: u128::MAX,
+            max_priority_fee_per_gas: u128::MAX,
+        }
+        .scaled_by_pct(10);
+        assert_eq!(est.max_fee_per_gas, u128::MAX);
+        assert_eq!(est.max_priority_fee_per_gas, u128::MAX);
     }
 }
