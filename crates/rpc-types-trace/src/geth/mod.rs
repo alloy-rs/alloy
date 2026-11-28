@@ -7,8 +7,12 @@ use crate::geth::{
 };
 use alloy_primitives::{Bytes, B256, U256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
-use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
-use std::{borrow::Cow, collections::BTreeMap, time::Duration};
+use serde::{
+    de::DeserializeOwned,
+    ser::{SerializeMap, SerializeSeq},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+use std::{borrow::Cow, collections::BTreeMap, sync::Arc, time::Duration};
 // re-exports
 pub use self::{
     call::{CallConfig, CallFrame, CallKind, CallLogFrame, FlatCallConfig},
@@ -170,20 +174,30 @@ pub struct StructLog {
     /// Last call's return data. Enabled via enableReturnData
     #[serde(default, rename = "returnData", skip_serializing_if = "Option::is_none")]
     pub return_data: Option<Bytes>,
+    /// EVM memory, serialized as a list of 0x-prefixed 32-byte words. A trailing partial word is
+    /// zero-padded. Deserialization also accepts words without the 0x prefix.
+    ///
     /// ref <https://github.com/ethereum/go-ethereum/blob/366d2169fbc0e0f803b68c042b77b6b480836dbc/eth/tracers/logger/logger.go#L450-L452>
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub memory: Option<Vec<String>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_memory_words_opt",
+        deserialize_with = "deserialize_memory_words_opt"
+    )]
+    pub memory: Option<Bytes>,
     /// Size of memory.
     #[serde(default, rename = "memSize", skip_serializing_if = "Option::is_none")]
     pub memory_size: Option<u64>,
     /// Storage slots of current contract read from and written to. Only emitted for SLOAD and
     /// SSTORE. Disabled via disableStorage
+    ///
+    /// Shared so that consecutive steps with the same storage snapshot don't need a copy each.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_string_storage_map_opt"
     )]
-    pub storage: Option<BTreeMap<B256, B256>>,
+    pub storage: Option<Arc<BTreeMap<B256, B256>>>,
     /// Ordinary transaction refund counter at this step, before the transaction-wide cap/floor.
     /// Excludes EIP-8037 state refills. This is not the applied refund or available execution gas.
     #[serde(default, rename = "refund", skip_serializing_if = "Option::is_none")]
@@ -836,10 +850,10 @@ impl From<GethDebugTracingOptions> for GethDebugTracingCallOptions {
 
 /// Serializes a storage map as a list of key-value pairs with 0x-prefix
 fn serialize_string_storage_map_opt<S: Serializer>(
-    storage: &Option<BTreeMap<B256, B256>>,
+    storage: &Option<Arc<BTreeMap<B256, B256>>>,
     s: S,
 ) -> Result<S::Ok, S::Error> {
-    match storage {
+    match storage.as_deref() {
         None => s.serialize_none(),
         Some(storage) => {
             let mut m = s.serialize_map(Some(storage.len()))?;
@@ -851,6 +865,37 @@ fn serialize_string_storage_map_opt<S: Serializer>(
             m.end()
         }
     }
+}
+
+/// Serializes memory as a list of 0x-prefixed 32-byte words, zero-padding a trailing partial word.
+fn serialize_memory_words_opt<S: Serializer>(
+    memory: &Option<Bytes>,
+    s: S,
+) -> Result<S::Ok, S::Error> {
+    match memory {
+        None => s.serialize_none(),
+        Some(memory) => {
+            let (words, remainder) = memory.as_chunks::<32>();
+            let mut seq = s.serialize_seq(Some(memory.len().div_ceil(32)))?;
+            for word in words {
+                seq.serialize_element(&B256::new(*word))?;
+            }
+            if !remainder.is_empty() {
+                let mut word = B256::ZERO;
+                word[..remainder.len()].copy_from_slice(remainder);
+                seq.serialize_element(&word)?;
+            }
+            seq.end()
+        }
+    }
+}
+
+/// Deserializes memory from a list of 32-byte hex words, with or without 0x prefix.
+fn deserialize_memory_words_opt<'de, D: Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Bytes>, D::Error> {
+    let words = Option::<Vec<B256>>::deserialize(d)?;
+    Ok(words.map(|words| words.iter().flat_map(|word| word.0).collect()))
 }
 
 #[cfg(test)]
@@ -958,6 +1003,40 @@ mod tests {
         let val = serde_json::to_value(&log).unwrap();
         let input = serde_json::from_str::<serde_json::Value>(s).unwrap();
         assert_eq!(input, val);
+    }
+
+    #[test]
+    fn struct_log_serde_byte_identical() {
+        let s = r#"{"pc":1,"op":"SSTORE","gas":2,"gasCost":3,"depth":1,"memory":["0x0000000000000000000000000000000000000000000000000000000000000001","0x00000000000000000000000000000000000000000000000000000000000000ff"],"storage":{"0x0000000000000000000000000000000000000000000000000000000000000001":"0x0000000000000000000000000000000000000000000000000000000000000002","0x0000000000000000000000000000000000000000000000000000000000000003":"0x0000000000000000000000000000000000000000000000000000000000000004"}}"#;
+        let log: StructLog = serde_json::from_str(s).unwrap();
+        assert_eq!(log.memory.as_ref().unwrap().len(), 64);
+        assert_eq!(log.storage.as_ref().unwrap().len(), 2);
+        assert_eq!(serde_json::to_string(&log).unwrap(), s);
+
+        let s = r#"{"pc":1,"op":"MSTORE","gas":2,"gasCost":3,"depth":1,"memory":[]}"#;
+        let log: StructLog = serde_json::from_str(s).unwrap();
+        assert_eq!(log.memory, Some(Bytes::new()));
+        assert_eq!(serde_json::to_string(&log).unwrap(), s);
+    }
+
+    #[test]
+    fn struct_log_memory_words() {
+        let log = StructLog { memory: Some(Bytes::from_static(&[0xab; 33])), ..Default::default() };
+        assert_eq!(
+            serde_json::to_value(&log).unwrap()["memory"],
+            serde_json::json!([
+                "0xabababababababababababababababababababababababababababababababab",
+                "0xab00000000000000000000000000000000000000000000000000000000000000"
+            ])
+        );
+
+        let s = r#"{"pc":1,"op":"MSTORE","gas":2,"gasCost":3,"depth":1,"memory":["00000000000000000000000000000000000000000000000000000000000000ff"]}"#;
+        let log: StructLog = serde_json::from_str(s).unwrap();
+        assert_eq!(log.memory.unwrap().as_ref(), B256::with_last_byte(0xff).as_slice());
+
+        let s = r#"{"pc":1,"op":"MSTORE","gas":2,"gasCost":3,"depth":1,"memory":["0xff"]}"#;
+        let err = serde_json::from_str::<StructLog>(s).unwrap_err();
+        assert!(err.to_string().contains("invalid string length"), "{err}");
     }
 
     #[test]
