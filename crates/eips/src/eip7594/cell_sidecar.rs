@@ -82,20 +82,24 @@ impl BlobTransactionCellSidecar {
         sidecar: &BlobTransactionSidecarEip7594,
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
-        let cells = sidecar.compute_cells_with_settings(settings)?;
-        Self::new(
-            sidecar.commitments.clone(),
-            sidecar.cell_proofs.clone(),
-            cells,
-            BlobCellMask::ALL,
-        )
-        .ok_or_else(|| {
-            c_kzg::Error::MismatchLength(alloc::format!(
-                "{} blobs, {} commitments and {} cell proofs",
-                sidecar.blobs.len(),
+        let blobs = sidecar.blobs.len();
+        if blobs == 0
+            || blobs != sidecar.commitments.len()
+            || blobs.checked_mul(CELLS_PER_EXT_BLOB) != Some(sidecar.cell_proofs.len())
+        {
+            return Err(c_kzg::Error::MismatchLength(alloc::format!(
+                "{blobs} blobs, {} commitments and {} cell proofs",
                 sidecar.commitments.len(),
                 sidecar.cell_proofs.len()
-            ))
+            )));
+        }
+
+        let cells = sidecar.compute_cells_with_settings(settings)?;
+        Ok(Self {
+            commitments: sidecar.commitments.clone(),
+            proofs: sidecar.cell_proofs.clone(),
+            cells,
+            mask: BlobCellMask::ALL,
         })
     }
 
@@ -180,9 +184,9 @@ impl BlobTransactionCellSidecar {
 
     /// Rebuilds the full sidecar, checking each rebuilt blob against its commitment.
     ///
-    /// Only the first half of the kept columns is used: it determines the blob, so once its
-    /// commitment matches, the recomputed proofs are valid too, even if other kept cells are
-    /// corrupt.
+    /// Recovery uses the first 64 kept columns in ascending index order. These determine the
+    /// blob, so once its commitment matches, the recomputed proofs are valid too, even if
+    /// other kept cells are corrupt.
     ///
     /// # Errors
     ///
@@ -494,6 +498,8 @@ mod tests {
     fn try_from_sidecar_rejects_counts_that_do_not_match() {
         let (mut full, _) = fixture();
         full.cell_proofs.pop();
+        // The count mismatch takes precedence over a KZG error from an invalid field element.
+        full.blobs[0][..32].fill(0xff);
         assert!(matches!(
             BlobTransactionCellSidecar::try_from_sidecar(&full, settings()),
             Err(c_kzg::Error::MismatchLength(message))
