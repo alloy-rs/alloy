@@ -55,7 +55,8 @@ pub enum GasFillable {
 ///   `max_priority_fee_per_gas`. If one of them is set, filling fails with
 ///   [`RpcError::UnsupportedFeature`], because a legacy tx would drop that fee.
 /// - If the filler was created with [`GasFiller::legacy`], it skips EIP-1559 estimation entirely
-///   and always populates the `gas_limit` and `gas_price` fields if unset.
+///   and fills missing legacy gas fields. If filling is needed and either EIP-1559 fee is set, it
+///   returns a local usage error.
 ///
 /// # Example
 ///
@@ -80,7 +81,7 @@ pub enum GasFillable {
 pub struct GasFiller {
     /// The eip1559 gas estimator to use.
     pub estimator: Eip1559Estimator,
-    /// Whether to always populate the legacy `gas_price` field instead of estimating EIP-1559
+    /// Whether to populate the legacy `gas_price` field instead of estimating EIP-1559
     /// fees, see [`GasFiller::legacy`].
     pub legacy: bool,
 }
@@ -91,8 +92,8 @@ impl GasFiller {
         Self { estimator, legacy: false }
     }
 
-    /// Creates a [`GasFiller`] that always populates the legacy `gas_price` field instead of the
-    /// EIP-1559 `max_fee_per_gas` and `max_priority_fee_per_gas` fields.
+    /// Creates a [`GasFiller`] that fills legacy gas fields. If filling is needed, setting
+    /// `max_fee_per_gas` or `max_priority_fee_per_gas` causes a local usage error.
     ///
     /// The default filler only falls back to legacy fees when the latest block header has no base
     /// fee. Chains that report a `baseFeePerGas` (typically `0`) in their headers but do not
@@ -185,6 +186,14 @@ impl<N: Network> TxFiller<N> for GasFiller {
     where
         P: Provider<N>,
     {
+        let has_eip1559_fee =
+            tx.max_fee_per_gas().is_some() || tx.max_priority_fee_per_gas().is_some();
+        if self.legacy && has_eip1559_fee {
+            return Err(RpcError::local_usage_str(
+                "legacy gas filling is incompatible with max_fee_per_gas or max_priority_fee_per_gas",
+            ));
+        }
+
         if self.legacy || tx.gas_price().is_some() {
             self.prepare_legacy(provider, tx).await
         } else {
@@ -192,10 +201,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
                 // fallback to legacy
                 Ok(estimate) => Ok(estimate),
                 // A legacy transaction would drop a caller-set EIP-1559 fee.
-                Err(RpcError::UnsupportedFeature(_))
-                    if tx.max_fee_per_gas().is_none()
-                        && tx.max_priority_fee_per_gas().is_none() =>
-                {
+                Err(RpcError::UnsupportedFeature(_)) if !has_eip1559_fee => {
                     self.prepare_legacy(provider, tx).await
                 }
                 Err(e) => Err(e),
@@ -495,6 +501,50 @@ mod tests {
             panic!("expected a signed envelope");
         };
         assert!(envelope.is_legacy());
+    }
+
+    #[tokio::test]
+    async fn legacy_filler_rejects_eip1559_fees() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        asserter.push_success(&U256::from(200));
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_legacy_gas_estimation()
+            .connect_mocked_client(asserter.clone());
+
+        for (max_fee_per_gas, max_priority_fee_per_gas) in [(Some(100), None), (None, Some(100))] {
+            let tx = TransactionRequest {
+                gas: Some(21_000),
+                max_fee_per_gas,
+                max_priority_fee_per_gas,
+                ..Default::default()
+            };
+            let err = provider.fill(tx).await.unwrap_err();
+            assert!(err.is_local_usage_error(), "{err}");
+        }
+        assert!(asserter.requests().is_empty());
+    }
+
+    #[tokio::test]
+    async fn legacy_filler_requires_gas_limit_with_eip1559_fees() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_legacy_gas_estimation()
+            .connect_mocked_client(asserter.clone());
+        let tx = TransactionRequest {
+            max_fee_per_gas: Some(100),
+            max_priority_fee_per_gas: Some(2),
+            ..Default::default()
+        };
+
+        let err = provider.fill(tx.clone()).await.unwrap_err();
+        assert!(err.is_local_usage_error(), "{err}");
+
+        let tx = tx.gas_limit(21_000);
+        let filled = provider.fill(tx.clone()).await.unwrap();
+        assert_eq!(filled.as_builder(), Some(&tx));
+        assert!(asserter.requests().is_empty());
     }
 
     async fn fill_eip1559_fees(

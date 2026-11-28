@@ -321,8 +321,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Add legacy gas estimation to the stack being built.
     ///
-    /// The filler always populates `gas_price` instead of the EIP-1559 fee fields, see
-    /// [`GasFiller::legacy`] for more information.
+    /// See [`GasFiller::legacy`] for how this handles requests with EIP-1559 fee fields.
     pub fn with_legacy_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
         self.filler(GasFiller::legacy())
     }
