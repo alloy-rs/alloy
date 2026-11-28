@@ -160,7 +160,7 @@ pub(crate) fn unused_port() -> u16 {
 /// Extracts the value for the given key from the line of text.
 ///
 /// It supports keys that end with '=' or ': '.
-/// For keys end with '=', find value until ' ' is encountered or end of line
+/// For keys ending with '=', reads until whitespace or the end of the line.
 /// For keys end with ':', find value until ',' is encountered or end of line
 pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
     let mut key_equal = Cow::from(key);
@@ -177,7 +177,7 @@ pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
     // Try to find the key with '='
     if let Some(pos) = line.find(key_equal.as_ref()) {
         let start = pos + key_equal.len();
-        let end = line[start..].find(' ').map(|i| start + i).unwrap_or(line.len());
+        let end = line[start..].find(char::is_whitespace).map(|i| start + i).unwrap_or(line.len());
         return Some(line[start..end].trim());
     }
 
@@ -298,6 +298,14 @@ mod tests {
     fn test_extract_value_with_equals() {
         let line = "key=value some other text";
         assert_eq!(extract_value("key", line), Some("value"));
+    }
+
+    #[test]
+    fn test_extract_value_with_whitespace_separator() {
+        for separator in [" ", "\t", "\r", "\n"] {
+            let line = format!("key=value{separator}other=field");
+            assert_eq!(extract_value("key", &line), Some("value"));
+        }
     }
 
     #[test]
