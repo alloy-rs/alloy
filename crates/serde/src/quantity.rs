@@ -391,7 +391,8 @@ mod private {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{string::ToString, vec, vec::Vec};
+    use alloc::{collections::BTreeMap, string::ToString, vec, vec::Vec};
+    use alloy_primitives::map::HashMap;
     use core::num::{NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8};
     use serde::{Deserialize, Serialize};
 
@@ -616,8 +617,6 @@ mod tests {
 
     #[test]
     fn test_u128_hashmap_via_ruint() {
-        use alloy_primitives::map::HashMap;
-
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
             #[serde(with = "super::hashmap")]
@@ -638,8 +637,6 @@ mod tests {
 
     #[test]
     fn test_u128_btreemap_via_ruint() {
-        use alloc::collections::BTreeMap;
-
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
             #[serde(with = "super::btreemap")]

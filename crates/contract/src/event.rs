@@ -277,8 +277,8 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     /// # Errors
     ///
     /// If the initial request fails, this method returns a local usage error for block hash
-    /// filters, and [`RpcError::NullResp`] if the range uses a `safe` or `finalized` tag that the
-    /// node cannot resolve.
+    /// filters or reversed block ranges, and [`RpcError::NullResp`] if the range uses a `safe` or
+    /// `finalized` tag that the node cannot resolve.
     pub async fn query_raw(&self) -> TransportResult<Vec<Log>> {
         if let Ok(logs) = self.provider.get_logs(&self.filter).await {
             return Ok(logs);
@@ -295,9 +295,10 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     ///
     /// # Errors
     ///
-    /// Returns a local usage error for block hash filters, and [`RpcError::NullResp`] if the range
-    /// uses a `safe` or `finalized` tag that the node cannot resolve. RPC and decoding errors that
-    /// occur while querying chunks are yielded by the returned stream.
+    /// Returns a local usage error for block hash filters or reversed block ranges, and
+    /// [`RpcError::NullResp`] if the range uses a `safe` or `finalized` tag that the node cannot
+    /// resolve. RPC and decoding errors that occur while querying chunks are yielded by the
+    /// returned stream.
     pub async fn query_stream(
         &self,
     ) -> Result<impl Stream<Item = Result<(E, Log), Error>> + use<P, E, N>, Error> {
@@ -315,9 +316,9 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     ///
     /// # Errors
     ///
-    /// Returns a local usage error for block hash filters, and [`RpcError::NullResp`] if the range
-    /// uses a `safe` or `finalized` tag that the node cannot resolve. RPC errors that occur while
-    /// querying chunks are yielded by the returned stream.
+    /// Returns a local usage error for block hash filters or reversed block ranges, and
+    /// [`RpcError::NullResp`] if the range uses a `safe` or `finalized` tag that the node cannot
+    /// resolve. RPC errors that occur while querying chunks are yielded by the returned stream.
     pub async fn query_raw_stream(
         &self,
     ) -> TransportResult<impl Stream<Item = TransportResult<Log>> + use<P, E, N>> {
@@ -343,11 +344,21 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
             ));
         };
 
-        let from =
-            resolve_block_tag(&self.provider, from_block.unwrap_or(BlockNumberOrTag::Earliest))
-                .await?;
-        let to =
-            resolve_block_tag(&self.provider, to_block.unwrap_or(BlockNumberOrTag::Latest)).await?;
+        let from_tag = from_block.unwrap_or(BlockNumberOrTag::Earliest);
+        let to_tag = to_block.unwrap_or(BlockNumberOrTag::Latest);
+        let from = resolve_block_tag(&self.provider, from_tag).await?;
+        // A moving block tag can resolve differently between RPC calls.
+        let to = if from_tag == to_tag {
+            from
+        } else {
+            resolve_block_tag(&self.provider, to_tag).await?
+        };
+
+        if from > to {
+            return Err(RpcError::local_usage_str(&format!(
+                "invalid block range: from block {from} is greater than to block {to}"
+            )));
+        }
 
         Ok((from, to))
     }
@@ -546,6 +557,7 @@ mod tests {
     use super::*;
     use alloy_network::EthereumWallet;
     use alloy_primitives::U256;
+    use alloy_provider::ext::AnvilApi;
     use alloy_rpc_types_eth::Header;
     use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
@@ -792,8 +804,6 @@ mod tests {
     /// when events are spread across a range requiring multiple chunks.
     #[tokio::test]
     async fn chunked_query_collects_and_orders_logs() {
-        use alloy_provider::ext::AnvilApi;
-
         let _ = tracing_subscriber::fmt::try_init();
 
         let anvil = alloy_node_bindings::Anvil::new().spawn();
@@ -850,6 +860,58 @@ mod tests {
         );
         assert_eq!(chunked.len(), 3, "expected exactly 3 events across all chunks");
         assert_eq!(chunked, reference, "chunked result must match full-range query");
+    }
+
+    #[tokio::test]
+    async fn chunked_query_rejects_reversed_range() {
+        let asserter = Asserter::new();
+        asserter.push_failure_msg("upstream unavailable");
+        let provider =
+            alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
+        let chunked = event.from_block(10u64).to_block(5u64).chunked();
+
+        let err = chunked.query_raw().await.unwrap_err();
+        assert!(err.is_local_usage_error(), "expected a local usage error, got: {err}");
+        assert!(asserter.read_q().is_empty(), "expected the initial request to reach the RPC");
+    }
+
+    #[tokio::test]
+    async fn chunked_query_stream_resolves_identical_block_tags_once() {
+        let asserter = Asserter::new();
+        asserter.push_success(&10_u64);
+        let log = Log { block_number: Some(10), ..Default::default() };
+        asserter.push_success(&[&log]);
+        let provider =
+            alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
+        let chunked =
+            event.from_block(BlockNumberOrTag::Latest).to_block(BlockNumberOrTag::Latest).chunked();
+
+        let logs = chunked.query_raw_stream().await.unwrap().try_collect::<Vec<_>>().await.unwrap();
+        assert_eq!(logs, [log]);
+
+        let requests = asserter.take_requests();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].method(), "eth_blockNumber");
+        assert_eq!(requests[1].method(), "eth_getLogs");
+        let (filter,): (Filter,) =
+            serde_json::from_str(requests[1].params().unwrap().get()).unwrap();
+        assert_eq!(filter.block_option, Filter::new().from_block(10).to_block(10).block_option);
+    }
+
+    #[tokio::test]
+    async fn chunked_query_stream_rejects_reversed_range() {
+        let asserter = Asserter::new();
+        asserter.push_success(&5_u64);
+        let provider = alloy_provider::ProviderBuilder::new().connect_mocked_client(asserter);
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
+        let chunked = event.from_block(10u64).to_block(BlockNumberOrTag::Latest).chunked();
+
+        let Err(err) = chunked.query_raw_stream().await else {
+            panic!("expected an error for a reversed block range");
+        };
+        assert!(err.is_local_usage_error(), "expected a local usage error, got: {err}");
     }
 
     /// Verifies that a chunked query stops sending requests once a chunk's fallback fails
@@ -912,8 +974,6 @@ mod tests {
     /// Verifies that a chunked query resolves `finalized`, `safe`, and `latest` separately
     #[tokio::test]
     async fn chunked_query_resolves_block_tags() {
-        use alloy_provider::ext::AnvilApi;
-
         let anvil = alloy_node_bindings::Anvil::new().spawn();
 
         let pk: PrivateKeySigner =

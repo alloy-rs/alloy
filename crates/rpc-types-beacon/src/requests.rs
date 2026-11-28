@@ -28,6 +28,7 @@ impl<'de> Deserialize<'de> for ExecutionRequestsV4 {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct Helper {
             #[serde(default)]
             deposits: Option<Vec<DepositRequest>>,
@@ -84,6 +85,7 @@ impl<'de> Deserialize<'de> for ExecutionRequestsV5 {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct Helper {
             #[serde(default)]
             deposits: Option<Vec<DepositRequest>>,
@@ -177,14 +179,23 @@ mod ssz_requests_conversions {
     impl TryFrom<&Requests> for ExecutionRequestsV4 {
         type Error = TryFromRequestsError;
 
+        /// Request types must be strictly ascending and each request must carry data.
         fn try_from(value: &Requests) -> Result<Self, Self::Error> {
             let mut requests = Self::default();
+            let mut prev_type = None;
 
             for request in value.iter() {
-                let (request_type, payload) =
+                let (&request_type, payload) =
                     request.split_first().ok_or(TryFromRequestsError::EmptyRequest)?;
+                if payload.is_empty() {
+                    return Err(TryFromRequestsError::EmptyRequest);
+                }
+                if prev_type.is_some_and(|prev| prev >= request_type) {
+                    return Err(TryFromRequestsError::UnorderedRequestType(request_type));
+                }
+                prev_type = Some(request_type);
 
-                match *request_type {
+                match request_type {
                     DEPOSIT_REQUEST_TYPE => {
                         requests.deposits = parse_request_payload(
                             payload,
@@ -216,8 +227,9 @@ mod ssz_requests_conversions {
 
     /// Errors possible converting a [Requests] to [ExecutionRequestsV4] or [ExecutionRequestsV5]
     #[derive(Debug, thiserror::Error)]
+    #[non_exhaustive]
     pub enum TryFromRequestsError {
-        /// One of the Bytes is empty.
+        /// One of the Bytes is empty or has no request_data after the request_type.
         #[error("empty bytes in requests body")]
         EmptyRequest,
         /// Bytes prefix is not a known EIP-7685 request_type for the target version.
@@ -229,6 +241,9 @@ mod ssz_requests_conversions {
         /// Requests of request_type exceeds the size limit for that type
         #[error("requests_data payload for request_type {0} exceeds size limit {1}")]
         RequestPayloadSizeExceeded(u8, usize),
+        /// A request_type is not greater than the one before it (repeated or out of order).
+        #[error("request_type {0} is repeated or out of order")]
+        UnorderedRequestType(u8),
     }
 
     impl From<&ExecutionRequestsV4> for Requests {
@@ -256,18 +271,28 @@ mod ssz_requests_conversions {
     impl TryFrom<&Requests> for ExecutionRequestsV5 {
         type Error = TryFromRequestsError;
 
+        /// Request types must be strictly ascending and each request must carry data.
+        ///
         /// Takes the two EIP-8282 request types out of the body and defers the rest to
         /// [`ExecutionRequestsV4`], which still rejects any type byte neither of us knows.
         fn try_from(value: &Requests) -> Result<Self, Self::Error> {
             let mut builder_deposits = Vec::new();
             let mut builder_exits = Vec::new();
             let mut rest = Vec::with_capacity(value.len());
+            let mut prev_type = None;
 
             for request in value.iter() {
-                let (request_type, payload) =
+                let (&request_type, payload) =
                     request.split_first().ok_or(TryFromRequestsError::EmptyRequest)?;
+                if payload.is_empty() {
+                    return Err(TryFromRequestsError::EmptyRequest);
+                }
+                if prev_type.is_some_and(|prev| prev >= request_type) {
+                    return Err(TryFromRequestsError::UnorderedRequestType(request_type));
+                }
+                prev_type = Some(request_type);
 
-                match *request_type {
+                match request_type {
                     BUILDER_DEPOSIT_REQUEST_TYPE => {
                         builder_deposits = parse_request_payload(
                             payload,
@@ -379,12 +404,89 @@ mod ssz_requests_conversions {
             ));
             Ok(())
         }
+
+        #[test]
+        fn test_from_requests_rejects_unordered_types() {
+            let deposits = Bytes::from_iter(
+                core::iter::once(DEPOSIT_REQUEST_TYPE)
+                    .chain(vec![DepositRequest::default()].as_ssz_bytes()),
+            );
+            let withdrawals = Bytes::from_iter(
+                core::iter::once(WITHDRAWAL_REQUEST_TYPE)
+                    .chain(vec![WithdrawalRequest::default()].as_ssz_bytes()),
+            );
+            let exits = Bytes::from_iter(
+                core::iter::once(BUILDER_EXIT_REQUEST_TYPE)
+                    .chain(vec![BuilderExitRequest::default()].as_ssz_bytes()),
+            );
+
+            // A repeated type must not erase the earlier entry.
+            let repeated = Requests::new(vec![withdrawals.clone(), withdrawals.clone()]);
+            assert!(matches!(
+                ExecutionRequestsV4::try_from(&repeated),
+                Err(TryFromRequestsError::UnorderedRequestType(WITHDRAWAL_REQUEST_TYPE))
+            ));
+            assert!(matches!(
+                ExecutionRequestsV5::try_from(&repeated),
+                Err(TryFromRequestsError::UnorderedRequestType(WITHDRAWAL_REQUEST_TYPE))
+            ));
+            let repeated_exits = Requests::new(vec![exits.clone(), exits.clone()]);
+            assert!(matches!(
+                ExecutionRequestsV5::try_from(&repeated_exits),
+                Err(TryFromRequestsError::UnorderedRequestType(BUILDER_EXIT_REQUEST_TYPE))
+            ));
+
+            // Types must ascend, also across V5's split.
+            let descending = Requests::new(vec![withdrawals.clone(), deposits.clone()]);
+            assert!(matches!(
+                ExecutionRequestsV4::try_from(&descending),
+                Err(TryFromRequestsError::UnorderedRequestType(DEPOSIT_REQUEST_TYPE))
+            ));
+            let unordered = Requests::new(vec![exits.clone(), withdrawals.clone()]);
+            assert!(matches!(
+                ExecutionRequestsV5::try_from(&unordered),
+                Err(TryFromRequestsError::UnorderedRequestType(WITHDRAWAL_REQUEST_TYPE))
+            ));
+            let ascending = Requests::new(vec![deposits, withdrawals, exits]);
+            let v5 = ExecutionRequestsV5::try_from(&ascending).unwrap();
+            assert_eq!(v5.builder_exits, vec![BuilderExitRequest::default()]);
+
+            // A request without request_data is rejected.
+            let type_only = Requests::new(vec![Bytes::from(vec![DEPOSIT_REQUEST_TYPE])]);
+            assert!(matches!(
+                ExecutionRequestsV4::try_from(&type_only),
+                Err(TryFromRequestsError::EmptyRequest)
+            ));
+            let exits_type_only = Requests::new(vec![Bytes::from(vec![BUILDER_EXIT_REQUEST_TYPE])]);
+            assert!(matches!(
+                ExecutionRequestsV5::try_from(&exits_type_only),
+                Err(TryFromRequestsError::EmptyRequest)
+            ));
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn requests_reject_unknown_fields() {
+        for value in [serde_json::Value::Null, serde_json::json!([])] {
+            let json = serde_json::json!({ "unknown": value });
+            assert!(serde_json::from_value::<ExecutionRequestsV4>(json.clone()).is_err());
+            assert!(serde_json::from_value::<ExecutionRequestsV5>(json).is_err());
+        }
+
+        for field in ["builder_deposits", "builder_exits"] {
+            let json = serde_json::json!({ field: [] });
+            assert!(serde_json::from_value::<ExecutionRequestsV4>(json.clone()).is_err());
+            assert_eq!(
+                serde_json::from_value::<ExecutionRequestsV5>(json).unwrap(),
+                ExecutionRequestsV5::default()
+            );
+        }
+    }
 
     #[test]
     fn deserde_requests_v4() {

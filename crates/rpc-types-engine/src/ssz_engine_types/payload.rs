@@ -295,7 +295,19 @@ pub struct BuiltPayloadShanghai {
 /// Engine API v2 REST-SSZ payload-build response for Cancun.
 ///
 /// This is wire-compatible with the legacy `engine_getPayloadV3` response envelope.
-pub type BuiltPayloadCancun = crate::ExecutionPayloadEnvelopeV3;
+#[derive(Clone, Debug, PartialEq, Eq, ssz_derive::Encode, ssz_derive::Decode)]
+pub struct BuiltPayloadCancun {
+    /// Execution payload V3.
+    #[ssz(with = "bounds")]
+    pub payload: ExecutionPayloadCancun,
+    /// The expected value to be received by the fee recipient in wei.
+    pub block_value: U256,
+    /// The blobs, commitments, and proofs associated with the executed payload.
+    pub blobs_bundle: BlobsBundleV1,
+    /// A suggestion from the execution layer whether this payload should be used instead of an
+    /// externally provided one.
+    pub should_override_builder: bool,
+}
 
 /// This structure maps to the Engine API v2 REST-SSZ payload-build response for Prague.
 ///
@@ -399,6 +411,28 @@ impl TryFrom<LegacyBuiltPayloadShanghai> for BuiltPayloadShanghai {
             ExecutionPayloadFieldV2::V1(_) => {
                 Err(BuiltPayloadConversionError::UnexpectedPayloadFork("Paris"))
             }
+        }
+    }
+}
+
+impl From<LegacyBuiltPayloadCancun> for BuiltPayloadCancun {
+    fn from(value: LegacyBuiltPayloadCancun) -> Self {
+        Self {
+            payload: value.execution_payload,
+            block_value: value.block_value,
+            blobs_bundle: value.blobs_bundle,
+            should_override_builder: value.should_override_builder,
+        }
+    }
+}
+
+impl From<BuiltPayloadCancun> for LegacyBuiltPayloadCancun {
+    fn from(value: BuiltPayloadCancun) -> Self {
+        Self {
+            execution_payload: value.payload,
+            block_value: value.block_value,
+            blobs_bundle: value.blobs_bundle,
+            should_override_builder: value.should_override_builder,
         }
     }
 }

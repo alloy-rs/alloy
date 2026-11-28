@@ -597,7 +597,8 @@ impl ExecutionPayloadEnvelopeV4 {
     ///
     /// # Errors
     ///
-    /// Returns an error if KZG proof computation fails.
+    /// Returns an error if the blobs bundle has mismatched lengths or if KZG proof computation
+    /// fails.
     #[cfg(feature = "kzg")]
     pub fn try_into_v5(
         self,
@@ -612,7 +613,8 @@ impl ExecutionPayloadEnvelopeV4 {
     ///
     /// # Errors
     ///
-    /// Returns an error if KZG proof computation fails.
+    /// Returns an error if the blobs bundle has mismatched lengths or if KZG proof computation
+    /// fails.
     #[cfg(feature = "kzg")]
     pub fn try_into_v5_with_settings(
         self,
@@ -1841,7 +1843,7 @@ impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct BlobsBundleV1 {
     /// All commitments in the bundle.
@@ -1874,6 +1876,35 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
                 raw.proofs.len(),
                 &format!("{}", raw.commitments.len()).as_str(),
             ))
+        }
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for BlobsBundleV1 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        #[derive(ssz_derive::Decode)]
+        struct BlobsBundleRaw {
+            commitments: Vec<alloy_consensus::Bytes48>,
+            proofs: Vec<alloy_consensus::Bytes48>,
+            blobs: Vec<alloy_consensus::Blob>,
+        }
+
+        let raw = BlobsBundleRaw::from_ssz_bytes(bytes)?;
+
+        if raw.proofs.len() == raw.commitments.len() && raw.proofs.len() == raw.blobs.len() {
+            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        } else {
+            Err(ssz::DecodeError::BytesInvalid(format!(
+                "Invalid BlobsBundleV1: {} commitments, {} proofs and {} blobs",
+                raw.commitments.len(),
+                raw.proofs.len(),
+                raw.blobs.len()
+            )))
         }
     }
 }
@@ -1979,6 +2010,15 @@ impl BlobsBundleV1 {
         settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
     ) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
         use alloy_eips::eip7594::CELLS_PER_EXT_BLOB;
+
+        if self.commitments.len() != self.blobs.len() || self.proofs.len() != self.blobs.len() {
+            return Err(alloy_eips::eip4844::c_kzg::Error::MismatchLength(format!(
+                "length mismatch: {} commitments, {} proofs and {} blobs",
+                self.commitments.len(),
+                self.proofs.len(),
+                self.blobs.len()
+            )));
+        }
 
         if let [blob] = self.blobs.as_slice() {
             let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob.as_ckzg())?;
@@ -3800,7 +3840,14 @@ pub enum PayloadStatusEnum {
     ///   - forkchoiceUpdate: if the new head is unknown, pre-merge, or reorg to it fails
     Invalid {
         /// The error message for the invalid payload.
-        #[cfg_attr(feature = "serde", serde(rename = "validationError"))]
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                rename = "validationError",
+                default,
+                deserialize_with = "alloy_serde::null_as_default"
+            )
+        )]
         validation_error: String,
     },
 
@@ -4158,11 +4205,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CancunPayloadFields, PayloadValidationError};
+    use crate::{CancunPayloadFields, ForkchoiceUpdated, PayloadValidationError};
     use alloc::vec;
     use alloy_consensus::TxEnvelope;
     use alloy_primitives::{b256, hex};
     use similar_asserts::assert_eq;
+    use std::path::PathBuf;
 
     #[test]
     fn convert_empty_bundle() {
@@ -4188,6 +4236,49 @@ mod tests {
         assert_eq!(sidecar.cell_proofs, v2.proofs);
         v2.proofs.pop();
         assert!(v2.try_into_sidecar().is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn convert_v1_to_v2_checks_lengths() {
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(|| {
+                let settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get();
+                for len in [0, 1, 2] {
+                    let bundle = BlobsBundleV1 {
+                        commitments: vec![Bytes48::ZERO; len],
+                        proofs: vec![Bytes48::ZERO; len],
+                        blobs: vec![Blob::default(); len],
+                    };
+                    let converted = bundle.try_into_v2_with_settings(settings).unwrap();
+                    converted.ensure_valid_lengths().unwrap();
+                    assert_eq!(converted.commitments, vec![Bytes48::ZERO; len]);
+                    assert_eq!(converted.blobs, vec![Blob::default(); len]);
+                }
+
+                for (commitments, proofs, blobs) in
+                    [(1, 0, 1), (0, 1, 1), (1, 1, 0), (1, 2, 2), (2, 1, 2)]
+                {
+                    let mut bundle = BlobsBundleV1 {
+                        commitments: vec![Bytes48::ZERO; commitments],
+                        proofs: vec![Bytes48::ZERO; proofs],
+                        blobs: vec![Blob::default(); blobs],
+                    };
+                    // Length validation must run before KZG rejects these blob field elements.
+                    for blob in &mut bundle.blobs {
+                        blob[0] = 0xff;
+                    }
+                    let result = bundle.try_into_v2_with_settings(settings);
+                    assert!(matches!(
+                        result,
+                        Err(alloy_eips::eip4844::c_kzg::Error::MismatchLength(_))
+                    ));
+                }
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     fn indexed_v2_bundle() -> BlobsBundleV2 {
@@ -4333,6 +4424,47 @@ mod tests {
         let deserialized: Result<BlobsBundleV2, serde_json::Error> =
             serde_json::from_str(&serialized);
         assert!(deserialized.is_err());
+    }
+
+    /// SSZ decoding V1 blobs needs more than the default test thread stack in debug builds.
+    #[cfg(feature = "ssz")]
+    fn ssz_decode_blobsbundlev1(encoded: Vec<u8>) -> Result<BlobsBundleV1, ssz::DecodeError> {
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || <BlobsBundleV1 as ssz::Decode>::from_ssz_bytes(&encoded))
+            .unwrap()
+            .join()
+            .unwrap()
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_blobsbundlev1_roundtrip() {
+        for len in [0, 1, 2] {
+            let bundle = BlobsBundleV1 {
+                commitments: vec![Bytes48::new([1; 48]); len],
+                proofs: vec![Bytes48::new([2; 48]); len],
+                blobs: vec![Blob::default(); len],
+            };
+            let decoded = ssz_decode_blobsbundlev1(ssz::Encode::as_ssz_bytes(&bundle)).unwrap();
+            assert_eq!(decoded, bundle);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_blobsbundlev1_rejects_mismatched_lengths() {
+        for (commitments, proofs, blobs) in
+            [(3, 1, 3), (2, 1, 1), (1, 2, 1), (1, 1, 2), (0, 1, 1), (1, 0, 1), (1, 1, 0)]
+        {
+            let bundle = BlobsBundleV1 {
+                commitments: vec![Bytes48::ZERO; commitments],
+                proofs: vec![Bytes48::ZERO; proofs],
+                blobs: vec![Blob::default(); blobs],
+            };
+            let result = ssz_decode_blobsbundlev1(ssz::Encode::as_ssz_bytes(&bundle));
+            assert!(matches!(result, Err(ssz::DecodeError::BytesInvalid(_))));
+        }
     }
 
     #[test]
@@ -4539,6 +4671,32 @@ mod tests {
 
         let decoded = ExecutionPayloadEnvelopeV2::from_ssz_bytes(&envelope.as_ssz_bytes()).unwrap();
         assert_eq!(decoded, envelope);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_execution_payload_envelopes_reject_mismatched_blob_bundle() {
+        use ssz::{Decode, Encode};
+
+        let envelope = ExecutionPayloadEnvelopeV3 {
+            execution_payload: ssz_payload_v3(),
+            block_value: U256::ZERO,
+            blobs_bundle: BlobsBundleV1 { commitments: vec![Bytes48::ZERO], ..Default::default() },
+            should_override_builder: false,
+        };
+        assert!(matches!(
+            ExecutionPayloadEnvelopeV3::from_ssz_bytes(&envelope.as_ssz_bytes()),
+            Err(ssz::DecodeError::BytesInvalid(_))
+        ));
+
+        let envelope = ExecutionPayloadEnvelopeV4 {
+            envelope_inner: envelope,
+            execution_requests: Default::default(),
+        };
+        assert!(matches!(
+            ExecutionPayloadEnvelopeV4::from_ssz_bytes(&envelope.as_ssz_bytes()),
+            Err(ssz::DecodeError::BytesInvalid(_))
+        ));
     }
 
     #[test]
@@ -4861,6 +5019,21 @@ mod tests {
             },
         };
         assert_eq!(q, serde_json::from_str(s).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_payload_status_invalid_without_validation_error() {
+        let s = r#"{"payloadStatus":{"status":"INVALID","latestValidHash":null,"validationError":null},"payloadId":null}"#;
+        let fcu: ForkchoiceUpdated = serde_json::from_str(s).unwrap();
+        assert_eq!(
+            fcu.payload_status.status,
+            PayloadStatusEnum::Invalid { validation_error: String::new() }
+        );
+
+        let s = r#"{"status":"INVALID","latestValidHash":null}"#;
+        let status: PayloadStatus = serde_json::from_str(s).unwrap();
+        assert_eq!(status.status, PayloadStatusEnum::Invalid { validation_error: String::new() });
     }
 
     #[test]
@@ -5323,8 +5496,6 @@ mod tests {
 
     #[test]
     fn test_payload_to_block_with_sidecar_raw() {
-        use std::path::PathBuf;
-
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/payload");
         let dir = std::fs::read_dir(path).expect("Unable to read payload folder");
 

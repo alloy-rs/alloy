@@ -459,12 +459,19 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 
 /// Calculates the `excess_blob_gas` from the parent header's `blob_gas_used` and `excess_blob_gas`.
 ///
+/// The result saturates at [`u64::MAX`] if the excess after subtracting the target exceeds it.
+///
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`calc_excess_blob_gas`).
 #[inline]
 pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
-    let next_excess_blob_gas = parent_excess_blob_gas + parent_blob_gas_used;
-    next_excess_blob_gas.saturating_sub(TARGET_DATA_GAS_PER_BLOCK_DENCUN)
+    let total = parent_excess_blob_gas as u128 + parent_blob_gas_used as u128;
+    let excess = total.saturating_sub(TARGET_DATA_GAS_PER_BLOCK_DENCUN as u128);
+    if excess > u64::MAX as u128 {
+        u64::MAX
+    } else {
+        excess as u64
+    }
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -490,6 +497,36 @@ pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert!(denominator != 0, "attempt to divide by zero");
 
+    // Blob fee inputs stay well within `u128`, which is much cheaper than the wide arithmetic that
+    // only inputs with overflowing intermediate values need.
+    fake_exponential_u128(factor, numerator, denominator)
+        .unwrap_or_else(|| fake_exponential_u512(factor, numerator, denominator))
+}
+
+/// [`fake_exponential`] in `u128` arithmetic.
+///
+/// Returns `None` if an intermediate value overflows, otherwise the result is the same as
+/// [`fake_exponential_u512`].
+#[inline]
+fn fake_exponential_u128(factor: u128, numerator: u128, denominator: u128) -> Option<u128> {
+    let mut i = 1;
+    let mut output = 0u128;
+    let mut numerator_accum = factor.checked_mul(denominator)?;
+
+    while numerator_accum > 0 {
+        output = output.checked_add(numerator_accum)?;
+
+        // accum = (accum * numerator) / (denominator * i)
+        numerator_accum = numerator_accum.checked_mul(numerator)? / denominator.checked_mul(i)?;
+
+        i += 1;
+    }
+
+    Some(output / denominator)
+}
+
+/// [`fake_exponential`] in `U512` arithmetic, saturating at [`u128::MAX`].
+fn fake_exponential_u512(factor: u128, numerator: u128, denominator: u128) -> u128 {
     let mut i = U512::from(1);
     let denominator = U512::from(denominator);
     let numerator = U512::from(numerator);
@@ -570,6 +607,15 @@ mod tests {
             );
             assert_eq!(actual, osaka, "osaka consistency: {t:?}");
         }
+    }
+
+    #[test]
+    fn calc_excess_blob_gas_at_u64_limit() {
+        assert_eq!(
+            calc_excess_blob_gas(u64::MAX, 1),
+            u64::MAX - TARGET_DATA_GAS_PER_BLOCK_DENCUN + 1
+        );
+        assert_eq!(calc_excess_blob_gas(u64::MAX, TARGET_DATA_GAS_PER_BLOCK_DENCUN + 1), u64::MAX);
     }
 
     // https://github.com/ethereum/go-ethereum/blob/28857080d732857030eda80c69b9ba2c8926f221/consensus/misc/eip4844/eip4844_test.go#L60
@@ -659,6 +705,67 @@ mod tests {
     }
 
     #[test]
+    fn fake_exp_u128_matches_u512() {
+        for update_fraction in [
+            BLOB_GASPRICE_UPDATE_FRACTION,
+            crate::eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
+            crate::eip7892::BPO2_BASE_UPDATE_FRACTION as u128,
+        ] {
+            for excess in (0..400_000_000).step_by(1_234_567) {
+                let expected = fake_exponential_u512(1, excess, update_fraction);
+                if let Some(actual) = fake_exponential_u128(1, excess, update_fraction) {
+                    assert_eq!(actual, expected, "test: {excess}, {update_fraction}");
+                }
+                assert_eq!(fake_exponential(1, excess, update_fraction), expected);
+            }
+
+            // A blob fee above 1 ETH per blob gas is still computed without the fallback.
+            let excess = 42 * update_fraction;
+            assert!(fake_exponential_u128(1, excess, update_fraction).unwrap() > 10u128.pow(18));
+        }
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_at_u64_limit() {
+        let params = eip7840::BlobParams::osaka();
+        assert_eq!(params.next_block_excess_blob_gas_osaka(u64::MAX, u64::MAX, 0), u64::MAX);
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_with_wide_target() {
+        // This schedule targets exactly 2^64 gas.
+        let params = eip7840::BlobParams {
+            target_blob_count: 1 << 47,
+            max_blob_count: 1 << 47,
+            ..eip7840::BlobParams::osaka()
+        };
+        assert_eq!(params.target_blob_gas_per_block(), u64::MAX);
+        assert_eq!(params.max_blob_gas_per_block(), u64::MAX);
+        assert_eq!(params.next_block_excess_blob_gas_osaka(1, u64::MAX - 1, 17), 0);
+        assert_eq!(params.next_block_excess_blob_gas_osaka(u64::MAX, 2, 0), 1);
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_with_scaled_usage() {
+        // Keep the reserve price active even at maximum parent excess.
+        let params = eip7840::BlobParams {
+            update_fraction: u64::MAX as u128,
+            ..eip7840::BlobParams::osaka()
+        };
+        // Osaka scales usage by (9 - 6) / 9.
+        let used = u64::MAX - 1;
+        assert_eq!(params.next_block_excess_blob_gas_osaka(0, used, 100), used / 3);
+        // The scaled usage is one, so the final addition exceeds u64::MAX.
+        assert_eq!(params.next_block_excess_blob_gas_osaka(u64::MAX, 3, 100), u64::MAX);
+    }
+
+    #[test]
+    fn osaka_excess_blob_gas_with_target_above_max() {
+        let params = eip7840::BlobParams { target_blob_count: 10, ..eip7840::BlobParams::osaka() };
+        assert_eq!(params.next_block_excess_blob_gas_osaka(42, 11 * DATA_GAS_PER_BLOB, 17), 42);
+    }
+
+    #[test]
     fn osaka_excess_blob_gas_with_zero_blob_capacity() {
         let params = crate::eip7840::BlobParams {
             target_blob_count: 0,
@@ -683,6 +790,8 @@ mod tests {
 
             assert_eq!(actual, expected, "test: {t:?}");
         }
+
+        assert_eq!(params.next_block_excess_blob_gas_osaka(1, 2, 17), 3);
     }
 
     #[test]

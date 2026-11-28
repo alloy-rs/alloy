@@ -1,6 +1,9 @@
 use super::*;
+use crate::ProviderBuilder;
 use alloy_network::Ethereum;
+use alloy_primitives::{Address, Bloom, U64};
 use alloy_rpc_types_eth::{Block, BlockTransactions};
+use alloy_transport::mock::Asserter;
 
 struct Harness {
     blocks: futures::channel::mpsc::UnboundedSender<Block>,
@@ -42,6 +45,7 @@ fn poll(pending: &mut PendingTransaction) -> Option<Result<TxHash, PendingTransa
 }
 
 const TX: TxHash = B256::with_last_byte(1);
+const OTHER: TxHash = B256::with_last_byte(9);
 
 #[tokio::test(start_paused = true)]
 async fn confirms_after_required_confirmations() {
@@ -74,6 +78,8 @@ async fn already_mined_tx_counts_confirmations_from_its_block() {
     ];
     for (received_at_block, confirmations, immediately) in cases {
         let harness = Harness::new();
+        // Keep the heartbeat unpaused so it records the blocks.
+        let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
         harness.block(1, &[]);
         harness.block(2, &[TX]);
         harness.block(3, &[]);
@@ -173,6 +179,8 @@ async fn lookbehind_keeps_last_ten_canonical_blocks() {
     ];
     for (blocks, found) in cases {
         let harness = Harness::new();
+        // Keep the heartbeat unpaused so it records the blocks.
+        let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
         for &(number, includes_tx) in &blocks {
             harness.block(number, if includes_tx { &[TX] } else { &[] });
         }
@@ -182,6 +190,27 @@ async fn lookbehind_keeps_last_ten_canonical_blocks() {
         settle().await;
         assert_eq!(poll(&mut pending).is_some(), found, "{blocks:?}");
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn ignores_blocks_while_paused() {
+    let harness = Harness::new();
+    let mut pending = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
+    harness.block(1, &[OTHER]);
+    settle().await;
+    assert!(poll(&mut pending).is_some());
+    assert!(harness.paused.is_paused());
+
+    // A block the stream had buffered before pausing can be reorged out, so it must not be
+    // matched later.
+    harness.block(2, &[TX]);
+    settle().await;
+    let config = PendingTransactionConfig::new(TX).with_timeout(Some(Duration::ZERO));
+    let res = harness.watch(config, None).await.await;
+    assert!(
+        matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+        "{res:?}"
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -201,6 +230,46 @@ async fn pauses_while_nothing_is_watched() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn pauses_once_watchers_are_dropped() {
+    // Dropped while unconfirmed.
+    let harness = Harness::new();
+    drop(harness.watch(PendingTransactionConfig::new(TX), None).await);
+    harness.block(1, &[]);
+    settle().await;
+    assert!(harness.paused.is_paused());
+
+    // Dropped while waiting for confirmations.
+    let harness = Harness::new();
+    let config = PendingTransactionConfig::new(TX).with_required_confirmations(10);
+    let waiting = harness.watch(config, None).await;
+    harness.block(1, &[TX]);
+    settle().await;
+    assert!(!harness.paused.is_paused());
+    drop(waiting);
+    harness.block(2, &[]);
+    settle().await;
+    assert!(harness.paused.is_paused());
+
+    // A remaining watcher for the same tx keeps the heartbeat running and still resolves, both
+    // while unconfirmed and while waiting for confirmations.
+    for (confirmations, first, last) in [(1, &[][..], &[TX][..]), (3, &[TX][..], &[][..])] {
+        let harness = Harness::new();
+        let config = PendingTransactionConfig::new(TX).with_required_confirmations(confirmations);
+        let dropped = harness.watch(config.clone(), None).await;
+        let mut kept = harness.watch(config, None).await;
+        harness.block(1, first);
+        settle().await;
+        drop(dropped);
+        harness.block(2, &[]);
+        settle().await;
+        assert!(!harness.paused.is_paused(), "{confirmations}");
+        harness.block(3, last);
+        settle().await;
+        assert_eq!(poll(&mut kept).unwrap().unwrap(), TX, "{confirmations}");
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn second_watcher_for_same_tx_does_not_replace_first() {
     let harness = Harness::new();
     let first = harness.watch(PendingTransactionConfig::new(TX), None).await;
@@ -214,6 +283,8 @@ async fn second_watcher_for_same_tx_does_not_replace_first() {
 #[tokio::test(start_paused = true)]
 async fn chain_gap_keeps_every_watcher_for_same_tx() {
     let harness = Harness::new();
+    // Keep the heartbeat unpaused so it records block 1.
+    let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
     harness.block(1, &[TX]);
     settle().await;
     let config = PendingTransactionConfig::new(TX).with_required_confirmations(3);
@@ -252,6 +323,8 @@ async fn timeout_reaps_only_the_watcher_that_set_it() {
 async fn timeout_applies_while_waiting_for_confirmations() {
     for received_at_block in [None, Some(1)] {
         let harness = Harness::new();
+        // Keep the heartbeat unpaused so it records block 1.
+        let _keepalive = harness.watch(PendingTransactionConfig::new(OTHER), None).await;
         harness.block(1, &[TX]);
         settle().await;
 
@@ -266,7 +339,171 @@ async fn timeout_applies_while_waiting_for_confirmations() {
             matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
             "{received_at_block:?}: {res:?}"
         );
+        harness.block(2, &[OTHER]);
         settle().await;
         assert!(harness.paused.is_paused(), "{received_at_block:?}");
     }
+}
+
+/// Watchers registered at the same instant (coarse clocks, e.g. browser timers) must each keep
+/// their own timeout.
+#[test]
+fn timeouts_registered_at_the_same_instant_reap_every_watcher() {
+    let (_blocks, stream) = futures::channel::mpsc::unbounded::<Block>();
+    let mut heartbeat = Heartbeat::<Ethereum, _>::new(stream, Arc::default());
+    let now = Instant::now();
+    let mut receivers = Vec::new();
+    for tx_hash in [B256::with_last_byte(1), B256::with_last_byte(2)] {
+        let (tx, rx) = oneshot::channel();
+        let config = PendingTransactionConfig::new(tx_hash).with_timeout(Some(Duration::ZERO));
+        let watcher = TxWatcher { config, received_at_block: None, reap_at: None, tx };
+        heartbeat.handle_watch_ix_at(watcher, now);
+        receivers.push(rx);
+    }
+
+    std::thread::sleep(Duration::from_millis(1));
+    heartbeat.reap_timeouts();
+
+    for mut rx in receivers {
+        let res = rx.try_recv();
+        assert!(
+            matches!(res, Ok(Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout)))),
+            "watcher not reaped"
+        );
+    }
+    assert!(!heartbeat.has_pending_transactions());
+}
+
+#[test]
+fn does_not_pause_while_watches_are_queued() {
+    let (_blocks, stream) = futures::channel::mpsc::unbounded::<Block>();
+    let mut heartbeat = Heartbeat::<Ethereum, _>::new(stream, Arc::default());
+    heartbeat.past_blocks.push_back((1, [TX].into_iter().collect()));
+    let (ix_tx, ixns) = mpsc::channel(1);
+    let (tx, _rx) = oneshot::channel();
+    let config = PendingTransactionConfig::new(TX);
+    ix_tx.try_send(TxWatcher { config, received_at_block: None, reap_at: None, tx }).unwrap();
+
+    heartbeat.update_pause_state(&ixns);
+    assert!(!heartbeat.paused.is_paused());
+    assert_eq!(heartbeat.past_blocks.len(), 1);
+}
+
+fn fork_block(number: u64, hash: u8, txs: &[TxHash]) -> Block {
+    let mut block: Block = Block::default();
+    block.header.inner.number = number;
+    block.header.hash = B256::with_last_byte(hash);
+    block.header.inner.parent_hash = B256::with_last_byte(hash - 1);
+    block.transactions = BlockTransactions::Hashes(txs.to_vec());
+    block
+}
+
+fn receipt(number: u64, hash: Option<u8>) -> serde_json::Value {
+    serde_json::json!({
+        "transactionHash": TX, "transactionIndex": "0x0", "blockHash": hash.map(B256::with_last_byte),
+        "blockNumber": U64::from(number), "from": Address::ZERO, "to": null, "contractAddress": null,
+        "gasUsed": "0x5208", "cumulativeGasUsed": "0x5208", "effectiveGasPrice": "0x1",
+        "status": "0x1", "logs": [], "logsBloom": Bloom::ZERO, "type": "0x0"
+    })
+}
+
+#[tokio::test(start_paused = true)]
+async fn receipt_seed_from_another_fork_does_not_confirm() {
+    let asserter = Asserter::new();
+    let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+    // The receipt is from fork A at block 10, but the heartbeat only samples fork B.
+    asserter.push_success(&receipt(10, Some(11)));
+    asserter.push_success(&U64::from(11));
+    asserter.push_success(&fork_block(10, 30, &[]));
+    asserter.push_success(&fork_block(11, 31, &[]));
+    // The recheck finds fork B at block 10, and the transaction is not mined there.
+    asserter.push_success(&fork_block(10, 30, &[]));
+    for _ in 0..3 {
+        asserter.push_success(&Option::<serde_json::Value>::None);
+    }
+
+    let mut pending = PendingTransactionBuilder::new(provider.root().clone(), TX)
+        .with_required_confirmations(2)
+        .register()
+        .await
+        .unwrap();
+    settle().await;
+    assert!(poll(&mut pending).is_none(), "orphaned receipt falsely confirmed");
+    assert!(asserter.read_q().is_empty());
+
+    // Once fork B mines the transaction, the block stream confirms it.
+    asserter.push_success(&U64::from(12));
+    asserter.push_success(&fork_block(11, 31, &[]));
+    asserter.push_success(&fork_block(12, 32, &[TX]));
+    asserter.push_success(&U64::from(13));
+    asserter.push_success(&fork_block(13, 33, &[]));
+    for _ in 0..2 {
+        tokio::time::advance(provider.client().poll_interval()).await;
+        settle().await;
+    }
+    assert_eq!(poll(&mut pending).unwrap().unwrap(), TX);
+}
+
+#[tokio::test(start_paused = true)]
+async fn receipt_seeded_public_watches_require_canonical_inclusion() {
+    // A receipt without a block hash can't be rechecked, so its height doesn't count.
+    let asserter = Asserter::new();
+    let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+    asserter.push_success(&receipt(10, None));
+    asserter.push_success(&U64::from(11));
+    asserter.push_success(&fork_block(10, 30, &[]));
+    asserter.push_success(&fork_block(11, 31, &[]));
+
+    let builder = PendingTransactionBuilder::new(provider.root().clone(), TX);
+    let mut watch = Box::pin(builder.with_required_confirmations(2).watch());
+    assert!(watch.as_mut().now_or_never().is_none());
+    settle().await;
+    assert!(watch.as_mut().now_or_never().is_none(), "unchecked receipt confirmed");
+    assert!(asserter.read_q().is_empty());
+}
+
+#[tokio::test]
+async fn restarted_watch_keeps_the_original_deadline() {
+    let asserter = Asserter::new();
+    let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+    asserter.push_success(&fork_block(10, 30, &[]));
+    for _ in 0..3 {
+        asserter.push_success(&Option::<serde_json::Value>::None);
+    }
+    let (tx, rx) = oneshot::channel();
+    let config = PendingTransactionConfig::new(TX)
+        .with_required_confirmations(2)
+        .with_timeout(Some(Duration::from_millis(200)));
+    let inclusion = BlockNumHash::new(10, B256::with_last_byte(11));
+    let pending = PendingTransaction { tx_hash: TX, rx }.recheck_inclusion(
+        provider.root().clone(),
+        config,
+        inclusion,
+    );
+
+    // The orphaned inclusion is found after the deadline, so the restarted watch times out now.
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    tx.send(Ok(())).unwrap();
+    let res =
+        tokio::time::timeout(Duration::from_millis(100), pending).await.expect("timeout renewed");
+    assert!(
+        matches!(res, Err(PendingTransactionError::TxWatcher(WatchTxError::Timeout))),
+        "{res:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn dropping_a_rechecked_watch_releases_the_heartbeat_watcher() {
+    let provider = ProviderBuilder::new().connect_mocked_client(Asserter::new());
+    let (tx, rx) = oneshot::channel();
+    let config = PendingTransactionConfig::new(TX).with_required_confirmations(2);
+    let pending = PendingTransaction { tx_hash: TX, rx }.recheck_inclusion(
+        provider.root().clone(),
+        config,
+        BlockNumHash::default(),
+    );
+    settle().await;
+    drop(pending);
+    settle().await;
+    assert!(tx.is_closed(), "the heartbeat watcher outlives the dropped watch");
 }

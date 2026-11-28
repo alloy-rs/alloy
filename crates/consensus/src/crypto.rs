@@ -364,7 +364,7 @@ mod impl_k256 {
 
     use super::*;
     use alloy_primitives::{keccak256, Address, B256};
-    use k256::ecdsa::{RecoveryId, SigningKey, VerifyingKey};
+    use k256::ecdsa::{signature::hazmat::PrehashVerifier, RecoveryId, SigningKey, VerifyingKey};
 
     /// Recovers the address of the sender using secp256k1 pubkey recovery.
     ///
@@ -397,8 +397,6 @@ mod impl_k256 {
         sig: &[u8; 64],
         msg: &[u8; 32],
     ) -> Result<Address, Error> {
-        use k256::ecdsa::signature::hazmat::PrehashVerifier;
-
         let vk = VerifyingKey::from_sec1_bytes(pubkey)?;
 
         let mut signature = k256::ecdsa::Signature::from_slice(&sig[0..64])?;

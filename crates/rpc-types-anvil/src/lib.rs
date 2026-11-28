@@ -9,7 +9,7 @@
 use alloy_primitives::{BlockHash, Bytes, ChainId, B256, U256};
 use alloy_rpc_types_eth::TransactionRequest;
 use serde::{
-    de::{self, IgnoredAny, MapAccess, Visitor},
+    de::{self, value::SeqAccessDeserializer, IgnoredAny, MapAccess, SeqAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 use std::{collections::BTreeMap, fmt};
@@ -39,13 +39,63 @@ impl<'de> serde::Deserialize<'de> for Forking {
             block_number: Option<u64>,
         }
 
+        /// The block number of positional `[url, block]` options.
+        #[derive(serde::Deserialize)]
+        struct PositionalBlock(#[serde(with = "alloy_serde::quantity::opt")] Option<u64>);
+
+        /// The first element of positional options: the URL, or the complete options.
+        enum PositionalFirst {
+            Url(Option<String>),
+            Options(Forking),
+        }
+
+        impl<'de> serde::Deserialize<'de> for PositionalFirst {
+            fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                struct PositionalFirstVisitor;
+
+                impl<'de> Visitor<'de> for PositionalFirstVisitor {
+                    type Value = PositionalFirst;
+
+                    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                        formatter.write_str("a fork URL or fork options")
+                    }
+
+                    fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                        Ok(PositionalFirst::Url(Some(v.to_string())))
+                    }
+
+                    fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+                        Ok(PositionalFirst::Url(None))
+                    }
+
+                    fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+                        Ok(PositionalFirst::Url(None))
+                    }
+
+                    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+                        // Apply the same tag, duplicate, and precedence rules as unwrapped
+                        // options, so `[{"forking": {..}}]` is not decoded as empty options.
+                        ForkingVisitor.visit_map(map).map(PositionalFirst::Options)
+                    }
+
+                    fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
+                        let ForkOpts { json_rpc_url, block_number } =
+                            ForkOpts::deserialize(SeqAccessDeserializer::new(seq))?;
+                        Ok(PositionalFirst::Options(Forking { json_rpc_url, block_number }))
+                    }
+                }
+
+                deserializer.deserialize_any(PositionalFirstVisitor)
+            }
+        }
+
         struct ForkingVisitor;
 
         impl<'de> Visitor<'de> for ForkingVisitor {
             type Value = Forking;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("fork options or an object containing tagged fork options")
+                formatter.write_str("fork options, tagged fork options, or positional fork options")
             }
 
             fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Forking, A::Error> {
@@ -88,9 +138,22 @@ impl<'de> serde::Deserialize<'de> for Forking {
                 let ForkOpts { json_rpc_url, block_number } = options;
                 Ok(Forking { json_rpc_url, block_number })
             }
+
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Forking, A::Error> {
+                // Positional options are either `[url, block]` or a single element holding the
+                // options, such as `[[url, block]]` or `[{"jsonRpcUrl": url}]`.
+                match seq.next_element::<PositionalFirst>()? {
+                    None => Err(de::Error::invalid_length(0, &self)),
+                    Some(PositionalFirst::Options(forking)) => Ok(forking),
+                    Some(PositionalFirst::Url(json_rpc_url)) => Ok(Forking {
+                        json_rpc_url,
+                        block_number: seq.next_element::<PositionalBlock>()?.and_then(|b| b.0),
+                    }),
+                }
+            }
         }
 
-        deserializer.deserialize_map(ForkingVisitor)
+        deserializer.deserialize_any(ForkingVisitor)
     }
 }
 
@@ -324,6 +387,55 @@ mod tests {
             .unwrap(),
             Forking { json_rpc_url: None, block_number: Some(1) }
         );
+    }
+
+    #[test]
+    fn test_serde_forking_positional_options() {
+        for data in [
+            r#"["http://localhost:8545",42]"#,
+            r#"["http://localhost:8545","0x2a"]"#,
+            r#"[["http://localhost:8545","0x2a"]]"#,
+            r#"[{"jsonRpcUrl":"http://localhost:8545","blockNumber":42}]"#,
+            r#"[{"forking":{"jsonRpcUrl":"http://localhost:8545","blockNumber":42}}]"#,
+        ] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking {
+                    json_rpc_url: Some("http://localhost:8545".into()),
+                    block_number: Some(42)
+                },
+                "{data}"
+            );
+        }
+        for data in [r#"["http://localhost:8545"]"#, r#"["http://localhost:8545",null]"#] {
+            assert_eq!(
+                serde_json::from_str::<Forking>(data).unwrap(),
+                Forking { json_rpc_url: Some("http://localhost:8545".into()), block_number: None },
+                "{data}"
+            );
+        }
+        assert_eq!(
+            serde_json::from_str::<Forking>("[null,42]").unwrap(),
+            Forking { json_rpc_url: None, block_number: Some(42) }
+        );
+    }
+
+    #[test]
+    fn test_serde_forking_rejects_invalid_positional_options() {
+        for data in [
+            "[]",
+            "[[]]",
+            "[42]",
+            "[true]",
+            r#"["http://localhost:8545","invalid"]"#,
+            r#"["http://localhost:8545",42,1]"#,
+            r#"[["http://localhost:8545",42],1]"#,
+            r#"[{"jsonRpcUrl":"http://localhost:8545"},42]"#,
+            r#"[{"blockNumber":"0x1","blockNumber":"0x2"}]"#,
+            r#"[{"forking":{"blockNumber":"invalid"}}]"#,
+        ] {
+            assert!(serde_json::from_str::<Forking>(data).is_err(), "{data}");
+        }
     }
 
     #[test]

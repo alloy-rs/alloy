@@ -219,7 +219,11 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn is_create(&self) -> bool {
-        self.fields.get("to").is_none_or(|v| v.is_null())
+        self.fields
+            .get("to")
+            .and_then(|v| v.as_str())
+            .and_then(|v| v.parse::<Address>().ok())
+            .is_none()
     }
 
     #[inline]
@@ -315,6 +319,24 @@ mod tests {
     use crate::{AnyRpcTransaction, AnyTxEnvelope};
 
     use super::*;
+
+    #[test]
+    fn create_detection_matches_kind() {
+        for (fields, expected) in [
+            (serde_json::json!({}), TxKind::Create),
+            (serde_json::json!({ "to": null }), TxKind::Create),
+            (serde_json::json!({ "to": Address::ZERO }), TxKind::Call(Address::ZERO)),
+            (serde_json::json!({ "to": "not-an-address" }), TxKind::Create),
+            (serde_json::json!({ "to": 42 }), TxKind::Create),
+        ] {
+            let tx = UnknownTypedTransaction::new(
+                AnyTxType(0x7e),
+                serde_json::from_value(fields).unwrap(),
+            );
+            assert_eq!(tx.kind(), expected, "{tx:?}");
+            assert_eq!(tx.is_create(), expected.is_create(), "{tx:?}");
+        }
+    }
 
     #[test]
     fn equality_ignores_deserialization_cache() {

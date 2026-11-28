@@ -5,12 +5,12 @@ use crate::{
     },
     eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
 };
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use alloy_primitives::{B128, B256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, EMPTY_LIST_CODE};
 
-use super::{decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594};
-use crate::eip4844::VersionedHashIter;
+use super::{decode_fixed_list, decode_sidecar, BlobSidecarEncoding, Decodable7594, Encodable7594};
+use crate::eip4844::{box_blob, VersionedHashIter};
 #[cfg(feature = "kzg")]
 use crate::eip4844::{AsAlloy, AsCkzg, BlobTransactionValidationError};
 
@@ -601,7 +601,7 @@ impl BlobTransactionSidecarEip7594 {
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, BlobCellRecoveryError> {
         let cells_per_blob = cell_mask.count();
-        if !commitments.is_empty() && cells_per_blob < CELLS_PER_EXT_BLOB / 2 {
+        if !commitments.is_empty() && !cell_mask.is_recoverable() {
             return Err(BlobCellRecoveryError::InsufficientCells {
                 provided: cells_per_blob,
                 required: CELLS_PER_EXT_BLOB / 2,
@@ -1001,10 +1001,10 @@ impl BlobTransactionSidecarEip7594 {
                         .cell_proofs
                         .get(proof_range)
                         .filter(|proofs| proofs.len() == CELLS_PER_EXT_BLOB);
-                    if let Some((blob, proofs)) = maybe_blob.copied().zip(maybe_proofs) {
+                    if let Some((blob, proofs)) = maybe_blob.zip(maybe_proofs) {
                         return Some((
                             j,
-                            BlobAndProofV2 { blob: Box::new(blob), proofs: proofs.to_vec() },
+                            BlobAndProofV2 { blob: box_blob(blob), proofs: proofs.to_vec() },
                         ));
                     }
                 }
@@ -1141,9 +1141,9 @@ impl BlobTransactionSidecarEip7594 {
     #[doc(hidden)]
     pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
-            blobs: Decodable::decode(buf)?,
-            commitments: Decodable::decode(buf)?,
-            cell_proofs: Decodable::decode(buf)?,
+            blobs: decode_fixed_list(buf)?,
+            commitments: decode_fixed_list(buf)?,
+            cell_proofs: decode_fixed_list(buf)?,
         })
     }
 
@@ -1282,13 +1282,38 @@ impl Decodable7594 for BlobTransactionSidecarEip7594 {
     }
 }
 
-/// Cell indices requested by `engine_getBlobsV4`.
+/// A set of cell indices, one bit per column of an extended blob.
+///
+/// Used for the cells requested by `engine_getBlobsV4` and for the `cell_mask` of eth/72
+/// ([EIP-8070]) announcements, `GetCells` requests and `Cells` responses. Both encode it as a
+/// 16-byte, little-endian bitarray.
+///
+/// # Examples
+///
+/// ```
+/// use alloy_eips::eip7594::BlobCellMask;
+///
+/// let custody = BlobCellMask::from_bits(0b0110);
+/// let received = BlobCellMask::from_bits(0b0011);
+///
+/// assert_eq!(custody.difference(received).bits(), 0b0100);
+/// assert_eq!(custody.union(received).first(2).bits(), 0b0011);
+/// assert!(received.intersection(custody).is_subset_of(custody));
+/// assert!(!custody.is_recoverable());
+/// assert!(BlobCellMask::ALL.is_recoverable());
+/// assert_eq!(BlobCellMask::new(custody.to_b128()), custody);
+/// ```
+///
+/// [EIP-8070]: https://eips.ethereum.org/EIPS/eip-8070
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct BlobCellMask {
     value: u128,
 }
 
 impl BlobCellMask {
+    /// A mask that selects every cell.
+    pub const ALL: Self = Self { value: u128::MAX };
+
     /// Creates a mask from the Engine API 16-byte, little-endian bitarray.
     /// Cell `i` is selected by bit `i % 8` of byte `i / 8`.
     #[inline]
@@ -1308,16 +1333,70 @@ impl BlobCellMask {
         self.value
     }
 
+    /// Returns the 16-byte, little-endian bitarray, the inverse of [`Self::new`].
+    #[inline]
+    pub const fn to_b128(self) -> B128 {
+        B128::new(self.value.to_le_bytes())
+    }
+
     /// Returns the number of selected cells.
     #[inline]
     pub const fn count(self) -> usize {
         self.value.count_ones() as usize
     }
 
+    /// Returns true if enough cells are selected to rebuild a blob, half of
+    /// [`CELLS_PER_EXT_BLOB`].
+    #[inline]
+    pub const fn is_recoverable(self) -> bool {
+        self.count() >= CELLS_PER_EXT_BLOB / 2
+    }
+
     /// Returns true if the given cell index is selected.
     #[inline]
     pub const fn contains(self, index: usize) -> bool {
         index < CELLS_PER_EXT_BLOB && self.value & (1u128 << index) != 0
+    }
+
+    /// Returns true if every cell selected by `self` is also selected by `other`.
+    #[inline]
+    pub const fn is_subset_of(self, other: Self) -> bool {
+        self.value & !other.value == 0
+    }
+
+    /// Returns the cells selected by `self` or `other`.
+    #[inline]
+    #[must_use]
+    pub const fn union(self, other: Self) -> Self {
+        Self { value: self.value | other.value }
+    }
+
+    /// Returns the cells selected by both `self` and `other`.
+    #[inline]
+    #[must_use]
+    pub const fn intersection(self, other: Self) -> Self {
+        Self { value: self.value & other.value }
+    }
+
+    /// Returns the cells selected by `self` but not by `other`.
+    #[inline]
+    #[must_use]
+    pub const fn difference(self, other: Self) -> Self {
+        Self { value: self.value & !other.value }
+    }
+
+    /// Returns the `n` lowest selected cells, or all of them if fewer are selected.
+    #[inline]
+    #[must_use]
+    pub const fn first(self, n: usize) -> Self {
+        // Clears the `n` lowest set bits, so `rest` holds the cells past the first `n`.
+        let mut rest = self.value;
+        let mut cleared = 0;
+        while cleared < n && rest != 0 {
+            rest &= rest - 1;
+            cleared += 1;
+        }
+        Self { value: self.value ^ rest }
     }
 
     /// Iterates selected cell indices in ascending order.
@@ -2008,6 +2087,38 @@ mod tests {
             let mask = BlobCellMask::new(B128::new(bytes));
 
             assert_eq!(mask.selected_indices().collect::<Vec<_>>(), vec![index]);
+            assert_eq!(mask.to_b128(), B128::new(bytes));
         }
+    }
+
+    #[test]
+    fn blob_cell_mask_set_operations() {
+        let a = BlobCellMask::from_bits(0b1100);
+        let b = BlobCellMask::from_bits(0b1010);
+
+        assert_eq!(a.union(b).bits(), 0b1110);
+        assert_eq!(a.intersection(b).bits(), 0b1000);
+        assert_eq!(a.difference(b).bits(), 0b0100);
+        assert!(a.intersection(b).is_subset_of(a));
+        assert!(!a.is_subset_of(b));
+        assert!(BlobCellMask::default().is_subset_of(a));
+        assert!(a.is_subset_of(BlobCellMask::ALL));
+        assert_eq!(BlobCellMask::ALL.count(), CELLS_PER_EXT_BLOB);
+
+        assert_eq!(a.first(0), BlobCellMask::default());
+        assert_eq!(a.first(1).bits(), 0b0100);
+        assert_eq!(a.first(3), a);
+        let half = CELLS_PER_EXT_BLOB / 2;
+        assert_eq!(BlobCellMask::ALL.first(half).bits(), u128::MAX >> half);
+        assert_eq!(BlobCellMask::ALL.first(CELLS_PER_EXT_BLOB), BlobCellMask::ALL);
+    }
+
+    #[test]
+    fn blob_cell_mask_is_recoverable_from_half_of_the_cells() {
+        let half = CELLS_PER_EXT_BLOB / 2;
+        assert!(BlobCellMask::ALL.is_recoverable());
+        assert!(BlobCellMask::ALL.first(half).is_recoverable());
+        assert!(!BlobCellMask::ALL.first(half - 1).is_recoverable());
+        assert!(!BlobCellMask::default().is_recoverable());
     }
 }

@@ -3,7 +3,7 @@ use crate::common::{Privacy, ProtocolVersion, Validity};
 use alloy_eips::BlockId;
 use alloy_primitives::{Bytes, TxHash, U256};
 use alloy_rpc_types_eth::{BlockOverrides, Log};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 /// A bundle of transactions to send to the matchmaker.
 ///
@@ -221,11 +221,41 @@ pub struct SimBundleOverrides {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_block: Option<BlockId>,
     /// Overrides for block environment values.
-    #[serde(flatten)]
+    #[serde(flatten, serialize_with = "serialize_sim_block_overrides")]
     pub block_overrides: BlockOverrides,
     /// Timeout in seconds, defaults to 5
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timeout: Option<u64>,
+}
+
+/// Serializes [`BlockOverrides`] with the `blockNumber` and `timestamp` keys that mev-share
+/// expects, instead of `number` and `time`.
+fn serialize_sim_block_overrides<S: Serializer>(
+    overrides: &BlockOverrides,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SimBlockOverrides {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        block_number: Option<U256>,
+        #[serde(with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+        timestamp: Option<u64>,
+        #[serde(flatten)]
+        overrides: BlockOverrides,
+    }
+
+    let mut overrides = overrides.clone();
+    SimBlockOverrides {
+        block_number: overrides.number.take(),
+        timestamp: overrides.time.take(),
+        overrides,
+    }
+    .serialize(serializer)
 }
 
 /// Response from the matchmaker after sending a simulation request.
@@ -373,9 +403,9 @@ mod tests {
             function_selector: true,
             hash: true,
             tx_hash: true,
+            special_logs: true,
         };
-        let expected =
-            r#"["calldata","contract_address","logs","function_selector","hash","tx_hash"]"#;
+        let expected = r#"["calldata","contract_address","logs","function_selector","hash","tx_hash","special_logs"]"#;
         let actual = serde_json::to_string(&hint).unwrap();
         assert_eq!(actual, expected);
     }
@@ -389,10 +419,21 @@ mod tests {
             function_selector: false,
             hash: true,
             tx_hash: false,
+            special_logs: false,
         };
         let expected = r#"["calldata","logs","hash"]"#;
         let actual: PrivacyHint = serde_json::from_str(expected).unwrap();
         assert_eq!(actual, hint);
+    }
+
+    #[test]
+    fn can_deserialize_special_logs_privacy_hint() {
+        // The MEV-Share node accepts both spellings and emits `special_logs`.
+        for hint in ["special_logs", "default_logs"] {
+            let actual: PrivacyHint = serde_json::from_str(&format!(r#"["{hint}"]"#)).unwrap();
+            assert!(actual.has_special_logs(), "failed to parse {hint}");
+            assert_eq!(serde_json::to_string(&actual).unwrap(), r#"["special_logs"]"#);
+        }
     }
 
     #[test]
@@ -410,5 +451,25 @@ mod tests {
         "#;
         let actual: SimBundleResponse = serde_json::from_str(expected).unwrap();
         assert!(actual.success);
+    }
+
+    #[test]
+    fn can_serialize_sim_bundle_overrides() {
+        let overrides = SimBundleOverrides {
+            block_overrides: BlockOverrides {
+                number: Some(U256::from(100)),
+                time: Some(1234),
+                gas_limit: Some(30_000_000),
+                ..Default::default()
+            },
+            timeout: Some(5),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&overrides).unwrap();
+        assert_eq!(
+            json,
+            r#"{"blockNumber":"0x64","timestamp":"0x4d2","gasLimit":"0x1c9c380","timeout":5}"#
+        );
+        assert_eq!(serde_json::from_str::<SimBundleOverrides>(&json).unwrap(), overrides);
     }
 }

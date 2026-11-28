@@ -2,6 +2,7 @@ use crate::{managers::ActiveSubscription, RawSubscription};
 use alloy_json_rpc::{EthNotification, SerializedRequest, SubId};
 use alloy_primitives::B256;
 use bimap::BiBTreeMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Default)]
 pub(crate) struct SubscriptionManager {
@@ -9,6 +10,10 @@ pub(crate) struct SubscriptionManager {
     local_to_sub: BiBTreeMap<B256, ActiveSubscription>,
     /// Tracks the CURRENT server id for a subscription.
     local_to_server: BiBTreeMap<B256, SubId>,
+    /// Number of subscribe responses delivered per local id. Identical
+    /// requests share one subscription, so it stays open until each of them
+    /// has been released.
+    holders: BTreeMap<B256, usize>,
 }
 
 impl SubscriptionManager {
@@ -83,10 +88,28 @@ impl SubscriptionManager {
         self.local_to_server.insert(local_id, server_id);
     }
 
+    /// Record that a subscribe response for this local_id was delivered.
+    pub(crate) fn acquire(&mut self, local_id: B256) {
+        *self.holders.entry(local_id).or_default() += 1;
+    }
+
+    /// Release one holder of a subscription. Returns `true` if it was the last
+    /// one, in which case the caller should remove the subscription.
+    pub(crate) fn release(&mut self, local_id: B256) -> bool {
+        match self.holders.get_mut(&local_id) {
+            Some(count) if *count > 1 => {
+                *count -= 1;
+                false
+            }
+            _ => true,
+        }
+    }
+
     /// Remove a subscription by its local_id.
     pub(crate) fn remove_sub(&mut self, local_id: B256) {
         let _ = self.local_to_sub.remove_by_left(&local_id);
         let _ = self.local_to_server.remove_by_left(&local_id);
+        let _ = self.holders.remove(&local_id);
     }
 
     /// Notify the subscription channel of a new value, if the sub is known,

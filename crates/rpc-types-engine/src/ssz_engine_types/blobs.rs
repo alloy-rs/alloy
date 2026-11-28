@@ -1,4 +1,5 @@
 use super::*;
+use alloy_eips::eip7594::{BlobCellMask, CELLS_PER_EXT_BLOB};
 
 /// V1-V3 blob request container.
 ///
@@ -58,6 +59,9 @@ pub type BlobsV2Response = BlobsResponse<BlobAndProofV2>;
 pub type BlobsV3Response = BlobsResponse<BlobAndProofV2>;
 
 /// V4 partial cell-range response.
+///
+/// Use [`Self::encode_with_indices`] to encode compact JSON-RPC results for a REST response.
+/// The vector-only [`TryFrom`] preserves the input positions and cannot recover a request mask.
 pub type BlobsV4Response = BlobsResponse<BlobCellsAndProofs>;
 
 /// Blob cells and proofs with REST-SSZ optional cell positions.
@@ -164,5 +168,73 @@ impl TryFrom<Vec<Option<BlobCellsAndProofsV1>>> for BlobsV4Response {
                 BlobCellsAndProofs::default,
             )
         })
+    }
+}
+
+/// Error encoding a compact JSON-RPC blob response with its requested cell indices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, derive_more::Display)]
+#[non_exhaustive]
+pub enum BlobsV4ConversionError {
+    /// The response contains more entries than the REST endpoint permits.
+    #[display("too many blobs: expected at most {MAX_BLOBS_REQUEST}, got {_0}")]
+    TooManyBlobs(usize),
+    /// Cell and proof counts must match the mask and each missing cell must have a missing proof.
+    #[display("blob cells and proofs must match the requested indices and optional positions")]
+    InvalidBlobCellsAndProofs,
+}
+
+impl core::error::Error for BlobsV4ConversionError {}
+
+impl BlobsV4Response {
+    /// Encodes an `engine_getBlobsV4` result for the REST-SSZ endpoint using the request bitarray.
+    ///
+    /// The two lists of an available blob each contain 128 optionals indexed by cell number.
+    /// Missing blobs keep their empty contents. The encoder borrows the selected cells and proofs.
+    pub fn encode_with_indices(
+        values: &[Option<BlobCellsAndProofsV1>],
+        indices_bitarray: B128,
+    ) -> Result<Vec<u8>, BlobsV4ConversionError> {
+        use ssz::Encode;
+
+        // These borrowed fields have the wire layout of BlobCellsAndProofs and BlobsV4Response.
+        #[derive(Default, ssz_derive::Encode)]
+        struct Contents<'a> {
+            blob_cells: Vec<Optional<&'a Cell>>,
+            proofs: Vec<Optional<&'a Bytes48>>,
+        }
+        #[derive(ssz_derive::Encode)]
+        struct Response<'a> {
+            entries: Vec<(bool, Contents<'a>)>,
+        }
+
+        if values.len() > MAX_BLOBS_REQUEST {
+            return Err(BlobsV4ConversionError::TooManyBlobs(values.len()));
+        }
+        let mask = BlobCellMask::new(indices_bitarray);
+        let mut entries = Vec::with_capacity(values.len());
+        for value in values {
+            let Some(value) = value else {
+                entries.push((false, Contents::default()));
+                continue;
+            };
+            if value.blob_cells.len() != mask.count() || value.proofs.len() != mask.count() {
+                return Err(BlobsV4ConversionError::InvalidBlobCellsAndProofs);
+            }
+            let mut contents = Contents {
+                blob_cells: vec![Optional::none(); CELLS_PER_EXT_BLOB],
+                proofs: vec![Optional::none(); CELLS_PER_EXT_BLOB],
+            };
+            for (index, (cell, proof)) in
+                mask.selected_indices().zip(value.blob_cells.iter().zip(&value.proofs))
+            {
+                if cell.is_some() != proof.is_some() {
+                    return Err(BlobsV4ConversionError::InvalidBlobCellsAndProofs);
+                }
+                contents.blob_cells[index] = cell.as_ref().into();
+                contents.proofs[index] = proof.as_ref().into();
+            }
+            entries.push((true, contents));
+        }
+        Ok(Response { entries }.as_ssz_bytes())
     }
 }

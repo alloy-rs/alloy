@@ -10,6 +10,7 @@ use coins_bip39::{English, Entropy, Mnemonic, MnemonicError, WordCount, Wordlist
 use k256::ecdsa::SigningKey;
 use rand::Rng;
 use std::{
+    fmt,
     marker::PhantomData,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -22,7 +23,7 @@ const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 
 /// Represents a structure that can resolve into a `PrivateKeySigner`.
-#[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, PartialEq, Zeroize, ZeroizeOnDrop)]
 #[must_use = "builders do nothing unless `build` is called"]
 pub struct MnemonicBuilder<W: Wordlist = English> {
     /// The mnemonic phrase can be supplied to the builder as a string. A builder that has a valid
@@ -43,6 +44,19 @@ pub struct MnemonicBuilder<W: Wordlist = English> {
     write_to: Option<PathBuf>,
     /// PhantomData
     _wordlist: PhantomData<W>,
+}
+
+impl<W: Wordlist> fmt::Debug for MnemonicBuilder<W> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MnemonicBuilder")
+            .field("phrase", &self.phrase.as_ref().map(|_| "<redacted>"))
+            .field("word_count", &self.word_count)
+            .field("derivation_path", &self.derivation_path)
+            .field("password", &self.password.as_ref().map(|_| "<redacted>"))
+            .field("write_to", &self.write_to)
+            .field("_wordlist", &self._wordlist)
+            .finish()
+    }
 }
 
 impl<W: Wordlist> Default for MnemonicBuilder<W> {
@@ -561,6 +575,20 @@ mod tests {
                 .unwrap();
             assert_eq!(signer.address, expected.address);
         }
+    }
+
+    #[test]
+    fn debug_redacts_phrase_and_password() {
+        const PHRASE: &str = "test test test test test test test test test test test junk";
+        const PASSWORD: &str = "correct horse battery staple";
+
+        let builder = MnemonicBuilder::<English>::default().phrase(PHRASE).password(PASSWORD);
+        let dbg = format!("{builder:?}");
+        assert!(!dbg.contains(PHRASE), "{dbg}");
+        assert!(!dbg.contains(PASSWORD), "{dbg}");
+        assert!(dbg.contains(r#"phrase: Some("<redacted>")"#), "{dbg}");
+        assert!(dbg.contains(r#"password: Some("<redacted>")"#), "{dbg}");
+        assert!(dbg.contains("_wordlist: PhantomData<"), "{dbg}");
     }
 
     #[test]

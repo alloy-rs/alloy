@@ -1,5 +1,5 @@
 use super::*;
-use alloy_eips::eip4895::Withdrawal;
+use alloy_eips::{eip4895::Withdrawal, eip7594::CELLS_PER_EXT_BLOB};
 use alloy_primitives::{Address, Bloom, Bytes};
 use ssz::{Decode, Encode};
 
@@ -103,7 +103,7 @@ fn built_payloads_roundtrip() {
     assert_roundtrip(&BuiltPayloadParis { payload: payload_v1(), block_value: U256::from(1) });
     assert_roundtrip(&BuiltPayloadShanghai { payload: payload_v2(), block_value: U256::from(1) });
     assert_roundtrip(&BuiltPayloadCancun {
-        execution_payload: payload_v3(),
+        payload: payload_v3(),
         block_value: U256::from(1),
         blobs_bundle: BlobsBundleV1::empty(),
         should_override_builder: true,
@@ -129,6 +129,85 @@ fn built_payloads_roundtrip() {
         execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
         should_override_builder: true,
     });
+}
+
+#[test]
+fn cancun_built_payload_preserves_legacy_wire_format() {
+    for should_override_builder in [false, true] {
+        let mut payload = payload_v3();
+        payload.payload_inner.withdrawals = vec![Withdrawal::default(); 16];
+        payload.payload_inner.payload_inner.extra_data = vec![0; 32].into();
+        let legacy = LegacyBuiltPayloadCancun {
+            execution_payload: payload,
+            block_value: U256::from(42),
+            blobs_bundle: BlobsBundleV1::empty(),
+            should_override_builder,
+        };
+        let bytes = legacy.as_ssz_bytes();
+        let built = BuiltPayloadCancun::from(legacy.clone());
+        assert_eq!(built.as_ssz_bytes(), bytes);
+        assert_eq!(BuiltPayloadCancun::from_ssz_bytes(&bytes).unwrap(), built);
+        assert_eq!(LegacyBuiltPayloadCancun::from(built), legacy);
+    }
+}
+
+#[test]
+fn cancun_built_payload_accepts_transaction_limit() {
+    let mut payload = payload_v3();
+    payload.payload_inner.payload_inner.transactions = vec![Bytes::new(); MAX_TXS_PER_PAYLOAD];
+    let built = BuiltPayloadCancun {
+        payload,
+        block_value: U256::from(1),
+        blobs_bundle: BlobsBundleV1::empty(),
+        should_override_builder: false,
+    };
+    assert!(BuiltPayloadCancun::from_ssz_bytes(&built.as_ssz_bytes()).is_ok());
+}
+
+fn assert_cancun_built_payload_rejects(payload: ExecutionPayloadV3, field: &str) {
+    let legacy = LegacyBuiltPayloadCancun {
+        execution_payload: payload.clone(),
+        block_value: U256::from(1),
+        blobs_bundle: BlobsBundleV1::empty(),
+        should_override_builder: true,
+    };
+    let prague = BuiltPayloadPrague {
+        payload: payload.clone(),
+        block_value: legacy.block_value,
+        blobs_bundle: legacy.blobs_bundle.clone(),
+        execution_requests: Requests::default(),
+        should_override_builder: legacy.should_override_builder,
+    };
+    let submission =
+        ExecutionPayloadEnvelopeCancun { payload, parent_beacon_block_root: B256::ZERO };
+    assert!(BuiltPayloadPrague::from_ssz_bytes(&prague.as_ssz_bytes()).is_err());
+    assert!(ExecutionPayloadEnvelopeCancun::from_ssz_bytes(&submission.as_ssz_bytes()).is_err());
+
+    let Err(error) = BuiltPayloadCancun::from_ssz_bytes(&legacy.as_ssz_bytes()) else {
+        panic!("Cancun build response must reject an out-of-bounds execution payload");
+    };
+    assert!(matches!(error, ssz::DecodeError::BytesInvalid(message) if message.contains(field)));
+}
+
+#[test]
+fn cancun_built_payload_rejects_excess_withdrawals() {
+    let mut payload = payload_v3();
+    payload.payload_inner.withdrawals = vec![Withdrawal::default(); 17];
+    assert_cancun_built_payload_rejects(payload, "withdrawals");
+}
+
+#[test]
+fn cancun_built_payload_rejects_excess_extra_data() {
+    let mut payload = payload_v3();
+    payload.payload_inner.payload_inner.extra_data = vec![0; 33].into();
+    assert_cancun_built_payload_rejects(payload, "extra_data");
+}
+
+#[test]
+fn cancun_built_payload_rejects_excess_transactions() {
+    let mut payload = payload_v3();
+    payload.payload_inner.payload_inner.transactions = vec![Bytes::new(); MAX_TXS_PER_PAYLOAD + 1];
+    assert_cancun_built_payload_rejects(payload, "transactions");
 }
 
 #[test]
@@ -688,51 +767,91 @@ fn witness_response_roundtrips_for_valid_payload() {
         codes: vec![Bytes::from_static(&[4, 5])],
         headers: vec![Bytes::from_static(&[6])],
     };
-    let public_keys = vec![FixedBytes::repeat_byte(7), FixedBytes::repeat_byte(8)];
     let response = PayloadStatusWithWitness::new(
         witness_status(PayloadStatusKind::Valid),
         Some(witness.clone()),
-        public_keys.clone(),
     );
     assert_eq!(response.witness.as_ref(), Some(&witness));
-    assert_eq!(response.public_keys, public_keys);
 
-    // Three offsets, then the variable fields; public keys are concatenated without offsets.
     let bytes = response.as_ssz_bytes();
-    let keys_offset = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
-    assert_eq!(bytes.len() - keys_offset, 2 * 65);
+    assert_eq!(&bytes[..4], &8u32.to_le_bytes());
+    let witness_offset = 8 + response.payload_status.ssz_bytes_len();
+    assert_eq!(&bytes[4..8], &u32::try_from(witness_offset).unwrap().to_le_bytes());
     assert_roundtrip(&response);
 }
 
 #[test]
-fn witness_response_omits_witness_and_keys_for_non_valid_status() {
+fn witness_response_matches_spec_syncing_bytes() {
+    // Two outer offsets, then SYNCING with absent latest_valid_hash and validation_error.
+    let bytes = [8, 0, 0, 0, 17, 0, 0, 0, 2, 9, 0, 0, 0, 9, 0, 0, 0];
+    let expected = PayloadStatusWithWitness::new(witness_status(PayloadStatusKind::Syncing), None);
+    assert_eq!(PayloadStatusWithWitness::from_ssz_bytes(&bytes).unwrap(), expected);
+    assert_eq!(expected.as_ssz_bytes(), bytes);
+}
+
+#[test]
+fn witness_response_omits_witness_for_non_valid_status() {
     for status in
         [PayloadStatusKind::Invalid, PayloadStatusKind::Syncing, PayloadStatusKind::Accepted]
     {
         let response = PayloadStatusWithWitness::new(
             witness_status(status),
             Some(ExecutionWitness::default()),
-            vec![FixedBytes::ZERO],
         );
         assert!(response.witness.is_none());
-        assert!(response.public_keys.is_empty());
         assert_roundtrip(&response);
 
-        for response in [
-            PayloadStatusWithWitness {
-                payload_status: witness_status(status),
-                witness: Optional::some(ExecutionWitness::default()),
-                public_keys: vec![],
-            },
-            PayloadStatusWithWitness {
-                payload_status: witness_status(status),
-                witness: Optional::none(),
-                public_keys: vec![FixedBytes::ZERO],
-            },
-        ] {
-            assert!(PayloadStatusWithWitness::from_ssz_bytes(&response.as_ssz_bytes()).is_err());
-        }
+        let response = PayloadStatusWithWitness {
+            payload_status: witness_status(status),
+            witness: Optional::some(ExecutionWitness::default()),
+        };
+        assert_eq!(
+            PayloadStatusWithWitness::from_ssz_bytes(&response.as_ssz_bytes()),
+            Err(ssz::DecodeError::BytesInvalid(
+                "execution witness is only valid for VALID payload status".into(),
+            )),
+        );
     }
+}
+
+#[test]
+fn witness_response_requires_witness_for_valid_status() {
+    let response = PayloadStatusWithWitness::new(witness_status(PayloadStatusKind::Valid), None);
+    assert_eq!(
+        PayloadStatusWithWitness::from_ssz_bytes(&response.as_ssz_bytes()),
+        Err(ssz::DecodeError::BytesInvalid(
+            "VALID payload status requires an execution witness".into(),
+        )),
+    );
+}
+
+#[test]
+fn built_payload_witness_has_two_offsets_and_requires_witness() {
+    let response = BuiltPayloadWithWitness {
+        built_payload: BuiltPayloadAmsterdam {
+            payload: payload_v4(),
+            block_value: U256::from(1),
+            blobs_bundle: BlobsBundleV2::empty(),
+            execution_requests: Requests::from_requests([Bytes::from_static(&[2, 3])]),
+            should_override_builder: true,
+        },
+        witness: ExecutionWitness {
+            state: vec![Bytes::from_static(&[4, 5])],
+            codes: vec![Bytes::from_static(&[6])],
+            headers: vec![Bytes::from_static(&[7])],
+        },
+    };
+    let bytes = response.as_ssz_bytes();
+    let witness_offset = 8 + response.built_payload.ssz_bytes_len();
+    assert_eq!(&bytes[..4], &8u32.to_le_bytes());
+    assert_eq!(&bytes[4..8], &u32::try_from(witness_offset).unwrap().to_le_bytes());
+    assert_eq!(&bytes[8..witness_offset], response.built_payload.as_ssz_bytes());
+    assert_eq!(&bytes[witness_offset..], response.witness.as_ssz_bytes());
+    assert_roundtrip(&response);
+    assert_eq!(
+        BuiltPayloadWithWitness::from_ssz_bytes(&bytes[..witness_offset]),
+        Err(ssz::DecodeError::InvalidLengthPrefix { len: 0, expected: 4 }),
+    );
 }
 
 #[test]
@@ -754,4 +873,73 @@ fn witness_bounds() {
     ] {
         assert_eq!(ExecutionWitness::from_ssz_bytes(&witness.as_ssz_bytes()).is_ok(), valid);
     }
+}
+
+#[test]
+fn blob_v4_response_preserves_cell_indices() {
+    for indices in [
+        vec![],
+        vec![127],
+        vec![0, 7, 8, 63, 64, 127],
+        (0..CELLS_PER_EXT_BLOB).step_by(2).collect(),
+        (0..CELLS_PER_EXT_BLOB).collect(),
+    ] {
+        let mut bitarray = [0u8; 16];
+        let mut legacy = BlobCellsAndProofsV1::default();
+        let mut expected = BlobCellsAndProofs {
+            blob_cells: vec![Optional::none(); CELLS_PER_EXT_BLOB],
+            proofs: vec![Optional::none(); CELLS_PER_EXT_BLOB],
+        };
+        for (position, &index) in indices.iter().enumerate() {
+            bitarray[index / 8] |= 1 << (index % 8);
+            let byte = u8::try_from(index).unwrap();
+            let cell = (position != 1).then_some(Cell::repeat_byte(byte));
+            let proof = (position != 1).then_some(Bytes48::repeat_byte(byte));
+            legacy.blob_cells.push(cell);
+            legacy.proofs.push(proof);
+            expected.blob_cells[index] = cell.into();
+            expected.proofs[index] = proof.into();
+        }
+
+        let encoded =
+            BlobsV4Response::encode_with_indices(&[None, Some(legacy)], B128::new(bitarray))
+                .unwrap();
+        let expected = BlobsV4Response {
+            entries: vec![
+                BlobEntry { available: false, contents: BlobCellsAndProofs::default() },
+                BlobEntry { available: true, contents: expected },
+            ],
+        };
+        assert_eq!(encoded, expected.as_ssz_bytes(), "indices: {indices:?}");
+        assert_eq!(BlobsV4Response::from_ssz_bytes(&encoded).unwrap(), expected);
+    }
+}
+
+#[test]
+fn blob_v4_response_rejects_invalid_cells_and_proofs() {
+    let indices_bitarray = B128::from(1u128.to_le_bytes());
+    for (blob_cells, proofs) in [
+        (vec![], vec![]),
+        (vec![None; 2], vec![None; 2]),
+        (vec![None], vec![]),
+        (vec![], vec![None]),
+        (vec![Some(Cell::ZERO)], vec![None]),
+        (vec![None], vec![Some(Bytes48::ZERO)]),
+    ] {
+        assert_eq!(
+            BlobsV4Response::encode_with_indices(
+                &[Some(BlobCellsAndProofsV1 { blob_cells, proofs })],
+                indices_bitarray,
+            ),
+            Err(BlobsV4ConversionError::InvalidBlobCellsAndProofs),
+        );
+    }
+}
+
+#[test]
+fn blob_v4_response_rejects_too_many_blobs() {
+    assert_eq!(
+        BlobsV4Response::encode_with_indices(&vec![None; MAX_BLOBS_REQUEST + 1], B128::ZERO),
+        Err(BlobsV4ConversionError::TooManyBlobs(MAX_BLOBS_REQUEST + 1)),
+    );
 }

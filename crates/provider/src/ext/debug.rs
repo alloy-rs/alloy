@@ -613,7 +613,7 @@ mod test {
     use crate::{ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
-    use alloy_primitives::{address, U256};
+    use alloy_primitives::{address, b256, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
@@ -797,8 +797,6 @@ mod test {
     #[tokio::test]
     #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_debug_code_by_hash() {
-        use alloy_primitives::b256;
-
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();

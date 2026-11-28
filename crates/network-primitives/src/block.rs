@@ -15,7 +15,7 @@ use core::slice;
 /// an empty JSON array deserializes as `Full([])`, so that ambiguous case does not preserve which
 /// request form produced it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum BlockTransactions<T> {
     /// Full transactions
@@ -371,6 +371,261 @@ impl From<BlockTransactionsKind> for bool {
         match kind {
             BlockTransactionsKind::Full => true,
             BlockTransactionsKind::Hashes => false,
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use super::BlockTransactions;
+    use alloc::{vec, vec::Vec};
+    use alloy_primitives::B256;
+    use core::{fmt, marker::PhantomData};
+    use serde::{
+        de::{
+            value::{
+                BytesDeserializer, MapAccessDeserializer, SeqAccessDeserializer, StrDeserializer,
+            },
+            DeserializeSeed, Error, MapAccess, SeqAccess, Visitor,
+        },
+        Deserialize, Deserializer,
+    };
+
+    /// Deserializes without buffering the `transactions` array: the first element decides whether
+    /// the array holds full transactions or hashes, and the remaining elements must match.
+    impl<'de, T: Deserialize<'de>> Deserialize<'de> for BlockTransactions<T> {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            deserializer.deserialize_any(TransactionsVisitor(PhantomData))
+        }
+    }
+
+    struct TransactionsVisitor<T>(PhantomData<T>);
+
+    impl<'de, T: Deserialize<'de>> Visitor<'de> for TransactionsVisitor<T> {
+        type Value = BlockTransactions<T>;
+
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("a sequence of transactions or transaction hashes, or null")
+        }
+
+        fn visit_unit<E: Error>(self) -> Result<Self::Value, E> {
+            Ok(BlockTransactions::Uncle)
+        }
+
+        fn visit_none<E: Error>(self) -> Result<Self::Value, E> {
+            Ok(BlockTransactions::Uncle)
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            match seq.next_element_seed(FirstElement(PhantomData))? {
+                None => Ok(BlockTransactions::Full(Vec::new())),
+                Some(First::Tx(first)) => {
+                    let mut txs = vec![first];
+                    while let Some(tx) = seq.next_element()? {
+                        txs.push(tx);
+                    }
+                    Ok(BlockTransactions::Full(txs))
+                }
+                Some(First::Hash(first)) => {
+                    let mut hashes = vec![first];
+                    while let Some(hash) = seq.next_element()? {
+                        hashes.push(hash);
+                    }
+                    Ok(BlockTransactions::Hashes(hashes))
+                }
+            }
+        }
+    }
+
+    enum First<T> {
+        Tx(T),
+        Hash(B256),
+    }
+
+    struct FirstElement<T>(PhantomData<T>);
+
+    impl<'de, T: Deserialize<'de>> DeserializeSeed<'de> for FirstElement<T> {
+        type Value = First<T>;
+
+        fn deserialize<D: Deserializer<'de>>(
+            self,
+            deserializer: D,
+        ) -> Result<Self::Value, D::Error> {
+            deserializer.deserialize_any(self)
+        }
+    }
+
+    impl<'de, T: Deserialize<'de>> Visitor<'de> for FirstElement<T> {
+        type Value = First<T>;
+
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("a transaction object or a transaction hash")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+            T::deserialize(Element(MapAccessDeserializer::new(map))).map(First::Tx)
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
+            T::deserialize(Element(SeqAccessDeserializer::new(seq))).map(First::Tx)
+        }
+
+        fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+            B256::deserialize(StrDeserializer::<E>::new(v)).map(First::Hash)
+        }
+
+        fn visit_bytes<E: Error>(self, v: &[u8]) -> Result<Self::Value, E> {
+            B256::deserialize(BytesDeserializer::<E>::new(v)).map(First::Hash)
+        }
+    }
+
+    /// Handles the newtype and option hints that the `serde::de::value` adapters ignore.
+    struct Element<D>(D);
+
+    impl<'de, D: Deserializer<'de>> Deserializer<'de> for Element<D> {
+        type Error = D::Error;
+
+        fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, D::Error> {
+            self.0.deserialize_any(visitor)
+        }
+
+        fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, D::Error> {
+            visitor.visit_some(self)
+        }
+
+        fn deserialize_newtype_struct<V: Visitor<'de>>(
+            self,
+            _name: &'static str,
+            visitor: V,
+        ) -> Result<V::Value, D::Error> {
+            visitor.visit_newtype_struct(self)
+        }
+
+        fn deserialize_enum<V: Visitor<'de>>(
+            self,
+            name: &'static str,
+            variants: &'static [&'static str],
+            visitor: V,
+        ) -> Result<V::Value, D::Error> {
+            self.0.deserialize_enum(name, variants, visitor)
+        }
+
+        serde::forward_to_deserialize_any! {
+            bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+            bytes byte_buf unit unit_struct seq tuple tuple_struct map struct
+            identifier ignored_any
+        }
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+    use alloc::{
+        format,
+        string::{String, ToString},
+    };
+    use alloy_primitives::b256;
+
+    #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
+    struct Tx {
+        hash: B256,
+    }
+
+    const H1: &str = "0x1111111111111111111111111111111111111111111111111111111111111111";
+    const H2: &str = "0x2222222222222222222222222222222222222222222222222222222222222222";
+
+    fn tx(hash: &str) -> String {
+        format!(r#"{{"hash":"{hash}","nonce":"0x1"}}"#)
+    }
+
+    #[test]
+    fn deserializes_shapes() {
+        let hashes = BlockTransactions::<Tx>::Hashes(vec![
+            b256!("1111111111111111111111111111111111111111111111111111111111111111"),
+            b256!("2222222222222222222222222222222222222222222222222222222222222222"),
+        ]);
+        let json = format!(r#"["{H1}","{H2}"]"#);
+        assert_eq!(serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap(), hashes);
+
+        let json = format!("[{},{}]", tx(H1), tx(H2));
+        let full = serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap();
+        assert_eq!(
+            full,
+            BlockTransactions::Full(vec![
+                Tx { hash: B256::repeat_byte(0x11) },
+                Tx { hash: B256::repeat_byte(0x22) }
+            ])
+        );
+
+        let json = format!(r#"[["{H1}"]]"#);
+        let tuples = serde_json::from_str::<BlockTransactions<(B256,)>>(&json).unwrap();
+        assert_eq!(tuples, BlockTransactions::Full(vec![(B256::repeat_byte(0x11),)]));
+
+        let empty = serde_json::from_str::<BlockTransactions<Tx>>("[]").unwrap();
+        assert_eq!(empty, BlockTransactions::Full(vec![]));
+
+        let uncle = serde_json::from_str::<BlockTransactions<Tx>>("null").unwrap();
+        assert_eq!(uncle, BlockTransactions::Uncle);
+    }
+
+    #[test]
+    fn deserializes_wrapped_transactions() {
+        #[derive(Debug, PartialEq, serde::Deserialize)]
+        struct Wrapped(Tx);
+
+        #[derive(Debug, PartialEq, serde::Deserialize)]
+        struct WrappedTuple((B256,));
+
+        #[derive(Debug, PartialEq, serde::Deserialize)]
+        enum Tagged {
+            Legacy(Tx),
+        }
+
+        let json = format!("[{},{}]", tx(H1), tx(H2));
+        let expected = BlockTransactions::Full(vec![
+            Wrapped(Tx { hash: B256::repeat_byte(0x11) }),
+            Wrapped(Tx { hash: B256::repeat_byte(0x22) }),
+        ]);
+        assert_eq!(serde_json::from_str::<BlockTransactions<Wrapped>>(&json).unwrap(), expected);
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(serde_json::from_value::<BlockTransactions<Wrapped>>(value).unwrap(), expected);
+
+        let options = serde_json::from_str::<BlockTransactions<Option<Tx>>>(&json).unwrap();
+        assert_eq!(
+            options,
+            BlockTransactions::Full(vec![
+                Some(Tx { hash: B256::repeat_byte(0x11) }),
+                Some(Tx { hash: B256::repeat_byte(0x22) })
+            ])
+        );
+
+        let json = format!(r#"[["{H1}"]]"#);
+        let tuples = serde_json::from_str::<BlockTransactions<WrappedTuple>>(&json).unwrap();
+        assert_eq!(tuples, BlockTransactions::Full(vec![WrappedTuple((B256::repeat_byte(0x11),))]));
+
+        let json = format!(r#"[{{"Legacy":{}}}]"#, tx(H1));
+        let tagged = serde_json::from_str::<BlockTransactions<Tagged>>(&json).unwrap();
+        assert_eq!(
+            tagged,
+            BlockTransactions::Full(vec![Tagged::Legacy(Tx { hash: B256::repeat_byte(0x11) })])
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_shapes() {
+        let bad_tx = r#"{"hash":"0x12"}"#;
+        for json in [
+            format!("[{},\"{H2}\"]", tx(H1)),
+            format!("[\"{H1}\",{}]", tx(H2)),
+            format!("[{}, {bad_tx}]", tx(H1)),
+            format!("[{bad_tx}]"),
+            r#"["0x12"]"#.to_string(),
+            format!("[\"{H1}\",\"0x12\"]"),
+            "{}".to_string(),
+            format!("\"{H1}\""),
+        ] {
+            serde_json::from_str::<BlockTransactions<Tx>>(&json).unwrap_err();
         }
     }
 }
