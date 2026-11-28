@@ -519,6 +519,28 @@ mod tests {
         assert!(asserter.requests().is_empty());
     }
 
+    #[tokio::test]
+    async fn legacy_filler_requires_gas_limit_with_eip1559_fees() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_legacy_gas_estimation()
+            .connect_mocked_client(asserter.clone());
+        let tx = TransactionRequest {
+            max_fee_per_gas: Some(100),
+            max_priority_fee_per_gas: Some(2),
+            ..Default::default()
+        };
+
+        let err = provider.fill(tx.clone()).await.unwrap_err();
+        assert!(err.is_local_usage_error(), "{err}");
+
+        let tx = tx.gas_limit(21_000);
+        let filled = provider.fill(tx.clone()).await.unwrap();
+        assert_eq!(filled.as_builder(), Some(&tx));
+        assert!(asserter.requests().is_empty());
+    }
+
     async fn fill_eip1559_fees(
         max_fee_per_gas: Option<u128>,
         max_priority_fee_per_gas: Option<u128>,
