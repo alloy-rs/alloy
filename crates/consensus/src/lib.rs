@@ -146,4 +146,7 @@ pub mod private {
     pub use serde;
     #[cfg(feature = "serde")]
     pub use serde_json;
+
+    #[cfg(feature = "serde")]
+    pub use crate::receipt::deserialize_receipt_with_type;
 }

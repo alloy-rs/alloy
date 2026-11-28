@@ -17,7 +17,7 @@ use core::fmt;
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[doc(alias = "AnyTransactionReceiptEnvelope", alias = "AnyTxReceiptEnvelope")]
 pub struct AnyReceiptEnvelope<T = Log> {
     /// The receipt envelope.
@@ -32,6 +32,22 @@ impl<T> AnyReceiptEnvelope<T> {
     /// Returns whether this is a legacy receipt (type 0)
     pub const fn is_legacy(&self) -> bool {
         self.r#type == 0
+    }
+}
+
+/// Deserializes in a single pass over the object. Flattening the receipt would buffer every
+/// field of the object, twice for the fields of the receipt itself.
+#[cfg(feature = "serde")]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for AnyReceiptEnvelope<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct TypeValue(#[serde(with = "alloy_serde::quantity")] u8);
+
+        let (r#type, inner) = alloy_consensus::private::deserialize_receipt_with_type(
+            deserializer,
+            |ty: Option<TypeValue>| ty.map(|TypeValue(ty)| ty).ok_or("missing field `type`"),
+        )?;
+        Ok(Self { inner, r#type })
     }
 }
 
@@ -168,6 +184,9 @@ mod tests {
     use alloc::vec;
     use alloy_rlp::Header;
 
+    #[cfg(feature = "serde")]
+    use alloy_primitives::B256;
+
     fn envelope(ty: u8) -> AnyReceiptEnvelope {
         AnyReceiptEnvelope { inner: Default::default(), r#type: ty }
     }
@@ -226,5 +245,128 @@ mod tests {
             AnyReceiptEnvelope::network_decode(&mut tagged_network.as_slice()),
             Err(Eip2718Error::UnexpectedType(0))
         ));
+    }
+
+    /// Compares the envelope with the `#[serde(flatten)]` derive it used before, as text and as a
+    /// `Value`, alone and flattened.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deserialize_matches_flattened_derive() {
+        #[derive(serde::Deserialize)]
+        struct Flattened {
+            #[serde(flatten)]
+            inner: ReceiptWithBloom<Receipt<Log>>,
+            #[serde(rename = "type", with = "alloy_serde::quantity")]
+            ty: u8,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct Outer<R> {
+            #[serde(flatten)]
+            receipt: R,
+            #[serde(rename = "blockHash")]
+            _block_hash: Option<B256>,
+        }
+
+        const ROOT: &str = "0x284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10";
+        const LOG: &str =
+            r#"{"address":"0x0000000000000000000000000000000000000001","topics":[],"data":"0x01"}"#;
+
+        // Fields added to a receipt with `cumulativeGasUsed`, `logs` and `logsBloom`.
+        let cases = [
+            r#""type":"0x0","status":"0x1""#,
+            r#""type":"0x2","status":"0x0""#,
+            r#""type":"0x7e","root":"ROOT""#,
+            r#""type":"0xff","status":"0x1","root":"ROOT""#,
+            r#""type":2,"status":"0x1""#,
+            // `type` is required
+            r#""status":"0x1""#,
+            r#""type":null,"status":"0x1""#,
+            r#""type":"0x100","status":"0x1""#,
+            r#""type":true,"status":"0x1""#,
+            // status vs root
+            r#""type":"0x1""#,
+            r#""type":"0x1","status":"0x2""#,
+            r#""type":"0x1","status":"0x2","root":"ROOT""#,
+            r#""type":"0x1","status":"0x1","root":{"a":1}"#,
+            // unknown and escaped keys
+            r#""type":"0x1","status":"0x1","blockHash":"ROOT","gasUsed":"0x1","other":{"status":"0x0"}"#,
+            r#""\u0074ype":"0x1","stat\u0075s":"0x1","oth\u0065r":1"#,
+            // repeated keys
+            r#""type":"0x1","type":"0x1","status":"0x1""#,
+            r#""type":"0x1","status":"0x1","status":"0x1""#,
+            r#""type":"0x1","status":"0x1","status":"0x1","root":"ROOT""#,
+            r#""type":"0x1","status":"0x1","root":"ROOT","root":"0x1""#,
+            r#""type":"0x1","status":"0x1","logs":[]"#,
+            r#""type":"0x1","status":"0x1","logsBloom":"BLOOM""#,
+            r#""type":"0x1","status":"0x1","cumulativeGasUsed":"0x1""#,
+        ];
+        let documents = cases
+            .iter()
+            .map(|fields| {
+                format!(
+                    r#"{{"cumulativeGasUsed":"0x1","logs":[LOG],"logsBloom":"BLOOM",{fields}}}"#
+                )
+            })
+            // Not a receipt with all of its fields.
+            .chain([
+                r#"{"type":"0x1","status":"0x1","logs":[LOG],"logsBloom":"BLOOM"}"#.to_string(),
+                r#"{"type":"0x1","status":"0x1","cumulativeGasUsed":"0x1","logsBloom":"BLOOM"}"#
+                    .to_string(),
+                r#"{"type":"0x1","status":"0x1","cumulativeGasUsed":"0x1","logs":[LOG]}"#
+                    .to_string(),
+            ]);
+
+        let message =
+            |err: serde_json::Error| err.to_string().split(" at line ").next().unwrap().to_string();
+        let from_flattened = |flattened: Flattened| AnyReceiptEnvelope {
+            inner: flattened.inner,
+            r#type: flattened.ty,
+        };
+
+        let mut decoded = 0;
+        for json in documents {
+            let json = json
+                .replace("BLOOM", &Bloom::repeat_byte(0x11).to_string())
+                .replace("ROOT", ROOT)
+                .replace("LOG", LOG);
+
+            let expected =
+                serde_json::from_str::<Flattened>(&json).map(from_flattened).map_err(message);
+            decoded += usize::from(expected.is_ok());
+            assert_eq!(
+                serde_json::from_str::<AnyReceiptEnvelope>(&json).map_err(message),
+                expected,
+                "{json}"
+            );
+
+            // The receipt may be flattened into a larger object, which passes down all its keys.
+            assert_eq!(
+                serde_json::from_str::<Outer<AnyReceiptEnvelope>>(&json)
+                    .map(|outer| outer.receipt)
+                    .map_err(message),
+                serde_json::from_str::<Outer<Flattened>>(&json)
+                    .map(|outer| from_flattened(outer.receipt))
+                    .map_err(message),
+                "{json}"
+            );
+
+            let value = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+            assert_eq!(
+                serde_json::from_value::<AnyReceiptEnvelope>(value.clone()).map_err(message),
+                serde_json::from_value::<Flattened>(value).map(from_flattened).map_err(message),
+                "{json}"
+            );
+        }
+        assert_eq!(decoded, 11);
+
+        // Only objects are receipts, as for the derive.
+        for (json, unexpected) in [(r#"["0x1","0x1",[],"0x1"]"#, "sequence"), ("null", "null")] {
+            assert!(serde_json::from_str::<Flattened>(json).is_err());
+            assert_eq!(
+                serde_json::from_str::<AnyReceiptEnvelope>(json).map_err(message),
+                Err(format!("invalid type: {unexpected}, expected a receipt object"))
+            );
+        }
     }
 }

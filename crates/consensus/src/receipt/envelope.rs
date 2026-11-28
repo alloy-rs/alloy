@@ -70,88 +70,117 @@ pub enum ReceiptEnvelope<T = Log> {
 impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for ReceiptEnvelope<T> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
-        #[serde(field_identifier, rename_all = "camelCase")]
-        enum Field {
-            Type,
-            Status,
-            Root,
-            CumulativeGasUsed,
-            Logs,
-            LogsBloom,
-            #[serde(other)]
-            Ignore,
-        }
-
-        #[derive(serde::Deserialize)]
         struct TypeValue(#[serde(with = "alloy_serde::quantity::opt")] Option<u8>);
 
-        #[derive(serde::Deserialize)]
-        struct GasValue(#[serde(with = "alloy_serde::quantity")] u64);
+        let (ty, receipt) =
+            deserialize_receipt_with_type(deserializer, |ty: Option<TypeValue>| {
+                TxType::try_from(ty.and_then(|TypeValue(ty)| ty).unwrap_or(LEGACY_TX_TYPE_ID))
+            })?;
+        Ok(Self::from_typed(ty, receipt))
+    }
+}
 
-        struct EnvelopeVisitor<T>(PhantomData<fn() -> T>);
+/// Deserializes a receipt with its bloom and the `type` of its envelope in a single pass over the
+/// object, without buffering it.
+///
+/// `resolve_type` is called once all receipt fields are valid, with the value of the `type` key
+/// or `None` if the object has none. Its error is reported like the error of a field.
+#[cfg(feature = "serde")]
+#[doc(hidden)]
+pub fn deserialize_receipt_with_type<'de, D, T, V, Ty, E>(
+    deserializer: D,
+    resolve_type: impl FnOnce(Option<V>) -> Result<Ty, E>,
+) -> Result<(Ty, ReceiptWithBloom<Receipt<T>>), D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+    V: serde::Deserialize<'de>,
+    E: fmt::Display,
+{
+    #[derive(serde::Deserialize)]
+    #[serde(field_identifier, rename_all = "camelCase")]
+    enum Field {
+        Type,
+        Status,
+        Root,
+        CumulativeGasUsed,
+        Logs,
+        LogsBloom,
+        #[serde(other)]
+        Ignore,
+    }
 
-        impl<'de, T: serde::Deserialize<'de>> Visitor<'de> for EnvelopeVisitor<T> {
-            type Value = ReceiptEnvelope<T>;
+    #[derive(serde::Deserialize)]
+    struct GasValue(#[serde(with = "alloy_serde::quantity")] u64);
 
-            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.write_str("a receipt object")
-            }
+    struct ReceiptVisitor<T, V, F>(F, PhantomData<fn() -> (T, V)>);
 
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-                let mut ty = None;
-                let mut status = Eip658Fields::default();
-                let mut cumulative_gas_used = None;
-                let mut logs = None;
-                let mut logs_bloom = None;
+    impl<'de, T, V, Ty, E, F> Visitor<'de> for ReceiptVisitor<T, V, F>
+    where
+        T: serde::Deserialize<'de>,
+        V: serde::Deserialize<'de>,
+        E: fmt::Display,
+        F: FnOnce(Option<V>) -> Result<Ty, E>,
+    {
+        type Value = (Ty, ReceiptWithBloom<Receipt<T>>);
 
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Type => read_once(&mut ty, "type", &mut map)?,
-                        Field::Status => status.status.read(&mut map)?,
-                        Field::Root => status.root.read(&mut map)?,
-                        Field::CumulativeGasUsed => {
-                            read_once(&mut cumulative_gas_used, "cumulativeGasUsed", &mut map)?
-                        }
-                        Field::Logs => read_once(&mut logs, "logs", &mut map)?,
-                        Field::LogsBloom => read_once(&mut logs_bloom, "logsBloom", &mut map)?,
-                        Field::Ignore => {
-                            map.next_value::<IgnoredAny>()?;
-                        }
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("a receipt object")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+            let mut ty = None;
+            let mut status = Eip658Fields::default();
+            let mut cumulative_gas_used = None;
+            let mut logs = None;
+            let mut logs_bloom = None;
+
+            while let Some(key) = map.next_key()? {
+                match key {
+                    Field::Type => read_once(&mut ty, "type", &mut map)?,
+                    Field::Status => status.status.read(&mut map)?,
+                    Field::Root => status.root.read(&mut map)?,
+                    Field::CumulativeGasUsed => {
+                        read_once(&mut cumulative_gas_used, "cumulativeGasUsed", &mut map)?
+                    }
+                    Field::Logs => read_once(&mut logs, "logs", &mut map)?,
+                    Field::LogsBloom => read_once(&mut logs_bloom, "logsBloom", &mut map)?,
+                    Field::Ignore => {
+                        map.next_value::<IgnoredAny>()?;
                     }
                 }
-
-                let logs_bloom = logs_bloom.ok_or_else(|| Error::missing_field("logsBloom"))?;
-                let GasValue(cumulative_gas_used) =
-                    cumulative_gas_used.ok_or_else(|| Error::missing_field("cumulativeGasUsed"))?;
-                let logs = logs.ok_or_else(|| Error::missing_field("logs"))?;
-                let status = status.finish()?;
-
-                let ty = ty.and_then(|TypeValue(ty)| ty).unwrap_or(LEGACY_TX_TYPE_ID);
-                let ty = TxType::try_from(ty).map_err(Error::custom)?;
-                Ok(ReceiptEnvelope::from_typed(
-                    ty,
-                    ReceiptWithBloom {
-                        receipt: Receipt { status, cumulative_gas_used, logs },
-                        logs_bloom,
-                    },
-                ))
             }
-        }
 
-        fn read_once<'de, V: serde::Deserialize<'de>, A: MapAccess<'de>>(
-            slot: &mut Option<V>,
-            name: &'static str,
-            map: &mut A,
-        ) -> Result<(), A::Error> {
-            if slot.is_some() {
-                return Err(Error::duplicate_field(name));
-            }
-            *slot = Some(map.next_value()?);
-            Ok(())
-        }
+            let logs_bloom = logs_bloom.ok_or_else(|| Error::missing_field("logsBloom"))?;
+            let GasValue(cumulative_gas_used) =
+                cumulative_gas_used.ok_or_else(|| Error::missing_field("cumulativeGasUsed"))?;
+            let logs = logs.ok_or_else(|| Error::missing_field("logs"))?;
+            let status = status.finish()?;
 
-        deserializer.deserialize_map(EnvelopeVisitor(PhantomData))
+            let ty = (self.0)(ty).map_err(Error::custom)?;
+            Ok((
+                ty,
+                ReceiptWithBloom {
+                    receipt: Receipt { status, cumulative_gas_used, logs },
+                    logs_bloom,
+                },
+            ))
+        }
     }
+
+    fn read_once<'de, V: serde::Deserialize<'de>, A: MapAccess<'de>>(
+        slot: &mut Option<V>,
+        name: &'static str,
+        map: &mut A,
+    ) -> Result<(), A::Error> {
+        if slot.is_some() {
+            return Err(Error::duplicate_field(name));
+        }
+        *slot = Some(map.next_value()?);
+        Ok(())
+    }
+
+    deserializer.deserialize_map(ReceiptVisitor(resolve_type, PhantomData))
 }
 
 impl<T> ReceiptEnvelope<T> {

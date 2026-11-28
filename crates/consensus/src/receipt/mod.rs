@@ -6,6 +6,9 @@ use core::fmt;
 mod envelope;
 pub use envelope::ReceiptEnvelope;
 
+#[cfg(feature = "serde")]
+pub use envelope::deserialize_receipt_with_type;
+
 mod frame;
 pub use frame::FrameReceiptEnvelope;
 
