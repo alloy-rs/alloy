@@ -30,7 +30,7 @@ use alloy_eips::{
 /// mainnet chain ID `1` when [`Self::chain_id`] is absent.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TxRequest")]
 pub struct TransactionRequest {
@@ -145,12 +145,7 @@ pub struct TransactionRequest {
     /// Blob sidecar for EIP-4844 transactions.
     #[cfg_attr(
         feature = "serde",
-        serde(
-            default,
-            flatten,
-            skip_serializing_if = "Option::is_none",
-            deserialize_with = "deserialize_flattened_sidecar"
-        )
+        serde(default, flatten, skip_serializing_if = "Option::is_none")
     )]
     pub sidecar: Option<BlobTransactionSidecarVariant>,
     /// Authorization list for EIP-7702 transactions.
@@ -1763,47 +1758,180 @@ pub struct FillTransaction<T = TypedTransaction> {
     pub tx: T,
 }
 
-/// Deserializes the flattened [`TransactionRequest::sidecar`].
-///
-/// A flattened `Option<T>` turns every error of `T` into `None`, which would silently drop
-/// malformed blobs, commitments or proofs. Incomplete sidecars still give `None`, since clients
-/// such as viem send `blobs` without `commitments` and `proofs`. `proofs` and `cellProofs`
-/// together are an error, as they are for [`BlobTransactionSidecarVariant`].
+/// Deserializes a [`TransactionRequest`] from its fields, with [`TransactionInput`] and the blob
+/// sidecar inlined instead of flattened, so unknown fields are skipped rather than buffered.
 #[cfg(feature = "serde")]
-fn deserialize_flattened_sidecar<'de, D>(
-    deserializer: D,
-) -> Result<Option<BlobTransactionSidecarVariant>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    #[derive(serde::Deserialize)]
-    #[serde(transparent)]
-    struct Blobs(#[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")] Vec<Blob>);
+impl<'de> serde::Deserialize<'de> for TransactionRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let TransactionRequestFields {
+            from,
+            to,
+            gas_price,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
+            max_fee_per_blob_gas,
+            gas,
+            value,
+            input,
+            data,
+            nonce,
+            chain_id,
+            access_list,
+            transaction_type,
+            blob_versioned_hashes,
+            blobs,
+            commitments,
+            proofs,
+            cell_proofs,
+            authorization_list,
+        } = serde::Deserialize::deserialize(MapOnly(deserializer))?;
 
-    #[derive(serde::Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct SidecarFields {
-        blobs: Option<Blobs>,
-        commitments: Option<Vec<Bytes48>>,
-        proofs: Option<Vec<Bytes48>>,
-        cell_proofs: Option<Vec<Bytes48>>,
+        // Incomplete sidecars give `None`, since clients such as viem send `blobs` without
+        // `commitments` and `proofs`. `proofs` and `cellProofs` together are an error, as they are
+        // for [`BlobTransactionSidecarVariant`].
+        let sidecar = match (blobs, commitments, proofs, cell_proofs) {
+            (Some(Blobs(blobs)), Some(commitments), Some(proofs), None) => {
+                Some(BlobTransactionSidecar { blobs, commitments, proofs }.into())
+            }
+            (Some(Blobs(blobs)), Some(commitments), None, Some(cell_proofs)) => {
+                Some(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs }.into())
+            }
+            (_, _, Some(_), Some(_)) => {
+                return Err(serde::de::Error::custom(
+                    "Both 'cellProofs' and 'proofs' cannot be present",
+                ))
+            }
+            _ => None,
+        };
+
+        Ok(Self {
+            from,
+            to,
+            gas_price,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
+            max_fee_per_blob_gas,
+            gas,
+            value,
+            input: TransactionInput { input, data },
+            nonce,
+            chain_id,
+            access_list,
+            transaction_type,
+            blob_versioned_hashes,
+            sidecar,
+            authorization_list,
+        })
+    }
+}
+
+/// The fields of a [`TransactionRequest`] as encoded, with the same serde attributes.
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", expecting = "struct TransactionRequest")]
+struct TransactionRequestFields {
+    #[serde(default)]
+    from: Option<Address>,
+    #[serde(default)]
+    to: Option<TxKind>,
+    #[serde(default, with = "alloy_serde::quantity::opt")]
+    gas_price: Option<u128>,
+    #[serde(default, with = "alloy_serde::quantity::opt")]
+    max_fee_per_gas: Option<u128>,
+    #[serde(default, with = "alloy_serde::quantity::opt")]
+    max_priority_fee_per_gas: Option<u128>,
+    #[serde(default, with = "alloy_serde::quantity::opt")]
+    max_fee_per_blob_gas: Option<u128>,
+    #[serde(default, with = "alloy_serde::quantity::opt")]
+    gas: Option<u64>,
+    #[serde(default)]
+    value: Option<U256>,
+    #[serde(default)]
+    input: Option<Bytes>,
+    #[serde(default)]
+    data: Option<Bytes>,
+    #[serde(default, with = "alloy_serde::quantity::opt")]
+    nonce: Option<u64>,
+    #[serde(default, with = "alloy_serde::quantity::opt")]
+    chain_id: Option<ChainId>,
+    #[serde(default)]
+    access_list: Option<AccessList>,
+    #[serde(default, rename = "type", with = "alloy_serde::quantity::opt")]
+    transaction_type: Option<u8>,
+    #[serde(default)]
+    blob_versioned_hashes: Option<Vec<B256>>,
+    blobs: Option<Blobs>,
+    commitments: Option<Vec<Bytes48>>,
+    proofs: Option<Vec<Bytes48>>,
+    cell_proofs: Option<Vec<Bytes48>>,
+    #[serde(default)]
+    authorization_list: Option<Vec<SignedAuthorization>>,
+}
+
+/// Blobs of a sidecar, checked for length in debug builds.
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[serde(transparent)]
+struct Blobs(#[serde(deserialize_with = "alloy_eips::eip4844::deserialize_blobs")] Vec<Blob>);
+
+/// A [`serde::Deserializer`] that decodes a struct from a map only.
+///
+/// Derived struct impls also accept an array of the fields in order, which the
+/// `#[serde(flatten)]` derive [`TransactionRequest`] used before rejected. Asking for a map also
+/// leaves the entries in place when the request is flattened into another type, such as
+/// `WithOtherFields`: asking for a struct would remove them from the entries that type's other
+/// flattened fields see.
+#[cfg(feature = "serde")]
+struct MapOnly<D>(D);
+
+#[cfg(feature = "serde")]
+impl<'de, D: serde::Deserializer<'de>> serde::Deserializer<'de> for MapOnly<D> {
+    type Error = D::Error;
+
+    fn deserialize_any<V: serde::de::Visitor<'de>>(
+        self,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        self.0.deserialize_any(visitor)
     }
 
-    let fields = <SidecarFields as serde::Deserialize>::deserialize(deserializer)?;
-    Ok(match (fields.blobs, fields.commitments, fields.proofs, fields.cell_proofs) {
-        (Some(Blobs(blobs)), Some(commitments), Some(proofs), None) => {
-            Some(BlobTransactionSidecar { blobs, commitments, proofs }.into())
-        }
-        (Some(Blobs(blobs)), Some(commitments), None, Some(cell_proofs)) => {
-            Some(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs }.into())
-        }
-        (_, _, Some(_), Some(_)) => {
-            return Err(serde::de::Error::custom(
-                "Both 'cellProofs' and 'proofs' cannot be present",
-            ))
-        }
-        _ => None,
-    })
+    fn deserialize_struct<V: serde::de::Visitor<'de>>(
+        self,
+        _name: &'static str,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        self.0.deserialize_map(MapOnlyVisitor(visitor))
+    }
+
+    fn is_human_readable(&self) -> bool {
+        self.0.is_human_readable()
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes byte_buf
+        option unit unit_struct newtype_struct seq tuple tuple_struct map enum identifier
+        ignored_any
+    }
+}
+
+/// A [`serde::de::Visitor`] that passes only maps to the visitor it wraps.
+///
+/// Some formats ignore the map hint and visit a sequence, which a derived visitor accepts.
+#[cfg(feature = "serde")]
+struct MapOnlyVisitor<V>(V);
+
+#[cfg(feature = "serde")]
+impl<'de, V: serde::de::Visitor<'de>> serde::de::Visitor<'de> for MapOnlyVisitor<V> {
+    type Value = V::Value;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.0.expecting(formatter)
+    }
+
+    fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+        self.0.visit_map(map)
+    }
 }
 
 #[cfg(test)]
@@ -2380,6 +2508,298 @@ mod tests {
         let request: TransactionRequest = eip1559.clone().into();
         assert_eq!(request.to, Some(TxKind::Create));
         assert_eq!(request.build_1559().unwrap(), eip1559);
+    }
+    /// Compares [`TransactionRequest`]'s deserialization with the `#[serde(flatten)]` derive
+    /// it replaced.
+    #[cfg(feature = "serde")]
+    mod serde_flatten {
+        use super::*;
+        use arbitrary::{Arbitrary, Unstructured};
+        use rand::{rngs::StdRng, Rng, SeedableRng};
+        use serde::{
+            de::value::{self, SeqDeserializer},
+            Deserialize,
+        };
+        use similar_asserts::assert_eq;
+
+        /// [`TransactionRequest`] decoded by the `#[serde(flatten)]` derive it used before.
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase", expecting = "struct TransactionRequest")]
+        struct FlattenedTransactionRequest {
+            #[serde(default)]
+            from: Option<Address>,
+            #[serde(default)]
+            to: Option<TxKind>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            gas_price: Option<u128>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            max_fee_per_gas: Option<u128>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            max_priority_fee_per_gas: Option<u128>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            max_fee_per_blob_gas: Option<u128>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            gas: Option<u64>,
+            #[serde(default)]
+            value: Option<U256>,
+            #[serde(default, flatten)]
+            input: TransactionInput,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            nonce: Option<u64>,
+            #[serde(default, with = "alloy_serde::quantity::opt")]
+            chain_id: Option<ChainId>,
+            #[serde(default)]
+            access_list: Option<AccessList>,
+            #[serde(default, rename = "type", with = "alloy_serde::quantity::opt")]
+            transaction_type: Option<u8>,
+            #[serde(default)]
+            blob_versioned_hashes: Option<Vec<B256>>,
+            #[serde(default, flatten, deserialize_with = "deserialize_flattened_sidecar")]
+            sidecar: Option<BlobTransactionSidecarVariant>,
+            #[serde(default)]
+            authorization_list: Option<Vec<SignedAuthorization>>,
+        }
+
+        fn deserialize_flattened_sidecar<'de, D>(
+            deserializer: D,
+        ) -> Result<Option<BlobTransactionSidecarVariant>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct SidecarFields {
+                blobs: Option<Blobs>,
+                commitments: Option<Vec<Bytes48>>,
+                proofs: Option<Vec<Bytes48>>,
+                cell_proofs: Option<Vec<Bytes48>>,
+            }
+
+            let fields = <SidecarFields as serde::Deserialize>::deserialize(deserializer)?;
+            Ok(match (fields.blobs, fields.commitments, fields.proofs, fields.cell_proofs) {
+                (Some(Blobs(blobs)), Some(commitments), Some(proofs), None) => {
+                    Some(BlobTransactionSidecar { blobs, commitments, proofs }.into())
+                }
+                (Some(Blobs(blobs)), Some(commitments), None, Some(cell_proofs)) => {
+                    Some(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs }.into())
+                }
+                (_, _, Some(_), Some(_)) => {
+                    return Err(serde::de::Error::custom(
+                        "Both 'cellProofs' and 'proofs' cannot be present",
+                    ))
+                }
+                _ => None,
+            })
+        }
+
+        const KEYS: &[&str] = &[
+            "from",
+            "to",
+            "gasPrice",
+            "maxFeePerGas",
+            "maxPriorityFeePerGas",
+            "maxFeePerBlobGas",
+            "gas",
+            "value",
+            "input",
+            "data",
+            "nonce",
+            "chainId",
+            "accessList",
+            "type",
+            "blobVersionedHashes",
+            "blobs",
+            "commitments",
+            "proofs",
+            "cellProofs",
+            "authorizationList",
+            "",
+            "x",
+            "Input",
+            "DATA",
+        ];
+
+        /// Values that are invalid for most fields, or valid only for some.
+        const VALUES: &[&str] = &[
+            "null",
+            "0",
+            "1",
+            "-1",
+            "1.5",
+            "18446744073709551616",
+            "true",
+            "\"\"",
+            "\"0x\"",
+            "\"0x0\"",
+            "\"0x01\"",
+            "\"0xzz\"",
+            "[]",
+            "[0]",
+            "[[]]",
+            "{}",
+            "{\"a\":1}",
+        ];
+
+        /// Returns the error message without its position. The flattened derive reports errors in
+        /// buffered fields at the end of the object.
+        fn without_position(err: &serde_json::Error) -> String {
+            err.to_string().split(" at line ").next().unwrap().to_string()
+        }
+
+        fn decode_flattened(json: &str) -> Result<TransactionRequest, String> {
+            serde_json::from_str::<FlattenedTransactionRequest>(json)
+                .map(FlattenedTransactionRequest::into_request)
+                .map_err(|err| without_position(&err))
+        }
+
+        impl FlattenedTransactionRequest {
+            fn into_request(request: Self) -> TransactionRequest {
+                TransactionRequest {
+                    from: request.from,
+                    to: request.to,
+                    gas_price: request.gas_price,
+                    max_fee_per_gas: request.max_fee_per_gas,
+                    max_priority_fee_per_gas: request.max_priority_fee_per_gas,
+                    max_fee_per_blob_gas: request.max_fee_per_blob_gas,
+                    gas: request.gas,
+                    value: request.value,
+                    input: request.input,
+                    nonce: request.nonce,
+                    chain_id: request.chain_id,
+                    access_list: request.access_list,
+                    transaction_type: request.transaction_type,
+                    blob_versioned_hashes: request.blob_versioned_hashes,
+                    sidecar: request.sidecar,
+                    authorization_list: request.authorization_list,
+                }
+            }
+        }
+
+        fn decode(json: &str) -> Result<TransactionRequest, String> {
+            serde_json::from_str::<TransactionRequest>(json).map_err(|err| without_position(&err))
+        }
+
+        /// Returns the JSON text of `object` with entries replaced by [`VALUES`], removed,
+        /// duplicated, or added under one of [`KEYS`].
+        fn mutate_object(object: &serde_json::Value, rng: &mut StdRng) -> String {
+            let mut entries: Vec<(String, String)> = object
+                .as_object()
+                .unwrap()
+                .iter()
+                .map(|(key, value)| (key.clone(), value.to_string()))
+                .collect();
+            for _ in 0..rng.gen_range(0..16) {
+                let value = VALUES[rng.gen_range(0..VALUES.len())].to_string();
+                let len = entries.len();
+                match rng.gen_range(0..4) {
+                    0 if len > 0 => entries[rng.gen_range(0..len)].1 = value,
+                    1 if len > 0 => {
+                        entries.remove(rng.gen_range(0..len));
+                    }
+                    2 if len > 0 => entries.push(entries[rng.gen_range(0..len)].clone()),
+                    _ => entries.push((KEYS[rng.gen_range(0..KEYS.len())].to_string(), value)),
+                }
+            }
+            let fields: Vec<String> = entries
+                .iter()
+                .map(|(key, value)| format!("{}:{value}", serde_json::Value::from(key.as_str())))
+                .collect();
+            format!("{{{}}}", fields.join(","))
+        }
+
+        #[test]
+        fn matches_flattened_derive() {
+            // Arbitrary requests in a debug build need more than the default test stack.
+            std::thread::Builder::new()
+                .stack_size(16 << 20)
+                .spawn(matches_flattened_derive_inner)
+                .unwrap()
+                .join()
+                .unwrap();
+        }
+
+        fn matches_flattened_derive_inner() {
+            let mut rng = StdRng::seed_from_u64(0);
+            let mut bytes = vec![0u8; 4096];
+            for _ in 0..256 {
+                rng.fill(bytes.as_mut_slice());
+                let request =
+                    TransactionRequest::arbitrary(&mut Unstructured::new(&bytes)).unwrap();
+                let json = serde_json::to_string(&request).unwrap();
+                let decoded = decode(&json);
+                assert!(decoded.is_ok(), "{json}: {decoded:?}");
+                assert_eq!(decoded, decode_flattened(&json), "{json}");
+
+                let mutated = mutate_object(&serde_json::from_str(&json).unwrap(), &mut rng);
+                assert_eq!(decode(&mutated).ok(), decode_flattened(&mutated).ok(), "{mutated}");
+            }
+        }
+
+        #[test]
+        fn edge_cases_match_flattened_derive() {
+            let blob = format!("\"0x{}\"", "00".repeat(alloy_eips::eip4844::BYTES_PER_BLOB));
+            let bytes48 = format!("\"0x{}\"", "00".repeat(48));
+            let sidecar = |proofs: &str| {
+                format!(r#"{{"blobs":[{blob}],"commitments":[{bytes48}],"{proofs}":[{bytes48}]}}"#)
+            };
+            for json in [
+                "{}".to_string(),
+                r#"{"input":"0x01","data":"0x02","gas":21000,"value":1,"type":"0x2"}"#.to_string(),
+                r#"{"to":null,"chainId":"0x1","nonce":"0x1","x":[0,[],{}]}"#.to_string(),
+                r#"{"from":"0x0000000000000000000000000000000000000001","from":"0x0000000000000000000000000000000000000001"}"#.to_string(),
+                r#"{"input":"0x","input":"0x"}"#.to_string(),
+                r#"{"blobs":[],"commitments":[],"proofs":[]}"#.to_string(),
+                r#"{"blobs":[],"commitments":[],"cellProofs":[]}"#.to_string(),
+                r#"{"blobs":[],"commitments":[],"proofs":[],"cellProofs":[]}"#.to_string(),
+                r#"{"blobs":null,"commitments":[]}"#.to_string(),
+                r#"{"blobs":["0x00"],"commitments":[],"proofs":[]}"#.to_string(),
+                r#"{"gasPrice":"0x"}"#.to_string(),
+                sidecar("proofs"),
+                sidecar("cellProofs"),
+                "[null,null]".to_string(),
+                "null".to_string(),
+            ] {
+                assert_eq!(decode(&json), decode_flattened(&json), "{json}");
+            }
+            assert!(decode(&sidecar("proofs")).unwrap().sidecar.is_some());
+        }
+
+        /// [`TransactionRequest`] is flattened into other types, such as `WithOtherFields`.
+        #[test]
+        fn decodes_when_flattened() {
+            #[derive(serde::Deserialize)]
+            struct Outer {
+                #[serde(flatten)]
+                request: TransactionRequest,
+                #[serde(flatten)]
+                other: alloy_serde::OtherFields,
+            }
+            #[derive(serde::Deserialize)]
+            struct FlattenedOuter {
+                #[serde(flatten)]
+                request: FlattenedTransactionRequest,
+                #[serde(flatten)]
+                other: alloy_serde::OtherFields,
+            }
+            let json = r#"{"from":"0x0000000000000000000000000000000000000001","input":"0x01","blobs":[],"extra":1}"#;
+            let outer: Outer = serde_json::from_str(json).unwrap();
+            let flattened: FlattenedOuter = serde_json::from_str(json).unwrap();
+            assert_eq!(outer.request, FlattenedTransactionRequest::into_request(flattened.request));
+            assert_eq!(outer.other, flattened.other);
+        }
+
+        /// Formats that ignore the map hint, such as MessagePack, visit a sequence.
+        #[test]
+        fn rejects_sequence_without_map_hint() {
+            // One unit for each field, which decodes every field to `None`.
+            let fields = || SeqDeserializer::<_, value::Error>::new([(); 20].into_iter());
+            let err = TransactionRequest::deserialize(fields()).unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                "invalid type: sequence, expected struct TransactionRequest"
+            );
+            assert_eq!(FlattenedTransactionRequest::deserialize(fields()).err(), Some(err));
+        }
     }
 }
 
