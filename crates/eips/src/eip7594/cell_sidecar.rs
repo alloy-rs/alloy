@@ -19,38 +19,12 @@ use crate::{
 
 /// An EIP-7594 sidecar that keeps the same subset of cells for every blob.
 ///
+/// Each blob extends to [`CELLS_PER_EXT_BLOB`] cells, and any half of them rebuilds it, so eth/72
+/// nodes fetch only the cells their mask selects: the same columns for every blob.
+///
 /// All commitments and all [`CELLS_PER_EXT_BLOB`] proofs per blob are kept, so the transaction
 /// body can be served without its blobs. Cells are ordered by blob, then by ascending cell index.
 /// [`Self::new`] ensures the cell and proof counts match the commitments and the mask.
-///
-/// # Examples
-///
-/// ```
-/// use alloy_eips::eip7594::{
-///     BlobCellMask, BlobTransactionCellSidecar, BlobTransactionSidecarEip7594,
-/// };
-///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get();
-/// let full = BlobTransactionSidecarEip7594::try_from_blobs(vec![Default::default()])?;
-/// let all = BlobTransactionCellSidecar::try_from_sidecar(&full, settings)?;
-///
-/// // Keep the first half of the columns: enough to rebuild the blob.
-/// let half = BlobCellMask::ALL.first(64);
-/// let cells = all.matching_cells(half).expect("all cells are kept");
-/// let kept = BlobTransactionCellSidecar::new(
-///     all.commitments().to_vec(),
-///     all.proofs().to_vec(),
-///     cells,
-///     half,
-/// )
-/// .expect("counts match");
-///
-/// kept.validate(&full.versioned_hashes().collect::<Vec<_>>(), settings)?;
-/// assert_eq!(kept.recover(settings)?, full);
-/// # Ok(())
-/// # }
-/// ```
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BlobTransactionCellSidecar {
     // One commitment per blob.
@@ -215,6 +189,35 @@ impl BlobTransactionCellSidecar {
     /// Returns [`BlobCellRecoveryError::InsufficientCells`] if fewer than half of the columns
     /// are kept, and [`BlobCellRecoveryError::CommitmentMismatch`] if a rebuilt blob does not
     /// match its commitment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use alloy_eips::eip7594::{
+    ///     BlobCellMask, BlobTransactionCellSidecar, BlobTransactionSidecarEip7594,
+    /// };
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get();
+    /// let full = BlobTransactionSidecarEip7594::try_from_blobs(vec![Default::default()])?;
+    /// let all = BlobTransactionCellSidecar::try_from_sidecar(&full, settings)?;
+    ///
+    /// // Keep the first half of the columns: enough to rebuild the blob.
+    /// let half = BlobCellMask::ALL.first(64);
+    /// let cells = all.matching_cells(half).expect("all cells are kept");
+    /// let kept = BlobTransactionCellSidecar::new(
+    ///     all.commitments().to_vec(),
+    ///     all.proofs().to_vec(),
+    ///     cells,
+    ///     half,
+    /// )
+    /// .expect("counts match");
+    ///
+    /// kept.validate(&full.versioned_hashes().collect::<Vec<_>>(), settings)?;
+    /// assert_eq!(kept.recover(settings)?, full);
+    /// # Ok(())
+    /// # }
+    /// ```
     #[cfg(feature = "kzg")]
     pub fn recover(
         &self,
